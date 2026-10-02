@@ -81,6 +81,8 @@ def _save_stub(manager, monkeypatch, item=None, project_choice=..., texts=None):
     stub.group_var = entry("")
     stub.category_var = entry("")
     stub.planned_minutes_entry = entry("")
+    stub.depth_var = entry("")
+    stub.work_block_var = entry("")
     stub.weekly_tactic_start_var = entry("")
     stub.week_action_id = None
     stub.pending_weekly_tactic_id = None

@@ -182,6 +182,8 @@ def _stamp_stub(value):
         group_var=entry(""),
         category_var=entry(""),
         planned_minutes_entry=entry(""),
+        depth_var=entry(""),
+        work_block_var=entry(""),
         weekly_tactic_start_var=entry(value),
         logger=SimpleNamespace(
             warning=lambda *a, **k: warnings.append(a),

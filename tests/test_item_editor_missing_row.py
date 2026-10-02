@@ -51,6 +51,8 @@ def _stub(manager, item_id, item, texts):
         group_var=_entry(""),
         category_var=_entry(""),
         planned_minutes_entry=_entry(""),
+        depth_var=_entry(""),
+        work_block_var=_entry(""),
         weekly_tactic_start_var=_entry(""),
         week_action_id=None,
         pending_weekly_tactic_id=None,
