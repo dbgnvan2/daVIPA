@@ -7,6 +7,8 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-02
+
 ### Added
 
 - **Depth and Work Block on action items.** Two new scheduling hints set on the
