@@ -210,11 +210,11 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
                 start_date, due_date,
                 original_due_date, is_meeting, meeting_start_time,
                 importance, urgency, size, value, priority_score,
-                "group", category, planned_minutes, status, completed_at,
+                "group", category, planned_minutes, depth, work_block, status, completed_at,
                 week_action_id, annual_plan_element_id, item_type, segment_description_id, is_habit, percent_complete,
                 today_pin_rank, weekly_tactic_start_date,
                 created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             item.id, item.who, item.contact_id, item.parent_id, item.weekly_tactic_id, item.title, item.description,
             item.next_action, item.deliverable,
@@ -222,7 +222,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             item.meeting_start_time,
             item.importance, item.urgency, item.size, item.value,
             item.priority_score, item.group, item.category,
-            item.planned_minutes, item.status, item.completed_at,
+            item.planned_minutes, item.depth, item.work_block, item.status, item.completed_at,
             item.week_action_id, item.annual_plan_element_id, item.item_type, item.segment_description_id, 1 if item.is_habit else 0,
             item.percent_complete,
             item.today_pin_rank, item.weekly_tactic_start_date,
@@ -410,7 +410,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
                 start_date = ?, due_date = ?, original_due_date = ?, is_meeting = ?, meeting_start_time = ?,
                 importance = ?, urgency = ?, size = ?, value = ?,
                 priority_score = ?, "group" = ?, category = ?,
-                planned_minutes = ?, status = ?, completed_at = ?,
+                planned_minutes = ?, depth = ?, work_block = ?, status = ?, completed_at = ?,
                 week_action_id = ?, annual_plan_element_id = ?, item_type = ?, segment_description_id = ?, is_habit = ?, percent_complete = ?,
                 today_pin_rank = ?, weekly_tactic_start_date = ?,
                 updated_at = ?
@@ -422,7 +422,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             item.meeting_start_time,
             item.importance, item.urgency, item.size, item.value,
             item.priority_score, item.group, item.category,
-            item.planned_minutes, item.status, item.completed_at,
+            item.planned_minutes, item.depth, item.work_block, item.status, item.completed_at,
             item.week_action_id, item.annual_plan_element_id, item.item_type, item.segment_description_id, 1 if item.is_habit else 0,
             item.percent_complete,
             item.today_pin_rank, item.weekly_tactic_start_date,
@@ -1976,6 +1976,16 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         except (KeyError, IndexError):
             deliverable = None
 
+        try:
+            depth = row["depth"]
+        except (KeyError, IndexError):
+            depth = None
+
+        try:
+            work_block = row["work_block"]
+        except (KeyError, IndexError):
+            work_block = None
+
         return ActionItem(
             id=row["id"],
             who=row["who"],
@@ -2000,6 +2010,8 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             group=row["group"],
             category=row["category"],
             planned_minutes=row["planned_minutes"],
+            depth=depth,
+            work_block=work_block,
             status=row["status"],
             completed_at=row["completed_at"],
             week_action_id=week_action_id,

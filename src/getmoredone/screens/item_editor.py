@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, date
 from typing import Optional, TYPE_CHECKING, Dict, Any, Tuple, List
 
 from ..utils.after_tracker import TrackedAfterMixin
-from ..models import ActionItem, PriorityFactors, ItemLink, Status
+from ..models import ActionItem, PriorityFactors, ItemLink, Status, SchedulingOptions
 from .week_collision_notice import notify_weekly_tactic_changes
 from .. import week_calendar
 from .. import weekly_tactic_titles
@@ -269,14 +269,33 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
 
         # WT-M3.A.3 — the original-week stamp, editable by hand (WT-D3).
         ctk.CTkLabel(plan_frame, text="Orig. Week:").grid(
-            row=3, column=0, sticky="w", padx=(10, 5), pady=(2, 8))
+            row=3, column=0, sticky="w", padx=(10, 5), pady=(2, 2))
         self.weekly_tactic_start_var = ctk.StringVar()
         self.weekly_tactic_start_entry = ctk.CTkEntry(
             plan_frame, width=120, textvariable=self.weekly_tactic_start_var,
             placeholder_text="YYYY-MM-DD",
         )
         self.weekly_tactic_start_entry.grid(
-            row=3, column=1, sticky="w", padx=(0, 10), pady=(2, 8))
+            row=3, column=1, sticky="w", padx=(0, 10), pady=(2, 2))
+
+        # Depth and Work Block — read-only echoes of the Priority tab. They sit
+        # here so the whole scheduling picture (Project, Wk Tactic, Orig. Week,
+        # Depth, Work Block) is visible without opening a tab.
+        ctk.CTkLabel(plan_frame, text="Depth:").grid(
+            row=4, column=0, sticky="w", padx=(10, 5), pady=2)
+        self.depth_label = ctk.CTkLabel(
+            plan_frame, text="(none)", anchor="w",
+            text_color=status_text_color("muted"),
+        )
+        self.depth_label.grid(row=4, column=1, sticky="ew", padx=(0, 10), pady=2)
+
+        ctk.CTkLabel(plan_frame, text="Work Block:").grid(
+            row=5, column=0, sticky="w", padx=(10, 5), pady=(2, 8))
+        self.work_block_label = ctk.CTkLabel(
+            plan_frame, text="(none)", anchor="w",
+            text_color=status_text_color("muted"),
+        )
+        self.work_block_label.grid(row=5, column=1, sticky="ew", padx=(0, 10), pady=(2, 8))
         row_l += 1
 
         self.refresh_weekly_tactic_display()
@@ -506,6 +525,37 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
             
         self.priority_label = ctk.CTkLabel(tab, text="Score: 0", font=ctk.CTkFont(weight="bold", size=14))
         self.priority_label.grid(row=r, column=0, columnspan=2, pady=10)
+        r += 1
+
+        # Depth — how much focus this task needs.
+        ctk.CTkLabel(tab, text="Depth:").grid(row=r, column=0, sticky="w", padx=10, pady=5)
+        self.depth_var = ctk.StringVar()
+        self.depth_combo = ctk.CTkComboBox(
+            tab, values=SchedulingOptions.DEPTH, variable=self.depth_var,
+            command=lambda _: self._refresh_scheduling_display(),
+            **combo_box_style())
+        self.depth_combo.grid(row=r, column=1, sticky="ew", padx=5, pady=5)
+        r += 1
+
+        # Work Block — the time-box to schedule on the calendar.
+        ctk.CTkLabel(tab, text="Work Block:").grid(row=r, column=0, sticky="w", padx=10, pady=5)
+        self.work_block_var = ctk.StringVar()
+        self.work_block_combo = ctk.CTkComboBox(
+            tab,
+            values=[SchedulingOptions.format_work_block(m) for m in SchedulingOptions.WORK_BLOCK_MINUTES],
+            variable=self.work_block_var,
+            command=lambda _: self._refresh_scheduling_display(),
+            **combo_box_style())
+        self.work_block_combo.grid(row=r, column=1, sticky="ew", padx=5, pady=5)
+        r += 1
+
+        # Schedule on Calendar — the same action as the Dates tab's button, so
+        # the scheduling hint and the button that acts on it sit together.
+        self.btn_schedule_calendar = ctk.CTkButton(
+            tab, text="📅 Schedule on Calendar", command=self.create_calendar_event,
+            **button_style("secondary"))
+        self.btn_schedule_calendar.grid(
+            row=r, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 5))
 
     def _setup_org_tab(self, tab):
         tab.grid_columnconfigure(1, weight=1)
@@ -943,6 +993,13 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
         if self.item.planned_minutes is not None:
             self.planned_minutes_entry.insert(
                 0, str(self.item.planned_minutes))
+
+        # Depth and Work Block (Priority tab + Action Plan echo)
+        if self.item.depth:
+            self.depth_var.set(self.item.depth)
+        if self.item.work_block is not None:
+            self.work_block_var.set(SchedulingOptions.format_work_block(self.item.work_block))
+        self._refresh_scheduling_display()
 
         # WT-M6.A — the Weekly Tactic display and its original-week stamp.
         if self.item.weekly_tactic_start_date:
@@ -1501,6 +1558,15 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
             text=f"{score} ({importance}×{urgency}×{size}×{value})"
         )
 
+    def _refresh_scheduling_display(self):
+        """Mirror the Priority tab's Depth/Work Block onto the Action Plan block."""
+        depth = self.depth_var.get().strip()
+        self.depth_label.configure(text=depth or "(none)")
+
+        work_block = SchedulingOptions.parse_work_block(self.work_block_var.get())
+        self.work_block_label.configure(
+            text=SchedulingOptions.format_work_block(work_block) or "(none)")
+
     def _start_sash_drag(self, event):
         """Begin dragging the sash between the left and right columns."""
         self._sash_start_x = event.x_root
@@ -1784,9 +1850,13 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
         if not self.save_item_if_needed():
             return
 
-        # Open calendar dialog
+        # Open calendar dialog. Pre-fill its Duration from the Work Block the
+        # user has chosen on the Priority tab (the current combo value, so an
+        # unsaved choice is honoured); None when no Work Block is set.
         from .calendar_dialog import CalendarEventDialog
-        dialog = CalendarEventDialog(self, self.db_manager, self.item_id)
+        default_duration = SchedulingOptions.parse_work_block(self.work_block_var.get())
+        dialog = CalendarEventDialog(self, self.db_manager, self.item_id,
+                                     default_duration_minutes=default_duration)
         dialog.wait_window()
 
         # Refresh item data and notes display to show the new calendar link

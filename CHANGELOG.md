@@ -7,6 +7,14 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Depth and Work Block on action items.** Two new scheduling hints set on the
+  editor's **Priority** tab — **Depth** (Deep, Medium, Shallow) and **Work Block**
+  (90, 60, or 30 minutes). Both echo in the **Action Plan** block beside Project,
+  Wk Tactic, and Orig. Week. A **Schedule on Calendar** button on the same tab
+  opens the calendar dialog with its Duration pre-filled from the Work Block.
+
 ## [0.3.1] - 2026-08-28
 
 ### Added

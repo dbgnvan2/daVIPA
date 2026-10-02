@@ -60,6 +60,12 @@ class ActionItem:
     group: Optional[str] = None
     category: Optional[str] = None
     planned_minutes: Optional[int] = None
+    # Depth (how much focus this task needs) and Work Block (the time-box to
+    # schedule on the calendar). Both are advisory scheduling hints set on the
+    # Priority tab; Depth is one of "Deep" | "Medium" | "Shallow", Work Block is
+    # a number of minutes (90 | 60 | 30).
+    depth: Optional[str] = None
+    work_block: Optional[int] = None
     status: str = "open"
     completed_at: Optional[str] = None
     week_action_id: Optional[str] = None  # References week_actions.id for VSP integration
@@ -307,6 +313,35 @@ class PriorityFactors:
         "M": 4,
         "S": 2
     }
+
+
+# Depth / Work Block option constants
+class SchedulingOptions:
+    """Valid options for the Depth and Work Block fields."""
+
+    DEPTH = ["Deep", "Medium", "Shallow"]
+    WORK_BLOCK_MINUTES = [90, 60, 30]
+
+    @staticmethod
+    def format_work_block(minutes: Optional[int]) -> str:
+        """Format a Work Block in minutes for display, e.g. ``90 min``."""
+        return f"{minutes} min" if minutes is not None else ""
+
+    @staticmethod
+    def parse_work_block(text: str) -> Optional[int]:
+        """Parse a Work Block combo value back to minutes, or None.
+
+        Tolerates the ``min``/``minutes`` suffix the combo shows (and any stray
+        whitespace), so a value typed by hand is read the same as one picked
+        from the list.
+        """
+        cleaned = (text or "").strip().lower().replace("min", "").strip()
+        if not cleaned:
+            return None
+        try:
+            return int(cleaned)
+        except ValueError:
+            return None
 
 
 # Status constants

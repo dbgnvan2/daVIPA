@@ -19,7 +19,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from ..models import ActionItem
+from ..models import ActionItem, SchedulingOptions
 from ..validation import Validator
 from .week_collision_notice import notify_weekly_tactic_changes
 
@@ -69,6 +69,10 @@ class ItemEditorFormMixin:
         # Planned minutes
         planned_text = self.planned_minutes_entry.get().strip()
         item.planned_minutes = int(planned_text) if planned_text else None
+
+        # Depth and Work Block (Priority tab)
+        item.depth = self.depth_var.get().strip() or None
+        item.work_block = SchedulingOptions.parse_work_block(self.work_block_var.get())
 
         # WT-M6.A.3 — the hand-edited original-week stamp (WT-D3). Blank clears
         # it; anything unparseable is left as it was rather than writing a date

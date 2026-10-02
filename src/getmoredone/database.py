@@ -184,6 +184,9 @@ class Database:
                 category          TEXT,
 
                 planned_minutes   INTEGER,
+                -- Depth and Work Block: advisory focus/time-box scheduling hints.
+                depth             TEXT,
+                work_block        INTEGER,
                 -- RP-2.1: the crisp "done = ..." definition of this task. A
                 -- checkable artifact, not a time-box.
                 deliverable       TEXT,
@@ -600,6 +603,20 @@ class Database:
             conn.execute("""
                 ALTER TABLE action_items
                 ADD COLUMN deliverable TEXT
+            """)
+
+        # Depth and Work Block: advisory scheduling hints set on the Priority
+        # tab. Nullable — an item that predates the fields simply has no hint.
+        if 'depth' not in columns:
+            conn.execute("""
+                ALTER TABLE action_items
+                ADD COLUMN depth TEXT
+            """)
+
+        if 'work_block' not in columns:
+            conn.execute("""
+                ALTER TABLE action_items
+                ADD COLUMN work_block INTEGER
             """)
 
         # RP-2.2a — the work_logs audit trail. Each ALTER is guarded

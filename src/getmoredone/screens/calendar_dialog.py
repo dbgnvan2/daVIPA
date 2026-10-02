@@ -44,13 +44,18 @@ def missing_credentials_message() -> str:
 class CalendarEventDialog(ctk.CTkToplevel):
     """Dialog for creating a Google Calendar event."""
 
-    def __init__(self, parent, db_manager: 'DatabaseManager', item_id: str):
+    def __init__(self, parent, db_manager: 'DatabaseManager', item_id: str,
+                 default_duration_minutes: Optional[int] = None):
         super().__init__(parent)
 
         self.db_manager = db_manager
         self.item_id = item_id
         self.item = db_manager.get_action_item(item_id)
         self.result = None  # Will store the calendar link if successful
+        # Pre-fill the event Duration from the item's Work Block when one is
+        # chosen (the Priority tab's "Schedule on Calendar" path passes it);
+        # None means "leave the default".
+        self.default_duration_minutes = default_duration_minutes
 
         if not self.item:
             self.destroy()
@@ -133,9 +138,10 @@ class CalendarEventDialog(ctk.CTkToplevel):
         self.ampm_combo.grid(row=0, column=4, padx=5, pady=5)
 
         # Duration
+        default_duration = self.default_duration_minutes if self.default_duration_minutes else 60
         ctk.CTkLabel(time_frame, text="Duration:").grid(row=0, column=5, sticky="w", padx=(20, 5), pady=5)
-        self.duration_entry = ctk.CTkEntry(time_frame, width=60, placeholder_text="60")
-        self.duration_entry.insert(0, "60")
+        self.duration_entry = ctk.CTkEntry(time_frame, width=60, placeholder_text=str(default_duration))
+        self.duration_entry.insert(0, str(default_duration))
         self.duration_entry.grid(row=0, column=6, padx=2, pady=5)
         ctk.CTkLabel(time_frame, text="minutes").grid(row=0, column=7, sticky="w", padx=2, pady=5)
 

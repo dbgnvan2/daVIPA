@@ -465,6 +465,10 @@ Action Plan (top left):
   Set it with **Set Wk Tactic**.
 - **Orig. Week** — What: The week the item was originally meant to start. Why: A task pushed
   out repeatedly still shows where it began.
+- **Depth** — What: How much focus this task needs — Deep, Medium, or Shallow. Why: Set
+  on the Priority tab; echoed here so the whole scheduling picture is visible at once.
+- **Work Block** — What: The time-box to schedule on the calendar (90, 60, or 30 minutes).
+  Why: A ready duration for the calendar button.
 
 Tabs:
 
@@ -477,6 +481,9 @@ Dates:
 
 Priority:
 - **Importance, Urgency, Effort-Cost, Value** — What: Priority factors. Why: Compute priority score and compare items.
+- **Depth** — What: How much focus this task needs (Deep, Medium, Shallow). Why: Match the task to your energy.
+- **Work Block** — What: The time-box to schedule (90, 60, or 30 minutes). Why: A ready duration for scheduling.
+- **Schedule on Calendar** — What: Opens the calendar event dialog for this item, with its Duration pre-filled from Work Block. Why: Put the work block on your calendar from the same tab.
 
 Organization:
 - **Group, Category** — What: Organizational labels. Why: Filter and report by area.
