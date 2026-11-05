@@ -8,9 +8,15 @@ Goal:
 
 daVIPA chooses its SQLite database in this order:
 1) Explicit db path passed by the caller (rare)
-2) Environment variable: `GETMOREDONE_DB`
-3) Default (production):
+2) Environment variable: `GETMOREDONE_DB` — one specific database file
+3) Environment variable: `GETMOREDONE_DATA_DIR` — the whole data directory;
+   the database is `<data dir>/getmoredone.db`
+4) Default (production):
    `~/Library/Application Support/GetMoreDone/getmoredone.db`
+
+`GETMOREDONE_DATA_DIR` moves the settings file, `app.lock` and the
+weekly-tactic log as well, which `GETMOREDONE_DB` does not. That is what a
+second instance needs: see [DEMO_INSTALL.md](DEMO_INSTALL.md).
 
 ## Recommended setup
 
@@ -19,7 +25,15 @@ daVIPA chooses its SQLite database in this order:
 Use the repo-local database:
 - `/Users/davemini2/ProjectsLocal/daVIPA/data/getmoredone.db`
 
-`start.sh` and `start.bat` default to this DB automatically unless you override `GETMOREDONE_DB`.
+Set `GETMOREDONE_DB` to it. The two launchers do **not** agree on a default,
+so do not rely on one:
+
+- `start.bat` defaults to the repo-local `data\getmoredone.db`.
+- `start.sh` defaults to the **production** Application Support database, and
+  only when neither `GETMOREDONE_DB` nor `GETMOREDONE_DATA_DIR` is set.
+
+(This section used to say both scripts defaulted to the repo-local database.
+They never did.)
 
 ### Prod (installed)
 
@@ -27,6 +41,12 @@ Use the Application Support database:
 - `~/Library/Application Support/GetMoreDone/getmoredone.db`
 
 Do **not** set `GETMOREDONE_DB` for the prod app.
+
+## Demo instance
+
+A third arrangement: a demo install with throwaway data, running at the same
+time as the real one. `./start-demo.sh`, documented in
+[DEMO_INSTALL.md](DEMO_INSTALL.md).
 
 ## Gmail importer
 

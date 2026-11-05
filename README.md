@@ -79,6 +79,17 @@ The startup script automatically:
 - Installs/updates dependencies
 - Launches the application
 
+### A demo instance alongside your real one
+
+```bash
+./start-demo.sh
+```
+
+Runs a second, fully isolated instance — its own database, settings, lock and
+logs under `~/Library/Application Support/GetMoreDone-Demo/` — seeded with
+sample items on its first launch, while the installed app keeps running on your
+real data. See [docs/DEMO_INSTALL.md](docs/DEMO_INSTALL.md).
+
 ### Manual Setup
 
 If you prefer to run commands individually:

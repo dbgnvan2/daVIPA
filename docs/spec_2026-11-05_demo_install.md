@@ -170,9 +170,10 @@ Acceptance: `test_d4_seed_writes_only_into_the_target_database`.
   to the production Application Support database, and only `start.bat:23` uses
   the repo-local path. Corrected here, because that sentence describes exactly
   the fallback D2.3 exists to defuse.
-- **D5.4** `docs/DOCUMENTATION_INDEX.md`, `README.md`, `INSTALL.md` and
-  `CHANGELOG.md` (under the existing `## [Unreleased]`) name the demo
-  launcher.
+- **D5.4** `docs/DOCUMENTATION_INDEX.md`, `README.md` and `CHANGELOG.md`
+  (under the existing `## [Unreleased]`) name the demo launcher.
+  `INSTALL.md` is deliberately left alone: it carries unrelated uncommitted
+  edits, and adding a line there would mean committing those too.
 
 Acceptance: `test_d5_demo_doc_names_both_env_vars`,
 `test_d5_demo_doc_links_resolve`.

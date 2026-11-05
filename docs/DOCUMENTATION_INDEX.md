@@ -140,6 +140,21 @@ Google Calendar integration guide:
 - Troubleshooting common issues
 - API quota information
 
+### docs/DEMO_INSTALL.md
+
+Running a demo instance beside the real installation:
+
+- `GETMOREDONE_DATA_DIR` and `GETMOREDONE_DB`, and which outranks which
+- Why the whole data directory moves, not just the database (`app.lock`)
+- `./start-demo.sh`, its first-run seed and `--print-env`
+- What stays shared (Google credentials)
+- Resetting and reseeding the demo
+
+### docs/DEV_PROD_WORKFLOW.md
+
+Dev vs prod database selection, the two launchers' differing defaults, and the
+Gmail importer's own rule.
+
 ## Troubleshooting Guides
 
 ### docs/EMAIL-AUTH-TROUBLESHOOTING.md (11KB)

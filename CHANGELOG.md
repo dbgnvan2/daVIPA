@@ -7,6 +7,22 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **A demo instance that runs beside your real one.** `./start-demo.sh` starts
+  a second, fully isolated copy of the app — its own database, settings,
+  single-instance lock and logs under
+  `~/Library/Application Support/GetMoreDone-Demo/` — seeded with sample items
+  on its first launch. The new `GETMOREDONE_DATA_DIR` environment variable
+  redirects the whole data directory, where `GETMOREDONE_DB` redirected only
+  the database. Documented in `docs/DEMO_INSTALL.md`.
+
+### Fixed
+
+- `tools/create_demo_data.py` could not run: it added `tools/src` to the import
+  path instead of the repository's `src/`, so the script README.md and
+  CLAUDE.md both tell you to run failed with `ModuleNotFoundError`.
+
 ## [0.3.2] - 2026-10-02
 
 ### Added
