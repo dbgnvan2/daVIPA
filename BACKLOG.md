@@ -24,6 +24,48 @@ deferred and for how long, not only of what is outstanding.
 
 ## Deferred — found by review, deliberately not fixed
 
+### The demo tests hash the whole production database (2026-11-05)
+
+`tests/test_demo_install.py::_fingerprint` does `read_bytes()` + sha256 on the
+real `getmoredone.db` before and after the seeding tests. Reading production is
+allowed and the assertion is the right one, but `conftest._user_data_fingerprint`
+deliberately digests only `settings.json` and documents why the guard has to
+stay cheap — so this is two full reads and hashes of a 914-item database per
+run for information that `(exists, size, mtime_ns)` already carries.
+
+Rated low: correct, just wasteful. Match conftest's split — size and mtime for
+the database, a digest for settings. Found by the failure-pattern sweep over
+the data-directory override.
+
+### An ambient `GETMOREDONE_DB` is honoured by the test session (2026-11-05)
+
+`conftest.pytest_sessionstart` points `GETMOREDONE_DB` at a temp database only
+`if not os.environ.get("GETMOREDONE_DB")`. A developer who has exported that
+variable — which `docs/DEV_PROD_WORKFLOW.md` tells them to do for the dev
+database, and which `start-demo.sh` now exports for the demo — has the suite
+run migrations, a row-deleting dedupe and a date-moving repair against that
+database. The live-data guards do not fire, because the named database is not
+the production one.
+
+Pre-existing, not introduced here, but this batch makes it easier to reach by
+adding a second populated database and a launcher that exports the variable.
+Rated medium-low and deferred rather than fixed in-loop: the fix is a policy
+decision (refuse, warn, or override) that belongs with whoever owns the dev
+workflow, not a correction to this change. Found by the failure-pattern sweep
+over the data-directory override.
+
+### `test_audio.py` references an undefined name (2026-11-05)
+
+`tests/test_audio.py:87` reads `getattr(settings, "music_volume", 1.0)`, and
+nothing in that test binds `settings` — it would raise `NameError`, not fail an
+assertion. It has never fired because the line is reached only when the real
+settings file names a music folder that holds a playable track, and the earlier
+skip paths catch every other case, including on CI. So a developer who
+configures a music folder is the one who meets it. Either load the settings the
+test already resolves the path from, or drop to a literal volume. Found while
+mapping the data-directory override (low); outside that change, not fixed
+in-loop.
+
 ### `project_time_line`'s guard tests presence, not value (2026-08-25)
 
 It checks `"session_count" not in row` and then reads `row.get(...) or 0`, so a

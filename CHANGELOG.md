@@ -19,9 +19,9 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- `tools/create_demo_data.py` could not run: it added `tools/src` to the import
-  path instead of the repository's `src/`, so the script README.md and
-  CLAUDE.md both tell you to run failed with `ModuleNotFoundError`.
+- `tools/create_demo_data.py` could not run at all. It added `tools/src` to the
+  import path instead of the repository's `src/`, so the script that both
+  README.md and CLAUDE.md tell you to run failed with `ModuleNotFoundError`.
 
 ## [0.3.2] - 2026-10-02
 

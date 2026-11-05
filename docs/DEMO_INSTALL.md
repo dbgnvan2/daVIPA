@@ -20,11 +20,20 @@ On the first run it creates the demo directory, seeds the demo database and
 launches. On later runs it just launches — the seed is additive, so re-running
 it every time would pile up another set of sample items.
 
+Seeding is decided by the rows, not by the file: a demo database that exists
+but holds no action items gets seeded, because that is what an interrupted
+first run leaves behind. A demo that holds items is never re-seeded.
+
 To see what it will use without launching anything:
 
 ```bash
 ./start-demo.sh --print-env
 ```
+
+It prints the data directory, the database, and whether this launch would seed
+(`seed=yes` or `seed=no`), and it creates nothing — not even the demo
+directory. The refusal below is checked before that point too, so asking the
+question can never be what brings a directory into existence.
 
 ## The two environment variables
 
@@ -74,9 +83,16 @@ rm -rf "$HOME/Library/Application Support/GetMoreDone-Demo"
 ```
 
 Never run that against `~/Library/Application Support/GetMoreDone` — that is
-the real one. `start-demo.sh` refuses to run if `GETMOREDONE_DATA_DIR` resolves
-to the real directory, and it compares the two as the filesystem sees them, so
-a trailing slash or a `..` will not slip past.
+the real one.
+
+`start-demo.sh` refuses to start if `GETMOREDONE_DATA_DIR` overlaps the real
+installation **in either direction**: the real directory itself, anything
+inside it, or any directory that contains it. Inside it would put the demo's
+database, settings and lock file among your real data; containing it would make
+the `rm -rf` above delete your real data. It compares the two as the filesystem
+sees them — `expanduser()` then `resolve()`, the same rule the app applies — so
+a `~`, a trailing slash, a doubled slash, a `..` or a symlinked parent will not
+slip past, and the check runs before anything is created.
 
 ## Seeding without the GUI
 

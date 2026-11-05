@@ -146,7 +146,8 @@ Running a demo instance beside the real installation:
 
 - `GETMOREDONE_DATA_DIR` and `GETMOREDONE_DB`, and which outranks which
 - Why the whole data directory moves, not just the database (`app.lock`)
-- `./start-demo.sh`, its first-run seed and `--print-env`
+- `./start-demo.sh`, its seed-when-empty rule and `--print-env`
+- Why it refuses a directory overlapping the real installation, either way
 - What stays shared (Google credentials)
 - Resetting and reseeding the demo
 

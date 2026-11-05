@@ -86,9 +86,20 @@ The only `src/` change.
   `resolve_db_path` consults `env_db_path()` first.
 - **D1.5** `conftest.py` removes `GETMOREDONE_DATA_DIR` from the environment for
   the duration of a test session and restores it afterwards — invariant I5.
-  Without this, an exported override would send `resolve_db_path` to the demo
-  directory, where `_forbid_resolving_the_real_database` would not fire, and a
-  test run would migrate and write the demo database.
+  Without this, an exported override would leave `app_data_dir_path()` pointing
+  at the demo directory while both live-data guards, which compute the real
+  directory from `platformdirs` directly, watched a directory nothing touched:
+  isolation reported rather than enforced.
+
+  The database itself was never at risk from this variable, and an earlier
+  draft of this line claiming it was overstated the case. `pytest_sessionstart`
+  points `GETMOREDONE_DB` at a temp file immediately afterwards, and
+  `GETMOREDONE_DB` outranks `GETMOREDONE_DATA_DIR`. The residual risk is the
+  one this requirement does **not** address: an ambient exported
+  `GETMOREDONE_DB` is honoured by `pytest_sessionstart`, so a session runs
+  migrations and a row-deleting dedupe against whatever it names. That is
+  pre-existing, it is recorded in `BACKLOG.md`, and this batch makes it more
+  reachable by shipping a launcher that exports that variable.
 
 Acceptance — `tests/test_demo_install.py`:
 
@@ -108,20 +119,39 @@ Acceptance — `tests/test_demo_install.py`:
   overridable from the caller's environment) and an explicit
   `GETMOREDONE_DB` inside it, then delegates to `./start.sh` for the venv
   bootstrap and launch.
-- **D2.2** The launcher refuses, with a non-zero exit, to run against the real
-  data directory — invariant I4.
+- **D2.2** The launcher refuses, with a non-zero exit, to run against any
+  directory that overlaps the real data directory in either direction — the
+  directory itself, anything inside it, or anything containing it — invariant
+  I4. Equality alone is not enough: a value of `.../GetMoreDone/demo` would put
+  the demo's database, settings and `app.lock` among the real data, and a value
+  that contained the real directory would make `DEMO_INSTALL.md`'s documented
+  `rm -rf` reset delete it. Both sides are compared after `expanduser()` and
+  `resolve()`, and the comparison runs before anything is created.
 - **D2.3** `start.sh`'s default no longer clobbers a data-dir-only override:
   when `GETMOREDONE_DB` is unset and `GETMOREDONE_DATA_DIR` is set, it leaves
   `GETMOREDONE_DB` unset and lets `paths.py` derive the database from the data
   directory. With neither set, it exports exactly the path it exports today —
   invariant I1.
 - **D2.4** Both scripts accept `--print-env`, which prints the resolved data
-  directory and database and exits 0 before any venv, pip, cache-clearing or
-  launch work. This exists so D2.1–D2.3 can be verified by running the scripts
-  rather than by grepping their text.
-- **D2.5** The demo seeds itself only when its database file does not yet
-  exist. `load_demo_data()` is additive, so seeding on every launch would add
-  another six items each time.
+  directory and database — and, for the demo launcher, whether this launch
+  would seed — then exits 0 before any venv, pip, cache-clearing, `mkdir` or
+  launch work. It has **no filesystem side effect at all**, which is what
+  `DEMO_INSTALL.md` promises of it. This exists so D2.1–D2.3 and D2.5 can be
+  verified by running the scripts rather than by grepping their text.
+
+  Each launcher resolves a path itself, because `paths.py` cannot be imported
+  before the venv exists. That mirror of `app_data_dir_path()`'s rule is pinned
+  to the real resolver by `test_d2_print_env_matches_the_resolver`, which
+  compares the two over a tilde, a trailing slash, a doubled slash, a `..` and
+  a symlinked parent.
+- **D2.5** The demo seeds itself when its database holds no action items —
+  judged by the rows, not by the file's existence. `load_demo_data()` is
+  additive, so seeding on every launch would add another six items each time;
+  but it also opens a `DatabaseManager`, which creates the file and runs
+  migrations, *before* its first insert, and it has no `except` clause. Keying
+  on the file alone therefore turned one interrupted seed into a permanent
+  state: run 1 failed loudly, and every run after it launched an empty demo in
+  silence.
 
 Acceptance — `tests/test_demo_install.py`:
 
@@ -133,6 +163,13 @@ Acceptance — `tests/test_demo_install.py`:
 | D2.3 | `test_d2_start_sh_default_db_follows_the_data_dir_override` |
 | D2.3 | `test_d2_start_sh_default_db_is_unchanged_with_no_env` |
 | D2.4 | `test_d2_launchers_are_valid_bash` |
+| D2.2 | `test_d2_demo_launcher_refuses_a_directory_inside_the_real_one` |
+| D2.2 | `test_d2_demo_launcher_refuses_a_directory_containing_the_real_one` |
+| D2.4 | `test_d2_print_env_creates_nothing` |
+| D2.4 | `test_d2_refusal_creates_nothing_under_the_real_path` |
+| D2.4 | `test_d2_print_env_matches_the_resolver` |
+| D2.1 | `test_d2_demo_launcher_expands_a_tilde` |
+| D2.5 | `test_d2_demo_launcher_reseeds_a_database_with_no_items` |
 
 ### D3 — The demo-data tool actually runs
 
