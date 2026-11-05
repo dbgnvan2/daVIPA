@@ -20,13 +20,25 @@ set -u
 cd "$(dirname "$0")" || exit 1
 
 DEFAULT_DEMO_DIR="${HOME}/Library/Application Support/GetMoreDone-Demo"
-export GETMOREDONE_DATA_DIR="${GETMOREDONE_DATA_DIR:-$DEFAULT_DEMO_DIR}"
-
 REAL_DATA_DIR="${HOME}/Library/Application Support/GetMoreDone"
 
-if ! mkdir -p "$GETMOREDONE_DATA_DIR" 2>/dev/null; then
+# Blank-after-trim falls back to the default, as paths.py's .strip() does.
+# Without it, GETMOREDONE_DATA_DIR="   " would survive ${VAR:-default} and
+# `mkdir -p` would create a directory named of spaces in the repo.
+gmd_trim() {
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+}
+GMD_DEMO_DIR="$(gmd_trim "${GETMOREDONE_DATA_DIR:-}")"
+if [ -z "$GMD_DEMO_DIR" ]; then
+    GMD_DEMO_DIR="$DEFAULT_DEMO_DIR"
+fi
+
+if ! mkdir -p "$GMD_DEMO_DIR" 2>/dev/null; then
     echo "❌ Cannot create the demo data directory:"
-    echo "   ${GETMOREDONE_DATA_DIR}"
+    echo "   ${GMD_DEMO_DIR}"
     exit 1
 fi
 
@@ -34,7 +46,7 @@ fi
 # a trailing slash, a "..", a "~" or a symlinked parent would all defeat a
 # string comparison, and the thing on the other side of it is 914 real action
 # items.
-DEMO_CANONICAL="$(cd "$GETMOREDONE_DATA_DIR" && pwd -P)" || exit 1
+DEMO_CANONICAL="$(cd "$GMD_DEMO_DIR" && pwd -P)" || exit 1
 PROD_CANONICAL="$REAL_DATA_DIR"
 if [ -d "$REAL_DATA_DIR" ]; then
     PROD_CANONICAL="$(cd "$REAL_DATA_DIR" && pwd -P)" || exit 1
@@ -48,6 +60,11 @@ if [ "$DEMO_CANONICAL" = "$PROD_CANONICAL" ]; then
     exit 1
 fi
 
+# Both variables carry the canonical path. Exporting the raw one and deriving
+# the database from the canonical one would have put two spellings of one
+# directory in --print-env, and DEMO_INSTALL.md tells the reader to delete the
+# directory the first of them names.
+export GETMOREDONE_DATA_DIR="$DEMO_CANONICAL"
 export GETMOREDONE_DB="${DEMO_CANONICAL}/getmoredone.db"
 
 if [ "${1:-}" = "--print-env" ]; then
@@ -68,10 +85,15 @@ if [ ! -f "$GETMOREDONE_DB" ]; then
     if [ ! -x "$VENV_PY" ]; then
         echo "📦 Creating virtual environment..."
         python3 -m venv venv || exit 1
-        echo "📥 Installing runtime requirements..."
-        export PIP_CACHE_DIR="${PIP_CACHE_DIR:-$(pwd)/.pip-cache}"
-        "$VENV_PY" -m pip install -q -r requirements.txt || exit 1
     fi
+    # Unconditionally, not only for a venv this script just created. A venv
+    # that exists but is missing a runtime dependency — an interrupted first
+    # launch, or a package added to requirements.txt since — made the seed
+    # below raise ModuleNotFoundError and took the whole launch down with it,
+    # where plain start.sh would have installed the dependency and started.
+    echo "📥 Installing runtime requirements..."
+    export PIP_CACHE_DIR="${PIP_CACHE_DIR:-$(pwd)/.pip-cache}"
+    "$VENV_PY" -m pip install -q -r requirements.txt || exit 1
     echo "🌱 Seeding the demo database..."
     "$VENV_PY" tools/create_demo_data.py || exit 1
 fi

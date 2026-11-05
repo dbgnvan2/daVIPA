@@ -11,7 +11,21 @@
 # a demo instance would end up writing the real data, so this default only
 # applies when neither variable is set. With neither set it exports exactly
 # what it always has.
-if [ -z "${GETMOREDONE_DB:-}" ] && [ -z "${GETMOREDONE_DATA_DIR:-}" ]; then
+
+# Blank-after-trim counts as unset, which is what paths.py's .strip() does.
+# The shell's -z alone does not agree with it: "   " is non-empty here and
+# empty there, so this script would skip the production default while
+# app_data_dir_path() fell back to production anyway — the app writing the real
+# database while this script printed an isolated path.
+gmd_trim() {
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+}
+GMD_DATA_DIR="$(gmd_trim "${GETMOREDONE_DATA_DIR:-}")"
+
+if [ -z "${GETMOREDONE_DB:-}" ] && [ -z "$GMD_DATA_DIR" ]; then
     export GETMOREDONE_DB="${HOME}/Library/Application Support/GetMoreDone/getmoredone.db"
 fi
 
@@ -19,14 +33,14 @@ fi
 # Empty GETMOREDONE_DB means paths.py derives it from the data directory.
 GMD_DB_RESOLVED="${GETMOREDONE_DB:-}"
 if [ -z "$GMD_DB_RESOLVED" ]; then
-    GMD_DB_RESOLVED="${GETMOREDONE_DATA_DIR%/}/getmoredone.db"
+    GMD_DB_RESOLVED="${GMD_DATA_DIR%/}/getmoredone.db"
 fi
 
 # Report the resolution and stop, before any venv, pip, cache-clearing or
 # launch work. This is what makes the rule above testable by running the
 # script rather than by reading it.
 if [ "${1:-}" = "--print-env" ]; then
-    echo "data-dir=${GETMOREDONE_DATA_DIR:-}"
+    echo "data-dir=${GMD_DATA_DIR}"
     echo "db-env=${GETMOREDONE_DB:-}"
     echo "db=${GMD_DB_RESOLVED}"
     exit 0
@@ -68,8 +82,8 @@ find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
 find . -name "*.pyc" -delete 2>/dev/null
 
 echo "✅ Launching daVIPA..."
-if [ -n "${GETMOREDONE_DATA_DIR:-}" ]; then
-    echo "   Data: ${GETMOREDONE_DATA_DIR}"
+if [ -n "$GMD_DATA_DIR" ]; then
+    echo "   Data: ${GMD_DATA_DIR}"
 fi
 echo "   DB: ${GMD_DB_RESOLVED}"
 "$VENV_PY" run.py
