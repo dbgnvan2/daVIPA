@@ -127,7 +127,19 @@ defect — `mkdir` above the guard — fails it.
 | `learning-qa` | failures that hide (P1–P7 + repo checklist) | 11 findings: 2 high, 3 medium, 6 low |
 | `/code-review` | correctness | 3 findings, all medium, all confirmed by hand |
 | `/security-review` | security | no HIGH or MEDIUM at confidence ≥ 8; five candidates argued down in writing |
-| cold test-quality pass | can each test fail | **not completed** — see Risks |
+| cold pass 1 | test quality: can each test fail | 9 findings: 1 high, 3 medium, 5 low |
+| cold pass 2 | the two launchers read as programs | 12 findings: 4 high, 5 medium, 3 low |
+
+Both cold passes were read-only by construction — `Read`, `Grep`, `Glob`, no
+shell — so neither could run the suite. The first attempt at this pass had to
+be killed because the agent ran the whole suite without
+`GETMOREDONE_NO_MAPPED_WINDOWS=1` and took the user's keyboard focus; taking
+the means away rather than asking it not to is what made the second attempt
+safe.
+
+Neither brief carried a conclusion of mine, which is what the cold pass is
+for. Both reported findings in the code the earlier passes had already been
+over twice.
 
 The two high-severity findings, both reproduced before being fixed:
 
@@ -143,7 +155,58 @@ The two high-severity findings, both reproduced before being fixed:
    CI, so it stayed green with the `conftest` pop deleted. It now runs a nested
    pytest with the variable actually set.
 
-Medium findings fixed: the `mkdir` ran before the guard (so a refused run
+**The four high-severity findings from the cold passes**, all reproduced
+against the script before being fixed, all in the guard that is the entire
+point of this feature:
+
+1. **A case variant of the real directory was accepted.** Stock macOS volumes
+   are case-insensitive and `Path.resolve()` folds no case, so
+   `.../Application Support/getmoredone` and `.../GetMoreDone` are one
+   directory and two strings. `--print-env` exited 0 for the lowercase
+   spelling; a launch would have written the demo's database, `settings.json`
+   and `app.lock` among 914 real action items.
+2. **`/` was accepted.** The containment test was built as `"$DEMO"/*`, which
+   for `/` is the literal `//*` and matches nothing — so the one directory
+   that contains everything was the one directory the guard let through, and
+   `DEMO_INSTALL.md` tells the reader to `rm -rf` what the launcher printed.
+3. **A firmlink path was accepted** —
+   `/System/Volumes/Data/Users/you/Library/...` is the same directory under a
+   name `realpath` does not collapse.
+4. **`start.sh` could print an isolated path and open the real database.**
+   bash's `[[:space:]]` is not `str.strip()`: a value of one non-breaking
+   space was a data directory to the shell and blank to `paths.py`, so the
+   launcher skipped its production default and printed a path in the
+   repository checkout while `app_data_dir_path()` fell back to production.
+
+All four came of doing path arithmetic in shell strings over `realpath`
+output. The guard is now one Python preflight that compares names, case-folded
+names and `(st_dev, st_ino)`, refuses the filesystem root, resolves the
+database path too, and derives the real directory from platformdirs' rule
+rather than hardcoding the macOS one. `start.sh` lost its shell trim and its
+unanchored in-memory test to Python mirrors of `app_data_dir_path()` and
+`env_db_path()`.
+
+**Mediums fixed:** reading the item count spliced the path into a SQLite URI,
+so a `?` created a file during `--print-env` and a `%` made every launch
+reseed; a `getmoredone.db` symlinked out of the demo directory was accepted;
+`--printenv` and any other typo performed a full launch; `start.sh` dropped
+its arguments, so `./start.sh --selftest` started the GUI; the pip-install
+guard asserted bash indentation as though it were block structure; the
+resolver-mirror test ran only one of the two launchers despite its name; and
+`start.sh`'s whole `GETMOREDONE_DB` branch had no test at all.
+
+**One high from the test-quality pass:**
+`test_d1_the_session_restores_the_override_afterwards` could not fail — its
+probe body was `assert True` and its only assertion was that a nested session
+exited 0, so deleting the restore left it green. It now calls the two hooks
+directly and observes the environment after the session that popped it has
+finished.
+
+Two mediums were deferred with their reasons written down in `BACKLOG.md`: an
+interrupted seed that got as far as its first insert is not retried, and
+`start.sh` has no `cd` to its own directory (pre-existing, adjacent).
+
+Medium findings fixed in the earlier rounds: the `mkdir` ran before the guard (so a refused run
 created the directory it refused, and `--print-env` had a filesystem side
 effect); seeding keyed on the database *file* rather than its rows, so one
 interrupted seed permanently disabled seeding and every later launch opened an
@@ -157,12 +220,16 @@ requirements install was asserted by indentation rather than by order; and the
 - **The full suite never ran on this machine.** It ran in CI instead, and the
   result is above: the 7 pre-existing window-attribute failures and nothing
   new. The four touched test files are green locally.
-- **The owed cold pass did not finish.** The repo's own rule is that a pass
-  producing a high-severity finding earns another, cold, in a different failure
-  family. That pass was stopped partway. The two fix commits `246981f` and
-  `d3f8ec0` are therefore the least-reviewed code in this batch — exactly the
-  category the rule exists for. A cold pass over
-  `df93846...d3f8ec0` is the first thing to do next.
+- **The cold passes' own fixes are now the least-reviewed code here.** Two
+  cold passes produced high-severity findings, so by the repo's rule another
+  pass is earned over the commits that fixed them. Nothing has reviewed the
+  new Python preflight in `start-demo.sh` but its author and its tests.
+- **The real launch was not repeated after the rewrite.** The two-instance
+  check in the Verification section above was run against the previous
+  preflight. The resolution it depends on is verified (`--print-env` under the
+  real `HOME` reports the same `GetMoreDone-Demo` directory and `seed=no`),
+  but no window was opened after the rewrite, deliberately: the machine was in
+  use and a launch takes keyboard focus.
 - `INSTALL.md` has no demo-launcher line (D5.4, **not done**, deliberate).
 - An ambient exported `GETMOREDONE_DB` is honoured by `pytest_sessionstart`
   rather than replaced, so a developer who exports it has the suite run
@@ -179,11 +246,11 @@ requirements install was asserted by indentation rather than by order; and the
 
 ## Next agent actions
 
-- Run a **cold** review pass over `df93846...d3f8ec0`, the two fix commits,
-  with the test suite explicitly out of its scope. Give it a read-only lens: a
-  subagent gets neither `GETMOREDONE_NO_MAPPED_WINDOWS=1` nor the
-  `taskpolicy -b` hook, and one in this batch ran the whole suite twice despite
-  being told not to, taking the user's keyboard focus.
+- Launch the demo for real once the machine is free, with
+  `/Applications/daVIPA.app` already running, and confirm both windows hold
+  open on the rewritten preflight — the one criterion the suite cannot assert.
+- Run a cold pass over the cold passes' fix commits, for the same reason the
+  last one was owed.
 - Decide what to do about the 7 standing CI failures. They are not this
   batch's, but they make CI unable to say "green" for anyone, which is the
   state the global rule tells us not to leave.

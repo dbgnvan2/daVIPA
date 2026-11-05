@@ -3,9 +3,11 @@
 Spec: [`docs/spec_2026-11-05_demo_install.md`](spec_2026-11-05_demo_install.md)
 
 Suite: the files this change touches — `tests/test_demo_install.py`,
-`tests/test_release_docs.py`, `tests/test_settings_isolation.py`,
-`tests/test_repo_hygiene.py` — **75 passed** under
-`GETMOREDONE_NO_MAPPED_WINDOWS=1`.
+`tests/test_release_docs.py`, `tests/test_release_licensing.py`,
+`tests/test_settings_isolation.py`, `tests/test_repo_hygiene.py`,
+`tests/test_weekly_tactic_cascade.py` — **142 passed** under
+`GETMOREDONE_NO_MAPPED_WINDOWS=1`, after the cold review pass added eight
+tests and rewrote three.
 
 The **full suite was not completed locally**. Two runs were started and both
 were stopped: the first because a second run had been pointed at the same log
@@ -47,16 +49,24 @@ handoff note and recorded in `BACKLOG.md`.
 | D2.2 | The real directory itself is refused | `start-demo.sh` (overlap comparison) | `::test_d2_demo_launcher_refuses_the_real_data_dir` | done |
 | D2.2 | A directory **inside** the real one is refused | same | `::test_d2_demo_launcher_refuses_a_directory_inside_the_real_one` | done |
 | D2.2 | A directory **containing** the real one is refused | same | `::test_d2_demo_launcher_refuses_a_directory_containing_the_real_one` | done |
+| D2.2 | A **case variant** of the real directory is refused | `start-demo.sh` (`overlaps`, case-folded names) | `::test_d2_demo_launcher_refuses_a_case_variant_of_the_real_directory` | done |
+| D2.2 | The **filesystem root** is refused | same (`demo == demo.anchor`) | `::test_d2_demo_launcher_refuses_the_filesystem_root` (`/`, `//`, `/..`, `/../..`) | done |
+| D2.2 | A database **symlinked out of** the demo directory is refused | same (the database path is resolved too) | `::test_d2_demo_launcher_refuses_a_database_symlinked_out_of_the_demo` | done |
+| D2.2 | Both launchers' idea of the real directory is platformdirs' | both scripts (`real_data_dir`) | `::test_d2_the_launchers_agree_with_platformdirs` | done |
 | D2.3 | `start.sh` no longer forces the production DB over a data-dir override | `start.sh` | `::test_d2_start_sh_default_db_follows_the_data_dir_override` | done |
 | D2.3 | With neither variable set, `start.sh` exports what it always did | same | `::test_d2_start_sh_default_db_is_unchanged_with_no_env` | done |
 | D2.3 | A blank data dir resolves to production in the shell too | same | `::test_d2_start_sh_treats_a_blank_data_dir_as_unset` | done |
 | D2.4 | `--print-env` reports the resolution before doing any work | `start.sh`, `start-demo.sh` | every D2 test above runs through it | done |
 | D2.4 | `--print-env` creates nothing | `start-demo.sh` (guard and exit precede the `mkdir`) | `::test_d2_print_env_creates_nothing` | done |
 | D2.4 | A refused run creates nothing under the real path | same | `::test_d2_refusal_creates_nothing_under_the_real_path` | done |
-| D2.4 | The launcher's resolver matches `app_data_dir_path()` | both scripts' `gmd_resolve` | `::test_d2_print_env_matches_the_resolver` (tilde, trailing slash, doubled slash, `..`, symlinked parent) | done |
+| D2.4 | The launchers' resolver matches `app_data_dir_path()` | both scripts | `::test_d2_print_env_matches_the_resolver` (both scripts × tilde, trailing slash, doubled slash, `..`, symlinked parent) | done |
+| D2.4 | `start.sh`'s database resolver matches `env_db_path()` | `start.sh` (`gmd_resolve_db`) | `::test_d2_print_env_matches_the_db_resolver` (tilde, `..`, three in-memory spellings, a path containing `mode=memory`) | done |
+| D2.4 | The shell and `paths.py` agree on blank, non-ASCII whitespace included | `start.sh` (`gmd_resolve_dir`, `str.strip()` in Python) | `::test_d2_start_sh_agrees_with_paths_on_a_non_breaking_space` | done |
+| D2.4 | An unrecognised argument exits 2 instead of launching | `start-demo.sh` (argument `case`) | `::test_d2_demo_launcher_refuses_an_unknown_argument` | done |
 | D2.4 | Both scripts parse | — | `::test_d2_launchers_are_valid_bash` | done |
 | D2.5 | Seeds when the demo database holds no items | `start-demo.sh` (row count, not file existence) | `::test_d2_demo_launcher_reseeds_a_database_with_no_items` (absent, unreadable, populated, emptied) | done |
 | D2.5 | Requirements are installed before the seed runs | same | `::test_d2_demo_launcher_installs_requirements_before_seeding` | done — source-text guard; see "Not covered" below |
+| D2.5 | The count is read through an escaped URI, and reading creates nothing | `start-demo.sh` (`item_count`, `pathname2url`) | `::test_d2_the_seed_decision_reads_an_awkward_path_and_creates_nothing` (`a?b`, `pc%20x`) | done |
 
 ## D3 / D4 — The headless seed
 
@@ -96,6 +106,12 @@ handoff note and recorded in `BACKLOG.md`.
   by a source-text guard rather than by behaviour — anchored to whole lines,
   asserting exact counts and the relative position of the two lines, as the
   repo's rules require where no behavioural check is practical.
+- The `(st_dev, st_ino)` half of the overlap guard — the one that catches a
+  macOS firmlink prefix — is not exercised by any test. It needs a second name
+  for one directory that survives `Path.resolve()`, which a test cannot
+  fabricate: a symlink is collapsed by `resolve()` and so is caught by the
+  name test instead, and directory hard links do not exist. The case-folded
+  name half is tested, and so is the ordinary name half.
 - An ambient exported `GETMOREDONE_DB` is honoured by `pytest_sessionstart`
   rather than replaced, so a developer who exports it has the suite run
   migrations against that database. Pre-existing; recorded in `BACKLOG.md`
@@ -108,7 +124,24 @@ handoff note and recorded in `BACKLOG.md`.
 | `learning-qa` | failures that hide (P1–P7 plus the repo checklist) | 11 findings: 2 high, 3 medium, 6 low |
 | `/code-review` | correctness | 3 findings, all medium, all confirmed by hand |
 | `/security-review` | security | no HIGH or MEDIUM at confidence ≥ 8; five candidates argued down in writing |
-| cold test-quality pass | can each test fail; the scripts as programs | **not completed** — stopped partway because it was running the suite without the mapped-window guard. Owed, because the previous pass produced high-severity findings. |
+| cold pass 1 | test quality: can each test fail | 9 findings: 1 high, 3 medium, 5 low |
+| cold pass 2 | the two launchers read as programs | 12 findings: 4 high, 5 medium, 3 low |
 
-Every high and medium finding was fixed with a test; every low was recorded in
-`BACKLOG.md` with its severity and reason, not fixed in-loop.
+Every high and medium finding was fixed with a test, except two mediums
+deferred with their reasons written down in `BACKLOG.md` (an interrupted seed
+that got as far as its first insert; `start.sh`'s missing `cd`, which predates
+this batch). Every low was recorded in `BACKLOG.md` with its severity, not
+fixed in-loop.
+
+The two cold passes were read-only by construction — `Read`, `Grep` and `Glob`
+and no shell — so neither could run the suite. That was the point: the first
+attempt at this pass had to be stopped because the agent ran the whole suite
+without `GETMOREDONE_NO_MAPPED_WINDOWS=1` and took the screen.
+
+Each of the 12 fixes was proved by restoring its defect verbatim and watching
+the named test go red. One mutation did not falsify on the first attempt
+(M23): it added an extra accepted flag rather than removing the argument check
+altogether, so `--printenv` was still refused and nothing was proved. Re-run
+with the original defect — no argument check at all — the test failed, and the
+run took 61 seconds because without the check the typo really does perform a
+full launch.

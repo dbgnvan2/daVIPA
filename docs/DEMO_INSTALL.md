@@ -94,6 +94,21 @@ sees them — `expanduser()` then `resolve()`, the same rule the app applies —
 a `~`, a trailing slash, a doubled slash, a `..` or a symlinked parent will not
 slip past, and the check runs before anything is created.
 
+
+## What the launcher refuses
+
+`./start-demo.sh` exits non-zero, before creating anything, when the demo
+directory would overlap the real installation. It checks more than the two
+names: a case variant of the real directory is the same directory on a stock
+macOS volume, a firmlink path such as
+`/System/Volumes/Data/Users/you/Library/...` is the same directory under a
+different name, and `/` contains everything. It also refuses a
+`getmoredone.db` inside the demo directory that is a symlink pointing out of
+it, because the app resolves that link and would write to its target.
+
+It accepts `--print-env`, or no argument at all, and exits 2 on anything else.
+A mistyped `--printenv` used to fall through to a full launch.
+
 ## Seeding without the GUI
 
 The launcher does this for you on a first run. To do it by hand — after a

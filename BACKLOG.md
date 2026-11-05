@@ -24,6 +24,66 @@ deferred and for how long, not only of what is outstanding.
 
 ## Deferred — found by review, deliberately not fixed
 
+### Deferred from the demo-install cold review pass (2026-11-05)
+
+Two cold read-only passes over the four fix commits `df93846..d3f8ec0` — one
+on test quality, one on the two launchers read as programs — produced 21
+findings. Every high and medium one was fixed with a test except the two
+recorded here; the lows follow.
+
+**An interrupted seed that got as far as its first insert is never retried
+(medium).** `start-demo.sh` seeds when the demo database holds no action
+items. `load_demo_data()` calls `create_action_item()` per item with no
+surrounding transaction, so a Ctrl-C part-way commits what it had written: the
+count is then positive, the launcher reports `seed=no`, and the demo stays
+permanently short of its six items with no signal to the user beyond the
+documented `rm -rf` reset.
+
+Deferred rather than fixed, with the reason stated at the time: both remedies
+reach past this feature. A completion marker makes "has items but no marker"
+ambiguous for every demo seeded before the marker existed, and reseeding those
+would double their items; wrapping the insert loop in one transaction changes
+`demo_data.load_demo_data()`, which the in-app Settings button shares. The
+residual failure loses no real data, is visible (a short demo), and is
+recoverable by the documented reset. Fix it by making the seed atomic in
+`demo_data.py`, with the Settings button in scope, not by patching the
+launcher.
+
+**`start.sh` does not `cd` to its own directory (medium, pre-existing).** Every
+path in it is relative to `$PWD`, so `bash ~/ProjectsLocal/daVIPA/start.sh`
+from elsewhere creates a `venv/` in the caller's directory, then reports a
+missing `requirements.txt` as a network problem — and `find . -type d -name
+"__pycache__" -exec rm -rf {} +` would run against that directory. One line
+fixes it (`cd "$(dirname "$0")" || exit 1`, which `start-demo.sh` already
+has). Adjacent, not swept into this batch: it predates the demo work and
+`exec ./start.sh` is unaffected, because the demo launcher cds first.
+
+**Lows, recorded not fixed**, per the rule that a cosmetic fix buys none of
+the safety it costs:
+
+- `start.sh --print-env` reports `data-dir=` empty when neither variable is
+  set, rather than the production directory the launch will use. The flag
+  answers "where would this go" only for `db=`.
+  `test_d2_start_sh_default_db_is_unchanged_with_no_env` asserts the empty
+  string, so it changes in the same commit.
+- `test_d2_demo_launcher_expands_a_tilde`'s second assertion,
+  `not (REPO_ROOT / "~").exists()`, cannot fail for the defect it names (the
+  `mkdir` now runs after the `--print-env` exit) and asserts on shared
+  checkout state, so an unrelated stray `~` directory fails it.
+- `start-demo.sh`'s `command -v python3` preflight is untested; its whole
+  value is its message, and without it the user gets a silent exit 1.
+  `_print_env(..., PATH="/nonexistent")` would reach it.
+- `test_d2_demo_launcher_reseeds_a_database_with_no_items` discards `_seed()`'s
+  exit code, so a broken seeder surfaces as `sqlite3.OperationalError: no such
+  table` from the next line rather than as the subprocess failure it is.
+- `test_d1_blank_override_is_ignored` writes outside its `tmp_path` *when it
+  fails*: without `.strip()` the resolver mkdirs a whitespace-named directory
+  in the checkout. `monkeypatch.chdir(tmp_path)` contains it.
+- `test_d1_the_suite_runs_with_no_data_dir_override` proves a nested run, not
+  "the suite", and is coupled to the two hook names `_run_nested_pytest`
+  re-exports, so moving the pop into `pytest_configure` would turn it red
+  while isolation still held.
+
 ### CI has been red for longer than anyone noticed (2026-11-05)
 
 The `Tests` workflow fails **7 of 1630** on every Python version, and has done

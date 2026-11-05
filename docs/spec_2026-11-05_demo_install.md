@@ -127,6 +127,34 @@ Acceptance — `tests/test_demo_install.py`:
   that contained the real directory would make `DEMO_INSTALL.md`'s documented
   `rm -rf` reset delete it. Both sides are compared after `expanduser()` and
   `resolve()`, and the comparison runs before anything is created.
+
+  **Overlap is not string containment.** A cold review pass found three ways
+  past a guard that compared the two canonical strings, and all three are now
+  refused:
+
+  - **A case variant.** macOS volumes are case-insensitive by default and
+    `Path.resolve()` folds no case, so `.../getmoredone` and `.../GetMoreDone`
+    are two strings for one directory. The names are therefore compared
+    case-folded as well as literally. That may refuse a genuinely distinct
+    directory on a case-sensitive volume, which costs a rename; the other
+    direction costs the user their data.
+  - **A second name that survives `resolve()`**, such as a macOS firmlink
+    prefix (`/System/Volumes/Data/Users/...`). Each existing ancestor of the
+    demo directory is compared to the real directory by `(st_dev, st_ino)`.
+  - **The filesystem root.** `/` is refused outright. The containment test was
+    built as `"$DEMO"/*`, which for `/` is the literal `//*` and matches
+    nothing, so the one directory containing everything was the one directory
+    accepted — and the reset recipe then names it.
+
+  The demo's **database path** is resolved too, and a database that resolves
+  outside the demo directory is refused: `env_db_path()` follows a
+  final-component symlink, so a link at `<demo>/getmoredone.db` sent every
+  write to its target while `--print-env` reported the demo path.
+
+  Both launchers derive the real data directory from **platformdirs' rule**,
+  transcribed because neither can import it before the venv exists. Hardcoding
+  the macOS path left the guard on Linux protecting a directory the app never
+  opens. Pinned by `test_d2_the_launchers_agree_with_platformdirs`.
 - **D2.3** `start.sh`'s default no longer clobbers a data-dir-only override:
   when `GETMOREDONE_DB` is unset and `GETMOREDONE_DATA_DIR` is set, it leaves
   `GETMOREDONE_DB` unset and lets `paths.py` derive the database from the data
@@ -139,11 +167,26 @@ Acceptance — `tests/test_demo_install.py`:
   `DEMO_INSTALL.md` promises of it. This exists so D2.1–D2.3 and D2.5 can be
   verified by running the scripts rather than by grepping their text.
 
+  The demo launcher accepts `--print-env` or nothing, and **exits 2 on any
+  other argument**. `--printenv` matched nothing and fell through to a full
+  launch, so a typo in the one command documented to touch nothing did a
+  `mkdir`, a pip install and a seed.
+
   Each launcher resolves a path itself, because `paths.py` cannot be imported
-  before the venv exists. That mirror of `app_data_dir_path()`'s rule is pinned
-  to the real resolver by `test_d2_print_env_matches_the_resolver`, which
-  compares the two over a tilde, a trailing slash, a doubled slash, a `..` and
-  a symlinked parent.
+  before the venv exists. Those mirrors are pinned to the real resolvers:
+  `test_d2_print_env_matches_the_resolver` compares **both** scripts against
+  `app_data_dir_path()` over a tilde, a trailing slash, a doubled slash, a `..`
+  and a symlinked parent, and `test_d2_print_env_matches_the_db_resolver`
+  compares `start.sh` against `env_db_path()` over a tilde, a `..` and the
+  three in-memory spellings.
+
+  Every step of a mirror runs in Python, never in shell string handling. Two
+  defects came of trying: bash's `[[:space:]]` is not `str.strip()`, so a value
+  of one non-breaking space was a data directory to `start.sh` and blank to
+  `paths.py` — the launcher printed a path in the repository checkout while the
+  app opened the real production database; and an unanchored substring test for
+  an in-memory target reported `./dbs/mode=memory/x.db` unresolved while the
+  app opened the resolved path.
 - **D2.5** The demo seeds itself when its database holds no action items —
   judged by the rows, not by the file's existence. `load_demo_data()` is
   additive, so seeding on every launch would add another six items each time;
@@ -152,6 +195,17 @@ Acceptance — `tests/test_demo_install.py`:
   on the file alone therefore turned one interrupted seed into a permanent
   state: run 1 failed loudly, and every run after it launched an empty demo in
   silence.
+
+  The count is read through a **URI-escaped** path (`pathname2url`), not an
+  f-string. SQLite parses `file:<path>?<query>`, so a `?` in the demo path
+  truncated the filename and took `mode=ro` with it — the read created a file
+  at the truncated path, during `--print-env`, which D2.4 promises creates
+  nothing — and a `%` made the path URI-decode to one that does not exist, so
+  the count came back -1 and `seed=yes` stuck on every launch.
+
+  The rule is "no items", not "a complete seed": a seed interrupted *after* its
+  first insert leaves items behind and is not retried. Recorded in
+  `BACKLOG.md` rather than fixed here.
 
 Acceptance — `tests/test_demo_install.py`:
 

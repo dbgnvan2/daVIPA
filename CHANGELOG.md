@@ -22,6 +22,27 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `tools/create_demo_data.py` could not run at all. It added `tools/src` to the
   import path instead of the repository's `src/`, so the script that both
   README.md and CLAUDE.md tell you to run failed with `ModuleNotFoundError`.
+- The demo launcher's refusal to run against your real data directory compared
+  the two paths only as strings, so three spellings of that directory got past
+  it: a case variant (stock macOS volumes are case-insensitive), a firmlink
+  path such as `/System/Volumes/Data/Users/...`, and `/` itself. It now
+  compares case-folded names and directory identity, refuses the filesystem
+  root, and refuses a `getmoredone.db` symlinked out of the demo directory.
+- `./start.sh` could print an isolated data directory and then open the real
+  production database: a value of one non-breaking space was non-empty to the
+  shell and empty to `paths.py`. Both launchers now apply every path rule in
+  Python, so the launcher and the app cannot disagree about where a launch
+  goes.
+- Reading the demo's item count spliced the path into a SQLite URI, so a `?` in
+  it created a file during `--print-env` — the one command documented to create
+  nothing — and a `%` made every launch reseed and double the demo's items.
+- Both launchers hardcoded the macOS data directory, so on Linux the demo guard
+  protected a directory the app never opens and `./start.sh` exported a
+  database `python run.py` would not have chosen.
+- `./start-demo.sh --printenv`, or any other typo, performed a full launch
+  instead of reporting what it would do; it now exits 2. `./start.sh` forwards
+  its arguments to `run.py`, so `--selftest` is no longer an ordinary GUI
+  launch.
 
 ## [0.3.2] - 2026-10-02
 
