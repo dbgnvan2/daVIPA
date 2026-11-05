@@ -23,7 +23,25 @@ gmd_trim() {
     value="${value%"${value##*[![:space:]]}"}"
     printf '%s' "$value"
 }
+
+# Resolve a path the way paths.app_data_dir_path() does — expanduser(), then
+# resolve() — so that what this script reports and what the app opens are the
+# same path. The shell does not expand a "~" inside a variable, and it does not
+# collapse "..", a double slash or a symlink; paths.py does all four. Pinned to
+# the resolver by tests/test_demo_install.py::test_d2_print_env_matches_the_resolver.
+gmd_resolve() {
+    python3 -I - "$1" <<'GMD_PY'
+import sys
+from pathlib import Path
+
+print(Path(sys.argv[1]).expanduser().resolve())
+GMD_PY
+}
+
 GMD_DATA_DIR="$(gmd_trim "${GETMOREDONE_DATA_DIR:-}")"
+if [ -n "$GMD_DATA_DIR" ]; then
+    GMD_DATA_DIR="$(gmd_resolve "$GMD_DATA_DIR")" || exit 1
+fi
 
 if [ -z "${GETMOREDONE_DB:-}" ] && [ -z "$GMD_DATA_DIR" ]; then
     export GETMOREDONE_DB="${HOME}/Library/Application Support/GetMoreDone/getmoredone.db"
@@ -33,7 +51,12 @@ fi
 # Empty GETMOREDONE_DB means paths.py derives it from the data directory.
 GMD_DB_RESOLVED="${GETMOREDONE_DB:-}"
 if [ -z "$GMD_DB_RESOLVED" ]; then
-    GMD_DB_RESOLVED="${GMD_DATA_DIR%/}/getmoredone.db"
+    GMD_DB_RESOLVED="${GMD_DATA_DIR}/getmoredone.db"
+elif [ "${GMD_DB_RESOLVED#*:memory:}" = "$GMD_DB_RESOLVED" ] &&
+     [ "${GMD_DB_RESOLVED#*mode=memory}" = "$GMD_DB_RESOLVED" ]; then
+    # env_db_path() resolves a file path but passes an in-memory target
+    # through untouched, so this mirrors both halves of that rule.
+    GMD_DB_RESOLVED="$(gmd_resolve "$GMD_DB_RESOLVED")" || exit 1
 fi
 
 # Report the resolution and stop, before any venv, pip, cache-clearing or
