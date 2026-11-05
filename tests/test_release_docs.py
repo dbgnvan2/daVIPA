@@ -17,7 +17,10 @@ both be wrong.
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -177,12 +180,6 @@ def test_rm6b_install_doc_links_resolve_to_real_files():
 # --------------------------------------------------------------------------
 
 # Anchored to the whole line, so a default moved into a comment or a second
-# assignment added below it is a failure rather than a silent match.
-DEFAULT_DEMO_DIR_LINE = re.compile(
-    r'^DEFAULT_DEMO_DIR="\$\{HOME\}/(?P<tail>.+)"$', re.MULTILINE
-)
-
-
 def test_d5_demo_doc_exists():
     assert DEMO_INSTALL.exists(), "no docs/DEMO_INSTALL.md"
 
@@ -203,17 +200,49 @@ def test_d5_demo_doc_names_the_variables_the_code_reads():
         )
 
 
-def test_d5_demo_doc_names_the_launcher_default_directory():
-    """The directory the doc tells you to delete must be the one in use."""
-    script = (REPO_ROOT / "start-demo.sh").read_text(encoding="utf-8")
-    defaults = DEFAULT_DEMO_DIR_LINE.findall(script)
+def test_d5_demo_doc_names_the_launcher_default_directory(tmp_path):
+    """The directory the doc tells you to delete must be the one in use.
 
-    assert len(defaults) == 1, (
-        f"expected exactly one DEFAULT_DEMO_DIR assignment in start-demo.sh, "
-        f"found {len(defaults)}: {defaults}"
+    Asked of the launcher rather than of its source: this read a
+    DEFAULT_DEMO_DIR= assignment until the default moved into the preflight,
+    where the guard that refuses the real installation can see it. Running
+    --print-env says what the launcher will actually use, which is what the
+    reader is being told to delete.
+
+    The macOS tail is asserted on every platform, so an edit to the document
+    is caught in CI too; the launcher is asked only on macOS, because
+    DEMO_INSTALL.md documents macOS paths and the launcher follows
+    platformdirs elsewhere (pinned by
+    tests/test_demo_install.py::test_d2_the_launchers_agree_with_platformdirs).
+    """
+    doc = DEMO_INSTALL.read_text(encoding="utf-8")
+    macos_tail = "Library/Application Support/GetMoreDone-Demo"
+
+    assert macos_tail in doc, (
+        f"DEMO_INSTALL.md no longer names {macos_tail!r}, the directory the "
+        "demo launcher creates on macOS and the one its reset recipe deletes"
     )
-    assert defaults[0] in DEMO_INSTALL.read_text(encoding="utf-8"), (
-        f"DEMO_INSTALL.md does not name the launcher's default, {defaults[0]!r}"
+
+    if sys.platform != "darwin":
+        return
+
+    env = dict(os.environ)
+    env["HOME"] = str(tmp_path)
+    env.pop("GETMOREDONE_DATA_DIR", None)
+    env.pop("GETMOREDONE_DB", None)
+    result = subprocess.run(
+        ["bash", str(REPO_ROOT / "start-demo.sh"), "--print-env"],
+        cwd=str(REPO_ROOT), env=env, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    reported = ""
+    for line in result.stdout.splitlines():
+        if line.startswith("data-dir="):
+            reported = line.partition("=")[2]
+    assert reported.endswith(macos_tail), (
+        f"the launcher's default is {reported!r}, which is not the "
+        f"{macos_tail!r} that DEMO_INSTALL.md tells the reader to delete"
     )
 
 

@@ -19,6 +19,7 @@ import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 from platformdirs import user_data_dir
 
@@ -43,6 +44,33 @@ def _real_data_dir() -> Path:
     is the thing under test.
     """
     return Path(user_data_dir(APP_NAME, APP_AUTHOR)).expanduser().resolve()
+
+
+def _real_data_dir_for(home: Path) -> Path:
+    """platformdirs' answer for `home` — what the installed app would use.
+
+    Both launchers transcribe this rule rather than importing platformdirs,
+    which does not exist before the venv does. Comparing against the real
+    function is what keeps the transcription honest: both scripts used to
+    hardcode the macOS path, so on Linux they named a directory the app never
+    opens — the demo guard protected nothing and start.sh exported a database
+    `python run.py` would never have chosen.
+    """
+    saved = os.environ.get("HOME")
+    os.environ["HOME"] = str(home)
+    try:
+        return Path(user_data_dir(APP_NAME, APP_AUTHOR)).expanduser().resolve()
+    finally:
+        if saved is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = saved
+
+
+def _demo_data_dir_for(home: Path) -> Path:
+    """Where ./start-demo.sh puts a demo when nothing is set."""
+    real = _real_data_dir_for(home)
+    return real.parent / f"{APP_NAME}-Demo"
 
 
 def _child_env(home: Path, **overrides: str | None) -> dict[str, str]:
@@ -110,6 +138,18 @@ def _resolver_data_dir(monkeypatch, home: Path, value: str) -> Path:
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv(DATA_DIR_ENV, value)
     return paths.app_data_dir_path()
+
+
+def _resolver_db(monkeypatch, home: Path, value: str):
+    """What env_db_path() itself returns for `value` under `home`.
+
+    The real function, for the same reason _resolver_data_dir calls the real
+    app_data_dir_path(): a second copy of the rule here would drift in step
+    with the launcher's copy and prove nothing.
+    """
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv(DB_ENV, value)
+    return paths.env_db_path()
 
 
 def _fingerprint(path: Path) -> tuple:
@@ -244,22 +284,32 @@ def test_d1_the_suite_runs_with_no_data_dir_override(tmp_path):
     )
 
 
-def test_d1_the_session_restores_the_override_afterwards(tmp_path):
+def test_d1_the_session_restores_the_override_afterwards(tmp_path, monkeypatch):
     """The pop is scoped to the session, not a permanent deletion.
 
     pytest_sessionfinish puts the value back, so an in-process caller that
     runs pytest.main() and then does other work still has its environment.
-    """
-    result = _run_nested_pytest(
-        tmp_path,
-        """
-        def test_probe():
-            assert True
-        """,
-        env_extra={DATA_DIR_ENV: str(tmp_path / "ambient-demo")},
-    )
 
-    assert result.returncode == 0, f"{result.stdout}\n{result.stderr}"
+    This calls the two hooks directly, because the value has to be observed
+    *after* the session that popped it has finished. The previous version ran
+    a nested session whose body was ``assert True`` and whose only assertion
+    was that it exited 0 — so deleting the restore left it green. It could not
+    fail. Found by a cold review pass.
+    """
+    import conftest as root_conftest
+
+    ambient = str(tmp_path / "ambient-demo")
+    monkeypatch.setenv(DATA_DIR_ENV, ambient)
+    session = SimpleNamespace(config=SimpleNamespace())
+
+    root_conftest.pytest_sessionstart(session)
+    assert DATA_DIR_ENV not in os.environ, (
+        "pytest_sessionstart did not drop the ambient override")
+
+    root_conftest.pytest_sessionfinish(session, 0)
+    assert os.environ.get(DATA_DIR_ENV) == ambient, (
+        "pytest_sessionfinish did not put the ambient override back: "
+        f"{os.environ.get(DATA_DIR_ENV)!r}")
 
 
 # --------------------------------------------------------------------------
@@ -272,8 +322,7 @@ def test_d2_demo_launcher_resolves_the_demo_data_dir(tmp_path):
 
     assert result.returncode == 0, result.stderr
     values = _parsed(result)
-    expected = tmp_path.resolve() / "Library/Application Support/GetMoreDone-Demo"
-    assert Path(values["data-dir"]) == expected
+    assert Path(values["data-dir"]) == _demo_data_dir_for(tmp_path)
     assert not Path(values["db"]).is_relative_to(_real_data_dir())
 
 
@@ -298,7 +347,7 @@ def test_d2_demo_launcher_refuses_the_real_data_dir(tmp_path):
     a string comparison would pass a path that differs only in punctuation and
     the directory on the other side holds the user's real items.
     """
-    real = tmp_path / "Library/Application Support/GetMoreDone"
+    real = _real_data_dir_for(tmp_path)
     real.mkdir(parents=True)
 
     result = _print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=f"{real}/")
@@ -323,7 +372,7 @@ def test_d2_start_sh_default_db_is_unchanged_with_no_env(tmp_path):
     """With neither variable set, the exported path is what it has always been."""
     values = _parsed(_print_env("start.sh", tmp_path))
 
-    expected = tmp_path / "Library/Application Support/GetMoreDone/getmoredone.db"
+    expected = _real_data_dir_for(tmp_path) / "getmoredone.db"
     assert values["db-env"] == str(expected)
     assert values["db"] == str(expected)
     assert values["data-dir"] == ""
@@ -340,7 +389,7 @@ def test_d2_start_sh_treats_a_blank_data_dir_as_unset(tmp_path):
     """
     values = _parsed(_print_env("start.sh", tmp_path, GETMOREDONE_DATA_DIR="   "))
 
-    expected = tmp_path / "Library/Application Support/GetMoreDone/getmoredone.db"
+    expected = _real_data_dir_for(tmp_path) / "getmoredone.db"
     assert values["data-dir"] == ""
     assert values["db-env"] == str(expected), (
         "start.sh skipped its production default for a blank data directory, "
@@ -357,8 +406,7 @@ def test_d2_demo_launcher_ignores_a_blank_data_dir(tmp_path):
     """
     values = _parsed(_print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR="  "))
 
-    expected = tmp_path.resolve() / "Library/Application Support/GetMoreDone-Demo"
-    assert Path(values["data-dir"]) == expected
+    assert Path(values["data-dir"]) == _demo_data_dir_for(tmp_path)
 
 
 def test_d2_demo_launcher_reports_one_canonical_directory(tmp_path):
@@ -383,8 +431,8 @@ def test_d2_demo_launcher_reports_one_canonical_directory(tmp_path):
 # The seeding step runs only on a first launch, against the repository's own
 # venv, so no test can reach it without building a venv or writing to this
 # checkout's. This is the source-text guard the repo's rules allow where no
-# behavioural check is practical: anchored to whole lines, asserting an exact
-# count and an exact indentation.
+# behavioural check is practical: anchored to whole lines, asserting exact
+# counts and the branch each line falls in.
 PIP_INSTALL_LINE = re.compile(
     r"^(?P<indent> *)\"\$VENV_PY\" -m pip install -q -r requirements\.txt \|\| exit 1$",
     re.MULTILINE,
@@ -395,14 +443,40 @@ SEED_LINE = re.compile(
 )
 
 
+def _venv_branch_span(script: str) -> tuple[int, int]:
+    """The character span of start-demo.sh's "create the venv" if-block.
+
+    Nesting in bash is `if`/`fi`, not indentation. An earlier version of the
+    guard below asked how many spaces the install line carried, which let the
+    line be moved back inside this branch — the exact defect the guard exists
+    for — as long as it kept four of them. Found by a cold review pass.
+    """
+    opener = 'if [ ! -x "$VENV_PY" ]; then'
+    start = None
+    depth = 0
+    offset = 0
+    for line in script.splitlines(keepends=True):
+        stripped = line.strip()
+        if start is None:
+            if stripped == opener:
+                start = offset
+                depth = 1
+        elif stripped.startswith("if "):
+            depth += 1
+        elif stripped == "fi":
+            depth -= 1
+            if depth == 0:
+                return start, offset + len(line)
+        offset += len(line)
+    raise AssertionError(f"start-demo.sh has no unclosed `{opener}` branch")
+
+
 def test_d2_demo_launcher_installs_requirements_before_seeding():
     """The install must not be nested inside the "create the venv" branch.
 
     It was, so a venv that existed but lacked a runtime dependency made the
     seed raise ModuleNotFoundError and took the launch down with it — where
     plain start.sh would have installed the dependency and started the app.
-    Indentation is the structure here: 4 spaces is the seeding block, 8 would
-    be back inside the venv-creation branch.
     """
     script = (REPO_ROOT / "start-demo.sh").read_text(encoding="utf-8")
     installs = list(PIP_INSTALL_LINE.finditer(script))
@@ -415,16 +489,17 @@ def test_d2_demo_launcher_installs_requirements_before_seeding():
     assert len(seeds) == 1, (
         f"expected exactly one seeding call in start-demo.sh, found {len(seeds)}"
     )
-    assert len(installs[0].group("indent")) == 4, (
-        f"the requirements install is indented "
-        f"{len(installs[0].group('indent'))} spaces, so it is nested inside "
-        "the venv-creation branch and will not run for a venv that already "
-        "exists"
+
+    branch_start, branch_end = _venv_branch_span(script)
+    assert not branch_start <= installs[0].start() < branch_end, (
+        'the requirements install sits inside the `if [ ! -x "$VENV_PY" ]` '
+        "branch, so it runs only for a venv this script just created — a venv "
+        "that exists but lacks a runtime dependency takes the seed, and the "
+        "launch, down with it"
     )
     assert installs[0].start() < seeds[0].start(), (
         "the requirements install comes after the seeding call, so the seed "
-        "runs before its dependencies are installed — which is the failure "
-        "this guard exists to catch, and indentation alone does not catch it"
+        "runs before its dependencies are installed"
     )
 
 
@@ -436,6 +511,188 @@ def test_d2_launchers_are_valid_bash():
             capture_output=True, text=True, timeout=60,
         )
         assert result.returncode == 0, f"{script}: {result.stderr}"
+
+
+def test_d2_the_launchers_agree_with_platformdirs(tmp_path):
+    """Both scripts' idea of "the real installation" is platformdirs'.
+
+    Neither can import platformdirs — on a first launch there is no venv —
+    so both transcribe its rule, and both used to transcribe it as the macOS
+    path unconditionally. On Linux that left the demo guard watching a
+    directory the app never uses, so pointing the demo at the real
+    ~/.local/share/GetMoreDone was accepted and would have seeded it.
+    """
+    real = _real_data_dir_for(tmp_path)
+
+    refusal = _print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=str(real))
+    assert refusal.returncode != 0, (
+        f"start-demo.sh does not recognise {real} as the real installation:\n"
+        f"{refusal.stdout}")
+
+    default = _parsed(_print_env("start.sh", tmp_path))
+    assert default["db-env"] == str(real / "getmoredone.db"), (
+        "start.sh's production default is not the directory platformdirs "
+        "names, so ./start.sh and `python run.py` would use two databases")
+
+
+def test_d2_demo_launcher_refuses_a_case_variant_of_the_real_directory(tmp_path):
+    """One name is not one directory on a case-insensitive volume.
+
+    macOS volumes are case-insensitive by default and Path.resolve() folds no
+    case, so ".../getmoredone" and ".../GetMoreDone" are two strings for one
+    directory. The guard compared the strings, so the lowercase spelling was
+    accepted and a launch would have written the demo's database, settings and
+    app.lock in among the real items. Found by a cold review pass.
+    """
+    real = _real_data_dir_for(tmp_path)
+    variant = real.parent / real.name.lower()
+
+    result = _print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=str(variant))
+
+    assert result.returncode != 0, (
+        f"a case variant of the real directory was accepted:\n{result.stdout}")
+    assert "is inside" in result.stdout
+
+
+def test_d2_demo_launcher_refuses_the_filesystem_root(tmp_path):
+    """"/" is the one directory that contains everything.
+
+    The containment test built its pattern as "$DEMO"/*, which for "/" is the
+    literal "//*" and matches nothing — so the root was accepted, exported as
+    "//getmoredone.db", and DEMO_INSTALL.md's reset recipe then tells the
+    reader to `rm -rf` what the launcher printed. Found by a cold review pass.
+    """
+    for spelling in ("/", "//", "/..", "/../.."):
+        result = _print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=spelling)
+
+        assert result.returncode != 0, (
+            f"GETMOREDONE_DATA_DIR={spelling!r} was accepted:\n{result.stdout}")
+        assert "root" in result.stdout
+
+
+def test_d2_demo_launcher_refuses_a_database_symlinked_out_of_the_demo(tmp_path):
+    """The guard canonicalises the directory; the app canonicalises the file.
+
+    env_db_path() resolves the whole database path, following a final-component
+    symlink, so a link at <demo>/getmoredone.db sent every write to its target
+    while --print-env reported the demo path. The target can be the real
+    database. Found by a cold review pass.
+    """
+    real = _real_data_dir_for(tmp_path)
+    real.mkdir(parents=True)
+    real_db = real / "getmoredone.db"
+    real_db.write_bytes(b"")
+    demo = _demo_data_dir_for(tmp_path)
+    demo.mkdir(parents=True)
+    (demo / "getmoredone.db").symlink_to(real_db)
+
+    result = _print_env("start-demo.sh", tmp_path)
+
+    assert result.returncode != 0, (
+        f"a database symlinked out of the demo directory was accepted:\n"
+        f"{result.stdout}")
+    assert "outside" in result.stdout
+
+
+def test_d2_start_sh_agrees_with_paths_on_a_non_breaking_space(tmp_path, monkeypatch):
+    """The shell's whitespace class is not str.strip().
+
+    bash's [[:space:]] does not match U+00A0 and Python's strip() does, so a
+    value of one non-breaking space was non-empty to start.sh and empty to
+    paths.py: the launcher printed a path inside the repository checkout while
+    the app opened the real production database. Found by a cold review pass.
+    """
+    values = _parsed(_print_env("start.sh", tmp_path, GETMOREDONE_DATA_DIR="\u00a0"))
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(DATA_DIR_ENV, "\u00a0")
+    monkeypatch.delenv(DB_ENV, raising=False)
+
+    assert values["data-dir"] == "", (
+        "start.sh treated a non-breaking space as a data directory; paths.py "
+        "strips it away and falls back to production")
+    assert Path(values["db"]) == paths.resolve_db_path()
+
+
+def test_d2_print_env_matches_the_db_resolver(tmp_path, monkeypatch):
+    """start.sh mirrors env_db_path(), in-memory targets included.
+
+    Nothing ran either launcher with GETMOREDONE_DB set, so the whole branch
+    was untested: deleting it changed no test, and its unanchored substring
+    test for "in-memory" reported "./dbs/mode=memory/x.db" unresolved while
+    the app opened the resolved path. Found by a cold review pass.
+    """
+    spellings = [
+        "~/explicit.db",
+        str(tmp_path / "x" / ".." / "explicit.db"),
+        ":memory:",
+        "file::memory:?cache=shared",
+        "file:/tmp/x.db?mode=memory",
+        "./dbs/mode=memory/x.db",
+    ]
+
+    for spelling in spellings:
+        values = _parsed(_print_env("start.sh", tmp_path, GETMOREDONE_DB=spelling))
+        expected = _resolver_db(monkeypatch, tmp_path, spelling)
+
+        assert values["db-env"] == spelling
+        assert values["db"] == str(expected), (
+            f"start.sh resolved GETMOREDONE_DB={spelling!r} to "
+            f"{values['db']!r}, but env_db_path() returns {expected!r}"
+        )
+
+
+def test_d2_the_seed_decision_reads_an_awkward_path_and_creates_nothing(tmp_path):
+    """The item count went through an f-string, not a URI.
+
+    SQLite parses "file:<path>?<query>", so a "?" in the demo path truncated
+    the filename and took `mode=ro` with it — the read created a file at the
+    truncated path, during the one command documented to create nothing. A "%"
+    made the path URI-decode to one that does not exist, so the count came
+    back -1, seed stuck at yes, and load_demo_data() is additive: six more
+    items on every launch. Found by a cold review pass.
+    """
+    parent = tmp_path / "awkward"
+    for name in ("a?b", "pc%20x"):
+        demo = parent / name
+        demo.mkdir(parents=True)
+        db = demo / "getmoredone.db"
+        with sqlite3.connect(db) as con:
+            con.execute("create table action_items (id integer primary key)")
+            con.execute("insert into action_items values (1)")
+        con.close()
+
+        values = _parsed(_print_env("start-demo.sh", tmp_path,
+                                    GETMOREDONE_DATA_DIR=str(demo)))
+
+        assert values["seed"] == "no", (
+            f"the launcher could not read the item count under {name!r}, so it "
+            "would seed an already-seeded demo and double its items")
+
+    assert sorted(child.name for child in parent.iterdir()) == ["a?b", "pc%20x"], (
+        "reading the item count created something next to the demo directory")
+
+
+def test_d2_demo_launcher_refuses_an_unknown_argument(tmp_path):
+    """A mistyped flag used to perform a full launch.
+
+    "--printenv" matched nothing, so the command documented to touch nothing
+    fell through to the mkdir, the pip install and the seed. Found by a cold
+    review pass.
+    """
+    result = subprocess.run(
+        ["bash", str(REPO_ROOT / "start-demo.sh"), "--printenv"],
+        cwd=str(REPO_ROOT),
+        env=_child_env(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    assert result.returncode == 2, result.stdout
+    assert "Unknown argument" in result.stdout
+    assert not _demo_data_dir_for(tmp_path).exists(), (
+        "the refused run created the demo data directory anyway")
 
 
 # --------------------------------------------------------------------------
@@ -507,7 +764,7 @@ def test_d2_demo_launcher_refuses_a_directory_inside_the_real_one(tmp_path):
     the demo's database, settings, app.lock and log INSIDE the real
     installation — the one thing this feature must never do.
     """
-    real = tmp_path / "Library/Application Support/GetMoreDone"
+    real = _real_data_dir_for(tmp_path)
     real.mkdir(parents=True)
 
     result = _print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=str(real / "demo"))
@@ -526,8 +783,9 @@ def test_d2_demo_launcher_refuses_a_directory_containing_the_real_one(tmp_path):
     directory that contained the real one would turn that instruction into
     data loss.
     """
-    support = tmp_path / "Library/Application Support"
-    (support / "GetMoreDone").mkdir(parents=True)
+    real = _real_data_dir_for(tmp_path)
+    real.mkdir(parents=True)
+    support = real.parent
 
     result = _print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=str(support))
 
@@ -556,7 +814,7 @@ def test_d2_refusal_creates_nothing_under_the_real_path(tmp_path):
     With the mkdir first, pointing the demo at a not-yet-existing real
     directory created that directory and *then* refused.
     """
-    target = tmp_path / "Library/Application Support/GetMoreDone"
+    target = _real_data_dir_for(tmp_path)
 
     result = _print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=f"{target}/")
 
@@ -583,10 +841,14 @@ def test_d2_print_env_matches_the_resolver(tmp_path, monkeypatch):
     """--print-env is the oracle every D2 test uses, so it must not drift.
 
     Both launchers resolve a path themselves rather than importing paths.py,
-    which cannot be imported before the venv exists. This pins the two
-    implementations together over the awkward spellings — a tilde, a trailing
+    which cannot be imported before the venv exists. This pins both copies to
+    app_data_dir_path() over the awkward spellings — a tilde, a trailing
     slash, a doubled slash, a "..", and a symlinked parent — so a change to
-    app_data_dir_path() that this mirror does not follow turns the suite red.
+    the resolver that a mirror does not follow turns the suite red.
+
+    It ran only start.sh until a cold review pass pointed out that the name
+    and the paragraph above both claimed otherwise, leaving start-demo.sh's
+    duplicate unpinned for every spelling but the tilde.
     """
     link_target = tmp_path / "actual"
     link_target.mkdir()
@@ -600,14 +862,16 @@ def test_d2_print_env_matches_the_resolver(tmp_path, monkeypatch):
         str(tmp_path / "linked" / "demo"),
     ]
 
-    for spelling in spellings:
-        values = _parsed(_print_env("start.sh", tmp_path, GETMOREDONE_DATA_DIR=spelling))
-        expected = _resolver_data_dir(monkeypatch, tmp_path, spelling)
-        assert Path(values["data-dir"]) == expected, (
-            f"start.sh resolved {spelling!r} to {values['data-dir']!r}, but "
-            f"app_data_dir_path() resolves it to {expected}"
-        )
-        assert Path(values["db"]) == expected / "getmoredone.db"
+    for script in ("start.sh", "start-demo.sh"):
+        for spelling in spellings:
+            values = _parsed(
+                _print_env(script, tmp_path, GETMOREDONE_DATA_DIR=spelling))
+            expected = _resolver_data_dir(monkeypatch, tmp_path, spelling)
+            assert Path(values["data-dir"]) == expected, (
+                f"{script} resolved {spelling!r} to {values['data-dir']!r}, "
+                f"but app_data_dir_path() resolves it to {expected}"
+            )
+            assert Path(values["db"]) == expected / "getmoredone.db"
 
 
 def test_d2_demo_launcher_reseeds_a_database_with_no_items(tmp_path):
