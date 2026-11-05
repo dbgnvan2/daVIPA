@@ -12,39 +12,82 @@
 # applies when neither variable is set. With neither set it exports exactly
 # what it always has.
 
-# Blank-after-trim counts as unset, which is what paths.py's .strip() does.
-# The shell's -z alone does not agree with it: "   " is non-empty here and
-# empty there, so this script would skip the production default while
-# app_data_dir_path() fell back to production anyway — the app writing the real
-# database while this script printed an isolated path.
-gmd_trim() {
-    local value="$1"
-    value="${value#"${value%%[![:space:]]*}"}"
-    value="${value%"${value##*[![:space:]]}"}"
-    printf '%s' "$value"
-}
-
-# Resolve a path the way paths.app_data_dir_path() does — expanduser(), then
-# resolve() — so that what this script reports and what the app opens are the
-# same path. The shell does not expand a "~" inside a variable, and it does not
-# collapse "..", a double slash or a symlink; paths.py does all four. Pinned to
-# the resolver by tests/test_demo_install.py::test_d2_print_env_matches_the_resolver.
-gmd_resolve() {
+# Resolve a data-directory value exactly as paths.app_data_dir_path() does:
+# strip() first, then expanduser(), then resolve(). Prints nothing for a blank
+# value, which this script reads as unset.
+#
+# All three steps have to happen in Python, not in the shell. The strip is the
+# one that was wrong: bash's [[:space:]] is not str.strip(), so a value of one
+# non-breaking space was non-empty here and empty there — this script skipped
+# its production default and printed a path inside the repository checkout,
+# while app_data_dir_path() stripped the value away and opened the real
+# production directory. The shell also does not expand a "~" inside a
+# variable, and does not collapse "..", a doubled slash or a symlink.
+#
+# Pinned to the resolver by
+# tests/test_demo_install.py::test_d2_print_env_matches_the_resolver.
+gmd_resolve_dir() {
     python3 -I - "$1" <<'GMD_PY'
 import sys
 from pathlib import Path
 
-print(Path(sys.argv[1]).expanduser().resolve())
+value = sys.argv[1].strip()
+print(Path(value).expanduser().resolve() if value else "")
 GMD_PY
 }
 
-GMD_DATA_DIR="$(gmd_trim "${GETMOREDONE_DATA_DIR:-}")"
-if [ -n "$GMD_DATA_DIR" ]; then
-    GMD_DATA_DIR="$(gmd_resolve "$GMD_DATA_DIR")" || exit 1
-fi
+# Resolve a GETMOREDONE_DB value exactly as paths.env_db_path() does: an
+# in-memory target passes through untouched, anything else is expanded and
+# resolved. The in-memory test is anchored, as _is_memory_db_target's is — an
+# unanchored substring test in the shell reported "./dbs/mode=memory/x.db"
+# unresolved while the app opened the resolved path.
+#
+# Pinned to the resolver by
+# tests/test_demo_install.py::test_d2_print_env_matches_the_db_resolver.
+gmd_resolve_db() {
+    python3 -I - "$1" <<'GMD_PY'
+import sys
+from pathlib import Path
+
+value = sys.argv[1]
+low = value.strip().lower()
+if (
+    low == ":memory:"
+    or low.startswith("file::memory:")
+    or (low.startswith("file:") and "mode=memory" in low)
+):
+    print(value)
+else:
+    print(Path(value).expanduser().resolve())
+GMD_PY
+}
+
+# Where the installed app keeps its data, by platformdirs' rule for this app,
+# transcribed because this runs before the venv exists. Hardcoding the macOS
+# path made a Linux `./start.sh` export a database the app would never have
+# chosen on its own, so a start.sh launch and a `python run.py` launch on one
+# machine used two different databases without saying so. Pinned to
+# platformdirs by
+# tests/test_demo_install.py::test_d2_the_launchers_agree_with_platformdirs.
+gmd_real_data_dir() {
+    python3 -I - <<'GMD_PY'
+import os
+import sys
+from pathlib import Path
+
+APP_NAME = "GetMoreDone"
+if sys.platform == "darwin":
+    print(Path("~/Library/Application Support").expanduser() / APP_NAME)
+else:
+    base = os.environ.get("XDG_DATA_HOME") or "~/.local/share"
+    print(Path(base).expanduser() / APP_NAME)
+GMD_PY
+}
+
+GMD_DATA_DIR="$(gmd_resolve_dir "${GETMOREDONE_DATA_DIR:-}")" || exit 1
 
 if [ -z "${GETMOREDONE_DB:-}" ] && [ -z "$GMD_DATA_DIR" ]; then
-    export GETMOREDONE_DB="${HOME}/Library/Application Support/GetMoreDone/getmoredone.db"
+    export GETMOREDONE_DB="$(gmd_real_data_dir)/getmoredone.db"
 fi
 
 # The database that will actually be used, for display and for --print-env.
@@ -52,11 +95,8 @@ fi
 GMD_DB_RESOLVED="${GETMOREDONE_DB:-}"
 if [ -z "$GMD_DB_RESOLVED" ]; then
     GMD_DB_RESOLVED="${GMD_DATA_DIR}/getmoredone.db"
-elif [ "${GMD_DB_RESOLVED#*:memory:}" = "$GMD_DB_RESOLVED" ] &&
-     [ "${GMD_DB_RESOLVED#*mode=memory}" = "$GMD_DB_RESOLVED" ]; then
-    # env_db_path() resolves a file path but passes an in-memory target
-    # through untouched, so this mirrors both halves of that rule.
-    GMD_DB_RESOLVED="$(gmd_resolve "$GMD_DB_RESOLVED")" || exit 1
+else
+    GMD_DB_RESOLVED="$(gmd_resolve_db "$GMD_DB_RESOLVED")" || exit 1
 fi
 
 # Report the resolution and stop, before any venv, pip, cache-clearing or
@@ -109,4 +149,7 @@ if [ -n "$GMD_DATA_DIR" ]; then
     echo "   Data: ${GMD_DATA_DIR}"
 fi
 echo "   DB: ${GMD_DB_RESOLVED}"
-"$VENV_PY" run.py
+# Forwarded, and exec'd: run.py has its own flags — --selftest is the headless
+# CI entry point — and dropping "$@" turned `./start.sh --selftest` into an
+# ordinary GUI launch. exec leaves no parent shell alive for the session.
+exec "$VENV_PY" run.py "$@"
