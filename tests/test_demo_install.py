@@ -248,6 +248,91 @@ def test_d2_start_sh_default_db_is_unchanged_with_no_env(tmp_path):
     assert values["data-dir"] == ""
 
 
+def test_d2_start_sh_treats_a_blank_data_dir_as_unset(tmp_path):
+    """The shell and paths.py must agree on what "blank" means.
+
+    They did not: the shell's -z is false for "   ", so start.sh skipped its
+    production default, while paths.py strips the value and fell back to
+    production anyway. The app opened the real database while the launcher
+    printed an isolated path. Pairs with
+    test_d1_blank_override_is_ignored, which fixes the Python half.
+    """
+    values = _parsed(_print_env("start.sh", tmp_path, GETMOREDONE_DATA_DIR="   "))
+
+    expected = tmp_path / "Library/Application Support/GetMoreDone/getmoredone.db"
+    assert values["data-dir"] == ""
+    assert values["db-env"] == str(expected), (
+        "start.sh skipped its production default for a blank data directory, "
+        "which paths.py then resolved to production regardless"
+    )
+    assert values["db"] == str(expected)
+
+
+def test_d2_demo_launcher_ignores_a_blank_data_dir(tmp_path):
+    """A blank override falls back to the default, not to a directory of spaces.
+
+    ``${VAR:-default}`` keeps "   ", and the launcher would then `mkdir -p` a
+    whitespace-named directory in the repository.
+    """
+    values = _parsed(_print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR="  "))
+
+    expected = tmp_path.resolve() / "Library/Application Support/GetMoreDone-Demo"
+    assert Path(values["data-dir"]) == expected
+
+
+def test_d2_demo_launcher_reports_one_canonical_directory(tmp_path):
+    """Both variables must name the same spelling of the same directory.
+
+    The data directory was exported raw while the database was derived from
+    the canonicalised path, so --print-env could report two paths for one
+    directory — and DEMO_INSTALL.md tells the reader to delete the one named
+    first.
+    """
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(real)
+
+    values = _parsed(_print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=str(link)))
+
+    assert Path(values["data-dir"]) == real.resolve()
+    assert Path(values["db"]).parent == Path(values["data-dir"])
+
+
+# The seeding step runs only on a first launch, against the repository's own
+# venv, so no test can reach it without building a venv or writing to this
+# checkout's. This is the source-text guard the repo's rules allow where no
+# behavioural check is practical: anchored to whole lines, asserting an exact
+# count and an exact indentation.
+PIP_INSTALL_LINE = re.compile(
+    r"^(?P<indent> *)\"\$VENV_PY\" -m pip install -q -r requirements\.txt \|\| exit 1$",
+    re.MULTILINE,
+)
+
+
+def test_d2_demo_launcher_installs_requirements_before_seeding():
+    """The install must not be nested inside the "create the venv" branch.
+
+    It was, so a venv that existed but lacked a runtime dependency made the
+    seed raise ModuleNotFoundError and took the launch down with it — where
+    plain start.sh would have installed the dependency and started the app.
+    Indentation is the structure here: 4 spaces is the seeding block, 8 would
+    be back inside the venv-creation branch.
+    """
+    script = (REPO_ROOT / "start-demo.sh").read_text(encoding="utf-8")
+    matches = PIP_INSTALL_LINE.findall(script)
+
+    assert len(matches) == 1, (
+        f"expected exactly one requirements install in start-demo.sh, found "
+        f"{len(matches)}: {matches!r}"
+    )
+    assert len(matches[0]) == 4, (
+        f"the requirements install is indented {len(matches[0])} spaces, so it "
+        "is nested inside the venv-creation branch and will not run for a venv "
+        "that already exists"
+    )
+
+
 def test_d2_launchers_are_valid_bash():
     """A launcher with a syntax error fails at the user, not in CI."""
     for script in ("start.sh", "start-demo.sh"):
