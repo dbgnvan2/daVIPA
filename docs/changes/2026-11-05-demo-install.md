@@ -102,11 +102,38 @@ alone) and the untracked files at the repository root.
   digest is the conclusive one: it proves the demo never opened the real
   directory, because opening it would have taken the lock.
 
-- Command: `./start-demo.sh`, for real, with the packaged app running
-- Result: **PASS** — both windows held open at once, the demo showing its six
-  seeded items from its own database. This is spec §8, the criterion flagged as
-  needing human review: two processes and two `flock` calls are not something
-  the suite can assert. The demo instance was closed afterwards.
+- Command: `./start-demo.sh`, for real, with `/Applications/daVIPA.app`
+  running — **re-run after the preflight was rewritten**
+- Result: **PASS.** This is spec §8, the criterion flagged as needing human
+  review: two processes and two `flock` calls are not something the suite can
+  assert. What was observed, against the rewritten preflight:
+
+  - Both windows open at once — `daVIPA [PROD]` on the real database,
+    `daVIPA [DEV]` on the demo's, read from the window server rather than
+    claimed.
+  - `lsof` on both lock files: two different processes, two different inodes.
+    The packaged app (pid 20021) holds
+    `.../GetMoreDone/app.lock`; the demo (pid 20169) holds
+    `.../GetMoreDone-Demo/app.lock`.
+  - `lsof -p` on the demo lists exactly three files under Application Support
+    — the demo's `app.lock`, `getmoredone.db` and `weekly_tactic_debug.log` —
+    and **zero** files under the real directory. That is the isolation claim
+    in full: not merely that the demo wrote nowhere it shouldn't, but that it
+    never opened anything there.
+  - The demo shows the sample items (`Fix login bug`, `Team meeting
+    preparation`, `Review project proposal`, …) against `ClientA`/`ClientB`,
+    while the packaged app shows the real list. Six rows in the demo
+    database, 937 in the real one, both unchanged by the launch.
+  - The two windows render in **different themes**. Neither instance was
+    reconfigured; the demo directory simply has no `settings.json`, so it
+    took defaults where the real instance read its own. That is the settings
+    half of the isolation claim, visible rather than inferred.
+  - The real `getmoredone.db` and `settings.json` keep their mtimes from
+    before the launch (13:05 and the previous day). Only the real `app.lock`
+    is touched, by the packaged app taking its own lock.
+
+  Both instances were left running at the user's request. The packaged app was
+  started for this check and had not been running beforehand.
 
 - Command: `./venv/bin/python tools/create_demo_data.py` under the demo
   environment
@@ -224,12 +251,15 @@ requirements install was asserted by indentation rather than by order; and the
   cold passes produced high-severity findings, so by the repo's rule another
   pass is earned over the commits that fixed them. Nothing has reviewed the
   new Python preflight in `start-demo.sh` but its author and its tests.
-- **The real launch was not repeated after the rewrite.** The two-instance
-  check in the Verification section above was run against the previous
-  preflight. The resolution it depends on is verified (`--print-env` under the
-  real `HOME` reports the same `GetMoreDone-Demo` directory and `seed=no`),
-  but no window was opened after the rewrite, deliberately: the machine was in
-  use and a launch takes keyboard focus.
+- **The window title does not say which data the instance opened.** The tag
+  is `"[PROD]" if getattr(sys, "frozen", False) else "[DEV]"`
+  (`src/getmoredone/app.py:43`), so it reports how the app was built, not
+  where it writes. A plain `./start.sh` on the real 937-item database and
+  `./start-demo.sh` on the demo both read `daVIPA [DEV]`. For a feature whose
+  purpose is telling two instances apart, the most visible signal is the one
+  that does not. Low severity — the guard is what prevents the dangerous case,
+  and this only makes two safe states look alike — so it is in `BACKLOG.md`
+  rather than fixed here, per the review-sweep rule.
 - `INSTALL.md` has no demo-launcher line (D5.4, **not done**, deliberate).
 - An ambient exported `GETMOREDONE_DB` is honoured by `pytest_sessionstart`
   rather than replaced, so a developer who exports it has the suite run
@@ -246,9 +276,6 @@ requirements install was asserted by indentation rather than by order; and the
 
 ## Next agent actions
 
-- Launch the demo for real once the machine is free, with
-  `/Applications/daVIPA.app` already running, and confirm both windows hold
-  open on the rewritten preflight — the one criterion the suite cannot assert.
 - Run a cold pass over the cold passes' fix commits, for the same reason the
   last one was owed.
 - Decide what to do about the 7 standing CI failures. They are not this

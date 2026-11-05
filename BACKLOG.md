@@ -24,6 +24,20 @@ deferred and for how long, not only of what is outstanding.
 
 ## Deferred — found by review, deliberately not fixed
 
+### Found during the demo-install launch check (2026-11-05)
+
+- **The window title reports how the app was built, not which data it
+  opened.** `src/getmoredone/app.py:43` sets
+  `"[PROD]" if getattr(sys, "frozen", False) else "[DEV]"`, so a plain
+  `./start.sh` on the real database and `./start-demo.sh` on the demo both
+  show `daVIPA [DEV]`. Observed with both instances running side by side. For
+  a feature whose point is telling two instances apart, the most visible
+  signal is the one that does not. Low: the launcher's guard is what prevents
+  the dangerous case, and this only makes two safe states look alike. A fix
+  would derive the tag from `app_data_dir_path()` rather than `sys.frozen`,
+  and would need a test that a demo-directory launch and a production launch
+  produce different titles.
+
 ### Deferred from the demo-install cold review pass (2026-11-05)
 
 Two cold read-only passes over the four fix commits `df93846..d3f8ec0` — one

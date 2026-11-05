@@ -93,7 +93,7 @@ handoff note and recorded in `BACKLOG.md`.
 
 | Criterion | Status |
 |---|---|
-| Spec §8 — the demo and the installed app hold windows open at the same time | Verified by hand, recorded in the handoff note. Two processes and two `flock` calls are not something the suite can assert. |
+| Spec §8 — the demo and the installed app hold windows open at the same time | Verified by hand **against the rewritten preflight**, recorded in the handoff note: both windows up, the two `app.lock` files held by different processes, and `lsof -p` on the demo showing three files in the demo directory and none in the real one. Two processes and two `flock` calls are not something the suite can assert. |
 
 ## Not covered by the suite
 
