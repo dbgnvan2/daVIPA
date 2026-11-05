@@ -10,6 +10,10 @@ User data location:
 - Linux: ~/.local/share/GetMoreDone/
 
 We use `platformdirs` for correct platform behavior.
+
+``GETMOREDONE_DATA_DIR`` overrides that whole directory, which is how a second
+"demo" instance runs beside a real one without sharing its settings, its
+single-instance lock or its logs. See docs/DEMO_INSTALL.md.
 """
 
 from __future__ import annotations
@@ -54,8 +58,34 @@ def resource_root() -> Path:
 
 
 def app_data_dir_path() -> Path:
-    """Directory for user-writable app data (DB, settings, exports, etc.)."""
-    p = Path(user_data_dir(APP_NAME, APP_AUTHOR)).expanduser().resolve()
+    """Directory for user-writable app data (DB, settings, exports, etc.).
+
+    Purpose: give every piece of per-install writable state one root, so a
+             second instance can be isolated by redirecting one directory.
+    Spec:    docs/spec_2026-11-05_demo_install.md#d1
+    Tests:   tests/test_demo_install.py::test_d1_data_dir_override_redirects_db_and_settings
+             tests/test_demo_install.py::test_d1_unset_override_falls_back_to_platformdirs
+
+    ``GETMOREDONE_DATA_DIR`` overrides the location. It is deliberately a
+    *directory* override rather than another per-file one: the database, the
+    settings file, ``app.lock`` and ``weekly_tactic_debug.log`` all hang off
+    this one call, and ``GETMOREDONE_DB`` isolates only the first of those. A
+    demo instance sharing this directory with the installed app does not merely
+    share a theme — ``acquire_single_instance_lock`` takes an exclusive
+    ``flock`` on ``app.lock`` here, so the second launch exits with the
+    "already running" dialog.
+
+    Blank or whitespace-only is treated as unset, the same as
+    ``GETMOREDONE_RESOURCE_ROOT`` above, so an exported-but-empty variable
+    cannot silently redirect the app into the current directory.
+    """
+    import os
+
+    override = (os.environ.get("GETMOREDONE_DATA_DIR") or "").strip()
+    if override:
+        p = Path(override).expanduser().resolve()
+    else:
+        p = Path(user_data_dir(APP_NAME, APP_AUTHOR)).expanduser().resolve()
     p.mkdir(parents=True, exist_ok=True)
     return p
 
@@ -87,7 +117,15 @@ def env_db_path() -> Path | str | None:
 
 
 def resolve_db_path(db_path: str | None = None) -> Path | str:
-    """Resolve DB path using (1) explicit arg, (2) env override, (3) default."""
+    """Resolve DB path using (1) explicit arg, (2) env override, (3) default.
+
+    ``GETMOREDONE_DB`` outranks ``GETMOREDONE_DATA_DIR``: the explicit database
+    override is consulted before ``default_db_path()`` consults the data
+    directory. ``start-demo.sh`` sets both, so the order matters.
+
+    Spec:  docs/spec_2026-11-05_demo_install.md#d1
+    Tests: tests/test_demo_install.py::test_d1_explicit_db_env_var_outranks_the_data_dir
+    """
     if db_path:
         if _is_memory_db_target(db_path):
             return db_path

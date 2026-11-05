@@ -1,5 +1,36 @@
 #!/bin/bash
 # daVIPA startup script
+#
+# Spec: docs/spec_2026-11-05_demo_install.md#d2
+
+# Default to production DB path unless overridden.
+#
+# GETMOREDONE_DATA_DIR redirects the whole data directory — database, settings,
+# app.lock, logs — and paths.py derives the database from it. Forcing the
+# production database here would clobber a data-dir-only override, which is how
+# a demo instance would end up writing the real data, so this default only
+# applies when neither variable is set. With neither set it exports exactly
+# what it always has.
+if [ -z "${GETMOREDONE_DB:-}" ] && [ -z "${GETMOREDONE_DATA_DIR:-}" ]; then
+    export GETMOREDONE_DB="${HOME}/Library/Application Support/GetMoreDone/getmoredone.db"
+fi
+
+# The database that will actually be used, for display and for --print-env.
+# Empty GETMOREDONE_DB means paths.py derives it from the data directory.
+GMD_DB_RESOLVED="${GETMOREDONE_DB:-}"
+if [ -z "$GMD_DB_RESOLVED" ]; then
+    GMD_DB_RESOLVED="${GETMOREDONE_DATA_DIR%/}/getmoredone.db"
+fi
+
+# Report the resolution and stop, before any venv, pip, cache-clearing or
+# launch work. This is what makes the rule above testable by running the
+# script rather than by reading it.
+if [ "${1:-}" = "--print-env" ]; then
+    echo "data-dir=${GETMOREDONE_DATA_DIR:-}"
+    echo "db-env=${GETMOREDONE_DB:-}"
+    echo "db=${GMD_DB_RESOLVED}"
+    exit 0
+fi
 
 echo "🚀 Starting daVIPA..."
 
@@ -36,11 +67,9 @@ echo "🧹 Clearing Python cache..."
 find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
 find . -name "*.pyc" -delete 2>/dev/null
 
-# Default to production DB path unless overridden
-if [ -z "${GETMOREDONE_DB:-}" ]; then
-    export GETMOREDONE_DB="${HOME}/Library/Application Support/GetMoreDone/getmoredone.db"
-fi
-
 echo "✅ Launching daVIPA..."
-echo "   DB: ${GETMOREDONE_DB}"
+if [ -n "${GETMOREDONE_DATA_DIR:-}" ]; then
+    echo "   Data: ${GETMOREDONE_DATA_DIR}"
+fi
+echo "   DB: ${GMD_DB_RESOLVED}"
 "$VENV_PY" run.py
