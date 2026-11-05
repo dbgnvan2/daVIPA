@@ -33,6 +33,7 @@ INSTALL = REPO_ROOT / "INSTALL.md"
 README = REPO_ROOT / "README.md"
 CHANGELOG = REPO_ROOT / "CHANGELOG.md"
 STANDALONE = REPO_ROOT / "docs/STANDALONE_BUILD.md"
+DEMO_INSTALL = REPO_ROOT / "docs/DEMO_INSTALL.md"
 
 
 # --------------------------------------------------------------------------
@@ -168,6 +169,64 @@ def test_rm6b_install_doc_links_resolve_to_real_files():
         if not path.exists():
             broken.append(target)
     assert not broken, f"INSTALL.md links to missing files: {broken}"
+
+
+# --------------------------------------------------------------------------
+# D5 — the demo-install documentation
+# docs/spec_2026-11-05_demo_install.md#d5
+# --------------------------------------------------------------------------
+
+# Anchored to the whole line, so a default moved into a comment or a second
+# assignment added below it is a failure rather than a silent match.
+DEFAULT_DEMO_DIR_LINE = re.compile(
+    r'^DEFAULT_DEMO_DIR="\$\{HOME\}/(?P<tail>.+)"$', re.MULTILINE
+)
+
+
+def test_d5_demo_doc_exists():
+    assert DEMO_INSTALL.exists(), "no docs/DEMO_INSTALL.md"
+
+
+def test_d5_demo_doc_names_the_variables_the_code_reads():
+    """Checked against paths.py, not against another document.
+
+    A doc naming an environment variable nothing reads sends the reader to a
+    setting that silently does nothing.
+    """
+    doc = DEMO_INSTALL.read_text(encoding="utf-8")
+    source = (REPO_ROOT / "src/getmoredone/paths.py").read_text(encoding="utf-8")
+
+    for variable in ("GETMOREDONE_DATA_DIR", "GETMOREDONE_DB"):
+        assert variable in doc, f"DEMO_INSTALL.md does not name {variable}"
+        assert f'os.environ.get("{variable}")' in source, (
+            f"paths.py does not read {variable}, but DEMO_INSTALL.md says it does"
+        )
+
+
+def test_d5_demo_doc_names_the_launcher_default_directory():
+    """The directory the doc tells you to delete must be the one in use."""
+    script = (REPO_ROOT / "start-demo.sh").read_text(encoding="utf-8")
+    defaults = DEFAULT_DEMO_DIR_LINE.findall(script)
+
+    assert len(defaults) == 1, (
+        f"expected exactly one DEFAULT_DEMO_DIR assignment in start-demo.sh, "
+        f"found {len(defaults)}: {defaults}"
+    )
+    assert defaults[0] in DEMO_INSTALL.read_text(encoding="utf-8"), (
+        f"DEMO_INSTALL.md does not name the launcher's default, {defaults[0]!r}"
+    )
+
+
+def test_d5_demo_doc_links_resolve_to_real_files():
+    """Its links are relative to docs/, not to the repo root."""
+    text = DEMO_INSTALL.read_text(encoding="utf-8")
+    broken = []
+    for target in re.findall(r"\]\(([^)#][^)]*)\)", text):
+        if target.startswith(("http://", "https://", "mailto:")):
+            continue
+        if not (DEMO_INSTALL.parent / target.split("#", 1)[0]).exists():
+            broken.append(target)
+    assert not broken, f"DEMO_INSTALL.md links to missing files: {broken}"
 
 
 def test_rm6b_docs_do_not_reference_the_moved_auth_script():

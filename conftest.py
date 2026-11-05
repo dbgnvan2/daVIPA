@@ -126,6 +126,19 @@ def pytest_sessionstart(session):
     """
     import tempfile
 
+    # GETMOREDONE_DATA_DIR redirects the whole data directory, and both guards
+    # in this file compute "the real data directory" from platformdirs
+    # directly — deliberately, because app_data_dir_path() mkdirs what it
+    # returns. An override exported in the shell (by `start-demo.sh`, in the
+    # same terminal) would split the two: app_data_dir_path() would resolve
+    # into the demo directory while the fingerprint and the resolve_db_path
+    # guard kept watching a directory nothing touched. The suite would then
+    # report isolation it was no longer enforcing, and would run migrations
+    # against the demo database instead (P6 — a status checked against the
+    # wrong artifact). So the suite always runs with the variable unset.
+    if "GETMOREDONE_DATA_DIR" in os.environ:
+        session.config._gmd_data_dir_env = os.environ.pop("GETMOREDONE_DATA_DIR")
+
     session.config._user_data_before = _user_data_fingerprint()
 
     # DatabaseManager() with no path resolves to the real database and runs
@@ -155,6 +168,10 @@ def pytest_sessionfinish(session, exitstatus):
     if getattr(session.config, "_gmd_db_env_set", False):
         os.environ.pop("GETMOREDONE_DB", None)
         remove_test_db_dir(getattr(session.config, "_gmd_db_dir", None))
+
+    data_dir_env = getattr(session.config, "_gmd_data_dir_env", None)
+    if data_dir_env is not None:
+        os.environ["GETMOREDONE_DATA_DIR"] = data_dir_env
 
     before = getattr(session.config, "_user_data_before", None)
     if before is None:
