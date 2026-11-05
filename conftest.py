@@ -132,10 +132,17 @@ def pytest_sessionstart(session):
     # returns. An override exported in the shell (by `start-demo.sh`, in the
     # same terminal) would split the two: app_data_dir_path() would resolve
     # into the demo directory while the fingerprint and the resolve_db_path
-    # guard kept watching a directory nothing touched. The suite would then
-    # report isolation it was no longer enforcing, and would run migrations
-    # against the demo database instead (P6 — a status checked against the
+    # guard kept watching a directory nothing touched. The suite would report
+    # isolation it was no longer enforcing (P6 — a status checked against the
     # wrong artifact). So the suite always runs with the variable unset.
+    #
+    # It would NOT have reached the demo *database*: the block below points
+    # GETMOREDONE_DB at a temp file, and that variable outranks this one in
+    # resolve_db_path. An earlier version of this comment claimed otherwise.
+    # The database case that is genuinely open is the one just below — an
+    # ambient GETMOREDONE_DB is honoured rather than replaced — and it is
+    # recorded in BACKLOG.md.
+    # Tests: tests/test_demo_install.py::test_d1_the_suite_runs_with_no_data_dir_override
     if "GETMOREDONE_DATA_DIR" in os.environ:
         session.config._gmd_data_dir_env = os.environ.pop("GETMOREDONE_DATA_DIR")
 

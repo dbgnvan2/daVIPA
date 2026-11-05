@@ -25,6 +25,11 @@ from platformdirs import user_data_dir
 from src.getmoredone import paths
 from src.getmoredone.paths import APP_AUTHOR, APP_NAME
 
+# Reused, not copied: this is the only machinery in the repo that loads the
+# root conftest's session hooks into a throwaway pytest run, and a second copy
+# would be a second thing to keep in step with those hooks.
+from tests.test_settings_isolation import _run_nested_pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR_ENV = "GETMOREDONE_DATA_DIR"
 DB_ENV = "GETMOREDONE_DB"
@@ -93,6 +98,20 @@ def _row_count(db_path: Path) -> int:
         conn.close()
 
 
+def _resolver_data_dir(monkeypatch, home: Path, value: str) -> Path:
+    """What app_data_dir_path() itself returns for `value` under `home`.
+
+    The real function, not a reimplementation of its rule: the whole point of
+    the comparison is to catch the launchers' mirror of that rule drifting
+    away from it, and a second copy here would drift in step. It does create
+    the directory, because that is what app_data_dir_path() does — everything
+    it creates is inside the calling test's tmp_path.
+    """
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv(DATA_DIR_ENV, value)
+    return paths.app_data_dir_path()
+
+
 def _fingerprint(path: Path) -> tuple:
     """(exists, size, sha256) — enough to catch any write to a real file."""
     if not path.exists():
@@ -120,14 +139,31 @@ def test_d1_data_dir_override_redirects_db_and_settings(tmp_path, monkeypatch):
     assert demo.is_dir(), "the override must create the directory, as the default does"
 
 
-def test_d1_unset_override_falls_back_to_platformdirs(monkeypatch):
-    """With the variable unset, every existing install must be unaffected."""
+def test_d1_unset_override_falls_back_to_platformdirs(tmp_path, monkeypatch):
+    """With the variable unset, every existing install must be unaffected.
+
+    HOME is redirected because app_data_dir_path() ends in
+    ``mkdir(parents=True, exist_ok=True)``. Checking the fallback against the
+    user's real location would therefore CREATE that location on a machine
+    where the app has never run — which is exactly what
+    conftest._user_data_fingerprint's docstring refuses to do. Both sides of
+    the comparison read the redirected HOME, so this still proves the
+    platformdirs branch is the one taken.
+    """
     monkeypatch.delenv(DATA_DIR_ENV, raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
 
-    assert paths.app_data_dir_path() == _real_data_dir()
+    expected = Path(user_data_dir(APP_NAME, APP_AUTHOR)).expanduser().resolve()
+    resolved = paths.app_data_dir_path()
+
+    assert resolved == expected
+    assert resolved.is_relative_to(tmp_path.resolve()), (
+        "the fallback escaped the redirected HOME, so this test would create "
+        "the user's real data directory"
+    )
 
 
-def test_d1_blank_override_is_ignored(monkeypatch):
+def test_d1_blank_override_is_ignored(tmp_path, monkeypatch):
     """An exported-but-empty variable must not redirect the app.
 
     Same rule as GETMOREDONE_RESOURCE_ROOT. Without the strip, a blank value
@@ -135,8 +171,15 @@ def test_d1_blank_override_is_ignored(monkeypatch):
     from source — and the app would quietly write its data into the checkout.
     """
     monkeypatch.setenv(DATA_DIR_ENV, "   ")
+    monkeypatch.setenv("HOME", str(tmp_path))
 
-    assert paths.app_data_dir_path() == _real_data_dir()
+    expected = Path(user_data_dir(APP_NAME, APP_AUTHOR)).expanduser().resolve()
+    resolved = paths.app_data_dir_path()
+
+    assert resolved == expected
+    assert resolved.is_relative_to(tmp_path.resolve()), (
+        "same reason as the unset case: this must not create the real directory"
+    )
 
 
 def test_d1_override_is_expanded_and_resolved(tmp_path, monkeypatch):
@@ -168,17 +211,55 @@ def test_d1_explicit_db_env_var_outranks_the_data_dir(tmp_path, monkeypatch):
     assert paths.default_db_path() == demo.resolve() / "getmoredone.db"
 
 
-def test_d1_the_suite_runs_with_no_data_dir_override():
+def test_d1_the_suite_runs_with_no_data_dir_override(tmp_path):
     """conftest drops an ambient override for the whole session.
 
     Both live-data guards compute the real directory from platformdirs, so an
-    exported override would send the app into the demo directory while the
-    guards watched one nothing touched — isolation reported, not enforced.
+    exported override would leave app_data_dir_path() pointing at the demo
+    directory while the guards watched one nothing touched — isolation
+    reported rather than enforced.
+
+    This has to run the hooks under an override that is actually set. Asserting
+    ``os.environ.get(DATA_DIR_ENV) is None`` in this process proved nothing:
+    it is true in any shell that never exported the variable, and in CI, so it
+    stayed green with the pop deleted. The nested-run helper is reused rather
+    than copied so there is one implementation of "load the root conftest's
+    session hooks into a throwaway run".
     """
-    assert os.environ.get(DATA_DIR_ENV) is None, (
-        "GETMOREDONE_DATA_DIR survived into the test session; the guards in "
-        "conftest.py are no longer watching the directory the app resolves"
+    result = _run_nested_pytest(
+        tmp_path,
+        """
+        import os
+
+        def test_probe():
+            assert os.environ.get("GETMOREDONE_DATA_DIR") is None, (
+                "pytest_sessionstart did not drop the ambient override")
+        """,
+        env_extra={DATA_DIR_ENV: str(tmp_path / "ambient-demo")},
     )
+
+    assert result.returncode == 0, (
+        "the session hooks did not drop an exported GETMOREDONE_DATA_DIR:\n"
+        f"{result.stdout}\n{result.stderr}"
+    )
+
+
+def test_d1_the_session_restores_the_override_afterwards(tmp_path):
+    """The pop is scoped to the session, not a permanent deletion.
+
+    pytest_sessionfinish puts the value back, so an in-process caller that
+    runs pytest.main() and then does other work still has its environment.
+    """
+    result = _run_nested_pytest(
+        tmp_path,
+        """
+        def test_probe():
+            assert True
+        """,
+        env_extra={DATA_DIR_ENV: str(tmp_path / "ambient-demo")},
+    )
+
+    assert result.returncode == 0, f"{result.stdout}\n{result.stderr}"
 
 
 # --------------------------------------------------------------------------
@@ -308,6 +389,10 @@ PIP_INSTALL_LINE = re.compile(
     r"^(?P<indent> *)\"\$VENV_PY\" -m pip install -q -r requirements\.txt \|\| exit 1$",
     re.MULTILINE,
 )
+SEED_LINE = re.compile(
+    r"^(?P<indent> *)\"\$VENV_PY\" tools/create_demo_data\.py \|\| exit 1$",
+    re.MULTILINE,
+)
 
 
 def test_d2_demo_launcher_installs_requirements_before_seeding():
@@ -320,16 +405,26 @@ def test_d2_demo_launcher_installs_requirements_before_seeding():
     be back inside the venv-creation branch.
     """
     script = (REPO_ROOT / "start-demo.sh").read_text(encoding="utf-8")
-    matches = PIP_INSTALL_LINE.findall(script)
+    installs = list(PIP_INSTALL_LINE.finditer(script))
+    seeds = list(SEED_LINE.finditer(script))
 
-    assert len(matches) == 1, (
+    assert len(installs) == 1, (
         f"expected exactly one requirements install in start-demo.sh, found "
-        f"{len(matches)}: {matches!r}"
+        f"{len(installs)}"
     )
-    assert len(matches[0]) == 4, (
-        f"the requirements install is indented {len(matches[0])} spaces, so it "
-        "is nested inside the venv-creation branch and will not run for a venv "
-        "that already exists"
+    assert len(seeds) == 1, (
+        f"expected exactly one seeding call in start-demo.sh, found {len(seeds)}"
+    )
+    assert len(installs[0].group("indent")) == 4, (
+        f"the requirements install is indented "
+        f"{len(installs[0].group('indent'))} spaces, so it is nested inside "
+        "the venv-creation branch and will not run for a venv that already "
+        "exists"
+    )
+    assert installs[0].start() < seeds[0].start(), (
+        "the requirements install comes after the seeding call, so the seed "
+        "runs before its dependencies are installed — which is the failure "
+        "this guard exists to catch, and indentation alone does not catch it"
     )
 
 
@@ -403,3 +498,156 @@ def test_d4_seed_writes_only_into_the_target_database(tmp_path):
 
     rows = _row_count(demo / "getmoredone.db")
     assert rows > 0, "nothing was seeded into the demo database"
+
+
+def test_d2_demo_launcher_refuses_a_directory_inside_the_real_one(tmp_path):
+    """Containment, not just equality.
+
+    ".../GetMoreDone/demo" passed the old equality test, and a launch then put
+    the demo's database, settings, app.lock and log INSIDE the real
+    installation — the one thing this feature must never do.
+    """
+    real = tmp_path / "Library/Application Support/GetMoreDone"
+    real.mkdir(parents=True)
+
+    result = _print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=str(real / "demo"))
+
+    assert result.returncode != 0, (
+        f"a demo directory inside the real one was accepted:\n{result.stdout}")
+    assert "is inside" in result.stdout
+    assert list(real.iterdir()) == [], (
+        "the refused run still created something inside the real directory")
+
+
+def test_d2_demo_launcher_refuses_a_directory_containing_the_real_one(tmp_path):
+    """The other direction matters because of the documented reset.
+
+    DEMO_INSTALL.md tells the reader to delete the demo directory, so a demo
+    directory that contained the real one would turn that instruction into
+    data loss.
+    """
+    support = tmp_path / "Library/Application Support"
+    (support / "GetMoreDone").mkdir(parents=True)
+
+    result = _print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=str(support))
+
+    assert result.returncode != 0, (
+        f"a demo directory containing the real one was accepted:\n{result.stdout}")
+    assert "contains" in result.stdout
+
+
+def test_d2_print_env_creates_nothing(tmp_path):
+    """DEMO_INSTALL.md calls --print-env a way to look without launching.
+
+    The mkdir used to run before the guard, so merely asking what would be
+    used created directories — including under the protected path when the
+    answer was going to be a refusal.
+    """
+    result = _print_env("start-demo.sh", tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert not (tmp_path / "Library").exists(), (
+        "--print-env created the data directory it only promised to describe")
+
+
+def test_d2_refusal_creates_nothing_under_the_real_path(tmp_path):
+    """A refused run must not be the thing that brings the real path into being.
+
+    With the mkdir first, pointing the demo at a not-yet-existing real
+    directory created that directory and *then* refused.
+    """
+    target = tmp_path / "Library/Application Support/GetMoreDone"
+
+    result = _print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=f"{target}/")
+
+    assert result.returncode != 0, result.stdout
+    assert not target.exists(), (
+        "the refused run created the real data directory before refusing it")
+
+
+def test_d2_demo_launcher_expands_a_tilde(tmp_path):
+    """The shell does not expand a "~" inside a variable; paths.py does.
+
+    `GETMOREDONE_DATA_DIR='~/demo'` (quoted, or read from a plist) made the
+    launcher create a literal "~" directory in the repository checkout while
+    the app opened $HOME/demo.
+    """
+    values = _parsed(_print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR="~/demo-tilde"))
+
+    assert Path(values["data-dir"]) == (tmp_path / "demo-tilde").resolve()
+    assert not (REPO_ROOT / "~").exists(), (
+        "a literal '~' directory was created in the repository")
+
+
+def test_d2_print_env_matches_the_resolver(tmp_path, monkeypatch):
+    """--print-env is the oracle every D2 test uses, so it must not drift.
+
+    Both launchers resolve a path themselves rather than importing paths.py,
+    which cannot be imported before the venv exists. This pins the two
+    implementations together over the awkward spellings — a tilde, a trailing
+    slash, a doubled slash, a "..", and a symlinked parent — so a change to
+    app_data_dir_path() that this mirror does not follow turns the suite red.
+    """
+    link_target = tmp_path / "actual"
+    link_target.mkdir()
+    (tmp_path / "linked").symlink_to(link_target)
+
+    spellings = [
+        "~/demo",
+        str(tmp_path / "demo") + "/",
+        str(tmp_path) + "//demo",
+        str(tmp_path / "a" / ".." / "demo"),
+        str(tmp_path / "linked" / "demo"),
+    ]
+
+    for spelling in spellings:
+        values = _parsed(_print_env("start.sh", tmp_path, GETMOREDONE_DATA_DIR=spelling))
+        expected = _resolver_data_dir(monkeypatch, tmp_path, spelling)
+        assert Path(values["data-dir"]) == expected, (
+            f"start.sh resolved {spelling!r} to {values['data-dir']!r}, but "
+            f"app_data_dir_path() resolves it to {expected}"
+        )
+        assert Path(values["db"]) == expected / "getmoredone.db"
+
+
+def test_d2_demo_launcher_reseeds_a_database_with_no_items(tmp_path):
+    """An interrupted first seed must not permanently disable seeding.
+
+    load_demo_data() creates the file and runs migrations before inserting
+    anything, and has no except clause, so an interruption leaves the file
+    present with no items. Keying on the file alone meant run 1 failed loudly
+    and every run after it launched an empty demo in silence.
+    """
+    demo = tmp_path / "demo"
+    demo.mkdir()
+    db = demo / "getmoredone.db"
+
+    absent = _parsed(_print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=str(demo)))
+    assert absent["seed"] == "yes", "a missing database must be seeded"
+
+    # A file that exists but carries no schema at all: the earliest point an
+    # interruption can leave it.
+    db.write_bytes(b"")
+    assert _parsed(
+        _print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=str(demo))
+    )["seed"] == "yes", "an unreadable database must be re-seeded, not skipped"
+
+    # Migrated but empty: the interruption landed after DatabaseManager ran
+    # and before the first insert.
+    _seed(demo)
+    seeded = _row_count(db)
+    assert seeded > 0, "the seeding helper did not insert anything"
+    assert _parsed(
+        _print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=str(demo))
+    )["seed"] == "no", "a demo that already holds items must not be re-seeded"
+
+    conn = sqlite3.connect(db)
+    try:
+        conn.execute("delete from action_items")
+        conn.commit()
+    finally:
+        conn.close()
+    assert _parsed(
+        _print_env("start-demo.sh", tmp_path, GETMOREDONE_DATA_DIR=str(demo))
+    )["seed"] == "yes", "a migrated but empty database must be seeded"
+
