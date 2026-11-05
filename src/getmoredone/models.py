@@ -236,7 +236,19 @@ class RescheduleHistory:
 
 @dataclass
 class TimeBlock:
-    """Represents a planned time block."""
+    """Represents a planned time block.
+
+    Purpose: one slot in a planned day -- an action item, or the buffer/break
+             padding between them.
+    Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
+    Tests:   tests/test_time_block_schema.py::test_tbm12_block_type_and_position_round_trip
+
+    ``start_time``/``end_time`` are *derived* values, not user input: the day's
+    order is ``position``, and the clock times come from packing that order
+    against the day's bounds (``time_block_layout.pack_day``). They are stored
+    so a day can be read back without recomputing it, and so a legacy row
+    written before TB-M1 still sorts sensibly.
+    """
 
     block_date: str  # YYYY-MM-DD
     start_time: str  # HH:MM
@@ -244,6 +256,10 @@ class TimeBlock:
     planned_minutes: int
     item_id: Optional[str] = None
     label: Optional[str] = None
+    # 'item' | 'buffer' | 'break'. See BlockType below.
+    block_type: str = "item"
+    # Order within the day. Lower comes first.
+    position: int = 0
     id: str = field(default_factory=lambda: str(uuid4()))
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -313,6 +329,37 @@ class PriorityFactors:
         "M": 4,
         "S": 2
     }
+
+
+class BlockType:
+    """The kinds of time block a planned day can hold.
+
+    Purpose: name the three kinds in one place so the screen, the layout
+             function and the database agree on the strings.
+    Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
+    Tests:   tests/test_time_block_schema.py::test_tbm12_block_type_and_position_round_trip
+
+    ITEM blocks carry an ``item_id`` and are coloured by that item's priority.
+    BUFFER and BREAK blocks carry none and are not priority-coloured -- they are
+    padding, and colouring them by a priority they do not have would be a lie
+    the eye reads as information.
+    """
+
+    ITEM = "item"
+    BUFFER = "buffer"
+    BREAK = "break"
+
+    ALL = (ITEM, BUFFER, BREAK)
+
+    @staticmethod
+    def normalize(value: Optional[str]) -> str:
+        """Coerce a stored value to a known type, defaulting to ITEM.
+
+        A row hand-edited or written by an older build must not make the
+        planner raise; an unrecognised type is treated as an item block.
+        """
+        candidate = (value or "").strip().lower()
+        return candidate if candidate in BlockType.ALL else BlockType.ITEM
 
 
 # Depth / Work Block option constants

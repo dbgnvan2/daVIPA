@@ -268,6 +268,14 @@ class Database:
         """)
 
         # Time blocks table
+        #
+        # TB-M1: block_type and position. A block is one of 'item' | 'buffer' |
+        # 'break', and its place in the day is the explicit `position` rather
+        # than its start_time -- the times are *derived* from the order plus the
+        # day's bounds (see time_block_layout.pack_day), so ordering by a
+        # computed value would make the reorder its own input.
+        # Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
+        # Tests: tests/test_time_block_schema.py::test_tbm12_block_type_and_position_round_trip
         conn.execute("""
             CREATE TABLE IF NOT EXISTS time_blocks (
                 id           TEXT PRIMARY KEY,
@@ -277,6 +285,8 @@ class Database:
                 end_time     TEXT NOT NULL,
                 planned_minutes INTEGER NOT NULL,
                 label        TEXT,
+                block_type   TEXT NOT NULL DEFAULT 'item',
+                position     INTEGER NOT NULL DEFAULT 0,
                 created_at   TEXT NOT NULL,
                 updated_at   TEXT NOT NULL
             )
@@ -328,6 +338,12 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_blocks_date
             ON time_blocks(block_date)
         """)
+
+        # TB-M1's idx_blocks_date_position is created by the migration, not
+        # here. Index creation runs *before* _run_migrations, and on an
+        # upgrading database time_blocks.position does not exist yet at this
+        # point — indexing it here failed the whole schema init with
+        # "no such column: position" before the migration could add it.
 
         conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_logs_item
@@ -726,6 +742,34 @@ class Database:
         # Multiple projects may now share one APE; drop the unique index if present.
         # The regular idx_project_boards_ape lookup index is retained.
         conn.execute("DROP INDEX IF EXISTS idx_project_boards_unique_ape")
+
+        # TB-M1 — time_blocks gains block_type and position. Guarded one column
+        # at a time, not as a block: a database half-migrated by an interrupted
+        # earlier run has one of these and not the other, and an all-or-nothing
+        # guard would skip the remainder forever.
+        #
+        # Both are NOT NULL DEFAULT, so existing rows are back-filled by SQLite
+        # itself -- every pre-migration block becomes an 'item' at position 0.
+        # Position 0 for all of them is deliberate: their real order is already
+        # recorded in their start_time, and get_time_blocks orders by
+        # (position, start_time), so a legacy day still comes out chronological
+        # until the first reorder renumbers it.
+        # Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
+        # Tests: tests/test_time_block_schema.py::test_tbm11_migration_adds_columns_and_is_idempotent
+        time_block_columns = [
+            row[1] for row in conn.execute("PRAGMA table_info(time_blocks)").fetchall()
+        ]
+        for column, definition in (
+            ('block_type', "TEXT NOT NULL DEFAULT 'item'"),
+            ('position', 'INTEGER NOT NULL DEFAULT 0'),
+        ):
+            if column not in time_block_columns:
+                conn.execute(f"ALTER TABLE time_blocks ADD COLUMN {column} {definition}")
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_blocks_date_position
+            ON time_blocks(block_date, position)
+        """)
 
     def __enter__(self):
         """Context manager entry."""

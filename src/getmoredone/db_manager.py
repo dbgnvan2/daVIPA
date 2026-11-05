@@ -16,7 +16,8 @@ from .db_manager_project_boards import DBManagerProjectBoardsMixin
 from .weekly_tactic import tactic_of
 from .models import (
     ActionItem, ItemLink, ContactLink, Defaults, RescheduleHistory,
-    TimeBlock, WorkLog, Status, Contact, ProjectBoard, ProjectBoardStatus, ProjectBoardLink
+    TimeBlock, WorkLog, Status, Contact, ProjectBoard, ProjectBoardStatus, ProjectBoardLink,
+    BlockType
 )
 from .app_settings import AppSettings
 from . import week_calendar
@@ -1281,27 +1282,221 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
     # ==================== TIME BLOCKS ====================
 
     def create_time_block(self, block: TimeBlock) -> str:
-        """Create a time block."""
+        """Create a time block, appending it to its day unless told otherwise.
+
+        Purpose: TB-M8/TB-M10 -- every way of making a block (drag an item in,
+                 add a buffer, add a break) puts it at the end of the day.
+        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m2
+        Tests:   tests/test_time_block_crud.py::test_tbm21_update_persists_duration
+
+        A block whose ``position`` is still 0 -- the dataclass default -- is
+        given the next position on its day. Callers that have already worked out
+        an order (a reorder, a test fixture) set position themselves and keep it.
+        Position 0 is reserved for rows written before TB-M1, so "0 means
+        append" cannot collide with a caller's real intent.
+        """
+        if not block.position:
+            block.position = self._next_block_position(block.block_date)
+
         self.db.conn.execute("""
             INSERT INTO time_blocks (
                 id, item_id, block_date, start_time, end_time,
-                planned_minutes, label, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                planned_minutes, label, block_type, position, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             block.id, block.item_id, block.block_date,
             block.start_time, block.end_time, block.planned_minutes,
-            block.label, block.created_at, block.updated_at
+            block.label, BlockType.normalize(block.block_type), block.position,
+            block.created_at, block.updated_at
         ))
         self.db.conn.commit()
         return block.id
 
+    def _next_block_position(self, block_date: str) -> int:
+        """One past the highest position on that day (1 for an empty day)."""
+        row = self.db.conn.execute(
+            "SELECT MAX(position) AS highest FROM time_blocks WHERE block_date = ?",
+            (block_date,)
+        ).fetchone()
+        highest = row["highest"] if row and row["highest"] is not None else 0
+        return int(highest) + 1
+
+    def update_time_block(self, block: TimeBlock) -> None:
+        """Write a changed block back.
+
+        Purpose: TB-M2 -- the write this module did not have. Without it no
+                 block could be resized, retyped, relabelled or reordered after
+                 creation, which made requirements 4 and 6 unbuildable.
+        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m2
+        Tests:   tests/test_time_block_crud.py::test_tbm21_update_persists_duration
+
+        ``block_date`` is deliberately *not* updated: moving a block to another
+        day is a different operation from editing one, and letting an edit
+        silently relocate a block is how a day loses work nobody deleted.
+        """
+        block.updated_at = datetime.now().isoformat()
+        self.db.conn.execute("""
+            UPDATE time_blocks
+            SET item_id = ?, start_time = ?, end_time = ?, planned_minutes = ?,
+                label = ?, block_type = ?, position = ?, updated_at = ?
+            WHERE id = ?
+        """, (
+            block.item_id, block.start_time, block.end_time, block.planned_minutes,
+            block.label, BlockType.normalize(block.block_type), block.position,
+            block.updated_at, block.id
+        ))
+        self.db.conn.commit()
+
     def get_time_blocks(self, block_date: str) -> List[TimeBlock]:
-        """Get all time blocks for a specific date."""
+        """Blocks for one date, in the order the day runs.
+
+        Ordered by ``position`` then ``start_time``. The second key carries
+        legacy rows: every block written before TB-M1 has position 0, so
+        position alone would order a migrated day arbitrarily -- their real
+        sequence is still in the start_time they were created with.
+        """
         rows = self.db.conn.execute(
-            "SELECT * FROM time_blocks WHERE block_date = ? ORDER BY start_time",
+            """
+            SELECT * FROM time_blocks
+            WHERE block_date = ?
+            ORDER BY position, start_time
+            """,
             (block_date,)
         ).fetchall()
         return [self._row_to_time_block(row) for row in rows]
+
+    def repack_day(self, block_date: str, bounds) -> List[TimeBlock]:
+        """Recompute and store every clock time on one day.
+
+        Purpose: TB-M3/TB-M9 -- a day's times are derived from its order, its
+                 block lengths and the day's bounds, so any change to those
+                 three has to re-time everything after it.
+        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m2
+        Tests:   tests/test_time_block_crud.py::test_tbm22_reorder_yields_unique_contiguous_times
+
+        All or nothing: a day left half re-timed would hold overlapping blocks
+        that no further edit would clean up, because the next repack would start
+        from the broken state and reproduce it.
+        """
+        from .time_block_layout import pack_day, renumber, sort_blocks
+
+        blocks = sort_blocks(self.get_time_blocks(block_date))
+        # Renumber as well as re-time. A repack that fixed the clock times but
+        # left a migrated day's positions at 0 would leave the two disagreeing,
+        # and every later read would have to re-derive the order from the times
+        # all over again. After any repack, position is the day's order.
+        renumber(blocks)
+        packed = pack_day(blocks, bounds)
+
+        with self.transaction():
+            for entry in packed:
+                self.db.conn.execute(
+                    """
+                    UPDATE time_blocks
+                    SET start_time = ?, end_time = ?, position = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        entry.start_time,
+                        entry.end_time,
+                        entry.block.position,
+                        datetime.now().isoformat(),
+                        entry.block.id,
+                    ),
+                )
+
+        for entry in packed:
+            entry.block.start_time = entry.start_time
+            entry.block.end_time = entry.end_time
+        return [entry.block for entry in packed]
+
+    def reorder_time_blocks(self, block_date: str, ordered_ids: List[str], bounds) -> List[TimeBlock]:
+        """Put a day's blocks in the given order and re-time them.
+
+        Purpose: TB-M11 -- the write behind "drag blocks to rearrange them".
+        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m2
+        Tests:   tests/test_time_block_crud.py::test_tbm22_reorder_yields_unique_contiguous_times
+
+        Ids not present on the day are ignored, and blocks the caller left out
+        keep their relative order *after* the ones it named -- a stale id list
+        from a screen that has not refreshed must not delete a block from the
+        day's order by omission.
+
+        Renumbering and re-timing happen in one transaction. Half of a reorder
+        is worse than none of it: the day would hold two blocks claiming the
+        same minutes, and nothing in the UI would show which.
+        """
+        from .time_block_layout import renumber, sort_blocks
+
+        existing = sort_blocks(self.get_time_blocks(block_date))
+        by_id = {block.id: block for block in existing}
+
+        ordered: List[TimeBlock] = []
+        for block_id in ordered_ids:
+            block = by_id.pop(block_id, None)
+            if block is not None:
+                ordered.append(block)
+        # Anything the caller did not name keeps its existing relative order.
+        ordered.extend(block for block in existing if block.id in by_id)
+
+        renumber(ordered)
+
+        with self.transaction():
+            for block in ordered:
+                self.db.conn.execute(
+                    "UPDATE time_blocks SET position = ?, updated_at = ? WHERE id = ?",
+                    (block.position, datetime.now().isoformat(), block.id),
+                )
+            return self.repack_day(block_date, bounds)
+
+    def get_items_for_start_date(
+        self,
+        start_date: str,
+        status_filter: Optional[str] = "open",
+    ) -> List[ActionItem]:
+        """Action items whose start date *is* this date.
+
+        Purpose: TB-M7 -- requirement 2, the list the planner blocks from.
+        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m2
+        Tests:   tests/test_time_block_crud.py::test_tbm24_start_date_filter_is_exact
+
+        Exactly this date, not "on or before" -- the user's decision. The
+        consequence is documented where the user will meet it: an item whose
+        start date is wrong does not appear on the day being planned, so start
+        dates have to be right *before* time blocking, and the user guide says
+        so in those words.
+
+        Week rows (``item_type = 'week'``) are excluded: they are containers for
+        other items' scheduling, not work anyone sits down and does.
+        """
+        query = """
+            SELECT * FROM action_items
+            WHERE start_date = ?
+              AND COALESCE(item_type, 'daily') != 'week'
+        """
+        params: List[Any] = [start_date]
+
+        if status_filter:
+            query += " AND status = ?"
+            params.append(status_filter)
+
+        query += " ORDER BY priority_score DESC, title COLLATE NOCASE"
+
+        rows = self.db.conn.execute(query, params).fetchall()
+        return [self._row_to_action_item(row) for row in rows]
+
+    def get_blocked_item_ids(self, block_date: str) -> set:
+        """Ids of items that already hold a block on this date.
+
+        The item list marks these rather than hiding them: an item can genuinely
+        need two blocks in a day, and silently removing it from the list would
+        look like the item had vanished.
+        """
+        rows = self.db.conn.execute(
+            "SELECT DISTINCT item_id FROM time_blocks WHERE block_date = ? AND item_id IS NOT NULL",
+            (block_date,)
+        ).fetchall()
+        return {row["item_id"] for row in rows}
 
     def delete_time_block(self, block_id: str):
         """Delete a time block."""
@@ -2175,7 +2370,26 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         )
 
     def _row_to_time_block(self, row: sqlite3.Row) -> TimeBlock:
-        """Convert database row to TimeBlock."""
+        """Convert database row to TimeBlock.
+
+        ``block_type`` and ``position`` are read defensively, in the style this
+        file already uses for depth/work_block: a row selected before the TB-M1
+        migration ran, or by a query that does not project those columns, must
+        not blow up here.
+
+        Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
+        Tests: tests/test_time_block_schema.py::test_tbm13_pre_migration_row_reads_with_defaults
+        """
+        try:
+            block_type = row["block_type"]
+        except (IndexError, KeyError):
+            block_type = None
+
+        try:
+            position = row["position"]
+        except (IndexError, KeyError):
+            position = 0
+
         return TimeBlock(
             id=row["id"],
             item_id=row["item_id"],
@@ -2184,6 +2398,8 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             end_time=row["end_time"],
             planned_minutes=row["planned_minutes"],
             label=row["label"],
+            block_type=BlockType.normalize(block_type),
+            position=int(position or 0),
             created_at=row["created_at"],
             updated_at=row["updated_at"]
         )
