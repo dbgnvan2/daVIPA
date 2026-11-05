@@ -11,10 +11,15 @@ The **full suite was not completed locally**. Two runs were started and both
 were stopped: the first because a second run had been pointed at the same log
 file, the second because a review subagent was running the whole suite *without*
 `GETMOREDONE_NO_MAPPED_WINDOWS=1`, so the three mapped-window tests were
-building real windows and taking keyboard focus on a machine in use. The whole
-suite therefore runs for the first time in CI on this push, which is the
-blank-machine run that matters more anyway. Treat the 75 above as what it is:
-the touched files, not the suite.
+building real windows and taking keyboard focus on a machine in use. Treat the
+75 above as what it is: the touched files, not the suite.
+
+The whole suite ran in CI instead, on `69f839b`: **7 failed, 1630 passed, 1
+skipped** on each of Python 3.11, 3.12 and 3.13. The same seven failed on the
+base commit with 1600 passed, so the pass count rose by exactly the 30 tests
+this batch adds and the failure set did not change. All seven are pre-existing
+window-manager attribute assertions under the headless display, listed in the
+handoff note and recorded in `BACKLOG.md`.
 
 ## D1 — Settings and data-dir isolation
 

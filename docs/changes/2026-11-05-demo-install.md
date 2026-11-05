@@ -62,12 +62,33 @@ alone) and the untracked files at the repository root.
   tests/test_settings_isolation.py tests/test_repo_hygiene.py -q`
 - Result: **PASS** — 75 passed.
 
-- Command: the full suite
+- Command: the full suite, locally
 - Result: **NOT RUN.** Two attempts were stopped: the first because a second
   run had been pointed at the same log file, the second because a review
   subagent was running the whole suite without
   `GETMOREDONE_NO_MAPPED_WINDOWS=1`, so the three mapped-window tests were
-  taking keyboard focus on a machine in use. CI runs it on this push.
+  taking keyboard focus on a machine in use.
+
+- Command: the full suite in CI, on `69f839b` (run 42088130403)
+- Result: **7 failed, 1630 passed, 1 skipped**, identically on Python 3.11,
+  3.12 and 3.13. All seven failures are pre-existing and unrelated to this
+  batch: the same seven failed on the base commit `47ff250`, and on at least
+  four commits before it, with **1600** passed. The pass count rose by exactly
+  the 30 tests this batch adds and the failure set did not change, so this
+  batch introduces no failure. The seven are all window-manager attribute
+  assertions — `-topmost` and `-alpha` read back unchanged under the headless
+  display, so `assert _topmost_now(...)` and
+  `assert float(...attributes("-alpha")) == 0.0` fail:
+  `test_t51_a_modal_drops_the_timers_always_on_top`,
+  `test_t52_the_timer_is_topmost_again_afterwards`,
+  `test_t56_a_second_modal_does_not_hand_the_flag_back_early`,
+  `test_t57_an_unbalanced_resume_does_not_break_the_next_modal`,
+  `test_alpha_still_passes_through_the_attributes_wrapper`,
+  `test_raw_tkinter_windows_are_hidden_and_registered_too`,
+  `test_wt_m6b6_a_notice_lowers_an_always_on_top_parent`.
+  That is a standing red build, which the global rule says to fix or delete
+  rather than keep as background noise. Out of scope here; recorded in
+  `BACKLOG.md`.
 
 - Command: `bash -n start.sh start-demo.sh`
 - Result: **PASS** (also asserted by `test_d2_launchers_are_valid_bash`).
@@ -133,8 +154,9 @@ requirements install was asserted by indentation rather than by order; and the
 
 ## Risks / Known gaps
 
-- **The full suite has not run on this tree.** CI is the first run. The four
-  touched test files are green.
+- **The full suite never ran on this machine.** It ran in CI instead, and the
+  result is above: the 7 pre-existing window-attribute failures and nothing
+  new. The four touched test files are green locally.
 - **The owed cold pass did not finish.** The repo's own rule is that a pass
   producing a high-severity finding earns another, cold, in a different failure
   family. That pass was stopped partway. The two fix commits `246981f` and
@@ -162,8 +184,9 @@ requirements install was asserted by indentation rather than by order; and the
   subagent gets neither `GETMOREDONE_NO_MAPPED_WINDOWS=1` nor the
   `taskpolicy -b` hook, and one in this batch ran the whole suite twice despite
   being told not to, taking the user's keyboard focus.
-- Confirm CI is green on this push, and treat a failure there as the real
-  first full-suite result rather than a surprise.
+- Decide what to do about the 7 standing CI failures. They are not this
+  batch's, but they make CI unable to say "green" for anyone, which is the
+  state the global rule tells us not to leave.
 - Decide whether `docs/demo-install-prompt.md` (the kickoff prompt, currently
   untracked) belongs in `docs/changes/` beside the other `*-kickoff-prompt.md`
   files. Left untracked at the user's instruction.

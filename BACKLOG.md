@@ -24,6 +24,31 @@ deferred and for how long, not only of what is outstanding.
 
 ## Deferred — found by review, deliberately not fixed
 
+### CI has been red for longer than anyone noticed (2026-11-05)
+
+The `Tests` workflow fails **7 of 1630** on every Python version, and has done
+since before this batch — the same seven failed on `47ff250` and on at least
+four commits before it. All seven assert a window-manager attribute that the
+headless CI display never honours: `-topmost` reads back false where the test
+set it true, and `-alpha` reads back `1.0` where the test set `0.0`.
+
+- `test_t51_a_modal_drops_the_timers_always_on_top`
+- `test_t52_the_timer_is_topmost_again_afterwards`
+- `test_t56_a_second_modal_does_not_hand_the_flag_back_early`
+- `test_t57_an_unbalanced_resume_does_not_break_the_next_modal`
+- `test_alpha_still_passes_through_the_attributes_wrapper`
+- `test_raw_tkinter_windows_are_hidden_and_registered_too`
+- `test_wt_m6b6_a_notice_lowers_an_always_on_top_parent`
+
+Rated medium, and deliberately not fixed in this batch, which changed none of
+that code. It matters because a red build nobody can distinguish from a real
+failure is the state the global rule names as worse than no CI: this batch's
+own run could only be read as clean by counting the failures and comparing
+them to the base. Either have these seven skip where the window manager does
+not honour the attribute — the repo already has
+`GETMOREDONE_NO_MAPPED_WINDOWS` for exactly this class — or assert the
+wrapper's recorded intent rather than the attribute read back.
+
 ### The demo tests hash the whole production database (2026-11-05)
 
 `tests/test_demo_install.py::_fingerprint` does `read_bytes()` + sha256 on the
