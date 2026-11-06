@@ -443,9 +443,13 @@ happen on that save, all deliberate:
   file that would not load could not be set aside, and the unreadable file
   stays exactly as it is rather than being replaced with no copy of it
   anywhere. The way out of that one is to move or delete
-  `settings.json` yourself — the app will not destroy it for you. Note that
-  while this is the case, **saving from other screens does nothing either**,
-  and most of them will still say they saved; see `BACKLOG.md`.
+  `settings.json` yourself — the app will not destroy it for you. While this is
+  the case, **saving from other screens does nothing either** — every Save
+  button on the Settings screen now says so instead of reporting a save, and
+  the Appearance section does not apply a theme it could not write. Three
+  places still fail silently rather than wrongly: a column drag on Today, the
+  timer window's position when it closes, and the Next Action dialog's. See
+  `BACKLOG.md`.
 - If the new file cannot be written — a permissions problem, a full disk — the
   dialog says so and stays open. It does not report the day settings as saved,
   and the day's shape goes back to what it was rather than being left changed

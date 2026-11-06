@@ -1,6 +1,36 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-05 (one below-medium from the grid rebuild's fifth pass added; the four earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-06 (the sixth pass of the grid rebuild: the raised save-reporting entry mostly cleared, three below-medium added; the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Below medium, from the sixth pass of the grid rebuild (2026-11-06)
+
+Cold pass, lens: the blast radius of the changed `AppSettings` contract across
+the twenty-odd screens that load and save their own settings object. Two
+mediums, fixed in the batch; the rest are here.
+
+- **On a full disk the refusal names a remedy that cannot work.** A write that
+  fails part-way through `json.dump` leaves invalid JSON behind; the next save
+  then finds a file that will not parse, fails to copy it aside for want of the
+  same space, and tells the user to move or delete it and try again. Moving the
+  settings file does not free the disk. Low: the state is recoverable and the
+  message is at least about the right file, but it points at the wrong remedy.
+- **Adjacent issue found, not fixed: tests pinned to the calendar.**
+  `test_the_date_is_a_picker_not_a_free_text_entry` compared the date picker,
+  which is built from `date.today()`, against a date the fixture had assigned
+  behind it — so it passed only on the day it was written and went red at the
+  first midnight. Fixed here, because it was red. There are 24 other uses of
+  `date.today()` across `tests/`, unaudited; some are legitimate relative-date
+  arithmetic and some may be the same defect waiting for a particular weekday.
+  Worth one pass with a frozen clock rather than finding them one midnight at a
+  time.
+- **`TimerWindow` and `NextActionWindow` hold a long-lived `AppSettings` and
+  save the whole of it.** They are Tk children of the screen that opened them,
+  so `app.clear_content()` destroys them before the user can reach the Plan
+  screen, and nothing stale can be written today. If either is ever reparented
+  to the app root, it becomes a path that writes a stale
+  `plan_day_shape_unconfirmed` over a confirmation and the user's four day
+  times. Low because it is not reachable now; recorded because the thing that
+  makes it unreachable is a parent argument nobody would think to preserve.
 
 ## Below medium, from the fifth pass of the grid rebuild (2026-11-05)
 
@@ -98,25 +128,21 @@ Severity rated before any fix was written, as above.
   production callers build a fresh block with `slot_index=None`, so it is
   latent. Low: a contract change in a public-ish method with no guard and no
   test.
-- **Only the Day Settings dialog checks whether a settings save succeeded, and
-  this batch gave it something new to miss.** `AppSettings.save` returns a bool
-  and that dialog acts on it; the other ten call sites
-  (`screens/settings.py` ×6, `settings_integrations.py`,
-  `timer_window_dialogs.py`, `column_resize.py`) call it for effect and report
-  success either way. Two things are now invisible on those surfaces: a failed
-  write, which was already true, and a **refused** write, which is new — when a
-  settings file that would not parse cannot be copied aside, `save` now returns
-  without writing, where before it printed and wrote anyway. So with a corrupt
-  `settings.json` whose copy also fails, picking a theme shows
-  *"✓ Saved appearance and completion badge settings"* and nothing is written,
-  and a column drag on Today changes nothing silently. The refusal is the right
-  trade -- the alternative is destroying the only copy of a file the app could
-  not read -- but the silence is not, and this entry is the fix for it.
-  **Raised from low: a user can now be told "saved" when nothing was.** Not
-  swept into this batch because it touches every settings surface and a change
-  that wide belongs in its own reviewed diff; the user-facing notice that an
-  unreadable file was kept aside belongs with it, since right now that path is
-  only in the log.
+- **✅ Mostly cleared 2026-11-06 — a settings save that could not happen was
+  reported as done.** Raised to medium by the sixth pass of the grid rebuild
+  and fixed there: the seven call sites that reported success
+  (`screens/settings.py` ×6, `settings_integrations.py`) now go through
+  `SettingsScreen._write_settings`, which reports the refusal on that section's
+  own status label, and the two that did more than report — Appearance applying
+  the theme app-wide, Email Import reloading launchd — skip that too.
+  `tests/test_settings_save_refusal.py` covers all four behaviours.
+  **What remains, at low:** three call sites still ignore the return value and
+  fail silently rather than wrongly — `column_resize.py:104` (a column drag on
+  Today), `timer_window.py:1778` and `timer_window_dialogs.py:452` (window
+  positions saved on close). None of them tells the user anything either way,
+  so none can lie; the setting is simply lost until the settings file is
+  dealt with. The user-facing notice that an unreadable file was kept aside is
+  still only in the log, and still belongs with whatever fixes these three.
 - **The traceability guard checks test pointers in `docs/spec_coverage.md` but
   not source ones.** Extending the guard to that document found eight rows
   naming deleted tests. Its *Implementation* column has the same class of

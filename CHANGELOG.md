@@ -7,6 +7,22 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — settings saves that could not happen were reported as done
+
+- Every **Save** button on the Settings screen now reports a write that was
+  refused, instead of printing *"✓ Saved"* over it. `AppSettings.save` declines
+  to write when a settings file is present, will not parse, and cannot be
+  copied aside — refusing is deliberate, because that file is the only copy of
+  whatever could not be read out of it — and seven buttons said they had saved
+  anyway. Two of them did more than say it: **Appearance** applied the new theme
+  app-wide, so the user saw a theme that was gone on the next launch, and
+  **Email Import** reloaded launchd from a file that had not changed, handing
+  the importer the old interval while reporting the new one.
+- The Plan screen's warning about an unconfirmed day no longer names a cause it
+  cannot know. It blamed an unreadable settings file for all three of the states
+  that reach it, and the common one — a settings file from a version that had no
+  Day Settings — reads perfectly well.
+
 ### Added
 
 - **The Plan screen builds a day on a grid of half-hour boxes.** Every half
