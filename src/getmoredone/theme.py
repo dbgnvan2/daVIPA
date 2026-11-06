@@ -353,11 +353,17 @@ def block_type_colors() -> Dict[str, str]:
     Buffer and break blocks carry no item, so they are not priority-coloured.
     A neutral accent says "this is padding" rather than implying an importance
     the block does not have.
+
+    PD-M4: one neutral for all three. A break had the theme's cyan, which is
+    the brightest thing on a planned day and read as a kind of work rather
+    than a gap in it. The three are told apart by their words -- "Break",
+    "Buffer", "Lunch" -- which is what they were already doing for buffer and
+    lunch, who have shared this value from the start.
+    Tests: tests/test_time_block_colors.py::test_pdm41_padding_and_lunch_share_one_colour
     """
     mode = (ctk.get_appearance_mode() or "Dark").lower()
-    if mode == "light":
-        return {"buffer": "#4B5563", "break": "#155E75", "lunch": "#4B5563"}
-    return {"buffer": "#9CA3AF", "break": "#22D3EE", "lunch": "#9CA3AF"}
+    padding = "#4B5563" if mode == "light" else "#9CA3AF"
+    return {"buffer": padding, "break": padding, "lunch": padding}
 
 
 def depth_bar_colors() -> Dict[str, str]:

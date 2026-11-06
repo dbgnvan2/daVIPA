@@ -471,13 +471,7 @@ def build_slot_row(
     rendered = SlotRow(frame=frame, slot_index=slot.index)
 
     if slot.is_lunch:
-        ctk.CTkLabel(
-            body,
-            text="Lunch",
-            anchor="w",
-            text_color=palette["muted_text"],
-            font=ctk.CTkFont(size=11),
-        ).grid(row=0, column=0, sticky="w")
+        _build_lunch_chip(body, row=0)
         return rendered
 
     inner = 0
@@ -516,6 +510,45 @@ def build_slot_row(
         inner += 1
 
     return rendered
+
+
+def _build_lunch_chip(parent, row: int) -> ctk.CTkFrame:
+    """The lunch box's own row: the padding stripe, and the word.
+
+    Purpose: PD-M4 -- break, buffer and lunch are one colour.
+    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m4
+    Tests:   tests/test_plan_screen.py::test_pdm42_break_buffer_and_lunch_render_in_the_shared_colour
+
+    A lunch half hour is a property of the day rather than a block, so it had
+    no chip and therefore nowhere to carry a colour: the only thing it shaded
+    was its own row fill, which is the surface every other box is drawn on.
+    The stripe is the same width, the same corner radius and the same place as
+    a break's and a buffer's, because the point of the shared colour is that
+    the three read as one kind of thing.
+    """
+    chip = ctk.CTkFrame(parent, fg_color="transparent")
+    chip.grid(row=row, column=0, sticky="ew", pady=1)
+    chip.grid_columnconfigure(0, minsize=STRIPE_WIDTH_PX + 8)
+    chip.grid_columnconfigure(1, weight=1)
+
+    stripe = ctk.CTkFrame(
+        chip,
+        width=STRIPE_WIDTH_PX,
+        height=STRIPE_MIN_HEIGHT_PX,
+        fg_color=block_type_colors()["lunch"],
+        corner_radius=3,
+    )
+    stripe.grid(row=0, column=0, sticky="ns", padx=(0, 8), pady=2)
+    stripe.grid_propagate(False)
+
+    ctk.CTkLabel(
+        chip,
+        text="Lunch",
+        anchor="w",
+        text_color=semantic_colors()["muted_text"],
+        font=ctk.CTkFont(size=11),
+    ).grid(row=0, column=1, sticky="w")
+    return chip
 
 
 def _build_block_chip(
