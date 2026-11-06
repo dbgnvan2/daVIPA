@@ -311,11 +311,30 @@ def test_the_date_is_a_picker_not_a_free_text_entry(screen):
 
     Asserted on the widget's own contract: a DatePickerButton validates and
     normalises, which is the behaviour being bought here.
+
+    The date is moved through the picker, which is the only thing that changes
+    it in the app. The first version of this compared the picker against a date
+    the fixture had assigned behind it -- the picker is built from
+    ``date.today()`` in ``__init__``, so the two agreed only on the day this
+    test was written, and it went red at the first midnight.
     """
     from src.getmoredone.widgets.date_picker import DatePickerButton
 
+    # Deliberately nowhere near today, so nothing here can pass by calendar
+    # accident.
+    a_later_day = "2027-03-03"
+
     assert isinstance(screen.date_picker, DatePickerButton)
-    assert screen.date_picker.get_date() == screen.selected_date
+
+    screen.date_picker.set_date(a_later_day)
+    screen.on_date_changed(a_later_day)
+
+    assert screen.date_picker.get_date() == a_later_day, (
+        "the picker did not take the date it was given"
+    )
+    assert screen.selected_date == a_later_day, (
+        "the screen did not follow the picker"
+    )
 
 
 # --- TB-M7 : the items pane --------------------------------------------------
@@ -1204,7 +1223,9 @@ def _legacy_block(manager, label="from the old model", start="09:00", minutes=30
     )
 
 
-def test_an_unreadable_settings_file_is_flagged_not_just_printed(tmp_path, monkeypatch):
+def test_an_unreadable_settings_file_is_flagged_not_just_printed(
+    tmp_path, monkeypatch, capsys
+):
     """``load`` must say when its defaults are a stand-in, not the user's.
 
     This flag exists for the Plan screen's adoption, which is why it is tested
@@ -1218,6 +1239,13 @@ def test_an_unreadable_settings_file_is_flagged_not_just_printed(tmp_path, monke
 
     loaded = AppSettings.load()
 
+    # The print is asserted because the flag alone no longer identifies this
+    # branch: a settings file that is missing, or that predates Day Settings,
+    # sets the same field. Without this the corrupt file could be deleted from
+    # the test and it would still pass.
+    assert "Error loading settings" in capsys.readouterr().out, (
+        "the parse failure was not reported at all"
+    )
     assert loaded.plan_day_shape_unconfirmed is True, (
         "an unreadable settings file returned all-defaults with nothing that"
         " survives a save to say the day's four times were invented"
@@ -1292,6 +1320,35 @@ def test_adoption_does_not_run_on_a_file_from_before_day_settings(
     )
     assert stored.start_time == "09:45", (
         "rewrote a stored time against a guessed day start, permanently"
+    )
+
+
+def test_the_unconfirmed_warning_does_not_name_a_cause_it_cannot_know(
+    root, manager, tmp_path, monkeypatch
+):
+    """Three states reach this message; the old wording described one of them.
+
+    "has not been confirmed since the settings file could not be read" was
+    written for the corrupt-file case and shipped as the wording for all three.
+    On the common one -- a settings file from a version with no Day Settings --
+    the file read perfectly, and the status line told the user it had not.
+    """
+    path = tmp_path / "settings.json"
+    path.write_text('{"theme_name": "dark-blue"}')
+    monkeypatch.setattr(AppSettings, "get_settings_path", classmethod(lambda cls: path))
+
+    _legacy_block(manager)
+
+    panel = PlanScreen(root, manager, _App(AppSettings.load()))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    root.update_idletasks()
+
+    text = panel.status_label.cget("text")
+    assert "has not been confirmed" in text, f"the state is not named: {text!r}"
+    assert "Day Settings" in text, f"the remedy is not named: {text!r}"
+    assert "could not be read" not in text, (
+        f"blamed a settings file that read perfectly well: {text!r}"
     )
 
 

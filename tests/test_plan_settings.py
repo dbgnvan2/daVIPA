@@ -276,6 +276,7 @@ def test_a_readable_file_is_not_copied_aside_on_every_save(settings_file):
     """
     _write(settings_file, plan_day_start="07:00")
     loaded = AppSettings.load()
+    assert loaded.plan_day_start == "07:00", "precondition: the file was read"
 
     loaded.save()
 
