@@ -17,12 +17,22 @@ from .paths import default_settings_path
 class AppSettings:
     """Application settings."""
 
-    # Not a dataclass field, deliberately: ``asdict`` must not write it to the
-    # settings file and ``load`` must not read it back. It describes *this
-    # load*, not the user's settings -- True when a settings file exists but
-    # could not be read, so every value here is a default standing in for one
-    # we do not know.
+    # Neither of these is a dataclass field, deliberately: ``asdict`` must not
+    # write them to the settings file and ``load`` must not read them back.
+    # They describe *this load and this save*, not the user's settings.
+    #
+    # ``settings_unreadable`` is True when a settings file existed and could
+    # not be parsed. It drives one thing only -- keeping that file aside before
+    # ``save`` overwrites it -- and a successful write clears it, because the
+    # file then parses. It must not be used to decide anything that has to
+    # outlive this process; ``plan_day_shape_unconfirmed`` below is the field
+    # for that.
     settings_unreadable = False
+
+    # The reason the last ``save`` returned False, for a caller that reports to
+    # the user. The two failures have different remedies and must not share one
+    # message.
+    last_save_error = None
 
     obsidian_vault_path: Optional[str] = None
     obsidian_notes_subfolder: str = "GetMoreDone"
@@ -114,6 +124,17 @@ class AppSettings:
     plan_block_weekdays: list = field(
         default_factory=lambda: [True, True, True, True, True, False, False]
     )
+    # TG-M5 -- whether the four day values above are a stand-in nobody has
+    # confirmed. Persisted on purpose, and this is the whole point of it: when
+    # a settings file cannot be parsed, every value in this object is a
+    # default, and the first save from *any* screen writes those defaults to
+    # disk as ordinary-looking settings. Without a field that goes to disk
+    # with them, the next launch reads a day start of 08:00 that nobody chose
+    # and has no way to know it was a guess -- and the Plan screen's adoption,
+    # which cannot be undone, would act on it. Cleared only by the Day
+    # Settings dialog, which is the one screen that shows these four values and
+    # takes the user's confirmation of them.
+    plan_day_shape_unconfirmed: bool = False
 
     # Email → Action Items (Gmail importer)
     gmail_import_enabled: bool = True
@@ -164,6 +185,9 @@ class AppSettings:
                 # that is the user's from one that is a stand-in.
                 unreadable = cls()
                 unreadable.settings_unreadable = True
+                # Written to the file by the first save, so a relaunch still
+                # knows these four day values were never chosen.
+                unreadable.plan_day_shape_unconfirmed = True
                 return unreadable
 
         return cls()
@@ -185,21 +209,19 @@ class AppSettings:
         destroy the only copy of the one they had, including the fields no
         screen in the app can re-enter by hand.
 
-        **A successful write does not clear the flag**, and that is not an
-        oversight. Writing the file makes it parseable; it does not make these
-        values the user's. Every settings screen loads its own ``AppSettings``
-        and saves the whole object, and ``screens/settings.py`` then replaces
-        ``app.settings`` with its copy -- so clearing the flag here would mean
-        that changing the *theme* on a corrupt settings file re-enabled the
-        Plan screen's adoption against a day start nobody chose, and did it in
-        the same session. The flag is cleared by the one surface that shows the
-        user the day's shape and takes their confirmation of it: the Day
-        Settings dialog.
+        A successful write clears ``settings_unreadable``, because the file
+        then parses -- so a second save does not keep a readable file aside as
+        an unreadable one. It does **not** touch
+        ``plan_day_shape_unconfirmed``: writing the file makes it parseable, it
+        does not make these values the user's, and that one has to survive both
+        this process and the next. Only the Day Settings dialog clears it.
 
-        The return value is new and additive: callers that ignore it behave as
-        before, and the ones that report success to the user should not.
+        The return value is additive: callers that ignore it behave as before,
+        and the ones that report success to the user should not.
+        ``last_save_error`` carries which failure it was.
         """
         settings_path = self.get_settings_path()
+        self.last_save_error = None
         self.appearance_mode = self._normalize_appearance_mode(
             self.appearance_mode)
         self.theme_name = self._normalize_theme_name(self.theme_name)
@@ -232,6 +254,11 @@ class AppSettings:
                 # copy destroys the one thing the copy exists to keep, and the
                 # caller would be told the settings were saved.
                 print(f"Could not keep the unreadable settings file: {e}")
+                self.last_save_error = (
+                    "Could not set aside the settings file that would not"
+                    " load, so nothing was changed — move or delete it and"
+                    " try again"
+                )
                 return False
             try:
                 # Outside the copy's ``try`` on purpose. A print that fails --
@@ -247,8 +274,12 @@ class AppSettings:
                 json.dump(asdict(self), f, indent=2)
         except Exception as e:
             print(f"Error saving settings: {e}")
+            self.last_save_error = "Could not write the settings file — see the log"
             return False
 
+        # The file parses now, so this load's parse failure is over. The day's
+        # shape is a separate question and a separate field.
+        self.settings_unreadable = False
         return True
 
     def _normalize_plan_day_settings(self) -> None:

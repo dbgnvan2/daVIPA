@@ -451,19 +451,25 @@ class PlanScreen(ctk.CTkFrame):
                     f" on the grid, using a day start of {self.bounds.day_start}",
                     "muted",
                 )
-            elif self._day_settings_are_unreadable() and any(
+            elif self._day_shape_is_unconfirmed() and any(
                 block.slot_index is None for block in blocks
             ):
-                # Both halves are load-bearing. Without the flag check this
-                # also fires when no settings object was supplied at all,
-                # which is a wiring mistake and not a file the user can fix.
-                # Without the second it fires on every date change of an
-                # ordinary day, naming blocks from an earlier version that do
-                # not exist.
+                # Both halves are load-bearing. Without the first this also
+                # fires when no settings object was supplied at all, which is a
+                # wiring mistake and nothing the user can act on. Without the
+                # second it fires on every date change of an ordinary day,
+                # naming blocks from an earlier version that do not exist.
+                #
+                # The wording says what is true in every state it can appear
+                # in, including after some other screen has written a readable
+                # file full of these same defaults: the day's shape has not
+                # been confirmed, whatever the file now parses as. And it names
+                # the remedy, because there is exactly one.
                 self.set_status(
-                    "Day Settings could not be read, so blocks from an earlier"
-                    " version are left off the grid rather than placed at a"
-                    " guessed day start",
+                    "Your day's shape has not been confirmed since the settings"
+                    " file could not be read, so blocks from an earlier version"
+                    " are left off the grid — open ⚙ Day Settings and save to"
+                    " place them",
                     "warning",
                 )
 
@@ -890,27 +896,30 @@ class PlanScreen(ctk.CTkFrame):
         Purpose: TG-M5 -- adoption is irreversible, so it must not run on a
                  guess. A settings file that exists but failed to parse yields
                  an all-defaults object, which is indistinguishable from a
-                 real fresh install unless the loader says so.
+                 real fresh install unless the loader says so -- and says so in
+                 a field that goes to disk, since the first save from any
+                 screen writes those defaults out as ordinary settings.
         Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
         Tests:   tests/test_plan_screen.py::test_adoption_does_not_run_on_a_guessed_day_start
         """
         if self.settings is None:
             return False
-        return not self._day_settings_are_unreadable()
+        return not self._day_shape_is_unconfirmed()
 
-    def _day_settings_are_unreadable(self) -> bool:
-        """Whether a settings file exists and could not be parsed.
+    def _day_shape_is_unconfirmed(self) -> bool:
+        """Whether these four day values are a stand-in nobody has confirmed.
 
-        Purpose: TG-M5 -- the narrower of the two questions. "Not the user's"
-                 covers a missing settings object too, which is a wiring
-                 mistake; only this one is a file the user can do something
-                 about, so only this one is worth telling them about.
+        Purpose: TG-M5 -- the narrower of the two questions, and the one with a
+                 remedy. "Not the user's" covers a missing settings object too,
+                 which is a wiring mistake and nothing the user can act on;
+                 this one is a day shape they can confirm in a dialog, so this
+                 is the one worth telling them about.
         Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
-        Tests:   tests/test_plan_screen.py::test_no_settings_object_is_not_reported_as_an_unreadable_file
+        Tests:   tests/test_plan_screen.py::test_no_settings_object_is_not_reported_as_an_unconfirmed_day
         """
         if self.settings is None:
             return False
-        return bool(getattr(self.settings, "settings_unreadable", False))
+        return bool(getattr(self.settings, "plan_day_shape_unconfirmed", False))
 
     def pointer_over_day(self) -> bool:
         return widget_contains_pointer(
