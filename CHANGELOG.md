@@ -15,8 +15,11 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the appearance section hands its object over after a successful save, and the
   section holding these two did not. Changing the box height now changes the
   Day Plan and the item rows as soon as you leave Settings, with no relaunch.
-  A refused write still hands nothing over, so the app never shows sizes the
-  file does not hold.
+  What the app is handed is re-read from the file, not the Settings screen's
+  own object: handing that object over would have made the two the same
+  object, and from the next Save on a *refused* write would have reached the
+  running app anyway -- red "could not write the settings file" and the new
+  sizes at once. The app never shows sizes the file does not hold.
 - Found by running the app after three review passes and a green suite, none of
   which could see it: every test builds a screen from a settings object it was
   handed, which is exactly the step the Save button was missing.

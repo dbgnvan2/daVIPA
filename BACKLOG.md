@@ -1,6 +1,60 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-06 (the PB-M6/PB-M7 sweep: three more below-medium added, after the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-06 (the cold sweep of the fix commits: five more below-medium added, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Below medium, from the cold sweep of the fix commits (2026-11-06)
+
+Found by the cold `learning-qa` pass over `8138181...HEAD` — the six fix
+commits no other pass had seen. Its one medium finding (a refused write
+reaching the running app, once the app held the Settings screen's own object)
+was fixed in-loop with three tests; these five were not, for the usual reason:
+a below-medium fix is new unreviewed surface that buys none of the safety it
+costs.
+
+- **The floor test's equality holds only at widget scaling 1.0.**
+  `tests/test_plan_screen.py::test_pbm61_the_floor_is_what_the_rows_own_grid_asks_for`
+  sums `winfo_reqheight()` plus `grid_info()["pady"]`, both of which
+  CustomTkinter scales, against the raw `ITEM_ROW_MIN_HEIGHT_PX`.
+  `ScalingTracker.get_window_dpi_scaling` returns 1 on darwin and on Linux, so
+  both Macs and the ubuntu CI matrix are unaffected; on a Windows HiDPI display
+  at 150% the sum is about 101 against a floor of 67 and the test is a false
+  red, with nothing actually clipped. The repo ships `start.bat` and a
+  `build-windows` job and has no Windows test job, so it would first surface on
+  a contributor's machine. Fix: compare against
+  `row._apply_widget_scaling(ITEM_ROW_MIN_HEIGHT_PX)`, or skip unless scaling
+  is 1.
+- **That same test's `pady` parsing misreads three forms it never sees.**
+  `re.findall(r"\d+", str(pady))` recovers `5` and `(6, 2)`, which is
+  everything `build_item_row` writes. It would misread a Tk screen distance
+  (`"2m"` as 2 rather than about 7.6px, `"0.5c"` as 5) and a float
+  (`(5.5, 0)` as 10) — silently, so the guard would demand the wrong floor
+  rather than fail. Fix: split the tokens and assert each converts and that
+  there are one or two of them.
+- **Nothing holds the hand-over as a class.** `app.settings` is read by the
+  Plan screen and the Weekly Items screen; the Settings-screen sections that
+  write a field either of them reads are the appearance section and the
+  date-increment section, and both now hand over. The class is complete today
+  and no test says so, so the next section that writes a field the Plan screen
+  reads reintroduces the original bug. A meta test over the `save_*` handlers
+  in `settings.py` would hold it.
+- **Two divergent stubs of the same Save handler, one of them blind.**
+  `tests/test_settings_week_rule_ui.py::_save_stub` and
+  `tests/test_plan_settings.py::_date_increment_stub` both stand in for
+  `save_date_increment_settings`'s widgets, and the first carries neither
+  `app` nor `plan_items_col_width_var`, so it raises part-way through and the
+  two tests using it wrap the call in `except AttributeError: pass`. The
+  assertions they make are still live — the rule reaches the settings object
+  before the raise — but nothing after that line can be seen from them, which
+  is part of why the suite could not see the missing hand-over. Low: the
+  stubs' own assertions hold. Fix: one shared stub carrying every widget the
+  handler touches, and no swallowed `AttributeError`.
+- **A concurrent writer still loses its write to disk.** `_write_settings`
+  writes the whole snapshot the Settings screen loaded at construction, so an
+  open Timer window calling `save_window_settings`
+  (`src/getmoredone/screens/timer_window.py:1769`) has its write overwritten by
+  the next Save on the Settings screen. Pre-existing, and not widened by the
+  hand-over fix — memory now matches disk either way. Low: the lost fields are
+  window geometry.
 
 ## Below medium, from the PB-M6/PB-M7 sweep (2026-11-06)
 

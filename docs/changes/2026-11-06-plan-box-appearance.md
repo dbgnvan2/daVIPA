@@ -216,7 +216,8 @@ the same session:
    shortfall on the title's row, so a one-box row showed its depth and its
    length and not which item it was; a 3-box row centred the title 100px from
    its own detail line. The weight is on an empty row 2 now, and
-   `ITEM_ROW_MIN_HEIGHT_PX = 66` keeps the row above its own two lines. Two new
+   `ITEM_ROW_MIN_HEIGHT_PX` keeps the row above its own two lines (66 as
+   shipped, corrected to the measured 67 later in the batch). Two new
    geometry tests measure every child against the frame.
 3. **Four colour assertions and one score assertion compared the unscored
    tint with itself** — three found by the first two passes, a fourth by the
@@ -316,8 +317,65 @@ claim that cannot be checked: `test_spec_coverage_doc_mentions_m1_through_m5`
 (renamed to `_m7` in `cf4189d`) and RP-4.2's second test. The rest are in
 `BACKLOG.md` with the meta test that would stop it recurring.
 
+### Cold sweep of the fix commits — `8138181...HEAD`
+
+Six commits no other pass had seen: the floor correction, the settings fix,
+their tests, and the docs. Run cold, with the diff and the range and none of
+the narrative. Six findings, one medium, and the medium is in the fix the walk
+had just produced.
+
+**The hand-over made a refused write reachable into the running app.**
+`self.app.settings = self.settings` published the object, which means from
+that moment the app's settings object *is* the Settings screen's object. Every
+Save handler on that screen mutates `self.settings` before its
+`_write_settings` guard and does not put it back on refusal — so on the next
+Save, a write the file refused reached the running app anyway: red "could not
+write the settings file" over a Day Plan drawn at the size that was never
+saved. The guard that exists to stop exactly that stopped nothing.
+
+Reproduced by the sweep before it was reported, which is why it is a finding
+and not a worry. It also falsified three claims this batch had already
+shipped: the CHANGELOG's "a refused write still hands nothing over", the
+comment at the swap, and PB-M5.7 in `docs/spec_coverage.md` marked `done`.
+
+Fixed by handing over what the file holds rather than the object that meant to
+become it — `_hand_settings_to_app`, `self.app.settings = AppSettings.load()`
+— which removes the alias as well as the leak. Both callers changed, the
+appearance section included: fixing one site would have closed nothing, since
+either swap arms the alias and the leak then applies to all six Save handlers
+on the screen. Three tests, 3/3 red under mutation (alias restored; hand-over
+removed; hand-over moved ahead of the guard), and the two existing tests
+rewritten — they now drive the real `_write_settings` against the real
+refusal (`tests/test_settings_save_refusal.py`'s mechanism) rather than a
+stubbed return value, and assert the outcome against the file instead of
+asserting object identity, which was the previous fix's mechanism rather than
+its contract.
+
+**PB-M6.1's live acceptance criterion still said 66.** The floor was corrected
+to the measured 67 earlier in this batch in the CHANGELOG, the user guide and
+`docs/spec_coverage.md`, but not in
+`docs/implementation_plan_2026-11-06_plan_box_appearance.md` — the plan
+`build_item_row`'s own `Spec:` line points at. A reader checking PB-M6.1
+against it would have concluded the code was wrong. Corrected there, in this
+note, and in one test docstring (working rule 13).
+
+**Four below-medium, in `BACKLOG.md`:** the floor test's equality holds only at
+widget scaling 1.0 (a false red on Windows HiDPI, which no CI job covers); its
+`pady` parsing would misread screen distances and floats, forms the code never
+writes; nothing holds the hand-over as a class, so the next section writing a
+field the Plan screen reads reintroduces the original bug; and two divergent
+stubs of this one Save handler, one of them swallowing an `AttributeError`.
+
+**Not covered**, in the sweep's own words: the 12 earlier commits of the 18
+(the range was fixed by the caller), the 14 on-screen geometry tests skipped by
+`GETMOREDONE_NO_MAPPED_WINDOWS=1`, no mutation of its own, and three test files
+run. No pass in this batch produced a high-severity finding, so by the review
+budget this is the last one — the fix commits above are therefore unswept, and
+that is the budget's deliberate stopping point, not an oversight.
+
 ### Next agent actions
 
-- Restart the demo and look at the Plan screen: the item-row heights beside the
-  day, the continuation colours, and a row at box height 30 against one at 86.
 - Re-walk the drag feel, still outstanding from PB-M5.
+- The box-height round trip was walked in the demo before the alias fix. The
+  behaviour it showed is unchanged and tested, but the refusal path has never
+  been seen on screen — it needs an unparseable settings file to produce.

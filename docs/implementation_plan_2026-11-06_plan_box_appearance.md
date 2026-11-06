@@ -173,7 +173,9 @@ Starting" row.
   the height against the row's own text, and the slack sits on an empty row
   below the two text rows so a tall row keeps its lines together and a short
   one loses from the bottom.
-- **PB-M6.1 Floor.** Never below `ITEM_ROW_MIN_HEIGHT_PX = 66`. The 30px floor
+- **PB-M6.1 Floor.** Never below `ITEM_ROW_MIN_HEIGHT_PX = 67` -- the title's
+  28px plus its 5px top pad, and the length label's 28 plus its 6px bottom pad,
+  measured off the real widgets rather than counted. The 30px floor
   on the box height was justified for a chip holding one line; an item row
   holds two plus the length, and matched to a 34px box it dropped the depth /
   `already blocked` line and the length with no sign of it.
