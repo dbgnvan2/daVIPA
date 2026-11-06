@@ -92,6 +92,10 @@ class AppSettings:
     # Drag Schedule date/future box height in pixels
     drag_schedule_box_height_px: int = 86
     drag_schedule_title_col_width: int = 220
+    # Plan screen: width (px) of the items column. Fixed, not a share of
+    # the window -- it holds titles, and the day beside it is what the
+    # width is for. Editable in Settings > Appearance.
+    plan_items_col_width: int = 260
     # Today view: width (px) of the resizable Title column
     today_title_col_width: int = 260
     # Per-column widths (px) for resizable list columns, keyed by column id.

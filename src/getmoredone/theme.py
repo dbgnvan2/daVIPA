@@ -119,7 +119,12 @@ def semantic_colors() -> Dict[str, str]:
         "chip_text": "white",
         "date_start_text": "#FFB347",
         "date_due_text": "#FF5A8A",
-        "time_text": "#FFD8A8",
+        # The clock label on a Plan box. It was a fixed peach, which is
+        # the dark theme's colour in both themes: on the light one it is
+        # pale text on a pale box and the hour is barely readable. The
+        # label is the only thing that says which half hour a box is, so
+        # it follows the body text and is legible in either mode.
+        "time_text": label_text,
         "success_tint": "#E8F5EE" if mode == "light" else "#1F2B24",
         "critical_tint": "#FDECEC" if mode == "light" else "#3A2328",
         "danger": "#B91C1C",
@@ -275,6 +280,70 @@ def priority_band_colors() -> Dict[str, str]:
         "medium": "#FBBF24",
         "low": "#4ADE80",
         "unscored": "#94A3B8",
+    }
+
+
+def priority_stripe_colors() -> Dict[str, str]:
+    """PB-M1 — the band accent as a stripe, brighter than the text-safe set.
+
+    Purpose: a visible priority bar, without weakening the colours that have
+             to sit behind a label.
+    Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m1
+    Tests:   tests/test_time_block_colors.py::test_pbm12_stripe_colors_meet_the_non_text_contrast_bar
+
+    A second table rather than an edit of ``priority_band_colors`` because the
+    two are held to different bars and cannot both be satisfied by one value.
+    A stripe is not text, so WCAG asks 3:1 of it; a band colour behind a label
+    is text, and asks 4.5:1. On a pale light-theme surface, brighter means less
+    contrast, so the light set below sits as high up each ramp as 3:1 allows
+    and the text-safe set stays where 4.5:1 put it.
+
+    The dark values are identical to ``priority_band_colors``: that set already
+    clears 4.5:1 against the dark surface with room to spare, so there is
+    nothing to trade and no second value worth inventing.
+    """
+    mode = (ctk.get_appearance_mode() or "Dark").lower()
+    if mode == "light":
+        return {
+            "critical": "#DC2626",
+            "high": "#C2410C",
+            "medium": "#B45309",
+            "low": "#15803D",
+            "unscored": "#71717A",
+        }
+    return dict(priority_band_colors())
+
+
+def priority_fill_colors() -> Dict[str, str]:
+    """PB-M4 — the shade a task is drawn on, by the priority behind it.
+
+    Purpose: carry priority as the shading of the task itself, not only as a
+             6px bar at its edge.
+    Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m4
+    Tests:   tests/test_plan_screen.py::test_pbm41_a_chips_title_is_coloured_for_the_shade_behind_it
+
+    A tint and not the accent. The project rule allows a colour as a chip or
+    stripe accent and not as a full-row fill, and the reason it gives -- a wall
+    of saturated rows stops carrying information and fights the text on top of
+    it -- applies whatever the colour's source. These are chosen so
+    ``pick_text_color`` clears 4.5:1 on them and so the band's own stripe still
+    clears 3:1 when drawn on them rather than on the bare surface.
+    """
+    mode = (ctk.get_appearance_mode() or "Dark").lower()
+    if mode == "light":
+        return {
+            "critical": "#FEE2E2",
+            "high": "#FFEDD5",
+            "medium": "#FEF3C7",
+            "low": "#DCFCE7",
+            "unscored": "#F4F4F5",
+        }
+    return {
+        "critical": "#450A0A",
+        "high": "#431407",
+        "medium": "#451A03",
+        "low": "#052E16",
+        "unscored": "#27272A",
     }
 
 

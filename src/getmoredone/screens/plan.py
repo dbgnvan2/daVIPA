@@ -54,6 +54,8 @@ from ..time_block_layout import (
 from ..widgets.date_picker import DatePickerButton
 from .drag_schedule_support import widget_contains_pointer
 from .plan_blocks import (
+    SLOT_CHIP_HEIGHT_PX,
+    SLOT_TITLE_WIDTH_PX,
     build_empty_day_note,
     build_item_row,
     build_outside_group,
@@ -69,6 +71,13 @@ if TYPE_CHECKING:
 # Button-2 under some input configurations, so both are bound; that the OS
 # delivers one of them is a human check in the running app.
 RIGHT_CLICK_SEQUENCES = ("<Button-3>", "<Button-2>")
+
+#: Width (px) of the items column when the setting is missing or unusable.
+PLAN_ITEMS_COL_WIDTH_PX = 260
+
+#: How much of the items column is frame, padding and scrollbar rather than
+#: text. Subtracted from the column width to get a wraplength that fits.
+ITEMS_TEXT_INSET_PX = 56
 
 # How many items the left pane will draw. Announced when it bites, never
 # silently applied (P2): a planner that quietly stopped listing an item would
@@ -180,8 +189,13 @@ class PlanScreen(ctk.CTkFrame):
         self._grid: DayGrid = DayGrid()
         self._items: List[ActionItem] = []
 
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=2)
+        # The items column is a fixed width and the day takes the rest.
+        # It was a third of the window on a weight of its own, which gave
+        # a list of titles as much room as the thing the titles are
+        # dragged onto. The width is a setting so it can be sized to the
+        # titles the user actually has.
+        self.grid_columnconfigure(0, weight=0, minsize=self.items_col_width())
+        self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
         self.create_header()
@@ -190,6 +204,59 @@ class PlanScreen(ctk.CTkFrame):
 
         self._ready = True
         self.refresh()
+
+    def items_col_width(self) -> int:
+        """Width (px) of the items column, from Settings > Appearance.
+
+        Purpose: the column is sized by a setting, not by a share of the
+                 window.
+        Tests:   tests/test_plan_screen.py::test_the_items_column_is_the_width_the_setting_asks_for
+
+        A missing, unparseable or non-positive value falls back rather
+        than collapsing the column: a settings file is user-editable, and
+        a zero there would hide the list with no way back to it from the
+        screen it hid.
+        """
+        return self._positive_setting(
+            "plan_items_col_width", PLAN_ITEMS_COL_WIDTH_PX
+        )
+
+    def box_height(self) -> int:
+        """Height (px) of one task in a day box, from Settings > Appearance.
+
+        Purpose: PB-M5 -- the Day Plan boxes are sized by the Drag Schedule
+                 box-height setting rather than by a constant.
+        Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m5
+        Tests:   tests/test_plan_screen.py::test_pbm52_the_setting_reaches_the_rendered_box
+        """
+        return self._positive_setting(
+            "drag_schedule_box_height_px", SLOT_CHIP_HEIGHT_PX
+        )
+
+    def box_title_width(self) -> int:
+        """Width (px) of a day box's title column, from the Drag Schedule setting.
+
+        Purpose: PB-M5 -- one title width across the two screens that show a
+                 task as a row, so the columns line up between them.
+        Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m5
+        Tests:   tests/test_plan_screen.py::test_pbm54_the_title_column_follows_the_drag_schedule_width
+        """
+        return self._positive_setting(
+            "drag_schedule_title_col_width", SLOT_TITLE_WIDTH_PX
+        )
+
+    def _positive_setting(self, name: str, fallback: int) -> int:
+        """A settings integer, or ``fallback`` when it is missing or unusable.
+
+        A settings file is user-editable, so every size read from one has to
+        survive a zero, a negative and a typo. Collapsing a column or a box to
+        nothing hides the control the user would need to put it back.
+        """
+        try:
+            value = int(getattr(self.settings, name, None))
+        except (TypeError, ValueError):
+            return fallback
+        return value if value > 0 else fallback
 
     # ================= construction =========================================
 
@@ -266,6 +333,17 @@ class PlanScreen(ctk.CTkFrame):
         self.items_scroll = ctk.CTkScrollableFrame(frame)
         self.items_scroll.grid(row=2, column=0, sticky="nsew", padx=5, pady=(0, 5))
         self.items_scroll.grid_columnconfigure(0, weight=1)
+
+        # Blocks no box can hold sit under the item list, in the column
+        # they have to be dragged from. Its own container rather than a
+        # tail of ``items_scroll``: that one is emptied by ``load_items``
+        # and this is filled by ``load_blocks``, so sharing it would make
+        # the group survive or vanish depending on which ran last.
+        self.outside_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        self.outside_frame.grid(
+            row=3, column=0, sticky="ew", padx=5, pady=(0, 5)
+        )
+        self.outside_frame.grid_columnconfigure(0, weight=1)
 
     def create_day_pane(self):
         frame = ctk.CTkFrame(self)
@@ -362,14 +440,23 @@ class PlanScreen(ctk.CTkFrame):
 
             shown = self._items[:MAX_ITEM_ROWS]
             if not shown:
+                # anchor and wraplength both matter here. CTkLabel centres its
+                # text by default, so a label wider than its cell overflows on
+                # both sides and Tk clips both -- which read as a sentence
+                # missing its first word. The hard line breaks this text used
+                # to carry were sized for a column that was a third of the
+                # window; the column is now a setting, so the text wraps to it.
                 ctk.CTkLabel(
                     self.items_scroll,
                     text=(
                         "No open items start on this date.\n\n"
-                        "This list is filtered on each item's Start Date, so an item\n"
-                        "with the wrong start date will not appear here."
+                        "This list is filtered on each item's Start Date, so "
+                        "an item with the wrong start date will not appear "
+                        "here."
                     ),
+                    anchor="w",
                     justify="left",
+                    wraplength=self.items_col_width() - ITEMS_TEXT_INSET_PX,
                 ).grid(row=0, column=0, padx=10, pady=20, sticky="w")
             else:
                 for row, item in enumerate(shown):
@@ -410,6 +497,11 @@ class PlanScreen(ctk.CTkFrame):
         self.blocks_scroll.grid_remove()
         try:
             for widget in self.blocks_scroll.winfo_children():
+                widget.destroy()
+            # Unconditional: emptied only inside the "there are blocks
+            # outside the day" branch, the last group drawn would stay on
+            # screen after the day that had one was left.
+            for widget in self.outside_frame.winfo_children():
                 widget.destroy()
             self._slot_frames = []
             self._block_widgets = []
@@ -479,7 +571,12 @@ class PlanScreen(ctk.CTkFrame):
             row = 0
             for entry in self._grid.slots:
                 rendered = build_slot_row(
-                    self.blocks_scroll, entry, items_by_id, row
+                    self.blocks_scroll,
+                    entry,
+                    items_by_id,
+                    row,
+                    chip_height=self.box_height(),
+                    title_width=self.box_title_width(),
                 )
                 self._slot_frames.append((rendered.frame, entry.slot.index))
                 for block, widget in rendered.block_widgets:
@@ -491,14 +588,16 @@ class PlanScreen(ctk.CTkFrame):
                 build_empty_day_note(self.blocks_scroll, row)
                 row += 1
 
-            # Surfaced under the grid, never dropped (P2).
+            # Surfaced beneath the item list, never dropped (P2). Under
+            # the items rather than under the grid: a block here is one
+            # the user has to drag onto a box, which is the same move as
+            # an item above it, from the same column.
             if self._grid.outside:
                 for block, widget in build_outside_group(
-                    self.blocks_scroll, self._grid.outside, items_by_id, row
+                    self.outside_frame, self._grid.outside, items_by_id, 0
                 ):
                     self.bind_block_handlers(widget, block)
                     self._block_widgets.append((widget, block.id))
-                row += 1 + len(self._grid.outside)
         finally:
             self.blocks_scroll.grid(**grid_info)
 

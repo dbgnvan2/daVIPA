@@ -619,6 +619,20 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
         )
         self.drag_schedule_box_height_entry.grid(row=7, column=1, sticky="w", padx=10, pady=5)
 
+        # Plan items column width setting
+        ctk.CTkLabel(section, text="Plan items column width (px):").grid(
+            row=8, column=0, sticky="w", padx=10, pady=5
+        )
+        self.plan_items_col_width_var = ctk.StringVar(
+            value=str(getattr(self.settings, "plan_items_col_width", 260))
+        )
+        self.plan_items_col_width_entry = ctk.CTkEntry(
+            section,
+            textvariable=self.plan_items_col_width_var,
+            width=180
+        )
+        self.plan_items_col_width_entry.grid(row=8, column=1, sticky="w", padx=10, pady=5)
+
         # Save button
         btn_save = ctk.CTkButton(
             section,
@@ -627,12 +641,12 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
             **button_style("primary"),
             width=150
         )
-        btn_save.grid(row=8, column=0, sticky="w", padx=10, pady=10)
+        btn_save.grid(row=9, column=0, sticky="w", padx=10, pady=10)
 
         # Status label
         self.date_increment_status_label = self._status_label(section, text="", level="success")
         self.date_increment_status_label.grid(
-            row=8, column=1, sticky="w", padx=10, pady=10)
+            row=9, column=1, sticky="w", padx=10, pady=10)
 
         # Info
         info_text = ("These settings control how dates are incremented when using:\n"
@@ -641,7 +655,7 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
                      "• Continue button (duplicate action for next day)\n\n"
                      "Note: Manual date entry is not affected by these settings.")
         self._info_label(section, text=info_text, justify="left", wraplength=600).grid(
-            row=9, column=0, columnspan=2, sticky="w", padx=10, pady=5
+            row=10, column=0, columnspan=2, sticky="w", padx=10, pady=5
         )
 
     def save_date_increment_settings(self):
@@ -671,6 +685,10 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
         self.settings.drag_schedule_box_height_px = self._parse_positive_int(
             self.drag_schedule_box_height_var.get(),
             default=getattr(self.settings, "drag_schedule_box_height_px", 86)
+        )
+        self.settings.plan_items_col_width = self._parse_positive_int(
+            self.plan_items_col_width_var.get(),
+            default=getattr(self.settings, "plan_items_col_width", 260)
         )
         if not self._write_settings(self.date_increment_status_label):
             return

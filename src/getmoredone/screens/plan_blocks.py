@@ -19,11 +19,14 @@ from typing import Dict, List, Optional, Tuple
 
 import customtkinter as ctk
 
+from ..color_contrast import pick_text_color
 from ..models import ActionItem, BlockType, TimeBlock
 from ..theme import (
     block_type_colors,
     depth_bar_colors,
     priority_band_colors,
+    priority_fill_colors,
+    priority_stripe_colors,
     semantic_colors,
 )
 from ..time_block_layout import (
@@ -40,13 +43,37 @@ from ..time_block_layout import (
 # information and starts fighting the text on top of it.
 STRIPE_WIDTH_PX = 6
 
+#: What the stripe asks to be tall. It is gridded ``sticky="ns"`` and stretched
+#: to its cell, so this number only has to be small -- but it has to be given.
+#: ``ctk.CTkFrame`` requests 200x200 when neither dimension is set, and the
+#: stripe set ``width`` alone, so its height request was a constant nobody
+#: chose. Every container that let a child's request through grew to 200px:
+#: an item row five times taller than its two lines of text, and a task chip
+#: whose title was laid out at y=100 inside a box clipped to 34, which is why
+#: a planned box showed nothing but the bar.
+STRIPE_MIN_HEIGHT_PX = 12
+
+
+def stripe_for_item(item: Optional[ActionItem]) -> str:
+    """PB-M1 — the brighter band colour, for the stripe on an item's row."""
+    return priority_stripe_colors()[_band_of(item)]
+
+
+def fill_for_item(item: Optional[ActionItem]) -> str:
+    """PB-M4 — the shade a task is drawn on, by the priority behind it."""
+    return priority_fill_colors()[_band_of(item)]
+
+
+def _band_of(item: Optional[ActionItem]) -> str:
+    """Which priority band an item falls in, or "unscored" when there is none."""
+    if item is None:
+        return "unscored"
+    return priority_band(getattr(item, "priority_score", 0))
+
 
 def accent_for_item(item: Optional[ActionItem]) -> str:
     """The band colour for the item behind a block, or the unscored grey."""
-    bands = priority_band_colors()
-    if item is None:
-        return bands["unscored"]
-    return bands[priority_band(getattr(item, "priority_score", 0))]
+    return priority_band_colors()[_band_of(item)]
 
 
 def accent_for_block(block: TimeBlock, item: Optional[ActionItem]) -> str:
@@ -60,6 +87,19 @@ def accent_for_block(block: TimeBlock, item: Optional[ActionItem]) -> str:
     if kind in (BlockType.BUFFER, BlockType.BREAK):
         return block_type_colors()[kind]
     return accent_for_item(item)
+
+
+def stripe_for_block(block: TimeBlock, item: Optional[ActionItem]) -> str:
+    """PB-M1 — ``accent_for_block`` in the brighter stripe table.
+
+    Padding keeps its neutral: ``block_type_colors`` is already the dimmest
+    thing on the row and brightening it would make a buffer compete with the
+    task beside it for attention it has no claim to.
+    """
+    kind = BlockType.normalize(block.block_type)
+    if kind in (BlockType.BUFFER, BlockType.BREAK):
+        return block_type_colors()[kind]
+    return stripe_for_item(item)
 
 
 class DepthBarStack(ctk.CTkFrame):
@@ -107,21 +147,25 @@ def build_item_row(
     its children -- a press that lands on a label must start the same drag as
     one that lands on the frame, or half the row is dead to the mouse.
     """
-    palette = semantic_colors()
-    frame = ctk.CTkFrame(parent, fg_color=palette["surface_subtle"], corner_radius=6)
+    fill = fill_for_item(item)
+    on_fill = pick_text_color(fill)
+    frame = ctk.CTkFrame(parent, fg_color=fill, corner_radius=6)
     frame.grid(row=row, column=0, sticky="ew", pady=3, padx=2)
     frame.grid_columnconfigure(1, weight=1)
 
     stripe = ctk.CTkFrame(
         frame,
         width=STRIPE_WIDTH_PX,
-        fg_color=accent_for_item(item),
+        height=STRIPE_MIN_HEIGHT_PX,
+        fg_color=stripe_for_item(item),
         corner_radius=3,
     )
     stripe.grid(row=0, column=0, rowspan=2, sticky="ns", padx=(4, 8), pady=4)
     stripe.grid_propagate(False)
 
-    title = ctk.CTkLabel(frame, text=item.title, anchor="w", justify="left")
+    title = ctk.CTkLabel(
+        frame, text=item.title, anchor="w", justify="left", text_color=on_fill
+    )
     title.grid(row=0, column=1, sticky="ew", padx=(0, 6), pady=(5, 0))
 
     # The scheduling facts, in the words the item editor uses for them.
@@ -141,7 +185,7 @@ def build_item_row(
         frame,
         text="  ·  ".join(details),
         anchor="w",
-        text_color=palette["muted_text"],
+        text_color=on_fill,
         font=ctk.CTkFont(size=11),
     )
     subtitle.grid(row=1, column=1, sticky="ew", padx=(0, 6), pady=(0, 5))
@@ -196,7 +240,14 @@ SLOT_TIME_WIDTH_PX = 58
 SLOT_MIN_HEIGHT_PX = 32
 
 #: Height of one task chip, and so what each task adds to a box's height.
+#: The fallback only: PB-M5 takes the live value from
+#: ``AppSettings.drag_schedule_box_height_px``, and this is what a missing or
+#: unusable setting resolves to.
 SLOT_CHIP_HEIGHT_PX = 30
+
+#: What the chip's title column asks for. Fallback for
+#: ``AppSettings.drag_schedule_title_col_width``, the same way.
+SLOT_TITLE_WIDTH_PX = 80
 
 
 @dataclass
@@ -225,14 +276,21 @@ def _configure_slot_columns(frame: ctk.CTkFrame) -> None:
     frame.grid_rowconfigure(0, weight=1)
 
 
-def slot_row_height(chips: int) -> int:
+def slot_row_height(chips: int, chip_height: int = SLOT_CHIP_HEIGHT_PX) -> int:
     """How tall a box holding this many task chips is drawn.
+
+    Purpose: PB-M5 -- box height follows the Drag Schedule box-height setting.
+    Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m5
+    Tests:   tests/test_plan_screen.py::test_pbm51_box_height_follows_the_setting
 
     Named rather than inlined because two tests and the renderer all need the
     same answer, and a second copy of the arithmetic is how a layout assertion
     starts agreeing with itself instead of with the screen.
+
+    An empty box keeps ``SLOT_MIN_HEIGHT_PX`` whatever the setting says: it
+    holds no text, and its height only has to be enough to drop onto.
     """
-    return max(SLOT_MIN_HEIGHT_PX, chips * SLOT_CHIP_HEIGHT_PX + 4)
+    return max(SLOT_MIN_HEIGHT_PX, chips * chip_height + 4)
 
 
 def build_slot_row(
@@ -240,6 +298,9 @@ def build_slot_row(
     grid_slot,
     items_by_id: Dict[str, ActionItem],
     row: int,
+    *,
+    chip_height: int = SLOT_CHIP_HEIGHT_PX,
+    title_width: int = SLOT_TITLE_WIDTH_PX,
 ) -> SlotRow:
     """One half-hour box of the day.
 
@@ -268,7 +329,7 @@ def build_slot_row(
         parent,
         fg_color=fill,
         corner_radius=6,
-        height=slot_row_height(chips),
+        height=slot_row_height(chips, chip_height),
         border_width=1,
         border_color=palette["border"],
     )
@@ -306,7 +367,13 @@ def build_slot_row(
     inner = 0
     for block in grid_slot.starting:
         chip = _build_block_chip(
-            body, block, items_by_id.get(block.item_id), inner, continued=False
+            body,
+            block,
+            items_by_id.get(block.item_id),
+            inner,
+            continued=False,
+            chip_height=chip_height,
+            title_width=title_width,
         )
         rendered.block_widgets.append((block, chip))
         inner += 1
@@ -327,6 +394,8 @@ def build_slot_row(
             inner,
             continued=True,
             last_box=last_box,
+            chip_height=chip_height,
+            title_width=title_width,
         )
         inner += 1
 
@@ -341,6 +410,8 @@ def _build_block_chip(
     *,
     continued: bool,
     last_box: bool = True,
+    chip_height: int = SLOT_CHIP_HEIGHT_PX,
+    title_width: int = SLOT_TITLE_WIDTH_PX,
 ) -> ctk.CTkFrame:
     """One task inside a box.
 
@@ -351,21 +422,41 @@ def _build_block_chip(
     palette = semantic_colors()
     kind = BlockType.normalize(block.block_type)
 
-    chip = ctk.CTkFrame(parent, fg_color="transparent", height=SLOT_CHIP_HEIGHT_PX - 4)
+    # PB-M4: the task carries its priority as shading, not only as the bar at
+    # its edge. A continuation is left unfilled on purpose -- it is the same
+    # task seen again, and shading it would read as a second task of equal
+    # weight. Padding has no priority to shade with.
+    if continued or kind in (BlockType.BUFFER, BlockType.BREAK):
+        fill = "transparent"
+        body_text = palette["muted_text"] if continued else palette["body_text"]
+    else:
+        fill = fill_for_item(item)
+        body_text = pick_text_color(fill)
+
+    chip = ctk.CTkFrame(
+        parent, fg_color=fill, corner_radius=4, height=chip_height - 4
+    )
     chip.grid(row=row, column=0, sticky="ew", pady=1)
     chip.grid_columnconfigure(0, minsize=STRIPE_WIDTH_PX + 8)
-    chip.grid_columnconfigure(1, minsize=80, weight=1)
+    chip.grid_columnconfigure(1, minsize=title_width, weight=1)
     chip.grid_columnconfigure(2, minsize=22)
     chip.grid_columnconfigure(3, minsize=48)
     chip.grid_rowconfigure(0, weight=1)
+    # No grid_propagate(False) here, deliberately. It would also hold the chip
+    # to its height, but then neither it nor the stripe's height= could be
+    # shown to matter: each alone keeps the title inside the box, so a test
+    # can only fail when both are reverted, and a line no test can fail on is
+    # a line nobody can safely change. The stripe's own height is the root
+    # cause and is where the fix stays.
 
     stripe = ctk.CTkFrame(
         chip,
         width=STRIPE_WIDTH_PX,
-        fg_color=palette["border"] if continued else accent_for_block(block, item),
+        height=STRIPE_MIN_HEIGHT_PX,
+        fg_color=palette["border"] if continued else stripe_for_block(block, item),
         corner_radius=3,
     )
-    stripe.grid(row=0, column=0, sticky="ns", padx=(0, 8))
+    stripe.grid(row=0, column=0, sticky="ns", padx=(0, 8), pady=2)
     stripe.grid_propagate(False)
 
     title = _block_title(block, item)
@@ -374,7 +465,7 @@ def _build_block_chip(
         text=f"↳ {title}" if continued else title,
         anchor="w",
         justify="left",
-        text_color=palette["muted_text"] if continued else palette["body_text"],
+        text_color=body_text,
     ).grid(row=0, column=1, sticky="ew")
 
     if continued:
@@ -403,7 +494,7 @@ def _build_block_chip(
         text=f"{block.planned_minutes}m",
         width=48,
         anchor="e",
-        text_color=palette["muted_text"],
+        text_color=body_text,
         font=ctk.CTkFont(size=11),
     ).grid(row=0, column=3, sticky="e")
 
