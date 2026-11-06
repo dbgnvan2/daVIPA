@@ -693,6 +693,14 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
         if not self._write_settings(self.date_increment_status_label):
             return
 
+        # Hand the object to the app, as the appearance section does. This
+        # screen edits its own ``AppSettings.load()``, and the Plan screen
+        # reads ``drag_schedule_box_height_px`` and ``plan_items_col_width``
+        # off ``app.settings`` each time it is built. Without this a saved box
+        # height is written to disk and does nothing until the next launch --
+        # which is what PB-M5 wired these two settings up to avoid.
+        self.app.settings = self.settings
+
         self._set_status(self.date_increment_status_label, "✓ Settings saved", "success")
 
     def pick_drag_schedule_text_color(self):
