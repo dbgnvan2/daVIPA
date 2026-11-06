@@ -32,6 +32,7 @@ from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem, BlockType, TimeBlock
 from src.getmoredone.color_contrast import contrast_ratio, pick_text_color
 from src.getmoredone.screens.plan import (
+    ITEMS_TEXT_INSET_PX,
     NOTE_MIN_WRAP_PX,
     OUTSIDE_GROUP_HEIGHT_PX,
     PLAN_ITEMS_COL_WIDTH_PX,
@@ -2027,15 +2028,22 @@ def test_the_items_column_is_the_width_the_setting_asks_for(root, manager, setti
              screen, and the day beside it is what the width is for.
     Tests:   this test
     """
-    settings.plan_items_col_width = 180
+    settings.plan_items_col_width = 520
     panel = PlanScreen(root, manager, _App(settings))
+    assert 520 > panel.items_width_floor(), (
+        "520 is below the floor, so this test would be about the floor and "
+        "not about the setting"
+    )
 
-    assert panel.grid_columnconfigure(0)["minsize"] == 180
+    assert panel.grid_columnconfigure(0)["minsize"] == 520
     assert panel.grid_columnconfigure(0)["weight"] == 0, (
         "with a weight the column grows with the window and the setting is "
         "only a floor"
     )
-    assert panel.grid_columnconfigure(1)["weight"] == 1, (
+    assert panel.grid_columnconfigure(1)["weight"] == 0, (
+        "column 1 is the drag grip since PD-M2 and must not grow"
+    )
+    assert panel.grid_columnconfigure(2)["weight"] == 1, (
         "the day column has to take the width the items column gave up"
     )
 
@@ -2050,11 +2058,21 @@ def test_an_unusable_items_column_width_falls_back_rather_than_collapsing(
     """
     settings.plan_items_col_width = 0
     panel = PlanScreen(root, manager, _App(settings))
-    assert panel.grid_columnconfigure(0)["minsize"] == PLAN_ITEMS_COL_WIDTH_PX
+    floored = max(PLAN_ITEMS_COL_WIDTH_PX, panel.items_width_floor())
+    assert panel.grid_columnconfigure(0)["minsize"] == floored
 
     settings.plan_items_col_width = "two hundred"
     other = PlanScreen(root, manager, _App(settings))
-    assert other.grid_columnconfigure(0)["minsize"] == PLAN_ITEMS_COL_WIDTH_PX
+    assert other.grid_columnconfigure(0)["minsize"] == floored
+
+    # The fallback is subject to the floor as well. At the shipped defaults it
+    # is below it -- 260 against the 360 a row asks for -- so a zero in the
+    # file used to take the unfloored fallback and clip the row's length label
+    # off the right edge, which is exactly what the floor exists to stop.
+    assert floored > PLAN_ITEMS_COL_WIDTH_PX, (
+        "the fallback is already above the floor, so the clause above is "
+        "about nothing"
+    )
 
 
 def _as_hex(widget, color) -> str:
@@ -2513,7 +2531,13 @@ def test_the_empty_item_note_fits_the_column_it_is_drawn_in(
     rather than a message. Measured as the laid-out label against the column,
     because the hard line breaks it carried were sized for a column that no
     longer exists.
+
+    The narrow column comes through the title-column setting since PD-M2.7:
+    ``plan_items_col_width`` alone can no longer make one, because it is raised
+    to what an item row needs. The column is read back off the screen rather
+    than restated here, for that reason.
     """
+    settings.drag_schedule_title_col_width = 60
     settings.plan_items_col_width = 240
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = SATURDAY
@@ -2525,8 +2549,13 @@ def test_the_empty_item_note_fits_the_column_it_is_drawn_in(
         if isinstance(child, ctk.CTkLabel)
         and "No open items start" in child.cget("text")
     )
-    assert note.winfo_reqwidth() <= 240, (
-        f"the note asks for {note.winfo_reqwidth()}px inside a 240px column"
+    width = panel.items_col_width()
+    assert width <= 240, (
+        f"the column came out at {width}px, so it is not the narrow one this "
+        "test is about"
+    )
+    assert note.winfo_reqwidth() <= width, (
+        f"the note asks for {note.winfo_reqwidth()}px inside a {width}px column"
     )
     assert note.cget("anchor") == "w", (
         f"the note is anchored {note.cget('anchor')!r}, so text that does not "
@@ -2727,9 +2756,23 @@ def test_the_empty_item_note_wraps_even_in_a_narrow_column(
     negative below it, and Tk documents ``-wraplength`` of zero or less as no
     wrapping at all -- so the narrowest columns were the ones that got the
     single long clipped line this batch had just removed.
+
+    PD-M2.7 raised ``plan_items_col_width`` to what an item row needs, which
+    takes a 50px column off the table and with it most of this floor's reach.
+    Not all of it: the row's own floor is mostly the title column, which has a
+    fallback and no minimum of its own, so a 1px title width in a
+    hand-edited file still produces a 141px items column and an 85px
+    wraplength. That is the input now, and the floor is still what stands
+    between it and a note that does not wrap.
     """
+    settings.drag_schedule_title_col_width = 1
     settings.plan_items_col_width = 50
     panel = PlanScreen(root, manager, _App(settings))
+    assert panel.items_col_width() - ITEMS_TEXT_INSET_PX < NOTE_MIN_WRAP_PX, (
+        f"a {panel.items_col_width()}px column leaves more than "
+        f"{NOTE_MIN_WRAP_PX}px to wrap in, so the floor is not what is being "
+        "measured"
+    )
     panel.selected_date = SATURDAY
     panel.refresh()
 
@@ -3260,35 +3303,40 @@ def test_pdm14_the_second_line_is_the_blocked_marker_alone(root, manager):
 
 
 def test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it(
-    root, manager, mapped_windows
+    root, manager, settings, mapped_windows
 ):
-    """PD-M1.4 - four columns in the narrow pane, and nothing squeezed out.
+    """PD-M1.4 - four columns in the real pane, at the real settings.
 
     ``test_pbm61_every_line_of_a_row_is_drawn_inside_it`` measures the row
     vertically, which was the risk when the row was two stacked lines. Putting
     the stripe, the title, the bars and the length on one line makes width the
-    risk instead: in a pane the width of the items column the four columns
-    have to fit, and a title column with ``weight=1`` is the one that gives
-    way -- collapsed to a pixel, or pushed past the frame's right edge.
+    risk instead, and that is what this measures.
 
-    So this asserts the horizontal edges, at the real column width, which the
-    vertical test does not look at at all.
+    Through ``PlanScreen``, and that is the whole lesson of this test. The
+    first version built the row by hand in a frame of
+    ``PLAN_ITEMS_COL_WIDTH_PX`` and let ``title_width`` default to
+    ``SLOT_TITLE_WIDTH_PX`` -- the 80px *fallback*. The setting's real default
+    is 220, so in the app the row asked for 306px inside a 256px pane and the
+    ``30m`` label was laid out entirely past the right edge: invisible, in
+    every item row, while this test was green. Built from the screen, the
+    widths are the ones the user has.
     """
-    item = _scored_item(manager, "Draft the proposal")
-    root.geometry(f"{PLAN_ITEMS_COL_WIDTH_PX}x700")
+    item = _item(manager, "Draft the proposal")
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.pack(fill="both", expand=True)
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    root.geometry("1200x700")
     root.deiconify()
-    pane = ctk.CTkFrame(root)
-    pane.pack(fill="both", expand=True)
-    pane.grid_columnconfigure(0, weight=1)
-
-    row = build_item_row(
-        pane, item, 0, already_blocked=True, work_block_minutes=30
-    )
     root.update_idletasks()
     root.update()
 
+    title = _find_label(panel.items_scroll, item.title)
+    assert title is not None, "the item is not in the left pane at all"
+    row = title.master
     width = row.winfo_width()
     assert width > 1, "the row itself was not laid out"
+
     for child in row.winfo_children():
         shown = (
             child.cget("text") if isinstance(child, ctk.CTkLabel)
@@ -3305,8 +3353,6 @@ def test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it(
         assert right <= width, (
             f"{shown!r} ends at {right} in a {width}px row -- it is clipped"
         )
-
-
 def test_pbm71_a_continuation_box_is_the_colour_of_its_task(root, manager):
     """PB-M7.1 — the later boxes of a long task are shaded like the first.
 
@@ -3378,4 +3424,261 @@ def test_pbm71_a_continuation_box_keeps_its_arrow(root, manager):
     )
     assert any("Draft the proposal" in text for text in texts), (
         f"the continuation does not name its task: {texts}"
+    )
+
+
+# --- PD-M2 : the divider between the panes drags ---------------------------
+
+
+def _drag_the_grip(panel, pixels, *, release=True, start=500):
+    """Press the grip, move it ``pixels`` to the right, release.
+
+    Positive is rightward: the items column grows and the day gives up the
+    width. The press position is arbitrary -- the handler works in deltas from
+    wherever it was pressed -- so it is named once here rather than chosen
+    again in every test.
+
+    The release lands past the last motion, which is what a real drag does:
+    Tk's last ``<B1-Motion>`` is wherever the pointer was when it last moved,
+    not where the button came up. Releasing at the same place as the final
+    motion made every one of these tests pass against a release handler that
+    ignored its own event and wrote whatever the last motion had left.
+    """
+    panel.on_divider_press(_FakeEvent(start, 0))
+    panel.on_divider_motion(_FakeEvent(start + pixels // 2, 0))
+    if release:
+        panel.on_divider_release(_FakeEvent(start + pixels, 0))
+    else:
+        panel.on_divider_motion(_FakeEvent(start + pixels, 0))
+
+
+def test_pdm21_dragging_the_grip_changes_the_items_column(
+    root, manager, settings
+):
+    """PD-M2.1 — the column follows the pointer, both ways, by the delta.
+
+    Both directions, and the second motion from the same press, because the
+    handler works from where the press was and not from where the last motion
+    left off: a handler that applied each motion's delta to the current width
+    would pass a single rightward drag and double every one after it.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    # Well clear of the floor at both ends, so this test is about the delta
+    # and not about the clamp.
+    settings.plan_items_col_width = panel.items_width_floor() + 100
+    before = panel.items_col_width()
+
+    panel.on_divider_press(_FakeEvent(500, 0))
+    panel.on_divider_motion(_FakeEvent(540, 0))
+    assert panel.grid_columnconfigure(0)["minsize"] == before + 40, (
+        f"40px right of a {before}px column gave "
+        f"{panel.grid_columnconfigure(0)['minsize']}px"
+    )
+
+    panel.on_divider_motion(_FakeEvent(460, 0))
+    assert panel.grid_columnconfigure(0)["minsize"] == before - 40, (
+        f"40px left of the press gave "
+        f"{panel.grid_columnconfigure(0)['minsize']}px, not {before - 40}"
+    )
+
+
+def test_pdm22_the_items_pane_cannot_be_dragged_shut(root, manager, settings):
+    """PD-M2.2 — the left end, where the clamp is a width a row can be drawn in.
+
+    The floor is what a task's own line asks for plus the pane's chrome, not a
+    round number: the columns are the chip's, one of them is a setting, and a
+    hand-picked floor would be wrong the moment the title width changed.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    floor = panel.items_width_floor()
+    assert floor > 0, "the floor is not a width at all"
+    settings.plan_items_col_width = floor + 100
+
+    _drag_the_grip(panel, -1000, release=False)
+    assert panel.grid_columnconfigure(0)["minsize"] == floor, (
+        f"dragged to {panel.grid_columnconfigure(0)['minsize']}px, past the "
+        f"{floor}px a row needs"
+    )
+
+    settings.drag_schedule_title_col_width = 300
+    wider = PlanScreen(root, manager, _App(settings))
+    assert wider.items_width_floor() > floor, (
+        "the floor ignores the title column width, so a wide title can still "
+        "be dragged out of its own pane"
+    )
+
+
+def test_pdm22_the_day_pane_cannot_be_dragged_shut(
+    root, manager, settings, mapped_windows
+):
+    """PD-M2.2 — the right end, which only exists on a window with a width.
+
+    Clamped against the real window, because that is the only place the day's
+    share is known: on an unmapped screen ``winfo_width`` is 1 and there is no
+    right-hand end to clamp to. So this is the one PD-M2 test that needs a
+    window on screen, and it is the half that cannot be checked without one.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    settings.plan_items_col_width = panel.items_width_floor() + 100
+    panel.pack(fill="both", expand=True)
+    root.geometry("1000x700")
+    root.deiconify()
+    root.update_idletasks()
+    root.update()
+
+    room = panel.winfo_width()
+    assert room > 1, "the panel was not laid out, so there is nothing to clamp"
+
+    _drag_the_grip(panel, 5000, release=False)
+    widest = room - panel.day_width_floor()
+    assert panel.grid_columnconfigure(0)["minsize"] == widest, (
+        f"dragged to {panel.grid_columnconfigure(0)['minsize']}px in a "
+        f"{room}px screen, leaving the day less than the "
+        f"{panel.day_width_floor()}px one of its rows needs"
+    )
+
+
+def test_pdm23_the_file_is_written_once_on_release_not_per_motion(
+    root, manager, settings, monkeypatch
+):
+    """PD-M2.3 — a drag is one write, at the end of it.
+
+    A write per motion is a settings file written tens of times for one
+    gesture, and every one of them a chance to fail halfway through a drag.
+    Counted, not merely observed to happen: "it saves" holds for both.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    before = panel.items_col_width()
+    saved = []
+    monkeypatch.setattr(
+        type(settings), "save",
+        lambda self: saved.append(self.plan_items_col_width) or True,
+    )
+
+    panel.on_divider_press(_FakeEvent(500, 0))
+    for x in (505, 515, 525):
+        panel.on_divider_motion(_FakeEvent(x, 0))
+    assert saved == [], f"the file was written mid-drag: {saved}"
+
+    # Past the last motion, because that is where a real release lands.
+    panel.on_divider_release(_FakeEvent(530, 0))
+    assert saved == [before + 30], (
+        f"release wrote {saved}, not one write of the width it ended at "
+        f"({before + 30})"
+    )
+
+
+def test_pdm23_a_motion_or_release_without_a_press_does_nothing(
+    root, manager, settings, monkeypatch
+):
+    """PD-M2.3 — the handlers are public and bound; they do not assume an order.
+
+    Added because the mutation gate found the ``_divider_from_x is None`` guard
+    was a line no test could fail on: every test pressed first, so the guard
+    was never reached. Tk's implicit grab makes a stray motion hard to produce
+    through the UI, which is an argument for the guard being cheap, not for it
+    being unchecked -- these are plain methods on the screen and nothing in the
+    class says they may only be called in order.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    before = panel.items_col_width()
+    # Not the same number: the stored setting is the shipped 260 and
+    # items_col_width() floors it to what a row needs. Each is checked
+    # against itself.
+    stored_before = settings.plan_items_col_width
+    saved = []
+    monkeypatch.setattr(
+        type(settings), "save", lambda self: saved.append(1) or True
+    )
+
+    panel.on_divider_motion(_FakeEvent(900, 0))
+    panel.on_divider_release(_FakeEvent(900, 0))
+
+    assert panel.grid_columnconfigure(0)["minsize"] == before, (
+        f"the column moved to {panel.grid_columnconfigure(0)['minsize']}px on "
+        "a motion that followed no press"
+    )
+    assert saved == [], "a release with no press wrote the settings file"
+    assert settings.plan_items_col_width == stored_before, (
+        "a release with no press changed the stored width from "
+        f"{stored_before} to {settings.plan_items_col_width}"
+    )
+
+
+def test_pdm24_a_refused_write_leaves_the_old_width(
+    root, manager, settings, monkeypatch
+):
+    """PD-M2.4 — P41: this screen's settings object is the app's own.
+
+    So a width left on it after a refused write is not merely a wrong number
+    in memory: every screen built from that object afterwards draws it, and the
+    user sees a resized pane that no file knows about and that the next launch
+    silently undoes. Put back, and said on screen.
+    """
+    app = _App(settings)
+    panel = PlanScreen(root, manager, app)
+    settings.plan_items_col_width = panel.items_width_floor() + 100
+    before = panel.items_col_width()
+    monkeypatch.setattr(type(settings), "save", lambda self: False)
+    settings.last_save_error = "settings file is read-only"
+
+    _drag_the_grip(panel, 60)
+
+    assert settings.plan_items_col_width == before, (
+        f"the app's settings object holds {settings.plan_items_col_width}, a "
+        f"width nothing wrote -- it had {before}"
+    )
+    assert panel.grid_columnconfigure(0)["minsize"] == before, (
+        "the column kept the dragged width after the write was refused"
+    )
+    assert app.settings is settings, (
+        "the app and the screen no longer share one settings object, so this "
+        "test is not about the alias P41 is about"
+    )
+    assert "read-only" in panel.items_hint.cget("text"), (
+        f"the refusal is not on screen: {panel.items_hint.cget('text')!r}"
+    )
+
+
+def test_pdm25_the_dragged_width_survives_a_rebuild(root, manager, settings):
+    """PD-M2.5 — read back off the file, not off the object that was mutated.
+
+    Asserting against ``settings`` would pass with no write at all, since the
+    drag mutates that very object. ``AppSettings.load()`` is what a later
+    launch, and the Settings screen, actually see.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    expected = panel.items_col_width() + 44
+    _drag_the_grip(panel, 44)
+
+    reloaded = AppSettings.load()
+    assert reloaded.plan_items_col_width == expected, (
+        f"the file holds {reloaded.plan_items_col_width}, not {expected}"
+    )
+    rebuilt = PlanScreen(root, manager, _App(reloaded))
+    assert rebuilt.grid_columnconfigure(0)["minsize"] == expected
+
+
+def test_pdm26_the_grip_and_the_settings_field_are_one_value(
+    root, manager, settings
+):
+    """PD-M2.6 — the grip writes the field the Settings entry is built from.
+
+    Two surfaces for one width. Settings to grip is
+    ``test_the_items_column_is_the_width_the_setting_asks_for``; this is the
+    other direction, asserted through the entry rather than through the
+    attribute name, so a grip that wrote a field of its own would fail it.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    settings.plan_items_col_width = panel.items_width_floor() + 100
+    expected = panel.items_col_width() + 25
+    _drag_the_grip(panel, 25)
+
+    # What SettingsScreen puts in the entry when it is next opened: its own
+    # AppSettings.load(), read exactly as that screen reads it.
+    opened = AppSettings.load()
+    assert str(getattr(opened, "plan_items_col_width", 260)) == str(expected), (
+        "the Settings entry would open at "
+        f"{getattr(opened, 'plan_items_col_width', 260)}, not at the "
+        f"{expected}px the grip was left at"
     )
