@@ -1482,6 +1482,36 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             self.create_time_block(block)
         return block
 
+    def shift_day_slots(self, block_date: str, by: int) -> int:
+        """Renumber a day's blocks so they keep their clock times when Day Start moves.
+
+        Purpose: PD-M5.5 -- a block's ``slot_index`` is its position counted
+                 from Day Start, not a time. Moving Day Start back two boxes
+                 without renumbering slides every planned task an hour earlier
+                 on the grid while its stored ``start_time`` still says
+                 otherwise, so the day on screen and the day in the row
+                 disagree and neither is marked wrong.
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
+        Tests:   tests/test_time_block_crud.py::test_pdm55_blocks_keep_their_times_when_the_day_grows
+
+        ``start_time`` and ``end_time`` are deliberately not touched: they are
+        the fact being preserved. Blocks with no slot index are left alone --
+        they are already outside the grid, and giving them one here would be
+        the adoption that TG-M5 gates on a confirmed day shape.
+        """
+        if not int(by):
+            return 0
+        with self.transaction() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE time_blocks
+                SET slot_index = slot_index + ?, updated_at = ?
+                WHERE block_date = ? AND slot_index IS NOT NULL
+                """,
+                (int(by), datetime.now().isoformat(), block_date),
+            )
+            return cursor.rowcount
+
     def place_block_at(self, block_id: str, slot_index: int, bounds) -> TimeBlock:
         """Move an existing block to another box.
 

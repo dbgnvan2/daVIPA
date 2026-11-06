@@ -36,6 +36,8 @@ import customtkinter as ctk
 from ..models import ActionItem, BlockType, TimeBlock
 from ..theme import button_style, semantic_colors, status_text_color
 from ..time_block_layout import (
+    DAY_EXTEND_EARLIER,
+    DAY_EXTEND_LATER,
     DURATION_CHOICES,
     MAX_BLOCK_MINUTES,
     SLOT_MINUTES,
@@ -44,8 +46,10 @@ from ..time_block_layout import (
     SlotRefusal,
     SlotRefusedError,
     build_day_grid,
+    day_grid,
     default_minutes_for_block_type,
     duration_for_item,
+    extended_day_bound,
     is_block_day,
     slots_for_minutes,
     total_planned_minutes,
@@ -54,15 +58,20 @@ from ..time_block_layout import (
 from ..widgets.date_picker import DatePickerButton
 from .drag_schedule_support import widget_contains_pointer
 from .plan_blocks import (
+    PD_EARLIER_HINT,
+    PD_EARLIER_TEXT,
+    PD_LATER_HINT,
+    PD_LATER_TEXT,
     SLOT_CHECK_WIDTH_PX,
     SLOT_CHIP_HEIGHT_PX,
     SLOT_TIME_WIDTH_PX,
     SLOT_TITLE_WIDTH_PX,
     build_empty_day_note,
-    chip_column_minsizes,
     build_item_row,
     build_outside_group,
     build_slot_row,
+    build_virtual_slot_row,
+    chip_column_minsizes,
 )
 from .plan_settings_dialog import PlanSettingsDialog
 
@@ -123,6 +132,15 @@ REFUSAL_TEXT = {
 #: Said when a refusal arrives with a reason nothing here words. Better than
 #: showing the user the reason's internal name, and loud enough to be noticed.
 UNKNOWN_REFUSAL = "That block cannot go there"
+
+
+class _DayNotWritten(Exception):
+    """PD-M5 — the settings file refused the day's new hours.
+
+    Its own type so the one broad ``except`` in ``extend_day_for`` can tell a
+    refused write from a refused placement when it chooses the words, while
+    still rolling the database work back the same way for both.
+    """
 
 
 def refusal_text(reason: str) -> str:
@@ -201,6 +219,11 @@ class PlanScreen(ctk.CTkFrame):
         #: asking Tk what is under the mouse: during a drag the pointer is over
         #: the floating drag label, not the box.
         self._slot_frames: List[tuple] = []
+        #: PD-M5 — the two always-drawn boxes at the ends of the day, each
+        #: paired with which end it is. Kept apart from ``_slot_frames``
+        #: because they are not slots: nothing may be placed in them, and a
+        #: drop on one lengthens the day before anything is placed at all.
+        self._virtual_frames: List[tuple] = []
         #: The task chips this screen bound handlers to, as
         #: (widget, block_id). Only blocks that *start* in a box are in here:
         #: a continuation chip is drawn but owns nothing, so it carries no
@@ -752,6 +775,7 @@ class PlanScreen(ctk.CTkFrame):
             for widget in self.outside_frame.winfo_children():
                 widget.destroy()
             self._slot_frames = []
+            self._virtual_frames = []
             self._block_widgets = []
 
             # Place anything that has never been on the grid before drawing,
@@ -817,6 +841,22 @@ class PlanScreen(ctk.CTkFrame):
                 )
 
             row = 0
+            # PD-M5 — above the first box and below the last, every redraw,
+            # whether or not the day has anything in it. A drop target that
+            # appears only once there is something to drop past would not be
+            # there for the first item of the day.
+            self._virtual_frames.append((
+                build_virtual_slot_row(
+                    self.blocks_scroll,
+                    row,
+                    label=PD_EARLIER_TEXT,
+                    hint=PD_EARLIER_HINT,
+                    chip_height=self.box_height(),
+                ),
+                DAY_EXTEND_EARLIER,
+            ))
+            row += 1
+
             for entry in self._grid.slots:
                 rendered = build_slot_row(
                     self.blocks_scroll,
@@ -831,6 +871,18 @@ class PlanScreen(ctk.CTkFrame):
                     self.bind_block_handlers(widget, block)
                     self._block_widgets.append((widget, block.id))
                 row += 1
+
+            self._virtual_frames.append((
+                build_virtual_slot_row(
+                    self.blocks_scroll,
+                    row,
+                    label=PD_LATER_TEXT,
+                    hint=PD_LATER_HINT,
+                    chip_height=self.box_height(),
+                ),
+                DAY_EXTEND_LATER,
+            ))
+            row += 1
 
             if not blocks:
                 build_empty_day_note(self.blocks_scroll, row)
@@ -1352,9 +1404,17 @@ class PlanScreen(ctk.CTkFrame):
         # running, and tearing down the widget that is dispatching the event
         # hangs Tk. after_idle lets this handler return first.
         target = self.slot_under_pointer()
+        # Both read, and the order of the branches below is what decides
+        # between them: a half hour that exists always wins. Computing the
+        # edge only when no box matched would make the two guards mutually
+        # exclusive by construction, and a precedence nothing can get wrong is
+        # also a precedence no test can check.
+        edge = self.virtual_under_pointer()
         if kind == "item" and item is not None:
             if target is not None:
                 self.after_idle(lambda: self.block_item(item, target))
+            elif edge is not None:
+                self.after_idle(lambda: self.extend_day_for(item, edge))
             elif self.pointer_over_day():
                 # In the day column but not on a box -- the heading, the
                 # summary, or the "outside the day" group below the grid.
@@ -1364,6 +1424,16 @@ class PlanScreen(ctk.CTkFrame):
         elif kind == "block" and block is not None:
             if target is not None:
                 self.after_idle(lambda: self.move_block_to_slot(block.id, target))
+            elif edge is not None:
+                # PD-M5.7 — the day grows to make room for work that is not
+                # planned yet, not to rehouse work that already has a box. A
+                # block dropped here would be asking the day to lengthen for
+                # something it is already long enough to hold.
+                self.set_status(
+                    "A block cannot make a new half hour — move it onto a box, "
+                    "or drag an item here to lengthen the day",
+                    "warning",
+                )
             elif self.pointer_over_day():
                 # Same reason as the item branch above, and the same words'
                 # worth of explanation: a move that does nothing and says
@@ -1437,6 +1507,138 @@ class PlanScreen(ctk.CTkFrame):
             if widget_contains_pointer(frame, x_root, y_root):
                 return slot_index
         return None
+
+    def virtual_under_pointer(self) -> Optional[str]:
+        """Which end of the day the pointer is over, or ``None``.
+
+        Purpose: PD-M5 -- the two boxes that are not slots.
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
+        Tests:   tests/test_plan_screen.py::test_pdm52_a_drop_above_moves_day_start_back
+
+        Read the same way as ``slot_under_pointer`` and only after it has
+        answered ``None``: a real box always wins, so the two boxes can sit
+        flush against the grid without stealing a drop meant for 08:00.
+        """
+        x_root, y_root = self.winfo_pointerx(), self.winfo_pointery()
+        if not widget_contains_pointer(self.blocks_scroll, x_root, y_root):
+            return None
+
+        for frame, edge in self._virtual_frames:
+            if widget_contains_pointer(frame, x_root, y_root):
+                return edge
+        return None
+
+    def extend_day_for(self, item: ActionItem, edge: str):
+        """PD-M5 — lengthen the day at one end and block the item in the room it made.
+
+        Purpose: "allow items to extend the day earlier or later when they are
+                 dropped above the first block or below the last".
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
+        Tests:   tests/test_plan_screen.py::test_pdm52_a_drop_above_moves_day_start_back
+
+        ``plan_day_shape_unconfirmed`` is left exactly as it was found
+        (PD-M5.4), by not being touched at all -- ``AppSettings.save`` does not
+        write it either. Lengthening a day is not the user confirming the four
+        values the flag gates, and that flag is what stops the irreversible
+        grid adoption running against a day shape nobody chose. An earlier
+        version of this method snapshotted it and put it back on the failure
+        path; the mutation gate showed that line could never change anything,
+        because nothing on any path here sets it.
+
+        One unit of work. The settings write is the last thing inside the
+        database transaction, so a refused write takes the renumbering and the
+        new block back out with it rather than leaving the file and the day
+        disagreeing about where the day starts (P41: ``self.settings`` is the
+        app's own object, so the attribute has to go back too).
+        """
+        if not self._require_block_day():
+            return
+        if self.settings is None:
+            self.set_status(
+                "The day's hours cannot be changed without a settings file",
+                "error",
+            )
+            return
+
+        minutes = duration_for_item(item, self.bounds.default_block_minutes)
+        span = slots_for_minutes(minutes)
+        new_bound = extended_day_bound(self.bounds, edge, span)
+        if new_bound is None:
+            where = "before midnight" if edge == DAY_EXTEND_EARLIER else "past midnight"
+            self.set_status(
+                f"{minutes}m of {item.title} would put the day {where}; "
+                "a day is one date",
+                "warning",
+            )
+            return
+
+        key = (
+            "plan_day_start" if edge == DAY_EXTEND_EARLIER else "plan_day_end"
+        )
+        previous = getattr(self.settings, key)
+        # Where the item lands. Earlier: box 0 of the day that is about to
+        # exist, the others having been renumbered past it. Later: the first
+        # box the old day did not have, which is the old box count.
+        slot_index = 0 if edge == DAY_EXTEND_EARLIER else len(day_grid(self.bounds))
+
+        setattr(self.settings, key, new_bound)
+        new_bounds = DayBounds.from_settings(self.settings)
+        block = TimeBlock(
+            block_date=self.selected_date,
+            start_time="",
+            end_time="",
+            planned_minutes=minutes,
+            item_id=item.id,
+            label=item.title,
+            block_type=BlockType.ITEM,
+        )
+        wrote_the_file = False
+        try:
+            with self.db_manager.transaction():
+                if edge == DAY_EXTEND_EARLIER:
+                    # Before the new block, and before anything reads the day:
+                    # a slot index counts boxes from Day Start, so moving Day
+                    # Start without renumbering slides every planned task
+                    # earlier on the clock (PD-M5.5).
+                    self.db_manager.shift_day_slots(self.selected_date, span)
+                self.db_manager.add_block_at(block, slot_index, new_bounds)
+                if not self.settings.save():
+                    raise _DayNotWritten(
+                        self.settings.last_save_error
+                        or "the day's new hours could not be saved"
+                    )
+                wrote_the_file = True
+        except Exception as problem:
+            # Broad on purpose. Whatever failed, the file and the database have
+            # to agree about where the day starts, and the only way to promise
+            # that is to put the day back on every path out of here. The
+            # settings write is last inside the transaction, so in every
+            # failure but a commit that itself fails the file was never
+            # touched and the attribute is the whole of it.
+            setattr(self.settings, key, previous)
+            restored = True
+            if wrote_the_file:
+                restored = bool(self.settings.save())
+            self.refresh()
+            if isinstance(problem, SlotRefusedError):
+                said = refusal_text(problem.reason)
+            else:
+                said = str(problem)
+            if not restored:
+                said += (
+                    " — and the day's hours could not be put back; "
+                    "check ⚙ Day Settings"
+                )
+            self.set_status(f"The day was not extended — {said}", "error")
+            return
+
+        self.bounds = new_bounds
+        self.refresh()
+        self.set_status(
+            f"The day now runs {new_bounds.day_start}–{new_bounds.day_end}; "
+            f"blocked {minutes}m for {item.title} at {block.start_time}",
+            "success",
+        )
 
     def move_block_to_slot(self, block_id: str, slot_index: int):
         """TG-M11 — put a dragged block on the box it was dropped on.

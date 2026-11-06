@@ -312,6 +312,25 @@ Header:
   refuses a block part-way, nothing at all is written and the message says how
   far it had got. On a day the week's Day Settings exclude, the button refuses
   with the same reason a drop onto that day gives.
+- **Earlier** / **Later** — What: A box at each end of the day column, above
+  the first half hour and below the last. Drop an item on one and the day
+  lengthens to hold it: *Day Start* moves back, or *Day End* moves forward, by
+  the item's own work-block length, and the item is blocked in the new half
+  hours. Why: the day you planned is not always the day you get, and the
+  alternative is opening Day Settings, working out the arithmetic and then
+  coming back to drag the item. The boxes are there on an empty day too — that
+  is the day with no first block to drop above.
+
+  Everything already on the day keeps the time it had. The day cannot be
+  extended across midnight: an item too long to fit before *Day Start* or after
+  *Day End* is refused and says so, rather than being given a day too short for
+  it. Dragging a block that already has a box onto one of these does nothing
+  but say why — they exist to make room for work that is not planned yet.
+
+  Lengthening the day does not count as confirming the day's hours, so if the
+  app guessed them it still says so afterwards. If the settings file cannot be
+  written, the day goes back to the hours it had and the reason appears on the
+  status line.
 - **Day summary** — What: `4 of 18 boxes · 2h 00m occupied · 1h 45m planned`.
   Why: Three separate numbers, because they are three separate facts. A
   45-minute task occupies a whole hour of your day and plans 45 minutes of it;

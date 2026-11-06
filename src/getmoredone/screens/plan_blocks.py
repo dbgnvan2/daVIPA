@@ -782,6 +782,69 @@ def _build_block_chip(
     return chip
 
 
+#: PD-M5 — what the two always-drawn boxes at the ends of the day say.
+PD_EARLIER_TEXT = "Earlier"
+PD_LATER_TEXT = "Later"
+PD_EARLIER_HINT = "drop an item here to start the day earlier"
+PD_LATER_HINT = "drop an item here to end the day later"
+
+
+def build_virtual_slot_row(
+    parent,
+    row: int,
+    *,
+    label: str,
+    hint: str,
+    chip_height: int = SLOT_CHIP_HEIGHT_PX,
+) -> ctk.CTkFrame:
+    """PD-M5 — the box above the day and the box below it.
+
+    Purpose: "leave a virtual block for these two areas so there is something
+             to drop into". A drop needs a rectangle; without one the gesture
+             is aiming at the gap between the grid and the pane's edge.
+    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
+    Tests:   tests/test_plan_screen.py::test_pdm51_a_virtual_box_sits_at_each_end
+
+    Drawn like a half hour and dimmed, in the same columns, so it reads as part
+    of the day without claiming to be a half hour that exists: it carries a
+    word where a box carries its clock time, because it has no clock time until
+    the drop decides one. Transparent and 1px-bordered like an empty box, which
+    is what it is a proposal for.
+    """
+    palette = semantic_colors()
+    frame = ctk.CTkFrame(
+        parent,
+        fg_color="transparent",
+        corner_radius=6,
+        height=slot_row_height(1, chip_height),
+        border_width=1,
+        border_color=palette["border"],
+    )
+    frame.grid(row=row, column=0, sticky="ew", pady=1, padx=2)
+    _configure_slot_columns(frame)
+    frame.grid_propagate(False)
+
+    ctk.CTkLabel(
+        frame,
+        text=label,
+        width=SLOT_TIME_WIDTH_PX,
+        anchor="w",
+        text_color=palette["muted_text"],
+        font=ctk.CTkFont(size=11),
+    ).grid(row=0, column=1, sticky="nw", padx=(8, 4), pady=4)
+
+    ctk.CTkLabel(
+        frame,
+        text=hint,
+        anchor="w",
+        justify="left",
+        text_color=palette["muted_text"],
+        font=ctk.CTkFont(size=11),
+    ).grid(row=0, column=2, sticky="nw", padx=(0, 6), pady=4)
+
+    return frame
+
+
 def build_empty_day_note(parent, row: int) -> ctk.CTkLabel:
     """What the grid says when every box is empty.
 

@@ -500,6 +500,47 @@ def day_grid(bounds: DayBounds) -> List[Slot]:
     return slots
 
 
+#: The two ends a drop can extend the day from (PD-M5).
+DAY_EXTEND_EARLIER = "earlier"
+DAY_EXTEND_LATER = "later"
+
+#: The latest Day End that still yields whole boxes. A box running 23:30--24:00
+#: would need a Day End of "24:00", which is not a time of day, so the last box
+#: a day can offer starts at 23:00 and the day ends at 23:30.
+LAST_DAY_END_MINUTES = MINUTES_PER_DAY - SLOT_MINUTES
+
+
+def extended_day_bound(
+    bounds: DayBounds, direction: str, span: int
+) -> Optional[str]:
+    """The Day Start or Day End that makes room for ``span`` more boxes.
+
+    Purpose: PD-M5 -- a drop above the day or below it lengthens the day rather
+             than being refused.
+    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
+    Tests:   tests/test_time_block_layout.py::test_pdm58_the_day_cannot_cross_midnight
+
+    ``None`` when the day cannot grow that far, which the caller reports rather
+    than clamping: a clamped bound would make fewer boxes than the item needs,
+    so the block would land somewhere other than the end that was dropped on,
+    or not at all. Midnight is both the floor and the ceiling -- a day is one
+    date, and a block has no way to say it belongs to the next one.
+    """
+    span = max(1, int(span))
+    room = span * SLOT_MINUTES
+    if direction == DAY_EXTEND_EARLIER:
+        value = bounds.day_start_minutes - room
+        if value < 0:
+            return None
+    elif direction == DAY_EXTEND_LATER:
+        value = bounds.day_end_minutes + room
+        if value > LAST_DAY_END_MINUTES:
+            return None
+    else:
+        raise ValueError(f"not an end of the day: {direction!r}")
+    return format_hhmm(value)
+
+
 def slots_for_minutes(minutes: Optional[int]) -> int:
     """How many boxes a block of this length occupies, rounding up.
 

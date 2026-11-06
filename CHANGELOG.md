@@ -7,6 +7,34 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — an item dropped above or below the day lengthens it
+
+- There is now a box at each end of the day, above the first half hour and
+  below the last, labelled **Earlier** and **Later**. Drop an item on one and
+  the day grows to hold it: *Day Start* moves back, or *Day End* moves forward,
+  by exactly the item's own length, and the item is blocked in the half hours
+  that appear. A 90-minute task takes the day back an hour and a half, not half
+  an hour.
+- The boxes are drawn every redraw, on an empty day too, which is the day that
+  most needs them: there is no first block to drop above.
+- **The day's existing work keeps its clock times.** A block is stored by which
+  half hour of the day it sits in, not by the time, so moving *Day Start* back
+  would otherwise have slid every block on the day earlier with nothing on
+  screen to say so. Extending earlier now renumbers the day by the same number
+  of boxes it gained.
+- Midnight is the floor and the ceiling. An item too long to fit before *Day
+  Start* or after *Day End* without crossing it is refused and says why, rather
+  than being given a shorter day than it needs — a day is one date.
+- Dragging a **block** onto one of these boxes is refused: the day lengthens to
+  make room for work that is not planned yet, not to rehouse work that already
+  has a box.
+- Lengthening the day is not confirming it. A day whose four times the app
+  guessed still says so afterwards, so the warning and the guards that depend
+  on it stay where they were.
+- If the settings file refuses the write, the day, the grid and the app's own
+  settings are put back as they were and the reason appears on screen (P41).
+  Nothing is left claiming a longer day than disk holds.
+
 ### Added — an AutoLoad button fills the day from the item list
 
 - **AutoLoad**, in the Plan header beside *+ Break* and *+ Buffer*, blocks

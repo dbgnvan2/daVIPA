@@ -201,9 +201,22 @@ half hour that drop created.
    and **leave the flag exactly as it found it** — extending a day is not the
    user confirming the four values, and five of this project's high-severity
    findings have been in that flag's neighbourhood.
-2. Existing blocks store clock times, and the grid is rebuilt from those, so
+2. ~~Existing blocks store clock times, and the grid is rebuilt from those, so
    moving `day_start` earlier should leave them where they are. "Should" is not
-   a test; PD-M5.5 makes it one.
+   a test; PD-M5.5 makes it one.~~ **This premise was wrong, and PD-M5.5 is
+   what found it.** A block stores `slot_index`, its position counted from Day
+   Start, and `build_day_grid` lays the day out from *that*; `start_time` is
+   derived and rewritten by `_settle_block_on_slot`. So moving `day_start` back
+   one box slides every planned task half an hour earlier on the grid while the
+   `start_time` in its own row still says otherwise — which is exactly what
+   `tests/test_time_block_crud.py::test_tgm64_a_day_start_change_writes_no_rows`
+   documents as the design, and it is the right design for a Day Settings
+   change. It is not what a drop above the day asks for. So the extend path
+   renumbers: `DatabaseManager.shift_day_slots(block_date, by)`, inside the
+   same transaction, before the new block, leaving `start_time` and `end_time`
+   untouched because they are the fact being preserved. That module's own
+   docstring, which said there was "nothing to renumber", is corrected in the
+   same change.
 
 | ID | Criterion | Verified by |
 |---|---|---|
@@ -211,10 +224,13 @@ half hour that drop created.
 | PD-M5.2 | A drop on the top box moves Day Start back by the item's span and blocks it there | `::test_pdm52_a_drop_above_moves_day_start_back` |
 | PD-M5.3 | A drop on the bottom box moves Day End forward by the span and blocks it there | `::test_pdm53_a_drop_below_moves_day_end_forward` |
 | PD-M5.4 | Extending does **not** clear `plan_day_shape_unconfirmed` | `tests/test_plan_settings.py::test_pdm54_extending_the_day_is_not_confirming_it` |
-| PD-M5.5 | Every existing block keeps its clock time when either bound moves | `tests/test_time_block_layout.py::test_pdm55_blocks_keep_their_times_when_the_day_grows` |
+| PD-M5.5 | Every existing block keeps its clock time when either bound moves | `tests/test_time_block_crud.py::test_pdm55_blocks_keep_their_times_when_the_day_grows` (+ `::test_pdm55_a_shift_of_zero_writes_nothing`, `::test_pdm55_a_block_outside_the_grid_is_not_given_a_box`, `::test_pdm55_only_the_named_day_is_renumbered`), and `tests/test_plan_screen.py::test_pdm52_existing_blocks_keep_their_clock_times` — in `test_time_block_crud.py` rather than `test_time_block_layout.py` as planned, because keeping the time turned out to need a *write*, not arithmetic |
 | PD-M5.6 | A refused settings write leaves the day, the grid and the app as they were | `tests/test_plan_screen.py::test_pdm56_a_refused_write_leaves_the_day_unchanged` (P41) |
 | PD-M5.7 | The virtual boxes are not droppable for a *block* drag — a block cannot invent a half hour | `::test_pdm57_a_block_drag_onto_a_virtual_box_is_refused` |
-| PD-M5.8 | Midnight is the floor and the ceiling: the day cannot be extended past either | `tests/test_time_block_layout.py::test_pdm58_the_day_cannot_cross_midnight` |
+| PD-M5.9 | A real box always wins over a virtual one, so a box flush against the Earlier box still gets its own drops | `::test_pdm5_a_real_box_wins_over_a_virtual_one` — unplanned; the read order is a one-line change nothing else would notice |
+| PD-M5.10 | The drop gesture itself routes to the right end, not only the method | `::test_pdm5_an_item_drag_onto_a_virtual_box_extends_the_day` — unplanned; without it the extension is only reachable by calling `extend_day_for` |
+| PD-M5.11 | Extending is refused on a non-working day, like every other write on this screen | `::test_pdm5_the_day_cannot_be_extended_onto_a_non_block_day` — unplanned |
+| PD-M5.8 | Midnight is the floor and the ceiling: the day cannot be extended past either | `tests/test_time_block_layout.py::test_pdm58_the_day_cannot_cross_midnight`, `::test_pdm58_the_ceiling_is_the_last_bound_that_yields_a_whole_box` — the ceiling is a Day End of **23:30**, not 24:00: a box running 23:30–24:00 would need a Day End that is not a time of day, so 23:30 is the last bound that yields a whole box. Refused rather than clamped, because a clamped bound makes fewer boxes than the item needs |
 
 ---
 
