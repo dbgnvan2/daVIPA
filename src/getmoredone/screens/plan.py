@@ -30,6 +30,7 @@ from ..time_block_layout import (
     DayBounds,
     PackedBlock,
     default_minutes_for_block_type,
+    DayTooFullError,
     duration_for_item,
     is_block_day,
     lunch_window,
@@ -57,6 +58,11 @@ RIGHT_CLICK_SEQUENCES = ("<Button-3>", "<Button-2>")
 # silently applied (P2): a planner that quietly stopped listing an item would
 # be hiding the work it exists to surface.
 MAX_ITEM_ROWS = 60
+
+# Shown when a write was refused because the day's blocks would run past the
+# last time HH:MM can express. One string, because four call sites report it,
+# and a refusal worded four ways reads as four different bugs.
+DAY_TOO_FULL = "This day is too full to re-time — shorten or remove a block"
 
 
 class PlanScreen(ctk.CTkFrame):
@@ -235,7 +241,21 @@ class PlanScreen(ctk.CTkFrame):
         re-deriving it gets the old shape of the day.
         """
         self.bounds = bounds
-        repacked = self.db_manager.repack_all_days(self.bounds)
+        try:
+            repacked = self.db_manager.repack_all_days(self.bounds)
+        except DayTooFullError:
+            # Every day rolled back together, so the stored days still match
+            # each other -- but they no longer match the settings file, which
+            # the dialog has already written. Said plainly, because the next
+            # ordinary block edit would re-time that day alone and create the
+            # mixed state this transaction exists to prevent.
+            self.refresh()
+            self.set_status(
+                "Day settings saved, but a day is too full to re-time:"
+                " shorten a block and change a day setting again",
+                "error",
+            )
+            return
         self.refresh()
         # Said every time, not only when more than one day moved: the whole
         # point of the message is that the save reached days the user cannot
@@ -403,19 +423,34 @@ class PlanScreen(ctk.CTkFrame):
         # One transaction, as everywhere a write is followed by its repack: in
         # between, the new row holds no times at all, and a repack that failed
         # there would leave it that way with nothing in the day to show it.
-        with self.db_manager.transaction():
-            self.db_manager.create_time_block(
-                TimeBlock(
-                    block_date=self.selected_date,
-                    start_time="",
-                    end_time="",
-                    planned_minutes=minutes,
-                    block_type=block_type,
+        try:
+            with self.db_manager.transaction():
+                self.db_manager.create_time_block(
+                    TimeBlock(
+                        block_date=self.selected_date,
+                        start_time="",
+                        end_time="",
+                        planned_minutes=minutes,
+                        block_type=block_type,
+                    )
                 )
-            )
-            self.db_manager.repack_day(self.selected_date, self.bounds)
+                self.db_manager.repack_day(self.selected_date, self.bounds)
+        except DayTooFullError:
+            # The write rolled back with the transaction. Said rather than
+            # left as a click that did nothing: a refused action and a broken
+            # one look identical from the outside.
+            self.set_status(DAY_TOO_FULL, "error")
+            return
         self.load_blocks()
-        self.set_status(f"Added a {minutes}m {block_type}", "success")
+        requested = default_minutes_for_block_type(block_type, self.settings)
+        if requested > minutes:
+            self.set_status(
+                f"Added a {minutes}m {block_type}"
+                f" (the configured {requested}m is longer than a day)",
+                "warning",
+            )
+        else:
+            self.set_status(f"Added a {minutes}m {block_type}", "success")
 
     def block_item(self, item: ActionItem):
         """TB-M8 — make a block for this item at the end of the day."""
@@ -423,19 +458,23 @@ class PlanScreen(ctk.CTkFrame):
             return
 
         minutes = duration_for_item(item, self.bounds.default_block_minutes)
-        with self.db_manager.transaction():
-            self.db_manager.create_time_block(
-                TimeBlock(
-                    block_date=self.selected_date,
-                    start_time="",
-                    end_time="",
-                    planned_minutes=minutes,
-                    item_id=item.id,
-                    label=item.title,
-                    block_type=BlockType.ITEM,
+        try:
+            with self.db_manager.transaction():
+                self.db_manager.create_time_block(
+                    TimeBlock(
+                        block_date=self.selected_date,
+                        start_time="",
+                        end_time="",
+                        planned_minutes=minutes,
+                        item_id=item.id,
+                        label=item.title,
+                        block_type=BlockType.ITEM,
+                    )
                 )
-            )
-            self.db_manager.repack_day(self.selected_date, self.bounds)
+                self.db_manager.repack_day(self.selected_date, self.bounds)
+        except DayTooFullError:
+            self.set_status(DAY_TOO_FULL, "error")
+            return
         self.refresh()
         try:
             requested = int(getattr(item, "work_block", None))
@@ -515,14 +554,24 @@ class PlanScreen(ctk.CTkFrame):
 
     def set_block_minutes(self, block: TimeBlock, minutes: int):
         """Resize one block, then re-time everything after it."""
+        previous = block.planned_minutes
         block.planned_minutes = minutes
         # One transaction. ``block`` still carries the end_time the last repack
         # gave it, so between these two writes the row reads as a 30-minute
         # block that claims 90 minutes, and the block after it still owns the
         # minutes this one has just taken.
-        with self.db_manager.transaction():
-            self.db_manager.update_time_block(block)
-            self.db_manager.repack_day(self.selected_date, self.bounds)
+        try:
+            with self.db_manager.transaction():
+                self.db_manager.update_time_block(block)
+                self.db_manager.repack_day(self.selected_date, self.bounds)
+        except DayTooFullError:
+            # The row rolled back, so the in-memory object must too -- it is
+            # the same object the row menu will hand back on the next click,
+            # and leaving it holding the rejected length would show a size the
+            # database refused.
+            block.planned_minutes = previous
+            self.set_status(DAY_TOO_FULL, "error")
+            return
         self.load_blocks()
         self.set_status(f"Set block to {minutes}m", "success")
 
@@ -553,9 +602,13 @@ class PlanScreen(ctk.CTkFrame):
         self.set_block_minutes(block, minutes)
 
     def delete_block(self, block_id: str):
-        with self.db_manager.transaction():
-            self.db_manager.delete_time_block(block_id)
-            self.db_manager.repack_day(self.selected_date, self.bounds)
+        try:
+            with self.db_manager.transaction():
+                self.db_manager.delete_time_block(block_id)
+                self.db_manager.repack_day(self.selected_date, self.bounds)
+        except DayTooFullError:
+            self.set_status(DAY_TOO_FULL, "error")
+            return
         self.refresh()
         self.set_status("Block deleted", "muted")
 

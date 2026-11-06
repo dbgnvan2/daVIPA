@@ -1378,7 +1378,12 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         that no further edit would clean up, because the next repack would start
         from the broken state and reproduce it.
         """
-        from .time_block_layout import pack_day, renumber, sort_blocks
+        from .time_block_layout import (
+            DayTooFullError,
+            pack_day,
+            renumber,
+            sort_blocks,
+        )
 
         blocks = sort_blocks(self.get_time_blocks(block_date))
         # Renumber as well as re-time. A repack that fixed the clock times but
@@ -1387,6 +1392,20 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         # all over again. After any repack, position is the day's order.
         renumber(blocks)
         packed = pack_day(blocks, bounds)
+
+        # Refused before anything is written, not clamped. Past the last time
+        # HH:MM can express, format_hhmm clamps, so the row would be stored
+        # with an end time that is not its start plus its duration -- and the
+        # per-block ceiling cannot catch it, because this is a property of the
+        # day: four blocks of exactly a day each are individually legal and
+        # together unwritable. Raised rather than trimmed, because dropping
+        # part of a day the user built is not this function's call (P2).
+        unwritable = [entry for entry in packed if not entry.fits_the_clock]
+        if unwritable:
+            raise DayTooFullError(
+                f"{block_date} has {len(packed)} blocks running past the last"
+                " time the clock can express; shorten or remove one"
+            )
 
         with self.transaction():
             for entry in packed:

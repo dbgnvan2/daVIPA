@@ -106,7 +106,7 @@ def parse_hhmm(value: Optional[str], *, default: Optional[str] = None) -> int:
         return parse_hhmm(default)
 
 
-def parse_clock_time(value: Optional[str]) -> int:
+def parse_clock_time(value: Optional[str], *, default: Optional[str] = None) -> int:
     """Minutes past midnight for a time that has to be a time *of day*.
 
     Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
@@ -118,11 +118,24 @@ def parse_clock_time(value: Optional[str]) -> int:
     different thing -- a point on one clock face. Accepting ``25:00`` as a Day
     End puts the end of the day beyond any block's reach, so the overrun
     warning that is Day End's only job can never fire again.
+
+    ``default`` makes this total, for the same reason ``parse_hhmm`` has one and
+    for one more. The settings dialog wants the raise, so it can name the field
+    rather than substitute a value. The *read* path cannot raise -- a settings
+    file must not stop the app from starting -- but it still has to be bounded,
+    because a file written before this check existed can hold ``25:00`` today.
+    Guarding only the keyboard would heal new input and leave that file saying
+    the day ends at 25:00 forever, with the overrun warning silently off.
     """
-    minutes = parse_hhmm(value)
-    if minutes >= MINUTES_PER_DAY:
-        raise TimeFormatError(f"not a time of day: {value!r}")
-    return minutes
+    try:
+        minutes = parse_hhmm(value)
+        if minutes >= MINUTES_PER_DAY:
+            raise TimeFormatError(f"not a time of day: {value!r}")
+        return minutes
+    except TimeFormatError:
+        if default is None:
+            raise TimeFormatError(f"not a time of day: {value!r}") from None
+        return parse_clock_time(default)
 
 
 def format_hhmm(minutes: int) -> str:
@@ -174,15 +187,15 @@ class DayBounds:
 
     @property
     def day_start_minutes(self) -> int:
-        return parse_hhmm(self.day_start, default=DEFAULT_DAY_START)
+        return parse_clock_time(self.day_start, default=DEFAULT_DAY_START)
 
     @property
     def day_end_minutes(self) -> int:
-        return parse_hhmm(self.day_end, default=DEFAULT_DAY_END)
+        return parse_clock_time(self.day_end, default=DEFAULT_DAY_END)
 
     @property
     def lunch_start_minutes(self) -> int:
-        return parse_hhmm(self.lunch_start, default=DEFAULT_LUNCH_START)
+        return parse_clock_time(self.lunch_start, default=DEFAULT_LUNCH_START)
 
     @property
     def lunch_length(self) -> int:
@@ -323,6 +336,21 @@ def priority_band(score: Optional[int]) -> str:
     return UNSCORED_BAND
 
 
+class DayTooFullError(Exception):
+    """A day whose blocks run past the last time ``HH:MM`` can express.
+
+    Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m3
+    Tests: tests/test_time_block_crud.py::test_a_day_too_full_to_write_is_refused
+
+    Raised by the writer, never by the display path. Past
+    ``MAX_FORMATTED_MINUTES`` ``format_hhmm`` clamps, so the row would be stored
+    with an end time that is not its start plus its duration -- and the
+    per-block ceiling cannot prevent it, because the ceiling bounds one block
+    and this is a property of the day. Four blocks of exactly a day each are
+    individually legal and together unrepresentable.
+    """
+
+
 @dataclass
 class PackedBlock:
     """A block with the clock times its place in the day gives it."""
@@ -349,6 +377,16 @@ class PackedBlock:
     @property
     def planned_minutes(self) -> int:
         return max(0, self.end_minutes - self.start_minutes)
+
+    @property
+    def fits_the_clock(self) -> bool:
+        """Whether this block's times can be stored without being clamped.
+
+        ``format_hhmm`` clamps at ``MAX_FORMATTED_MINUTES``, so a block past it
+        would be written with an end time that is not its start plus its
+        duration. The display path tolerates that; the writer must not.
+        """
+        return self.end_minutes <= MAX_FORMATTED_MINUTES
 
 
 def pack_day(blocks: Sequence[TimeBlock], bounds: DayBounds) -> List[PackedBlock]:

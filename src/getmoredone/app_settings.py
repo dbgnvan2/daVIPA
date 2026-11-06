@@ -209,17 +209,23 @@ class AppSettings:
             MINUTES_PER_DAY,
             format_hhmm,
             normalize_block_weekdays,
-            parse_hhmm,
+            parse_clock_time,
         )
 
+        # parse_clock_time, not parse_hhmm: a settings file written before that
+        # check existed can hold "25:00", and a Day End past every block the
+        # planner can make retires the overrun warning permanently. Falling
+        # back rather than raising, because an unreadable settings file must
+        # not stop the app from starting -- the dialog is where a person is
+        # told, and it raises.
         self.plan_day_start = format_hhmm(
-            parse_hhmm(self.plan_day_start, default=DEFAULT_DAY_START)
+            parse_clock_time(self.plan_day_start, default=DEFAULT_DAY_START)
         )
         self.plan_lunch_start = format_hhmm(
-            parse_hhmm(self.plan_lunch_start, default=DEFAULT_LUNCH_START)
+            parse_clock_time(self.plan_lunch_start, default=DEFAULT_LUNCH_START)
         )
         self.plan_day_end = format_hhmm(
-            parse_hhmm(self.plan_day_end, default=DEFAULT_DAY_END)
+            parse_clock_time(self.plan_day_end, default=DEFAULT_DAY_END)
         )
 
         try:
