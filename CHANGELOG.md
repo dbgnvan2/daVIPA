@@ -35,13 +35,15 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   reports how many blocks it placed **and the Day Start it placed them
   against** — and if your settings file exists but cannot be read, it does not
   run at all: the blocks wait under *Outside the day* rather than being written
-  permanently against a day shape the app only guessed at. Saving Day Settings
-  is the way back: it writes a file the app can read and the day is mapped on
-  the next draw. That save keeps the unreadable file aside as
-  `settings.json.unreadable-<date>-<time>` first, because it replaces every
-  setting in the file and not just the day's shape — and if the new file cannot
-  be written, the dialog says so and stays open instead of reporting a save
-  that did not happen.
+  permanently against a day shape the app only guessed at. Saving **Day
+  Settings** is the way back, and the only way: it is the one screen that shows
+  you the day's four times, so it is the one whose save tells the app they are
+  yours. It keeps the unreadable file aside as
+  `settings.json.unreadable-<date>-<time>` first, because saving replaces every
+  setting in the file and not just the day's shape; if that copy cannot be
+  made, nothing is overwritten; and if the new file cannot be written, the
+  dialog says so, stays open, and puts the day's shape back instead of
+  reporting a save that did not happen.
 - **Every refusal says which refusal it is**: outside the day, running into
   lunch, that half hour already full, or — choosing a length for a block that
   is not on a box yet — *that block is not on a box yet*. Nothing is written

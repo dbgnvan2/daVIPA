@@ -1,6 +1,6 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-05 (the grid rebuild's deferrals, the six below-medium findings from its pre-push sweep, and the six from the re-sweep of its own fix commits; the time-block rebuild's deferrals, its sweep findings, and the four from the re-sweep of its own fix commits remain, two of them changed by the grid; the five from the timer-endings batch remain cleared, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-05 (the grid rebuild's deferrals, the six below-medium findings from its pre-push sweep, the six from the re-sweep of its own fix commits, and two from the third pass; the time-block rebuild's deferrals, its sweep findings, and the four from the re-sweep of its own fix commits remain, two of them changed by the grid; the five from the timer-endings batch remain cleared, and older sections from 08-24 and earlier remain)
 
 ## Deferred from the time-block rebuild (2026-11-05)
 
@@ -26,6 +26,27 @@ new unreviewed surface and none of these is above low severity.
   block and dragging the item again on that day. *Raised by the grid from low to
   worth doing:* a drag within a day now moves a block between boxes, so this is
   the only gesture a user would reasonably expect and not find.
+
+## Below medium, from the third pass of the grid rebuild (2026-11-05)
+
+A cold correctness and test-quality pass over the second round's fix commits.
+It produced one high and four medium findings, all fixed with tests and
+mutation-proved, and these two.
+
+- **The kept-aside settings file is named to the second.** A save that fails
+  after a successful copy leaves the flag set, so an immediate retry inside the
+  same second writes `settings.json.unreadable-<same stamp>` and replaces the
+  first copy. Harmless as it stands -- the original is unchanged by a failed
+  write, so the second copy has identical content -- but the name is one
+  collision away from mattering. Low: add a counter, or use a finer stamp.
+- **Each settings screen loads its own `AppSettings` and saves the whole
+  object.** So the last screen to save silently reverts every field another
+  screen changed, including the day settings the Plan dialog just wrote, and
+  `screens/settings.py` additionally replaces `app.settings` with its own copy.
+  Pre-existing and wider than this batch: it is the root of both the "reports
+  success on a failed write" entry below and the reason the unreadable flag is
+  cleared by the Day Settings dialog rather than by `save`. Worth one diff of
+  its own that gives the app a single settings object.
 
 ## Below medium, from the re-sweep of the grid rebuild's fix commits (2026-11-05)
 

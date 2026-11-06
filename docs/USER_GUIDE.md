@@ -417,16 +417,24 @@ against a Day Start the app only guessed at.
 
 **To recover:** open **⚙ Day Settings**, check the four times and the weekday
 boxes, and save. That writes a settings file the app can read, and the blocks
-are mapped onto the grid the next time the day is drawn. Two things happen on
-that first save, both deliberate:
+are mapped onto the grid the next time the day is drawn. **Day Settings is the
+only place that restores it** — saving from Settings or any other screen writes
+a readable file, but it does not tell the app that the day's four times are
+yours, because it never showed them to you. Three things happen on that save,
+all deliberate:
 
 - The unreadable file is **kept aside** next to the new one, named
   `settings.json.unreadable-<date>-<time>`. Saving replaces every setting in
   the file, not just the day's shape, so the old file is the only copy of
   anything the app could not read out of it — an Obsidian path, a theme, a
   business year. The path it was kept at is written to the log.
+- If that copy cannot be made, **nothing is overwritten.** The dialog reports
+  the failure and the unreadable file stays exactly as it is, rather than being
+  replaced with no copy of it anywhere.
 - If the new file cannot be written — a permissions problem, a full disk — the
-  dialog says so and stays open. It does not report the day settings as saved.
+  dialog says so and stays open. It does not report the day settings as saved,
+  and the day's shape goes back to what it was rather than being left changed
+  in memory only.
 
 ### Completed
 - What: Shows completed items over the last N days.
