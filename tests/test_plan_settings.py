@@ -620,3 +620,88 @@ def test_a_failing_status_print_does_not_fail_the_save(settings_file, monkeypatc
     assert loaded.save() is True, "a message that could not be printed failed the save"
     assert json.loads(settings_file.read_text())["plan_day_start"] == "08:00"
     assert len(list(settings_file.parent.glob("settings.json.unreadable-*"))) == 1
+
+
+def _date_increment_stub(settings, app, label, box_height="86", refuse=False):
+    """The save method's widgets, stubbed, with a real ``_write_settings``.
+
+    The screen itself needs an app, a sidebar and a mapped window to build, so
+    these drive the real method against a stub -- the pattern
+    ``tests/test_settings_week_rule_ui.py`` established for this screen.
+    """
+    from types import SimpleNamespace
+
+    from src.getmoredone.screens.settings import SettingsScreen
+
+    stub = SimpleNamespace(
+        settings=settings,
+        app=app,
+        include_saturday_var=SimpleNamespace(get=lambda: True),
+        include_sunday_var=SimpleNamespace(get=lambda: True),
+        default_columns_expanded_var=SimpleNamespace(get=lambda: False),
+        first_day_of_week_var=SimpleNamespace(get=lambda: "Monday"),
+        week_rule_labels={},
+        first_week_of_year_var=SimpleNamespace(get=lambda: "ISO 8601"),
+        drag_schedule_text_color_var=SimpleNamespace(get=lambda: "#FFFFFF"),
+        drag_schedule_box_height_var=SimpleNamespace(get=lambda: box_height),
+        plan_items_col_width_var=SimpleNamespace(get=lambda: "260"),
+        date_increment_status_label=label,
+    )
+    stub._parse_positive_int = lambda value, default: int(value)
+    stub._set_status = lambda lbl, text, level="success": None
+    stub._write_settings = lambda lbl: not refuse
+    return stub
+
+
+def test_a_saved_box_height_reaches_the_running_app(settings_file):
+    """PB-M5 — the setting the Plan screen reads is the one Save just wrote.
+
+    Found by running the app, after three review passes and a green suite: set
+    the box height to 86, Save, walk to another screen and back, and the Day
+    Plan is still drawn at 30. The Settings screen edits its own
+    ``AppSettings.load()`` and the Plan screen reads ``app.settings`` when it
+    is built, so a saved size did nothing until the next launch. The appearance
+    section already hands the object over; this section, which carries both
+    sizes PB-M5 wired up, did not.
+    """
+    from src.getmoredone.screens.settings import SettingsScreen
+
+    settings = AppSettings()
+    app = type("_App", (), {})()
+    app.settings = AppSettings()
+    app.settings.drag_schedule_box_height_px = 30
+
+    stub = _date_increment_stub(settings, app, label=None, box_height="86")
+    SettingsScreen.save_date_increment_settings(stub)
+
+    assert app.settings is settings, (
+        "the app is still holding the object from launch, so the Plan screen "
+        "reads the old sizes until the app is restarted"
+    )
+    assert app.settings.drag_schedule_box_height_px == 86, (
+        "the saved box height did not reach the app's settings object"
+    )
+
+
+def test_a_refused_write_does_not_hand_the_app_the_unsaved_object(settings_file):
+    """The ordering the appearance section uses, for the same reason.
+
+    ``AppSettings.save`` declines when the file on disk will not parse and
+    cannot be copied aside. Handing the app an object that was not written
+    would show sizes that are gone on the next launch.
+    """
+    from src.getmoredone.screens.settings import SettingsScreen
+
+    settings = AppSettings()
+    app = type("_App", (), {})()
+    at_launch = AppSettings()
+    at_launch.drag_schedule_box_height_px = 30
+    app.settings = at_launch
+
+    stub = _date_increment_stub(settings, app, label=None, box_height="86", refuse=True)
+    SettingsScreen.save_date_increment_settings(stub)
+
+    assert app.settings is at_launch, (
+        "a refused write handed the app an object the file does not hold"
+    )
+    assert app.settings.drag_schedule_box_height_px == 30
