@@ -128,6 +128,26 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
         )
         return False
 
+    def _hand_settings_to_app(self) -> None:
+        """Give the app what the settings file now holds, after a write.
+
+        Purpose: PB-M5.7 -- a size this screen saves must reach the running
+                 app, and a size it did not save must not.
+        Tests:   tests/test_plan_settings.py::test_a_saved_box_height_reaches_the_running_app
+                 tests/test_plan_settings.py::test_a_refused_write_after_a_saved_one_does_not_reach_the_app
+
+        Re-read rather than handed over. Assigning ``self.settings`` would make
+        the app's object *this screen's* object, and every Save handler here
+        mutates ``self.settings`` before its ``_write_settings`` guard without
+        putting it back on refusal -- so once the two are the same object, a
+        refused write is published to the running app anyway, which is the
+        opposite of what that guard is for. The user would see the red "could
+        not write the settings file" and the new sizes at the same time.
+        ``load`` reads the file this save has just written and never raises.
+        (P6: the artifact, not the object that meant to become it.)
+        """
+        self.app.settings = AppSettings.load()
+
     def create_database_section(self, parent=None):
         """Create database management section."""
         if parent is None:
@@ -477,7 +497,7 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
         if not self._write_settings(self.appearance_status_label):
             return
 
-        self.app.settings = self.settings
+        self._hand_settings_to_app()
         self.app.apply_theme_preferences()
         self._set_status(self.appearance_status_label, "✓ Saved appearance and completion badge settings", "success")
 
@@ -693,13 +713,12 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
         if not self._write_settings(self.date_increment_status_label):
             return
 
-        # Hand the object to the app, as the appearance section does. This
-        # screen edits its own ``AppSettings.load()``, and the Plan screen
-        # reads ``drag_schedule_box_height_px`` and ``plan_items_col_width``
-        # off ``app.settings`` each time it is built. Without this a saved box
-        # height is written to disk and does nothing until the next launch --
-        # which is what PB-M5 wired these two settings up to avoid.
-        self.app.settings = self.settings
+        # The Plan screen reads ``drag_schedule_box_height_px`` and
+        # ``plan_items_col_width`` off ``app.settings`` each time it is built,
+        # and this screen edits its own ``AppSettings.load()``. Without this a
+        # saved box height is written to disk and does nothing until the next
+        # launch -- which is what PB-M5 wired these two settings up to avoid.
+        self._hand_settings_to_app()
 
         self._set_status(self.date_increment_status_label, "✓ Settings saved", "success")
 
