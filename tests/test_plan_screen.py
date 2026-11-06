@@ -42,6 +42,7 @@ from src.getmoredone.screens.plan import (
 )
 from src.getmoredone.screens.plan_blocks import (
     ITEM_ROW_MIN_HEIGHT_PX,
+    PD_CHECK_TEXT,
     STRIPE_WIDTH_PX,
     SLOT_CHIP_HEIGHT_PX,
     SLOT_MIN_HEIGHT_PX,
@@ -63,6 +64,7 @@ from src.getmoredone.theme import (
     block_type_colors,
     priority_band_colors,
     semantic_colors,
+    status_text_color,
 )
 from src.getmoredone.time_block_layout import (
     MAX_BLOCKS_PER_SLOT,
@@ -1336,6 +1338,180 @@ def test_pdm42_break_buffer_and_lunch_render_in_the_shared_colour(root):
     assert [seen[kind][0] for kind in ("break", "buffer", "lunch")] == [shared] * 3, (
         "the three kinds of padding render in different colours: "
         f"{ {k: seen[k][0] for k in ('break', 'buffer', 'lunch')} }"
+    )
+
+
+def _slot_row_for(root, blocks, items_by_id, slot_index=0, bounds=None):
+    """The rendered box at ``slot_index`` of a day holding ``blocks``.
+
+    ``_one_slot_pane`` takes a single block and is the right tool for one
+    task; this is for the boxes that hold two, and for picking a box other
+    than the first.
+    """
+    pane = ctk.CTkFrame(root)
+    pane.grid_columnconfigure(0, weight=1)
+    entry = build_day_grid(blocks, bounds or DayBounds()).slots[slot_index]
+    return build_slot_row(pane, entry, items_by_id, 0)
+
+
+def _check_label(widget):
+    """The completion check in a box, or ``None``."""
+    return _find_label(widget, PD_CHECK_TEXT)
+
+
+def _plain_item(title, status="open"):
+    """An ActionItem the renderer can read, with no database behind it.
+
+    ``_item`` creates a row, which these need nothing of: ``build_slot_row``
+    is handed its items in a dict and reads title, depth, score and status off
+    the object.
+    """
+    return ActionItem(who="me", title=title, start_date=THURSDAY, status=status)
+
+
+def test_pdm61_a_completed_task_shows_a_check_left_of_the_time(root):
+    """PD-M6.1 — the day says which of its boxes are done.
+
+    Purpose: PD-M6 -- a completed task is marked where the day is read, at
+             the start of the row.
+    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m6
+
+    Left of the time, as a grid column rather than as a glance: a check that
+    rendered after the time would still satisfy "the box has a check".
+    """
+    item = _plain_item("Draft the proposal", status="completed")
+    block = TimeBlock(
+        block_date=THURSDAY, start_time="08:00", end_time="08:30",
+        planned_minutes=30, item_id=item.id, slot_index=0,
+    )
+    row = _slot_row_for(root, [block], {item.id: item})
+
+    check = _check_label(row.frame)
+    assert check is not None, (
+        f"no check in a box holding a completed task; labels were {_label_texts(row.frame)}"
+    )
+    time_label = _find_label(row.frame, "08:00")
+    assert time_label is not None, "the box lost its time label"
+    assert check.grid_info()["column"] < time_label.grid_info()["column"], (
+        "the check is drawn at or after the time: check at column "
+        f"{check.grid_info()['column']}, time at {time_label.grid_info()['column']}"
+    )
+    assert check.cget("text_color") == status_text_color("success"), (
+        f"the check is {check.cget('text_color')}, not the theme's success token"
+    )
+
+
+def test_pdm62_an_open_task_shows_no_check(root):
+    """PD-M6.2 — the mark means something only if it is absent otherwise."""
+    item = _plain_item("Draft the proposal")
+    block = TimeBlock(
+        block_date=THURSDAY, start_time="08:00", end_time="08:30",
+        planned_minutes=30, item_id=item.id, slot_index=0,
+    )
+    row = _slot_row_for(root, [block], {item.id: item})
+
+    assert _check_label(row.frame) is None, (
+        f"an open task was marked complete; labels were {_label_texts(row.frame)}"
+    )
+    assert _find_label(row.frame, "08:00") is not None, "the box lost its time label"
+
+
+def test_pdm63_a_box_with_one_task_still_open_shows_no_check(root):
+    """PD-M6 — the check is the box's claim, and a half-done box is not done.
+
+    The adversarial case: a box holding a finished task beside an unfinished
+    one looks finished from the time column, which is the one place a reader
+    is counting on the mark to be exact.
+    """
+    done = _plain_item("Draft the proposal", status="completed")
+    todo = _plain_item("Send the proposal")
+    blocks = [
+        TimeBlock(
+            block_date=THURSDAY, start_time="08:00", end_time="08:30",
+            planned_minutes=30, item_id=done.id, slot_index=0,
+        ),
+        TimeBlock(
+            block_date=THURSDAY, start_time="08:00", end_time="08:30",
+            planned_minutes=30, item_id=todo.id, slot_index=0,
+        ),
+    ]
+    row = _slot_row_for(root, blocks, {done.id: done, todo.id: todo})
+
+    assert len(_label_texts(row.frame)) > 2, "the box did not render both tasks"
+    assert _check_label(row.frame) is None, (
+        "a box with work still open was marked complete"
+    )
+
+
+def test_pdm64_a_continuation_of_a_completed_task_shows_the_check(root):
+    """PD-M6.4 — the later boxes of a finished task are finished too.
+
+    The box is spent either way, and a 90-minute task checked in its first
+    box and bare in the next two reads as a task that was abandoned.
+    """
+    item = _plain_item("Review the proposal", status="completed")
+    block = TimeBlock(
+        block_date=THURSDAY, start_time="08:00", end_time="09:00",
+        planned_minutes=60, item_id=item.id, slot_index=0,
+    )
+    row = _slot_row_for(root, [block], {item.id: item}, slot_index=1)
+
+    assert _find_label(row.frame, "08:30") is not None, "not the continuation box"
+    assert _check_label(row.frame) is not None, (
+        f"the continuation of a completed task is bare; labels were {_label_texts(row.frame)}"
+    )
+
+
+def test_pdm65_a_block_whose_item_is_gone_draws_no_check(root):
+    """PD-M6.5 — an unknown item is not a completed one, and must not raise."""
+    block = TimeBlock(
+        block_date=THURSDAY, start_time="08:00", end_time="08:30",
+        planned_minutes=30, item_id="item-that-was-deleted", slot_index=0,
+    )
+    row = _slot_row_for(root, [block], {})
+
+    assert _check_label(row.frame) is None, "a block with no item was marked complete"
+
+
+def test_pdm66_a_break_in_the_box_does_not_hold_it_open(root):
+    """PD-M6 — padding is not work, so it cannot be *unfinished* work.
+
+    A half hour holding a finished task and a five-minute break is a finished
+    half hour: the break is time accounted for, not work outstanding. The
+    first version of this test put a break in a box on its own, which cannot
+    fail -- a break carries no item, so it reads as "not completed" whether
+    the padding filter is there or not, and the mutation came back green over
+    it. This is the case that tells the two apart.
+    """
+    done = _plain_item("Draft the proposal", status="completed")
+    blocks = [
+        TimeBlock(
+            block_date=THURSDAY, start_time="08:00", end_time="08:30",
+            planned_minutes=30, item_id=done.id, slot_index=0,
+        ),
+        TimeBlock(
+            block_date=THURSDAY, start_time="08:00", end_time="08:05",
+            planned_minutes=5, block_type=BlockType.BREAK, slot_index=0,
+        ),
+    ]
+    row = _slot_row_for(root, blocks, {done.id: done})
+    assert _check_label(row.frame) is not None, (
+        "a break beside a finished task took the box's mark away; labels were "
+        f"{_label_texts(row.frame)}"
+    )
+
+    bare = _slot_row_for(
+        root,
+        [
+            TimeBlock(
+                block_date=THURSDAY, start_time="08:00", end_time="08:30",
+                planned_minutes=30, block_type=BlockType.BREAK, slot_index=0,
+            )
+        ],
+        {},
+    )
+    assert _check_label(bare.frame) is None, (
+        "a box holding nothing but a break was marked complete"
     )
 
 
