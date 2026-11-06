@@ -60,6 +60,24 @@ STRIPE_MIN_HEIGHT_PX = 12
 #: unusable setting resolves to.
 SLOT_CHIP_HEIGHT_PX = 30
 
+#: The vertical gap between two consecutive boxes of the day: ``build_slot_row``
+#: grids each box ``pady=1``, so one box's bottom edge and the next box's top
+#: edge are 2px apart. An item row has to add it back, or an N-box row is 2(N-1)
+#: pixels shorter than the N boxes it claims to be the size of.
+SLOT_ROW_GAP_PX = 2
+
+#: The least an item row may be drawn at, whatever the box height says: the
+#: title's 5px top pad, two 28px lines of text, and 5px under them.
+#:
+#: The 30px floor on the box height was justified for a chip holding one line,
+#: and an item row holds two plus the work-block length. At 30 the day gives a
+#: half hour 34px, and a row matching it showed its title and clipped both the
+#: depth / ``already blocked`` line and the length -- the two facts the colour
+#: cannot carry, gone with no sign they were there. So the match with the day is
+#: exact at every box height the day itself can show a line of text at, and
+#: below that the row stays legible and is the taller of the two.
+ITEM_ROW_MIN_HEIGHT_PX = 66
+
 
 def stripe_for_item(item: Optional[ActionItem]) -> str:
     """PB-M1 — the brighter band colour, for the stripe on an item's row."""
@@ -141,6 +159,34 @@ class DepthBarStack(ctk.CTkFrame):
             bar.grid_propagate(False)
 
 
+def item_row_height(span: int, box_height: int = SLOT_CHIP_HEIGHT_PX) -> int:
+    """How tall an item row is drawn: the space the day gives it, exactly.
+
+    Purpose: PB-M6.1 -- an item row is the size of the space it will take, so
+             the day's room for it is visible before the drag.
+    Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m6
+    Tests:   tests/test_plan_screen.py::test_pbm61_an_item_row_is_the_height_the_day_would_give_it
+
+    ``span`` boxes of ``slot_row_height(1, box_height)``, plus the
+    ``SLOT_ROW_GAP_PX`` between each pair -- the measurement a user would take
+    from the top edge of the first box to the bottom edge of the last -- and
+    never less than ``ITEM_ROW_MIN_HEIGHT_PX``, so a row that cannot match the
+    day and stay readable stays readable.
+
+    Named rather than inlined for the reason ``slot_row_height`` is: the first
+    version multiplied ``box_height`` by the span, which is 2px per box short
+    of the day and 4px short of one box, and its test asserted that same
+    product. The claim and the check agreed with each other and not with the
+    screen. Both now go through here, and the box height comes from
+    ``slot_row_height``, so the two panes cannot drift apart without this
+    function changing.
+    """
+    as_the_day_draws_it = (
+        span * slot_row_height(1, box_height) + SLOT_ROW_GAP_PX * (span - 1)
+    )
+    return max(ITEM_ROW_MIN_HEIGHT_PX, as_the_day_draws_it)
+
+
 def build_item_row(
     parent,
     item: ActionItem,
@@ -155,27 +201,43 @@ def build_item_row(
     Purpose: PB-M6 -- an item is drawn at the size of the space it will take
              in the day, so the drag has nothing to guess at.
     Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m6
-    Tests:   tests/test_plan_screen.py::test_pbm61_an_item_row_is_as_tall_as_the_boxes_it_will_fill
+    Tests:   tests/test_plan_screen.py::test_pbm61_every_line_of_a_row_is_drawn_inside_it
 
     Returns the frame, so the caller can bind the drag handlers to it and to
     its children -- a press that lands on a label must start the same drag as
     one that lands on the frame, or half the row is dead to the mouse.
 
-    The height is ``slots_for_minutes`` half hours of ``box_height``, the same
-    arithmetic and the same unit the day's boxes use, so a 90-minute item is
-    three boxes tall on the left because it will be three boxes tall on the
-    right. ``grid_propagate(False)`` is what holds it there; a row that grew
-    to its own text would be telling the user a length it does not have.
+    The height is the space the day will give those half hours, asked of
+    ``slot_row_height`` rather than recomputed: one box plus the 2px gap to the
+    next, ``slots_for_minutes`` times over. A 90-minute item is three boxes tall
+    on the left because it will be three boxes tall on the right.
+    ``grid_propagate(False)`` is what holds it there; a row that grew to its own
+    text would be telling the user a length it does not have.
+
+    Multiplying ``box_height`` directly was 2px per box short of the day, and
+    the test asserted the same formula the code used, so the one relationship
+    this function exists for was the one thing unchecked.
+
+    Row 2 is empty and carries the weight. That is what keeps the two lines
+    together at the top of a tall row instead of centring the title in the
+    slack, and it is what makes a row too short for both lines lose the detail
+    line rather than the title -- at a box height of 30 the weight was on row 0
+    and Tk took the whole shortfall out of it, collapsing the title to a single
+    pixel and leaving a row that showed its depth and its length and not which
+    item it was.
     """
     fill = fill_for_item(item)
     on_fill = pick_text_color(fill)
     span = slots_for_minutes(work_block_minutes)
     frame = ctk.CTkFrame(
-        parent, fg_color=fill, corner_radius=6, height=span * box_height
+        parent,
+        fg_color=fill,
+        corner_radius=6,
+        height=item_row_height(span, box_height),
     )
     frame.grid(row=row, column=0, sticky="ew", pady=3, padx=2)
     frame.grid_columnconfigure(1, weight=1)
-    frame.grid_rowconfigure(0, weight=1)
+    frame.grid_rowconfigure(2, weight=1)
     frame.grid_propagate(False)
 
     stripe = ctk.CTkFrame(
@@ -185,7 +247,7 @@ def build_item_row(
         fg_color=stripe_for_item(item),
         corner_radius=3,
     )
-    stripe.grid(row=0, column=0, rowspan=2, sticky="ns", padx=(4, 8), pady=4)
+    stripe.grid(row=0, column=0, rowspan=3, sticky="ns", padx=(4, 8), pady=4)
     stripe.grid_propagate(False)
 
     title = ctk.CTkLabel(
