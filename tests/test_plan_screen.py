@@ -1135,3 +1135,43 @@ class _ExplodingBounds:
     @property
     def lunch_length(self):
         raise RuntimeError("bounds unreadable")
+
+
+@pytest.mark.parametrize(
+    "dates,expected",
+    [
+        ([THURSDAY], "Day settings saved; re-timed 1 day"),
+        ([THURSDAY, FRIDAY], "Day settings saved; re-timed 2 days"),
+    ],
+)
+def test_saving_day_settings_says_how_many_days_it_retimed(
+    screen, manager, dates, expected
+):
+    """The user guide promises the count, so the count is a claim under test.
+
+    It matters because the save reaches days that are not on screen: without
+    the message the user has no way to tell whether it did.
+    """
+    for block_date in dates:
+        _add_block(manager, 30, f"block {block_date}", block_date=block_date)
+
+    screen.on_settings_saved(DayBounds(day_start="10:00"))
+
+    assert screen.status_label.cget("text") == expected
+
+
+def test_a_capped_work_block_is_reported_not_quietly_applied(screen, manager):
+    """The item asked for a length the planner cannot store.
+
+    The user guide says the status line says so. Clamping silently would leave
+    the item claiming a Work Block the day does not reflect, with nothing
+    anywhere to say which of the two numbers is real.
+    """
+    item = _item(manager, "far too long", THURSDAY, work_block=5000)
+
+    screen.block_item(item)
+
+    assert manager.get_time_blocks(THURSDAY)[0].planned_minutes == 1440
+    text = screen.status_label.cget("text")
+    assert "1440m" in text
+    assert "5000m is longer than a day" in text
