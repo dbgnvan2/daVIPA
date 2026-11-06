@@ -42,6 +42,7 @@ from src.getmoredone.screens.plan import (
 )
 from src.getmoredone.screens.plan_blocks import (
     ITEM_ROW_MIN_HEIGHT_PX,
+    STRIPE_WIDTH_PX,
     SLOT_CHIP_HEIGHT_PX,
     SLOT_MIN_HEIGHT_PX,
     SLOT_ROW_GAP_PX,
@@ -1276,6 +1277,66 @@ def _find_label(widget, text):
         if found is not None:
             return found
     return None
+
+
+def _stripe_colors(widget):
+    """Every stripe frame's colour under a widget, in render order.
+
+    A stripe is the only frame built at ``STRIPE_WIDTH_PX``, which is what
+    makes it findable without the renderer handing one back.
+    """
+    found = []
+    for child in widget.winfo_children():
+        if isinstance(child, ctk.CTkFrame) and child.cget("width") == STRIPE_WIDTH_PX:
+            found.append(child.cget("fg_color"))
+        found.extend(_stripe_colors(child))
+    return found
+
+
+def test_pdm42_break_buffer_and_lunch_render_in_the_shared_colour(root):
+    """PD-M4.2 — the table reaching the screen, for all three kinds.
+
+    Purpose: PD-M4 -- one colour for the time that is not work.
+    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m4
+
+    A lunch box carried no stripe at all, so "the same colour as a break" had
+    nowhere to be: the only thing it coloured was its own row fill, which is
+    the surface every other box is drawn on. It gets the stripe the other two
+    have, in the same place and the same width, which is also what makes the
+    three read as one kind of thing.
+    """
+    blocks = [
+        TimeBlock(
+            block_date=THURSDAY, start_time="08:00", end_time="08:30",
+            planned_minutes=30, block_type=BlockType.BREAK, slot_index=0,
+        ),
+        TimeBlock(
+            block_date=THURSDAY, start_time="08:30", end_time="09:00",
+            planned_minutes=30, block_type=BlockType.BUFFER, slot_index=1,
+        ),
+    ]
+    pane = ctk.CTkFrame(root)
+    pane.grid_columnconfigure(0, weight=1)
+
+    seen = {}
+    for row, entry in enumerate(build_day_grid(blocks, DayBounds()).slots):
+        rendered = build_slot_row(pane, entry, {}, row)
+        if entry.slot.is_lunch:
+            seen.setdefault("lunch", _stripe_colors(rendered.frame))
+        elif entry.slot.index == 0:
+            seen["break"] = _stripe_colors(rendered.frame)
+        elif entry.slot.index == 1:
+            seen["buffer"] = _stripe_colors(rendered.frame)
+
+    for kind in ("break", "buffer", "lunch"):
+        assert len(seen.get(kind, [])) == 1, (
+            f"the {kind} box drew {len(seen.get(kind, []))} stripes, expected 1"
+        )
+    shared = block_type_colors()["buffer"]
+    assert [seen[kind][0] for kind in ("break", "buffer", "lunch")] == [shared] * 3, (
+        "the three kinds of padding render in different colours: "
+        f"{ {k: seen[k][0] for k in ('break', 'buffer', 'lunch')} }"
+    )
 
 
 def test_tgm81_a_block_row_fills_its_pane(root, manager, mapped_windows):

@@ -131,6 +131,30 @@ def test_block_type_colors_meet_contrast_in_both_themes(restore_appearance):
     assert not failures, "block types below the minimum: " + "; ".join(failures)
 
 
+def test_pdm41_padding_and_lunch_share_one_colour(restore_appearance):
+    """PD-M4.1 — break, buffer and lunch are one neutral, in both themes.
+
+    Purpose: PD-M4 -- three kinds of time that are not work, told apart by
+             their words rather than by three colours.
+    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m4
+
+    Buffer and lunch already shared the neutral; a break was the theme's cyan,
+    which read as a kind of work rather than a gap in it. An exact count of
+    distinct values, not a floor: a floor of "at most three" is satisfied by
+    the state this test exists to end.
+    """
+    for mode in THEMES:
+        ctk.set_appearance_mode(mode)
+        colors = block_type_colors()
+        assert set(colors) == {"buffer", "break", "lunch"}, (
+            f"{mode}: the padding table is {sorted(colors)}"
+        )
+        distinct = set(colors.values())
+        assert len(distinct) == 1, (
+            f"{mode}: three kinds of padding in {len(distinct)} colours: {colors}"
+        )
+
+
 def test_a_filled_depth_bar_is_distinguishable_from_an_empty_one(restore_appearance):
     """The three-bar stack carries information only if the two states differ.
 
