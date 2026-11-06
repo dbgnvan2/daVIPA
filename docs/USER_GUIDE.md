@@ -410,19 +410,28 @@ relative to Day Start, so the Day Start in force at that first open is the one
 the day keeps. Set your day's shape before opening an upgraded day, or expect to
 drag.
 
-If your settings file exists but cannot be read, the mapping does **not** run.
-The blocks stay off the grid, appear under **Outside the day**, and the status
-line says the settings could not be read — rather than being placed permanently
-against a Day Start the app only guessed at.
+The mapping runs only against a day shape **you** have confirmed — which means
+a day you have saved in Day Settings at least once. Until then the blocks stay
+off the grid, appear under **Outside the day**, and the status line says the
+day's shape has not been confirmed, rather than being placed permanently
+against a Day Start the app guessed at. Three ordinary situations are that
+guess: a settings file that cannot be read; a settings file written by a version
+of daVIPA that had no Day Settings, which is every version before this one, so
+this is the normal upgrade; and a day time the app had to replace because the
+file held something it could not read as a time.
 
 **To recover:** open **⚙ Day Settings**, check the four times and the weekday
 boxes, and save. That writes a settings file the app can read, and the blocks
 are mapped onto the grid the next time the day is drawn. **Day Settings is the
 only place that restores it** — saving from Settings or any other screen writes
 a readable file, but it does not tell the app that the day's four times are
-yours, because it never showed them to you. That holds across a relaunch: the
-app records in the settings file itself that the day's shape was never chosen,
-so quitting and reopening does not turn a guess into a setting. Three things
+yours, because it never showed them to you. That holds across a relaunch and
+across an upgrade: the settings file itself records whether the day's shape was
+confirmed, so neither quitting and reopening nor installing a new version turns
+a guess into a setting. A settings file from a version that did not have this
+field counts as unconfirmed, which is why you may be asked to confirm a day you
+feel you have already set — it is one save, and the alternative is the app
+rewriting your planned times against a day start it invented. Three things
 happen on that save, all deliberate:
 
 - The unreadable file is **kept aside** next to the new one, named

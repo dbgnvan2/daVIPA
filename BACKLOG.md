@@ -1,6 +1,20 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-05 (the grid rebuild's deferrals, the six below-medium findings from its pre-push sweep, the six from the re-sweep of its own fix commits, and two from the third pass; the time-block rebuild's deferrals, its sweep findings, and the four from the re-sweep of its own fix commits remain, two of them changed by the grid; the five from the timer-endings batch remain cleared, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-05 (one below-medium from the grid rebuild's fifth pass added; the four earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Below medium, from the fifth pass of the grid rebuild (2026-11-05)
+
+Cold pass, lens: the settings-file format and the state around the new
+persisted field. One finding below medium.
+
+- **The confirmation gate covers the migration, not the planning done on an
+  unconfirmed day.** `load_blocks` gates `adopt_legacy_day` on the day's shape
+  being the user's, but `move_block_to_slot` and `add_block_at` are ungated,
+  and `_settle_block_on_slot` derives and stores clock times from the same
+  `day_start`. Low, and arguably correct: the user is dragging onto a grid they
+  can see, and the times follow the boxes they chose. But the settings file can
+  then hold stored times derived from a day shape it also records as
+  unconfirmed. Worth deciding deliberately rather than by omission.
 
 ## Deferred from the time-block rebuild (2026-11-05)
 

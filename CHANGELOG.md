@@ -33,11 +33,14 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   opened: a readable start time goes on the box that time names **or nowhere**,
   never slid to the nearest free box. That mapping cannot be undone, so it
   reports how many blocks it placed **and the Day Start it placed them
-  against** — and if your settings file exists but cannot be read, it does not
-  run at all: the blocks wait under *Outside the day* rather than being written
-  permanently against a day shape the app only guessed at — and it stays that
-  way across a relaunch, because the settings file itself records that the
-  day's shape was never chosen. Saving **Day Settings** is the way back, and
+  against** — and it runs only against a day shape you have confirmed in Day
+  Settings: otherwise the blocks wait under *Outside the day* rather than being
+  written permanently against a day shape the app guessed at. An unreadable
+  settings file is one such guess; so is a settings file from any version
+  before this one, which had no Day Settings, and so is a day time the app had
+  to substitute because the file held something it could not read. The settings
+  file itself records whether the four times were confirmed, so the guarantee
+  holds across a relaunch and across an upgrade in either direction. Saving **Day Settings** is the way back, and
   the only way: it is the one screen that shows you the day's four times, so it
   is the one whose save tells the app they are yours. It keeps the unreadable
   file aside as
