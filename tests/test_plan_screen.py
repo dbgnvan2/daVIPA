@@ -40,8 +40,10 @@ from src.getmoredone.screens.plan import (
     refusal_text,
 )
 from src.getmoredone.screens.plan_blocks import (
+    ITEM_ROW_MIN_HEIGHT_PX,
     SLOT_CHIP_HEIGHT_PX,
     SLOT_MIN_HEIGHT_PX,
+    SLOT_ROW_GAP_PX,
     SLOT_TITLE_WIDTH_PX,
     DepthBarStack,
     accent_for_block,
@@ -50,6 +52,7 @@ from src.getmoredone.screens.plan_blocks import (
     build_outside_group,
     build_slot_row,
     fill_for_item,
+    item_row_height,
     slot_row_height,
     stripe_for_item,
 )
@@ -67,6 +70,8 @@ from src.getmoredone.time_block_layout import (
     SlotRefusal,
     build_day_grid,
     day_grid,
+    priority_band,
+    slots_for_minutes,
 )
 
 THURSDAY = "2026-11-05"
@@ -147,6 +152,36 @@ def screen(root, manager, settings):
 def _item(manager, title, start_date=THURSDAY, **kwargs):
     item = ActionItem(who="me", title=title, start_date=start_date, **kwargs)
     manager.create_action_item(item)
+    return item
+
+
+def _scored_item(manager, title, band="critical", **kwargs):
+    """An item that is really in a priority band after the database has it.
+
+    ``_item(..., priority_score=51200)`` does not produce a scored item.
+    ``create_action_item`` calls ``update_priority_score``, which multiplies the
+    four factors and returns 0 when any of them is None -- so the item came back
+    ``unscored`` and every colour assertion written against it compared the
+    unscored grey with the unscored grey. 51200 is a real critical score
+    (20 x 20 x 16 x 8); it was only ever being thrown away.
+
+    The resulting band is asserted here rather than left to the caller, so this
+    helper cannot start handing back unscored items without a test failing on
+    the spot.
+    """
+    factors = {
+        "critical": dict(importance=20, urgency=20, size=16, value=8),   # 51200
+        "medium": dict(importance=5, urgency=5, size=4, value=2),        # 200
+    }[band]
+    item = _item(manager, title, **factors, **kwargs)
+    assert item.priority_score > 0, (
+        f"{title!r} came back from the database scoring "
+        f"{item.priority_score!r} -- the factors did not take"
+    )
+    assert priority_band(item.priority_score) == band, (
+        f"{title!r} scores {item.priority_score}, which is band "
+        f"{priority_band(item.priority_score)!r}, not {band!r}"
+    )
     return item
 
 
@@ -1197,7 +1232,9 @@ class _FakeEvent:
 # sufficient -- but do not read a pass here as the box being legible.
 
 
-def _one_slot_pane(root, block, width=None, *, mapped=True, continued=False):
+def _one_slot_pane(
+    root, block, width=None, *, mapped=True, continued=False, items_by_id=None
+):
     """A pane holding one box of ``block``: the one it starts in, or its next.
 
     ``mapped`` is explicit because the ``deiconify`` here is what makes a
@@ -1206,6 +1243,11 @@ def _one_slot_pane(root, block, width=None, *, mapped=True, continued=False):
     documented local workflow for nothing. ``continued=True`` returns the
     second box of a longer block, which is the only way to get at a
     continuation chip.
+
+    ``items_by_id`` defaulted to empty and could not be given, so every chip
+    this helper built was rendered with ``item=None`` -- band ``unscored``,
+    whatever the test had stored. Any colour assertion against the item's own
+    band was comparing the unscored tint with itself.
     """
     if mapped:
         root.geometry("1200x800")
@@ -1222,7 +1264,7 @@ def _one_slot_pane(root, block, width=None, *, mapped=True, continued=False):
     else:
         entry = slots[0]
         assert entry.starting, "the block was not placed in the first box"
-    return pane, build_slot_row(pane, entry, {}, 0)
+    return pane, build_slot_row(pane, entry, items_by_id or {}, 0)
 
 
 def _find_label(widget, text):
@@ -1879,9 +1921,10 @@ def test_an_item_row_lays_out_at_the_height_it_asks_for(root, mapped_windows):
     )
     root.update()
 
-    assert row.winfo_height() == 3 * 60, (
-        f"a 90-minute item laid out at {row.winfo_height()}px, not the three "
-        "boxes of 60px it asked for"
+    expected = item_row_height(3, 60)
+    assert row.winfo_height() == expected, (
+        f"a 90-minute item laid out at {row.winfo_height()}px, not the "
+        f"{expected}px the day gives three boxes of 60px"
     )
 
 
@@ -1969,11 +2012,20 @@ def test_pbm43_a_chip_is_filled_by_its_priority(root, manager, light_appearance)
 
     Asserted against ``fill_for_item`` rather than a literal: a test holding
     its own copy of the hex would pass a theme change that the screen failed.
+
+    Adjacent to PB-M7's fix and corrected with it, because it was the same
+    defect: the item was built with ``priority_score=51200``, which the database
+    recomputes to 0, and the pane rendered with an empty ``items_by_id``, so
+    both sides of the comparison were the unscored tint. Only the second
+    assertion could fail, and a critical task drawn in the unscored grey would
+    have passed the test named for drawing it in its band.
     """
-    item = _item(manager, "Draft the proposal", priority_score=51200)
+    item = _scored_item(manager, "Draft the proposal")
     block = _item_block()
     block.item_id = item.id
-    _pane, row = _one_slot_pane(root, block, width=600, mapped=False)
+    _pane, row = _one_slot_pane(
+        root, block, width=600, mapped=False, items_by_id={item.id: item}
+    )
 
     chip = row.block_widgets[0][1]
     assert _as_hex(chip, chip.cget("fg_color")) == _as_hex(
@@ -1982,6 +2034,9 @@ def test_pbm43_a_chip_is_filled_by_its_priority(root, manager, light_appearance)
     assert _as_hex(chip, chip.cget("fg_color")) != _as_hex(
         chip, semantic_colors()["surface_subtle"]
     ), "the chip is still drawn on the generic surface"
+    assert _as_hex(chip, chip.cget("fg_color")) != _as_hex(
+        chip, fill_for_item(None)
+    ), "a critical task is drawn in the unscored tint"
 
 
 def test_pbm51_box_height_follows_the_setting():
@@ -2133,11 +2188,21 @@ def test_pbm41_a_chips_title_is_coloured_for_the_shade_behind_it(
     can: before PB-M4 the title was the theme's body text, which is the right
     colour for the theme's surface and the wrong one for a band tint -- pale
     text on a pale shade, the same failure the clock labels had.
+
+    Adjacent to PB-M7's fix and corrected with it: the item was not really
+    scored and the chip's item was ``None``, so this ran against the unscored
+    tint -- the one fill whose pairing with the body text was never the bug.
     """
-    item = _item(manager, "Draft the proposal", priority_score=51200)
+    item = _scored_item(manager, "Draft the proposal")
     block = _item_block()
     block.item_id = item.id
-    _pane, row = _one_slot_pane(root, block, width=600, mapped=False)
+    _pane, row = _one_slot_pane(
+        root, block, width=600, mapped=False, items_by_id={item.id: item}
+    )
+
+    assert _as_hex(row.frame, fill_for_item(item)) != _as_hex(
+        row.frame, fill_for_item(None)
+    ), "the item is unscored, so this test is not about a band tint at all"
 
     chip = row.block_widgets[0][1]
     title = _find_label(chip, "Draft the proposal")
@@ -2420,28 +2485,139 @@ def _find_continuation_chip(widget):
 
 
 @pytest.mark.parametrize(
-    "minutes, boxes",
-    [(30, 1), (45, 2), (60, 2), (90, 3), (120, 4)],
+    "minutes, boxes, height_at_86",
+    [(30, 1, 90), (45, 2, 182), (60, 2, 182), (90, 3, 274), (120, 4, 366)],
 )
-def test_pbm61_an_item_row_is_as_tall_as_the_boxes_it_will_fill(
-    root, manager, minutes, boxes
+def test_pbm61_an_item_row_is_the_height_the_day_would_give_it(
+    root, manager, minutes, boxes, height_at_86
 ):
     """PB-M6.1 — a 90-minute item is three boxes tall, because it will be.
 
-    The same ``slots_for_minutes`` the day's grid uses, times the same box
-    height, so the row on the left is the shape of the space it is about to
-    take on the right. 45 minutes is two boxes for the same reason it is two
-    boxes in the day: a half-hour grid cannot hold a quarter hour.
+    The expected height is built here from the day's own renderer --
+    ``slot_row_height`` per box plus the gap ``build_slot_row`` grids between
+    them -- not from ``item_row_height``, and not as ``boxes * box_height``.
+    That product was what the first version of this test asserted, and it was
+    also what the code computed, so the one relationship the change exists for
+    was the one thing unchecked: a box in the day is ``box_height + 4`` and sits
+    2px from the next, so a 3-box row was 274px of day claimed in 258px of row.
+
+    45 minutes is two boxes for the same reason it is two boxes in the day: a
+    half-hour grid cannot hold a quarter hour.
+
+    The expected heights are literals, not expressions over the module's own
+    constants. Built from ``slot_row_height`` and ``SLOT_ROW_GAP_PX`` they moved
+    with any change to either -- setting ``SLOT_ROW_GAP_PX = 0`` left this test
+    green, which is the same self-agreement in a new place. The numbers are what
+    the day measures at a box height of 86: a box is 86 + 4, and consecutive
+    boxes are 2 apart. ``test_pbm61_a_row_is_as_tall_as_the_boxes_beside_it``
+    pins the relationship to the rendered day rather than to arithmetic.
     """
-    item = _item(manager, "Draft the proposal", priority_score=51200)
-    row = build_item_row(
-        root, item, 0, already_blocked=False,
-        work_block_minutes=minutes, box_height=86,
+    box_height = 86
+    assert height_at_86 > boxes * box_height, (
+        "the expected height is no more than the plain product, so this test "
+        "cannot tell the two apart"
     )
 
-    assert row.cget("height") == boxes * 86, (
-        f"a {minutes}-minute item asks for {row.cget('height')}px, not the "
-        f"{boxes} boxes of 86px it will fill"
+    item = _scored_item(manager, "Draft the proposal")
+    row = build_item_row(
+        root, item, 0, already_blocked=False,
+        work_block_minutes=minutes, box_height=box_height,
+    )
+
+    assert row.cget("height") == height_at_86, (
+        f"a {minutes}-minute item asks for {row.cget('height')}px; the "
+        f"{boxes} boxes the day gives it occupy {height_at_86}px"
+    )
+
+
+def test_pbm61_a_row_is_as_tall_as_the_boxes_beside_it(
+    root, manager, mapped_windows
+):
+    """PB-M6.1 — measured against the day on screen, not against arithmetic.
+
+    Every other height assertion in this file compares one formula with
+    another, and the first version of this change shipped because the formula
+    the test used was the formula the code used. This one renders the day this
+    item would actually produce -- a 90-minute block as the box it starts in
+    and the two it runs through -- measures from the top edge of the first to
+    the bottom edge of the third, and asserts the item row is exactly that
+    tall. It fails for a wrong gap, a wrong per-box height, or a wrong span,
+    without knowing how any of the three is computed.
+
+    The boxes have to hold the task. An empty box keeps ``SLOT_MIN_HEIGHT_PX``
+    whatever the box-height setting says, deliberately, because it holds no
+    text -- three empty boxes span 100px at a setting of 86. What the row
+    claims to match is the space the task takes, not the space it leaves.
+    """
+    box_height = 86
+    item = _scored_item(manager, "Draft the proposal")
+
+    block = _item_block()
+    block.item_id = item.id
+    block.planned_minutes = 90
+    slots = build_day_grid([block], DayBounds()).slots[:3]
+    assert [bool(slot.starting) for slot in slots] == [True, False, False], (
+        "the 90-minute block did not lay out as one box and two continuations"
+    )
+    assert all(slot.continued for slot in slots[1:]), (
+        "the later boxes are not marked as this task's continuations"
+    )
+
+    pane = ctk.CTkFrame(root, width=600)
+    pane.grid(row=0, column=0, sticky="nsew")
+    pane.grid_columnconfigure(0, weight=1)
+    boxes = [
+        build_slot_row(
+            pane, slot, {item.id: item}, index, chip_height=box_height
+        ).frame
+        for index, slot in enumerate(slots)
+    ]
+
+    row = build_item_row(
+        root, item, 0, already_blocked=False,
+        work_block_minutes=90, box_height=box_height,
+    )
+    root.geometry("1200x900")
+    root.deiconify()
+    root.update_idletasks()
+    root.update()
+
+    top = boxes[0].winfo_y()
+    bottom = boxes[-1].winfo_y() + boxes[-1].winfo_height()
+    assert bottom > top, "the three boxes did not lay out"
+    assert boxes[0].winfo_height() > 1, "the boxes have no height to measure"
+
+    assert row.winfo_height() == bottom - top, (
+        f"the row is {row.winfo_height()}px; the three boxes it says it will "
+        f"fill span {bottom - top}px on screen"
+    )
+
+
+def test_pbm61_a_row_too_short_for_its_text_keeps_its_text(root, manager):
+    """PB-M6.1 — the floor, and why the match with the day stops at it.
+
+    A box height of 30 -- the floor, and what the demo's settings file holds --
+    gives a half hour 34px in the day. A row matching that showed its title and
+    clipped the depth / ``already blocked`` line and the work-block length: the
+    two facts the colour cannot carry, gone with nothing to say they were there.
+
+    Asserted as the real relationship rather than against the constant alone:
+    below the floor the row is the taller of the two, at and above it the row is
+    exactly what the day gives.
+    """
+    assert item_row_height(1, 30) == ITEM_ROW_MIN_HEIGHT_PX, (
+        "a one-box row at the box-height floor is not held at the row floor"
+    )
+    assert item_row_height(1, 30) > slot_row_height(1, 30), (
+        "the row is no taller than a 34px box, so its second line is still cut"
+    )
+
+    tall_enough = 86
+    assert item_row_height(1, tall_enough) == slot_row_height(1, tall_enough), (
+        "at a usable box height the row is no longer the day's own height"
+    )
+    assert item_row_height(3, tall_enough) > ITEM_ROW_MIN_HEIGHT_PX, (
+        "the floor is swallowing a multi-box row"
     )
 
 
@@ -2462,9 +2638,98 @@ def test_pbm61_the_item_row_height_comes_from_the_setting(root, manager, setting
         if isinstance(child, ctk.CTkFrame)
     ]
     assert len(rows) == 1, f"{len(rows)} item rows, expected the one"
-    assert rows[0].cget("height") == 2 * 64, (
-        f"the row is {rows[0].cget('height')}px; a 60-minute item is two "
-        "boxes of the 64px the day draws a task at"
+    expected = item_row_height(slots_for_minutes(60), 64)
+    assert rows[0].cget("height") == expected, (
+        f"the row is {rows[0].cget('height')}px, not the {expected}px two "
+        "boxes take at the 64px this screen was told to draw a task at"
+    )
+    assert expected != item_row_height(slots_for_minutes(60)), (
+        "64 gives the same height as the default, so this test cannot tell "
+        "whether the setting was read at all"
+    )
+
+
+def test_pbm61_every_line_of_a_row_is_drawn_inside_it(root, manager, mapped_windows):
+    """PB-M6.1 — on screen, at the floor and well above it, nothing is clipped.
+
+    The height assertions above are all ``cget``, and a frame can ask for 66px
+    while Tk lays its children out somewhere else entirely. This is the same
+    measurement PB-M2.1 makes on a task chip, applied to the row: every child's
+    bottom edge inside the frame's own height.
+
+    It is the test that fails on the defect the first version shipped with.
+    ``grid_rowconfigure(0, weight=1)`` put all the slack -- including a negative
+    shortfall -- on the title's row, so at a 30px box height Tk collapsed the
+    title to a single pixel and the row showed its depth and its length and not
+    which item it was. The weight is on an empty row 2 now, so a row short of
+    space loses from the bottom.
+    """
+    item = _scored_item(manager, "Draft the proposal")
+
+    for box_height in (SLOT_CHIP_HEIGHT_PX, 86):
+        row = build_item_row(
+            root, item, 0, already_blocked=True,
+            work_block_minutes=30, box_height=box_height,
+        )
+        root.geometry("700x700")
+        root.deiconify()
+        root.update_idletasks()
+        root.update()
+
+        height = row.winfo_height()
+        assert height == row.cget("height"), (
+            f"the row asked for {row.cget('height')}px and laid out at {height}"
+        )
+        for child in row.winfo_children():
+            bottom = child.winfo_y() + child.winfo_height()
+            label = (
+                child.cget("text") if isinstance(child, ctk.CTkLabel)
+                else type(child).__name__
+            )
+            assert child.winfo_height() > 1, (
+                f"at box height {box_height}, {label!r} is "
+                f"{child.winfo_height()}px tall -- it has been collapsed"
+            )
+            assert bottom <= height, (
+                f"at box height {box_height}, {label!r} ends at {bottom} "
+                f"inside a {height}px row -- it is clipped"
+            )
+        row.destroy()
+
+
+def test_pbm61_a_tall_row_keeps_its_two_lines_together(
+    root, manager, mapped_windows
+):
+    """PB-M6.1 — the slack goes under the text, not between the two lines.
+
+    A 90-minute item at the default is a 274px row holding two lines of text.
+    With the weight on the title's row the title was centred in it: drawn at
+    y=100 with its own detail line 124px below it and the depth bars pinned to
+    the top, so the row stopped reading as one item. Asserted as a distance,
+    because "the title is above the detail line" held in the broken version too.
+    """
+    item = _scored_item(manager, "Draft the proposal", depth="Medium")
+    row = build_item_row(
+        root, item, 0, already_blocked=False,
+        work_block_minutes=90, box_height=86,
+    )
+    root.geometry("700x700")
+    root.deiconify()
+    root.update_idletasks()
+    root.update()
+
+    title = _find_label(row, "Draft the proposal")
+    detail = _find_label(row, "Medium")
+    assert title is not None and detail is not None, "the row lost a label"
+
+    gap = detail.winfo_y() - (title.winfo_y() + title.winfo_height())
+    assert 0 <= gap <= 8, (
+        f"{gap}px between the title and its own detail line in a "
+        f"{row.winfo_height()}px row -- the slack is between them, not below"
+    )
+    assert title.winfo_y() < row.winfo_height() // 4, (
+        f"the title sits at y={title.winfo_y()} in a {row.winfo_height()}px "
+        "row, not at the top of it"
     )
 
 
@@ -2474,8 +2739,14 @@ def test_pbm62_an_item_row_does_not_print_its_priority_score(root, manager):
     The band is the shade the row is drawn on and the colour of its stripe, so
     the score was a third way of saying one thing, in the one place a reader
     is looking for something the colour cannot tell them.
+
+    The item has to be really scored for the first assertion to mean anything.
+    Written against ``_item(..., priority_score=51200)`` the number never
+    reached the row even before the change -- the database recomputed the score
+    to 0, so what the old code printed was ``P 0`` and ``"51200" in text`` was
+    dead either way.
     """
-    item = _item(manager, "Draft the proposal", priority_score=51200)
+    item = _scored_item(manager, "Draft the proposal")
     row = build_item_row(
         root, item, 0, already_blocked=False, work_block_minutes=30
     )
@@ -2484,8 +2755,9 @@ def test_pbm62_an_item_row_does_not_print_its_priority_score(root, manager):
         child.cget("text") for child in row.winfo_children()
         if isinstance(child, ctk.CTkLabel)
     ]
-    assert not any("51200" in text for text in texts), (
-        f"the priority score is still on the row: {texts}"
+    assert not any(str(item.priority_score) in text for text in texts), (
+        f"the priority score ({item.priority_score}) is still on the row: "
+        f"{texts}"
     )
     assert not any(text.startswith("P ") for text in texts), (
         f"the row still carries a P-prefixed score: {texts}"
@@ -2533,12 +2805,23 @@ def test_pbm71_a_continuation_box_is_the_colour_of_its_task(root, manager):
     90-minute task was one coloured box followed by two empty ones, which
     reads as a task that stops after half an hour. The arrow is what says
     "same task, continued", and the colour is what says which task.
+
+    Both halves of this had to be fixed before it could fail for the thing it
+    is named after. The item was built with ``priority_score=51200``, which the
+    database recomputed to 0, and the pane was rendered with an empty
+    ``items_by_id``, so the chip's item was ``None``: band ``unscored`` on both
+    sides, and an implementation that filled every continuation with the
+    unscored tint regardless of its task would have passed. Hence the real
+    factors, the lookup, and the last assertion.
     """
-    item = _item(manager, "Draft the proposal", priority_score=51200)
+    item = _scored_item(manager, "Draft the proposal")
     block = _item_block()
     block.item_id = item.id
     block.planned_minutes = 90
-    _pane, row = _one_slot_pane(root, block, width=600, continued=True)
+    _pane, row = _one_slot_pane(
+        root, block, width=600, continued=True, mapped=False,
+        items_by_id={item.id: item},
+    )
 
     assert row.block_widgets == [], "this box starts no task"
     chip = _find_continuation_chip(row.frame)
@@ -2547,6 +2830,9 @@ def test_pbm71_a_continuation_box_is_the_colour_of_its_task(root, manager):
     assert _as_hex(chip, chip.cget("fg_color")) == _as_hex(
         chip, fill_for_item(item)
     ), f"the continuation is {chip.cget('fg_color')}, not the task's shade"
+    assert _as_hex(chip, chip.cget("fg_color")) != _as_hex(
+        chip, fill_for_item(None)
+    ), "the continuation is the unscored tint, so it says nothing about which task"
 
     stripe = next(
         child for child in chip.winfo_children()
@@ -2555,6 +2841,9 @@ def test_pbm71_a_continuation_box_is_the_colour_of_its_task(root, manager):
     assert _as_hex(stripe, stripe.cget("fg_color")) == _as_hex(
         stripe, stripe_for_item(item)
     ), "the continuation's bar is not the task's bar"
+    assert _as_hex(stripe, stripe.cget("fg_color")) != _as_hex(
+        stripe, stripe_for_item(None)
+    ), "the continuation's bar is the unscored bar"
 
 
 def test_pbm71_a_continuation_box_keeps_its_arrow(root, manager):
@@ -2564,11 +2853,14 @@ def test_pbm71_a_continuation_box_keeps_its_arrow(root, manager):
     colour no longer does, so it is asserted separately from the colour: a
     change that dropped it would otherwise pass as a colour fix.
     """
-    item = _item(manager, "Draft the proposal", priority_score=51200)
+    item = _scored_item(manager, "Draft the proposal")
     block = _item_block()
     block.item_id = item.id
     block.planned_minutes = 90
-    _pane, row = _one_slot_pane(root, block, width=600, continued=True)
+    _pane, row = _one_slot_pane(
+        root, block, width=600, continued=True, mapped=False,
+        items_by_id={item.id: item},
+    )
 
     texts = _label_texts(row.frame)
     assert any(text.startswith("↳ ") for text in texts), (
