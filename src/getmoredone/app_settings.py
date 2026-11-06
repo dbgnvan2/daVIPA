@@ -17,22 +17,21 @@ from .paths import default_settings_path
 class AppSettings:
     """Application settings."""
 
-    # Neither of these is a dataclass field, deliberately: ``asdict`` must not
-    # write them to the settings file and ``load`` must not read them back.
-    # They describe *this load and this save*, not the user's settings.
-    #
-    # ``settings_unreadable`` is True when a settings file existed and could
-    # not be parsed. It drives one thing only -- keeping that file aside before
-    # ``save`` overwrites it -- and a successful write clears it, because the
-    # file then parses. It must not be used to decide anything that has to
-    # outlive this process; ``plan_day_shape_unconfirmed`` below is the field
-    # for that.
-    settings_unreadable = False
-
-    # The reason the last ``save`` returned False, for a caller that reports to
-    # the user. The two failures have different remedies and must not share one
-    # message.
+    # Not a dataclass field, deliberately: ``asdict`` must not write it to the
+    # settings file and ``load`` must not read it back. It is the reason the
+    # last ``save`` returned False, for a caller that reports to the user. The
+    # two failures have different remedies and must not share one message.
     last_save_error = None
+
+    # The four values the Plan grid derives every box from, and the only four
+    # the Day Settings dialog takes a confirmation of. Not a dataclass field
+    # for the same reason as above; a tuple so nothing can edit it in place.
+    DAY_SHAPE_KEYS = (
+        "plan_day_start",
+        "plan_lunch_start",
+        "plan_lunch_minutes",
+        "plan_day_end",
+    )
 
     obsidian_vault_path: Optional[str] = None
     obsidian_notes_subfolder: str = "GetMoreDone"
@@ -134,6 +133,11 @@ class AppSettings:
     # which cannot be undone, would act on it. Cleared only by the Day
     # Settings dialog, which is the one screen that shows these four values and
     # takes the user's confirmation of them.
+    #
+    # The default is False and must stay False, so that constructing an
+    # AppSettings in code is not a claim about a user. Deciding it from a file
+    # is ``_day_shape_was_confirmed``, and absence there is never confirmation
+    # -- read its docstring before changing either.
     plan_day_shape_unconfirmed: bool = False
 
     # Email → Action Items (Gmail importer)
@@ -176,30 +180,71 @@ class AppSettings:
                 settings.first_week_of_year_rule = cls._normalize_first_week_of_year_rule(
                     getattr(settings, "first_week_of_year_rule", "iso")
                 )
-                settings._normalize_plan_day_settings()
+                substituted = settings._normalize_plan_day_settings()
+                # Decided from the file, not from the fact that it parsed. A
+                # file can parse perfectly and still have nothing to say about
+                # the day's shape -- see ``_day_shape_was_confirmed``.
+                settings.plan_day_shape_unconfirmed = (
+                    not cls._day_shape_was_confirmed(data, substituted)
+                )
                 return settings
             except Exception as e:
                 print(f"Error loading settings: {e}")
-                # Flagged, not just printed: a caller about to write something
-                # derived from these values has to be able to tell a default
-                # that is the user's from one that is a stand-in.
                 unreadable = cls()
-                unreadable.settings_unreadable = True
                 # Written to the file by the first save, so a relaunch still
                 # knows these four day values were never chosen.
                 unreadable.plan_day_shape_unconfirmed = True
                 return unreadable
 
-        return cls()
+        # No file at all is no confirmation either: these four values are
+        # defaults nobody has seen. Harmless on a fresh install, where there
+        # are no blocks to adopt, and the honest answer in the case that is not
+        # a fresh install -- a settings file deleted and a database kept.
+        fresh = cls()
+        fresh.plan_day_shape_unconfirmed = True
+        return fresh
+
+    @classmethod
+    def _day_shape_was_confirmed(cls, data: dict, substituted: bool) -> bool:
+        """Whether the four day values in a settings file are the user's.
+
+        Purpose: TG-M5 -- the single question the irreversible grid adoption
+                 is gated on.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
+        Tests:   tests/test_plan_settings.py::test_a_settings_file_from_before_day_settings_is_not_a_confirmed_day
+
+        Confirmed means the file *says so*: ``plan_day_shape_unconfirmed``
+        present and false, all four values present, and none of them
+        substituted on the way in. Absence is not confirmation, and that is
+        the whole of this method --
+
+        * a file written before Day Settings existed holds none of the four
+          keys, so all four values are this build's guess. ``load`` filters
+          the parsed dict against the dataclass fields, which erases the
+          difference between a default the user accepted and a default nobody
+          has seen; checking for the key is the only way back to it.
+        * a file written by a build that does not define this field has lost
+          the key, because that build's ``save`` writes ``asdict`` of a class
+          without it. A boolean whose absence meant "confirmed" could not
+          survive one launch of an older packaged app.
+        * a value the normalizer had to replace -- ``"25:00"``, a hand-edited
+          ``"8am"`` -- is as much a guess as one that was never there.
+
+        A wrong "unconfirmed" costs one visit to Day Settings. A wrong
+        "confirmed" lets adoption rewrite stored clock times that nothing can
+        recover, so the cheap mistake is the default.
+        """
+        if substituted:
+            return False
+        if data.get("plan_day_shape_unconfirmed") is not False:
+            return False
+        return all(key in data for key in cls.DAY_SHAPE_KEYS)
 
     def save(self) -> bool:
         """Write settings to file. Returns whether the write succeeded.
 
-        Purpose: the one destructive step in this class, and the only caller
-                 that can act on ``settings_unreadable``.
+        Purpose: the one destructive step in this class.
         Tests:   tests/test_plan_settings.py::test_an_unreadable_settings_file_is_kept_before_it_is_overwritten
-
-        Two things happen here that the flag exists for.
 
         An unreadable file is **copied aside before it is overwritten.** When
         the file on disk exists but would not parse, every value in this object
@@ -209,12 +254,20 @@ class AppSettings:
         destroy the only copy of the one they had, including the fields no
         screen in the app can re-enter by hand.
 
-        A successful write clears ``settings_unreadable``, because the file
-        then parses -- so a second save does not keep a readable file aside as
-        an unreadable one. It does **not** touch
-        ``plan_day_shape_unconfirmed``: writing the file makes it parseable, it
-        does not make these values the user's, and that one has to survive both
-        this process and the next. Only the Day Settings dialog clears it.
+        Whether to keep it is read **from the file, at save time**, and not
+        from a flag set when this object was loaded. Over a dozen screens each
+        call ``AppSettings.load()`` and hold their own object, while
+        ``app.settings`` is loaded once at startup and lives for the session,
+        so a flag captured at load describes a file another object may already
+        have rewritten -- and the startup object would then archive a perfectly
+        good file and say in the log that it could not be read. The file is the
+        only thing that knows the answer. (P6: verify the artifact, do not
+        trust a status field about it.)
+
+        This does **not** touch ``plan_day_shape_unconfirmed``: writing the
+        file makes it parseable, it does not make these values the user's, and
+        that one has to survive both this process and the next. Only the Day
+        Settings dialog clears it.
 
         The return value is additive: callers that ignore it behave as before,
         and the ones that report success to the user should not.
@@ -242,7 +295,7 @@ class AppSettings:
         # Ensure data directory exists
         settings_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if self.settings_unreadable and settings_path.exists():
+        if self._will_not_parse(settings_path):
             stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
             kept = settings_path.with_name(f"{settings_path.name}.unreadable-{stamp}")
             try:
@@ -277,12 +330,38 @@ class AppSettings:
             self.last_save_error = "Could not write the settings file — see the log"
             return False
 
-        # The file parses now, so this load's parse failure is over. The day's
-        # shape is a separate question and a separate field.
-        self.settings_unreadable = False
         return True
 
-    def _normalize_plan_day_settings(self) -> None:
+    @staticmethod
+    def _will_not_parse(settings_path: Path) -> bool:
+        """Whether a settings file is there and cannot be read back.
+
+        Purpose: the one question ``save`` has to ask before overwriting.
+        Tests:   tests/test_plan_settings.py::test_a_second_object_does_not_archive_a_file_that_now_parses
+
+        A file that cannot even be opened counts as one that will not parse:
+        the answer feeds a decision about whether overwriting destroys
+        something, and a file we cannot read is exactly the one we must not
+        replace. Same breadth of catch as ``load``, deliberately -- the two
+        must agree about what unreadable means.
+
+        ``is_file``, not ``exists``: the copy exists to keep the *contents* of
+        a file we could not parse, and a path that is a directory has none to
+        lose. Caught by the two tests that make the settings path a directory
+        to force a write failure -- with ``exists`` the copy was attempted,
+        failed, and the user was told to move a file that was not there, about
+        a failure that was really the write.
+        """
+        if not settings_path.is_file():
+            return False
+        try:
+            with open(settings_path, 'r') as f:
+                json.load(f)
+        except Exception:
+            return True
+        return False
+
+    def _normalize_plan_day_settings(self) -> bool:
         """TB-M4.1/4.2 — coerce the four day values and the seven weekday flags.
 
         Purpose: a hand-edited or corrupt settings file must not stop the app
@@ -306,6 +385,7 @@ class AppSettings:
             DEFAULT_LUNCH_MINUTES,
             DEFAULT_LUNCH_START,
             MINUTES_PER_DAY,
+            TimeFormatError,
             format_hhmm,
             normalize_block_weekdays,
             parse_clock_time,
@@ -317,28 +397,44 @@ class AppSettings:
         # back rather than raising, because an unreadable settings file must
         # not stop the app from starting -- the dialog is where a person is
         # told, and it raises.
-        self.plan_day_start = format_hhmm(
-            parse_clock_time(self.plan_day_start, default=DEFAULT_DAY_START)
-        )
-        self.plan_lunch_start = format_hhmm(
-            parse_clock_time(self.plan_lunch_start, default=DEFAULT_LUNCH_START)
-        )
-        self.plan_day_end = format_hhmm(
-            parse_clock_time(self.plan_day_end, default=DEFAULT_DAY_END)
-        )
+        # Returned rather than only applied: a substituted day value is a
+        # guess of ours, and ``load`` has to mark the day's shape unconfirmed
+        # when one was needed. The three clock values are parsed without a
+        # default so the failure is visible here instead of being absorbed.
+        substituted = False
+        for name, fallback in (
+            ("plan_day_start", DEFAULT_DAY_START),
+            ("plan_lunch_start", DEFAULT_LUNCH_START),
+            ("plan_day_end", DEFAULT_DAY_END),
+        ):
+            try:
+                minutes = parse_clock_time(getattr(self, name))
+            except TimeFormatError:
+                minutes = parse_clock_time(fallback)
+                substituted = True
+            setattr(self, name, format_hhmm(minutes))
 
         try:
             lunch = int(self.plan_lunch_minutes)
         except (TypeError, ValueError):
             lunch = DEFAULT_LUNCH_MINUTES
+            substituted = True
         # Capped at a day: a lunch longer than the day it sits in would push
         # every block past midnight, which looks like the planner losing them.
-        self.plan_lunch_minutes = max(0, min(lunch, MINUTES_PER_DAY))
+        clamped = max(0, min(lunch, MINUTES_PER_DAY))
+        if clamped != lunch:
+            substituted = True
+        self.plan_lunch_minutes = clamped
 
-        # Stored as a list, not a tuple: asdict() goes straight to JSON.
+        # Stored as a list, not a tuple: asdict() goes straight to JSON. Not
+        # part of ``substituted``: the weekday flags are not one of the four
+        # values adoption derives a box from, and a coerced flag cannot move
+        # planned work to another hour.
         self.plan_block_weekdays = list(
             normalize_block_weekdays(self.plan_block_weekdays)
         )
+
+        return substituted
 
     @staticmethod
     def _normalize_first_week_of_year_rule(value: Optional[str]) -> str:
