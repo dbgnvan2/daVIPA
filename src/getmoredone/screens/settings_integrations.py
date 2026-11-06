@@ -200,7 +200,11 @@ class SettingsIntegrationsMixin:
                 calendar_days = 365
             self.settings.calendar_import_days_ahead = calendar_days
 
-            self.settings.save()
+            # Before launchd, not after: the updater re-reads the settings
+            # file, so reloading it over a refused write hands the importer the
+            # old interval while the user is told the new one took.
+            if not self._write_settings(self.gmail_status_label):
+                return
 
             # Apply to launchd (prod) so interval changes take effect automatically
             try:

@@ -460,16 +460,19 @@ class PlanScreen(ctk.CTkFrame):
                 # second it fires on every date change of an ordinary day,
                 # naming blocks from an earlier version that do not exist.
                 #
-                # The wording says what is true in every state it can appear
-                # in, including after some other screen has written a readable
-                # file full of these same defaults: the day's shape has not
-                # been confirmed, whatever the file now parses as. And it names
-                # the remedy, because there is exactly one.
+                # No cause named, deliberately. There are three, and the
+                # message cannot tell which: a settings file that would not
+                # parse, a file from a version that had no Day Settings --
+                # which is every version before this one, so it is the common
+                # one -- and a day time the app had to substitute. An earlier
+                # wording blamed the file for all three and was false for the
+                # one that happens most. What is true in every state it can
+                # appear in is the state itself, and the remedy, which is one
+                # screen.
                 self.set_status(
-                    "Your day's shape has not been confirmed since the settings"
-                    " file could not be read, so blocks from an earlier version"
-                    " are left off the grid — open ⚙ Day Settings and save to"
-                    " place them",
+                    "Your day's shape has not been confirmed, so blocks from an"
+                    " earlier version are left off the grid — open ⚙ Day"
+                    " Settings and save to place them",
                     "warning",
                 )
 

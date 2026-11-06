@@ -103,6 +103,31 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
     def _set_status(self, label: ctk.CTkLabel, text: str, level: str = "success"):
         label.configure(text=text, text_color=status_text_color(level))
 
+    def _write_settings(self, label: ctk.CTkLabel) -> bool:
+        """Write the settings file, and report it on ``label`` if it refused.
+
+        Purpose: ``AppSettings.save`` can decline to write -- a settings file
+                 that will not parse and cannot be kept aside is not
+                 overwritten -- and every Save button on this screen reported
+                 "✓ Saved" over that.
+        Tests:   tests/test_settings_save_refusal.py::test_a_refused_write_is_not_reported_as_saved
+
+        Returns whether the write happened, so the caller can skip the rest of
+        what a successful save means: its own success message, and for the
+        appearance section applying the theme app-wide and handing the object
+        to the app. Reporting only the failure here keeps each caller's success
+        message, and its ordering, exactly as it was.
+        """
+        if self.settings.save():
+            return True
+        self._set_status(
+            label,
+            getattr(self.settings, "last_save_error", None)
+            or "Could not write the settings file — see the log",
+            "error",
+        )
+        return False
+
     def create_database_section(self, parent=None):
         """Create database management section."""
         if parent is None:
@@ -183,7 +208,8 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
     def save_database_settings(self):
         """Save database-related preferences."""
         self.settings.business_year_start_mmdd = self.business_year_start_var.get().strip()
-        self.settings.save()
+        if not self._write_settings(self.db_status_label):
+            return
         self.business_year_start_var.set(self.settings.business_year_start_mmdd)
         self._set_status(self.db_status_label, "✓ Database settings saved", "success")
 
@@ -294,7 +320,8 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
         # obsidian_notes_subfolder at use-time (see get_project_notes_subfolder_or_default).
         self.settings.project_notes_subfolder = self.project_notes_folder_var.get().strip()
 
-        self.settings.save()
+        if not self._write_settings(self.obsidian_status_label):
+            return
 
         self._set_status(self.obsidian_status_label, "✓ Settings saved", "success")
 
@@ -444,7 +471,11 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
             self.completion_confetti_threshold_var.get(),
             default=getattr(self.settings, "completion_confetti_threshold", 0),
         )
-        self.settings.save()
+        # Before the theme is applied, not after: a refused write leaves the
+        # file saying something else, and applying app-wide would show a theme
+        # that is gone on the next launch.
+        if not self._write_settings(self.appearance_status_label):
+            return
 
         self.app.settings = self.settings
         self.app.apply_theme_preferences()
@@ -641,7 +672,8 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
             self.drag_schedule_box_height_var.get(),
             default=getattr(self.settings, "drag_schedule_box_height_px", 86)
         )
-        self.settings.save()
+        if not self._write_settings(self.date_increment_status_label):
+            return
 
         self._set_status(self.date_increment_status_label, "✓ Settings saved", "success")
 
@@ -683,7 +715,8 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
         self.settings.next_quarter_offset_days = self._parse_int(
             self.future_next_quarter_var.get(), default=self.settings.next_quarter_offset_days)
 
-        self.settings.save()
+        if not self._write_settings(self.future_date_status_label):
+            return
 
         self._set_status(self.future_date_status_label, "✓ Future date options saved", "success")
 
@@ -792,7 +825,8 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
         """Save timer and audio settings."""
         self.settings.music_folder = self.music_folder_var.get().strip() or None
         self.settings.music_volume = self.music_volume_var.get()
-        self.settings.save()
+        if not self._write_settings(self.timer_audio_status_label):
+            return
 
         self._set_status(
             self.timer_audio_status_label,
