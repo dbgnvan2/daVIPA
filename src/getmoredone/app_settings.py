@@ -206,6 +206,7 @@ class AppSettings:
             DEFAULT_DAY_START,
             DEFAULT_LUNCH_MINUTES,
             DEFAULT_LUNCH_START,
+            MINUTES_PER_DAY,
             format_hhmm,
             normalize_block_weekdays,
             parse_hhmm,
@@ -227,7 +228,7 @@ class AppSettings:
             lunch = DEFAULT_LUNCH_MINUTES
         # Capped at a day: a lunch longer than the day it sits in would push
         # every block past midnight, which looks like the planner losing them.
-        self.plan_lunch_minutes = max(0, min(lunch, 24 * 60))
+        self.plan_lunch_minutes = max(0, min(lunch, MINUTES_PER_DAY))
 
         # Stored as a list, not a tuple: asdict() goes straight to JSON.
         self.plan_block_weekdays = list(

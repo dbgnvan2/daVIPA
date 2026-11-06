@@ -18,6 +18,7 @@ import customtkinter as ctk
 from ..app_settings import AppSettings
 from ..theme import button_style, status_text_color
 from ..time_block_layout import (
+    MINUTES_PER_DAY,
     DayBounds,
     TimeFormatError,
     format_hhmm,
@@ -157,7 +158,7 @@ class PlanSettingsDialog(ctk.CTkToplevel):
             raise ValueError("Lunch must be a whole number of minutes") from None
         if lunch_minutes < 0:
             raise ValueError("Lunch cannot be a negative number of minutes")
-        if lunch_minutes > 24 * 60:
+        if lunch_minutes > MINUTES_PER_DAY:
             raise ValueError("Lunch cannot be longer than a day")
 
         if parse_hhmm(times["plan_day_end"]) <= parse_hhmm(times["plan_day_start"]):
