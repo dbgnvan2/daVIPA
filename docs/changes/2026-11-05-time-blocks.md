@@ -81,13 +81,13 @@ Modified:
 ## Verification
 
 - Command: `taskpolicy -b ./venv/bin/python -m pytest tests/test_time_block_schema.py tests/test_time_block_layout.py tests/test_time_block_crud.py tests/test_plan_screen.py tests/test_plan_settings.py tests/test_time_block_colors.py tests/test_drag_schedule_support.py -q`
-- Result: PASS — 244 passed (238 of them new in this batch).
+- Result: PASS — 247 passed (241 of them new in this batch).
 
 - Command: the same seven files plus `tests/test_settings_isolation.py
   tests/test_theme_settings.py tests/test_today_screen.py tests/test_timer.py
   tests/test_future_dates.py tests/test_db_project_drag.py
   tests/test_depth_work_block.py`, with `GETMOREDONE_NO_MAPPED_WINDOWS=1`
-- Result: PASS — 330 passed, 5 skipped (the mapped-window tests, which pass
+- Result: PASS — 333 passed, 5 skipped (the mapped-window tests, which pass
   when the variable is unset). Run after the sweep fixes, because the length
   ceiling and the strict time parser are shared code and the adjacent screens
   read both.

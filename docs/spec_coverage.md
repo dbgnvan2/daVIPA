@@ -189,10 +189,10 @@ so the parametrised cases are included.
 | `tests/test_plan_settings.py` | 19 | no |
 | `tests/test_time_block_colors.py` | 6 | no |
 | `tests/test_drag_schedule_support.py` | 18 (12 new) | one builds a withdrawn Tk root |
-| `tests/test_plan_screen.py` | 55 | real Tk; 5 need `mapped_windows` |
-| **Total new in this batch** | **238** | 182 need no Tk at all |
+| `tests/test_plan_screen.py` | 58 | real Tk; 5 need `mapped_windows` |
+| **Total new in this batch** | **241** | 182 need no Tk at all |
 
-Whole suite after the batch: 1672 behaviour tests and 212 meta.
+Whole suite after the batch: 1675 behaviour tests and 212 meta.
 
 ## Pre-push review passes
 
