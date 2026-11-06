@@ -14,6 +14,7 @@ change the running app's configuration.
 from __future__ import annotations
 
 import json
+import shutil
 
 import pytest
 
@@ -282,39 +283,89 @@ def test_a_readable_file_is_not_copied_aside_on_every_save(settings_file):
     assert list(settings_file.parent.glob("settings.json.unreadable-*")) == []
 
 
-def test_a_successful_write_clears_the_flag(settings_file):
-    """P6 -- the flag describes a load, and a save is what makes it false.
+def test_saving_does_not_make_a_guessed_day_the_users(settings_file):
+    """Writing the file makes it parseable; it does not make it theirs.
 
-    The file now holds exactly these values, so the next load reads them back
-    and reports nothing. Left set, the same day shape is untrusted now and
-    trusted after a restart, and the Plan screen's adoption stays blocked with
-    no way out but relaunching the app -- which no message or document tells
-    the user to do.
+    Every settings screen loads its own object and saves the whole of it, and
+    the appearance screen then replaces ``app.settings`` with its copy. If a
+    successful write cleared the flag, changing the *theme* on a corrupt
+    settings file would re-enable the Plan screen's irreversible adoption
+    against a day start nobody chose -- in the same session, from a surface
+    that never showed the user a day setting. Only the Day Settings dialog
+    clears it, because only it asks.
     """
     settings_file.write_text("{ not json")
     loaded = AppSettings.load()
     assert loaded.settings_unreadable is True
 
-    loaded.save()
+    assert loaded.save() is True
 
-    assert loaded.settings_unreadable is False, (
-        "the file is readable and holds these values, and the flag still says otherwise"
+    assert loaded.settings_unreadable is True, (
+        "a write from anywhere in the app turned a guessed day start into a"
+        " day start adoption will act on"
     )
 
 
-def test_a_failed_write_is_reported_and_leaves_the_flag_alone(settings_file):
-    """A write that did not happen must not clear the flag or claim success.
+def test_a_failed_write_is_reported(settings_file):
+    """``save`` swallowed its own failure and the caller reported success.
 
-    The settings path is a directory here, so ``open(..., 'w')`` raises. The
-    in-memory object is then the only place these values exist, and the file
-    on disk is still the one nobody could read.
+    A readable file here, so the backup path is not involved: the settings
+    path is a directory, and ``open(..., 'w')`` raises on it.
     """
-    settings_file.write_text("{ not json")
+    _write(settings_file, plan_day_start="07:00")
     loaded = AppSettings.load()
+    assert loaded.settings_unreadable is False
     settings_file.unlink()
     settings_file.mkdir()
 
     assert loaded.save() is False, "a failed write reported success"
-    assert loaded.settings_unreadable is True, (
-        "a failed write cleared the flag, so adoption would run on a guess"
+
+
+def test_a_failed_backup_refuses_to_overwrite_the_unreadable_file(
+    settings_file, monkeypatch
+):
+    """The guard must not proceed past its own failure.
+
+    Keeping the file aside and then overwriting it anyway when the copy failed
+    is worse than not trying: the only copy of whatever could not be read out
+    of it is gone, and the caller is told the settings were saved. Refusing is
+    the lesser failure, and it is a failure the dialog shows.
+    """
+    original = '{ "obsidian_vault_path": "/Users/me/vault", not json'
+    settings_file.write_text(original)
+    loaded = AppSettings.load()
+
+    def boom(*args, **kwargs):
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(shutil, "copy2", boom)
+
+    assert loaded.save() is False, (
+        "overwrote the file after failing to keep a copy of it, and said it saved"
     )
+    assert settings_file.read_text() == original, "the only copy was destroyed"
+
+
+def test_a_failing_status_print_does_not_fail_the_save(settings_file, monkeypatch):
+    """A status message is not part of the operation it describes.
+
+    The print naming where the unreadable file was kept sat inside the ``try``
+    that guarded the copy, so a stdout write that failed -- a packaged app with
+    a closed stdout, a full disk -- read as a copy that failed and refused the
+    save, and the handler's own print then escaped a method whose callers have
+    no handler. Exactly the shape of the credential-token failure in the
+    project's own notes.
+    """
+    settings_file.write_text("{ not json")
+    loaded = AppSettings.load()
+
+    import builtins
+
+    def no_stdout(*args, **kwargs):
+        raise OSError("stdout is closed")
+
+    monkeypatch.setattr(builtins, "print", no_stdout)
+
+    assert loaded.save() is True, "a message that could not be printed failed the save"
+    assert json.loads(settings_file.read_text())["plan_day_start"] == "08:00"
+    assert len(list(settings_file.parent.glob("settings.json.unreadable-*"))) == 1

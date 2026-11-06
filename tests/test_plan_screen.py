@@ -1372,17 +1372,31 @@ def test_a_length_chosen_for_an_unplaced_block_does_not_show_the_row_id(screen, 
 # --- found by the re-sweep of this batch's own fix commits -------------------
 
 
-def test_saving_day_settings_unblocks_adoption(root, manager, settings):
-    """The recovery path has to actually recover.
+def test_saving_day_settings_unblocks_adoption(root, manager, tmp_path, monkeypatch):
+    """The recovery path has to actually recover, from the real starting state.
 
     Declining to adopt on a day shape nobody could read is only half a fix: the
-    user is told Day Settings could not be read, opens Day Settings, saves --
+    user is told Day Settings could not be read, opens Day Settings and saves --
     and the flag was never cleared, so adoption stayed blocked and the screen
     reported "Day settings saved" over it. The only escape was relaunching the
     app, which nothing in the UI or the guide mentions.
+
+    The settings file here is a real corrupt one rather than a hand-set flag,
+    so the whole path runs: ``load`` deciding the file is unreadable, the
+    screen declining, the dialog writing, the old file kept aside, and the day
+    mapped on the next draw. An earlier version of this test set the flag by
+    hand on a path that did not exist, which skipped both ``load`` and the
+    copy-aside -- the two steps most likely to be wrong.
     """
+    path = tmp_path / "settings.json"
+    corrupt = '{ "plan_day_start": "08:00", this is not json'
+    path.write_text(corrupt)
+    monkeypatch.setattr(AppSettings, "get_settings_path", classmethod(lambda cls: path))
+
+    settings = AppSettings.load()
+    assert settings.settings_unreadable is True
+
     _legacy_block(manager)
-    settings.settings_unreadable = True
 
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = THURSDAY
@@ -1397,12 +1411,46 @@ def test_saving_day_settings_unblocks_adoption(root, manager, settings):
         if dialog.winfo_exists():
             dialog.destroy()
 
+    kept = list(path.parent.glob("settings.json.unreadable-*"))
+    assert [p.read_text() for p in kept] == [corrupt], (
+        f"the unreadable file was not kept aside: {kept}"
+    )
+
     panel.refresh()
     root.update_idletasks()
 
     stored = manager.get_time_blocks(THURSDAY)[0]
     assert stored.slot_index == 2, (
         "saving the day settings left adoption blocked, with no way out but a restart"
+    )
+
+
+def test_a_failed_settings_write_puts_the_day_back(root, settings, tmp_path, monkeypatch):
+    """The dialog writes to the app-wide settings object before it saves.
+
+    On a failed write it reported the failure and left the new values on that
+    object. Cancel does not restore it and the Plan screen is rebuilt from it
+    on every navigation, so the next visit drew and timed the day against
+    bounds that exist nowhere on disk.
+    """
+    unwritable = tmp_path / "unwritable"
+    unwritable.mkdir()
+    monkeypatch.setattr(
+        AppSettings, "get_settings_path", classmethod(lambda cls: unwritable)
+    )
+    before = settings.plan_day_start
+
+    dialog = PlanSettingsDialog(root, settings)
+    try:
+        dialog.day_start_entry.delete(0, tk.END)
+        dialog.day_start_entry.insert(0, "06:30")
+        dialog.save()
+    finally:
+        if dialog.winfo_exists():
+            dialog.destroy()
+
+    assert settings.plan_day_start == before, (
+        "a write that failed left the day on the settings object the whole app reads"
     )
 
 
@@ -1444,11 +1492,19 @@ def test_no_settings_object_is_not_reported_as_an_unreadable_file(root, manager)
     built without settings is a wiring mistake; telling the user their Day
     Settings could not be read sends them to a dialog that will not help.
     """
+    _legacy_block(manager)
+
     panel = PlanScreen(root, manager, _App(None))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    root.update_idletasks()
 
     assert panel._day_shape_is_the_users() is False
     assert panel._day_settings_are_unreadable() is False, (
         "no settings object was reported as a settings file that would not parse"
+    )
+    assert "could not be read" not in panel.status_label.cget("text"), (
+        "sent the user to a Day Settings dialog that cannot fix a wiring mistake"
     )
 
 
@@ -1468,4 +1524,14 @@ def test_the_unreadable_warning_needs_a_block_to_be_about(root, manager, setting
 
     assert "earlier version" not in panel.status_label.cget("text"), (
         "warned about blocks from an earlier version on a day that has none"
+    )
+
+    # The other half, in the same test: the condition has to be about blocks
+    # existing, not about the branch being gone.
+    _legacy_block(manager)
+    panel.refresh()
+    root.update_idletasks()
+
+    assert "earlier version" in panel.status_label.cget("text"), (
+        "said nothing about a block adoption declined to place"
     )
