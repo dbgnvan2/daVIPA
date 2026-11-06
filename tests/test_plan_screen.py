@@ -2710,7 +2710,7 @@ def test_pbm61_the_item_row_height_comes_from_the_setting(root, manager, setting
 def test_pbm61_every_line_of_a_row_is_drawn_inside_it(root, manager, mapped_windows):
     """PB-M6.1 — on screen, at the floor and well above it, nothing is clipped.
 
-    The height assertions above are all ``cget``, and a frame can ask for 66px
+    The height assertions above are all ``cget``, and a frame can ask for 67px
     while Tk lays its children out somewhere else entirely. This is the same
     measurement PB-M2.1 makes on a task chip, applied to the row: every child's
     bottom edge inside the frame's own height.

@@ -19,6 +19,7 @@ import shutil
 import pytest
 
 from src.getmoredone.app_settings import AppSettings
+from src.getmoredone.screens.settings import SettingsScreen
 from src.getmoredone.time_block_layout import DEFAULT_DAY_END, DayBounds
 
 
@@ -622,16 +623,18 @@ def test_a_failing_status_print_does_not_fail_the_save(settings_file, monkeypatc
     assert len(list(settings_file.parent.glob("settings.json.unreadable-*"))) == 1
 
 
-def _date_increment_stub(settings, app, label, box_height="86", refuse=False):
-    """The save method's widgets, stubbed, with a real ``_write_settings``.
+def _date_increment_stub(settings, app, label, box_height="86"):
+    """The save method's widgets, stubbed around a real write and hand-over.
 
     The screen itself needs an app, a sidebar and a mapped window to build, so
     these drive the real method against a stub -- the pattern
-    ``tests/test_settings_week_rule_ui.py`` established for this screen.
+    ``tests/test_settings_week_rule_ui.py`` established for this screen. Only
+    the widgets are stubbed: ``_write_settings`` and ``_hand_settings_to_app``
+    are the screen's own, so the write goes through ``AppSettings.save`` to the
+    file the ``settings_file`` fixture points at. A refusal here is a refusal
+    the file caused, not a stubbed return value.
     """
     from types import SimpleNamespace
-
-    from src.getmoredone.screens.settings import SettingsScreen
 
     stub = SimpleNamespace(
         settings=settings,
@@ -649,32 +652,51 @@ def _date_increment_stub(settings, app, label, box_height="86", refuse=False):
     )
     stub._parse_positive_int = lambda value, default: int(value)
     stub._set_status = lambda lbl, text, level="success": None
-    stub._write_settings = lambda lbl: not refuse
+    stub._write_settings = lambda lbl: SettingsScreen._write_settings(stub, lbl)
+    stub._hand_settings_to_app = lambda: SettingsScreen._hand_settings_to_app(stub)
     return stub
 
 
+def _refuse_the_write(monkeypatch, settings_file):
+    """The one state in which ``save`` declines: unparseable, uncopyable.
+
+    The same mechanism ``tests/test_settings_save_refusal.py`` uses, and the
+    only real one -- ``save`` refuses when the file on disk will not parse and
+    cannot be set aside, because that file is the only copy of whatever could
+    not be read out of it. Returns the text that must still be there after.
+    """
+    original = '{ "obsidian_vault_path": "/Users/me/vault", not json'
+    settings_file.write_text(original)
+    monkeypatch.setattr(
+        shutil, "copy2", lambda *a, **k: (_ for _ in ()).throw(OSError("full"))
+    )
+    return original
+
+
 def test_a_saved_box_height_reaches_the_running_app(settings_file):
-    """PB-M5 — the setting the Plan screen reads is the one Save just wrote.
+    """PB-M5 -- the setting the Plan screen reads is the one Save just wrote.
 
     Found by running the app, after three review passes and a green suite: set
     the box height to 86, Save, walk to another screen and back, and the Day
     Plan is still drawn at 30. The Settings screen edits its own
     ``AppSettings.load()`` and the Plan screen reads ``app.settings`` when it
-    is built, so a saved size did nothing until the next launch. The appearance
-    section already hands the object over; this section, which carries both
-    sizes PB-M5 wired up, did not.
-    """
-    from src.getmoredone.screens.settings import SettingsScreen
+    is built, so a saved size did nothing until the next launch.
 
+    What the app ends up holding is checked against the file, not against the
+    screen's object: the two being the same object is what the previous fix
+    did, and it is what the next test is about.
+    """
     settings = AppSettings()
     app = type("_App", (), {})()
-    app.settings = AppSettings()
-    app.settings.drag_schedule_box_height_px = 30
+    at_launch = AppSettings()
+    at_launch.drag_schedule_box_height_px = 30
+    app.settings = at_launch
 
     stub = _date_increment_stub(settings, app, label=None, box_height="86")
     SettingsScreen.save_date_increment_settings(stub)
 
-    assert app.settings is settings, (
+    assert json.loads(settings_file.read_text())["drag_schedule_box_height_px"] == 86
+    assert app.settings is not at_launch, (
         "the app is still holding the object from launch, so the Plan screen "
         "reads the old sizes until the app is restarted"
     )
@@ -683,25 +705,61 @@ def test_a_saved_box_height_reaches_the_running_app(settings_file):
     )
 
 
-def test_a_refused_write_does_not_hand_the_app_the_unsaved_object(settings_file):
+def test_a_refused_write_does_not_hand_the_app_the_unsaved_object(
+    settings_file, monkeypatch
+):
     """The ordering the appearance section uses, for the same reason.
 
-    ``AppSettings.save`` declines when the file on disk will not parse and
-    cannot be copied aside. Handing the app an object that was not written
-    would show sizes that are gone on the next launch.
+    Handing the app an object that was not written would show sizes that are
+    gone on the next launch.
     """
-    from src.getmoredone.screens.settings import SettingsScreen
-
-    settings = AppSettings()
+    original = _refuse_the_write(monkeypatch, settings_file)
+    settings = AppSettings.load()
     app = type("_App", (), {})()
     at_launch = AppSettings()
     at_launch.drag_schedule_box_height_px = 30
     app.settings = at_launch
 
-    stub = _date_increment_stub(settings, app, label=None, box_height="86", refuse=True)
+    stub = _date_increment_stub(settings, app, label=None, box_height="86")
     SettingsScreen.save_date_increment_settings(stub)
 
+    assert settings_file.read_text() == original, "the refused write landed"
     assert app.settings is at_launch, (
         "a refused write handed the app an object the file does not hold"
     )
     assert app.settings.drag_schedule_box_height_px == 30
+
+
+def test_a_refused_write_after_a_saved_one_does_not_reach_the_app(
+    settings_file, monkeypatch
+):
+    """The leak the first fix for PB-M5.7 opened, found by a cold sweep.
+
+    Handing ``self.settings`` over made the app's object this screen's object.
+    From the next Save on, the guard that stops a refused write being reported
+    as saved stopped nothing: the handler mutates ``self.settings`` before the
+    guard and does not put it back, so the running app showed 200px boxes
+    under a red "could not write the settings file".
+
+    One ``settings`` object across both saves, as a real screen has -- it is
+    loaded once in ``__init__`` and never reloaded.
+    """
+    settings = AppSettings()
+    app = type("_App", (), {})()
+    app.settings = AppSettings()
+
+    SettingsScreen.save_date_increment_settings(
+        _date_increment_stub(settings, app, label=None, box_height="86")
+    )
+    assert app.settings.drag_schedule_box_height_px == 86
+
+    original = _refuse_the_write(monkeypatch, settings_file)
+    SettingsScreen.save_date_increment_settings(
+        _date_increment_stub(settings, app, label=None, box_height="200")
+    )
+
+    assert settings_file.read_text() == original, "the refused write landed"
+    assert app.settings.drag_schedule_box_height_px == 86, (
+        "a refused write reached the running app, because the app was holding "
+        "the screen's own settings object"
+    )
