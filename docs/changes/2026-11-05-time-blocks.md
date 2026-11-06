@@ -80,8 +80,17 @@ Modified:
 
 ## Verification
 
-- Command: `taskpolicy -b ./venv/bin/python -m pytest tests/test_time_block_schema.py tests/test_time_block_layout.py tests/test_time_block_crud.py tests/test_plan_screen.py tests/test_plan_settings.py tests/test_time_block_colors.py -q`
-- Result: PASS — 190 passed.
+- Command: `taskpolicy -b ./venv/bin/python -m pytest tests/test_time_block_schema.py tests/test_time_block_layout.py tests/test_time_block_crud.py tests/test_plan_screen.py tests/test_plan_settings.py tests/test_time_block_colors.py tests/test_drag_schedule_support.py -q`
+- Result: PASS — 244 passed (238 of them new in this batch).
+
+- Command: the same seven files plus `tests/test_settings_isolation.py
+  tests/test_theme_settings.py tests/test_today_screen.py tests/test_timer.py
+  tests/test_future_dates.py tests/test_db_project_drag.py
+  tests/test_depth_work_block.py`, with `GETMOREDONE_NO_MAPPED_WINDOWS=1`
+- Result: PASS — 330 passed, 5 skipped (the mapped-window tests, which pass
+  when the variable is unset). Run after the sweep fixes, because the length
+  ceiling and the strict time parser are shared code and the adjacent screens
+  read both.
 
 - Command: `taskpolicy -b ./venv/bin/python -m pytest tests/test_tk_offscreen.py tests/test_ci_contract.py -q`
 - Result: PASS — 111 passed, 1 skipped (the CI-only display check).
@@ -105,6 +114,61 @@ found something:
   blocks, and the right-click loop each turned red exactly the one test that
   names that binding.
 
+## Review sweeps
+
+Three passes, per the budget in `CLAUDE.md`: two with different lenses over the
+whole range, and `/security-review` because the diff adds SQL.
+
+- `/code-review` (correctness, reuse, simplification): 5 findings — 1 high, 2
+  medium, 2 low.
+- `learning-qa` (the failure-pattern catalogue): 12 findings — 2 high, 1
+  medium-high, 3 medium, 6 below medium. Its own scope note is worth keeping:
+  it covers failures that hide, in I/O, migration, state and derived-value
+  paths, and did **not** assess Tk event-loop or geometry correctness,
+  UI-contract regressions on the 48 untouched screens, accessibility beyond the
+  one contrast change, security, performance or dependency risk.
+- `/security-review`: run on the committed range plus the working tree.
+
+Everything at medium or above was fixed in the same session with a test, each
+proved by mutation — ten mutations, ten reds, every original restored verbatim.
+The fixes were then re-swept as their own range, because a fix commit is the
+least-reviewed code in any change.
+
+What the two high findings were:
+
+1. **The block length ceiling guarded one of two ways in.** The dialog refused
+   anything over a day; an item's Work Block value, which the item editor
+   accepts as any typed integer, went straight through — so the row's stored
+   end time was not its start plus its length, which is exactly what the
+   constant's own comment forbids. The ceiling now lives in the arithmetic
+   layer beside the constant, and both callers go through it.
+2. **A test in the batch was red, and the test was wrong, not the code.** It
+   asserted stored clock times on a row that nothing in the test had ever
+   repacked — an expectation that encoded the inverse of the design.
+
+And the three at medium or medium-high:
+
+3. **Each screen write and its repack were two commits.** Between them a new
+   block had no times, and a resize read as a 30-minute block claiming 90 while
+   the next block still owned the minutes. Invisible because `load_blocks`
+   re-derives, which is also why no test saw it.
+4. **The Day Settings dialog accepted an hour past 23.** `25:00` as a Day End
+   put the end of the day past every block the planner can make, retiring the
+   overrun warning permanently; `170:0` was stored as `99:59`. `parse_hhmm`
+   accepts those on purpose, because `format_hhmm` writes them for an
+   overrunning block's end time — so the dialog needed a strict reader, not a
+   change to the lenient one.
+5. **A settings change re-timed only the day on screen.** Every other planned
+   day was left holding times derived from bounds that no longer existed.
+
+Two findings were about the tests rather than the code and were corrected as
+such: the expectation above, and an atomicity test that passed against a
+version with no transaction at all, because its fixture raised before anything
+had been written. A third was a false `Tests:` line — `widget_contains_pointer`
+named a test that existed nowhere, so the one function this batch extracted
+specifically to be shared between two drag surfaces had no direct coverage
+while its docstring claimed otherwise.
+
 ## Risks / Known gaps
 
 - **Not seen on screen.** `/Applications/daVIPA.app` was running throughout, and
@@ -118,8 +182,16 @@ found something:
 - **The demo instance is a thin test bed as seeded.** All six sample items in
   `demo_data.py` have an empty start date and the item list filters on start
   date exactly, so the left pane is empty on a fresh demo. In `BACKLOG.md`.
-- The four low-severity items this batch deferred are in `BACKLOG.md` under
-  *Deferred from the time-block rebuild*.
+- Twelve low-severity items are in `BACKLOG.md` under *Deferred from the
+  time-block rebuild* — four deferred during the build, eight more from the
+  review passes, each with the pass that found it and the reason it was not
+  fixed in-loop. One is worth naming here because it is a crash rather than a
+  rough edge: deleting an action item that holds a time block raises
+  `IntegrityError`, because `time_blocks.item_id` references `action_items(id)`
+  with no `ON DELETE` clause. Pre-existing, but this batch makes creating a
+  block a single drag, so it becomes reachable in ordinary use. The fix is a
+  schema decision, not a line, which is why it is recorded rather than taken
+  in a fix pass at the end of a session.
 
 ### One bug worth naming
 
@@ -139,6 +211,12 @@ deadlocks on a withdrawn window.
 
 ## Next agent actions
 
-- Review sweeps on this batch: at most 2 warm passes, at least 1 cold pass, and
-  every finding severity-rated before any fix is written.
-- Then the human check in the running app, per the gap above.
+- The human check in the running app, per the gap above. It is the only part of
+  this batch nothing automated has covered: how the screen looks at full size,
+  and which of the two bound right-click sequences macOS actually delivers.
+- A cold sweep over this range from a session with no context, per the
+  calibration cadence in the `csdp` skill. This batch needed two fix rounds,
+  which is below the three-round trigger, but it is also the batch where both
+  review passes found real defects in code two in-session passes had already
+  read — so a cold pass here would measure something.
+- The schema decision behind the `ON DELETE` crash above.

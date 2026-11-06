@@ -24,6 +24,71 @@ new unreviewed surface and none of these is above low severity.
   to, the selected date. Re-planning an item for tomorrow means deleting the
   block and dragging the item again on that day.
 
+### From the pre-push review sweeps on this batch
+
+Severity-rated before any fix was written. Everything medium and above was
+fixed in the same session with a test; these are the rest. Each names the pass
+that found it — `/code-review` for correctness, `learning-qa` for the
+failure-pattern catalogue.
+
+- **`total_planned_minutes` and `pack_day` disagree about an unusable length**
+  (`src/getmoredone/time_block_layout.py`, `/code-review`, low). The summary
+  arithmetic and the packer fall back differently for a block whose
+  `planned_minutes` is zero or unparseable, so a day holding one would show a
+  planned total that does not match the blocks drawn in it. Low: nothing in the
+  app can create such a block — it takes a hand-edited row — and the next
+  repack corrects the drawing. Worth making the fallback one function both
+  call.
+- **`db_manager` commits unconditionally in places** (`/code-review`, low).
+  Some writers call `commit()` rather than taking `commit=False` and deferring
+  to `transaction()`. Pre-existing and untouched by this batch; the four screen
+  writes this batch added are now inside transactions. Low until a caller needs
+  one of those writers to be part of a larger unit.
+- **Deleting an action item that holds a time block raises** (`database.py`,
+  `learning-qa`, low-medium). `time_blocks.item_id` references
+  `action_items(id)` with no `ON DELETE` clause and foreign keys are on, so
+  `delete_action_item` raises `IntegrityError` for an item with a block. The
+  item editor calls it bare inside a Tk command, so the traceback goes to
+  stderr, the dialog never closes its own way, and the user sees a confirmation
+  that did nothing and said nothing. Pre-existing — `87ae093`'s Plan screen
+  also created blocks — but this batch makes creating one a single drag, so a
+  latent crash becomes reachable in ordinary use. Flagged, not fixed, per
+  global rule 10: the fix is a schema decision (cascade, set null, or refuse
+  with a message), not a line.
+- **A failed settings write is reported as success** (`app_settings.py`,
+  `learning-qa`, low-medium). `save()` swallows a write error with a `print`
+  and returns `None`, so on a read-only or full disk the Day Settings dialog
+  closes, the day re-times itself, and the preference is gone at next launch.
+  Wants `save()` to return a bool or raise, and the dialog to stay open with
+  the message in its error label.
+- **The migration guard's stated reason has no test** (`database.py`,
+  `learning-qa`, low-medium). The per-column guard exists because an
+  interrupted earlier run can leave a database with `block_type` and not
+  `position`. The six schema tests cover fresh, fully-legacy, idempotent and
+  CREATE-TABLE-alone, but never that half-migrated state — so collapsing the
+  loop into a single `if 'block_type' not in columns:` would keep every test
+  green while leaving such a database permanently without `position`, which by
+  that test file's own words "would not fail loudly — it would make every
+  reorder a no-op". Wants a fixture that ALTERs only `block_type` on before
+  `initialize_schema`.
+- **The 60-item cap drops the unscored items first** (`db_manager.py`,
+  `learning-qa`, low). `get_items_for_start_date` orders by `priority_score
+  DESC`, and an item missing any one of its four factors scores 0 — absence of
+  information, not low priority. So an unscored item on a day with more than 60
+  items cannot be dragged at all. The cap announces what it dropped and that is
+  tested; what it has no stated justification for is the number, and the item
+  pane is already scrollable, so the cap may not need to exist.
+- **A source guard matches an unanchored substring**
+  (`tests/test_time_block_colors.py`, `learning-qa`, low). One assertion tests
+  `"def priority_band_colors" in path.read_text()`. The count is exact rather
+  than a floor, which is the part that matters, but the project rule asks for
+  an AST walk or a whole-line anchor; line 160 of the same file already parses
+  with `ast`.
+- **`Status.OPEN` exists and the query uses the literal `"open"`**
+  (`db_manager.py`, `learning-qa`, low). Correct against `models.py` today, but
+  a renamed status would silently empty the Plan screen's left pane rather than
+  fail.
+
 ## ✅ Cleared 2026-08-25 — the five deferred from the timer-endings batch
 
 All five fixed and pushed the same day they were recorded. Kept as a list

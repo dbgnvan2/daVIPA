@@ -46,6 +46,30 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   handler destroyed the row widget whose own event it was still dispatching.
   Found by driving real Tk button events at the real row widgets; every test
   that called the handlers directly passed.
+- **Dragging a block down moved it one place too far.** The drop position was
+  counted against the rows as drawn, dragged block included, and passed to a
+  function that counts against the list with that block already removed. A drop
+  in a block's own lower gap moved it past the next block instead of doing
+  nothing.
+- **A block could be longer than a day, and then lie about its own end time.**
+  The length ceiling was checked only in the dialog that asks you for a number.
+  An item's Work Block value, which the item editor accepts as any integer, went
+  straight through — so a Work Block of 5000 made a 5000-minute block whose
+  stored end time was not its start plus its length. Both ways in now stop at
+  1440 minutes, and a capped Work Block is reported rather than quietly applied.
+- **Day Settings accepted an hour past 23.** A Day End of `24:00` or `25:00` was
+  stored, which put the end of the day past every block the planner can make and
+  retired the "past day end" warning permanently; `170:0` was stored as `99:59`,
+  a value nobody typed. Times outside `00:00`–`23:59` are now rejected in the
+  modal with the field named.
+- **Saving Day Settings re-timed only the day on screen.** Day start, lunch and
+  day end shape every planned day, so every other day was left holding times
+  derived from settings that no longer existed. Save now re-times every day that
+  holds blocks, in one transaction, and says how many.
+- **Each block write and its re-timing were two separate commits.** Between
+  them, a newly dropped block had no times at all, and a resized one read as a
+  30-minute block claiming 90 while the next block still held the minutes it had
+  taken. Each write and its re-timing are now one unit.
 - `tools/create_demo_data.py` could not run at all. It added `tools/src` to the
   import path instead of the repository's `src/`, so the script that both
   README.md and CLAUDE.md tell you to run failed with `ModuleNotFoundError`.

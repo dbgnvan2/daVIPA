@@ -305,6 +305,11 @@ Day pane (right):
   minutes, or a custom number, or deletes it. Why: 30 minutes is the default for
   a dropped item unless the item has a Work Block value, which is used instead.
   Changing a length re-times the rest of the day.
+- **Block lengths stop at a day** — What: 1440 minutes is the longest block.
+  A custom length above it is refused in the dialog; an item whose Work Block is
+  above it is blocked at 1440 and the status line says so. Why: past a day the
+  app can no longer write an end time that is the start plus the length, so the
+  block would be drawn claiming minutes it does not own.
 - **Lunch** — What: A band drawn where the day skips lunch. Why: It is not a
   block: it cannot be dragged, resized or deleted, and exists so the gap is
   visible rather than an unexplained jump in the times.
@@ -324,9 +329,13 @@ Day Settings modal:
   the weekdays that accept blocks at all. A drop onto a day that is not checked
   is refused and says why, so a weekend cannot be filled by accident. At least
   one day must be checked.
-- Times must be written as `HH:MM`. A time the app cannot read is rejected in
-  the modal with the field named — never silently replaced.
-- **Save** re-times the whole day immediately.
+- Times must be written as `HH:MM`, between `00:00` and `23:59`. A time the app
+  cannot read — including an hour past 23, such as `24:00` — is rejected in the
+  modal with the field named, never silently replaced.
+- **Save** re-times **every** day that holds blocks, not only the one on screen,
+  and says how many it re-timed. Why: these four values shape every planned day,
+  so a day left on the old shape would be showing times that no longer follow
+  from your settings.
 
 ### Completed
 - What: Shows completed items over the last N days.

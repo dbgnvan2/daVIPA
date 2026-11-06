@@ -163,18 +163,53 @@ silently. Run `./start-demo.sh`, or quit the packaged app and `./start.sh`.
 - The drag hit-test was written out by hand four times in `drag_schedule.py`.
   Factored into one `widget_contains_pointer` in `drag_schedule_support.py`
   rather than adding a fifth and sixth copy; the 38 existing drag-schedule
-  tests cover the change.
-- Four low-severity items are recorded in `BACKLOG.md` under *Deferred from
-  the time-block rebuild* rather than fixed in this batch.
+  tests cover the change. The pre-push sweep then found that its `Tests:` line
+  named a test that did not exist anywhere, so the function this batch
+  extracted to be shared had no direct coverage at all. Twelve tests now cover
+  it, including the named one.
+- `delete_action_item` raises on an item that holds a block:
+  `time_blocks.item_id` references `action_items(id)` with no `ON DELETE`
+  clause and foreign keys are on. Pre-existing, but this batch makes creating a
+  block a single drag, so a latent crash becomes reachable in ordinary use.
+  Flagged, not fixed, per global rule 10 — the fix is a schema decision, not a
+  line. In `BACKLOG.md`.
+- Twelve low-severity items are recorded in `BACKLOG.md` — four deferred
+  during the build, eight more from the two pre-push review passes.
 
 ## Final test counts
+
+Collected counts, measured with `--collect-only` rather than counted by hand,
+so the parametrised cases are included.
 
 | File | Tests | Needs a display |
 |---|---|---|
 | `tests/test_time_block_schema.py` | 6 | no |
-| `tests/test_time_block_layout.py` | 95 | no |
-| `tests/test_time_block_crud.py` | 22 | no |
+| `tests/test_time_block_layout.py` | 115 | no |
+| `tests/test_time_block_crud.py` | 25 | no |
 | `tests/test_plan_settings.py` | 19 | no |
 | `tests/test_time_block_colors.py` | 6 | no |
-| `tests/test_plan_screen.py` | 42 | real Tk; 5 need `mapped_windows` |
-| **Total** | **190** | 148 of them headless |
+| `tests/test_drag_schedule_support.py` | 18 (12 new) | one builds a withdrawn Tk root |
+| `tests/test_plan_screen.py` | 55 | real Tk; 5 need `mapped_windows` |
+| **Total new in this batch** | **238** | 182 need no Tk at all |
+
+Whole suite after the batch: 1672 behaviour tests and 212 meta.
+
+## Pre-push review passes
+
+| Pass | Lens | Result |
+|---|---|---|
+| `/code-review` | correctness, reuse, simplification | 5 findings: 1 high, 2 medium, 2 low |
+| `learning-qa` | the failure-pattern catalogue (P1–P39) | 12 findings: 2 high, 1 medium-high, 3 medium, 6 below |
+| `/security-review` | injection, secrets, path traversal, deserialization | run because the diff adds SQL; see the batch report |
+
+Everything at medium severity or above was fixed in the same session with a
+test, each proved by mutation. Everything below medium is recorded in
+`BACKLOG.md` with the pass that found it and the reason it was deferred, per
+the review-sweep budget in `CLAUDE.md`: a below-medium fix is new unreviewed
+surface that buys none of the safety it costs.
+
+Two of the sweep's findings were about the tests themselves rather than the
+code, and both were corrected as such: one expectation encoded the inverse of
+the design (that `load_blocks` persists derived times), and one atomicity test
+passed against a version with no transaction at all, because its fixture raised
+before anything had been written.
