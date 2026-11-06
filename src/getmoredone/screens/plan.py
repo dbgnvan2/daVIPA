@@ -237,8 +237,14 @@ class PlanScreen(ctk.CTkFrame):
         self.bounds = bounds
         repacked = self.db_manager.repack_all_days(self.bounds)
         self.refresh()
-        if len(repacked) > 1:
-            self.set_status(f"Day settings saved; re-timed {len(repacked)} days", "success")
+        # Said every time, not only when more than one day moved: the whole
+        # point of the message is that the save reached days the user cannot
+        # see, and "1 day" is the one case where they could have assumed that
+        # without being told.
+        noun = "day" if len(repacked) == 1 else "days"
+        self.set_status(
+            f"Day settings saved; re-timed {len(repacked)} {noun}", "success"
+        )
 
     def load_items(self):
         grid_info = self.items_scroll.grid_info()
