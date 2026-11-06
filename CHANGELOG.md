@@ -9,6 +9,24 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The Plan screen builds a day by dragging, and derives the clock from the
+  order.** Drag an item from the left pane onto the day to create a block for
+  it; drag blocks up and down to order the day; right-click a block to set its
+  length to 15/30/45/60/90 minutes, a custom number, or delete it. `+ Break`
+  and `+ Buffer` append padding blocks. Block order is now stored (`position`),
+  and start and end times are derived from the order, each block's length and
+  the day settings — so a reorder, a resize or a settings change re-times the
+  whole day at once. A block that would straddle lunch is pushed past it whole,
+  never split; one that runs past Day End is flagged rather than dropped.
+- **Day Settings for the Plan screen** (⚙ in the Plan header): day start, lunch
+  start and length, day end, and seven checkboxes for the weekdays that accept
+  blocks. A drop onto a day that is not checked is refused with the reason. A
+  time the app cannot read is rejected in the modal with the field named.
+- **Blocks are readable before they are read.** A block's height tracks its
+  length, the stripe down its left is its item's priority band, and depth is
+  drawn as a three-bar stack (deep 3, medium 2, shallow 1, unset 1). A dropped
+  item's block takes the item's Work Block value as its length when it has one,
+  otherwise 30 minutes.
 - **A demo instance that runs beside your real one.** `./start-demo.sh` starts
   a second, fully isolated copy of the app — its own database, settings,
   single-instance lock and logs under
@@ -19,6 +37,15 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The Plan screen's time blocking did not work.** There was no way to change
+  a block once created — `DatabaseManager` had no `update_time_block` at all —
+  so a block's length could not be edited and the day could not be reordered.
+  The date was a free-text field that silently wrote unusable dates, and the
+  item list was not filtered by the selected date.
+- **Dropping an item or reordering a block could hang the app.** The release
+  handler destroyed the row widget whose own event it was still dispatching.
+  Found by driving real Tk button events at the real row widgets; every test
+  that called the handlers directly passed.
 - `tools/create_demo_data.py` could not run at all. It added `tools/src` to the
   import path instead of the repository's `src/`, so the script that both
   README.md and CLAUDE.md tell you to run failed with `ModuleNotFoundError`.

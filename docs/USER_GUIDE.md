@@ -256,24 +256,77 @@ Action Items section:
 - **Open Notes** — Browse the project's linked notes in a separate dialog (kept for explicit "show me the notes I have" use).
 
 ### Plan (Time Blocks)
-- What: A time block planning view with a backlog of open items and a day plan.
-- Why: Translate tasks into a concrete daily schedule.
+- What: Build a day by dragging the items that start on that date into an
+  ordered column of time blocks.
+- Why: A planned day is an **order**, not a set of appointments. You arrange
+  the blocks; the clock times are worked out for you from the order, each
+  block's length, and your day settings.
 
-Backlog panel:
-- **Open Items list** — What: Top open items by priority. Why: Pick the best tasks to schedule.
+> **Before you start: the start dates must be right.**
+> This screen lists the items whose Start Date is **exactly** the date you have
+> selected — not "on or before", and not overdue items carried forward. An item
+> with a missing or wrong start date will simply not appear here, and nothing
+> will tell you it is missing. Fix the start dates first (the Scheduler and the
+> item editor are the places to do it), then come back and plan the day.
 
-Day planner:
-- **Date** — What: The date for time blocks. Why: Plan the right day.
-- **Load** — What: Loads time blocks for the selected date. Why: Refresh or switch dates.
-- **+ Add Block** — What: Opens the Add Time Block dialog. Why: Create a block of focused time.
+Header:
+- **Date picker** — What: Chooses the day you are planning. Why: Changing it
+  reloads both panes. It is a picker rather than a typed field, so a date that
+  cannot be stored cannot be entered.
+- **⚙ Day Settings** — What: Opens the Day Settings modal (below). Why: The
+  shape of the day is what the times are derived from.
+- **+ Break** / **+ Buffer** — What: Appends a 30-minute padding block to the
+  end of the day. Why: Real days are not back-to-back. These carry no item, so
+  they are drawn in a neutral colour rather than a priority one.
 
-Time blocks list:
-- **Delete** — What: Removes a time block. Why: Adjust your plan.
+Items pane (left):
+- **Items starting \<date\>** — What: Open items whose start date is that date,
+  highest priority score first. Why: These are the only items the day is built
+  from. Each row shows the priority score, the block length it would get, its
+  depth, and `already blocked` if the day already holds a block for it — marked
+  rather than hidden, because an item can genuinely need two blocks in a day.
+- **Drag a row to the right** — What: Drops it on the day column and creates a
+  block for it. Why: This is how blocks are made. The new block goes on the end
+  of the day and the whole day is re-timed.
+- Long lists are capped, and the cap says how many of how many are shown.
 
-Add Time Block dialog:
-- **Start Time / End Time** — What: Time range for the block. Why: Define the schedule.
-- **Label** — What: Optional label for the block. Why: Add a note or task name.
-- **Save** — What: Creates the block. Why: Commit the plan.
+Day pane (right):
+- **Blocks, in order** — What: Each block shows its derived start–end time, its
+  title, its depth as a three-bar stack, and its length. Why: The block's
+  **height** tracks its length, so a 90-minute block is three times the height
+  of a 30 without reading either number.
+- **Colour** — What: The stripe down the left of a block is its item's priority
+  band: critical, high, medium, low, or grey for unscored. Why: The shape of
+  the day is readable before any of the text is.
+- **Drag a block up or down** — What: Moves it in the order. Why: The entire day
+  is re-timed from the new order — this is the one action that changes what time
+  everything happens.
+- **Right-click a block** — What: Sets its length to 15, 30, 45, 60 or 90
+  minutes, or a custom number, or deletes it. Why: 30 minutes is the default for
+  a dropped item unless the item has a Work Block value, which is used instead.
+  Changing a length re-times the rest of the day.
+- **Lunch** — What: A band drawn where the day skips lunch. Why: It is not a
+  block: it cannot be dragged, resized or deleted, and exists so the gap is
+  visible rather than an unexplained jump in the times.
+- **past day end** — What: A warning border and label on any block that runs
+  past your Day End. Why: Over-filling a day is your business, not the app's —
+  the block is kept and flagged, never silently dropped.
+
+Day Settings modal:
+- **Day Start** — What: The time the first block begins. Why: Everything is
+  packed forward from here.
+- **Lunch Start** and **Lunch (minutes)** — What: When the gap is and how long.
+  Why: A block that would straddle lunch is pushed past it **whole**, never
+  split. Set the minutes to 0 for no lunch.
+- **Day End** — What: Where the day is considered over-filled. Why: It does not
+  refuse blocks; it marks the ones that run past it.
+- **Days for Blocks** — What: Seven checkboxes, Monday to Sunday. Why: These are
+  the weekdays that accept blocks at all. A drop onto a day that is not checked
+  is refused and says why, so a weekend cannot be filled by accident. At least
+  one day must be checked.
+- Times must be written as `HH:MM`. A time the app cannot read is rejected in
+  the modal with the field named — never silently replaced.
+- **Save** re-times the whole day immediately.
 
 ### Completed
 - What: Shows completed items over the last N days.

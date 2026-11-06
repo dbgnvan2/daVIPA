@@ -14,13 +14,14 @@ python run.py
 
 # Tests
 pytest                                          # All tests
-pytest -m "not meta"                            # App behaviour only (911 tests, ~27s)
-pytest -m meta                                  # Repo/infra assertions only (198 tests, ~25s)
+pytest -m "not meta"                            # App behaviour only (1624 tests)
+pytest -m meta                                  # Repo/infra assertions only (212 tests)
 pytest -v                                       # Verbose
 pytest tests/test_vps_integration.py -v        # Single file
 pytest --cov=src/getmoredone                   # With coverage
 
-# Three tests build a real on-screen window and take keyboard focus.
+# Ten tests build a real on-screen window and take keyboard focus: the
+# geometry checks, and the ones that drive real Tk button events.
 # Skip them while working on the machine. CI never sets this.
 GETMOREDONE_NO_MAPPED_WINDOWS=1 pytest
 

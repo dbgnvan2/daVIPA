@@ -15,7 +15,7 @@ A comprehensive Python task management application with GUI interface and SQLite
 🌳 **Hierarchical View** - Visual tree structure showing all parent-child relationships with indentation
 ⚙️ **Intelligent Defaults** - System-wide and per-client default settings with date offsets
 📊 **Time Tracking** - Track planned vs actual time with work logs and productivity insights
-🗓️ **Time Blocks** - Plan your day with visual time block scheduling
+🗓️ **Time Blocks** - Drag the day's items into an ordered column of blocks; clock times are derived from the order, each block's length and your day settings
 📈 **Statistics** - Analyze planned vs actual time with insights by effort-cost and category
 🔄 **Reschedule History** - Never lose track of why dates changed
 📆 **Google Calendar Integration** - Create calendar events directly from action items with automatic linking
@@ -143,7 +143,9 @@ daVIPA/
 │           ├── upcoming.py     # Next N days view
 │           ├── all_items.py    # Complete item list
 │           ├── hierarchical.py # Parent-child tree view
-│           ├── plan.py         # Time block planner
+│           ├── plan.py         # Time block planner (drag, reorder, day settings)
+│           ├── plan_blocks.py  # The item row and block row widgets
+│           ├── plan_settings_dialog.py # Day Settings modal
 │           ├── completed.py    # Completed items
 │           ├── timer_window.py # Action timer (floating window)
 │           ├── manage_contacts.py  # Contact list screen
@@ -468,10 +470,16 @@ python3 tools/diagnose_google_auth.py
 
 ### Time Planning
 
-1. Go to **Plan** screen
-2. See open items on left (sorted by priority)
-3. Select date and add time blocks on right
-4. Link items to blocks or create standalone blocks
+1. Make sure the items' **Start Dates are right** — the Plan screen lists only
+   items whose start date is exactly the date you select
+2. Go to **Plan** screen and pick the date
+3. Set the shape of the day once under **⚙ Day Settings** (day start, lunch,
+   day end, which weekdays accept blocks)
+4. Drag items from the left onto the day to create blocks; add **+ Break** or
+   **+ Buffer** for padding
+5. Drag blocks up and down to order the day — the clock times follow the order
+6. Right-click a block to set its length (default 30 minutes, or the item's
+   Work Block value if it has one)
 
 ### Tracking Progress
 
@@ -517,7 +525,7 @@ GETMOREDONE_NO_MAPPED_WINDOWS=1 pytest
   - **action_items** - Tasks with parent_id for hierarchical relationships, is_meeting flag, and meeting_start_time
   - **contacts** - Clients/contacts with name, type, email, phone, notes
   - **defaults** - System and per-contact default settings
-  - **time_blocks** - Time block planning
+  - **time_blocks** - Time block planning (`block_type`, `position`: order is stored, times are derived)
   - **work_logs** - Time tracking
   - **reschedule_history** - Change audit trail
   - **item_links** - Attachments and references (including google_calendar links)

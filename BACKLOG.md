@@ -1,6 +1,28 @@
 # daVIPA Backlog
 
-Last Updated: 2026-08-25 (the five deferred from the timer-endings batch are cleared; older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-05 (four deferred from the time-block rebuild added; the five from the timer-endings batch remain cleared, and older sections from 08-24 and earlier remain)
+
+## Deferred from the time-block rebuild (2026-11-05)
+
+Recorded rather than fixed in the batch that found them, because a fix pass is
+new unreviewed surface and none of these is above low severity.
+
+- **Deleting a block asks nothing.** `Delete block` on the right-click menu
+  removes it immediately. Every other destructive action in the app confirms
+  first. Low: a block holds no content of its own, and dragging the item back
+  rebuilds it — but it is inconsistent with the rest of the app.
+- **A depth bar is not draggable.** The three-bar stack is a grandchild of the
+  row frame, and the drag handlers are bound to the frame and its direct
+  children only, so a press that lands exactly on a 14×3px bar does not start a
+  drag. Low: the target is tiny and the rest of the row works.
+- **The demo instance cannot exercise the Plan screen as seeded.** All six
+  sample items in `demo_data.py` have an empty start date, and the Plan item
+  list filters on start date exactly, so the left pane is empty on a fresh demo
+  until a start date is set by hand. Worth giving the sample items dates
+  relative to first launch.
+- **No way to move a block to another day.** Blocks are created on, and belong
+  to, the selected date. Re-planning an item for tomorrow means deleting the
+  block and dragging the item again on that day.
 
 ## ✅ Cleared 2026-08-25 — the five deferred from the timer-endings batch
 
