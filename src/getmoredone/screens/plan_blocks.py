@@ -20,7 +20,7 @@ from typing import Dict, List, Optional, Tuple
 import customtkinter as ctk
 
 from ..color_contrast import pick_text_color
-from ..models import ActionItem, BlockType, TimeBlock
+from ..models import ActionItem, BlockType, Status, TimeBlock
 from ..theme import (
     block_type_colors,
     depth_bar_colors,
@@ -28,6 +28,7 @@ from ..theme import (
     priority_fill_colors,
     priority_stripe_colors,
     semantic_colors,
+    status_text_color,
 )
 from ..time_block_layout import (
     MAX_DEPTH_BARS,
@@ -365,6 +366,12 @@ SLOT_MIN_HEIGHT_PX = 32
 #: ``AppSettings.drag_schedule_title_col_width``, the same way.
 SLOT_TITLE_WIDTH_PX = 80
 
+#: PD-M6 -- the completion mark, and the column it sits in to the left of the
+#: time. A column of its own rather than a prefix on the time label: the mark
+#: is green and the time is not, and one label cannot be two colours.
+PD_CHECK_TEXT = "\u2713"
+SLOT_CHECK_WIDTH_PX = 16
+
 
 @dataclass
 class SlotRow:
@@ -387,8 +394,9 @@ def _configure_slot_columns(frame: ctk.CTkFrame) -> None:
     its date boxes also switch off grid propagation and render correctly
     because no column is left to be sized by whatever happens to be in it.
     """
-    frame.grid_columnconfigure(0, minsize=SLOT_TIME_WIDTH_PX)
-    frame.grid_columnconfigure(1, minsize=120, weight=1)
+    frame.grid_columnconfigure(0, minsize=SLOT_CHECK_WIDTH_PX)
+    frame.grid_columnconfigure(1, minsize=SLOT_TIME_WIDTH_PX)
+    frame.grid_columnconfigure(2, minsize=120, weight=1)
     frame.grid_rowconfigure(0, weight=1)
 
 
@@ -455,6 +463,16 @@ def build_slot_row(
     # so it must survive its children.
     frame.grid_propagate(False)
 
+    if slot_is_complete(grid_slot, items_by_id):
+        ctk.CTkLabel(
+            frame,
+            text=PD_CHECK_TEXT,
+            width=SLOT_CHECK_WIDTH_PX,
+            anchor="w",
+            text_color=status_text_color("success"),
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).grid(row=0, column=0, sticky="nw", padx=(6, 0), pady=4)
+
     ctk.CTkLabel(
         frame,
         text=slot.start_time,
@@ -462,10 +480,10 @@ def build_slot_row(
         anchor="w",
         text_color=palette["time_text"],
         font=ctk.CTkFont(size=11),
-    ).grid(row=0, column=0, sticky="nw", padx=(8, 4), pady=4)
+    ).grid(row=0, column=1, sticky="nw", padx=(8, 4), pady=4)
 
     body = ctk.CTkFrame(frame, fg_color="transparent")
-    body.grid(row=0, column=1, sticky="nsew", padx=(0, 6), pady=2)
+    body.grid(row=0, column=2, sticky="nsew", padx=(0, 6), pady=2)
     body.grid_columnconfigure(0, weight=1)
 
     rendered = SlotRow(frame=frame, slot_index=slot.index)
@@ -510,6 +528,50 @@ def build_slot_row(
         inner += 1
 
     return rendered
+
+
+def item_is_complete(item: Optional[ActionItem]) -> bool:
+    """Whether this item has been marked completed.
+
+    Purpose: PD-M6 -- one answer for the mark, rather than a status string
+             compared four ways.
+    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m6
+    Tests:   tests/test_plan_screen.py::test_pdm61_a_completed_task_shows_a_check_left_of_the_time
+
+    Case-folded and stripped: the column is user-editable through the item
+    editor's own history and through older rows, and a mark that depends on
+    the exact casing of a word is a mark that is silently wrong.
+    """
+    if item is None:
+        return False
+    return str(getattr(item, "status", "") or "").strip().lower() == Status.COMPLETED
+
+
+def slot_is_complete(grid_slot, items_by_id: Dict[str, ActionItem]) -> bool:
+    """Whether every task in this box is finished, and there is one.
+
+    Purpose: PD-M6 -- the check sits beside the box's time, so it is the
+             box's claim about itself.
+    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m6
+    Tests:   tests/test_plan_screen.py::test_pdm63_a_box_with_one_task_still_open_shows_no_check
+
+    **All**, not any. A box holding a finished task beside an unfinished one
+    reads as finished from the time column, which is the one place a reader
+    is counting on the mark to be exact -- and a half hour with work left in
+    it is not a half hour that is done.
+
+    Padding is not work, so a break or a buffer can never carry the mark, and
+    a box of nothing but padding is not a finished box. A block whose item has
+    been deleted is unknown, not finished.
+    """
+    tasks = [
+        block
+        for block in list(grid_slot.starting) + list(grid_slot.continued)
+        if BlockType.normalize(block.block_type) == BlockType.ITEM
+    ]
+    if not tasks:
+        return False
+    return all(item_is_complete(items_by_id.get(block.item_id)) for block in tasks)
 
 
 def _build_lunch_chip(parent, row: int) -> ctk.CTkFrame:
