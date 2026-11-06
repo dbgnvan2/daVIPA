@@ -283,27 +283,71 @@ def test_a_readable_file_is_not_copied_aside_on_every_save(settings_file):
     assert list(settings_file.parent.glob("settings.json.unreadable-*")) == []
 
 
-def test_saving_does_not_make_a_guessed_day_the_users(settings_file):
+def test_a_guessed_day_shape_survives_the_save_that_hides_it(settings_file):
     """Writing the file makes it parseable; it does not make it theirs.
 
-    Every settings screen loads its own object and saves the whole of it, and
-    the appearance screen then replaces ``app.settings`` with its copy. If a
-    successful write cleared the flag, changing the *theme* on a corrupt
-    settings file would re-enable the Plan screen's irreversible adoption
-    against a day start nobody chose -- in the same session, from a surface
-    that never showed the user a day setting. Only the Day Settings dialog
-    clears it, because only it asks.
+    Every settings screen loads its own object and saves the whole of it, so
+    the first save from *anywhere* -- a theme, a column width, a timer window
+    position -- writes a full set of defaults out as ordinary-looking
+    settings. If the only record that the day's four times were a guess lived
+    in memory, that save would erase it, and the Plan screen's irreversible
+    adoption would act on a day start nobody chose.
+
+    The parse flag is cleared by the write, because the file does now parse.
+    The day's shape is a separate fact and goes to disk.
     """
     settings_file.write_text("{ not json")
     loaded = AppSettings.load()
     assert loaded.settings_unreadable is True
+    assert loaded.plan_day_shape_unconfirmed is True
 
     assert loaded.save() is True
 
-    assert loaded.settings_unreadable is True, (
-        "a write from anywhere in the app turned a guessed day start into a"
-        " day start adoption will act on"
+    assert loaded.settings_unreadable is False, (
+        "the file parses now, and the parse flag still says it does not"
     )
+    assert loaded.plan_day_shape_unconfirmed is True, (
+        "a write from anywhere in the app turned a guessed day start into one"
+        " adoption will act on"
+    )
+
+
+def test_a_guessed_day_shape_survives_a_relaunch(settings_file):
+    """P8 -- the state that matters here is the state between runs.
+
+    This is the whole reason the fact is a field. A corrupt file, any screen
+    saving, then a restart: the file parses, so nothing on load says the day's
+    four times were invented. The flag that lived only in memory was gone, and
+    adoption ran against a guessed 08:00 on the next visit to the Plan screen.
+    """
+    settings_file.write_text("{ not json")
+    AppSettings.load().save()
+
+    relaunched = AppSettings.load()
+
+    assert relaunched.settings_unreadable is False, "the file parses; this is a fresh load"
+    assert relaunched.plan_day_shape_unconfirmed is True, (
+        "one relaunch turned a guessed day shape into a confirmed one"
+    )
+
+
+def test_a_second_save_does_not_keep_a_readable_file_aside(settings_file):
+    """One `.unreadable-` copy, of the file that was actually unreadable.
+
+    The parse flag drives the copy-aside. Left set after a successful write, a
+    second save in the same session copies a file that now parses perfectly to
+    `settings.json.unreadable-<stamp>` and logs that it was unreadable.
+    """
+    settings_file.write_text("{ not json")
+    loaded = AppSettings.load()
+
+    loaded.save()
+    loaded.plan_day_start = "07:00"
+    loaded.save()
+
+    kept = list(settings_file.parent.glob("settings.json.unreadable-*"))
+    assert len(kept) == 1, f"kept a readable file aside as an unreadable one: {kept}"
+    assert kept[0].read_text() == "{ not json"
 
 
 def test_a_failed_write_is_reported(settings_file):
@@ -344,6 +388,38 @@ def test_a_failed_backup_refuses_to_overwrite_the_unreadable_file(
         "overwrote the file after failing to keep a copy of it, and said it saved"
     )
     assert settings_file.read_text() == original, "the only copy was destroyed"
+    assert "set aside" in loaded.last_save_error, (
+        f"blamed the write for a failure in the backup: {loaded.last_save_error!r}"
+    )
+
+
+def test_the_two_save_failures_do_not_share_one_message(settings_file, monkeypatch):
+    """They have different causes and different remedies.
+
+    One means the settings file could not be written -- check permissions, free
+    space. The other means a file that would not load could not be set aside,
+    nothing was touched, and the way out is to move or delete that file. A
+    single message sends half the users to look at the wrong thing.
+    """
+    _write(settings_file, plan_day_start="07:00")
+    readable = AppSettings.load()
+    settings_file.unlink()
+    settings_file.mkdir()
+    assert readable.save() is False
+    write_failure = readable.last_save_error
+
+    settings_file.rmdir()
+    settings_file.write_text("{ not json")
+    unreadable = AppSettings.load()
+    monkeypatch.setattr(shutil, "copy2", lambda *a, **k: (_ for _ in ()).throw(OSError("full")))
+    assert unreadable.save() is False
+    backup_failure = unreadable.last_save_error
+
+    assert write_failure != backup_failure, (
+        f"both failures say {write_failure!r}"
+    )
+    assert "write" in write_failure
+    assert "set aside" in backup_failure
 
 
 def test_a_failing_status_print_does_not_fail_the_save(settings_file, monkeypatch):

@@ -1221,8 +1221,14 @@ def test_an_unreadable_settings_file_is_flagged_not_just_printed(tmp_path, monke
     assert loaded.settings_unreadable is True, (
         "an unreadable settings file returned all-defaults with nothing to say so"
     )
+    assert loaded.plan_day_shape_unconfirmed is True, (
+        "nothing that survives a save says the day's four times were invented"
+    )
     assert AppSettings().settings_unreadable is False, (
         "a fresh object claims to be a stand-in"
+    )
+    assert AppSettings().plan_day_shape_unconfirmed is False, (
+        "a fresh install claims its day shape was guessed"
     )
 
 
@@ -1238,7 +1244,7 @@ def test_adoption_does_not_run_on_a_guessed_day_start(root, manager, settings):
     retryable state the outside-the-day group already exists to show.
     """
     _legacy_block(manager)
-    settings.settings_unreadable = True
+    settings.plan_day_shape_unconfirmed = True
 
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = THURSDAY
@@ -1249,7 +1255,10 @@ def test_adoption_does_not_run_on_a_guessed_day_start(root, manager, settings):
     assert stored.slot_index is None, "adopted against a day shape nobody could read"
     assert stored.start_time == "09:00", "the stored time was overwritten by a guess"
     assert [b.label for b in panel._grid.outside] == ["from the old model"]
-    assert "could not be read" in panel.status_label.cget("text")
+    assert "has not been confirmed" in panel.status_label.cget("text")
+    assert "Day Settings" in panel.status_label.cget("text"), (
+        "told the user their day shape is unconfirmed and not how to confirm it"
+    )
 
 
 def test_adoption_says_which_day_start_it_used(screen, manager):
@@ -1424,6 +1433,12 @@ def test_saving_day_settings_unblocks_adoption(root, manager, tmp_path, monkeypa
         "saving the day settings left adoption blocked, with no way out but a restart"
     )
 
+    # And it stays confirmed: the dialog's confirmation went to disk with the
+    # values it describes, so the next launch does not ask again.
+    assert AppSettings.load().plan_day_shape_unconfirmed is False, (
+        "the confirmation did not survive the save that carried it"
+    )
+
 
 def test_a_failed_settings_write_puts_the_day_back(root, settings, tmp_path, monkeypatch):
     """The dialog writes to the app-wide settings object before it saves.
@@ -1439,6 +1454,9 @@ def test_a_failed_settings_write_puts_the_day_back(root, settings, tmp_path, mon
         AppSettings, "get_settings_path", classmethod(lambda cls: unwritable)
     )
     before = settings.plan_day_start
+    # Unconfirmed on the way in, so the restore has something to put back:
+    # nothing was written, so nothing was confirmed.
+    settings.plan_day_shape_unconfirmed = True
 
     dialog = PlanSettingsDialog(root, settings)
     try:
@@ -1451,6 +1469,10 @@ def test_a_failed_settings_write_puts_the_day_back(root, settings, tmp_path, mon
 
     assert settings.plan_day_start == before, (
         "a write that failed left the day on the settings object the whole app reads"
+    )
+    assert settings.plan_day_shape_unconfirmed is True, (
+        "a write that failed confirmed a day shape that never reached the disk,"
+        " so adoption would run on it"
     )
 
 
@@ -1484,7 +1506,7 @@ def test_a_failed_settings_write_is_not_reported_as_saved(
             dialog.destroy()
 
 
-def test_no_settings_object_is_not_reported_as_an_unreadable_file(root, manager):
+def test_no_settings_object_is_not_reported_as_an_unconfirmed_day(root, manager):
     """Two different problems, and only one of them is the user's to fix.
 
     ``_day_shape_is_the_users`` is false for both a missing settings object and
@@ -1500,10 +1522,10 @@ def test_no_settings_object_is_not_reported_as_an_unreadable_file(root, manager)
     root.update_idletasks()
 
     assert panel._day_shape_is_the_users() is False
-    assert panel._day_settings_are_unreadable() is False, (
-        "no settings object was reported as a settings file that would not parse"
+    assert panel._day_shape_is_unconfirmed() is False, (
+        "no settings object was reported as a day shape nobody had confirmed"
     )
-    assert "could not be read" not in panel.status_label.cget("text"), (
+    assert "has not been confirmed" not in panel.status_label.cget("text"), (
         "sent the user to a Day Settings dialog that cannot fix a wiring mistake"
     )
 
@@ -1515,7 +1537,7 @@ def test_the_unreadable_warning_needs_a_block_to_be_about(root, manager, setting
     date change on an ordinary day warned about work left off the grid that
     was never there.
     """
-    settings.settings_unreadable = True
+    settings.plan_day_shape_unconfirmed = True
 
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = THURSDAY
