@@ -1197,16 +1197,31 @@ class _FakeEvent:
 # sufficient -- but do not read a pass here as the box being legible.
 
 
-def _one_slot_pane(root, block, width=None):
-    """A laid-out pane holding the one box ``block`` starts in."""
-    root.geometry("1200x800")
-    root.deiconify()
+def _one_slot_pane(root, block, width=None, *, mapped=True, continued=False):
+    """A pane holding one box of ``block``: the one it starts in, or its next.
+
+    ``mapped`` is explicit because the ``deiconify`` here is what makes a
+    window measurable, and a test that only reads ``cget`` or a grid option
+    does not need it -- mapping anyway means the test is skipped in the
+    documented local workflow for nothing. ``continued=True`` returns the
+    second box of a longer block, which is the only way to get at a
+    continuation chip.
+    """
+    if mapped:
+        root.geometry("1200x800")
+        root.deiconify()
     pane = ctk.CTkFrame(root, width=width) if width else ctk.CTkFrame(root)
     pane.pack(fill="both", expand=True)
     pane.grid_columnconfigure(0, weight=1)
 
-    entry = build_day_grid([block], DayBounds()).slots[0]
-    assert entry.starting, "the block was not placed in the first box"
+    slots = build_day_grid([block], DayBounds()).slots
+    if continued:
+        entry = slots[1]
+        assert entry.continued, "the block does not reach a second box"
+        assert not entry.starting, "the second box starts a task of its own"
+    else:
+        entry = slots[0]
+        assert entry.starting, "the block was not placed in the first box"
     return pane, build_slot_row(pane, entry, {}, 0)
 
 
@@ -1822,20 +1837,28 @@ def test_the_outside_group_does_not_outlive_the_day_that_had_one(screen, manager
 # ``ctk.CTkFrame`` requests 200x200 when neither width nor height is given.
 # The accent stripe sets ``width`` only, so its requested *height* stayed at
 # the class default and every container that let a child's request through
-# grew to 200px tall. On screen that is an item row five times taller than its
-# own two lines of text, and a task chip whose title is centred at y=100
+# grew to 200px tall. On screen that was an item row five times taller than
+# its own two lines of text -- the row is pinned to a multiple of the box
+# height since PB-M6, so the symptom there is now a row that does not lay out
+# at the height it asks for -- and a task chip whose title is centred at y=100
 # inside a box clipped to 20 -- the title is drawn below the visible area, so
 # the box shows nothing but the stripe. Both are the same missing `height=`.
 
 
-def test_an_item_row_is_as_tall_as_its_text_not_the_stripe_default(
-    root, mapped_windows
-):
-    """An item in the left pane is two lines tall, not 200px.
+def test_an_item_row_lays_out_at_the_height_it_asks_for(root, mapped_windows):
+    """An item in the left pane is as tall on screen as the boxes it will fill.
 
-    The stripe spans both lines, so if its requested height leaks out the row
-    is sized by a constant nobody chose. 120px is generous for two lines at
-    the default font and still nowhere near 200.
+    This test used to read "is two lines tall, not 200px" and asserted
+    ``<= 120``. The behaviour changed intentionally at PB-M6: the row is no
+    longer sized by its text at all but pinned to
+    ``slots_for_minutes(minutes) * box_height``, so the old upper bound was
+    measuring a number that had stopped meaning anything -- it passed only
+    because one box of the fallback 30px happens to be under 120.
+
+    What is worth keeping is the laid-out measurement. PB-M6.1 asserts the
+    height the row asks for; this asserts Tk gives it, which is what the
+    stripe's 200px request broke in the first place: a container that lets a
+    child's request through is sized by a constant nobody chose.
     """
     root.geometry("1200x800")
     root.deiconify()
@@ -1851,16 +1874,14 @@ def test_an_item_row_is_as_tall_as_its_text_not_the_stripe_default(
         ),
         0,
         already_blocked=False,
-        work_block_minutes=30,
+        work_block_minutes=90,
+        box_height=60,
     )
     root.update()
 
-    assert row.winfo_height() > 1, (
-        f"the row did not lay out at all: {row.winfo_height()}px"
-    )
-    assert row.winfo_height() <= 120, (
-        f"item row is {row.winfo_height()}px tall -- the stripe's default "
-        "200px height is sizing it"
+    assert row.winfo_height() == 3 * 60, (
+        f"a 90-minute item laid out at {row.winfo_height()}px, not the three "
+        "boxes of 60px it asked for"
     )
 
 
@@ -1952,8 +1973,7 @@ def test_pbm43_a_chip_is_filled_by_its_priority(root, manager, light_appearance)
     item = _item(manager, "Draft the proposal", priority_score=51200)
     block = _item_block()
     block.item_id = item.id
-    _pane, row = _one_slot_pane(root, block, width=600)
-    root.update()
+    _pane, row = _one_slot_pane(root, block, width=600, mapped=False)
 
     chip = row.block_widgets[0][1]
     assert _as_hex(chip, chip.cget("fg_color")) == _as_hex(
@@ -2117,8 +2137,7 @@ def test_pbm41_a_chips_title_is_coloured_for_the_shade_behind_it(
     item = _item(manager, "Draft the proposal", priority_score=51200)
     block = _item_block()
     block.item_id = item.id
-    _pane, row = _one_slot_pane(root, block, width=600)
-    root.update()
+    _pane, row = _one_slot_pane(root, block, width=600, mapped=False)
 
     chip = row.block_widgets[0][1]
     title = _find_label(chip, "Draft the proposal")
@@ -2374,4 +2393,187 @@ def test_the_empty_item_note_wraps_even_in_a_narrow_column(
     assert note.cget("wraplength") == NOTE_MIN_WRAP_PX, (
         f"the note wraps at {note.cget('wraplength')}, which Tk reads as "
         "'do not wrap' at or below zero"
+    )
+
+
+def _find_continuation_chip(widget):
+    """The frame holding a continuation's arrow label, however deeply nested."""
+    for child in widget.winfo_children():
+        labels = [
+            grandchild for grandchild in child.winfo_children()
+            if isinstance(grandchild, ctk.CTkLabel)
+            and grandchild.cget("text").startswith("↳ ")
+        ]
+        if labels:
+            return child
+        found = _find_continuation_chip(child)
+        if found is not None:
+            return found
+    return None
+
+
+# --- PB-M6 / PB-M7 --------------------------------------------------------
+#
+# An item is drawn at the size of the space it will take, the facts on it are
+# the ones the colour cannot carry, and the later boxes of a long task look
+# like the task rather than like padding.
+
+
+@pytest.mark.parametrize(
+    "minutes, boxes",
+    [(30, 1), (45, 2), (60, 2), (90, 3), (120, 4)],
+)
+def test_pbm61_an_item_row_is_as_tall_as_the_boxes_it_will_fill(
+    root, manager, minutes, boxes
+):
+    """PB-M6.1 — a 90-minute item is three boxes tall, because it will be.
+
+    The same ``slots_for_minutes`` the day's grid uses, times the same box
+    height, so the row on the left is the shape of the space it is about to
+    take on the right. 45 minutes is two boxes for the same reason it is two
+    boxes in the day: a half-hour grid cannot hold a quarter hour.
+    """
+    item = _item(manager, "Draft the proposal", priority_score=51200)
+    row = build_item_row(
+        root, item, 0, already_blocked=False,
+        work_block_minutes=minutes, box_height=86,
+    )
+
+    assert row.cget("height") == boxes * 86, (
+        f"a {minutes}-minute item asks for {row.cget('height')}px, not the "
+        f"{boxes} boxes of 86px it will fill"
+    )
+
+
+def test_pbm61_the_item_row_height_comes_from_the_setting(root, manager, settings):
+    """The other half of PB-M6.1: the screen passes the setting it draws with.
+
+    Read off the rendered row, because a row built by hand with an explicit
+    ``box_height`` proves only that the argument works.
+    """
+    settings.drag_schedule_box_height_px = 64
+    _item(manager, "Draft the proposal", work_block=60)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+
+    rows = [
+        child for child in panel.items_scroll.winfo_children()
+        if isinstance(child, ctk.CTkFrame)
+    ]
+    assert len(rows) == 1, f"{len(rows)} item rows, expected the one"
+    assert rows[0].cget("height") == 2 * 64, (
+        f"the row is {rows[0].cget('height')}px; a 60-minute item is two "
+        "boxes of the 64px the day draws a task at"
+    )
+
+
+def test_pbm62_an_item_row_does_not_print_its_priority_score(root, manager):
+    """PB-M6.2 — the number is gone from the row.
+
+    The band is the shade the row is drawn on and the colour of its stripe, so
+    the score was a third way of saying one thing, in the one place a reader
+    is looking for something the colour cannot tell them.
+    """
+    item = _item(manager, "Draft the proposal", priority_score=51200)
+    row = build_item_row(
+        root, item, 0, already_blocked=False, work_block_minutes=30
+    )
+
+    texts = [
+        child.cget("text") for child in row.winfo_children()
+        if isinstance(child, ctk.CTkLabel)
+    ]
+    assert not any("51200" in text for text in texts), (
+        f"the priority score is still on the row: {texts}"
+    )
+    assert not any(text.startswith("P ") for text in texts), (
+        f"the row still carries a P-prefixed score: {texts}"
+    )
+
+
+def test_pbm63_the_work_block_length_is_under_the_depth_bars(root, manager):
+    """PB-M6.3 — "30m" sits below the stacked lines, not in the detail line.
+
+    Position asserted, not just presence: the fact is in the same place on an
+    item row as on a task in a box, which is the point of moving it. Measured
+    off the grid rather than off pixels so it holds on a withdrawn window.
+    """
+    item = _item(manager, "Draft the proposal", depth="Medium")
+    row = build_item_row(
+        root, item, 0, already_blocked=False, work_block_minutes=45
+    )
+
+    bars = next(
+        child for child in row.winfo_children()
+        if isinstance(child, DepthBarStack)
+    )
+    duration = next(
+        child for child in row.winfo_children()
+        if isinstance(child, ctk.CTkLabel) and child.cget("text") == "45m"
+    )
+
+    bars_at = bars.grid_info()
+    duration_at = duration.grid_info()
+    assert duration_at["column"] == bars_at["column"], (
+        f"the length is in column {duration_at['column']}, the bars in "
+        f"{bars_at['column']} -- it is not under them"
+    )
+    assert int(duration_at["row"]) > int(bars_at["row"]), (
+        f"the length is on row {duration_at['row']}, the bars on "
+        f"{bars_at['row']} -- it is not under them"
+    )
+
+
+def test_pbm71_a_continuation_box_is_the_colour_of_its_task(root, manager):
+    """PB-M7.1 — the later boxes of a long task are shaded like the first.
+
+    They were transparent, on the argument that shading a continuation would
+    read as a second task of equal weight. On screen the opposite happened: a
+    90-minute task was one coloured box followed by two empty ones, which
+    reads as a task that stops after half an hour. The arrow is what says
+    "same task, continued", and the colour is what says which task.
+    """
+    item = _item(manager, "Draft the proposal", priority_score=51200)
+    block = _item_block()
+    block.item_id = item.id
+    block.planned_minutes = 90
+    _pane, row = _one_slot_pane(root, block, width=600, continued=True)
+
+    assert row.block_widgets == [], "this box starts no task"
+    chip = _find_continuation_chip(row.frame)
+    assert chip is not None, "no continuation chip in the second box"
+
+    assert _as_hex(chip, chip.cget("fg_color")) == _as_hex(
+        chip, fill_for_item(item)
+    ), f"the continuation is {chip.cget('fg_color')}, not the task's shade"
+
+    stripe = next(
+        child for child in chip.winfo_children()
+        if isinstance(child, ctk.CTkFrame)
+    )
+    assert _as_hex(stripe, stripe.cget("fg_color")) == _as_hex(
+        stripe, stripe_for_item(item)
+    ), "the continuation's bar is not the task's bar"
+
+
+def test_pbm71_a_continuation_box_keeps_its_arrow(root, manager):
+    """PB-M7.2 — shaded, and still marked as the same task.
+
+    The arrow is the whole of what distinguishes a continuation now that the
+    colour no longer does, so it is asserted separately from the colour: a
+    change that dropped it would otherwise pass as a colour fix.
+    """
+    item = _item(manager, "Draft the proposal", priority_score=51200)
+    block = _item_block()
+    block.item_id = item.id
+    block.planned_minutes = 90
+    _pane, row = _one_slot_pane(root, block, width=600, continued=True)
+
+    texts = _label_texts(row.frame)
+    assert any(text.startswith("↳ ") for text in texts), (
+        f"no continuation arrow on the box: {texts}"
+    )
+    assert any("Draft the proposal" in text for text in texts), (
+        f"the continuation does not name its task: {texts}"
     )
