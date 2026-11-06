@@ -10,12 +10,15 @@ arithmetic should not need a window to verify — which is also why none of it
 lives in screens/plan.py.
 """
 
+from types import SimpleNamespace
+
 import pytest
 
 from src.getmoredone.models import ActionItem, BlockType, TimeBlock
 from src.getmoredone.time_block_layout import (
     DEFAULT_DAY_START,
     FALLBACK_BLOCK_MINUTES,
+    MAX_BLOCK_MINUTES,
     MIN_BLOCK_HEIGHT_PX,
     PIXELS_PER_MINUTE,
     DayBounds,
@@ -28,8 +31,10 @@ from src.getmoredone.time_block_layout import (
     is_block_day,
     lunch_window,
     move_block,
+    move_block_to_gap,
     normalize_block_weekdays,
     pack_day,
+    parse_clock_time,
     parse_hhmm,
     priority_band,
     renumber,
@@ -550,3 +555,156 @@ def test_an_unusable_length_falls_back_rather_than_vanishing(minutes):
     the database, the user cannot see it, and the day's times no longer add up.
     """
     assert block_height(minutes) == block_height(FALLBACK_BLOCK_MINUTES)
+
+
+# --- TB-M11 : the gap a block was dropped in -------------------------------
+#
+# These exist because the screen can only measure one thing -- which rendered
+# row the pointer is in, with the dragged block still on screen -- and
+# move_block counts against a list the block has already been taken out of.
+# The two differ by one for a downward move, and getting it wrong is invisible:
+# the day reorders, just not to where the user let go.
+
+
+def test_a_downward_drop_lands_in_the_gap_it_was_dropped_in():
+    """Dragging the first block into the gap before the third puts it second.
+
+    The regression this names: the rendered gap index was passed straight to
+    move_block, which removes the block before inserting, so the result was
+    ['B', 'C', 'A'] -- one place too far, for every downward drag.
+    """
+    assert move_block_to_gap(["A", "B", "C"], "A", 2) == ["B", "A", "C"]
+    assert move_block_to_gap(["A", "B", "C", "D"], "A", 3) == ["B", "C", "A", "D"]
+
+
+def test_a_drop_in_a_block_s_own_gap_changes_nothing():
+    """Releasing a block where it already is must not reorder the day.
+
+    Both gaps that bound a block are its own: the one above it and the one
+    below. A small drag inside its own row is a mis-click, not an instruction,
+    and the old arithmetic turned the lower one into a move past its neighbour.
+    """
+    for gap in (0, 1):
+        assert move_block_to_gap(["A", "B", "C"], "A", gap) == ["A", "B", "C"]
+    for gap in (1, 2):
+        assert move_block_to_gap(["A", "B", "C"], "B", gap) == ["A", "B", "C"]
+
+
+def test_an_upward_drop_lands_in_the_gap_it_was_dropped_in():
+    """The direction that already worked, kept working."""
+    assert move_block_to_gap(["A", "B", "C"], "C", 0) == ["C", "A", "B"]
+    assert move_block_to_gap(["A", "B", "C"], "C", 1) == ["A", "C", "B"]
+
+
+def test_every_gap_in_a_four_block_day_is_reachable():
+    """Each of the four gaps puts the dragged block somewhere different.
+
+    An exhaustive check rather than a sampled one: an off-by-one makes two
+    adjacent gaps produce the same order, and the set below is what proves
+    they do not.
+    """
+    order = ["A", "B", "C", "D"]
+    results = [tuple(move_block_to_gap(order, "B", gap)) for gap in range(5)]
+    assert results == [
+        ("B", "A", "C", "D"),
+        ("A", "B", "C", "D"),
+        ("A", "B", "C", "D"),
+        ("A", "C", "B", "D"),
+        ("A", "C", "D", "B"),
+    ]
+
+
+def test_a_gap_index_past_the_end_puts_the_block_last():
+    """A release below the last block is a move to the end, not an error."""
+    assert move_block_to_gap(["A", "B", "C"], "A", 99) == ["B", "C", "A"]
+
+
+def test_a_block_that_is_no_longer_there_is_not_resurrected():
+    """A stale drag must not add an id the day no longer holds."""
+    assert move_block_to_gap(["A", "B"], "GONE", 0) == ["A", "B"]
+
+
+def test_the_block_length_ceiling_is_a_day():
+    """A block cannot be longer than the day it is stored on.
+
+    Not a style preference: format_hhmm clamps at 99:59, so a block long
+    enough to push its end past that would be stored with an end_time that is
+    not its start plus its duration.
+    """
+    assert MAX_BLOCK_MINUTES == 24 * 60
+    assert format_hhmm(DayBounds().day_start_minutes + MAX_BLOCK_MINUTES) == "32:00"
+
+
+
+# --- found by the pre-push sweep: the ceiling has two ways in ---------------
+
+
+@pytest.mark.parametrize("work_block", [MAX_BLOCK_MINUTES + 1, 5000, 10**6])
+def test_a_work_block_longer_than_a_day_is_capped(work_block):
+    """The Work Block hint goes through the same ceiling as a typed length.
+
+    The dialog that asks a human for a length refuses anything over a day. The
+    other way in asks nobody: a block takes its length from the item's Work
+    Block, which the item editor stores as any integer typed into it. Past the
+    ceiling format_hhmm clamps the end time, so the row stops saying start +
+    duration.
+    """
+    item = SimpleNamespace(work_block=work_block)
+
+    assert duration_for_item(item) == MAX_BLOCK_MINUTES
+
+
+def test_a_capped_work_block_still_gives_a_row_that_says_start_plus_duration():
+    """The reason the cap exists, asserted as the property it protects."""
+    item = SimpleNamespace(work_block=5000)
+    minutes = duration_for_item(item)
+    bounds = DayBounds()
+    block = SimpleNamespace(
+        id="b1",
+        planned_minutes=minutes,
+        position=1,
+        block_type="item",
+        start_time="",
+    )
+
+    packed = pack_day([block], bounds)[0]
+
+    assert parse_hhmm(packed.end_time) - parse_hhmm(packed.start_time) == minutes
+
+
+@pytest.mark.parametrize("stored", [5000, MAX_BLOCK_MINUTES + 1])
+def test_a_default_block_length_longer_than_a_day_is_capped(stored):
+    """A hand-edited settings file is the other way past the dialog."""
+    settings = SimpleNamespace(
+        default_time_block_minutes=stored, default_break_minutes=stored
+    )
+
+    assert default_minutes_for_block_type("buffer", settings) == MAX_BLOCK_MINUTES
+    assert default_minutes_for_block_type("break", settings) == MAX_BLOCK_MINUTES
+
+
+@pytest.mark.parametrize("text", ["24:00", "25:00", "99:59", "170:0"])
+def test_a_clock_time_past_midnight_is_refused(text):
+    """A day bound is a point on one clock face.
+
+    parse_hhmm accepts an hour past 23 on purpose, because format_hhmm writes
+    one -- an overrunning block's end_time is "25:30" and sort_blocks has to
+    read it back. A Day End of 25:00, though, is past every block, so the
+    overrun warning that is Day End's only job could never fire again. And
+    "170:0" came back from format_hhmm as "99:59": a value the user never
+    typed, stored under their hands.
+    """
+    with pytest.raises(TimeFormatError):
+        parse_clock_time(text)
+
+
+@pytest.mark.parametrize(
+    "text,minutes", [("00:00", 0), ("09:05", 545), ("23:59", 1439)]
+)
+def test_a_clock_time_within_the_day_is_read(text, minutes):
+    """The strict parser is still a parser.
+
+    Paired with the test above so a guard that refused everything would not
+    pass for the right reason.
+    """
+    assert parse_clock_time(text) == minutes

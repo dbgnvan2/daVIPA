@@ -408,3 +408,86 @@ def test_blocked_item_ids_is_scoped_to_one_day(manager):
 
     assert manager.get_blocked_item_ids(DAY) == set()
     assert manager.get_blocked_item_ids(NEXT_DAY) == {item.id}
+
+
+# --- TB-M4 : the bounds are a setting, not a property of one date -----------
+
+
+def test_tbm4_a_settings_change_repacks_every_day(manager):
+    """Day Start shapes every planned day, so changing it re-times all of them.
+
+    Found by the pre-push sweep: the screen repacked only the date on screen,
+    which left every other day holding times derived from bounds that no longer
+    exist -- stored values that do not follow from their inputs, which the
+    first reader to trust the stored string rather than re-deriving it gets
+    wrong (P6).
+    """
+    _add(manager, 30, "thursday one", block_date=DAY)
+    _add(manager, 30, "thursday two", block_date=DAY)
+    _add(manager, 30, "friday one", block_date=NEXT_DAY)
+    manager.repack_all_days(BOUNDS)
+    assert _day(manager, NEXT_DAY) == [("friday one", 1, "08:00", "08:30")]
+
+    repacked = manager.repack_all_days(DayBounds(day_start="10:00"))
+
+    assert repacked == [DAY, NEXT_DAY]
+    assert _day(manager, DAY) == [
+        ("thursday one", 1, "10:00", "10:30"),
+        ("thursday two", 2, "10:30", "11:00"),
+    ]
+    assert _day(manager, NEXT_DAY) == [("friday one", 1, "10:00", "10:30")]
+
+
+class _ExplodingOnTheSecondDay:
+    """Bounds that pack the first day and then raise.
+
+    `_ExplodingBounds` is no use here: it raises on the first day, before
+    anything has been written, so there is nothing to roll back and a repack
+    with no transaction at all would pass the test. The failure has to land
+    *after* one day has been re-timed, which is the only state the outer
+    transaction exists to prevent. pack_day reads each bound exactly once per
+    day, so the second read of day_start_minutes is the second day.
+    """
+
+    default_block_minutes = 30
+    block_weekdays = (True,) * 7
+
+    def __init__(self, real=BOUNDS):
+        self._real = real
+        self.days_packed = 0
+
+    @property
+    def day_start_minutes(self):
+        self.days_packed += 1
+        if self.days_packed > 1:
+            raise RuntimeError("bounds unreadable")
+        return self._real.day_start_minutes
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
+def test_tbm4_repacking_every_day_is_all_or_nothing(manager):
+    """A half-applied bounds change leaves days on two different shapes.
+
+    With nothing in the data to say which day is on which, and the next repack
+    starting from that. The failure here lands after the first day has already
+    been re-timed, so the test fails if the per-day repacks are not joined into
+    one transaction.
+    """
+    _add(manager, 30, "thursday", block_date=DAY)
+    _add(manager, 30, "friday", block_date=NEXT_DAY)
+    manager.repack_all_days(BOUNDS)
+    before = (_day(manager, DAY), _day(manager, NEXT_DAY))
+
+    bounds = _ExplodingOnTheSecondDay(DayBounds(day_start="10:00"))
+    with pytest.raises(RuntimeError):
+        manager.repack_all_days(bounds)
+
+    assert bounds.days_packed == 2, "the failure must land after a day was re-timed"
+    assert (_day(manager, DAY), _day(manager, NEXT_DAY)) == before
+
+
+def test_tbm4_repacking_a_database_with_no_blocks_does_nothing(manager):
+    """So the save path cannot fail on a day the user has not planned yet."""
+    assert manager.repack_all_days(BOUNDS) == []

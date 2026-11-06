@@ -158,6 +158,17 @@ def test_the_modal_offers_exactly_seven_weekday_checkboxes(root, settings):
         ("day_start_entry", "9am", "Day Start must be a time like 09:00"),
         ("lunch_start_entry", "", "Lunch Start must be a time like 09:00"),
         ("day_end_entry", "25:99", "Day End must be a time like 09:00"),
+        # Found by the pre-push sweep. The minutes in "25:99" are what made
+        # that case fail; the hours never were. "25:00" was accepted and
+        # stored, which puts Day End past every block the planner can make, so
+        # the overrun warning that is Day End's only job could never fire
+        # again. "170:0" was worse: format_hhmm clamped it to "99:59", storing
+        # a value the user never typed -- the one thing this dialog validates
+        # rather than falling back in order to avoid.
+        ("day_end_entry", "24:00", "Day End must be a time like 09:00"),
+        ("day_end_entry", "25:00", "Day End must be a time like 09:00"),
+        ("day_end_entry", "170:0", "Day End must be a time like 09:00"),
+        ("day_start_entry", "99:59", "Day Start must be a time like 09:00"),
     ],
 )
 def test_the_modal_names_the_field_it_cannot_read(root, settings, field, value, expected_message):
@@ -182,6 +193,25 @@ def test_the_modal_names_the_field_it_cannot_read(root, settings, field, value, 
     finally:
         if dialog.winfo_exists():
             dialog.destroy()
+
+
+def test_the_modal_accepts_the_last_minute_of_the_day(root, settings):
+    """The boundary the hours-past-midnight refusal is written against.
+
+    Paired with the cases above so a guard that refused every time would not
+    pass for the right reason.
+    """
+    dialog = PlanSettingsDialog(root, settings)
+    try:
+        dialog.day_end_entry.delete(0, tk.END)
+        dialog.day_end_entry.insert(0, "23:59")
+
+        dialog.save()
+    finally:
+        if dialog.winfo_exists():
+            dialog.destroy()
+
+    assert settings.plan_day_end == "23:59"
 
 
 def test_the_modal_refuses_a_day_that_ends_before_it_starts(root, settings):
@@ -909,3 +939,199 @@ def test_a_real_right_click_on_a_block_opens_the_menu(
 
     assert len(opened) == 1, "the right-click binding did not open a menu"
     assert opened[0].index("end") is not None
+
+
+# --- found by the pre-push sweep --------------------------------------------
+
+
+def test_dragging_a_block_down_lands_it_where_it_was_dropped(screen, manager):
+    """The sweep's high-severity finding, at the screen level.
+
+    `reorder_to` is given the gap index the pointer was released in, counted
+    against the rendered rows with the dragged block still among them. It used
+    to pass that straight to `move_block`, which removes the block first, so
+    every downward drag overshot by one: dropping the first block between the
+    second and third put it last instead.
+    """
+    _add_block(manager, 30, "First")
+    _add_block(manager, 30, "Second")
+    _add_block(manager, 30, "Third")
+    screen.load_blocks()
+    first_id = screen._block_frames[0][1]
+
+    # The gap before "Third" — released on the bottom half of "Second".
+    screen.reorder_to(first_id, 2)
+
+    assert _stored(manager) == [
+        ("Second", 1, "08:00", "08:30", 30),
+        ("First", 2, "08:30", "09:00", 30),
+        ("Third", 3, "09:00", "09:30", 30),
+    ]
+
+
+def test_releasing_a_block_in_its_own_gap_writes_nothing(screen, manager):
+    """A mis-click inside a block's own row is not an instruction to move it.
+
+    Both gaps bounding a block are its own. The old arithmetic turned the
+    lower one into a move past the next block, so a two-pixel drag reordered
+    the day.
+    """
+    _add_block(manager, 30, "First")
+    _add_block(manager, 30, "Second")
+    screen.load_blocks()
+    first_id = screen._block_frames[0][1]
+    before = _stored(manager)
+
+    screen.reorder_to(first_id, 0)
+    screen.reorder_to(first_id, 1)
+
+    assert _stored(manager) == before
+
+
+def test_a_custom_block_length_longer_than_a_day_is_refused(screen, manager, monkeypatch):
+    """A length that format_hhmm would clamp must not reach the database.
+
+    Stored, it would give the row an end_time that is not its start plus its
+    duration — a row that lies about itself to every later reader — and draw a
+    block tall enough to put the rest of the day out of reach.
+    """
+    _add_block(manager, 30, "First")
+    screen.load_blocks()
+    block = manager.get_time_blocks(THURSDAY)[0]
+    before = _stored(manager)
+
+    monkeypatch.setattr(
+        ctk.CTkInputDialog, "get_input", lambda self: str(24 * 60 + 1)
+    )
+    screen.ask_custom_minutes(block)
+
+    assert _stored(manager) == before
+    assert "1440 minutes or less" in screen.status_label.cget("text")
+
+
+def test_a_custom_block_length_of_exactly_a_day_is_accepted(screen, manager, monkeypatch):
+    """The boundary the refusal is written against, so it cannot creep inward."""
+    _add_block(manager, 30, "First")
+    screen.load_blocks()
+    block = manager.get_time_blocks(THURSDAY)[0]
+
+    monkeypatch.setattr(ctk.CTkInputDialog, "get_input", lambda self: str(24 * 60))
+    screen.ask_custom_minutes(block)
+
+    assert manager.get_time_blocks(THURSDAY)[0].planned_minutes == 24 * 60
+
+
+def test_finishing_a_drag_does_not_drop_the_posted_menu(screen, manager, monkeypatch):
+    """`clear_hover_target` must not reset the reference that keeps a menu alive.
+
+    An annotated assignment belonging in `__init__` had been left at the end of
+    that method, so ending any drag discarded the reference held to stop a
+    posted menu being collected — which takes its commands with it.
+    """
+    _add_block(manager, 30, "First")
+    screen.load_blocks()
+    monkeypatch.setattr(tk.Menu, "tk_popup", lambda self, *a, **k: None)
+    monkeypatch.setattr(tk.Menu, "grab_release", lambda self: None)
+
+    screen.open_block_menu(_FakeEvent(10, 10), manager.get_time_blocks(THURSDAY)[0])
+    assert screen._block_menu is not None
+
+    screen.clear_hover_target()
+
+    assert screen._block_menu is not None, "the menu reference was discarded"
+
+
+class _FakeEvent:
+    """The two attributes open_block_menu reads off a Tk event."""
+
+    def __init__(self, x_root, y_root):
+        self.x_root = x_root
+        self.y_root = y_root
+
+
+def test_a_day_settings_change_retimes_the_days_that_are_not_on_screen(
+    screen, manager
+):
+    """The sweep's P6 finding at the screen level.
+
+    `on_settings_saved` used to repack `self.selected_date` alone, so Friday
+    kept the clock times Thursday's old Day Start had given it.
+    """
+    _add_block(manager, 30, "thursday")
+    _add_block(manager, 30, "friday", block_date=FRIDAY)
+    manager.repack_day(THURSDAY, screen.bounds)
+    manager.repack_day(FRIDAY, screen.bounds)
+
+    screen.on_settings_saved(DayBounds(day_start="10:00"))
+
+    assert _stored(manager, THURSDAY)[0][2] == "10:00"
+    assert _stored(manager, FRIDAY)[0][2] == "10:00"
+
+
+def test_a_failed_repack_does_not_leave_a_block_with_no_times(screen, manager):
+    """Each screen write and its repack are one commit.
+
+    In between them the new row holds no times at all, and `set_block_minutes`
+    is worse: the row would read as a 30-minute block claiming 90 minutes while
+    the next block still owned the minutes it had taken.
+    """
+    _add_block(manager, 30, "first")
+    screen.load_blocks()
+    before = _stored(manager)
+    screen.bounds = _ExplodingBounds()
+
+    with pytest.raises(RuntimeError):
+        screen.block_item(_item(manager, "dropped", THURSDAY))
+
+    assert _stored(manager) == before
+
+
+def test_a_failed_repack_does_not_leave_a_resized_block_claiming_two_lengths(
+    screen, manager
+):
+    """The resize half of the same finding."""
+    _add_block(manager, 30, "first")
+    _add_block(manager, 30, "second")
+    manager.repack_day(THURSDAY, screen.bounds)
+    screen.load_blocks()
+    before = _stored(manager)
+    block = manager.get_time_blocks(THURSDAY)[0]
+    screen.bounds = _ExplodingBounds()
+
+    with pytest.raises(RuntimeError):
+        screen.set_block_minutes(block, 90)
+
+    assert _stored(manager) == before
+
+
+class _ExplodingBounds:
+    """Bounds that raise the moment packing reads them.
+
+    The same shape as the fixture in test_time_block_crud, pointed at the
+    screen's methods rather than the manager's: pack_day asks for
+    day_start_minutes first, which puts the failure after the screen's own
+    write and before anything is committed.
+    """
+
+    default_block_minutes = 30
+    block_weekdays = (True,) * 7
+
+    @property
+    def day_start_minutes(self):
+        raise RuntimeError("bounds unreadable")
+
+    @property
+    def day_end_minutes(self):
+        raise RuntimeError("bounds unreadable")
+
+    @property
+    def lunch_start_minutes(self):
+        raise RuntimeError("bounds unreadable")
+
+    @property
+    def lunch_end_minutes(self):
+        raise RuntimeError("bounds unreadable")
+
+    @property
+    def lunch_length(self):
+        raise RuntimeError("bounds unreadable")
