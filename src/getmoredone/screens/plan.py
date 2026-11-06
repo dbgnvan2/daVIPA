@@ -54,9 +54,12 @@ from ..time_block_layout import (
 from ..widgets.date_picker import DatePickerButton
 from .drag_schedule_support import widget_contains_pointer
 from .plan_blocks import (
+    SLOT_CHECK_WIDTH_PX,
     SLOT_CHIP_HEIGHT_PX,
+    SLOT_TIME_WIDTH_PX,
     SLOT_TITLE_WIDTH_PX,
     build_empty_day_note,
+    chip_column_minsizes,
     build_item_row,
     build_outside_group,
     build_slot_row,
@@ -78,6 +81,11 @@ PLAN_ITEMS_COL_WIDTH_PX = 260
 #: How much of the items column is frame, padding and scrollbar rather than
 #: text. Subtracted from the column width to get a wraplength that fits.
 ITEMS_TEXT_INSET_PX = 56
+
+#: Width (px) of the grip between the two panes. Narrow enough to read as a
+#: divider and wide enough to press: it is the whole of column 1, so what is
+#: here is what the pointer has to land on.
+PLAN_DIVIDER_WIDTH_PX = 6
 
 #: Height (px) of the "Outside the day" group. Fixed and scrollable rather
 #: than as tall as its contents: the group shares the items column with the
@@ -203,17 +211,29 @@ class PlanScreen(ctk.CTkFrame):
         self._grid: DayGrid = DayGrid()
         self._items: List[ActionItem] = []
 
+        #: PD-M2 drag state: where the grip was pressed, the width it was
+        #: pressed at, and the width the motion has taken it to. ``None`` for
+        #: the press means no drag is in progress, so a stray motion or
+        #: release -- Tk delivers both to a widget that was never pressed when
+        #: a drag starts elsewhere and ends over it -- does nothing.
+        self._divider_from_x: Optional[int] = None
+        self._divider_from_width: int = 0
+        self._divider_width: int = 0
+
         # The items column is a fixed width and the day takes the rest.
         # It was a third of the window on a weight of its own, which gave
         # a list of titles as much room as the thing the titles are
         # dragged onto. The width is a setting so it can be sized to the
-        # titles the user actually has.
+        # titles the user actually has -- by typing it into Settings, or
+        # since PD-M2 by dragging the grip in column 1.
         self.grid_columnconfigure(0, weight=0, minsize=self.items_col_width())
-        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(1, weight=0, minsize=PLAN_DIVIDER_WIDTH_PX)
+        self.grid_columnconfigure(2, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
         self.create_header()
         self.create_items_pane()
+        self.create_divider()
         self.create_day_pane()
 
         self._ready = True
@@ -230,9 +250,22 @@ class PlanScreen(ctk.CTkFrame):
         than collapsing the column: a settings file is user-editable, and
         a zero there would hide the list with no way back to it from the
         screen it hid.
+
+        Floored at ``items_width_floor()`` since PD-M1 made a row the day
+        chip's four columns, one of which is the 220px Drag Schedule title
+        width. At the shipped 260 the row asked for 306px inside a 256px pane
+        and the ``30m`` label was laid out past the right edge: measured, not
+        inferred -- it was invisible in the app while the first version of
+        ``::test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it``
+        stayed green, because that test built its row at the 80px *fallback*
+        title width rather than at the setting's real default. The floor is the
+        same one PD-M2's grip clamps to, so the pane the user can drag and the
+        pane the screen opens at cannot disagree about what a row needs.
         """
         return self._positive_setting(
-            "plan_items_col_width", PLAN_ITEMS_COL_WIDTH_PX
+            "plan_items_col_width",
+            PLAN_ITEMS_COL_WIDTH_PX,
+            minimum=self.items_width_floor(),
         )
 
     def box_height(self) -> int:
@@ -285,13 +318,20 @@ class PlanScreen(ctk.CTkFrame):
         it as a clipped widget. The raise is documented in the user guide
         beside the fallback, which is the only surface a hand-edited settings
         file has.
+
+        The fallback is raised too. It did not used to be, and for the box
+        height that could not show: there the fallback and the minimum are the
+        same constant. For the items column they are not -- the floor is
+        derived from the title-column setting -- so a zero in the file took the
+        unfloored fallback and clipped the row, which is the defect the
+        minimum exists to prevent, reached by the one path that skipped it.
         """
         try:
             value = int(getattr(self.settings, name, None))
         except (TypeError, ValueError):
-            return fallback
+            value = 0
         if value <= 0:
-            return fallback
+            value = fallback
         if minimum is not None:
             return max(minimum, value)
         return value
@@ -300,7 +340,7 @@ class PlanScreen(ctk.CTkFrame):
 
     def create_header(self):
         header = ctk.CTkFrame(self)
-        header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 0))
+        header.grid(row=0, column=0, columnspan=3, sticky="ew", padx=10, pady=(10, 0))
 
         ctk.CTkLabel(
             header,
@@ -350,7 +390,7 @@ class PlanScreen(ctk.CTkFrame):
 
     def create_items_pane(self):
         frame = ctk.CTkFrame(self)
-        frame.grid(row=1, column=0, sticky="nsew", padx=(10, 5), pady=10)
+        frame.grid(row=1, column=0, sticky="nsew", padx=(10, 2), pady=10)
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_rowconfigure(2, weight=1)
 
@@ -396,9 +436,149 @@ class PlanScreen(ctk.CTkFrame):
         # grid_remove on this path would be a line no test could fail on --
         # the same reason the chip in a box carries no grid_propagate.
 
+    def items_width_floor(self) -> int:
+        """The narrowest the items column may be dragged to, in pixels.
+
+        Purpose: PD-M2.2 -- neither pane can be dragged shut.
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m2
+        Tests:   tests/test_plan_screen.py::test_pdm22_the_items_pane_cannot_be_dragged_shut
+
+        What one item row asks for, plus the frame, padding and scrollbar
+        around it. Derived rather than chosen: the row's columns are the day
+        chip's columns and one of them is a user setting, so a round number
+        here would be wrong the first time someone widened the title column.
+        """
+        return sum(chip_column_minsizes(self.box_title_width())) + (
+            ITEMS_TEXT_INSET_PX
+        )
+
+    def day_width_floor(self) -> int:
+        """The narrowest the day pane may be left, in pixels.
+
+        Purpose: PD-M2.2 -- the other end of the same clamp.
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m2
+        Tests:   tests/test_plan_screen.py::test_pdm22_the_day_pane_cannot_be_dragged_shut
+
+        One day row: the completion check, the time, and the same four columns
+        the item row has, plus the pane's own chrome. The chrome is the items
+        pane's number because the two panes are the same frame around the same
+        scrollable frame, so what is not text is the same on both sides.
+        """
+        return (
+            SLOT_CHECK_WIDTH_PX
+            + SLOT_TIME_WIDTH_PX
+            + sum(chip_column_minsizes(self.box_title_width()))
+            + ITEMS_TEXT_INSET_PX
+        )
+
+    def _clamp_items_width(self, width: int) -> int:
+        """``width`` held inside what the two panes each need.
+
+        The right-hand end is measured against the real window, which is the
+        only place the day's share is known. On a screen that has not been laid
+        out ``winfo_width`` is 1, and clamping to that would pin the column to
+        its floor for a drag that has not happened yet -- so with no width to
+        measure there is no right-hand end, only the floor.
+        """
+        floor = self.items_width_floor()
+        width = max(floor, int(width))
+        room = self.winfo_width()
+        if room > 1:
+            width = min(width, max(floor, room - self.day_width_floor()))
+        return width
+
+    def create_divider(self):
+        """The grip between the two panes, which drags them wider and narrower.
+
+        Purpose: PD-M2 -- "the dividing line vertical between the two areas
+                 should slide right and left to resize the two areas."
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m2
+        Tests:   tests/test_plan_screen.py::test_pdm21_dragging_the_grip_changes_the_items_column
+
+        Its own 6px column rather than a border on either pane: a border
+        belongs to the frame that draws it and cannot be pressed without
+        pressing the pane, and a pane here is a drag surface already.
+
+        Not ``ColumnResizer``. That widget resizes columns inside a table row
+        and persists to ``<prefix>_col_widths``; this is a splitter between two
+        top-level grid columns writing one integer setting, and the two have
+        nothing but the gesture in common.
+        """
+        self.divider = ctk.CTkFrame(
+            self,
+            width=PLAN_DIVIDER_WIDTH_PX,
+            fg_color=semantic_colors()["border"],
+            corner_radius=0,
+        )
+        self.divider.grid(row=1, column=1, sticky="ns", pady=10)
+        self.divider.grid_propagate(False)
+        # The cursor is the only thing on screen that says this is draggable,
+        # so it is set here rather than left to the theme.
+        try:
+            self.divider.configure(cursor="sb_h_double_arrow")
+        except tk.TclError:
+            # A cursor name X11 or the platform does not know is not a reason
+            # to lose the divider.
+            pass
+        self.divider.bind("<Button-1>", self.on_divider_press)
+        self.divider.bind("<B1-Motion>", self.on_divider_motion)
+        self.divider.bind("<ButtonRelease-1>", self.on_divider_release)
+
+    def on_divider_press(self, event):
+        """Remember where the grip was pressed, and at what width."""
+        self._divider_from_x = event.x_root
+        self._divider_from_width = self.items_col_width()
+        self._divider_width = self._divider_from_width
+
+    def on_divider_motion(self, event):
+        """Resize the columns to follow the pointer. Nothing is written here.
+
+        Measured from the press, not from the last motion: applying each
+        motion's own delta to the current width doubles every drag after the
+        first, and the clamp would make the error silent at the ends.
+        """
+        if self._divider_from_x is None:
+            return
+        moved = event.x_root - self._divider_from_x
+        self._divider_width = self._clamp_items_width(
+            self._divider_from_width + moved
+        )
+        self.grid_columnconfigure(0, minsize=self._divider_width)
+
+    def on_divider_release(self, event):
+        """Take the final position and write it, once.
+
+        P41: ``self.settings`` is the app's own settings object, not a copy of
+        it. So a refused write cannot be left as it is -- every screen built
+        from that object afterwards would draw a width no file holds, and the
+        next launch would undo it with nothing having said so. The previous
+        value goes back on the object and on the column, and the refusal is
+        reported where the pane the user just dragged can show it.
+        """
+        if self._divider_from_x is None:
+            return
+        self.on_divider_motion(event)
+        self._divider_from_x = None
+
+        width = self._divider_width
+        if self.settings is None or width == self._divider_from_width:
+            return
+
+        previous = getattr(self.settings, "plan_items_col_width", None)
+        self.settings.plan_items_col_width = width
+        if not self.settings.save():
+            self.settings.plan_items_col_width = previous
+            self.grid_columnconfigure(0, minsize=self.items_col_width())
+            self.items_hint.configure(
+                text=(
+                    getattr(self.settings, "last_save_error", None)
+                    or "Could not write the settings file — see the log"
+                )
+            )
+
     def create_day_pane(self):
         frame = ctk.CTkFrame(self)
-        frame.grid(row=1, column=1, sticky="nsew", padx=(5, 10), pady=10)
+        frame.grid(row=1, column=2, sticky="nsew", padx=(2, 10), pady=10)
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_rowconfigure(2, weight=1)
 

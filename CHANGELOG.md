@@ -7,6 +7,62 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — an item is drawn as the task it is about to become
+
+- A row in **Items starting** now uses a day box's own first line: the same
+  four columns in the same order at the same widths — colour stripe, title,
+  depth bars, block length. The length is beside the bars at the right-hand
+  end, where a box writes it, not under them. The two panes read as one list of
+  tasks either side of the divider, which is what the width settings were for.
+- The depth word has come off the second line. The row is already drawn in its
+  depth's shade, striped in it, and carries the bar stack that exists to show
+  it, so the word was a fourth telling in the one place a reader looks for
+  something the colours cannot say. `already blocked` is what that line
+  carries, and only when it is true.
+- The title column takes its width from **Drag Schedule title column width
+  (px)** on both panes. It had been a constant on the left, so the columns
+  lined up at the default and nowhere else.
+- **Fixed in the same change:** at the shipped settings the four columns asked
+  for 306px inside a 256px pane and the length label was laid out past the
+  right edge — invisible in every item row. **Plan items column width (px)** is
+  now raised, when it has to be, to what one row needs: the stripe, the title
+  column, the bars, the length, and the pane's padding and scrollbar. At the
+  default sizes that is 360px, so the shipped 260 is raised. A blank, zero or
+  non-numeric value is raised too; it was not, which was the one path around
+  the guard.
+
+### Added — the divider between the Plan panes drags
+
+- The thin vertical line between **Items starting** and **Day Plan** is now a
+  grip: drag it to make the item list wider or narrower, and the day takes the
+  rest. It writes **Plan items column width (px)**, the same setting the field
+  in Settings holds, so a drag shows up in the field and a typed width shows up
+  on screen.
+- Written once, when you let go, not on every pixel of the drag. If the write
+  is refused the pane goes back to the width it had and the reason appears
+  under the *Items* heading: the app never draws a width the file does not
+  hold.
+- Neither pane can be dragged shut. The item list stops at the width one of its
+  own rows needs; the day stops at the width one day row needs.
+
+### Changed — break, buffer and lunch are one colour
+
+- The three kinds of time that are not work now share a single colour, so the
+  day reads as work and not-work rather than as four kinds of thing. Lunch had
+  no colour of its own to share — it was drawn as a bare surface with no stripe
+  at all — so it gains the stripe the other two have.
+
+### Added — a finished box shows a green check
+
+- A half hour whose every task is complete carries a check mark to the left of
+  its time, in the theme's success colour. A box with any work left in it does
+  not, including one holding a finished task beside an open one. Padding in the
+  box neither claims the check on its own nor withholds it from a finished task
+  beside it. The later boxes of a long finished task show it too — the box is
+  spent either way.
+- Day Plan only: the item list on the left shows open items, so a completed one
+  is never in it.
+
 ### Fixed — a box height saved in Settings did nothing until the next launch
 
 - **Drag Schedule box height (px)** and **Plan items column width (px)** were
@@ -52,18 +108,22 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   task is taller than one box, so the match is with the day the item would be
   dropped into. The row is the shape of the space it
   is about to take, so the day's room for it is visible before the drag.
-- A row never goes below 67px, its own two lines of text, whatever the box
-  height says. The 30px floor on the box height was set for a chip holding one
-  line, and an item row holds two plus the work-block length; matched to a 34px
-  box the row showed its title and silently cut the depth / `already blocked`
-  line and the length. So the row and the day agree exactly from a box height of
-  63 up, and below that the row is the taller of the two.
+- A row never goes below its own two lines of text, whatever the box height
+  says. The 30px floor on the box height was set for a chip holding one line,
+  and an item row holds two; matched to a 34px box the row showed its title and
+  silently cut the second line. So the row and the day agree exactly from a box
+  height of 62 up, and below that the row is the taller of the two. (66px and
+  62 since the length label moved onto the first line — see *an item is drawn
+  as the task it is about to become* below. It was 67px and 63 as shipped
+  here.)
 - The priority score has come off the row. The row is drawn in its priority
   band and striped in it, so the number was a third way of saying one thing in
   the one place a reader looks for what the colour cannot tell them.
 - The work-block length (`30m`) moved out of the detail line to sit under the
   depth bars, which puts it in the same place on an item row as on a task in a
-  box.
+  box. *Superseded below*: a box does not put it under the bars, it puts it
+  beside them at the right-hand end of the task's line, and that is where it is
+  now.
 
 ### Fixed — a long task's later boxes read as empty half hours
 

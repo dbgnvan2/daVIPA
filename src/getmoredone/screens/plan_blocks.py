@@ -67,6 +67,37 @@ SLOT_CHIP_HEIGHT_PX = 30
 #: ``AppSettings.drag_schedule_title_col_width``.
 SLOT_TITLE_WIDTH_PX = 80
 
+#: The gap between a task's stripe and its title, counted into the stripe's own
+#: column so that column is the stripe plus its gap.
+SLOT_STRIPE_GAP_PX = 8
+
+#: What the depth bars' column and the length's column ask for. The bar stack
+#: is 14px of bar in a 22px column; the length is a right-aligned label of its
+#: own fixed width, so "30m" and "120m" end at the same pixel.
+SLOT_BARS_WIDTH_PX = 22
+SLOT_LENGTH_WIDTH_PX = 48
+
+
+def chip_column_minsizes(title_width: int = SLOT_TITLE_WIDTH_PX):
+    """The four column widths one task's line is laid out in, in order.
+
+    Purpose: PD-M1.1 -- a day box and an item row are the same four columns,
+             so there is one place that says what those columns are.
+    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m1
+    Tests:   tests/test_plan_screen.py::test_pdm11_the_item_row_uses_the_chips_column_order
+
+    Both renderers configure their columns from here, and PD-M2's clamp adds
+    them up to find the narrowest a pane can be dragged to and still draw a
+    row. Written out twice they agreed by inspection, which is the kind of
+    agreement that lasts until someone widens one of them.
+    """
+    return (
+        STRIPE_WIDTH_PX + SLOT_STRIPE_GAP_PX,
+        title_width,
+        SLOT_BARS_WIDTH_PX,
+        SLOT_LENGTH_WIDTH_PX,
+    )
+
 #: The vertical gap between two consecutive boxes of the day: ``build_slot_row``
 #: grids each box ``pady=1``, so one box's bottom edge and the next box's top
 #: edge are 2px apart. An item row has to add it back, or an N-box row is 2(N-1)
@@ -290,10 +321,11 @@ def build_item_row(
     # The chip's columns, kept in the same order and at the same widths by
     # ``test_pdm11_the_item_row_uses_the_chips_column_order``, which reads them
     # off a real chip rather than restating them.
-    frame.grid_columnconfigure(0, minsize=STRIPE_WIDTH_PX + 8)
-    frame.grid_columnconfigure(1, minsize=title_width, weight=1)
-    frame.grid_columnconfigure(2, minsize=22)
-    frame.grid_columnconfigure(3, minsize=48)
+    widths = chip_column_minsizes(title_width)
+    frame.grid_columnconfigure(0, minsize=widths[0])
+    frame.grid_columnconfigure(1, minsize=widths[1], weight=1)
+    frame.grid_columnconfigure(2, minsize=widths[2])
+    frame.grid_columnconfigure(3, minsize=widths[3])
     frame.grid_rowconfigure(2, weight=1)
     frame.grid_propagate(False)
 
@@ -320,7 +352,7 @@ def build_item_row(
     ctk.CTkLabel(
         frame,
         text=f"{work_block_minutes}m",
-        width=48,
+        width=SLOT_LENGTH_WIDTH_PX,
         anchor="e",
         text_color=on_fill,
         font=ctk.CTkFont(size=11),
@@ -680,10 +712,11 @@ def _build_block_chip(
         parent, fg_color=fill, corner_radius=4, height=chip_height - 4
     )
     chip.grid(row=row, column=0, sticky="ew", pady=1)
-    chip.grid_columnconfigure(0, minsize=STRIPE_WIDTH_PX + 8)
-    chip.grid_columnconfigure(1, minsize=title_width, weight=1)
-    chip.grid_columnconfigure(2, minsize=22)
-    chip.grid_columnconfigure(3, minsize=48)
+    widths = chip_column_minsizes(title_width)
+    chip.grid_columnconfigure(0, minsize=widths[0])
+    chip.grid_columnconfigure(1, minsize=widths[1], weight=1)
+    chip.grid_columnconfigure(2, minsize=widths[2])
+    chip.grid_columnconfigure(3, minsize=widths[3])
     chip.grid_rowconfigure(0, weight=1)
     # No grid_propagate(False) here, deliberately. It would also hold the chip
     # to its height, but then neither it nor the stripe's height= could be
@@ -722,7 +755,7 @@ def _build_block_chip(
         ctk.CTkLabel(
             chip,
             text=f"{spare}m spare" if spare else "same task",
-            width=48,
+            width=SLOT_LENGTH_WIDTH_PX,
             anchor="e",
             # PB-M7: chosen for the shade now behind it, like the title. The
             # theme's muted text is the right colour for the theme's surface
@@ -740,7 +773,7 @@ def _build_block_chip(
     ctk.CTkLabel(
         chip,
         text=f"{block.planned_minutes}m",
-        width=48,
+        width=SLOT_LENGTH_WIDTH_PX,
         anchor="e",
         text_color=body_text,
         font=ctk.CTkFont(size=11),

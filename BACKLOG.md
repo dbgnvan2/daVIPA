@@ -1,6 +1,21 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-06 (the cold sweep of the fix commits: five more below-medium added, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-06 (one adjacent issue from the plan day-controls batch added; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Adjacent issues from the plan day-controls batch (2026-11-06)
+
+Found while building PD-M2, not introduced by it, and not fixed in the batch
+that found it — rule 10.
+
+- **A Settings screen left open holds a stale copy of the settings.** The
+  Settings screen builds its fields from its own `AppSettings.load()` at the
+  time it is built. Dragging the Plan divider writes
+  `plan_items_col_width`; if a Settings screen was already open, its Save
+  writes the width it loaded back over the dragged one. This is every field on
+  that handler, not just this one, and it predates the grip — the grip only
+  made it reachable without typing. Low: the two screens are rarely open at
+  once, and the fix is a reload on screen-show, which touches every field at
+  once and so belongs in its own change.
 
 ## Below medium, from the cold sweep of the fix commits (2026-11-06)
 

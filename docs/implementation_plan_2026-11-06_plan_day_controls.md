@@ -82,6 +82,35 @@ the file does not.
 | PD-M2.4 | A refused write leaves the running app the width it had, and says so | `::test_pdm24_a_refused_write_leaves_the_old_width` (P41) |
 | PD-M2.5 | The dragged width survives a rebuild of the screen | `::test_pdm25_the_dragged_width_survives_a_rebuild` |
 | PD-M2.6 | Settings and the grip agree: a width set in either is read by the other | `::test_pdm26_the_grip_and_the_settings_field_are_one_value` |
+| PD-M2.7 | The items column is never narrower than one of its own rows, by setting or by drag, and the fallback is floored too | `::test_an_unusable_items_column_width_falls_back_rather_than_collapsing`, `::test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it` |
+
+**PD-M2.7 was not planned. It is a defect PD-M1 shipped, found here.**
+
+Building the clamp meant putting a number on what a row needs, and the number
+came out at 360px: the stripe's column, the 220px Drag Schedule title width,
+the bars, the length, and the pane's chrome. The items column ships at 260. So
+at the app's own default settings an item row asked for 306px of content inside
+a 256px pane and the `30m` label was laid out from x=258 to x=306 -- entirely
+past the right edge, invisible, in every row.
+
+`::test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it` was written to
+catch exactly this and did not, because it built its row directly with
+`title_width` left at its default -- `SLOT_TITLE_WIDTH_PX`, which is the 80px
+*fallback*, not the setting's 220px default. A test that builds the widget
+itself chooses its own inputs, and the one it chose was the only width that
+fits. It now builds the row through `PlanScreen`, so the widths are the user's.
+
+The fix is the floor, for the same reason PB-M5.6 floors the box height: a
+column too narrow to draw what it holds is a clipped widget with nothing on
+screen to say so. It makes the default left pane 360px rather than 260, which
+is the honest cost of the two panes lining up -- and PD-M2's own grip is what
+lets the user move it from there.
+
+`_positive_setting` turned out to apply `minimum` to a parsed value and not to
+the fallback. For the box height that could never show, since there the two are
+the same constant; here they are not, so a zero in the settings file took the
+unfloored 260 and clipped the row by the one path that skipped the guard. Fixed
+in the helper rather than at this one call site.
 
 ---
 

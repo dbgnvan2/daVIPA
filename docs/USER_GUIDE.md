@@ -297,17 +297,31 @@ Header:
   one number would have to be wrong about one of them.
 
 Items pane (left):
-- **Column width** — What: The items column is a fixed width, set by *Plan
-  items column width (px)* in Settings ▸ Date Increment Settings, beside the
-  Drag Schedule sizes. Why: it holds titles,
-  and the day beside it is what the rest of the window is for. Widening the
-  window widens the day, not the list.
+- **Column width** — What: The items column is a fixed width. Drag the thin
+  vertical divider between the two panes to change it, or type a number into
+  *Plan items column width (px)* in Settings ▸ Date Increment Settings, beside
+  the Drag Schedule sizes; the two are one value, so a drag shows up in the
+  field and a typed width shows up on screen. Why: it holds titles, and the day
+  beside it is what the rest of the window is for. Widening the window widens
+  the day, not the list.
+
+  Neither the drag nor the field can shut either pane: the items column stops
+  at the width one of its own rows needs, and the drag stops before the day
+  pane goes below the width of one day row. The row's width comes from *Drag
+  Schedule title column width (px)*, so a wider title column raises the
+  narrowest the items pane can be.
+
+  The drag writes the settings file when you let go, not while you move. If
+  that write fails, the pane goes back to the width it had and the reason
+  appears under the *Items* heading — the width you dragged to is not kept,
+  because nothing on disk would hold it.
 - **Items starting \<date\>** — What: Open items whose start date is that date,
   highest priority score first. Why: These are the only items the day is built
   from. Each row shows its depth, `already blocked` if the day already holds a
   block for it — marked rather than hidden, because an item can genuinely need
-  two blocks in a day — and the block length it would get (`30m`), under the
-  depth bars. The priority score is not printed: the row is drawn in its
+  two blocks in a day — and the block length it would get (`30m`), beside the
+  depth bars at the right-hand end of the row's first line, where a task in a
+  day box carries the same fact. The priority score is not printed: the row is drawn in its
   priority band and striped in it, so the number said a third time what the
   colour already says twice.
 - **How tall a row is** — What: The space the item's work block will take in an
@@ -319,12 +333,12 @@ Items pane (left):
   take, so you can see whether the day has room for it before dragging. The
   height comes from *Drag Schedule box height (px)*, the same setting the day's
   boxes use.
-- **The shortest a row gets** — What: 67px, two lines of text, whatever the box
-  height is set to. Why: below that the row cannot show its depth, its
-  `already blocked` marker or its length, and it would lose them with nothing
-  to say they were there. So at a box height of 30 — the lowest the setting
-  goes — a one-box row is taller than the 34px box it matches everywhere else.
-  From 63 up, the row and the day agree exactly.
+- **The shortest a row gets** — What: 66px, two lines of text, whatever the box
+  height is set to. Why: below that the row cannot show its `already blocked`
+  marker, and it would lose it with nothing to say it was there. So at a box
+  height of 30 — the lowest the setting goes — a one-box row is taller than the
+  34px box it matches everywhere else. From 62 up, the row and the day agree
+  exactly.
 - **Drag a row onto a box** — What: Creates a block for it in that half hour.
   Why: This is how blocks are made, and the box you drop on is the box you get.
   If the item needs more than one box, the status line says how many and what is
@@ -571,7 +585,7 @@ Date Increment Settings:
 - **Drag Schedule date text color** — What: Hex color for date-box text (default `#FFFFFF`). Why: Improve readability across box colors.
   - Includes **Pick Color** button for visual selection.
 - **Drag Schedule box height (px)** — What: Controls the height of all Drag Schedule date/future boxes, and, since 2026-11-06, the height of each task in a Plan half-hour box. Why: Match readability and spacing preferences, and keep a task the same size on both screens. A larger value makes the Plan tasks easier to read but makes the day scroll; empty half hours keep their compact height whatever this is set to. A blank, zero or non-numeric value falls back to 30 for the Plan boxes rather than flattening them, and a value below 30 is raised to 30 — one line of text, below which a half hour holding two tasks clips the second. Saving it takes effect as soon as you leave Settings; before 2026-11-06 the value was written to the file and the screens kept the one they started with until the next launch.
-- **Plan items column width (px)** — What: Width of the items column on the Plan screen (default 260). Why: Size it to the titles you actually have; the day column takes the rest of the window. A blank, zero or non-numeric value falls back to 260 rather than hiding the list.
+- **Plan items column width (px)** — What: Width of the items column on the Plan screen (default 260). Why: Size it to the titles you actually have; the day column takes the rest of the window. A blank, zero or non-numeric value falls back to 260 rather than hiding the list. Either way the width is then raised, if it has to be, to what one item row needs — the stripe, *Drag Schedule title column width (px)*, the depth bars and the block length, plus the pane's own padding and scrollbar. At the default sizes that is 360px, so the shipped 260 is raised: a narrower column would clip the block length off the right-hand edge of every row with nothing on screen to say so. Dragging the divider between the panes writes this same setting.
 - **Completion Badge** — What: Optional image shown on completed Today items. Why: Replace the default large green check mark with your preferred badge.
 - **Confetti Every N Completions** — What: Controls how often confetti triggers on Today completions. Why: Tune or disable celebration feedback.
 
