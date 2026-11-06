@@ -415,6 +415,19 @@ The blocks stay off the grid, appear under **Outside the day**, and the status
 line says the settings could not be read — rather than being placed permanently
 against a Day Start the app only guessed at.
 
+**To recover:** open **⚙ Day Settings**, check the four times and the weekday
+boxes, and save. That writes a settings file the app can read, and the blocks
+are mapped onto the grid the next time the day is drawn. Two things happen on
+that first save, both deliberate:
+
+- The unreadable file is **kept aside** next to the new one, named
+  `settings.json.unreadable-<date>-<time>`. Saving replaces every setting in
+  the file, not just the day's shape, so the old file is the only copy of
+  anything the app could not read out of it — an Obsidian path, a theme, a
+  business year. The path it was kept at is written to the log.
+- If the new file cannot be written — a permissions problem, a full disk — the
+  dialog says so and stays open. It does not report the day settings as saved.
+
 ### Completed
 - What: Shows completed items over the last N days.
 - Why: Review progress and time spent.

@@ -1,6 +1,6 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-05 (the grid rebuild's deferrals, plus the six below-medium findings from its pre-push sweep; the time-block rebuild's deferrals, its sweep findings, and the four from the re-sweep of its own fix commits remain, two of them changed by the grid; the five from the timer-endings batch remain cleared, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-05 (the grid rebuild's deferrals, the six below-medium findings from its pre-push sweep, and the six from the re-sweep of its own fix commits; the time-block rebuild's deferrals, its sweep findings, and the four from the re-sweep of its own fix commits remain, two of them changed by the grid; the five from the timer-endings batch remain cleared, and older sections from 08-24 and earlier remain)
 
 ## Deferred from the time-block rebuild (2026-11-05)
 
@@ -26,6 +26,59 @@ new unreviewed surface and none of these is above low severity.
   block and dragging the item again on that day. *Raised by the grid from low to
   worth doing:* a drag within a day now moves a block between boxes, so this is
   the only gesture a user would reasonably expect and not find.
+
+## Below medium, from the re-sweep of the grid rebuild's fix commits (2026-11-05)
+
+The second sweep round: a cold `learning-qa` pass over the three fix commits
+alone, which is the least-reviewed code in the change. It produced one high and
+four medium findings, all fixed with tests and mutation-proved, and these five.
+Severity rated before any fix was written, as above.
+
+- **The spare-minutes label re-derives a span the layout module already
+  computes.** `plan_blocks.build_slot_row` calls
+  `slots_for_minutes(block.planned_minutes)` where `build_day_grid` uses
+  `slot_span_of(block)` for the same fact. They agree — `slot_span_of` is a
+  one-line wrapper — and `slots_for_minutes` takes `Optional[int]`, so there is
+  no crash path. Low, and P19: two expressions of one fact in a module whose
+  own docstring says span is computed in one place for exactly this reason. If
+  they ever diverge, no box satisfies the last-box test and the label silently
+  disappears. One call swap.
+- **`AppSettings.load`'s `except Exception` spans the six normalizers as well
+  as the parse.** A bug in `_normalize_plan_day_settings` is therefore reported
+  to the user as "Day Settings could not be read" and blocks adoption for the
+  session — a code defect presented as a file problem (P40). Low: the fallback
+  is still safe and the print names the real exception. Narrow the `try` to
+  `json.load` plus the constructor, or separate `JSONDecodeError`/`OSError`
+  from the rest.
+- **`_subtree` overwrites `<Button-1>` on every descendant of a block chip.**
+  Nothing in a chip is interactive today, so nothing is broken — but the first
+  `CTkButton` or `CTkCheckBox` put inside one will stop responding with no
+  error. Low, and now documented in the helper's own docstring along with why
+  its pre-order traversal is load-bearing. The fix is an `isinstance` skip for
+  widgets that handle their own clicks.
+- **`add_block_at` now depends on its caller not pre-setting `slot_index`.**
+  With the `keep_position` default off this is only reachable by a caller that
+  builds a block whose `slot_index` already equals the target box, which then
+  keeps `position = 0` and collides with whatever is in that box. Both
+  production callers build a fresh block with `slot_index=None`, so it is
+  latent. Low: a contract change in a public-ish method with no guard and no
+  test.
+- **Only the Day Settings dialog checks whether a settings save succeeded.**
+  `AppSettings.save` now returns a bool and that dialog acts on it, but every
+  other settings screen still calls it for effect and reports success either
+  way — so a failed write is invisible everywhere else in the app. Adjacent
+  issue, found while fixing the Plan screen's half and deliberately not swept
+  into this batch: it touches every settings surface, and a change that wide
+  belongs in its own reviewed diff. The user-facing notice that an unreadable
+  file was kept aside belongs with it; right now that path is only in the log.
+- **The traceability guard checks test pointers in `docs/spec_coverage.md` but
+  not source ones.** Extending the guard to that document found eight rows
+  naming deleted tests. Its *Implementation* column has the same class of
+  defect — the re-sweep found seven deleted functions named there, four of them
+  on rows still marked `done` — and the guard cannot see any of it. Those rows
+  are corrected, but nothing stops the next one. Low-to-medium: parse the
+  parenthesised symbol lists and assert each name still exists in the file the
+  row points at.
 
 ## Below medium, from the grid rebuild's pre-push sweep (2026-11-05)
 
