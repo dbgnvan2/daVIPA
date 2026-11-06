@@ -14,7 +14,8 @@ style preference.
 
 from __future__ import annotations
 
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
 
 import customtkinter as ctk
 
@@ -25,7 +26,12 @@ from ..theme import (
     priority_band_colors,
     semantic_colors,
 )
-from ..time_block_layout import MAX_DEPTH_BARS, block_height, depth_bars, priority_band
+from ..time_block_layout import (
+    MAX_DEPTH_BARS,
+    depth_bars,
+    priority_band,
+    spare_minutes_in_last_slot,
+)
 
 # The coloured edge that carries the priority band. Narrow on purpose: the
 # project's theme rule allows a DB/semantic colour as a chip or stripe accent
@@ -145,83 +151,9 @@ def build_item_row(
     return frame
 
 
-def build_block_row(
-    parent,
-    block: TimeBlock,
-    item: Optional[ActionItem],
-    row: int,
-    overflows_day_end: bool,
-) -> ctk.CTkFrame:
-    """One time block in the day column.
-
-    The frame's height tracks ``planned_minutes``, so a 90 reads as three times
-    a 30 without the user reading either number.
-    """
-    palette = semantic_colors()
-    kind = BlockType.normalize(block.block_type)
-
-    frame = ctk.CTkFrame(
-        parent,
-        fg_color=palette["surface_subtle"],
-        corner_radius=6,
-        height=block_height(block.planned_minutes),
-        border_width=2 if overflows_day_end else 0,
-        border_color=palette["warning"],
-    )
-    frame.grid(row=row, column=0, sticky="ew", pady=2, padx=2)
-    frame.grid_columnconfigure(2, weight=1)
-    # Without this the frame shrinks to fit its children and the height -- the
-    # one thing carrying the block's length -- is thrown away.
-    frame.grid_propagate(False)
-
-    stripe = ctk.CTkFrame(
-        frame,
-        width=STRIPE_WIDTH_PX,
-        fg_color=accent_for_block(block, item),
-        corner_radius=3,
-    )
-    stripe.grid(row=0, column=0, sticky="ns", padx=(4, 8), pady=4)
-    stripe.grid_propagate(False)
-
-    ctk.CTkLabel(
-        frame,
-        text=f"{block.start_time}–{block.end_time}",
-        width=100,
-        anchor="w",
-        text_color=palette["time_text"],
-    ).grid(row=0, column=1, sticky="w", padx=(0, 6))
-
-    ctk.CTkLabel(
-        frame,
-        text=_block_title(block, item),
-        anchor="w",
-        justify="left",
-    ).grid(row=0, column=2, sticky="ew", padx=(0, 6))
-
-    if kind == BlockType.ITEM:
-        DepthBarStack(frame, item.depth if item else None).grid(
-            row=0, column=3, padx=(4, 6)
-        )
-
-    ctk.CTkLabel(
-        frame,
-        text=f"{block.planned_minutes}m",
-        width=48,
-        anchor="e",
-        text_color=palette["muted_text"],
-    ).grid(row=0, column=4, padx=(0, 6))
-
-    if overflows_day_end:
-        # Shown, not refused: over-filling a day is the user's business, and
-        # the planner's job is to say so rather than drop the block (P2).
-        ctk.CTkLabel(
-            frame,
-            text="past day end",
-            text_color=palette["warning"],
-            font=ctk.CTkFont(size=11),
-        ).grid(row=0, column=5, padx=(0, 10))
-
-    return frame
+# ``build_block_row`` was here: one row per block, as tall as the block was
+# long. ``build_slot_row`` below draws one row per half hour instead, which is
+# what lets a box hold two tasks and an empty box be drawn at all.
 
 
 def _block_title(block: TimeBlock, item: Optional[ActionItem]) -> str:
@@ -239,31 +171,296 @@ def _block_title(block: TimeBlock, item: Optional[ActionItem]) -> str:
     return block.label or "(item no longer exists)"
 
 
-def build_lunch_band(parent, row: int, start: str, end: str) -> ctk.CTkFrame:
-    """The lunch gap, drawn where blocks were pushed past it.
+# ``build_lunch_band`` was here. The grid marks lunch slots rather than
+# removing them, so lunch is a box like any other and needs no separate band.
 
-    Not a block: it is not stored, cannot be dragged, resized or deleted, and
-    exists only so the hour the day skips is visible rather than an unexplained
-    jump in the times.
+
+# =====================================================================
+# TG-M7 -- the 30-minute grid
+#
+# One row per half hour from Day Start to Day End, drawn whether anything is
+# in it or not. An empty 09:00 between two filled boxes is a legitimate day,
+# not a state to pack away, so the empty boxes are the point rather than
+# something to hide.
+# Spec: docs/implementation_plan_2026-11-05_time_grid.md#tg-m7
+# =====================================================================
+
+#: The time column's width. Fixed, so every row's titles start at the same x
+#: -- aligned columns are a design goal in this repo's tabular UIs, and a time
+#: column sized to its own text is the first thing that breaks it.
+SLOT_TIME_WIDTH_PX = 58
+
+#: What an empty box is tall enough to be a drop target for. A box the pointer
+#: struggles to land on is a box the user cannot plan into.
+SLOT_MIN_HEIGHT_PX = 32
+
+#: Height of one task chip, and so what each task adds to a box's height.
+SLOT_CHIP_HEIGHT_PX = 30
+
+
+@dataclass
+class SlotRow:
+    """A rendered box, and the per-block widgets a caller must bind to.
+
+    The widgets are handed back rather than bound here so this module stays
+    free of the screen's drag and menu state: it draws, and ``plan.py`` decides
+    what a press on one of these means.
+    """
+
+    frame: ctk.CTkFrame
+    slot_index: int
+    block_widgets: List[Tuple[TimeBlock, ctk.CTkFrame]] = field(default_factory=list)
+
+
+def _configure_slot_columns(frame: ctk.CTkFrame) -> None:
+    """Every column gets a width to request, following the Schedule panel.
+
+    ``_configure_date_box_columns`` in drag_schedule.py is the working sibling:
+    its date boxes also switch off grid propagation and render correctly
+    because no column is left to be sized by whatever happens to be in it.
+    """
+    frame.grid_columnconfigure(0, minsize=SLOT_TIME_WIDTH_PX)
+    frame.grid_columnconfigure(1, minsize=120, weight=1)
+    frame.grid_rowconfigure(0, weight=1)
+
+
+def slot_row_height(chips: int) -> int:
+    """How tall a box holding this many task chips is drawn.
+
+    Named rather than inlined because two tests and the renderer all need the
+    same answer, and a second copy of the arithmetic is how a layout assertion
+    starts agreeing with itself instead of with the screen.
+    """
+    return max(SLOT_MIN_HEIGHT_PX, chips * SLOT_CHIP_HEIGHT_PX + 4)
+
+
+def build_slot_row(
+    parent,
+    grid_slot,
+    items_by_id: Dict[str, ActionItem],
+    row: int,
+) -> SlotRow:
+    """One half-hour box of the day.
+
+    Purpose: TG-M7/TG-M10 -- the fixed grid, including the boxes holding more
+             than one task.
+    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m7
+    Tests:   tests/test_plan_screen.py::test_tgm71_every_slot_is_drawn
+
+    A box drawn for a lunch half hour says so and takes no tasks. A box that a
+    longer task runs through shows that task greyed and marked, so the user can
+    see what the box is spent on without it looking like a second copy of the
+    task.
     """
     palette = semantic_colors()
-    frame = ctk.CTkFrame(parent, fg_color="transparent", height=26)
-    frame.grid(row=row, column=0, sticky="ew", pady=2, padx=2)
-    frame.grid_columnconfigure(2, weight=1)
+    slot = grid_slot.slot
+    chips = len(grid_slot.starting) + len(grid_slot.continued)
+
+    if slot.is_lunch:
+        fill = palette["surface"]
+    elif grid_slot.is_empty:
+        fill = "transparent"
+    else:
+        fill = palette["surface_subtle"]
+
+    frame = ctk.CTkFrame(
+        parent,
+        fg_color=fill,
+        corner_radius=6,
+        height=slot_row_height(chips),
+        border_width=1,
+        border_color=palette["border"],
+    )
+    frame.grid(row=row, column=0, sticky="ew", pady=1, padx=2)
+    _configure_slot_columns(frame)
+    # The height is what tells the user a box holds two tasks rather than one,
+    # so it must survive its children.
     frame.grid_propagate(False)
 
+    ctk.CTkLabel(
+        frame,
+        text=slot.start_time,
+        width=SLOT_TIME_WIDTH_PX,
+        anchor="w",
+        text_color=palette["time_text"],
+        font=ctk.CTkFont(size=11),
+    ).grid(row=0, column=0, sticky="nw", padx=(8, 4), pady=4)
+
+    body = ctk.CTkFrame(frame, fg_color="transparent")
+    body.grid(row=0, column=1, sticky="nsew", padx=(0, 6), pady=2)
+    body.grid_columnconfigure(0, weight=1)
+
+    rendered = SlotRow(frame=frame, slot_index=slot.index)
+
+    if slot.is_lunch:
+        ctk.CTkLabel(
+            body,
+            text="Lunch",
+            anchor="w",
+            text_color=palette["muted_text"],
+            font=ctk.CTkFont(size=11),
+        ).grid(row=0, column=0, sticky="w")
+        return rendered
+
+    inner = 0
+    for block in grid_slot.starting:
+        chip = _build_block_chip(
+            body, block, items_by_id.get(block.item_id), inner, continued=False
+        )
+        rendered.block_widgets.append((block, chip))
+        inner += 1
+    for block in grid_slot.continued:
+        # Deliberately not added to block_widgets: a press here would start a
+        # drag of a block whose home is another box, and a right-click would
+        # offer to resize it from a box it does not start in. The box a block
+        # starts in is the one that owns it.
+        _build_block_chip(
+            body, block, items_by_id.get(block.item_id), inner, continued=True
+        )
+        inner += 1
+
+    return rendered
+
+
+def _build_block_chip(
+    parent,
+    block: TimeBlock,
+    item: Optional[ActionItem],
+    row: int,
+    *,
+    continued: bool,
+) -> ctk.CTkFrame:
+    """One task inside a box.
+
+    ``continued`` marks the second and later boxes of a longer task: shown so
+    the time is accounted for, greyed and without its controls so it is not
+    mistaken for another task.
+    """
+    palette = semantic_colors()
+    kind = BlockType.normalize(block.block_type)
+
+    chip = ctk.CTkFrame(parent, fg_color="transparent", height=SLOT_CHIP_HEIGHT_PX - 4)
+    chip.grid(row=row, column=0, sticky="ew", pady=1)
+    chip.grid_columnconfigure(0, minsize=STRIPE_WIDTH_PX + 8)
+    chip.grid_columnconfigure(1, minsize=80, weight=1)
+    chip.grid_columnconfigure(2, minsize=22)
+    chip.grid_columnconfigure(3, minsize=48)
+    chip.grid_rowconfigure(0, weight=1)
+
     stripe = ctk.CTkFrame(
-        frame, width=STRIPE_WIDTH_PX, fg_color=block_type_colors()["lunch"], corner_radius=3
+        chip,
+        width=STRIPE_WIDTH_PX,
+        fg_color=palette["border"] if continued else accent_for_block(block, item),
+        corner_radius=3,
     )
-    stripe.grid(row=0, column=0, sticky="ns", padx=(4, 8), pady=4)
+    stripe.grid(row=0, column=0, sticky="ns", padx=(0, 8))
     stripe.grid_propagate(False)
 
+    title = _block_title(block, item)
     ctk.CTkLabel(
-        frame, text=f"{start}–{end}", width=100, anchor="w",
-        text_color=palette["muted_text"],
-    ).grid(row=0, column=1, sticky="w", padx=(0, 6))
-    ctk.CTkLabel(
-        frame, text="Lunch", anchor="w", text_color=palette["muted_text"],
-    ).grid(row=0, column=2, sticky="ew")
+        chip,
+        text=f"↳ {title}" if continued else title,
+        anchor="w",
+        justify="left",
+        text_color=palette["muted_text"] if continued else palette["body_text"],
+    ).grid(row=0, column=1, sticky="ew")
 
-    return frame
+    if continued:
+        # The minutes this box gives the task that the task does not use. 45 in
+        # two boxes ends at 09:45 and leaves 15 of the second box spare, and
+        # the whole 45-vs-60 question is why this is written on screen rather
+        # than rounded away.
+        spare = spare_minutes_in_last_slot(block)
+        ctk.CTkLabel(
+            chip,
+            text=f"{spare}m spare" if spare else "same task",
+            width=48,
+            anchor="e",
+            text_color=palette["muted_text"],
+            font=ctk.CTkFont(size=11),
+        ).grid(row=0, column=3, sticky="e")
+        return chip
+
+    if kind == BlockType.ITEM:
+        DepthBarStack(chip, item.depth if item else None).grid(
+            row=0, column=2, padx=(4, 6)
+        )
+
+    ctk.CTkLabel(
+        chip,
+        text=f"{block.planned_minutes}m",
+        width=48,
+        anchor="e",
+        text_color=palette["muted_text"],
+        font=ctk.CTkFont(size=11),
+    ).grid(row=0, column=3, sticky="e")
+
+    return chip
+
+
+def build_empty_day_note(parent, row: int) -> ctk.CTkLabel:
+    """What the grid says when every box is empty.
+
+    Its own function so the drop instructions live in one place, and so the
+    note can be found by a test without matching on prose.
+    """
+    label = ctk.CTkLabel(
+        parent,
+        text=(
+            "Nothing planned yet. Drag an item from the left onto the half "
+            "hour you mean to work it."
+        ),
+        anchor="w",
+        justify="left",
+        text_color=semantic_colors()["muted_text"],
+        font=ctk.CTkFont(size=11),
+    )
+    label.grid(row=row, column=0, sticky="ew", padx=10, pady=(2, 8))
+    return label
+
+
+def build_outside_group(
+    parent,
+    blocks: List[TimeBlock],
+    items_by_id: Dict[str, ActionItem],
+    row: int,
+) -> List[Tuple[TimeBlock, ctk.CTkFrame]]:
+    """Blocks no box can hold, drawn under the grid rather than dropped.
+
+    Purpose: TG-M3 -- surface, never silently drop (P2).
+    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m3
+    Tests:   tests/test_plan_screen.py::test_tgm31_an_outside_block_is_drawn
+
+    A block gets here when Day End moved earlier than its box, when its length
+    now runs past the last box, or when it has never been placed at all. The
+    day it stops being drawn is the day the user loses planned work with
+    nothing on screen to say so.
+    """
+    palette = semantic_colors()
+    ctk.CTkLabel(
+        parent,
+        text=f"Outside the day ({len(blocks)}) — drag onto a box to place",
+        anchor="w",
+        text_color=palette["warning"],
+        font=ctk.CTkFont(size=11, weight="bold"),
+    ).grid(row=row, column=0, sticky="ew", padx=10, pady=(12, 2))
+
+    widgets: List[Tuple[TimeBlock, ctk.CTkFrame]] = []
+    for offset, block in enumerate(blocks, start=1):
+        holder = ctk.CTkFrame(
+            parent,
+            fg_color=palette["surface_subtle"],
+            corner_radius=6,
+            height=SLOT_CHIP_HEIGHT_PX,
+            border_width=1,
+            border_color=palette["warning"],
+        )
+        holder.grid(row=row + offset, column=0, sticky="ew", pady=1, padx=2)
+        holder.grid_columnconfigure(0, minsize=120, weight=1)
+        holder.grid_rowconfigure(0, weight=1)
+        holder.grid_propagate(False)
+        _build_block_chip(
+            holder, block, items_by_id.get(block.item_id), 0, continued=False
+        )
+        widgets.append((block, holder))
+    return widgets

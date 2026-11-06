@@ -269,13 +269,26 @@ class Database:
 
         # Time blocks table
         #
-        # TB-M1: block_type and position. A block is one of 'item' | 'buffer' |
-        # 'break', and its place in the day is the explicit `position` rather
-        # than its start_time -- the times are *derived* from the order plus the
-        # day's bounds (see time_block_layout.pack_day), so ordering by a
-        # computed value would make the reorder its own input.
-        # Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
-        # Tests: tests/test_time_block_schema.py::test_tbm12_block_type_and_position_round_trip
+        # TB-M1/TG-M4: block_type, slot_index and position. A block is one of
+        # 'item' | 'buffer' | 'break'; `slot_index` is which half-hour box of
+        # the day it sits in, counted from Day Start, and `position` orders the
+        # tasks that share one box.
+        #
+        # The clock columns are still written, and they are still the block's
+        # own start and end -- but they are a record, not the truth. The truth
+        # is the box, and the times are re-derived from it on read, which is
+        # what lets a Day Start change re-time every day with no write at all
+        # (TG-M6.4).
+        #
+        # `slot_index` is nullable with no default on purpose. NULL means
+        # "never placed on the grid", which is a different fact from "the first
+        # box of the day": a NOT NULL DEFAULT 0 would have piled every
+        # unmigrated block onto Day Start. The data back-fill is deliberately
+        # not here -- mapping a stored 09:30 to a box needs the user's Day
+        # Start, which this module knows nothing about and should not.
+        # DatabaseManager.adopt_legacy_day does it, on the first load of a day.
+        # Spec:  docs/implementation_plan_2026-11-05_time_grid.md#tg-m4
+        # Tests: tests/test_time_block_schema.py::test_tgm41_migration_adds_slot_index_idempotently
         conn.execute("""
             CREATE TABLE IF NOT EXISTS time_blocks (
                 id           TEXT PRIMARY KEY,
@@ -286,6 +299,7 @@ class Database:
                 planned_minutes INTEGER NOT NULL,
                 label        TEXT,
                 block_type   TEXT NOT NULL DEFAULT 'item',
+                slot_index   INTEGER,
                 position     INTEGER NOT NULL DEFAULT 0,
                 created_at   TEXT NOT NULL,
                 updated_at   TEXT NOT NULL
@@ -748,20 +762,40 @@ class Database:
         # earlier run has one of these and not the other, and an all-or-nothing
         # guard would skip the remainder forever.
         #
-        # Both are NOT NULL DEFAULT, so existing rows are back-filled by SQLite
-        # itself -- every pre-migration block becomes an 'item' at position 0.
-        # Position 0 for all of them is deliberate: their real order is already
-        # recorded in their start_time, and get_time_blocks orders by
-        # (position, start_time), so a legacy day still comes out chronological
-        # until the first reorder renumbers it.
-        # Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
-        # Tests: tests/test_time_block_schema.py::test_tbm11_migration_adds_columns_and_is_idempotent
+        # block_type and position are NOT NULL DEFAULT, so existing rows are
+        # back-filled by SQLite itself -- every pre-migration block becomes an
+        # 'item' at position 0. Position 0 for all of them is deliberate: their
+        # real order is already recorded in their start_time, and
+        # get_time_blocks orders by (slot_index, position, start_time), so a
+        # legacy day still comes out chronological until adopt_legacy_day gives
+        # each block its box.
+        #
+        # slot_index takes no default, for the reason given with the CREATE
+        # TABLE above, so SQLite back-fills it with NULL and every legacy row
+        # arrives honestly marked as not yet placed.
+        # Spec:  docs/implementation_plan_2026-11-05_time_grid.md#tg-m4
+        # Tests: tests/test_time_block_schema.py::test_tgm41_migration_adds_slot_index_idempotently
         time_block_columns = [
             row[1] for row in conn.execute("PRAGMA table_info(time_blocks)").fetchall()
         ]
         for column, definition in (
             ('block_type', "TEXT NOT NULL DEFAULT 'item'"),
             ('position', 'INTEGER NOT NULL DEFAULT 0'),
+            # TG-M4 -- which half-hour box of the day the block sits in.
+            # Deliberately NULLable and with no default: NULL means "never
+            # placed on the grid", which is a real and distinct state from
+            # "the first box of the day". Back-filling it to 0 here would pile
+            # every day's blocks onto 08:00 and call it a migration.
+            #
+            # The data back-fill is NOT done here. A stored 09:30 is box 3
+            # under an 08:00 day and box 1 under a 09:00 one, so mapping a
+            # time to a box needs the user's Day Start -- which this module,
+            # correctly, knows nothing about. DatabaseManager.adopt_legacy_day
+            # does it per day, with the real bounds, the first time that day
+            # is opened.
+            # Spec:  docs/implementation_plan_2026-11-05_time_grid.md#tg-m4
+            # Tests: tests/test_time_block_schema.py::test_tgm41_migration_adds_slot_index_idempotently
+            ('slot_index', 'INTEGER'),
         ):
             if column not in time_block_columns:
                 conn.execute(f"ALTER TABLE time_blocks ADD COLUMN {column} {definition}")
@@ -769,6 +803,11 @@ class Database:
         conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_blocks_date_position
             ON time_blocks(block_date, position)
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_blocks_date_slot
+            ON time_blocks(block_date, slot_index, position)
         """)
 
     def __enter__(self):

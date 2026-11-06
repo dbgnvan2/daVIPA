@@ -243,11 +243,16 @@ class TimeBlock:
     Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
     Tests:   tests/test_time_block_schema.py::test_tbm12_block_type_and_position_round_trip
 
-    ``start_time``/``end_time`` are *derived* values, not user input: the day's
-    order is ``position``, and the clock times come from packing that order
-    against the day's bounds (``time_block_layout.pack_day``). They are stored
-    so a day can be read back without recomputing it, and so a legacy row
-    written before TB-M1 still sorts sensibly.
+    ``start_time``/``end_time`` are *derived* values, not user input. The truth
+    is ``slot_index``: which half-hour box of the day the block sits in,
+    counted from Day Start, so moving Day Start re-times every day without
+    writing a single row. The clock times come from
+    ``time_block_layout.times_for_slot`` and are stored so a day reads back
+    without recomputing it.
+
+    ``end_time`` is the start plus the block's **own** length, not the end of
+    the last box it occupies: a 45-minute block fills two boxes and ends at
+    09:45, leaving 15 minutes of the second box spare.
     """
 
     block_date: str  # YYYY-MM-DD
@@ -258,7 +263,11 @@ class TimeBlock:
     label: Optional[str] = None
     # 'item' | 'buffer' | 'break'. See BlockType below.
     block_type: str = "item"
-    # Order within the day. Lower comes first.
+    # Which half-hour box of the day this block sits in, counted from Day
+    # Start. ``None`` means the block has never been placed on the grid.
+    slot_index: Optional[int] = None
+    # Order *within one box*. Lower comes first. A box can hold more than one
+    # task, and this is what puts them in a settled order.
     position: int = 0
     id: str = field(default_factory=lambda: str(uuid4()))
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())

@@ -6,12 +6,23 @@ Spec:    docs/implementation_plan_2026-11-05_time_blocks.md
 Tests:   tests/test_plan_screen.py
 
 The model, stated once because every method here assumes it: **a planned day
-is an order, not a set of appointments.** Nothing on this screen lets a block
-be dropped at 10:17. The user arranges blocks in the sequence they intend to
-work them, and the clock times are derived from that order, the block lengths
-and the day's bounds (``time_block_layout.pack_day``). That is why a reorder
-re-times the whole day, and why the arithmetic lives in a module with no Tk in
-it rather than in here.
+is a fixed grid of half hours.** Every half hour from Day Start to Day End is
+a box, drawn whether anything is in it or not, and a block is placed on the
+box the user drops it on. A block that is not a whole number of half hours
+rounds up -- a 45 occupies two boxes, keeps its own 45, and leaves 15 of the
+second box spare. More than one task may share a box, and a box costs 30
+minutes however many tasks are in it.
+
+Two consequences worth stating, because they are what the previous model got
+wrong:
+
+* **Gaps are legitimate.** An empty 09:00 between two filled boxes is a day
+  the user planned that way, not a state to pack away.
+* **``slot_index`` is relative to Day Start**, so moving Day Start re-times
+  every day with no write to ``time_blocks`` at all. There is nothing to
+  repack, which is why the packing machinery is gone.
+
+The arithmetic lives in ``time_block_layout``, which has no Tk in it.
 """
 
 from __future__ import annotations
@@ -27,22 +38,27 @@ from ..theme import button_style, semantic_colors, status_text_color
 from ..time_block_layout import (
     DURATION_CHOICES,
     MAX_BLOCK_MINUTES,
+    SLOT_MINUTES,
     DayBounds,
-    PackedBlock,
+    DayGrid,
+    SlotRefusal,
+    SlotRefusedError,
+    build_day_grid,
     default_minutes_for_block_type,
-    DayTooFullError,
     duration_for_item,
     is_block_day,
-    lunch_window,
-    move_block_to_gap,
-    pack_day,
-    sort_blocks,
+    slots_for_minutes,
     total_planned_minutes,
     weekday_names,
 )
 from ..widgets.date_picker import DatePickerButton
 from .drag_schedule_support import widget_contains_pointer
-from .plan_blocks import build_block_row, build_item_row, build_lunch_band
+from .plan_blocks import (
+    build_empty_day_note,
+    build_item_row,
+    build_outside_group,
+    build_slot_row,
+)
 from .plan_settings_dialog import PlanSettingsDialog
 
 if TYPE_CHECKING:
@@ -59,10 +75,38 @@ RIGHT_CLICK_SEQUENCES = ("<Button-3>", "<Button-2>")
 # be hiding the work it exists to surface.
 MAX_ITEM_ROWS = 60
 
-# Shown when a write was refused because the day's blocks would run past the
-# last time HH:MM can express. One string, because four call sites report it,
-# and a refusal worded four ways reads as four different bugs.
-DAY_TOO_FULL = "This day is too full to re-time — shorten or remove a block"
+# What each refusal reason is called on screen. Keyed by SlotRefusal, so a
+# rule added to the grid arithmetic has exactly one place to be worded here,
+# and a reason with no wording is caught by the test rather than shown to the
+# user as a bare enum value.
+#
+# These replace DAY_TOO_FULL, which reported a ceiling the grid cannot reach:
+# the last box ends at Day End, so no placement can run past what HH:MM can
+# express.
+REFUSAL_TEXT = {
+    SlotRefusal.OUTSIDE_GRID: "That is outside the day — Day Settings sets its hours",
+    SlotRefusal.CROSSES_LUNCH: "That would run into lunch — try a later box",
+    SlotRefusal.SLOT_FULL: "That half hour is full — try another box",
+}
+
+#: Said when a refusal arrives with a reason nothing here words. Better than
+#: showing the user the reason's internal name, and loud enough to be noticed.
+UNKNOWN_REFUSAL = "That block cannot go there"
+
+
+def refusal_text(reason: str) -> str:
+    """The screen's wording for a grid refusal."""
+    return REFUSAL_TEXT.get(reason, UNKNOWN_REFUSAL)
+
+
+def _clock(minutes: int) -> str:
+    """A duration as the summary says it: ``45m``, or ``2h 30m``.
+
+    One function, because the summary prints three durations side by side and
+    three formattings of the same quantity would read as three different units.
+    """
+    hours, remainder = divmod(max(0, int(minutes)), 60)
+    return f"{hours}h {remainder:02d}m" if hours else f"{remainder}m"
 
 
 class PlanScreen(ctk.CTkFrame):
@@ -91,12 +135,24 @@ class PlanScreen(ctk.CTkFrame):
         self._drag_block: Optional[TimeBlock] = None
         self._drag_label: Optional[ctk.CTkLabel] = None
         self._drag_hover_frame = None
+        #: The hovered box's own border width, so clearing the hover puts it
+        #: back instead of flattening it to 0.
+        self._drag_hover_border: int = 1
         self._block_menu: Optional[tk.Menu] = None
 
-        #: Rendered block frames in day order, so a drop can be turned into an
-        #: insertion index without asking Tk which widget is under the mouse.
-        self._block_frames: List[tuple] = []
-        self._packed: List[PackedBlock] = []
+        #: Rendered boxes, as (frame, slot_index), in day order. A drop is
+        #: turned into a slot by pointer-y against these frames rather than by
+        #: asking Tk what is under the mouse: during a drag the pointer is over
+        #: the floating drag label, not the box.
+        self._slot_frames: List[tuple] = []
+        #: The task chips this screen bound handlers to, as
+        #: (widget, block_id). Only blocks that *start* in a box are in here:
+        #: a continuation chip is drawn but owns nothing, so it carries no
+        #: drag and no menu.
+        self._block_widgets: List[tuple] = []
+        #: The grid last drawn, so the summary and the drop rules read the
+        #: same object the user is looking at.
+        self._grid: DayGrid = DayGrid()
         self._items: List[ActionItem] = []
 
         self.grid_columnconfigure(0, weight=1)
@@ -232,39 +288,38 @@ class PlanScreen(ctk.CTkFrame):
         dialog.wait_window()
 
     def on_settings_saved(self, bounds: DayBounds):
-        """The day's shape changed, so every stored time on *every* day is stale.
+        """The day's shape changed. Nothing is written, and that is the point.
 
-        Not just the date on screen. Day Start, lunch and Day End are settings,
-        so they shape every planned day; a day left holding times derived from
-        bounds that no longer exist stores values that do not follow from their
-        inputs, and the first reader to trust the stored string rather than
-        re-deriving it gets the old shape of the day.
+        Purpose: TG-M6.4 -- a block's box is stored relative to Day Start, so
+                 moving Day Start re-times every day on read. There is no
+                 stored clock time to go stale, nothing to re-pack, and no
+                 transaction that can leave one day's times derived from one
+                 set of bounds and another's from a different set.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+        Tests:   tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks
+
+        The stored ``start_time``/``end_time`` columns are still written when a
+        block is placed or resized, and they are still the block's own times --
+        but they are a record, not the truth, and the screen draws from the
+        grid. A day whose boxes no longer exist under the new bounds is
+        surfaced as outside the day rather than re-timed into one that does.
         """
         self.bounds = bounds
-        try:
-            repacked = self.db_manager.repack_all_days(self.bounds)
-        except DayTooFullError:
-            # Every day rolled back together, so the stored days still match
-            # each other -- but they no longer match the settings file, which
-            # the dialog has already written. Said plainly, because the next
-            # ordinary block edit would re-time that day alone and create the
-            # mixed state this transaction exists to prevent.
-            self.refresh()
+        self.refresh()
+
+        outside = len(self._grid.outside)
+        if outside:
+            # Said, because this is the one way a settings change can take
+            # work off the grid, and a block silently absent is the failure
+            # the "outside the day" group exists to prevent (P2).
+            noun = "block" if outside == 1 else "blocks"
             self.set_status(
-                "Day settings saved, but a day is too full to re-time:"
-                " shorten a block and change a day setting again",
-                "error",
+                f"Day settings saved — {outside} {noun} no longer fit the day;"
+                " drag them onto a box",
+                "warning",
             )
             return
-        self.refresh()
-        # Said every time, not only when more than one day moved: the whole
-        # point of the message is that the save reached days the user cannot
-        # see, and "1 day" is the one case where they could have assumed that
-        # without being told.
-        noun = "day" if len(repacked) == 1 else "days"
-        self.set_status(
-            f"Day settings saved; re-timed {len(repacked)} {noun}", "success"
-        )
+        self.set_status("Day settings saved", "success")
 
     def load_items(self):
         grid_info = self.items_scroll.grid_info()
@@ -320,55 +375,55 @@ class PlanScreen(ctk.CTkFrame):
             self.items_scroll.grid(**grid_info)
 
     def load_blocks(self):
+        """Draw the day as its grid of half hours.
+
+        Purpose: TG-M7 -- every box from Day Start to Day End, filled or not.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m7
+        Tests:   tests/test_plan_screen.py::test_tgm71_every_slot_is_drawn
+        """
         grid_info = self.blocks_scroll.grid_info()
         self.blocks_scroll.grid_remove()
         try:
             for widget in self.blocks_scroll.winfo_children():
                 widget.destroy()
-            self._block_frames = []
+            self._slot_frames = []
+            self._block_widgets = []
 
-            blocks = sort_blocks(self.db_manager.get_time_blocks(self.selected_date))
-            self._packed = pack_day(blocks, self.bounds)
+            # Place anything that has never been on the grid before drawing,
+            # so a day stored by the old model reads as a day rather than as a
+            # list of blocks outside it. Idempotent, so this is a no-op on
+            # every load after the first.
+            self.db_manager.adopt_legacy_day(self.selected_date, self.bounds)
+
+            blocks = self.db_manager.get_time_blocks(self.selected_date)
+            self._grid = build_day_grid(blocks, self.bounds)
             items_by_id = self._items_by_id(blocks)
 
             self.update_day_summary(blocks)
 
-            if not self._packed:
-                ctk.CTkLabel(
-                    self.blocks_scroll,
-                    text=(
-                        "No blocks on this day yet.\n\n"
-                        "Drag an item across from the left, or add a Buffer or Break."
-                    ),
-                    justify="left",
-                ).grid(row=0, column=0, padx=10, pady=20, sticky="w")
-                return
-
-            lunch = lunch_window(self.bounds)
             row = 0
-            for entry in self._packed:
-                if entry.pushed_after_lunch and lunch:
-                    build_lunch_band(self.blocks_scroll, row, lunch[0], lunch[1])
-                    row += 1
-
-                block = entry.block
-                # The packed times, not the stored ones: a settings change
-                # re-shapes the day on screen in the same pass that writes it,
-                # and showing the old times until the next reload would be a
-                # status that disagrees with the data (P6).
-                block.start_time = entry.start_time
-                block.end_time = entry.end_time
-
-                frame = build_block_row(
-                    self.blocks_scroll,
-                    block,
-                    items_by_id.get(block.item_id),
-                    row,
-                    overflows_day_end=entry.overflows_day_end,
+            for entry in self._grid.slots:
+                rendered = build_slot_row(
+                    self.blocks_scroll, entry, items_by_id, row
                 )
-                self.bind_block_handlers(frame, block)
-                self._block_frames.append((frame, block.id))
+                self._slot_frames.append((rendered.frame, entry.slot.index))
+                for block, widget in rendered.block_widgets:
+                    self.bind_block_handlers(widget, block)
+                    self._block_widgets.append((widget, block.id))
                 row += 1
+
+            if not blocks:
+                build_empty_day_note(self.blocks_scroll, row)
+                row += 1
+
+            # Surfaced under the grid, never dropped (P2).
+            if self._grid.outside:
+                for block, widget in build_outside_group(
+                    self.blocks_scroll, self._grid.outside, items_by_id, row
+                ):
+                    self.bind_block_handlers(widget, block)
+                    self._block_widgets.append((widget, block.id))
+                row += 1 + len(self._grid.outside)
         finally:
             self.blocks_scroll.grid(**grid_info)
 
@@ -390,11 +445,20 @@ class PlanScreen(ctk.CTkFrame):
         return found
 
     def update_day_summary(self, blocks):
-        planned = total_planned_minutes(blocks)
-        hours, minutes = divmod(planned, 60)
-        planned_text = f"{hours}h {minutes:02d}m" if hours else f"{minutes}m"
+        """Boxes used, time occupied, time planned -- all three, separately.
 
-        parts = [f"{len(blocks)} blocks", f"{planned_text} planned"]
+        Purpose: TG-M12 -- collapsing these is how the 45-in-two-boxes case
+                 becomes a lie. A 45-minute task occupies 60 minutes of the
+                 day and plans 45 of them; a summary reporting one number
+                 would have to pick which of those to be wrong about.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m12
+        Tests:   tests/test_plan_screen.py::test_tgm121_the_summary_separates_occupied_from_planned
+        """
+        parts = [
+            f"{self._grid.slots_used} of {len(self._grid.slots)} boxes",
+            f"{_clock(self._grid.minutes_occupied)} occupied",
+            f"{_clock(total_planned_minutes(blocks))} planned",
+        ]
         if not is_block_day(self.selected_date, self.bounds):
             allowed = [
                 name for name, on in zip(weekday_names(), self.bounds.block_weekdays) if on
@@ -403,9 +467,8 @@ class PlanScreen(ctk.CTkFrame):
                 "not a block day — Day Settings allows "
                 + (", ".join(allowed) if allowed else "no days")
             )
-        overflowing = sum(1 for entry in self._packed if entry.overflows_day_end)
-        if overflowing:
-            parts.append(f"{overflowing} past {self.bounds.day_end}")
+        if self._grid.outside:
+            parts.append(f"{len(self._grid.outside)} outside the day")
 
         self.day_summary.configure(text="  ·  ".join(parts))
 
@@ -414,82 +477,108 @@ class PlanScreen(ctk.CTkFrame):
 
     # ================= creating blocks ======================================
 
-    def add_padding_block(self, block_type: str):
-        """TB-M10 — append a buffer or a break to the day."""
+    def add_padding_block(self, block_type: str, slot_index: Optional[int] = None):
+        """TB-M10/TG-M9 — put a buffer or a break on a box.
+
+        With no ``slot_index`` it goes on the first box that will hold it,
+        which is what the toolbar buttons want: they are a click, not a drop,
+        so there is no box under a pointer to read.
+        """
         if not self._require_block_day():
             return
 
         minutes = default_minutes_for_block_type(block_type, self.settings)
-        # One transaction, as everywhere a write is followed by its repack: in
-        # between, the new row holds no times at all, and a repack that failed
-        # there would leave it that way with nothing in the day to show it.
-        try:
-            with self.db_manager.transaction():
-                self.db_manager.create_time_block(
-                    TimeBlock(
-                        block_date=self.selected_date,
-                        start_time="",
-                        end_time="",
-                        planned_minutes=minutes,
-                        block_type=block_type,
-                    )
+        if slot_index is None:
+            slot_index = self.first_free_slot(minutes)
+            if slot_index is None:
+                self.set_status(
+                    f"No free half hour left for a {minutes}m {block_type}", "warning"
                 )
-                self.db_manager.repack_day(self.selected_date, self.bounds)
-        except DayTooFullError:
-            # The write rolled back with the transaction. Said rather than
-            # left as a click that did nothing: a refused action and a broken
-            # one look identical from the outside.
-            self.set_status(DAY_TOO_FULL, "error")
+                return
+
+        block = TimeBlock(
+            block_date=self.selected_date,
+            start_time="",
+            end_time="",
+            planned_minutes=minutes,
+            block_type=block_type,
+        )
+        try:
+            self.db_manager.add_block_at(block, slot_index, self.bounds)
+        except SlotRefusedError as refused:
+            # Said, not left as a click that did nothing: a refused action and
+            # a broken one look identical from the outside.
+            self.set_status(refusal_text(refused.reason), "error")
             return
         self.load_blocks()
-        requested = default_minutes_for_block_type(block_type, self.settings)
-        if requested > minutes:
-            self.set_status(
-                f"Added a {minutes}m {block_type}"
-                f" (the configured {requested}m is longer than a day)",
-                "warning",
-            )
-        else:
-            self.set_status(f"Added a {minutes}m {block_type}", "success")
+        self.set_status(
+            f"Added a {minutes}m {block_type} at {block.start_time}", "success"
+        )
 
-    def block_item(self, item: ActionItem):
-        """TB-M8 — make a block for this item at the end of the day."""
+    def block_item(self, item: ActionItem, slot_index: Optional[int] = None):
+        """TG-M9 — make a block for this item on the box it was dropped on.
+
+        Purpose: the half hour the user chose, not the end of the day.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m9
+        Tests:   tests/test_plan_screen.py::test_tgm91_a_drop_lands_on_the_slot_under_the_pointer
+
+        With no ``slot_index`` — the item row's own double-click path, where
+        there is no pointer over a box to read — it takes the first box that
+        will hold it.
+        """
         if not self._require_block_day():
             return
 
         minutes = duration_for_item(item, self.bounds.default_block_minutes)
-        try:
-            with self.db_manager.transaction():
-                self.db_manager.create_time_block(
-                    TimeBlock(
-                        block_date=self.selected_date,
-                        start_time="",
-                        end_time="",
-                        planned_minutes=minutes,
-                        item_id=item.id,
-                        label=item.title,
-                        block_type=BlockType.ITEM,
-                    )
+        if slot_index is None:
+            slot_index = self.first_free_slot(minutes)
+            if slot_index is None:
+                self.set_status(
+                    f"No free half hour left for {minutes}m of {item.title}", "warning"
                 )
-                self.db_manager.repack_day(self.selected_date, self.bounds)
-        except DayTooFullError:
-            self.set_status(DAY_TOO_FULL, "error")
+                return
+
+        block = TimeBlock(
+            block_date=self.selected_date,
+            start_time="",
+            end_time="",
+            planned_minutes=minutes,
+            item_id=item.id,
+            label=item.title,
+            block_type=BlockType.ITEM,
+        )
+        try:
+            self.db_manager.add_block_at(block, slot_index, self.bounds)
+        except SlotRefusedError as refused:
+            self.set_status(refusal_text(refused.reason), "error")
             return
         self.refresh()
-        try:
-            requested = int(getattr(item, "work_block", None))
-        except (TypeError, ValueError):
-            requested = 0
-        if requested > minutes:
-            # Said, not swallowed: the item asked for a length the planner
-            # cannot store, and the block it got is not the one it asked for.
-            self.set_status(
-                f"Blocked {minutes}m for {item.title}"
-                f" (Work Block of {requested}m is longer than a day)",
-                "warning",
-            )
-        else:
-            self.set_status(f"Blocked {minutes}m for {item.title}", "success")
+
+        boxes = slots_for_minutes(minutes)
+        spare = boxes * SLOT_MINUTES - minutes
+        text = f"Blocked {minutes}m for {item.title} at {block.start_time}"
+        if spare:
+            # Said out loud, because the box the task does not fill is still
+            # spent: the next task starts at the following box, not at the
+            # minute this one ends.
+            text += f" — {boxes} boxes, {spare}m spare"
+        self.set_status(text, "success")
+
+    def first_free_slot(self, minutes: int) -> Optional[int]:
+        """The earliest box in today's grid that will hold this length.
+
+        For the paths with no pointer to read. ``None`` when the day has no
+        room, which the caller reports rather than writing anyway: a day with
+        nowhere left is a fact about the day, not a failure.
+        """
+        from ..time_block_layout import can_place
+
+        blocks = self.db_manager.get_time_blocks(self.selected_date)
+        span = slots_for_minutes(minutes)
+        for entry in self._grid.slots or build_day_grid(blocks, self.bounds).slots:
+            if not can_place(blocks, self.bounds, entry.slot.index, span):
+                return entry.slot.index
+        return None
 
     def _require_block_day(self) -> bool:
         """Refuse to write a block onto a day the user does not work.
@@ -553,27 +642,34 @@ class PlanScreen(ctk.CTkFrame):
             menu.grab_release()
 
     def set_block_minutes(self, block: TimeBlock, minutes: int):
-        """Resize one block, then re-time everything after it."""
-        previous = block.planned_minutes
-        block.planned_minutes = minutes
-        # One transaction. ``block`` still carries the end_time the last repack
-        # gave it, so between these two writes the row reads as a 30-minute
-        # block that claims 90 minutes, and the block after it still owns the
-        # minutes this one has just taken.
+        """TG-M11 — change a block's length, keeping it where it is.
+
+        Purpose: a length that will not fit from where the block sits is
+                 refused. The block is not slid to a box where it would fit:
+                 that answers a question the user did not ask.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m11
+        Tests:   tests/test_time_block_crud.py::test_tgm112_a_resize_that_does_not_fit_is_refused
+
+        The in-memory ``block`` is deliberately not mutated before the write:
+        it is the same object the row menu hands back on the next click, and a
+        refused length left on it would show a size the database refused (P6).
+        """
         try:
-            with self.db_manager.transaction():
-                self.db_manager.update_time_block(block)
-                self.db_manager.repack_day(self.selected_date, self.bounds)
-        except DayTooFullError:
-            # The row rolled back, so the in-memory object must too -- it is
-            # the same object the row menu will hand back on the next click,
-            # and leaving it holding the rejected length would show a size the
-            # database refused.
-            block.planned_minutes = previous
-            self.set_status(DAY_TOO_FULL, "error")
+            resized = self.db_manager.set_block_length(block.id, minutes, self.bounds)
+        except SlotRefusedError as refused:
+            self.set_status(refusal_text(refused.reason), "error")
+            return
+        except ValueError as error:
+            self.set_status(str(error), "error")
             return
         self.load_blocks()
-        self.set_status(f"Set block to {minutes}m", "success")
+
+        boxes = slots_for_minutes(resized.planned_minutes)
+        spare = boxes * SLOT_MINUTES - resized.planned_minutes
+        text = f"Set block to {resized.planned_minutes}m"
+        if spare:
+            text += f" — {boxes} boxes, {spare}m spare"
+        self.set_status(text, "success")
 
     def ask_custom_minutes(self, block: TimeBlock):
         dialog = ctk.CTkInputDialog(
@@ -602,13 +698,12 @@ class PlanScreen(ctk.CTkFrame):
         self.set_block_minutes(block, minutes)
 
     def delete_block(self, block_id: str):
-        try:
-            with self.db_manager.transaction():
-                self.db_manager.delete_time_block(block_id)
-                self.db_manager.repack_day(self.selected_date, self.bounds)
-        except DayTooFullError:
-            self.set_status(DAY_TOO_FULL, "error")
-            return
+        """Remove a block. Its box goes back to being empty, and stays there.
+
+        No repack: an empty box between two filled ones is a legitimate day,
+        so nothing moves up to fill the hole the delete leaves.
+        """
+        self.db_manager.delete_time_block(block_id)
         self.refresh()
         self.set_status("Block deleted", "muted")
 
@@ -675,13 +770,19 @@ class PlanScreen(ctk.CTkFrame):
         # refresh(), which destroys the very row whose ButtonRelease handler is
         # running, and tearing down the widget that is dispatching the event
         # hangs Tk. after_idle lets this handler return first.
+        target = self.slot_under_pointer()
         if kind == "item" and item is not None:
-            if self.pointer_over_day():
-                self.after_idle(lambda: self.block_item(item))
-        elif kind == "block" and block is not None:
-            target = self.drop_index_for_pointer()
             if target is not None:
-                self.after_idle(lambda: self.reorder_to(block.id, target))
+                self.after_idle(lambda: self.block_item(item, target))
+            elif self.pointer_over_day():
+                # In the day column but not on a box -- the heading, the
+                # summary, or the "outside the day" group below the grid.
+                # Reported rather than guessed at: picking a box for them
+                # would put the work somewhere they did not point.
+                self.set_status("Drop an item on a half-hour box", "muted")
+        elif kind == "block" and block is not None:
+            if target is not None:
+                self.after_idle(lambda: self.move_block_to_slot(block.id, target))
 
     def _end_drag(self):
         if self._drag_label is not None:
@@ -695,70 +796,91 @@ class PlanScreen(ctk.CTkFrame):
             self.day_drop_frame, self.winfo_pointerx(), self.winfo_pointery()
         )
 
-    def drop_index_for_pointer(self) -> Optional[int]:
-        """Where in the day order a block dropped here belongs.
+    def slot_under_pointer(self) -> Optional[int]:
+        """The box the pointer is inside, or ``None``.
 
-        The index is decided by which half of which rendered block the pointer
-        is in, so dropping on the top half of block 3 puts the dragged block
-        before it and the bottom half puts it after. Pointer-y against frame
-        midpoints rather than asking Tk what widget is underneath: during a
-        drag the pointer is over the floating drag label, not the row.
+        Purpose: TG-M9 -- the drop target is a half hour, not the pane.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m9
+        Tests:   tests/test_plan_screen.py::test_tgm91_a_drop_lands_on_the_slot_under_the_pointer
 
-        None means the drop was outside the day column, which is a cancelled
-        drag rather than a move to the end -- a release over the sidebar should
-        not quietly re-order the day.
+        Each box's own rectangle, not a midpoint rule: a box is a place, so a
+        release either lands in one or does not. ``None`` is a cancelled drag
+        and never "the nearest box" -- a release over the sidebar must not
+        quietly move the day's work.
+
+        Read from the frames' root coordinates rather than by asking Tk what is
+        under the mouse, because during a drag the pointer is over the floating
+        drag label.
         """
-        if not widget_contains_pointer(
-            self.blocks_scroll, self.winfo_pointerx(), self.winfo_pointery()
-        ):
+        x_root, y_root = self.winfo_pointerx(), self.winfo_pointery()
+        if not widget_contains_pointer(self.blocks_scroll, x_root, y_root):
             return None
 
-        y_root = self.winfo_pointery()
-        index = len(self._block_frames)
-        for position, (frame, _block_id) in enumerate(self._block_frames):
-            try:
-                top = frame.winfo_rooty()
-                middle = top + frame.winfo_height() / 2
-            except tk.TclError:
-                continue
-            if y_root < middle:
-                index = position
-                break
-        return index
+        for frame, slot_index in self._slot_frames:
+            if widget_contains_pointer(frame, x_root, y_root):
+                return slot_index
+        return None
 
-    def reorder_to(self, block_id: str, gap_index: int):
-        """Move one block into the gap the pointer was released in.
+    def move_block_to_slot(self, block_id: str, slot_index: int):
+        """TG-M11 — put a dragged block on the box it was dropped on.
 
-        ``gap_index`` is counted against the rendered rows, dragged block
-        included, which is the only thing the screen can measure. The
-        conversion to a list position lives in time_block_layout, because
-        getting it wrong here is invisible: it reorders *something*, just not
-        where the user let go.
+        Spec:  docs/implementation_plan_2026-11-05_time_grid.md#tg-m11
+        Tests: tests/test_plan_screen.py::test_tgm111_a_real_drag_moves_a_block_between_slots
+
+        A refusal is reported and nothing is written. Moving the block to some
+        other box that happens to fit would be the screen deciding where the
+        user's work goes.
         """
-        order = [bid for _frame, bid in self._block_frames]
-        new_order = move_block_to_gap(order, block_id, gap_index)
-        if new_order == order:
+        try:
+            moved = self.db_manager.place_block_at(block_id, slot_index, self.bounds)
+        except SlotRefusedError as refused:
+            self.set_status(refusal_text(refused.reason), "error")
             return
-        self.db_manager.reorder_time_blocks(self.selected_date, new_order, self.bounds)
+        except ValueError as error:
+            self.set_status(str(error), "error")
+            return
         self.load_blocks()
-        self.set_status("Day rearranged", "success")
+        self.set_status(f"Moved to {moved.start_time}", "success")
 
     def update_hover_target(self):
-        """Outline the day column while an item is being dragged onto it."""
-        if self._drag_kind != "item":
+        """Outline the box under the pointer during a drag.
+
+        The box, not the column: with a fixed grid the user is choosing a half
+        hour, and an outline around the whole pane would not tell them which
+        one they are about to get. Both kinds of drag get it, because a block
+        being moved lands on a box exactly as an item does.
+        """
+        if not self._drag_kind:
             return
-        hovered = self.day_drop_frame if self.pointer_over_day() else None
+        target = self.slot_under_pointer()
+        hovered = None
+        if target is not None:
+            for frame, slot_index in self._slot_frames:
+                if slot_index == target:
+                    hovered = frame
+                    break
         if hovered is self._drag_hover_frame:
             return
         self.clear_hover_target()
         if hovered is not None:
-            hovered.configure(border_width=2, border_color=semantic_colors()["primary_hover"])
+            self._drag_hover_border = hovered.cget("border_width")
+            hovered.configure(
+                border_width=2, border_color=semantic_colors()["primary_hover"]
+            )
             self._drag_hover_frame = hovered
 
     def clear_hover_target(self):
+        """Put the outlined box's own border back.
+
+        Restored to what it was rather than to 0: every box is drawn with a
+        1px border, so clearing to 0 would leave the last-hovered box subtly
+        different from its neighbours for the rest of the session.
+        """
         if self._drag_hover_frame is not None:
             try:
-                self._drag_hover_frame.configure(border_width=0)
+                self._drag_hover_frame.configure(
+                    border_width=self._drag_hover_border
+                )
             except tk.TclError:
                 pass
             self._drag_hover_frame = None

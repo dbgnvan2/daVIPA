@@ -1282,18 +1282,22 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
     # ==================== TIME BLOCKS ====================
 
     def create_time_block(self, block: TimeBlock) -> str:
-        """Create a time block, appending it to its day unless told otherwise.
+        """Insert a block exactly as given. Not the way the screen makes one.
 
-        Purpose: TB-M8/TB-M10 -- every way of making a block (drag an item in,
-                 add a buffer, add a break) puts it at the end of the day.
-        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m2
+        Purpose: the raw insert. ``add_block_at`` is what every screen path
+                 uses, because a block that is not on a box is not yet on the
+                 day -- it is drawn under "Outside the day" until one is
+                 chosen for it.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
         Tests:   tests/test_time_block_crud.py::test_tbm21_update_persists_duration
 
         A block whose ``position`` is still 0 -- the dataclass default -- is
-        given the next position on its day. Callers that have already worked out
-        an order (a reorder, a test fixture) set position themselves and keep it.
-        Position 0 is reserved for rows written before TB-M1, so "0 means
-        append" cannot collide with a caller's real intent.
+        given the next position on its day, so a block created with no box has
+        a stable order among the others that have none. ``_settle_block_on_slot``
+        has already set a real position by the time ``add_block_at`` gets here,
+        so that path keeps the position its box gave it. Position 0 stays
+        reserved for rows written before TB-M1, which is what lets "0 means
+        append" not collide with a caller's real intent.
         """
         if not block.position:
             block.position = self._next_block_position(block.block_date)
@@ -1301,12 +1305,14 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         self.db.conn.execute("""
             INSERT INTO time_blocks (
                 id, item_id, block_date, start_time, end_time,
-                planned_minutes, label, block_type, position, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                planned_minutes, label, block_type, slot_index, position,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             block.id, block.item_id, block.block_date,
             block.start_time, block.end_time, block.planned_minutes,
-            block.label, BlockType.normalize(block.block_type), block.position,
+            block.label, BlockType.normalize(block.block_type),
+            block.slot_index, block.position,
             block.created_at, block.updated_at
         ))
         self.db.conn.commit()
@@ -1338,11 +1344,13 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         self.db.conn.execute("""
             UPDATE time_blocks
             SET item_id = ?, start_time = ?, end_time = ?, planned_minutes = ?,
-                label = ?, block_type = ?, position = ?, updated_at = ?
+                label = ?, block_type = ?, slot_index = ?, position = ?,
+                updated_at = ?
             WHERE id = ?
         """, (
             block.item_id, block.start_time, block.end_time, block.planned_minutes,
-            block.label, BlockType.normalize(block.block_type), block.position,
+            block.label, BlockType.normalize(block.block_type),
+            block.slot_index, block.position,
             block.updated_at, block.id
         ))
         self.db.conn.commit()
@@ -1350,147 +1358,249 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
     def get_time_blocks(self, block_date: str) -> List[TimeBlock]:
         """Blocks for one date, in the order the day runs.
 
-        Ordered by ``position`` then ``start_time``. The second key carries
-        legacy rows: every block written before TB-M1 has position 0, so
-        position alone would order a migrated day arbitrarily -- their real
-        sequence is still in the start_time they were created with.
+        Ordered by ``slot_index`` then ``position`` then ``start_time``: which
+        box, then where in the box, then a stable tie-break. The last key
+        carries rows written before the grid existed -- they have no
+        ``slot_index`` at all, and SQLite sorts NULL first, so they come out
+        in the order their old clock times give them until
+        ``adopt_legacy_day`` places them.
+
+        Spec:  docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+        Tests: tests/test_time_block_crud.py::test_tgm61_two_blocks_share_a_slot
         """
         rows = self.db.conn.execute(
             """
             SELECT * FROM time_blocks
             WHERE block_date = ?
-            ORDER BY position, start_time
+            ORDER BY slot_index, position, start_time
             """,
             (block_date,)
         ).fetchall()
         return [self._row_to_time_block(row) for row in rows]
 
-    def repack_day(self, block_date: str, bounds) -> List[TimeBlock]:
-        """Recompute and store every clock time on one day.
+    # =================================================================
+    # The 30-minute grid (TG-M6)
+    #
+    # Every write is "put this block in that box". The clock times are
+    # derived from the box and written alongside in the same transaction, so
+    # a row never exists claiming a time its box does not give it.
+    # Spec: docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+    # =================================================================
 
-        Purpose: TB-M3/TB-M9 -- a day's times are derived from its order, its
-                 block lengths and the day's bounds, so any change to those
-                 three has to re-time everything after it.
-        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m2
-        Tests:   tests/test_time_block_crud.py::test_tbm22_reorder_yields_unique_contiguous_times
+    def get_time_block(self, block_id: str) -> Optional[TimeBlock]:
+        """One block by id, or ``None``."""
+        row = self.db.conn.execute(
+            "SELECT * FROM time_blocks WHERE id = ?", (block_id,)
+        ).fetchone()
+        return self._row_to_time_block(row) if row else None
 
-        All or nothing: a day left half re-timed would hold overlapping blocks
-        that no further edit would clean up, because the next repack would start
-        from the broken state and reproduce it.
+    def _next_position_in_slot(
+        self, block_date: str, slot_index: int, ignoring: Optional[str] = None
+    ) -> int:
+        """One past the highest position already in that box.
+
+        ``position`` orders tasks *within* a box now. A box holds more than
+        one task, so this is what settles which title is drawn first and keeps
+        that answer the same between loads.
         """
-        from .time_block_layout import (
-            DayTooFullError,
-            pack_day,
-            renumber,
-            sort_blocks,
+        row = self.db.conn.execute(
+            """
+            SELECT MAX(position) AS highest FROM time_blocks
+            WHERE block_date = ? AND slot_index = ? AND id IS NOT ?
+            """,
+            (block_date, int(slot_index), ignoring),
+        ).fetchone()
+        highest = row["highest"] if row and row["highest"] is not None else 0
+        return int(highest) + 1
+
+    def _settle_block_on_slot(self, block: TimeBlock, slot_index: int, bounds) -> None:
+        """Give a block its box, its order in that box, and its clock times.
+
+        One place, because a write that set the box and forgot the times would
+        leave a row whose stored start is from wherever it used to be -- and
+        nothing on screen reads the stored time, so it would stay wrong until
+        somebody opened the database.
+        """
+        from .time_block_layout import times_for_slot
+
+        block.slot_index = int(slot_index)
+        block.position = self._next_position_in_slot(
+            block.block_date, slot_index, ignoring=block.id
+        )
+        block.start_time, block.end_time = times_for_slot(
+            slot_index, block.planned_minutes, bounds
         )
 
-        blocks = sort_blocks(self.get_time_blocks(block_date))
-        # Renumber as well as re-time. A repack that fixed the clock times but
-        # left a migrated day's positions at 0 would leave the two disagreeing,
-        # and every later read would have to re-derive the order from the times
-        # all over again. After any repack, position is the day's order.
-        renumber(blocks)
-        packed = pack_day(blocks, bounds)
+    def _refuse_unless_it_fits(
+        self, block_date: str, slot_index: int, minutes: int, bounds, ignoring=None
+    ) -> None:
+        """Raise ``SlotRefusedError`` unless the grid allows this placement."""
+        from .time_block_layout import SlotRefusedError, can_place, slots_for_minutes
 
-        # Refused before anything is written, not clamped. Past the last time
-        # HH:MM can express, format_hhmm clamps, so the row would be stored
-        # with an end time that is not its start plus its duration -- and the
-        # per-block ceiling cannot catch it, because this is a property of the
-        # day: four blocks of exactly a day each are individually legal and
-        # together unwritable. Raised rather than trimmed, because dropping
-        # part of a day the user built is not this function's call (P2).
-        unwritable = [entry for entry in packed if not entry.fits_the_clock]
-        if unwritable:
-            raise DayTooFullError(
-                f"{block_date} has {len(packed)} blocks running past the last"
-                " time the clock can express; shorten or remove one"
-            )
+        reason = can_place(
+            self.get_time_blocks(block_date),
+            bounds,
+            slot_index,
+            slots_for_minutes(minutes),
+            ignoring=ignoring,
+        )
+        if reason:
+            raise SlotRefusedError(reason)
 
-        with self.transaction():
-            for entry in packed:
-                self.db.conn.execute(
-                    """
-                    UPDATE time_blocks
-                    SET start_time = ?, end_time = ?, position = ?, updated_at = ?
-                    WHERE id = ?
-                    """,
-                    (
-                        entry.start_time,
-                        entry.end_time,
-                        entry.block.position,
-                        datetime.now().isoformat(),
-                        entry.block.id,
-                    ),
-                )
+    def add_block_at(self, block: TimeBlock, slot_index: int, bounds) -> TimeBlock:
+        """Create a block in a particular box.
 
-        for entry in packed:
-            entry.block.start_time = entry.start_time
-            entry.block.end_time = entry.end_time
-        return [entry.block for entry in packed]
+        Purpose: TG-M9 -- an item dropped on the 10:00 box becomes a block at
+                 the 10:00 box, not one appended to the end of the day.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+        Tests:   tests/test_time_block_crud.py::test_tgm61_two_blocks_share_a_slot
 
-    def repack_all_days(self, bounds) -> List[str]:
-        """Re-time every day that holds blocks, and say which ones were re-timed.
-
-        Purpose: TB-M4 -- the day bounds are a setting, not a property of the
-                 date on screen. Changing Day Start re-shapes every planned
-                 day, so leaving the others holding times derived from bounds
-                 that no longer exist stores values that do not follow from
-                 their inputs (P6).
-        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
-        Tests:   tests/test_time_block_crud.py::test_tbm4_a_settings_change_repacks_every_day
-
-        One transaction for all of them: a half-applied bounds change would
-        leave some days on the old shape and some on the new, with nothing to
-        say which, and the next repack would start from that.
+        The fit is checked before anything is written, so a refusal leaves the
+        day exactly as it was rather than rolling a write back.
         """
+        self._refuse_unless_it_fits(
+            block.block_date, slot_index, block.planned_minutes, bounds
+        )
+        with self.transaction():
+            self._settle_block_on_slot(block, slot_index, bounds)
+            self.create_time_block(block)
+        return block
+
+    def place_block_at(self, block_id: str, slot_index: int, bounds) -> TimeBlock:
+        """Move an existing block to another box.
+
+        Purpose: TG-M11 -- dragging a block up or down the day.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+        Tests:   tests/test_time_block_crud.py::test_tgm62_a_failed_move_writes_nothing
+
+        The block does not count against the room in the box it is moving to
+        if it is already there, which is what lets it be nudged inside a full
+        box instead of being refused by its own presence.
+        """
+        block = self.get_time_block(block_id)
+        if block is None:
+            raise ValueError(f"no time block {block_id!r}")
+
+        self._refuse_unless_it_fits(
+            block.block_date, slot_index, block.planned_minutes, bounds,
+            ignoring=block.id,
+        )
+        with self.transaction():
+            self._settle_block_on_slot(block, slot_index, bounds)
+            self.update_time_block(block)
+        return block
+
+    def set_block_length(self, block_id: str, minutes: int, bounds) -> TimeBlock:
+        """Change a block's length, keeping it where it is.
+
+        Purpose: TG-M11 -- the right-click menu's lengths.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+        Tests:   tests/test_time_block_crud.py::test_tgm112_a_resize_that_does_not_fit_is_refused
+
+        A length that would not fit from where the block sits is refused and
+        the block does not move. Silently sliding it somewhere it does fit
+        would answer a question the user did not ask.
+        """
+        from .time_block_layout import clamp_block_minutes
+
+        block = self.get_time_block(block_id)
+        if block is None:
+            raise ValueError(f"no time block {block_id!r}")
+        if block.slot_index is None:
+            raise ValueError(f"time block {block_id!r} is not on the grid")
+
+        wanted = clamp_block_minutes(minutes)
+        self._refuse_unless_it_fits(
+            block.block_date, block.slot_index, wanted, bounds, ignoring=block.id
+        )
+        with self.transaction():
+            block.planned_minutes = wanted
+            self._settle_block_on_slot(block, block.slot_index, bounds)
+            self.update_time_block(block)
+        return block
+
+    def adopt_legacy_day(self, block_date: str, bounds) -> List[str]:
+        """Give a box to every block on this day that has never had one.
+
+        Purpose: TG-M5 -- the days already in the database, mapped onto the
+                 grid the first time that day is opened.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
+        Tests:   tests/test_time_block_schema.py::test_tgm51_existing_times_map_to_slots
+
+        Done here rather than in the schema migration because a stored 09:30
+        is box 3 under an 08:00 day and box 1 under a 09:00 one -- the mapping
+        needs the user's Day Start, which ``database.py`` knows nothing about.
+
+        Two cases, and the difference is whether the row holds a time the user
+        can be said to have chosen:
+
+        * **A readable start time** goes on the box that time names, or
+          nowhere. If that box will not hold it -- the time is past Day End,
+          before Day Start, in lunch, or the box is already full -- the block
+          keeps its ``NULL`` and ``build_day_grid`` surfaces it as outside the
+          day (P2). It is not quietly dropped, and it is not slid to the
+          nearest free box: that would move planned work to an hour the user
+          never picked and say nothing about it. The user moves it or shortens
+          it.
+        * **No readable start time** -- a row written between a create and its
+          repack, which the old model allowed -- takes the first box that will
+          hold it. There is no time to honour, so this invents nothing.
+        """
+        from .time_block_layout import (
+            TimeFormatError,
+            can_place,
+            day_grid,
+            parse_hhmm,
+            slot_index_for_time,
+            slots_for_minutes,
+        )
+
         rows = self.db.conn.execute(
-            "SELECT DISTINCT block_date FROM time_blocks ORDER BY block_date"
+            """
+            SELECT * FROM time_blocks
+            WHERE block_date = ? AND slot_index IS NULL
+            ORDER BY position, start_time
+            """,
+            (block_date,),
         ).fetchall()
-        dates = [row[0] for row in rows if row[0]]
+        if not rows:
+            return []
+
+        every_box = range(len(day_grid(bounds)))
+        adopted: List[str] = []
         with self.transaction():
-            for block_date in dates:
-                self.repack_day(block_date, bounds)
-        return dates
+            for row in rows:
+                block = self._row_to_time_block(row)
+                span = slots_for_minutes(block.planned_minutes)
 
-    def reorder_time_blocks(self, block_date: str, ordered_ids: List[str], bounds) -> List[TimeBlock]:
-        """Put a day's blocks in the given order and re-time them.
+                try:
+                    parse_hhmm(block.start_time)
+                except TimeFormatError:
+                    # Nothing to honour, so any box that fits will do.
+                    candidates = every_box
+                else:
+                    # One candidate only. A readable time is the user's
+                    # choice; the single box it names is the only box this
+                    # block may be adopted onto.
+                    named = slot_index_for_time(block.start_time, bounds)
+                    candidates = [] if named is None else [named]
 
-        Purpose: TB-M11 -- the write behind "drag blocks to rearrange them".
-        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m2
-        Tests:   tests/test_time_block_crud.py::test_tbm22_reorder_yields_unique_contiguous_times
+                for candidate in candidates:
+                    if can_place(
+                        self.get_time_blocks(block_date), bounds, candidate, span
+                    ):
+                        continue
+                    self._settle_block_on_slot(block, candidate, bounds)
+                    self.update_time_block(block)
+                    adopted.append(block.id)
+                    break
+        return adopted
 
-        Ids not present on the day are ignored, and blocks the caller left out
-        keep their relative order *after* the ones it named -- a stale id list
-        from a screen that has not refreshed must not delete a block from the
-        day's order by omission.
-
-        Renumbering and re-timing happen in one transaction. Half of a reorder
-        is worse than none of it: the day would hold two blocks claiming the
-        same minutes, and nothing in the UI would show which.
-        """
-        from .time_block_layout import renumber, sort_blocks
-
-        existing = sort_blocks(self.get_time_blocks(block_date))
-        by_id = {block.id: block for block in existing}
-
-        ordered: List[TimeBlock] = []
-        for block_id in ordered_ids:
-            block = by_id.pop(block_id, None)
-            if block is not None:
-                ordered.append(block)
-        # Anything the caller did not name keeps its existing relative order.
-        ordered.extend(block for block in existing if block.id in by_id)
-
-        renumber(ordered)
-
-        with self.transaction():
-            for block in ordered:
-                self.db.conn.execute(
-                    "UPDATE time_blocks SET position = ?, updated_at = ? WHERE id = ?",
-                    (block.position, datetime.now().isoformat(), block.id),
-                )
-            return self.repack_day(block_date, bounds)
+    # ``repack_day``, ``repack_all_days`` and ``reorder_time_blocks`` were
+    # here. Every one of them existed to re-derive stored clock times from a
+    # day's order. A block's box is stored relative to Day Start, so its times
+    # follow from the box on read and a settings change writes nothing at all
+    # (TG-M6.4). ``place_block_at`` above replaces the reorder.
 
     def get_items_for_start_date(
         self,
@@ -2433,6 +2543,16 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         except (IndexError, KeyError):
             position = 0
 
+        # NULL stays None rather than becoming 0: "never placed" and "the
+        # first box of the day" are different facts, and collapsing them here
+        # would put every unmigrated block at 08:00.
+        try:
+            slot_index = row["slot_index"]
+        except (IndexError, KeyError):
+            slot_index = None
+        if slot_index is not None:
+            slot_index = int(slot_index)
+
         return TimeBlock(
             id=row["id"],
             item_id=row["item_id"],
@@ -2442,6 +2562,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             planned_minutes=row["planned_minutes"],
             label=row["label"],
             block_type=BlockType.normalize(block_type),
+            slot_index=slot_index,
             position=int(position or 0),
             created_at=row["created_at"],
             updated_at=row["updated_at"]

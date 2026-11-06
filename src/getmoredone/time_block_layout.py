@@ -112,12 +112,13 @@ def parse_clock_time(value: Optional[str], *, default: Optional[str] = None) -> 
     Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
     Tests: tests/test_time_block_layout.py::test_a_clock_time_past_midnight_is_refused
 
-    ``parse_hhmm`` deliberately accepts an hour past 23, because ``format_hhmm``
-    writes one: a block that overruns the day gets an end_time like ``25:30``,
-    and ``sort_blocks`` has to be able to read that back. A day *bound* is a
-    different thing -- a point on one clock face. Accepting ``25:00`` as a Day
-    End puts the end of the day beyond any block's reach, so the overrun
-    warning that is Day End's only job can never fire again.
+    ``parse_hhmm`` deliberately accepts an hour past 23, because
+    ``format_hhmm`` can write one and a hand-edited or legacy row may hold one;
+    reading such a row has to be possible, if only so ``slot_index_for_time``
+    can decide it belongs nowhere on the grid. A day *bound* is a different
+    thing -- a point on one clock face. Accepting ``25:00`` as a Day End puts
+    the end of the day beyond any box, so the grid would have no last box and
+    every placement would be legal.
 
     ``default`` makes this total, for the same reason ``parse_hhmm`` has one and
     for one more. The settings dialog wants the raise, so it can name the field
@@ -149,7 +150,7 @@ class DayBounds:
     """The shape of a planning day: when it starts, when lunch is, when it ends.
 
     Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
-    Tests: tests/test_time_block_layout.py::test_tbm31_blocks_pack_from_day_start
+    Tests: tests/test_time_grid.py::test_tgm11_grid_covers_the_day_in_half_hours
 
     Frozen, and built through ``from_settings``, so a screen cannot drift the
     day's shape halfway through packing it.
@@ -336,178 +337,27 @@ def priority_band(score: Optional[int]) -> str:
     return UNSCORED_BAND
 
 
-class DayTooFullError(Exception):
-    """A day whose blocks run past the last time ``HH:MM`` can express.
-
-    Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m3
-    Tests: tests/test_time_block_crud.py::test_a_day_too_full_to_write_is_refused
-
-    Raised by the writer, never by the display path. Past
-    ``MAX_FORMATTED_MINUTES`` ``format_hhmm`` clamps, so the row would be stored
-    with an end time that is not its start plus its duration -- and the
-    per-block ceiling cannot prevent it, because the ceiling bounds one block
-    and this is a property of the day. Four blocks of exactly a day each are
-    individually legal and together unrepresentable.
-    """
-
-
-@dataclass
-class PackedBlock:
-    """A block with the clock times its place in the day gives it."""
-
-    block: TimeBlock
-    start_minutes: int
-    end_minutes: int
-    #: True when this block ends after the configured day end. It is reported,
-    #: never dropped: a day the user has over-filled is something to show them,
-    #: not something to silently discard part of (P2).
-    overflows_day_end: bool = False
-    #: True when this block was moved past lunch to avoid straddling it, so the
-    #: screen knows where to draw the lunch band.
-    pushed_after_lunch: bool = False
-
-    @property
-    def start_time(self) -> str:
-        return format_hhmm(self.start_minutes)
-
-    @property
-    def end_time(self) -> str:
-        return format_hhmm(self.end_minutes)
-
-    @property
-    def planned_minutes(self) -> int:
-        return max(0, self.end_minutes - self.start_minutes)
-
-    @property
-    def fits_the_clock(self) -> bool:
-        """Whether this block's times can be stored without being clamped.
-
-        ``format_hhmm`` clamps at ``MAX_FORMATTED_MINUTES``, so a block past it
-        would be written with an end time that is not its start plus its
-        duration. The display path tolerates that; the writer must not.
-        """
-        return self.end_minutes <= MAX_FORMATTED_MINUTES
-
-
-def pack_day(blocks: Sequence[TimeBlock], bounds: DayBounds) -> List[PackedBlock]:
-    """Assign clock times to an ordered sequence of blocks.
-
-    Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m3
-    Tests: tests/test_time_block_layout.py::test_tbm31_blocks_pack_from_day_start
-
-    Blocks are packed back to back from the day's start, in the order given --
-    the caller has already sorted them, because the order *is* the plan.
-
-    A block that would straddle lunch is moved **whole** to after lunch rather
-    than split across it. Splitting would be the obvious implementation and the
-    wrong one: half an hour of deep work before lunch and half an hour after is
-    not the same thing as an hour of it, and the planner should not quietly
-    claim otherwise.
-
-    Blocks that run past the day's end are returned with ``overflows_day_end``
-    set. Nothing is refused and nothing is trimmed here; over-filling a day is
-    the user's business, and the screen's job is to show it.
-    """
-    packed: List[PackedBlock] = []
-    cursor = bounds.day_start_minutes
-    lunch_start = bounds.lunch_start_minutes
-    lunch_end = bounds.lunch_end_minutes
-    has_lunch = bounds.lunch_length > 0
-    day_end = bounds.day_end_minutes
-
-    for block in blocks:
-        duration = _positive_int(getattr(block, "planned_minutes", None), bounds.default_block_minutes)
-
-        pushed = False
-        # Straddles lunch when it starts before lunch ends and would still be
-        # running once lunch has begun. A block that starts exactly at
-        # lunch_start is inside lunch, and moves too.
-        if has_lunch and cursor < lunch_end and cursor + duration > lunch_start:
-            cursor = lunch_end
-            pushed = True
-
-        start = cursor
-        end = start + duration
-        packed.append(
-            PackedBlock(
-                block=block,
-                start_minutes=start,
-                end_minutes=end,
-                overflows_day_end=end > day_end,
-                pushed_after_lunch=pushed,
-            )
-        )
-        cursor = end
-
-    return packed
-
-
-def sort_blocks(blocks: Iterable[TimeBlock]) -> List[TimeBlock]:
-    """Blocks in the order the day runs: position first, then stored time.
-
-    The secondary key carries legacy rows. Every block written before TB-M1 has
-    position 0, so position alone would order a migrated day arbitrarily --
-    their real sequence is still in the start_time they were created with.
-    """
-    return sorted(
-        blocks,
-        key=lambda block: (
-            _positive_int(getattr(block, "position", None), 0),
-            parse_hhmm(getattr(block, "start_time", None), default="00:00"),
-        ),
-    )
-
-
-def renumber(blocks: Sequence[TimeBlock]) -> None:
-    """Stamp 1..n onto the given order, in place.
-
-    Positions start at 1, not 0: 0 is the value every legacy row carries, and
-    keeping it reserved means ``sort_blocks`` can tell a renumbered day from a
-    migrated one.
-    """
-    for index, block in enumerate(blocks, start=1):
-        block.position = index
-
-
-def move_block(order: Sequence[str], block_id: str, target_index: int) -> List[str]:
-    """The id order after dragging ``block_id`` to ``target_index``.
-
-    Pure list arithmetic, kept out of the screen so the reorder can be tested
-    without a mouse. ``target_index`` is the position the block should occupy
-    once removed from its old place; out-of-range values clamp to the ends, and
-    an id that is not in the order is returned unchanged rather than appended --
-    a drag of something that is no longer there must not resurrect it.
-    """
-    ids = list(order)
-    if block_id not in ids:
-        return ids
-    ids.remove(block_id)
-    index = max(0, min(int(target_index), len(ids)))
-    ids.insert(index, block_id)
-    return ids
-
-
-def move_block_to_gap(order: Sequence[str], block_id: str, gap_index: int) -> List[str]:
-    """The id order after dropping ``block_id`` into the gap at ``gap_index``.
-
-    Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m11
-    Tests: tests/test_time_block_layout.py::test_a_downward_drop_lands_in_the_gap_it_was_dropped_in
-
-    ``gap_index`` is counted against the list **as rendered** -- the dragged
-    block still in it -- because that is the only thing the screen can measure:
-    it compares the pointer against the midpoints of the rows actually on
-    screen. ``move_block`` counts against the list with the block already
-    removed. The two differ by one for a downward move, and passing a rendered
-    gap index straight to ``move_block`` is why every downward drag used to
-    land one place too far.
-    """
-    ids = list(order)
-    if block_id not in ids:
-        return ids
-    gap = max(0, min(int(gap_index), len(ids)))
-    if ids.index(block_id) < gap:
-        gap -= 1
-    return move_block(ids, block_id, gap)
+# ---------------------------------------------------------------------------
+# Retired with the order-based model (TG, 2026-11-05)
+#
+# ``DayTooFullError``, ``PackedBlock``, ``pack_day``, ``sort_blocks``,
+# ``renumber``, ``move_block`` and ``move_block_to_gap`` lived here.
+#
+# A planned day was an *order*: ``position`` was the truth, and the clock times
+# were derived by walking that order from Day Start, past lunch, until the day
+# ran out -- which is what ``DayTooFullError`` reported. A fixed grid stores the
+# box instead, so there is nothing to pack and no ceiling to run past: the last
+# box ends at Day End. ``position`` keeps its name and now orders the tasks
+# *inside* one box, which ``_next_position_in_slot`` assigns directly, so
+# nothing renumbers a day any more. A drop names a box, so there is no "between
+# rows 2 and 3" gap to convert into a list position.
+#
+# Deleted rather than left unused: a guard that can no longer fire is the thing
+# this repo's checklist warns about (P27), because the next reader takes its
+# presence as evidence that the case it names still exists.
+#
+# ``sort_blocks_by_slot`` below is the replacement for ``sort_blocks``.
+# ---------------------------------------------------------------------------
 
 
 def total_planned_minutes(blocks: Iterable[TimeBlock]) -> int:
@@ -518,31 +368,11 @@ def total_planned_minutes(blocks: Iterable[TimeBlock]) -> int:
     )
 
 
-# TB-M12 — a block's height tracks its length, so a 90 reads as three times a
-# 30 at a glance. 1.1 px per minute keeps the common lengths exactly
-# proportional (30 -> 33, 60 -> 66, 90 -> 99) rather than nearly so.
-PIXELS_PER_MINUTE = 1.1
-# A 5-minute break at 1.1 px/min would be 6 pixels tall: too small to see,
-# read or right-click. Short blocks stop shrinking here, which is the one place
-# proportionality is deliberately given up.
-MIN_BLOCK_HEIGHT_PX = 26
-
-
-def block_height(minutes: Optional[int]) -> int:
-    """Pixel height for a block of this many minutes.
-
-    Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m12
-    Tests: tests/test_time_block_layout.py::test_block_height_is_proportional_to_minutes
-    """
-    length = _positive_int(minutes, FALLBACK_BLOCK_MINUTES)
-    return max(MIN_BLOCK_HEIGHT_PX, round(length * PIXELS_PER_MINUTE))
-
-
-def lunch_window(bounds: DayBounds) -> Optional[Tuple[str, str]]:
-    """The lunch band as ``(start, end)``, or None when lunch is zero minutes."""
-    if bounds.lunch_length <= 0:
-        return None
-    return format_hhmm(bounds.lunch_start_minutes), format_hhmm(bounds.lunch_end_minutes)
+# ``PIXELS_PER_MINUTE``, ``MIN_BLOCK_HEIGHT_PX``, ``block_height`` and
+# ``lunch_window`` were here. A row's height encoded its block's length when a
+# row *was* a block; a box is half an hour whatever is in it, and its height
+# comes from how many tasks share it (``plan_blocks.slot_row_height``). Lunch
+# is a marked box in the grid, so the separate band those fed is gone too.
 
 
 def default_minutes_for_block_type(block_type: str, settings=None) -> int:
@@ -562,3 +392,352 @@ def default_minutes_for_block_type(block_type: str, settings=None) -> int:
             getattr(settings, "default_time_block_minutes", None), FALLBACK_BLOCK_MINUTES
         )
     )
+
+
+# =========================================================================
+# The 30-minute grid (TG-M1, TG-M2, TG-M3)
+#
+# A planned day is a fixed grid of half hours, not an order. Every slot from
+# Day Start to Day End exists whether or not anything sits in it, and a block
+# is placed on the slot the user drops it on. Gaps are legitimate: an empty
+# 09:00 between two filled slots is a day someone planned that way, not a
+# state to be packed away.
+#
+# Spec: docs/implementation_plan_2026-11-05_time_grid.md#m1
+# =========================================================================
+
+SLOT_MINUTES = 30
+
+# What a slot row can draw legibly, not a rule about how people work. A box is
+# worth 30 minutes however many tasks share it, so there is no arithmetic
+# reason for a ceiling -- past about four titles the row stops being readable,
+# which is the only reason this number exists. Promoted to a named constant
+# rather than buried in the check (P4), so the day it needs changing it is one
+# edit and the reason is written down beside it.
+MAX_BLOCKS_PER_SLOT = 4
+
+
+class SlotRefusedError(Exception):
+    """A placement the grid does not allow, carrying which rule said no.
+
+    Raised rather than returned by the database writes, because by then the
+    caller has asked for something specific and "it did not happen" has to be
+    impossible to ignore. ``reason`` is a ``SlotRefusal`` value, so one screen
+    string per rule rather than one string for every refusal.
+    """
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
+class SlotRefusal:
+    """Why a placement was refused, as named values rather than a bare False.
+
+    Four call sites report these, and a refusal worded four ways reads to a
+    user as four different bugs -- the lesson ``DAY_TOO_FULL`` taught the
+    previous model. The screen maps each to one sentence.
+    """
+
+    OUTSIDE_GRID = "outside_grid"
+    CROSSES_LUNCH = "crosses_lunch"
+    SLOT_FULL = "slot_full"
+
+
+@dataclass(frozen=True)
+class Slot:
+    """One half hour of a planned day."""
+
+    index: int
+    start_minutes: int
+    is_lunch: bool
+
+    @property
+    def end_minutes(self) -> int:
+        return self.start_minutes + SLOT_MINUTES
+
+    @property
+    def start_time(self) -> str:
+        return format_hhmm(self.start_minutes)
+
+    @property
+    def end_time(self) -> str:
+        return format_hhmm(self.end_minutes)
+
+
+def day_grid(bounds: DayBounds) -> List[Slot]:
+    """Every half hour from Day Start to Day End, in order.
+
+    Purpose: the fixed set of boxes a day offers, which is the thing items are
+             dropped onto.
+    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m1
+    Tests:   tests/test_time_grid.py::test_tgm11_grid_covers_the_day_in_half_hours
+
+    A slot that would run past Day End is not produced at all, so a Day End of
+    16:45 gives a last slot of 16:00--16:30 rather than a 15-minute stub that
+    nothing can hold. Lunch slots are **marked, not removed**: the grid stays
+    contiguous in time, which is what lets a span's end be its start plus its
+    length without walking the list.
+    """
+    start = bounds.day_start_minutes
+    end = bounds.day_end_minutes
+    lunch_start = bounds.lunch_start_minutes
+    lunch_end = bounds.lunch_end_minutes
+
+    slots: List[Slot] = []
+    index = 0
+    at = start
+    while at + SLOT_MINUTES <= end:
+        # Overlap, not containment: a lunch of 12:15--12:45 makes both the
+        # 12:00 and the 12:30 slot unavailable, because a block in either
+        # would run through part of it.
+        overlaps_lunch = (
+            bounds.lunch_length > 0 and at < lunch_end and lunch_start < at + SLOT_MINUTES
+        )
+        slots.append(Slot(index=index, start_minutes=at, is_lunch=overlaps_lunch))
+        index += 1
+        at += SLOT_MINUTES
+    return slots
+
+
+def slots_for_minutes(minutes: Optional[int]) -> int:
+    """How many boxes a block of this length occupies, rounding up.
+
+    Purpose: 45 minutes takes two boxes. The item keeps its own 45; the grid it
+             occupies is 60, and the screen shows both because they are
+             different facts.
+    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m2
+    Tests:   tests/test_time_grid.py::test_tgm21_odd_lengths_round_up
+
+    Never zero: a block with a nonsense length still has to be somewhere, and a
+    zero-slot block would be invisible and undraggable rather than obviously
+    wrong.
+    """
+    value = _positive_int(minutes, FALLBACK_BLOCK_MINUTES)
+    return max(1, -(-value // SLOT_MINUTES))
+
+
+def spare_minutes_in_last_slot(block: TimeBlock) -> int:
+    """Minutes of the block's last box that the block itself does not use.
+
+    Purpose: TG-M2 -- the 45-in-two-boxes case, said out loud.
+    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m2
+    Tests:   tests/test_time_grid.py::test_the_spare_minutes_of_the_last_box_are_what_the_task_leaves
+
+    A 45-minute task occupies two boxes and ends at 09:45, so 15 minutes of
+    the 09:30 box are spare. Spare, not free: the next task starts at 10:00,
+    because a box is the unit the day is planned in. This number exists so the
+    screen can show the gap rather than let the user discover it by arithmetic
+    -- and so that the day summary's "occupied" and "planned" totals have a
+    stated reason to differ.
+    """
+    minutes = _positive_int(getattr(block, "planned_minutes", None), 0)
+    if minutes <= 0:
+        return 0
+    return slots_for_minutes(minutes) * SLOT_MINUTES - minutes
+
+
+def slot_span_of(block: TimeBlock) -> int:
+    """The span of a stored block, derived from its length and never stored.
+
+    Two columns that can disagree about one fact is the failure this project
+    already catalogues (P6), so ``span`` is computed everywhere it is needed
+    rather than written beside ``planned_minutes``.
+    """
+    return slots_for_minutes(getattr(block, "planned_minutes", None))
+
+
+def can_place(
+    blocks: Sequence[TimeBlock],
+    bounds: DayBounds,
+    slot_index: int,
+    span: int,
+    *,
+    ignoring: Optional[str] = None,
+) -> Optional[str]:
+    """``None`` if a block of ``span`` boxes may sit at ``slot_index``.
+
+    Purpose: one answer for every write path, so a drop, a move and a resize
+             cannot disagree about what the day allows.
+    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m2
+    Tests:   tests/test_time_grid.py::test_tgm23_each_refusal_has_its_own_reason
+
+    Returns a ``SlotRefusal`` value rather than raising: a refusal here is an
+    ordinary answer about an ordinary gesture, not an error. ``ignoring`` is
+    the block being moved, which must not count itself as occupying the slot
+    it is leaving.
+    """
+    grid = day_grid(bounds)
+    span = max(1, int(span))
+    if slot_index < 0 or slot_index + span > len(grid):
+        return SlotRefusal.OUTSIDE_GRID
+
+    covered = grid[slot_index : slot_index + span]
+    if any(slot.is_lunch for slot in covered):
+        return SlotRefusal.CROSSES_LUNCH
+
+    occupancy = slot_occupancy(blocks, bounds, ignoring=ignoring)
+    if any(len(occupancy.get(slot.index, ())) >= MAX_BLOCKS_PER_SLOT for slot in covered):
+        return SlotRefusal.SLOT_FULL
+    return None
+
+
+def slot_occupancy(
+    blocks: Iterable[TimeBlock],
+    bounds: DayBounds,
+    *,
+    ignoring: Optional[str] = None,
+) -> dict:
+    """Which blocks cover which slot index, spanning blocks included.
+
+    A block at slot 4 with a span of 2 appears under both 4 and 5, because
+    "is there room here" has to mean the whole box, not just where something
+    started.
+    """
+    grid_length = len(day_grid(bounds))
+    occupancy: dict = {}
+    for block in blocks:
+        if ignoring is not None and str(getattr(block, "id", "")) == str(ignoring):
+            continue
+        start = _slot_index_of(block)
+        if start is None:
+            continue
+        for offset in range(slot_span_of(block)):
+            index = start + offset
+            if 0 <= index < grid_length:
+                occupancy.setdefault(index, []).append(block)
+    return occupancy
+
+
+def times_for_slot(slot_index: int, minutes: int, bounds: DayBounds) -> Tuple[str, str]:
+    """The clock times a block at this slot carries.
+
+    Purpose: the derived ``start_time``/``end_time`` written with every slot
+             change, so the row stays readable in sqlite and the
+             ``end == start + planned_minutes`` invariant stays checkable.
+    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+    Tests:   tests/test_time_block_crud.py::test_tgm63_every_row_says_start_plus_duration
+
+    The end is the start plus the block's **own** length, not the end of the
+    last box it occupies. A 45-minute block in two boxes ends at 09:45 and
+    leaves 15 minutes of its second box spare; writing 10:00 there would be the
+    row claiming minutes the item does not own.
+    """
+    start = bounds.day_start_minutes + max(0, int(slot_index)) * SLOT_MINUTES
+    return format_hhmm(start), format_hhmm(start + _positive_int(minutes, 0))
+
+
+@dataclass
+class GridSlot:
+    """One rendered row of the day: a slot and what sits in it."""
+
+    slot: Slot
+    starting: List[TimeBlock] = field(default_factory=list)
+    continued: List[TimeBlock] = field(default_factory=list)
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.starting and not self.continued
+
+
+@dataclass
+class DayGrid:
+    """A day ready to draw: every slot, plus whatever no slot can hold."""
+
+    slots: List[GridSlot] = field(default_factory=list)
+    outside: List[TimeBlock] = field(default_factory=list)
+
+    @property
+    def slots_used(self) -> int:
+        return sum(1 for entry in self.slots if not entry.is_empty)
+
+    @property
+    def minutes_occupied(self) -> int:
+        """The day's cost in boxes: 30 a box, however many tasks share it."""
+        return self.slots_used * SLOT_MINUTES
+
+
+def build_day_grid(blocks: Iterable[TimeBlock], bounds: DayBounds) -> DayGrid:
+    """Lay a day's blocks onto its grid.
+
+    Purpose: the single function the screen draws from, so what is on screen
+             and what the arithmetic says are the same object.
+    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m3
+    Tests:   tests/test_time_grid.py::test_tgm31_blocks_outside_the_grid_are_surfaced
+
+    A block whose slot no longer exists -- because Day End moved earlier, or
+    because its length now spans past the last box -- is **returned in
+    ``outside``, never dropped** (P2). The day it stops being drawn is the day
+    the user loses work with nothing on screen to say so.
+
+    A block whose boxes now include lunch goes to ``outside`` for the same
+    reason. ``can_place`` refuses lunch, so this is only reachable after the
+    user moves the lunch hour over work they had already planned -- and a
+    lunch box draws "Lunch" and nothing else, so leaving the block in it would
+    hide it exactly as dropping it would.
+    """
+    grid = [GridSlot(slot=slot) for slot in day_grid(bounds)]
+    outside: List[TimeBlock] = []
+
+    for block in sort_blocks_by_slot(blocks):
+        start = _slot_index_of(block)
+        span = slot_span_of(block)
+        if start is None or start < 0 or start + span > len(grid):
+            outside.append(block)
+            continue
+        if any(entry.slot.is_lunch for entry in grid[start : start + span]):
+            outside.append(block)
+            continue
+        grid[start].starting.append(block)
+        for offset in range(1, span):
+            grid[start + offset].continued.append(block)
+
+    return DayGrid(slots=grid, outside=outside)
+
+
+def sort_blocks_by_slot(blocks: Iterable[TimeBlock]) -> List[TimeBlock]:
+    """Blocks in the order a day reads: by slot, then within a slot.
+
+    ``position`` keeps its name and its job, but now orders blocks *inside* one
+    box, which is what makes two tasks in a box representable without a second
+    table.
+    """
+    return sorted(
+        blocks,
+        key=lambda block: (
+            _slot_index_of(block) if _slot_index_of(block) is not None else 10**6,
+            _positive_int(getattr(block, "position", None), 0),
+            str(getattr(block, "id", "")),
+        ),
+    )
+
+
+def _slot_index_of(block: TimeBlock) -> Optional[int]:
+    """A block's slot, or ``None`` when it has never been placed."""
+    raw = getattr(block, "slot_index", None)
+    if raw is None or raw == "":
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def slot_index_for_time(start_time: Optional[str], bounds: DayBounds) -> Optional[int]:
+    """The slot a stored clock time falls in, for the migration.
+
+    Purpose: map the days already in the database onto the grid.
+    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
+    Tests:   tests/test_time_block_schema.py::test_tgm51_existing_times_map_to_slots
+
+    ``None`` for a time that cannot be read or falls before Day Start, so the
+    caller can fall back to the row's position rather than inventing a slot.
+    """
+    try:
+        minutes = parse_hhmm(start_time)
+    except TimeFormatError:
+        return None
+    offset = minutes - bounds.day_start_minutes
+    if offset < 0:
+        return None
+    return offset // SLOT_MINUTES
