@@ -328,3 +328,92 @@ app and `./start.sh`.
   is now the only way to re-plan work for tomorrow, since a drag within a day
   moves it between boxes.
 
+
+---
+
+# Spec Coverage — Plan box appearance (2026-11-06)
+
+Plan: [`docs/implementation_plan_2026-11-06_plan_box_appearance.md`](implementation_plan_2026-11-06_plan_box_appearance.md)
+
+Seven changes asked for against the running demo: five after the first
+walkthrough, two more after those five were on screen. All tests are in
+`tests/test_plan_screen.py` unless named otherwise.
+
+| Spec ID | Description | Implementation | Test | Status |
+|---|---|---|---|---|
+| PB-M1.1 | `priority_stripe_colors()` returns all five bands in both themes | `src/getmoredone/theme.py` (priority_stripe_colors) | `tests/test_time_block_colors.py::test_pbm11_stripe_colors_cover_every_band` | done |
+| PB-M1.2 | Every stripe colour clears 3:1 on `surface_subtle`, both themes | `src/getmoredone/theme.py` (priority_stripe_colors) | `tests/test_time_block_colors.py::test_pbm12_stripe_colors_meet_the_non_text_contrast_bar` | done |
+| PB-M1.2 | `priority_band_colors()` is unchanged and still clears 4.5:1 wherever a band sits behind text | `src/getmoredone/theme.py` (priority_band_colors) | `tests/test_time_block_colors.py::test_tbm122_band_colors_meet_contrast_in_both_themes` | done — pre-existing test, carried |
+| PB-M1.3 | Every light-theme stripe colour is brighter than the text-safe band of the same name, by relative luminance rather than by eye | `src/getmoredone/theme.py` (priority_stripe_colors) | `tests/test_time_block_colors.py::test_pbm13_stripe_colors_are_brighter_than_the_text_safe_set`, `::test_pbm13_the_dark_stripe_table_is_the_band_table` | done |
+| PB-M1.4 | An item row's stripe comes from the brighter table | `src/getmoredone/screens/plan_blocks.py` (stripe_for_item) | `::test_pbm1_an_item_rows_stripe_uses_the_brighter_table` *(pins the appearance mode)* | done — added in the sweep; the criterion was not in the plan |
+| PB-M2.1 | A chip's title label lies wholly inside the box it is drawn in | `src/getmoredone/screens/plan_blocks.py` (STRIPE_MIN_HEIGHT_PX, _build_block_chip) | `::test_a_task_chips_title_is_inside_the_box_it_is_drawn_in` *(needs `mapped_windows`; labelled TG-M8.3 in its docstring, written before this plan)* | done |
+| PB-M2.2 | An item row is no taller than its two lines of text | `src/getmoredone/screens/plan_blocks.py` (build_item_row) | `::test_an_item_row_lays_out_at_the_height_it_asks_for` | superseded by PB-M6.1 — a row is now a multiple of the box height on purpose. The test was rewritten to assert the row lays out at the height it *asks for* rather than at its text's height |
+| PB-M3.1 | A chip for an item with depth renders three bars, all inside the box | `src/getmoredone/screens/plan_blocks.py` (_build_block_chip, DepthBarStack) | `::test_pbm31_the_depth_bars_are_inside_the_box` *(needs `mapped_windows`)* | done |
+| PB-M4.1 | Every fill tint carries legible text under the colour `pick_text_color` picks for it, both themes | `src/getmoredone/theme.py` (priority_fill_colors, pick_text_color) | `tests/test_time_block_colors.py::test_pbm41_pick_text_color_is_not_what_makes_a_fill_legible`, `::test_pbm41_a_chips_title_is_coloured_for_the_shade_behind_it` | done |
+| PB-M4.2 | Every stripe clears 3:1 against its own band's fill tint, both themes | `src/getmoredone/theme.py` (priority_stripe_colors, priority_fill_colors) | `tests/test_time_block_colors.py::test_pbm42_a_stripe_is_visible_on_its_own_fill` | done |
+| PB-M4.3 | A chip for a critical item is filled with the critical tint and not `surface_subtle`; padding is left unshaded | `src/getmoredone/screens/plan_blocks.py` (fill_for_item, _build_block_chip) | `::test_pbm43_a_chip_is_filled_by_its_priority` *(pins the appearance mode)* | done |
+| PB-M5.1 | `slot_row_height(1, chip_height=86)` is 90; the no-argument form is unchanged | `src/getmoredone/time_block_layout.py` (slot_row_height) | `::test_pbm51_box_height_follows_the_setting` | done |
+| PB-M5.2 | A box built with `drag_schedule_box_height_px = 120` is taller than one at the default | `src/getmoredone/screens/plan.py` (box_height), `plan_blocks.py` (build_slot_row) | `::test_pbm52_the_setting_reaches_the_rendered_box` | done |
+| PB-M5.3 | An unusable setting (0, negative, non-numeric) falls back to the constant | `src/getmoredone/screens/plan.py` (_positive_setting) | `::test_pbm53_an_unusable_box_height_falls_back` | done |
+| PB-M5.4 | The chip's title column requests the Drag Schedule title width | `src/getmoredone/screens/plan.py` (box_title_width), `plan_blocks.py` (_build_block_chip) | `::test_pbm54_the_title_column_follows_the_drag_schedule_width` | done |
+| PB-M5.5 | A block outside the day is sized by the same two settings as one in a box | `src/getmoredone/screens/plan_blocks.py` (build_outside_group), `plan.py` (load_blocks) | `::test_pbm55_an_outside_block_is_sized_like_one_in_a_box`, `::test_pbm55_the_settings_reach_the_outside_group_on_screen` | done |
+| PB-M5.6 | A box height below one line of text is raised to the 30px floor; a usable value is not floored | `src/getmoredone/screens/plan.py` (_positive_setting, box_height) | `::test_pbm56_a_box_height_below_one_line_of_text_is_raised`, `::test_pbm56_a_usable_box_height_is_not_floored` | done |
+| PB-M6.1 | An item row's requested height is `slots_for_minutes(minutes) × box_height` — 30/45/60/90/120 minutes give 1/2/2/3/4 boxes | `src/getmoredone/screens/plan_blocks.py` (build_item_row) | `::test_pbm61_an_item_row_is_as_tall_as_the_boxes_it_will_fill` | done |
+| PB-M6.1 | The screen passes the setting it draws the day with, read off the rendered row | `src/getmoredone/screens/plan.py` (load_blocks → build_item_row) | `::test_pbm61_the_item_row_height_comes_from_the_setting` | done |
+| PB-M6.1 | The row lays out at the height it asks for, against its own text | `src/getmoredone/screens/plan_blocks.py` (build_item_row, grid_propagate) | `::test_an_item_row_lays_out_at_the_height_it_asks_for` *(needs `mapped_windows`)* | done |
+| PB-M6.2 | No label on an item row carries the priority score, in any form | `src/getmoredone/screens/plan_blocks.py` (build_item_row) | `::test_pbm62_an_item_row_does_not_print_its_priority_score` | done |
+| PB-M6.3 | The work-block length sits in the depth bars' column and on a later grid row | `src/getmoredone/screens/plan_blocks.py` (build_item_row) | `::test_pbm63_the_work_block_length_is_under_the_depth_bars` | done |
+| PB-M7.1 | A continuation chip's fill is the task's fill and its stripe is the task's stripe | `src/getmoredone/screens/plan_blocks.py` (_build_block_chip) | `::test_pbm71_a_continuation_box_is_the_colour_of_its_task` | done |
+| PB-M7.2 | A continuation chip still carries the `↳` and names its task | `src/getmoredone/screens/plan_blocks.py` (_build_block_chip) | `::test_pbm71_a_continuation_box_keeps_its_arrow` | done |
+
+## Human review required (not code-testable)
+
+| Item | Why it cannot be a test | What is tested instead |
+|---|---|---|
+| Whether the brighter stripes read as brighter on this screen | A judgement about a display, not a predicate | PB-M1.3 asserts the stripe table's relative luminance exceeds the band table's, per band, in both themes |
+| Whether a priority-shaded day reads as a column of priorities rather than as noise | Pixel judgement | PB-M4.1 asserts the fill is the band's and PB-M4.3 asserts every fill is readable under the text colour chosen for it |
+| Whether a row that is three boxes tall reads as "this needs three boxes" rather than as an oversized row | Subjective | PB-M6.1 asserts the exact height in boxes, and that it lays out at that height on a real window |
+
+### Walked on screen, 2026-11-06 (`./start-demo.sh`)
+
+- **Does the grid read as a day** — **done, and the earlier answer is
+  superseded.** PB-M2 was walked on screen: titles, durations and depth bars
+  are drawn inside their boxes. The 2026-11-05 walkthrough row above
+  ("no, and the test that said it did was wrong") describes the state before
+  this batch.
+- **Does a drag feel right** — **still outstanding.** PB-M5 makes a box as
+  tall as the Drag Schedule box height, so the 30px grab target the question
+  was about no longer exists at the default. To be re-walked; the question is
+  now whether an 86px box is an easy target, not whether a 30px one is.
+- **Do the item rows read at their new heights** — see the status report for
+  this batch. The known consequence is stated in the plan under PB-M6: at a box
+  height near the 30px floor a one-box row clips its second line.
+
+## Pre-push review passes
+
+| Pass | Lens | Result |
+|---|---|---|
+| `learning-qa` (cold) | the failure-pattern catalogue (P1–P40) | 8 findings: 0 high, 3 medium, 5 below |
+| `/code-review` (cold) | correctness, reuse, simplification | 4 findings: 0 high, 2 medium, 2 below |
+| `/security-review` | injection, secrets, path traversal, deserialization | not applicable, established by grep of the added lines rather than by judgement: the diff adds no SQL, no subprocess, no HTTP, no deserializer and no path handling |
+
+Both passes were cold — given the range and the diff, not the session's
+narrative. Three findings converged, which is the evidence two lenses are for.
+Everything at medium or above was fixed with a test, each proved by mutation
+(8/8 red for the sweep fixes, 9/9 red for PB-M6/PB-M7). Everything below medium
+is in `BACKLOG.md` with the pass that found it.
+
+The most useful finding was one neither pass reported as severe: a colour test
+was passing only because this Mac is in light mode. Forced to dark it failed
+against correct code, because the stripe and band tables are deliberately
+identical there. On Mac Mini1, which runs dark, it would have gone red.
+
+## Adjacent issues found, not fixed
+
+- `src/getmoredone/screens/drag_schedule.py:115` reads the same two settings
+  with its own inline fallbacks rather than through a shared helper. Flagged,
+  not fixed: it is the sibling of the reader this batch added, and changing it
+  is a second screen's worth of surface.
+- The four size controls live under **Settings ▸ Date Increment Settings**,
+  which is not where a user would look for them. Relocating a shipped control
+  needs approval, so it is in `BACKLOG.md`.

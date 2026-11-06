@@ -102,7 +102,7 @@ Plus three test-quality fixes: a colour test that passed only because this Mac
 is in light mode, three tests holding `mapped_windows` without reading
 geometry, and a duplicated WCAG luminance formula whose justification was
 false. The documented mapped-window count (conftest: three, CLAUDE.md: ten;
-actual: nineteen) is now asserted against the suite by AST.
+actual: sixteen) is now asserted against the suite by AST.
 
 Mutation gate on the fixes: 8 mutations, 8 red, every file restored. The
 appearance pin was probed by forcing dark mode, where the test it protects
@@ -130,3 +130,73 @@ flagged rather than fixed under rule 10.
 ## Next agent actions
 
 - Re-walk the drag feel on screen once a box height other than 30 is in use.
+
+---
+
+## PB-M6 / PB-M7 — a second round, after the first five were on screen
+
+### Summary
+
+Four more changes, asked for against the same demo once PB-M1 to PB-M5 were
+visible.
+
+- An item row in **Items starting** is now `slots_for_minutes(minutes)` boxes
+  of `box_height()` tall — the same arithmetic and unit the day's grid uses, so
+  a 90-minute item is three boxes and a 45-minute item is two. Held by
+  `grid_propagate(False)`, which is what makes it the grid's height rather than
+  its text's.
+- The priority score came off the row. It was the third statement of one fact,
+  after the fill and the stripe.
+- The work-block length (`30m`) moved from the detail line to under the depth
+  bars, which puts it where it already is on a task in a box.
+- A continuation chip now carries the task's fill and stripe instead of being
+  transparent, and keeps its `↳`. Transparent was the earlier decision, on the
+  argument that shading a continuation would read as a second task; on screen a
+  90-minute task read as one that stops after half an hour. Buffers and breaks
+  stay transparent. The `same task` / `15m spare` line takes the text colour
+  the new fill calls for.
+
+### Files changed
+
+- `src/getmoredone/screens/plan_blocks.py` — `build_item_row` height, span and
+  detail line; the duration label; `_build_block_chip`'s merged fill branch and
+  unconditional stripe; `SLOT_CHIP_HEIGHT_PX` moved above `build_item_row`
+  because it is now a default argument and defaults bind at definition time.
+- `src/getmoredone/screens/plan.py` — `build_item_row` called with
+  `box_height=self.box_height()`.
+- `tests/test_plan_screen.py` — six new tests, one rewritten.
+- `docs/implementation_plan_2026-11-06_plan_box_appearance.md`,
+  `docs/spec_coverage.md`, `docs/USER_GUIDE.md`, `CHANGELOG.md`.
+
+### Verification
+
+- Command: `pytest tests/test_plan_screen.py tests/test_time_block_colors.py tests/test_plan_settings.py -q`
+- Result: PASS — 160 passed, mapped windows enabled.
+- Mutation gate: 9 mutations over the four changes, 9 red, every file restored
+  from a verbatim copy. The first run skipped one because
+  `    frame.grid_propagate(False)` matches twice in the module; anchored to its
+  preceding line and re-run.
+
+### Risks / Known gaps
+
+- **At a box height near the 30px floor a one-box row clips its second line.**
+  The demo's settings file holds 30, so it is visible there; the 86px default
+  has room. The height is pinned on purpose — a row that grew to its text would
+  stop matching the grid, which is what was asked for. Stated in the plan under
+  PB-M6 and in the user guide rather than treated as a defect.
+- One rewritten test, under test rule (b): the behaviour changed intentionally.
+  `test_an_item_row_is_as_tall_as_its_text_not_the_stripe_default` asserted the
+  opposite of PB-M6.1 and is now
+  `test_an_item_row_lays_out_at_the_height_it_asks_for`. PB-M2.2 is marked
+  superseded in both the plan and `docs/spec_coverage.md` rather than left
+  claiming a property this change removes.
+- Two test names the plan doc had named were wrong (`PB-M4.1`'s, and PB-M2.2's
+  after the rewrite). Found by checking every `::test_` reference in both docs
+  against the suite, not by review. Both corrected.
+- No review pass has run over PB-M6/PB-M7 itself. The sweep covered
+  `99d438f...2e4add9`; this work sits after it.
+
+### Next agent actions
+
+- Walk the item-row heights and the continuation colours on screen in the demo.
+- Re-walk the drag feel, still outstanding from PB-M5.

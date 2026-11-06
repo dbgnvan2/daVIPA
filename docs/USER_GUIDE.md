@@ -304,9 +304,21 @@ Items pane (left):
   window widens the day, not the list.
 - **Items starting \<date\>** — What: Open items whose start date is that date,
   highest priority score first. Why: These are the only items the day is built
-  from. Each row shows the priority score, the block length it would get, its
-  depth, and `already blocked` if the day already holds a block for it — marked
-  rather than hidden, because an item can genuinely need two blocks in a day.
+  from. Each row shows its depth, `already blocked` if the day already holds a
+  block for it — marked rather than hidden, because an item can genuinely need
+  two blocks in a day — and the block length it would get (`30m`), under the
+  depth bars. The priority score is not printed: the row is drawn in its
+  priority band and striped in it, so the number said a third time what the
+  colour already says twice.
+- **How tall a row is** — What: The number of half-hour boxes the item will
+  fill, each as tall as a box in the day. A 90-minute item is three boxes tall;
+  a 45-minute item is two, for the reason it takes two in the day — a half-hour
+  grid cannot hold a quarter hour. Why: the row is the shape of the space it is
+  about to take, so you can see whether the day has room for it before
+  dragging. The height comes from *Drag Schedule box height (px)*, the same
+  setting the day's boxes use. At a box height near the 30px floor a row is one
+  line of text tall and its second line is cut off; the 86px default has room
+  for both.
 - **Drag a row onto a box** — What: Creates a block for it in that half hour.
   Why: This is how blocks are made, and the box you drop on is the box you get.
   If the item needs more than one box, the status line says how many and what is
@@ -326,12 +338,16 @@ Day pane (right):
   length in minutes. Why: The box tells you the time; the chip tells you the
   task.
 - **A task that runs through a box** — What: The later boxes of a longer task
-  show it greyed and marked with `↳`. Each reads `same task`, except the final
-  one, which reads how many minutes of itself the task leaves — `15m spare` for
-  a 45-minute task in two boxes. Why: Drawn plainly a continuation would read as
-  a second copy of the task; left blank the box would read as free. Neither is
-  true. Only the last box can have minutes left over, so only the last box
-  claims any: a middle box is spent in full.
+  are shaded and striped like the box that starts it, and marked with `↳`. Each
+  reads `same task`, except the final one, which reads how many minutes of
+  itself the task leaves — `15m spare` for a 45-minute task in two boxes. Why:
+  the colour says which task owns the half hour and the arrow says it is the
+  same one, continued. They were drawn unshaded at first, so that a
+  continuation would not read as a second task of equal weight; on screen a
+  90-minute task became one coloured box followed by two empty ones, which
+  reads as a task that stops after half an hour. Only the last box can have
+  minutes left over, so only the last box claims any: a middle box is spent in
+  full.
 - **Colour** — What: The stripe down the left of a task is its item's priority
   band: critical, high, medium, low, or grey for unscored. Why: The shape of
   the day is readable before any of the text is.
@@ -365,10 +381,11 @@ Day pane (right):
   is also shaded in its priority band, so the day reads as a column of
   priorities without having to look at the bars. Padding — a Buffer or a Break —
   is left unshaded and keeps its neutral bar, because it has no priority to
-  show. A continuation box (the second and later boxes of a longer task) is left
-  unshaded too, so it does not read as a second task of equal weight. Why: a box
-  that showed only the bar was the state this screen shipped in; the title is
-  what tells you which task the half hour is spent on.
+  show. A continuation box (the second and later boxes of a longer task) carries
+  the same shade and stripe as the box that starts the task, with its `↳` to
+  say it is the same task rather than another one. Why: a box that showed only
+  the bar was the state this screen shipped in; the title is what tells you
+  which task the half hour is spent on.
 - **Task height and title width** — What: Both come from Settings ▸ Date
   Increment Settings, which is where the Drag Schedule sizes live: a task is as
   tall as *Drag Schedule box height (px)* and its title column is as wide as

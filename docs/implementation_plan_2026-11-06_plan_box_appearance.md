@@ -1,11 +1,13 @@
-# Plan box appearance — PB-M1 to PB-M5
+# Plan box appearance — PB-M1 to PB-M7
 
-Status: **proposed, not approved, nothing implemented**
+Status: **approved and implemented** (PB-M1 to PB-M5 approved 2026-11-06 and
+shipped in `3f44a26`; PB-M6 and PB-M7 asked for and shipped the same day)
 Date: 2026-11-06
 Supersedes nothing; extends `docs/implementation_plan_2026-11-05_time_grid.md`.
 
-Five changes asked for against the running demo, in the user's order. One of
-them conflicts with a standing theme rule; that is called out under PB-M4.
+Five changes asked for against the running demo, in the user's order, and then
+two more after seeing those five on screen. One of the five conflicts with a
+standing theme rule; that is called out under PB-M4.
 
 ---
 
@@ -70,8 +72,14 @@ two call sites.
   `tests/test_plan_screen.py::test_a_task_chips_title_is_inside_the_box_it_is_drawn_in`
   *(already written, currently failing — this is the sliver, measured)*
 - PB-M2.2 An item row in the left pane is no taller than its two lines of text.
-  Test: `::test_an_item_row_is_as_tall_as_its_text_not_the_stripe_default`
-  *(already written, currently failing)*
+  Test *as planned*: `::test_an_item_row_is_as_tall_as_its_text_not_the_stripe_default`
+  — that test no longer exists under that name; see below.
+  **Superseded by PB-M6.1.** The criterion was right for the 200px defect it
+  was written against and wrong afterwards: a row is now a multiple of the box
+  height on purpose, which is taller than its text whenever the item needs more
+  than one box. The test was rewritten as
+  `::test_an_item_row_lays_out_at_the_height_it_asks_for`, which asserts the
+  row lays out at the height it requests rather than at its text's height.
 
 ## PB-M3 — the three depth bars show in the box
 
@@ -108,7 +116,10 @@ full accent.
 
 **Acceptance**
 - PB-M4.1 Every fill tint carries legible text (`pick_text_color` >= 4.5:1),
-  both themes. Test: `tests/test_time_block_colors.py::test_pbm41_fill_tints_carry_legible_text`
+  both themes. Test: `tests/test_time_block_colors.py::test_pbm41_pick_text_color_is_not_what_makes_a_fill_legible`
+  *(named `test_pbm41_fill_tints_carry_legible_text` when planned; renamed when
+  written, because what it proves is that `pick_text_color` picking a colour is
+  not itself evidence the pairing clears the bar)*
 - PB-M4.2 Every stripe clears 3:1 against its own band's fill tint, both
   themes. Test: `::test_pbm42_a_stripe_is_visible_on_its_own_fill`
 - PB-M4.3 A chip for a critical item is filled with the critical tint and not
@@ -148,6 +159,68 @@ say so rather than left claiming a property this change removes.
 
 ---
 
+## PB-M6 — an item row is the size of the space it will take
+
+Asked for after PB-M1 to PB-M5 were on screen. Three parts, all on the "Items
+Starting" row.
+
+- **PB-M6.1 Height.** The row is `slots_for_minutes(work_block_minutes)` boxes
+  of `box_height()` tall — the same arithmetic and the same unit the day's grid
+  uses, so a 90-minute item is three boxes tall on the left because it will be
+  three boxes tall on the right. 45 minutes is two boxes for the reason it is
+  two boxes in the day: a half-hour grid cannot hold a quarter hour.
+  `grid_propagate(False)` holds the height against the row's own text.
+- **PB-M6.2 The priority score comes off.** The band is already the shade the
+  row is drawn on and the colour of its stripe, so the number was a third way
+  of saying one thing, in the one place a reader looks for what the colour
+  cannot tell them.
+- **PB-M6.3 The work-block length moves under the depth bars.** `30m` sits
+  below the stacked lines rather than in the detail line, which puts the fact
+  in the same place on an item row as on a task in a box.
+
+**Known consequence, not a defect:** at a box height of 30 — what the demo's
+settings file holds — a 30-minute row is 30px and its second line clips. At the
+86px default it does not. The height is pinned because a row that grew to its
+text would stop matching the grid, which is the whole of what was asked for.
+
+**Acceptance**
+- PB-M6.1 A row's requested height is `boxes × box_height` for 30/45/60/90/120
+  minutes. Test: `tests/test_plan_screen.py::test_pbm61_an_item_row_is_as_tall_as_the_boxes_it_will_fill`
+- PB-M6.1 The screen passes the setting it draws the day with, read off the
+  rendered row. Test: `::test_pbm61_the_item_row_height_comes_from_the_setting`
+- PB-M6.1 The row lays out at the height it asks for on a real window.
+  Test: `::test_an_item_row_lays_out_at_the_height_it_asks_for`
+- PB-M6.2 No label on the row carries the score or a `P `-prefixed form of it.
+  Test: `::test_pbm62_an_item_row_does_not_print_its_priority_score`
+- PB-M6.3 The length label is in the bars' column and on a later row.
+  Test: `::test_pbm63_the_work_block_length_is_under_the_depth_bars`
+
+---
+
+## PB-M7 — a continuation box looks like the task it continues
+
+The later boxes of a long task were drawn transparent, on the argument that
+shading them would read as a second task of equal weight. On screen the
+opposite happened: a 90-minute task was one coloured box followed by two empty
+ones, which reads as a task that stops after half an hour.
+
+- **PB-M7.1** A continuation chip takes `fill_for_item` and
+  `stripe_for_block` like the box that starts the task; only buffers and breaks
+  stay transparent. Its "same task" / "N m spare" line switches from the muted
+  text colour to the one `pick_text_color` picks for the fill, because the fill
+  is no longer the pane's background.
+- **PB-M7.2** The `↳` prefix stays. It is now the whole of what distinguishes a
+  continuation, so it is asserted separately from the colour — a change that
+  dropped it would otherwise pass as a colour fix.
+
+**Acceptance**
+- PB-M7.1 A continuation chip's `fg_color` is the task's fill and its stripe is
+  the task's stripe. Test: `tests/test_plan_screen.py::test_pbm71_a_continuation_box_is_the_colour_of_its_task`
+- PB-M7.2 A continuation chip still carries the arrow and names its task.
+  Test: `::test_pbm71_a_continuation_box_keeps_its_arrow`
+
+---
+
 ## Order
 
 1. PB-M2 (the stripe height) — everything else is invisible until this lands.
@@ -155,6 +228,9 @@ say so rather than left claiming a property this change removes.
    and the fill are worth looking at.
 3. PB-M1 + PB-M4 (the two colour tables) — one change to `theme.py`.
 4. PB-M3 (the bars) — a test, once the box is tall enough to hold them.
+5. PB-M6 + PB-M7 — added after the first four were on screen. PB-M6 reuses
+   PB-M5's `box_height()`, and PB-M7 reuses PB-M4's `fill_for_item`, so both
+   wait on those.
 
 ## Not code-testable
 

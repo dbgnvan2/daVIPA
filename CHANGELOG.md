@@ -26,12 +26,37 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   label clipped by its parent is still full-width and still `winfo_ismapped()`
   — the new PB-M2.1 measures where the title sits inside the box instead.
 
+### Changed — an item row is the size of the space it will take
+
+- A row in **Items starting** is now as many boxes tall as the item's work
+  block will fill, each box as tall as a box in the day: a 90-minute item is
+  three boxes, a 45-minute item is two. The row is the shape of the space it is
+  about to take, so the day's room for it is visible before the drag. At a box
+  height near the 30px floor the row holds one line and clips the second; the
+  86px default has room for both.
+- The priority score has come off the row. The row is drawn in its priority
+  band and striped in it, so the number was a third way of saying one thing in
+  the one place a reader looks for what the colour cannot tell them.
+- The work-block length (`30m`) moved out of the detail line to sit under the
+  depth bars, which puts it in the same place on an item row as on a task in a
+  box.
+
+### Fixed — a long task's later boxes read as empty half hours
+
+- The second and later boxes of a task were drawn transparent, so a 90-minute
+  task was one coloured box followed by two blank ones — a task that appears to
+  stop after half an hour. A continuation now carries the task's shade and its
+  stripe, and keeps the `↳` that says it is the same task continued. Buffers
+  and breaks stay transparent. The `same task` / `15m spare` line takes the
+  text colour the new fill calls for instead of the pane's muted grey.
+
 ### Changed — a task in the Plan grid is shaded by its priority
 
 - A task now carries its priority band as the shade it is drawn on, as well as
   the bar at its edge, on both the Day Plan and the items list. Padding
-  (Buffer, Break) and continuation boxes are left unshaded: neither has a
-  priority to show. Title colour is chosen for the shade behind it.
+  (Buffer, Break) is left unshaded: it has no priority to show. A continuation
+  box carries the task's shade and stripe (see below). Title colour is chosen
+  for the shade behind it.
 - The band stripes are brighter. A second table, `priority_stripe_colors()`,
   held to the 3:1 WCAG bar for a non-text object; `priority_band_colors()` is
   unchanged and stays at 4.5:1 for anywhere a band colour sits behind text.
