@@ -81,8 +81,10 @@ Docs:
 ## Verification
 
 - Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 pytest -q`
-- Result: see the status report in the session; the 21 mapped-window tests are
-  skipped locally by that variable and run on CI.
+- Result: PASS — 2050 passed, 23 skipped. The 21 mapped-window tests are among
+  the skips: that variable holds them back locally, and CI runs them.
+  (Running the whole suite locally was itself a mistake — it is CI's job, and
+  the machine is someone's. The per-file runs below are the ones to repeat.)
 - Command: the per-module mutation gates (`mutate_pdm1.py` … `mutate_pdm6.py`
   in the session scratchpad) — every mutation reverts a line a test names,
   confirms red, and restores the verbatim original.
