@@ -214,10 +214,11 @@ def test_tbm13_pre_migration_row_reads_with_defaults(tmp_path):
 def test_tbm13a_a_legacy_day_still_reads_in_clock_order(tmp_path):
     """Position 0 on every legacy row must not scramble a migrated day.
 
-    get_time_blocks orders by (position, start_time); with every legacy block at
-    position 0 the second key is the only thing keeping an upgraded day in the
-    order the user left it in. Dropping `start_time` from that ORDER BY has to
-    fail here.
+    get_time_blocks orders by (slot_index, position, start_time). A legacy day
+    has no box on any row, so the first key cannot separate them and every
+    legacy block sits at position 0 -- which leaves `start_time` as the only
+    thing keeping an upgraded day in the order the user left it in. Dropping it
+    from that ORDER BY has to fail here.
     """
     path = tmp_path / "legacy_day.db"
     conn = sqlite3.connect(path)

@@ -9,6 +9,11 @@ checked, so nothing said.
 This is a source check because the thing being verified *is* the source text.
 It fails loudly on a name that does not resolve, and the last test here proves
 it can fail at all (P24).
+
+``docs/spec_coverage.md`` is scanned too. A retired criterion keeps its history
+by naming the deleted test in plain backticks rather than as a
+``tests/...::name`` path, so the row still says what proved it without leaving
+a pointer a reviewer would follow to nothing.
 """
 
 import re
@@ -27,7 +32,12 @@ REPO = Path(__file__).resolve().parents[1]
 # Scanned in full rather than just src/: the first version of this guard looked
 # only under src/, and there was a broken reference in conftest.py at the time
 # — the exact defect it was written to catch, in a file it could not see.
-SCANNED = ("src", "tools", "conftest.py")
+# ``docs/spec_coverage.md`` is in here because citing tests is its entire
+# job: every row names the test that proves its criterion. It was outside the
+# scan until 2026-11-05, and the grid rebuild's pre-push sweep found eight rows
+# naming tests that had been deleted -- two of them still marked "done". The
+# guard could not see the one document most made of the references it checks.
+SCANNED = ("src", "tools", "conftest.py", "docs/spec_coverage.md")
 SKIP_DIRS = {"venv", ".git", "build", "dist", "__pycache__"}
 
 # A reference is any tests/... path, wherever it appears. Anchoring on the
@@ -106,6 +116,10 @@ def test_this_guard_can_actually_fire():
         f"{SCANNED}")
     assert any(name for _src, _target, name in found), (
         "no reference carries a ::test_name, so the name check is inert")
+    assert any(str(src) == "docs/spec_coverage.md" for src, _t, _n in found), (
+        "docs/spec_coverage.md is not being scanned -- it is the document most "
+        "made of test references, and eight of them had gone stale unnoticed "
+        "while it sat outside this scan")
     assert any(str(src) == "conftest.py" for src, _t, _n in found), (
         "conftest.py is not being scanned — that is where the first broken "
         "reference this guard missed was living")

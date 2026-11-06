@@ -469,3 +469,37 @@ def test_a_block_added_past_the_end_of_the_grid_is_refused(manager):
 
     assert refusal.value.reason == SlotRefusal.OUTSIDE_GRID
     assert manager.get_time_blocks(DAY) == []
+
+
+# --- found by the pre-push sweep of the grid rebuild ------------------------
+
+
+def test_a_resize_keeps_a_task_where_it_is_in_its_box(manager):
+    """``position`` is a place in a box, and a length change is not a move.
+
+    ``_settle_block_on_slot`` reassigned ``position`` to one past the highest
+    other in the box on every call, so resizing the first of two tasks sharing
+    a box moved it below the second -- a reordering nobody asked for, from a
+    function whose docstring says it keeps the block where it is.
+    """
+    first = manager.add_block_at(
+        TimeBlock(
+            block_date=DAY, start_time="", end_time="", planned_minutes=30, label="first"
+        ),
+        3,
+        DayBounds(),
+    )
+    manager.add_block_at(
+        TimeBlock(
+            block_date=DAY, start_time="", end_time="", planned_minutes=30, label="second"
+        ),
+        3,
+        DayBounds(),
+    )
+    before = [(label, position) for label, _slot, position, _s, _e in _day(manager)]
+    assert [label for label, _p in before] == ["first", "second"]
+
+    manager.set_block_length(first.id, 60, DayBounds())
+
+    after = [(label, position) for label, _slot, position, _s, _e in _day(manager)]
+    assert after == before, f"the resize reordered the box: {before} -> {after}"

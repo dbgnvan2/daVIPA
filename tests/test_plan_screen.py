@@ -1182,3 +1182,188 @@ def test_tgm82_a_block_row_shows_its_title(root, manager, mapped_windows):
     )
     assert title.winfo_ismapped(), "the title label is not on screen"
     assert title.winfo_width() > 1, f"title label is {title.winfo_width()}px wide"
+
+
+# --- found by the pre-push sweep of the grid rebuild ------------------------
+
+
+def _legacy_block(manager, label="from the old model", start="09:00", minutes=30):
+    """A row as the retired model wrote it: a clock time and no box.
+
+    ``create_time_block`` is the raw insert, so it places nothing -- which is
+    exactly the shape every day in a database written before the grid has.
+    """
+    manager.create_time_block(
+        TimeBlock(
+            block_date=THURSDAY,
+            start_time=start,
+            end_time="09:30",
+            planned_minutes=minutes,
+            label=label,
+        )
+    )
+
+
+def test_an_unreadable_settings_file_is_flagged_not_just_printed(tmp_path, monkeypatch):
+    """``load`` must say when its defaults are a stand-in, not the user's.
+
+    This flag exists for the Plan screen's adoption, which is why it is tested
+    beside it: adoption writes a box derived from Day Start and cannot be
+    undone, so it has to be able to tell a default the user chose from one
+    that is covering for a file nobody could read.
+    """
+    path = tmp_path / "settings.json"
+    path.write_text("{ this is not json")
+    monkeypatch.setattr(AppSettings, "get_settings_path", classmethod(lambda cls: path))
+
+    loaded = AppSettings.load()
+
+    assert loaded.settings_unreadable is True, (
+        "an unreadable settings file returned all-defaults with nothing to say so"
+    )
+    assert AppSettings().settings_unreadable is False, (
+        "a fresh object claims to be a stand-in"
+    )
+
+
+def test_adoption_does_not_run_on_a_guessed_day_start(root, manager, settings):
+    """A settings file that cannot be read must not become a permanent box.
+
+    ``adopt_legacy_day`` turns a stored clock time into a ``slot_index``
+    relative to Day Start and then overwrites the stored time. Run against an
+    all-defaults object standing in for settings nobody could read, it moves
+    planned work to an hour the user never picked and destroys the only record
+    of the hour they did -- a transient read failure written down as a
+    permanent fact (P1). The blocks keep their NULL instead, which is the
+    retryable state the outside-the-day group already exists to show.
+    """
+    _legacy_block(manager)
+    settings.settings_unreadable = True
+
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    root.update_idletasks()
+
+    stored = manager.get_time_blocks(THURSDAY)[0]
+    assert stored.slot_index is None, "adopted against a day shape nobody could read"
+    assert stored.start_time == "09:00", "the stored time was overwritten by a guess"
+    assert [b.label for b in panel._grid.outside] == ["from the old model"]
+    assert "could not be read" in panel.status_label.cget("text")
+
+
+def test_adoption_says_which_day_start_it_used(screen, manager):
+    """The one irreversible write on this screen, and it was silent.
+
+    The ids ``adopt_legacy_day`` returns were discarded, so a day mapped onto
+    the grid said nothing about the Day Start it was mapped against -- the
+    assumption that cannot be undone was the one thing not reported.
+    """
+    _legacy_block(manager)
+
+    screen.load_blocks()
+
+    assert manager.get_time_blocks(THURSDAY)[0].slot_index == 2, "09:00 is box 2 of an 08:00 day"
+    text = screen.status_label.cget("text")
+    assert "Placed 1 block(s) from an earlier version" in text
+    assert "08:00" in text, f"the day start it used is not named: {text!r}"
+
+
+def test_only_the_last_box_of_a_task_claims_the_spare_minutes(screen, manager):
+    """Spare minutes are the last box's, not every continuation's.
+
+    A 75-minute task covers three boxes and leaves 15 minutes of the third.
+    The second box it consumes whole. Labelling both "15m spare" makes the one
+    number that explains the gap between *occupied* and *planned* wrong in the
+    place a reader checks it.
+    """
+    _add_block(manager, 75, "long one", 0)
+    screen.load_blocks()
+
+    frames = {index: frame for frame, index in screen._slot_frames}
+    middle = _label_texts(frames[1])
+    last = _label_texts(frames[2])
+
+    assert "15m spare" not in middle, (
+        f"the middle box claims the last box's spare minutes: {middle}"
+    )
+    assert "same task" in middle, f"the middle box says nothing useful: {middle}"
+    assert "15m spare" in last, f"the last box does not report its spare: {last}"
+
+
+def test_a_block_released_off_a_box_says_so(screen, manager, monkeypatch):
+    """A move that does nothing must not also say nothing.
+
+    The item branch of this same handler reports it; the block branch did not,
+    so letting go over the day heading, the summary, or the "Outside the day"
+    group was indistinguishable from a drag that missed.
+    """
+    _add_block(manager, 30, "somewhere", 3)
+    screen.load_blocks()
+    block = manager.get_time_blocks(THURSDAY)[0]
+
+    monkeypatch.setattr(screen, "slot_under_pointer", lambda: None)
+    monkeypatch.setattr(screen, "pointer_over_day", lambda: True)
+    screen._drag_kind = "block"
+    screen._drag_block = block
+
+    screen.on_drag_release(None)
+
+    assert screen.status_label.cget("text") == "Drop a block on a half-hour box"
+    assert manager.get_time_blocks(THURSDAY)[0].slot_index == 3, "the block moved anyway"
+
+
+def test_every_part_of_an_outside_row_starts_a_drag(screen, manager):
+    """The title covers most of an outside row, and it was inert.
+
+    ``build_outside_group`` wraps its chip in a holder, so the labels sit two
+    levels below the widget the handlers were bound to. Binding only the
+    direct children left a press on the text doing nothing at all, in the one
+    group the screen tells the user to drag blocks out of.
+    """
+    _add_block(manager, 30, "late afternoon", 16)
+    screen.load_blocks()
+    screen.on_settings_saved(DayBounds(day_end="12:00"))
+
+    label = _find_label(screen.blocks_scroll, "late afternoon")
+    assert label is not None, (
+        f"no title label in the outside group; labels were {_label_texts(screen.blocks_scroll)}"
+    )
+
+    # The binding itself, not a generated press: these windows are withdrawn,
+    # so Tk does not deliver a synthetic press to a widget that is not
+    # viewable -- which is why every other real-press test here asks for
+    # ``mapped_windows``. ``CTkLabel.bind`` forwards to this inner
+    # ``tkinter.Label``, so this is the widget a real press lands on and the
+    # one that either carries the handler or does not.
+    inner = label._label
+    assert inner.bind("<ButtonPress-1>"), "a press on the title is bound to nothing"
+    assert inner.bind("<ButtonRelease-1>"), "a release on the title is bound to nothing"
+    assert any(
+        inner.bind(sequence) for sequence in RIGHT_CLICK_SEQUENCES
+    ), "a right-click on the title opens no menu"
+
+
+def test_a_length_chosen_for_an_unplaced_block_does_not_show_the_row_id(screen, manager):
+    """The outside group binds this menu, so the refusal must be in English.
+
+    ``set_block_length`` raises ``ValueError("time block '<uuid>' is not on
+    the grid")`` and the screen rendered ``str(error)`` straight into the
+    status line. Every other refusal here goes through ``REFUSAL_TEXT`` so
+    that one rule reads as one sentence.
+    """
+    # 19:00 is past Day End, so adoption leaves it NULL rather than sliding it
+    # to a box the user never picked -- which is how a block comes to be in
+    # the outside group with this menu bound to it.
+    _legacy_block(manager, label="never placed", start="19:00")
+    screen.load_blocks()
+    block = manager.get_time_blocks(THURSDAY)[0]
+    assert block.slot_index is None, "the fixture placed the block after all"
+    assert [b.label for b in screen._grid.outside] == ["never placed"]
+
+    screen.set_block_minutes(block, 45)
+
+    text = screen.status_label.cget("text")
+    assert "not on a box yet" in text, f"status was {text!r}"
+    assert block.id not in text, f"the row id reached the status line: {text!r}"
+    assert manager.get_time_blocks(THURSDAY)[0].planned_minutes == 30, "it resized anyway"
