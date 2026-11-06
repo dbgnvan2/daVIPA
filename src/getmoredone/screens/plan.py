@@ -385,6 +385,18 @@ class PlanScreen(ctk.CTkFrame):
         )
         self.btn_add_buffer.pack(side="right", padx=4)
 
+        # The one button on this screen that acts on the whole day, so the one
+        # that carries the primary colour. Nothing else here is primary, which
+        # is the condition the theme rule puts on using it at all.
+        self.btn_autoload = ctk.CTkButton(
+            header,
+            text="AutoLoad",
+            width=100,
+            command=self.autoload_day,
+            **button_style("primary"),
+        )
+        self.btn_autoload.pack(side="right", padx=4)
+
         self.status_label = ctk.CTkLabel(header, text="", anchor="e")
         self.status_label.pack(side="right", padx=10)
 
@@ -984,6 +996,135 @@ class PlanScreen(ctk.CTkFrame):
             # minute this one ends.
             text += f" — {boxes} boxes, {spare}m spare"
         self.set_status(text, "success")
+
+    def autoload_day(self):
+        """PD-M3 — block every item the day still has room for, in list order.
+
+        Purpose: fill the day from the item list in one click, one item after
+                 another, at the earliest box that holds each.
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m3
+        Tests:   tests/test_plan_screen.py::test_pdm31_autoload_fills_in_list_order
+
+        Purely additive. It never moves, resizes or deletes a block that is
+        already there, which is what makes it undoable by hand in an app with
+        no undo, and it does not extend the day: lengthening the working day is
+        PD-M5's deliberate gesture, not something a button does quietly.
+
+        One transaction, so a refusal part-way leaves none of it rather than
+        half a planned day. ``first_free_slot`` re-reads the day inside that
+        transaction, on the same connection, so each item is placed after the
+        one before it rather than all of them into the same box.
+
+        The item list is re-read rather than taken from ``self._items``. It is
+        the same query and the same cap the pane draws, so in the ordinary case
+        it is the list on screen; where the two differ the list on screen is
+        the stale one, and blocking an item that has since been completed
+        elsewhere is not what the click asked for.
+
+        It places through ``first_clear_slot``, not ``first_free_slot``, which
+        is a correction to the approved plan rather than what it said. See that
+        method for why.
+        """
+        if not self._require_block_day():
+            return
+
+        items = self.db_manager.get_items_for_start_date(self.selected_date)
+        shown = items[:MAX_ITEM_ROWS]
+        if not shown:
+            self.set_status(
+                "AutoLoad: nothing to block — no open items start on "
+                f"{self.selected_date}",
+                "warning",
+            )
+            return
+
+        blocked_ids = self.db_manager.get_blocked_item_ids(self.selected_date)
+        placed = 0
+        no_room = 0
+        already = 0
+        try:
+            with self.db_manager.transaction():
+                for item in shown:
+                    if item.id in blocked_ids:
+                        already += 1
+                        continue
+                    minutes = duration_for_item(
+                        item, self.bounds.default_block_minutes
+                    )
+                    slot_index = self.first_clear_slot(minutes)
+                    if slot_index is None:
+                        no_room += 1
+                        continue
+                    self.db_manager.add_block_at(
+                        TimeBlock(
+                            block_date=self.selected_date,
+                            start_time="",
+                            end_time="",
+                            planned_minutes=minutes,
+                            item_id=item.id,
+                            label=item.title,
+                            block_type=BlockType.ITEM,
+                        ),
+                        slot_index,
+                        self.bounds,
+                    )
+                    placed += 1
+        except SlotRefusedError as refused:
+            # Counted and said, never swallowed. A refusal here is the day
+            # disagreeing with the box first_free_slot just offered, which is
+            # a bug rather than a full day -- and the transaction has already
+            # taken the earlier items back out, so the number that would have
+            # been written is part of the report.
+            self.refresh()
+            self.set_status(
+                f"AutoLoad wrote nothing — {refusal_text(refused.reason)} "
+                f"(refused after {placed} of {len(shown)})",
+                "error",
+            )
+            return
+
+        self.refresh()
+        # All three counts, every time (P2): "blocked 4" alone cannot be told
+        # apart from "blocked 4 and quietly dropped 7".
+        self.set_status(
+            f"AutoLoad: blocked {placed} of {len(shown)} — "
+            f"{no_room} did not fit, {already} already blocked",
+            "success" if placed else "warning",
+        )
+
+    def first_clear_slot(self, minutes: int) -> Optional[int]:
+        """The earliest box in today's grid with nothing in it at all.
+
+        Purpose: PD-M3 -- "one after another", for AutoLoad.
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m3
+        Tests:   tests/test_plan_screen.py::test_pdm31_autoload_fills_in_list_order
+
+        Not ``first_free_slot``, which is the earliest box that is not *full*.
+        A box holds four tasks, so on an empty default day first_free_slot
+        answers 08:00 four times running: AutoLoad would have stacked the first
+        four items four deep at 08:00, the next four at 08:30, and called it a
+        planned day. The approved plan named first_free_slot and said that was
+        what "one after another" meant on a grid with work already in it. It is
+        not -- the depth is there for a second task a person deliberately puts
+        beside a first, and a button that fills it is not planning a day.
+
+        Every box of a multi-box task has to be clear, not only the first: a
+        90m task at 08:00 covers 08:00, 08:30 and 09:00, and dropping it on top
+        of something already sitting at 09:00 is the same defect one box along.
+        """
+        from ..time_block_layout import can_place, slot_occupancy
+
+        blocks = self.db_manager.get_time_blocks(self.selected_date)
+        span = slots_for_minutes(minutes)
+        occupancy = slot_occupancy(blocks, self.bounds)
+        for entry in self._grid.slots or build_day_grid(blocks, self.bounds).slots:
+            index = entry.slot.index
+            if can_place(blocks, self.bounds, index, span) is not None:
+                continue
+            if any(occupancy.get(index + step) for step in range(span)):
+                continue
+            return index
+        return None
 
     def first_free_slot(self, minutes: int) -> Optional[int]:
         """The earliest box in today's grid that will hold this length.

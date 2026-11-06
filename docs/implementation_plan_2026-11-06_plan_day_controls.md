@@ -125,9 +125,17 @@ discovered during implementation:
 - **What it takes:** the items the left pane is showing, in the order shown,
   skipping any already blocked today. (That list is already capped at
   `MAX_ITEM_ROWS` and the cap is announced; AutoLoad plans what is on screen.)
-- **Where each goes:** `first_free_slot(minutes)` — the earliest box that will
-  hold it, which is what "one after another" means on a grid that already has
-  work, lunch and padding in it.
+- **Where each goes:** ~~`first_free_slot(minutes)` — the earliest box that
+  will hold it, which is what "one after another" means on a grid that already
+  has work, lunch and padding in it.~~ **Corrected during implementation:**
+  `first_clear_slot(minutes)`, the earliest box with nothing in it at all. A box
+  holds four tasks, so `first_free_slot` — the earliest box that is not *full* —
+  answers 08:00 four times running on an empty default day: AutoLoad would have
+  stacked the first four items four deep at 08:00, the next four at 08:30, and
+  called that a planned day. The depth is for a second task a person
+  deliberately puts beside a first; a button that fills it is not planning a
+  day, and it is not what "one after another" asks for. Every box of a
+  multi-box task must be clear, not only the one it starts in.
 - **What it never does:** move, resize or delete an existing block. It is purely
   additive, which is also what makes it undoable by hand in an app with no undo.
 - **It does not extend the day.** PD-M5 is a deliberate gesture; a button that
@@ -139,14 +147,15 @@ discovered during implementation:
 
 | ID | Criterion | Verified by |
 |---|---|---|
-| PD-M3.1 | Every item that fits is blocked, in list order, at the earliest box that holds it | `tests/test_plan_screen.py::test_pdm31_autoload_fills_in_list_order` |
+| PD-M3.1 | Every item that fits is blocked, in list order, at the earliest box with nothing in it; a multi-box task takes its own boxes and the next item starts after them | `tests/test_plan_screen.py::test_pdm31_autoload_fills_in_list_order`, `::test_pdm31_autoload_gives_a_long_task_its_own_boxes`, `::test_pdm31_a_long_task_does_not_land_on_a_later_occupied_box` |
 | PD-M3.2 | An item already blocked today is skipped, not blocked twice | `::test_pdm32_autoload_skips_an_item_already_blocked` |
 | PD-M3.3 | Existing blocks are not moved, resized or deleted | `::test_pdm33_autoload_leaves_existing_blocks_untouched` |
-| PD-M3.4 | Nothing is placed across lunch or past Day End | `::test_pdm34_autoload_respects_lunch_and_the_day_end` |
+| PD-M3.4 | Nothing is placed across lunch or past Day End | `::test_pdm34_autoload_does_not_straddle_lunch`, `::test_pdm34_autoload_does_not_run_past_the_day_end` |
 | PD-M3.5 | The status line reports blocked / did not fit / already blocked, all three | `::test_pdm35_autoload_reports_all_three_counts` |
 | PD-M3.6 | On a day with no room, nothing is written and the status says so | `::test_pdm36_a_full_day_writes_nothing` |
-| PD-M3.7 | A refusal partway rolls the whole run back | `tests/test_time_block_crud.py::test_pdm37_autoload_is_one_transaction` |
+| PD-M3.7 | A refusal partway rolls the whole run back | `::test_pdm37_autoload_is_one_transaction` — in `test_plan_screen.py`, not `test_time_block_crud.py` as planned: `autoload_day` is a screen method and the rollback is only observable through it |
 | PD-M3.8 | Not offered on a non-working day — the `_require_block_day` refusal | `::test_pdm38_autoload_refuses_a_non_working_day` |
+| PD-M3.9 | A day with no items says so, in words that are not "no room" | `::test_pdm3_autoload_on_an_empty_list_says_so` — unplanned: the two are different facts about the day and a shared sentence would hide which one it is |
 
 ---
 

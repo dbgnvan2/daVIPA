@@ -7,6 +7,26 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — an AutoLoad button fills the day from the item list
+
+- **AutoLoad**, in the Plan header beside *+ Break* and *+ Buffer*, blocks
+  every item in the list that the day still has room for: one after another,
+  from the top of the list down the day, each at the earliest half hour with
+  nothing in it. A task longer than half an hour takes the boxes it needs and
+  the next item starts after them.
+- It only adds. It never moves, resizes or deletes a block that is already
+  there, and it does not lengthen the working day — an item that will not fit
+  is reported, not accommodated.
+- It says what it did, all three numbers every time: how many it blocked, how
+  many did not fit, and how many were skipped because they already had a block
+  today. A day with no items says that instead, which is a different fact from
+  a day with no room.
+- The whole run is one write. If the day refuses a block part-way, nothing at
+  all is written and the message says how far it had got, rather than leaving
+  half a planned day behind.
+- Not offered on a day the week's Day Settings exclude: it refuses with the
+  same reason a drop onto that day gives.
+
 ### Changed — an item is drawn as the task it is about to become
 
 - A row in **Items starting** now uses a day box's own first line: the same

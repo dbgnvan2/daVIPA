@@ -291,6 +291,27 @@ Header:
 - **+ Break** / **+ Buffer** — What: Puts a 30-minute padding block in the first
   box that will hold it. Why: Real days are not back-to-back. These carry no
   item, so they are drawn in a neutral colour rather than a priority one.
+- **AutoLoad** — What: Blocks every item in the left-hand list that the day
+  still has room for, one after another: from the top of the list down the
+  day, each at the earliest half hour with nothing in it. A task longer than
+  half an hour takes the boxes it needs, and the next item starts after them.
+  Why: a day's worth of dragging in one click. It only ever adds — nothing
+  already on the day moves, changes length or disappears — so a run you did not
+  want can be undone by deleting the blocks it made. It will not lengthen the
+  day to fit the list: an item with nowhere to go is reported rather than
+  squeezed in, and *Day Start* / *Day End* stay where you set them.
+
+  It skips an item that already has a block today rather than giving it a
+  second one, and it leaves the half hours lunch covers alone.
+
+  The status line to the right of the buttons says what happened, with all
+  three numbers every time — `AutoLoad: blocked 4 of 7 — 2 did not fit, 1
+  already blocked` — so "blocked 4" can never be mistaken for "blocked 4 and
+  there were only 4". A day with no items on the left says *nothing to block*,
+  which is not the same as no room. The whole run is one write: if the day
+  refuses a block part-way, nothing at all is written and the message says how
+  far it had got. On a day the week's Day Settings exclude, the button refuses
+  with the same reason a drop onto that day gives.
 - **Day summary** — What: `4 of 18 boxes · 2h 00m occupied · 1h 45m planned`.
   Why: Three separate numbers, because they are three separate facts. A
   45-minute task occupies a whole hour of your day and plans 45 minutes of it;

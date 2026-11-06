@@ -4,9 +4,17 @@ Last Updated: 2026-11-06 (one adjacent issue from the plan day-controls batch ad
 
 ## Adjacent issues from the plan day-controls batch (2026-11-06)
 
-Found while building PD-M2, not introduced by it, and not fixed in the batch
-that found it — rule 10.
+Found while building PD-M2 and PD-M3, not introduced by either, and not fixed
+in the batch that found them — rule 10.
 
+- **`+ Break` and `+ Buffer` place at the first box that is not full.** Both
+  toolbar buttons use `first_free_slot`, so a 30m break lands in the earliest
+  box with fewer than four tasks in it — on a planned day that is on top of
+  work, not in an empty half hour. PD-M3's AutoLoad uses `first_clear_slot`
+  instead. Low, and a decision rather than a defect: a break deliberately
+  dropped beside a task is a thing people do, and it is not obvious the button
+  should refuse to do what a drag can. Worth settling before the two paths
+  drift further apart.
 - **A Settings screen left open holds a stale copy of the settings.** The
   Settings screen builds its fields from its own `AppSettings.load()` at the
   time it is built. Dragging the Plan divider writes
