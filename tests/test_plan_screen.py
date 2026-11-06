@@ -1218,17 +1218,12 @@ def test_an_unreadable_settings_file_is_flagged_not_just_printed(tmp_path, monke
 
     loaded = AppSettings.load()
 
-    assert loaded.settings_unreadable is True, (
-        "an unreadable settings file returned all-defaults with nothing to say so"
-    )
     assert loaded.plan_day_shape_unconfirmed is True, (
-        "nothing that survives a save says the day's four times were invented"
-    )
-    assert AppSettings().settings_unreadable is False, (
-        "a fresh object claims to be a stand-in"
+        "an unreadable settings file returned all-defaults with nothing that"
+        " survives a save to say the day's four times were invented"
     )
     assert AppSettings().plan_day_shape_unconfirmed is False, (
-        "a fresh install claims its day shape was guessed"
+        "an object built in code claims a user guessed something"
     )
 
 
@@ -1258,6 +1253,45 @@ def test_adoption_does_not_run_on_a_guessed_day_start(root, manager, settings):
     assert "has not been confirmed" in panel.status_label.cget("text")
     assert "Day Settings" in panel.status_label.cget("text"), (
         "told the user their day shape is unconfirmed and not how to confirm it"
+    )
+
+
+def test_adoption_does_not_run_on_a_file_from_before_day_settings(
+    root, manager, tmp_path, monkeypatch
+):
+    """The upgrade path end to end, through a real file.
+
+    Time blocks are as old as the application; the four day values are not.
+    A settings file from before Day Settings existed parses perfectly, so the
+    first four rounds of this batch all let adoption run on it -- against a
+    day start of 08:00 that nobody has ever seen, rewriting the stored time
+    that said 09:45 to the 09:30 of the box it landed in.
+
+    The whole chain is here on purpose: a real file with real keys missing,
+    ``load`` reading it, the screen deciding, and the row checked afterwards.
+    The screen-level tests beside this one set the field by hand, which is
+    exactly the step that was never wrong.
+    """
+    path = tmp_path / "settings.json"
+    path.write_text('{"obsidian_vault_path": "/Users/me/vault"}')
+    monkeypatch.setattr(AppSettings, "get_settings_path", classmethod(lambda cls: path))
+
+    settings = AppSettings.load()
+    assert settings.plan_day_start == "08:00", "precondition: the day start is a guess"
+
+    _legacy_block(manager, start="09:45", minutes=45)
+
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    root.update_idletasks()
+
+    stored = manager.get_time_blocks(THURSDAY)[0]
+    assert stored.slot_index is None, (
+        "adopted against four day values the user has never seen"
+    )
+    assert stored.start_time == "09:45", (
+        "rewrote a stored time against a guessed day start, permanently"
     )
 
 
@@ -1403,7 +1437,7 @@ def test_saving_day_settings_unblocks_adoption(root, manager, tmp_path, monkeypa
     monkeypatch.setattr(AppSettings, "get_settings_path", classmethod(lambda cls: path))
 
     settings = AppSettings.load()
-    assert settings.settings_unreadable is True
+    assert settings.plan_day_shape_unconfirmed is True
 
     _legacy_block(manager)
 

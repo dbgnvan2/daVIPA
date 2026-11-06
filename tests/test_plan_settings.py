@@ -257,7 +257,7 @@ def test_an_unreadable_settings_file_is_kept_before_it_is_overwritten(settings_f
     settings_file.write_text(original)
 
     loaded = AppSettings.load()
-    assert loaded.settings_unreadable is True
+    assert loaded.plan_day_shape_unconfirmed is True
 
     assert loaded.save() is True
 
@@ -276,7 +276,6 @@ def test_a_readable_file_is_not_copied_aside_on_every_save(settings_file):
     """
     _write(settings_file, plan_day_start="07:00")
     loaded = AppSettings.load()
-    assert loaded.settings_unreadable is False
 
     loaded.save()
 
@@ -293,18 +292,17 @@ def test_a_guessed_day_shape_survives_the_save_that_hides_it(settings_file):
     in memory, that save would erase it, and the Plan screen's irreversible
     adoption would act on a day start nobody chose.
 
-    The parse flag is cleared by the write, because the file does now parse.
-    The day's shape is a separate fact and goes to disk.
+    The write makes the file parse. It does not make the values anyone's, so
+    the field goes to disk with them.
     """
     settings_file.write_text("{ not json")
     loaded = AppSettings.load()
-    assert loaded.settings_unreadable is True
     assert loaded.plan_day_shape_unconfirmed is True
 
     assert loaded.save() is True
 
-    assert loaded.settings_unreadable is False, (
-        "the file parses now, and the parse flag still says it does not"
+    assert json.loads(settings_file.read_text())["plan_day_shape_unconfirmed"] is True, (
+        "the fact that these four values were invented did not reach the file"
     )
     assert loaded.plan_day_shape_unconfirmed is True, (
         "a write from anywhere in the app turned a guessed day start into one"
@@ -325,7 +323,6 @@ def test_a_guessed_day_shape_survives_a_relaunch(settings_file):
 
     relaunched = AppSettings.load()
 
-    assert relaunched.settings_unreadable is False, "the file parses; this is a fresh load"
     assert relaunched.plan_day_shape_unconfirmed is True, (
         "one relaunch turned a guessed day shape into a confirmed one"
     )
@@ -334,9 +331,10 @@ def test_a_guessed_day_shape_survives_a_relaunch(settings_file):
 def test_a_second_save_does_not_keep_a_readable_file_aside(settings_file):
     """One `.unreadable-` copy, of the file that was actually unreadable.
 
-    The parse flag drives the copy-aside. Left set after a successful write, a
-    second save in the same session copies a file that now parses perfectly to
-    `settings.json.unreadable-<stamp>` and logs that it was unreadable.
+    ``save`` decides from the file, so the second save sees one that parses and
+    leaves it alone. Implemented from a flag captured at load instead, this
+    copies a perfectly good file to `settings.json.unreadable-<stamp>` and logs
+    that it could not be read.
     """
     settings_file.write_text("{ not json")
     loaded = AppSettings.load()
@@ -350,6 +348,183 @@ def test_a_second_save_does_not_keep_a_readable_file_aside(settings_file):
     assert kept[0].read_text() == "{ not json"
 
 
+# --- found by the fifth pass, over the fourth round's fixes -----------------
+
+
+def _write_confirmed(settings_file, **values):
+    """A settings file whose day shape the user has confirmed.
+
+    All four day values present and ``plan_day_shape_unconfirmed`` present and
+    false -- which is what the Day Settings dialog writes, and the only thing
+    ``load`` accepts as confirmation.
+    """
+    day = {
+        "plan_day_start": "08:00",
+        "plan_lunch_start": "12:00",
+        "plan_lunch_minutes": 60,
+        "plan_day_end": "17:00",
+        "plan_day_shape_unconfirmed": False,
+    }
+    day.update(values)
+    settings_file.write_text(json.dumps(day))
+
+
+def test_a_settings_file_from_before_day_settings_is_not_a_confirmed_day(
+    settings_file,
+):
+    """The upgrade path, which is the common one, not an edge case.
+
+    Time blocks are as old as the application; the four day values are not.
+    A settings file written before Day Settings existed parses perfectly and
+    holds none of them, so ``load`` fills in 08:00 / 12:00 / 60 / 17:00 --
+    every one of them this build's guess. Read as a confirmed day, the Plan
+    screen's adoption then rewrites stored clock times against a day start
+    nobody has ever seen, and that cannot be undone.
+
+    ``load`` filters the parsed file against the dataclass fields, which erases
+    the difference between a default the user accepted and a default nobody has
+    seen. Only the presence of the key carries it.
+    """
+    _write(settings_file, obsidian_vault_path="/Users/me/vault")
+
+    loaded = AppSettings.load()
+
+    assert loaded.plan_day_start == "08:00", "precondition: the value is a default"
+    assert loaded.plan_day_shape_unconfirmed is True, (
+        "a file from before Day Settings existed was read as a confirmed day"
+    )
+
+
+def test_a_build_that_dropped_the_field_is_not_confirmation(settings_file):
+    """A boolean whose absence means "confirmed" cannot survive a downgrade.
+
+    ``save`` writes ``asdict`` of this dataclass, so a build that does not
+    define the field writes a file without the key -- a packaged app one
+    version behind, or any build of this batch before the field was added. If
+    absence meant confirmation, one launch of that build would clear a guard
+    that exists to stop an irreversible write.
+    """
+    _write_confirmed(settings_file)
+    data = json.loads(settings_file.read_text())
+    del data["plan_day_shape_unconfirmed"]
+    settings_file.write_text(json.dumps(data))
+
+    assert AppSettings.load().plan_day_shape_unconfirmed is True, (
+        "a file that lost the key was read as a confirmed day"
+    )
+
+
+def test_a_confirmed_flag_without_the_values_it_describes_is_not_confirmation(
+    settings_file,
+):
+    """The second of the two independent reasons a file is not confirmation.
+
+    Written as one test because it is the only input that reaches the
+    key-presence check on its own: a hand-edited file -- the case the whole
+    normalizer exists for -- that says the day shape was confirmed while
+    holding none of the four values that claim is about. Every file a build of
+    this app writes carries both or neither, so for the realistic inputs the
+    two checks cover each other, and neither can be removed on the evidence of
+    the other's test.
+    """
+    _write(settings_file, plan_day_shape_unconfirmed=False, theme_name="dark-blue")
+
+    assert AppSettings.load().plan_day_shape_unconfirmed is True, (
+        "a flag was believed about four values that were not in the file"
+    )
+
+
+def test_a_day_shape_the_user_confirmed_is_left_alone(settings_file):
+    """The companion, and the reason the rule above is a rule and not a floor.
+
+    Refusing everything would gate adoption off permanently and leave every
+    legacy block off the grid with no way back. What the dialog writes has to
+    read back as confirmation.
+    """
+    _write_confirmed(settings_file, plan_day_start="07:30")
+
+    loaded = AppSettings.load()
+
+    assert loaded.plan_day_start == "07:30"
+    assert loaded.plan_day_shape_unconfirmed is False, (
+        "a day the user confirmed in the dialog did not read back as confirmed"
+    )
+
+
+def test_a_day_value_the_app_had_to_substitute_is_not_the_users(settings_file):
+    """A value we replaced is a guess, whatever the file says about the rest.
+
+    ``25:00`` is a Day End a build before the bound check could write, and
+    ``_normalize_plan_day_settings`` silently replaces it with 17:00 so the app
+    still starts. That substitute then fed adoption as though the user had
+    chosen it.
+    """
+    _write_confirmed(settings_file, plan_day_end="25:00")
+
+    loaded = AppSettings.load()
+
+    assert loaded.plan_day_end == "17:00", "precondition: the value was substituted"
+    assert loaded.plan_day_shape_unconfirmed is True, (
+        "a day end the app substituted was treated as the user's"
+    )
+
+
+def test_a_lunch_the_app_had_to_clamp_is_not_the_users(settings_file):
+    """The same, for the one of the four that is a number.
+
+    A lunch of 3000 minutes is clamped to a day. The clamp keeps the packing
+    arithmetic sane; it does not make 1440 a lunch anybody chose.
+    """
+    _write_confirmed(settings_file, plan_lunch_minutes=3000)
+
+    loaded = AppSettings.load()
+
+    assert loaded.plan_lunch_minutes == 24 * 60, "precondition: it was clamped"
+    assert loaded.plan_day_shape_unconfirmed is True, (
+        "a lunch length the app invented was treated as the user's"
+    )
+
+
+def test_no_settings_file_is_not_a_confirmed_day(settings_file):
+    """No file is no confirmation. It is the same four guesses.
+
+    Harmless on a fresh install, where there is nothing to adopt, and the
+    honest answer in the case that is not a fresh install: a settings file
+    deleted or moved aside with the database kept.
+    """
+    assert not settings_file.exists(), "precondition: no settings file"
+
+    assert AppSettings.load().plan_day_shape_unconfirmed is True, (
+        "a missing settings file was read as a confirmed day"
+    )
+
+
+def test_a_second_object_does_not_archive_a_file_that_now_parses(settings_file):
+    """Over a dozen screens each hold their own ``AppSettings``.
+
+    ``app.settings`` is loaded once at startup and lives for the session, and
+    the Day Settings dialog saves that object. So: launch on a corrupt file,
+    another screen saves and the file is kept aside and replaced, then the user
+    opens Day Settings and saves. Decided from a flag captured at load, the
+    startup object archives the good file a second time and logs that it could
+    not be read; worse, if that copy fails the dialog refuses the write and
+    tells the user to move a file that loads -- leaving the one screen that can
+    confirm the day's shape unable to.
+    """
+    corrupt = "{ not json"
+    settings_file.write_text(corrupt)
+    startup = AppSettings.load()
+    other_screen = AppSettings.load()
+
+    assert other_screen.save() is True
+    assert startup.save() is True, "refused a write against a file that parses"
+
+    kept = list(settings_file.parent.glob("settings.json.unreadable-*"))
+    assert len(kept) == 1, f"archived a file that parses: {[k.name for k in kept]}"
+    assert kept[0].read_text() == corrupt
+    assert json.loads(settings_file.read_text())["plan_day_shape_unconfirmed"] is True
+
+
 def test_a_failed_write_is_reported(settings_file):
     """``save`` swallowed its own failure and the caller reported success.
 
@@ -358,7 +533,6 @@ def test_a_failed_write_is_reported(settings_file):
     """
     _write(settings_file, plan_day_start="07:00")
     loaded = AppSettings.load()
-    assert loaded.settings_unreadable is False
     settings_file.unlink()
     settings_file.mkdir()
 
