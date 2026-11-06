@@ -9,9 +9,17 @@ Tests:   this file
 with the writes they covered. A planned day was an order, so every edit had to
 re-derive and re-store the whole day's clock times; a block now stores which
 half-hour box it sits in, relative to Day Start, and the times follow from the
-box on read. There is nothing to re-pack, nothing to renumber, and no ceiling
-to run past — the last box ends at Day End. TG-M6.4 at the foot of this file is
-the test that says so: a Day Start change writes no rows at all.
+box on read. There is nothing to re-pack and no ceiling to run past — the last
+box ends at Day End. TG-M6.4 at the foot of this file is the test that says so:
+a Day Start change writes no rows at all.
+
+There is now exactly **one** renumber, and it is not that one: PD-M5's
+drop-extend moves Day Start to make room for an item dropped above the day, and
+renumbers so the work already on the day keeps the clock time it had. Changing
+Day Start in Day Settings still writes nothing and still re-times the day,
+which is the behaviour TG-M6.4 pins; lengthening the day at one end is a
+different gesture, and sliding every planned task half an hour earlier is not
+what it asked for.
 """
 
 import pytest
@@ -522,3 +530,94 @@ def test_a_drop_onto_its_own_box_moves_a_task_to_the_end_of_it(manager):
     assert [label for label, _s, _p, _a, _b in _day(manager)] == ["second", "first"], (
         "a drop onto its own box did nothing, and the screen said it moved"
     )
+
+
+# ================= PD-M5.5 — the day grows, the work stays put ==========
+
+
+def _rows(manager):
+    return {
+        row["label"]: (row["slot_index"], row["start_time"], row["end_time"])
+        for row in manager.db.conn.execute(
+            "SELECT label, slot_index, start_time, end_time FROM time_blocks"
+        ).fetchall()
+    }
+
+
+def test_pdm55_blocks_keep_their_times_when_the_day_grows(manager):
+    """PD-M5.5 — renumbering is what keeps a stored clock time true.
+
+    A slot index counts boxes from Day Start. Move Day Start back one box and
+    leave the indexes alone, and every planned task is drawn half an hour
+    earlier than the ``start_time`` in its own row says: two answers on screen
+    at once, neither marked wrong. The renumber is what makes the box and the
+    time agree again.
+    """
+    _at(manager, 30, "08:00 meeting", 0)
+    _at(manager, 60, "09:00 workshop", 2)
+    before = _rows(manager)
+
+    moved = manager.shift_day_slots(DAY, 1)
+
+    assert moved == 2, f"both blocks should have been renumbered, not {moved}"
+    grid = build_day_grid(
+        manager.get_time_blocks(DAY), DayBounds(day_start="07:30")
+    )
+    placed = {
+        entry.starting[0].label: entry.slot.start_time
+        for entry in grid.slots
+        if entry.starting
+    }
+    assert placed == {"08:00 meeting": "08:00", "09:00 workshop": "09:00"}, placed
+
+    after = _rows(manager)
+    for label, (slot, start, end) in before.items():
+        assert after[label] == (slot + 1, start, end), (
+            f"{label} was {(slot, start, end)} and is now {after[label]}: the "
+            "index had to move and the times had not"
+        )
+
+
+def test_pdm55_a_shift_of_zero_writes_nothing(manager):
+    """Day End moving does not renumber, so the no-op path must really be one."""
+    _at(manager, 30, "steady", 4)
+    before = manager.db.conn.execute(
+        "SELECT slot_index, updated_at FROM time_blocks"
+    ).fetchone()
+
+    assert manager.shift_day_slots(DAY, 0) == 0
+
+    after = manager.db.conn.execute(
+        "SELECT slot_index, updated_at FROM time_blocks"
+    ).fetchone()
+    assert tuple(after) == tuple(before), "a shift of zero touched a row"
+
+
+def test_pdm55_a_block_outside_the_grid_is_not_given_a_box(manager):
+    """A NULL slot index stays NULL: handing it one here is TG-M5's adoption."""
+    manager.create_time_block(
+        TimeBlock(
+            block_date=DAY,
+            start_time="10:00",
+            end_time="10:30",
+            planned_minutes=30,
+            label="from an older version",
+        )
+    )
+
+    assert manager.shift_day_slots(DAY, 2) == 0
+
+    assert _rows(manager)["from an older version"] == (None, "10:00", "10:30"), (
+        f"a block that was outside the grid was moved onto it: {_rows(manager)}"
+    )
+
+
+def test_pdm55_only_the_named_day_is_renumbered(manager):
+    """Each date's boxes count from its own Day Start, and days are independent."""
+    _at(manager, 30, "today", 4)
+    _at(manager, 30, "tomorrow", 4, block_date=NEXT_DAY)
+
+    assert manager.shift_day_slots(DAY, 1) == 1
+
+    placed = {label: row[0] for label, row in _rows(manager).items()}
+    assert placed == {"today": 5, "tomorrow": 4}, placed

@@ -19,8 +19,16 @@ import shutil
 import pytest
 
 from src.getmoredone.app_settings import AppSettings
+from src.getmoredone.db_manager import DatabaseManager
+from src.getmoredone.models import ActionItem
+from src.getmoredone.screens.plan import PlanScreen
 from src.getmoredone.screens.settings import SettingsScreen
-from src.getmoredone.time_block_layout import DEFAULT_DAY_END, DayBounds
+from src.getmoredone.time_block_layout import (
+    DAY_EXTEND_EARLIER,
+    DAY_EXTEND_LATER,
+    DEFAULT_DAY_END,
+    DayBounds,
+)
 
 
 @pytest.fixture
@@ -763,3 +771,96 @@ def test_a_refused_write_after_a_saved_one_does_not_reach_the_app(
         "a refused write reached the running app, because the app was holding "
         "the screen's own settings object"
     )
+
+
+# ================= PD-M5.4 — extending a day is not confirming it =======
+
+
+class _App:
+    def __init__(self, settings):
+        self.settings = settings
+
+
+def test_pdm54_extending_the_day_is_not_confirming_it(settings_file, tmp_path):
+    """PD-M5.4 — the flag that gates the irreversible adoption is left alone.
+
+    ``plan_day_shape_unconfirmed`` says the four day times were invented rather
+    than chosen, and it is what stops the Plan screen's one irreversible write
+    running against a day nobody picked. Only the Day Settings dialog clears
+    it. A drop that lengthens the day writes one of those four values -- which
+    is exactly the shape of change that *looks* like confirmation and is not:
+    the user said where one item goes, not that 08:00, 12:00, 60 and 17:00 are
+    their day.
+    """
+    import customtkinter as ctk
+
+    settings_file.write_text("{ not json")
+    settings = AppSettings.load()
+    assert settings.plan_day_shape_unconfirmed is True, (
+        "precondition: an unreadable file means the day's shape is a guess"
+    )
+
+    manager = DatabaseManager(str(tmp_path / "plan.db"))
+    root = ctk.CTk()
+    try:
+        panel = PlanScreen(root, manager, _App(settings))
+        panel.selected_date = "2026-11-05"
+        panel.refresh()
+        item = ActionItem(who="me", title="Early start", start_date="2026-11-05")
+        manager.create_action_item(item)
+
+        panel.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+        assert settings.plan_day_start == "07:30", (
+            "precondition for the real assertion: the extension has to have "
+            f"happened, and the day start is {settings.plan_day_start}"
+        )
+        assert settings.plan_day_shape_unconfirmed is True, (
+            "lengthening the day was taken as the user confirming its shape"
+        )
+        assert json.loads(settings_file.read_text())[
+            "plan_day_shape_unconfirmed"
+        ] is True, "the file now says a guessed day shape is the user's"
+    finally:
+        root.destroy()
+        manager.close()
+
+
+def test_pdm54_an_already_confirmed_day_stays_confirmed(settings_file, tmp_path):
+    """The other direction: extending must not re-raise the flag either.
+
+    Without this, the test above would pass for an implementation that wrote
+    ``True`` unconditionally -- which would put every user who has opened Day
+    Settings back behind the warning and stop their old blocks being placed.
+    """
+    import customtkinter as ctk
+
+    _write(
+        settings_file,
+        plan_day_start="08:00",
+        plan_lunch_start="12:00",
+        plan_lunch_minutes=60,
+        plan_day_end="17:00",
+        plan_day_shape_unconfirmed=False,
+    )
+    settings = AppSettings.load()
+    assert settings.plan_day_shape_unconfirmed is False, "precondition"
+
+    manager = DatabaseManager(str(tmp_path / "plan.db"))
+    root = ctk.CTk()
+    try:
+        panel = PlanScreen(root, manager, _App(settings))
+        panel.selected_date = "2026-11-05"
+        panel.refresh()
+        item = ActionItem(who="me", title="Late finish", start_date="2026-11-05")
+        manager.create_action_item(item)
+
+        panel.extend_day_for(item, DAY_EXTEND_LATER)
+
+        assert settings.plan_day_end == "17:30", settings.plan_day_end
+        assert settings.plan_day_shape_unconfirmed is False, (
+            "extending the day put a confirmed day back behind the warning"
+        )
+    finally:
+        root.destroy()
+        manager.close()

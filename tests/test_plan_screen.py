@@ -44,6 +44,10 @@ from src.getmoredone.screens.plan import (
 from src.getmoredone.screens.plan_blocks import (
     ITEM_ROW_MIN_HEIGHT_PX,
     PD_CHECK_TEXT,
+    PD_EARLIER_HINT,
+    PD_EARLIER_TEXT,
+    PD_LATER_HINT,
+    PD_LATER_TEXT,
     STRIPE_WIDTH_PX,
     SLOT_CHIP_HEIGHT_PX,
     SLOT_MIN_HEIGHT_PX,
@@ -72,6 +76,8 @@ from src.getmoredone.time_block_layout import (
     MAX_DEPTH_BARS,
     SLOT_MINUTES,
     DayBounds,
+    DAY_EXTEND_EARLIER,
+    DAY_EXTEND_LATER,
     SlotRefusal,
     SlotRefusedError,
     build_day_grid,
@@ -3997,3 +4003,343 @@ def test_pdm3_autoload_on_an_empty_list_says_so(screen, manager):
     text = screen.status_label.cget("text")
     assert "nothing to block" in text, text
     assert _stored(manager) == []
+
+
+# ================= PD-M5 — dropping above or below extends the day =======
+
+
+def _pointer_on(screen, monkeypatch, *widgets):
+    """Put the pointer inside these widgets, and nothing else.
+
+    ``blocks_scroll`` is always included: both ``slot_under_pointer`` and
+    ``virtual_under_pointer`` refuse outright unless the pointer is in the day
+    pane, so a test that left it out would be asserting against that guard
+    rather than against the box it meant to drop on.
+    """
+    inside = {id(screen.blocks_scroll)} | {id(w) for w in widgets}
+    monkeypatch.setattr(screen, "winfo_pointerx", lambda: 0)
+    monkeypatch.setattr(screen, "winfo_pointery", lambda: 0)
+    monkeypatch.setattr(
+        "src.getmoredone.screens.plan.widget_contains_pointer",
+        lambda widget, x, y: id(widget) in inside,
+    )
+
+
+def _virtual(screen, edge):
+    return [frame for frame, which in screen._virtual_frames if which == edge][0]
+
+
+def test_pdm51_a_virtual_box_sits_at_each_end(screen, manager):
+    """PD-M5.1 — one above the first box and one below the last, every redraw."""
+    assert [edge for _, edge in screen._virtual_frames] == [
+        DAY_EXTEND_EARLIER,
+        DAY_EXTEND_LATER,
+    ], screen._virtual_frames
+
+    slot_rows = [frame.grid_info()["row"] for frame, _ in _slot_frames(screen)]
+    above = _virtual(screen, DAY_EXTEND_EARLIER).grid_info()["row"]
+    below = _virtual(screen, DAY_EXTEND_LATER).grid_info()["row"]
+    assert above < min(slot_rows), f"the Earlier box is at row {above}, not above {min(slot_rows)}"
+    assert below > max(slot_rows), f"the Later box is at row {below}, not below {max(slot_rows)}"
+
+
+def test_pdm51_the_virtual_boxes_survive_a_redraw_with_blocks_on_the_day(
+    screen, manager
+):
+    """PD-M5.1 — drawn on a day that has work in it, not only on an empty one.
+
+    The empty-day assertion above would hold for a screen that drew them in
+    the ``if not blocks`` branch, where they would vanish the moment the first
+    item was blocked -- taking away the drop target the user had just used.
+    """
+    _add_block(manager, 30, "Something", slot_index=3)
+    screen.refresh()
+
+    assert [edge for _, edge in screen._virtual_frames] == [
+        DAY_EXTEND_EARLIER,
+        DAY_EXTEND_LATER,
+    ], screen._virtual_frames
+
+
+def test_pdm51_a_virtual_box_says_which_end_it_is(screen):
+    """PD-M5.1 — "marked as what they are and dimmed".
+
+    An unlabelled empty rectangle at each end of the day is indistinguishable
+    from a drawing mistake, and nothing would tell the user it can be dropped
+    on.
+    """
+    palette = semantic_colors()
+    for edge, word, hint in (
+        (DAY_EXTEND_EARLIER, PD_EARLIER_TEXT, PD_EARLIER_HINT),
+        (DAY_EXTEND_LATER, PD_LATER_TEXT, PD_LATER_HINT),
+    ):
+        frame = _virtual(screen, edge)
+        texts = _label_texts(frame)
+        assert word in texts, f"the {edge} box says {texts}, not {word!r}"
+        assert hint in texts, f"the {edge} box has no drop hint: {texts}"
+        dimmed = [
+            child for child in frame.winfo_children()
+            if isinstance(child, ctk.CTkLabel)
+            and child.cget("text_color") == palette["muted_text"]
+        ]
+        assert len(dimmed) == 2, (
+            f"the {edge} box draws {len(dimmed)} dimmed labels, not both of them"
+        )
+
+
+def test_pdm51_a_virtual_box_is_not_a_slot(screen):
+    """They must never be offered to anything that places by slot index.
+
+    ``_slot_frames`` is what ``slot_under_pointer`` and the hover outline read,
+    and a virtual box in it would be a box the day does not have.
+    """
+    virtual = {id(frame) for frame, _ in screen._virtual_frames}
+    assert virtual, "precondition: there are virtual boxes to confuse"
+    for frame, index in _slot_frames(screen):
+        assert id(frame) not in virtual, f"a virtual box is being offered as slot {index}"
+
+
+def test_pdm52_a_drop_above_moves_day_start_back(screen, manager, settings):
+    """PD-M5.2 — Day Start moves back by the item's span and the item lands there."""
+    item = _item(manager, "Early start")
+    assert settings.plan_day_start == "08:00", "precondition: the shipped day start"
+
+    screen.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+    assert settings.plan_day_start == "07:30", settings.plan_day_start
+    assert AppSettings.load().plan_day_start == "07:30", "the file did not get it"
+    assert [(row[0], row[1], row[3]) for row in _stored(manager)] == [
+        ("Early start", 0, "07:30")
+    ], _stored(manager)
+    assert screen.bounds.day_start == "07:30", "the screen kept the old day"
+
+
+def test_pdm52_a_long_item_dropped_above_takes_the_day_back_far_enough(
+    screen, manager, settings
+):
+    """PD-M5.2 — the span, not one box: a 90m item needs three half hours."""
+    item = _item(manager, "Deep work", work_block=90)
+
+    screen.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+    assert settings.plan_day_start == "06:30", settings.plan_day_start
+    assert [(row[0], row[1], row[3]) for row in _stored(manager)] == [
+        ("Deep work", 0, "06:30")
+    ], _stored(manager)
+
+
+def test_pdm52_existing_blocks_keep_their_clock_times(screen, manager, settings):
+    """PD-M5.5 — on screen: the 08:00 task is still at 08:00 after the day grows.
+
+    A slot index counts boxes from Day Start. Moving Day Start back one box
+    without renumbering leaves the 08:00 task at box 0 of a day that now starts
+    at 07:30, so it is drawn at 07:30 while its stored start_time still says
+    08:00 -- the day on screen and the row disagreeing with nothing marked
+    wrong.
+    """
+    _add_block(manager, 30, "Standing meeting", slot_index=0)
+    item = _item(manager, "Early start")
+
+    screen.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+    placed = {row[0]: (row[1], row[3]) for row in _stored(manager)}
+    assert placed["Standing meeting"] == (1, "08:00"), (
+        f"the meeting moved: {placed['Standing meeting']}"
+    )
+    assert placed["Early start"] == (0, "07:30"), placed["Early start"]
+
+
+def test_pdm53_a_drop_below_moves_day_end_forward(screen, manager, settings):
+    """PD-M5.3 — Day End moves forward by the span and the item lands there."""
+    item = _item(manager, "Late finish")
+    assert settings.plan_day_end == "17:00", "precondition: the shipped day end"
+    boxes_before = len(day_grid(screen.bounds))
+
+    screen.extend_day_for(item, DAY_EXTEND_LATER)
+
+    assert settings.plan_day_end == "17:30", settings.plan_day_end
+    assert [(row[0], row[1], row[3]) for row in _stored(manager)] == [
+        ("Late finish", boxes_before, "17:00")
+    ], _stored(manager)
+
+
+def test_pdm53_a_drop_below_does_not_renumber_the_day(screen, manager, settings):
+    """Day End moving does not change any slot index: they count from the start."""
+    _add_block(manager, 30, "Standing meeting", slot_index=0)
+    item = _item(manager, "Late finish")
+
+    screen.extend_day_for(item, DAY_EXTEND_LATER)
+
+    placed = {row[0]: (row[1], row[3]) for row in _stored(manager)}
+    assert placed["Standing meeting"] == (0, "08:00"), placed["Standing meeting"]
+
+
+def test_pdm56_a_refused_write_leaves_the_day_unchanged(
+    screen, manager, settings, monkeypatch
+):
+    """PD-M5.6/P41 — a refused settings write rolls back all of it, and says so."""
+    _add_block(manager, 30, "Standing meeting", slot_index=0)
+    item = _item(manager, "Early start")
+    before = _stored(manager)
+    monkeypatch.setattr(type(settings), "save", lambda self: False)
+
+    screen.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+    assert settings.plan_day_start == "08:00", (
+        f"the refused width stayed on the app's own settings object: "
+        f"{settings.plan_day_start}"
+    )
+    assert screen.bounds.day_start == "08:00", "the screen took the day anyway"
+    assert _stored(manager) == before, (
+        f"the database kept work the settings file never agreed to: "
+        f"{_stored(manager)}"
+    )
+    text = screen.status_label.cget("text")
+    assert "was not extended" in text, text
+
+
+def test_pdm56_a_refused_write_is_not_reported_as_a_longer_day(
+    screen, manager, settings, monkeypatch
+):
+    """The status must not read like a success. Nothing happened."""
+    item = _item(manager, "Early start")
+    monkeypatch.setattr(type(settings), "save", lambda self: False)
+
+    screen.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+    assert screen.status_label.cget("text_color") == status_text_color("error")
+
+
+def test_pdm57_a_block_drag_onto_a_virtual_box_is_refused(
+    screen, manager, monkeypatch
+):
+    """PD-M5.7 — a block already has a half hour; it cannot invent another."""
+    item = _item(manager, "Draft the proposal")
+    block = _add_block(manager, 30, "Draft the proposal", slot_index=4, item_id=item.id)
+    screen.refresh()
+    before = _stored(manager)
+    _pointer_on(screen, monkeypatch, _virtual(screen, DAY_EXTEND_EARLIER))
+
+    screen.start_block_drag(None, block)
+    screen.on_drag_release(None)
+    screen.update_idletasks()
+
+    assert _stored(manager) == before, f"the block moved: {_stored(manager)}"
+    assert screen.settings.plan_day_start == "08:00", "a block lengthened the day"
+    text = screen.status_label.cget("text")
+    assert "cannot make a new half hour" in text, text
+
+
+def test_pdm5_an_item_drag_onto_a_virtual_box_extends_the_day(
+    screen, manager, monkeypatch
+):
+    """The release handler routes a drop that missed every box to the right end.
+
+    Without this the extension is reachable only by calling the method, and the
+    gesture the user actually makes -- a drag that lands on the Later box -- is
+    untested.
+    """
+    item = _item(manager, "Late finish")
+    screen.refresh()
+    asked = []
+    monkeypatch.setattr(
+        screen, "extend_day_for", lambda i, edge: asked.append((i.title, edge))
+    )
+    _pointer_on(screen, monkeypatch, _virtual(screen, DAY_EXTEND_LATER))
+
+    screen.start_item_drag(None, item)
+    screen.on_drag_release(None)
+    screen.update_idletasks()
+
+    assert asked == [("Late finish", DAY_EXTEND_LATER)], asked
+
+
+def test_pdm5_a_drop_in_the_day_but_on_no_box_still_does_nothing(
+    screen, manager, monkeypatch
+):
+    """The day pane is more than its boxes, and the gap between them is not an end.
+
+    Found by the mutation gate: ``virtual_under_pointer`` returning an end of
+    the day instead of ``None`` for a release that hit neither box passed every
+    other test here, because none of them released over the heading, the
+    summary or the empty-day note. That release would have lengthened the day.
+    """
+    item = _item(manager, "Draft the proposal")
+    screen.refresh()
+    # The day column, but no box in it: day_drop_frame is what
+    # pointer_over_day reads, and a pointer really in the column is inside it.
+    _pointer_on(screen, monkeypatch, screen.day_drop_frame)
+
+    assert screen.slot_under_pointer() is None
+    assert screen.virtual_under_pointer() is None
+
+    screen.start_item_drag(None, item)
+    screen.on_drag_release(None)
+    screen.update_idletasks()
+
+    assert _stored(manager) == [], f"a block was created: {_stored(manager)}"
+    assert screen.settings.plan_day_start == "08:00", "the day was lengthened"
+    assert "Drop an item on a half-hour box" in screen.status_label.cget("text")
+
+
+def test_pdm5_a_real_box_wins_over_a_virtual_one(screen, manager, monkeypatch):
+    """A box flush against the Earlier box must still get its own drops.
+
+    The two are read in order -- slots first -- so a pointer that is somehow in
+    both lands on the half hour that exists. Asserted because the reverse order
+    is a one-line change that no other test would notice.
+    """
+    item = _item(manager, "Draft the proposal")
+    screen.refresh()
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    _pointer_on(
+        screen, monkeypatch, frames[0], _virtual(screen, DAY_EXTEND_EARLIER)
+    )
+
+    assert screen.slot_under_pointer() == 0
+    blocked = []
+    monkeypatch.setattr(screen, "block_item", lambda i, t: blocked.append((i.title, t)))
+    monkeypatch.setattr(
+        screen, "extend_day_for", lambda i, edge: blocked.append(("EXTENDED", edge))
+    )
+
+    screen.start_item_drag(None, item)
+    screen.on_drag_release(None)
+    screen.update_idletasks()
+
+    assert blocked == [("Draft the proposal", 0)], blocked
+
+
+def test_pdm5_the_day_cannot_be_extended_onto_a_non_block_day(
+    root, manager, settings
+):
+    """The Saturday refusal covers this path too, not only the drops onto boxes."""
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    item = _item(manager, "Weekend", start_date=SATURDAY)
+
+    panel.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+    assert settings.plan_day_start == "08:00", "a non-block day lengthened the week"
+    assert manager.get_time_blocks(SATURDAY) == []
+    assert "not a block day" in panel.status_label.cget("text")
+
+
+def test_pdm5_an_item_that_would_cross_midnight_is_refused(
+    root, manager, settings
+):
+    """PD-M5.8 on screen: nothing is written and the reason is the date, not room."""
+    settings.plan_day_start = "00:00"
+    settings.plan_day_end = "17:00"
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    item = _item(manager, "Impossible")
+
+    panel.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+    assert settings.plan_day_start == "00:00", settings.plan_day_start
+    assert manager.get_time_blocks(THURSDAY) == []
+    text = panel.status_label.cget("text")
+    assert "before midnight" in text, text

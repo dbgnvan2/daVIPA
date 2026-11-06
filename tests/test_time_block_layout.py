@@ -22,12 +22,16 @@ import pytest
 
 from src.getmoredone.models import ActionItem, BlockType, TimeBlock
 from src.getmoredone.time_block_layout import (
+    DAY_EXTEND_EARLIER,
+    DAY_EXTEND_LATER,
     DEFAULT_DAY_START,
     FALLBACK_BLOCK_MINUTES,
     MAX_BLOCK_MINUTES,
     DayBounds,
     TimeFormatError,
+    day_grid,
     default_minutes_for_block_type,
+    extended_day_bound,
     depth_bars,
     duration_for_item,
     format_hhmm,
@@ -419,3 +423,52 @@ def test_a_clock_time_within_the_day_is_read(text, minutes):
     pass for the right reason.
     """
     assert parse_clock_time(text) == minutes
+
+
+# ================= PD-M5 — how far the day can be extended ==============
+
+
+def test_pdm58_the_day_cannot_cross_midnight():
+    """PD-M5.8 — midnight is the floor and the ceiling, and it refuses rather than clamps.
+
+    A clamped bound would make fewer boxes than the item needs, so the block
+    would land somewhere other than the end that was dropped on -- or nowhere,
+    with the day already lengthened for it.
+    """
+    assert extended_day_bound(DayBounds(day_start="00:30"), DAY_EXTEND_EARLIER, 1) == "00:00"
+    assert extended_day_bound(DayBounds(day_start="00:30"), DAY_EXTEND_EARLIER, 2) is None
+    assert extended_day_bound(DayBounds(day_start="00:00"), DAY_EXTEND_EARLIER, 1) is None
+
+    assert extended_day_bound(DayBounds(day_end="23:00"), DAY_EXTEND_LATER, 1) == "23:30"
+    assert extended_day_bound(DayBounds(day_end="23:00"), DAY_EXTEND_LATER, 2) is None
+    assert extended_day_bound(DayBounds(day_end="23:30"), DAY_EXTEND_LATER, 1) is None
+
+
+def test_pdm58_the_ceiling_is_the_last_bound_that_yields_a_whole_box():
+    """23:30, not 23:59: a box running 23:30--24:00 has no storable end time.
+
+    Written because "the day ends at midnight" and "the day's last box ends at
+    midnight" are different numbers, and picking the first would let the day be
+    extended to a bound that produces no new box at all -- the settings written
+    and the item with nowhere to go.
+    """
+    grown = extended_day_bound(DayBounds(day_end="23:00"), DAY_EXTEND_LATER, 1)
+
+    assert grown == "23:30"
+    boxes = day_grid(DayBounds(day_start="23:00", day_end=grown))
+    assert [slot.start_time for slot in boxes] == ["23:00"], (
+        f"the bound the function offered makes these boxes: "
+        f"{[slot.start_time for slot in boxes]}"
+    )
+
+
+def test_pdm5_the_bound_moves_by_the_whole_span():
+    """A 90m item needs three boxes, so the day moves an hour and a half."""
+    assert extended_day_bound(DayBounds(), DAY_EXTEND_EARLIER, 3) == "06:30"
+    assert extended_day_bound(DayBounds(), DAY_EXTEND_LATER, 3) == "18:30"
+
+
+def test_pdm5_an_end_of_the_day_that_is_not_one_is_an_error():
+    """Not silently treated as one end or the other: a typo would pick a day."""
+    with pytest.raises(ValueError):
+        extended_day_bound(DayBounds(), "sideways", 1)
