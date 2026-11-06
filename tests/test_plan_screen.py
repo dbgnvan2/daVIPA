@@ -26,7 +26,9 @@ import pytest
 from src.getmoredone.app_settings import AppSettings
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem, BlockType, TimeBlock
+from src.getmoredone.color_contrast import contrast_ratio, pick_text_color
 from src.getmoredone.screens.plan import (
+    PLAN_ITEMS_COL_WIDTH_PX,
     REFUSAL_TEXT,
     RIGHT_CLICK_SEQUENCES,
     PlanScreen,
@@ -35,16 +37,25 @@ from src.getmoredone.screens.plan import (
 from src.getmoredone.screens.plan_blocks import (
     SLOT_CHIP_HEIGHT_PX,
     SLOT_MIN_HEIGHT_PX,
+    SLOT_TITLE_WIDTH_PX,
     DepthBarStack,
     accent_for_block,
     accent_for_item,
+    build_item_row,
     build_slot_row,
+    fill_for_item,
     slot_row_height,
+    stripe_for_item,
 )
 from src.getmoredone.screens.plan_settings_dialog import PlanSettingsDialog
-from src.getmoredone.theme import block_type_colors, priority_band_colors
+from src.getmoredone.theme import (
+    block_type_colors,
+    priority_band_colors,
+    semantic_colors,
+)
 from src.getmoredone.time_block_layout import (
     MAX_BLOCKS_PER_SLOT,
+    MAX_DEPTH_BARS,
     SLOT_MINUTES,
     DayBounds,
     SlotRefusal,
@@ -908,7 +919,7 @@ def test_tgm101_two_tasks_share_a_box(screen, manager):
     frame = next(f for f, index in _slot_frames(screen) if index == 2)
     assert _label_texts(frame).count("first task") == 1
     assert _label_texts(frame).count("second task") == 1
-    assert frame.cget("height") == slot_row_height(2)
+    assert frame.cget("height") == slot_row_height(2, screen.box_height())
     assert frame.cget("height") > slot_row_height(1)
 
     # The box is still one half hour, not two.
@@ -948,10 +959,13 @@ def test_tgm31_an_outside_block_is_drawn(screen, manager, settings):
     screen.on_settings_saved(DayBounds(day_end="12:00"))
 
     assert [b.label for b in screen._grid.outside] == ["late afternoon"]
-    drawn = _label_texts(screen.blocks_scroll)
+    drawn = _label_texts(screen.outside_frame)
     assert "late afternoon" in drawn
     assert any("Outside the day (1)" in text for text in drawn)
     assert "no longer fit the day" in screen.status_label.cget("text")
+    # In the items column, not under the grid: the group is dragged from,
+    # so it belongs beside the other things that are dragged from.
+    assert "late afternoon" not in _label_texts(screen.blocks_scroll)
 
 
 def test_tgm91_a_drop_lands_on_the_slot_under_the_pointer(screen, manager, monkeypatch):
@@ -1127,16 +1141,28 @@ class _FakeEvent:
 #
 # These were written to catch a sliver bug -- block rows reported as rendering
 # a few pixels wide -- on the theory that grid_propagate(False) left the frame
-# with no width. **The bug does not reproduce.** Measured against the real Plan
-# screen, a row is 667px inside a 671px pane; measured against a hand-built
-# pane, it fills it too. So nothing was fixed here and no fix is claimed.
+# with no width.
 #
-# The tests stay because the property they pin had no coverage at all: every
-# geometry test in this file asserts *behaviour* -- a drag creates a block, a
-# drop lands on a box -- and a row collapsed to a sliver does all of that
-# correctly. They are the guard for the grid pane, not a regression test for a
-# defect anyone has seen. They measure a real box of that pane, since the
-# per-block row they were first written against is gone.
+# This comment used to say **the bug does not reproduce**, on the strength of
+# those two measurements. It was wrong, and it was wrong in the way a
+# measurement is wrong when it measures the available thing rather than the
+# reported one. The bug was real and visible on screen on 2026-11-06: every
+# placed task drew as a bare 6px stripe, no title, no duration, no bars. The
+# two tests below passed the whole time.
+#
+# They passed because the row's *width* was never the problem. The stripe
+# asked to be 200px tall (``ctk.CTkFrame`` requests 200x200 when neither
+# dimension is set, and the stripe set only ``width``), the chip passed that
+# request up, and the box clipped it to 34 -- so the title was laid out around
+# y=100, below everything the box shows. A label clipped by its parent is
+# still full-width and Tk still calls it mapped, which is exactly the pair of
+# properties these two assert.
+#
+# PB-M2.1 (``test_a_task_chips_title_is_inside_the_box_it_is_drawn_in``) is
+# the test that closes that gap: it measures where the title sits inside the
+# box, which is the question "is the user looking at it" actually reduces to.
+# Keep these two as well -- width and mapping are still necessary, just not
+# sufficient -- but do not read a pass here as the box being legible.
 
 
 def _one_slot_pane(root, block, width=None):
@@ -1435,9 +1461,9 @@ def test_every_part_of_an_outside_row_starts_a_drag(screen, manager):
     screen.load_blocks()
     screen.on_settings_saved(DayBounds(day_end="12:00"))
 
-    label = _find_label(screen.blocks_scroll, "late afternoon")
+    label = _find_label(screen.outside_frame, "late afternoon")
     assert label is not None, (
-        f"no title label in the outside group; labels were {_label_texts(screen.blocks_scroll)}"
+        f"no title label in the outside group; labels were {_label_texts(screen.outside_frame)}"
     )
 
     # The binding itself, not a generated press: these windows are withdrawn,
@@ -1657,4 +1683,451 @@ def test_the_unreadable_warning_needs_a_block_to_be_about(root, manager, setting
 
     assert "earlier version" in panel.status_label.cget("text"), (
         "said nothing about a block adoption declined to place"
+    )
+
+
+# --- The items column, and the clock that has to be read off a box ---------
+#
+# Found by running the app rather than by a review pass: at full size the day
+# had a third of the window, the group of blocks it tells you to drag was in
+# the other pane from the things you drag, and the hour on a box was pale
+# peach on pale lavender.
+
+
+def test_the_items_column_is_the_width_the_setting_asks_for(root, manager, settings):
+    """The column is a width from Settings > Appearance, not a share of the window.
+
+    Purpose: a column of titles does not read better for being a third of the
+             screen, and the day beside it is what the width is for.
+    Tests:   this test
+    """
+    settings.plan_items_col_width = 180
+    panel = PlanScreen(root, manager, _App(settings))
+
+    assert panel.grid_columnconfigure(0)["minsize"] == 180
+    assert panel.grid_columnconfigure(0)["weight"] == 0, (
+        "with a weight the column grows with the window and the setting is "
+        "only a floor"
+    )
+    assert panel.grid_columnconfigure(1)["weight"] == 1, (
+        "the day column has to take the width the items column gave up"
+    )
+
+
+def test_an_unusable_items_column_width_falls_back_rather_than_collapsing(
+    root, manager, settings
+):
+    """A zero in a user-editable file must not hide the list.
+
+    The settings file is hand-editable, and the screen a zero would hide is
+    the screen you would have to use to get it back.
+    """
+    settings.plan_items_col_width = 0
+    panel = PlanScreen(root, manager, _App(settings))
+    assert panel.grid_columnconfigure(0)["minsize"] == PLAN_ITEMS_COL_WIDTH_PX
+
+    settings.plan_items_col_width = "two hundred"
+    other = PlanScreen(root, manager, _App(settings))
+    assert other.grid_columnconfigure(0)["minsize"] == PLAN_ITEMS_COL_WIDTH_PX
+
+
+def _as_hex(widget, color) -> str:
+    """``color`` as #RRGGBB, whatever Tk spelling it arrived in.
+
+    The palette mixes hex strings with Tk colour names ("gray81"), and the
+    contrast helper only reads hex. Asking Tk resolves both, and resolves them
+    the way the screen itself will.
+    """
+    if isinstance(color, (tuple, list)):
+        mode = (ctk.get_appearance_mode() or "Dark").lower()
+        color = color[0] if mode == "light" else color[-1]
+    red, green, blue = widget.winfo_rgb(color)
+    return "#{:02X}{:02X}{:02X}".format(red // 257, green // 257, blue // 257)
+
+
+def test_the_clock_on_a_box_is_legible_against_the_box(screen):
+    """The hour label was a fixed peach, which is the dark theme's colour.
+
+    In light mode that is pale text on a pale box: the one thing that says
+    which half hour a box is was the hardest thing on the screen to read.
+    4.5:1 is WCAG AA for body text.
+    """
+    palette = semantic_colors()
+    label = _find_label(screen.blocks_scroll, "08:00")
+    assert label is not None, "no clock label on the first box"
+
+    foreground = _as_hex(screen, label.cget("text_color"))
+    for name in ("surface", "surface_subtle"):
+        background = _as_hex(screen, palette[name])
+        ratio = contrast_ratio(background, foreground)
+        assert ratio >= 4.5, (
+            f"the clock label is {ratio:.2f}:1 on {name} "
+            f"({foreground} on {background})"
+        )
+
+
+def test_the_outside_group_does_not_outlive_the_day_that_had_one(screen, manager):
+    """Cleared on every redraw, not only when there is a new group to draw.
+
+    The group lives in the items pane now, which ``load_blocks`` does not
+    otherwise touch: emptied inside the "there are blocks outside the day"
+    branch, yesterday's group would still be on screen under today's items.
+    """
+    _add_block(manager, 30, "late afternoon", 16)
+    screen.load_blocks()
+    screen.on_settings_saved(DayBounds(day_end="12:00"))
+    assert "late afternoon" in _label_texts(screen.outside_frame)
+
+    screen.selected_date = FRIDAY
+    screen.refresh()
+    assert _label_texts(screen.outside_frame) == [], (
+        "the group from the day before is still under the item list"
+    )
+
+
+# --- the accent stripe's default height ------------------------------------
+#
+# ``ctk.CTkFrame`` requests 200x200 when neither width nor height is given.
+# The accent stripe sets ``width`` only, so its requested *height* stayed at
+# the class default and every container that let a child's request through
+# grew to 200px tall. On screen that is an item row five times taller than its
+# own two lines of text, and a task chip whose title is centred at y=100
+# inside a box clipped to 20 -- the title is drawn below the visible area, so
+# the box shows nothing but the stripe. Both are the same missing `height=`.
+
+
+def test_an_item_row_is_as_tall_as_its_text_not_the_stripe_default(
+    root, mapped_windows
+):
+    """An item in the left pane is two lines tall, not 200px.
+
+    The stripe spans both lines, so if its requested height leaks out the row
+    is sized by a constant nobody chose. 120px is generous for two lines at
+    the default font and still nowhere near 200.
+    """
+    root.geometry("1200x800")
+    root.deiconify()
+    pane = ctk.CTkFrame(root, width=PLAN_ITEMS_COL_WIDTH_PX)
+    pane.pack(fill="both", expand=True)
+    pane.grid_columnconfigure(0, weight=1)
+
+    row = build_item_row(
+        pane,
+        ActionItem(
+            who="me", id="i1", title="Draft the proposal", priority_score=100,
+            depth="Medium", work_block=True,
+        ),
+        0,
+        already_blocked=False,
+        work_block_minutes=30,
+    )
+    root.update()
+
+    assert row.winfo_height() > 1, (
+        f"the row did not lay out at all: {row.winfo_height()}px"
+    )
+    assert row.winfo_height() <= 120, (
+        f"item row is {row.winfo_height()}px tall -- the stripe's default "
+        "200px height is sizing it"
+    )
+
+
+def test_a_task_chips_title_is_inside_the_box_it_is_drawn_in(
+    root, manager, mapped_windows
+):
+    """TG-M8.3 — the title is within the box, not merely wide and mapped.
+
+    TG-M8.1 and TG-M8.2 measure width and mapping, and a chip whose title is
+    centred 100px below a box clipped to 20px passes both: the label is the
+    full width of its column and Tk still calls it mapped, because clipping by
+    a parent does not unmap a child. What the user sees is the stripe alone.
+    """
+    _pane, row = _one_slot_pane(
+        root,
+        TimeBlock(
+            block_date=THURSDAY, start_time="08:00", end_time="08:30",
+            planned_minutes=30, label="Draft the proposal", slot_index=0,
+        ),
+        width=600,
+    )
+    root.update()
+
+    title = _find_label(row.frame, "Draft the proposal")
+    assert title is not None, "no title label in the box"
+
+    box_height = row.frame.winfo_height()
+    top = title.winfo_rooty() - row.frame.winfo_rooty()
+    assert box_height > 1, f"the box did not lay out: {box_height}px"
+    assert 0 <= top and top + title.winfo_height() <= box_height, (
+        f"title occupies y {top}..{top + title.winfo_height()} of a "
+        f"{box_height}px box, so it is drawn outside what the box shows"
+    )
+
+
+# --- PB-M3 / PB-M5 : the box holds its contents, at the size asked for -----
+
+
+def _item_block(label="Draft the proposal"):
+    return TimeBlock(
+        block_date=THURSDAY, start_time="08:00", end_time="08:30",
+        planned_minutes=30, label=label, slot_index=0,
+    )
+
+
+def _find_depth_stacks(widget):
+    """Every DepthBarStack under ``widget``, however deeply nested."""
+    found = []
+    for child in widget.winfo_children():
+        if isinstance(child, DepthBarStack):
+            found.append(child)
+        found.extend(_find_depth_stacks(child))
+    return found
+
+
+def test_pbm31_the_depth_bars_are_inside_the_box(root, manager, mapped_windows):
+    """PB-M3.1 — the three-bar stack is drawn, and within the box.
+
+    Its own test rather than a line in the title one: the stack is a
+    grandchild of the box, so it has a way of disappearing that the title
+    does not -- the title shares the chip's row, the bars are a frame of
+    frames inside it.
+    """
+    item = _item(manager, "Draft the proposal", depth="Deep")
+    block = _item_block()
+    block.item_id = item.id
+    _pane, row = _one_slot_pane(root, block, width=600)
+    root.update()
+
+    stacks = _find_depth_stacks(row.frame)
+    assert len(stacks) == 1, f"expected one depth stack, found {len(stacks)}"
+    bars = stacks[0].winfo_children()
+    assert len(bars) == MAX_DEPTH_BARS, f"{len(bars)} bars, not {MAX_DEPTH_BARS}"
+
+    box_height = row.frame.winfo_height()
+    top = stacks[0].winfo_rooty() - row.frame.winfo_rooty()
+    assert 0 <= top and top + stacks[0].winfo_height() <= box_height, (
+        f"bars occupy y {top}..{top + stacks[0].winfo_height()} of a "
+        f"{box_height}px box"
+    )
+
+
+def test_pbm43_a_chip_is_filled_by_its_priority(root, manager, mapped_windows):
+    """PB-M4.3 — the task is shaded by its band, not by the generic surface.
+
+    Asserted against ``fill_for_item`` rather than a literal: a test holding
+    its own copy of the hex would pass a theme change that the screen failed.
+    """
+    item = _item(manager, "Draft the proposal", priority_score=51200)
+    block = _item_block()
+    block.item_id = item.id
+    _pane, row = _one_slot_pane(root, block, width=600)
+    root.update()
+
+    chip = row.block_widgets[0][1]
+    assert _as_hex(chip, chip.cget("fg_color")) == _as_hex(
+        chip, fill_for_item(item)
+    ), f"chip fill is {chip.cget('fg_color')}, not {fill_for_item(item)}"
+    assert _as_hex(chip, chip.cget("fg_color")) != _as_hex(
+        chip, semantic_colors()["surface_subtle"]
+    ), "the chip is still drawn on the generic surface"
+
+
+def test_pbm51_box_height_follows_the_setting():
+    """PB-M5.1 — the arithmetic takes the chip height from its caller.
+
+    The no-argument form is pinned alongside, because every existing layout
+    assertion in this suite depends on it and a silent change to the default
+    would move them all at once.
+    """
+    assert slot_row_height(1, chip_height=86) == 90
+    assert slot_row_height(2, chip_height=86) == 176
+    assert slot_row_height(1) == SLOT_CHIP_HEIGHT_PX + 4
+    assert slot_row_height(0) == SLOT_MIN_HEIGHT_PX, (
+        "an empty box must keep its minimum: it holds no text and only has "
+        "to be large enough to drop onto"
+    )
+
+
+def _one_block_day(manager, item):
+    """One 30-minute block in the first box, for the sizing tests below."""
+    manager.add_block_at(
+        TimeBlock(
+            block_date=THURSDAY, start_time="", end_time="",
+            planned_minutes=30, item_id=item.id, label=item.title,
+        ),
+        0,
+        DayBounds(),
+    )
+
+
+def test_pbm52_the_setting_reaches_the_rendered_box(
+    root, manager, settings, mapped_windows
+):
+    """PB-M5.2 — the setting is not merely stored, it sizes a real box.
+
+    Two screens built at different settings and measured against each other,
+    rather than one measured against a number: the number would re-state the
+    arithmetic PB-M5.1 already pins, and prove nothing about the wiring.
+    """
+    _one_block_day(manager, _item(manager, "Draft the proposal"))
+
+    def box_height_at(setting):
+        """The rendered height of box 0 on a screen built at ``setting``.
+
+        The screen is destroyed before the next one is built. Two live Plan
+        screens on one mapped root wedge Tk's event loop in ``root.update()``,
+        which is a property of the fixture rather than of the code under test
+        -- but it hangs the run just the same.
+        """
+        settings.drag_schedule_box_height_px = setting
+        panel = PlanScreen(root, manager, _App(settings))
+        panel.selected_date = THURSDAY
+        panel.refresh()
+        root.update_idletasks()
+        try:
+            box = next(f for f, index in _slot_frames(panel) if index == 0)
+            return box.winfo_height()
+        finally:
+            panel.destroy()
+            root.update_idletasks()
+
+    short_height = box_height_at(40)
+    tall_height = box_height_at(120)
+
+    assert short_height > 1, f"the short box did not lay out: {short_height}px"
+    assert tall_height > short_height, (
+        f"box is {tall_height}px at a 120px setting and "
+        f"{short_height}px at 40px -- the setting is not reaching the box"
+    )
+
+
+@pytest.mark.parametrize("bad", [0, -40, "wide", None])
+def test_pbm53_an_unusable_box_height_falls_back(root, manager, settings, bad):
+    """PB-M5.3 — a zero or a typo in the settings file does not flatten the day.
+
+    A settings file is user-editable. A box of height 0 is a day with no drop
+    targets and no way back to the screen that would fix it.
+    """
+    settings.drag_schedule_box_height_px = bad
+    panel = PlanScreen(root, manager, _App(settings))
+
+    assert panel.box_height() == SLOT_CHIP_HEIGHT_PX
+
+
+def test_pbm54_the_title_column_follows_the_drag_schedule_width(
+    root, manager, settings, mapped_windows
+):
+    """PB-M5.4 — a box's title column is the width Drag Schedule uses.
+
+    Read off the rendered chip's own grid, not off the setting: the point of
+    the criterion is that the value arrives, and re-reading the setting would
+    assert only that a number equals itself.
+    """
+    _one_block_day(manager, _item(manager, "Draft the proposal"))
+    settings.drag_schedule_title_col_width = 173
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    root.update_idletasks()
+
+    chip = panel._block_widgets[0][0]
+    assert chip.grid_columnconfigure(1)["minsize"] == 173, (
+        f"title column asks for {chip.grid_columnconfigure(1)['minsize']}px, "
+        "not the Drag Schedule width"
+    )
+
+
+@pytest.mark.parametrize("bad", [0, -5, "wide", None])
+def test_pbm54_an_unusable_title_width_falls_back(root, manager, settings, bad):
+    """The other half of PB-M5.4, on the same grounds as PB-M5.3."""
+    settings.drag_schedule_title_col_width = bad
+    panel = PlanScreen(root, manager, _App(settings))
+
+    assert panel.box_title_width() == SLOT_TITLE_WIDTH_PX
+
+
+def test_pbm1_an_item_rows_stripe_uses_the_brighter_table(root, manager):
+    """PB-M1 reaches the widget, not just the theme module.
+
+    A colour table nothing consumes is a table that passes its own contrast
+    tests and changes nothing on screen.
+    """
+    item = _item(manager, "Draft the proposal", priority_score=51200)
+    row = build_item_row(
+        root, item, 0, already_blocked=False, work_block_minutes=30
+    )
+    stripe = next(
+        child for child in row.winfo_children()
+        if isinstance(child, ctk.CTkFrame) and not isinstance(child, DepthBarStack)
+    )
+
+    assert _as_hex(row, stripe.cget("fg_color")) == _as_hex(
+        row, stripe_for_item(item)
+    )
+    assert _as_hex(row, stripe.cget("fg_color")) != _as_hex(
+        row, accent_for_item(item)
+    ), "the stripe is still the text-safe band colour"
+
+
+def test_pbm41_a_chips_title_is_coloured_for_the_shade_behind_it(
+    root, manager, mapped_windows
+):
+    """PB-M4.1 — the renderer picks the title colour from the fill it drew.
+
+    The theme-level form of this criterion cannot fail (see
+    ``test_pbm41_pick_text_color_is_not_what_makes_a_fill_legible``). This one
+    can: before PB-M4 the title was the theme's body text, which is the right
+    colour for the theme's surface and the wrong one for a band tint -- pale
+    text on a pale shade, the same failure the clock labels had.
+    """
+    item = _item(manager, "Draft the proposal", priority_score=51200)
+    block = _item_block()
+    block.item_id = item.id
+    _pane, row = _one_slot_pane(root, block, width=600)
+    root.update()
+
+    chip = row.block_widgets[0][1]
+    title = _find_label(chip, "Draft the proposal")
+    assert title is not None, "no title label on the chip"
+
+    fill = _as_hex(chip, chip.cget("fg_color"))
+    drawn = _as_hex(title, title.cget("text_color"))
+    assert drawn == _as_hex(title, pick_text_color(fill)), (
+        f"title is {title.cget('text_color')} on a {fill} chip, not the "
+        "colour chosen for that fill"
+    )
+    assert contrast_ratio(fill, drawn) >= 4.5, (
+        f"title {drawn} on {fill} is {contrast_ratio(fill, drawn):.2f}:1"
+    )
+
+
+def test_the_empty_item_note_fits_the_column_it_is_drawn_in(
+    root, manager, settings, mapped_windows
+):
+    """The "no items start on this date" note stays inside the items column.
+
+    It did not. ``CTkLabel`` centres its text, so a label wider than its cell
+    overflows on both sides and Tk clips both -- on screen that read as a
+    sentence with its first word missing, which looks like a rendering fault
+    rather than a message. Measured as the laid-out label against the column,
+    because the hard line breaks it carried were sized for a column that no
+    longer exists.
+    """
+    settings.plan_items_col_width = 240
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    root.update_idletasks()
+
+    note = next(
+        child for child in panel.items_scroll.winfo_children()
+        if isinstance(child, ctk.CTkLabel)
+        and "No open items start" in child.cget("text")
+    )
+    assert note.winfo_reqwidth() <= 240, (
+        f"the note asks for {note.winfo_reqwidth()}px inside a 240px column"
+    )
+    assert note.cget("anchor") == "w", (
+        f"the note is anchored {note.cget('anchor')!r}, so text that does not "
+        "fit is clipped at both ends rather than at one"
     )
