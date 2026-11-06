@@ -446,10 +446,10 @@ happen on that save, all deliberate:
   `settings.json` yourself — the app will not destroy it for you. While this is
   the case, **saving from other screens does nothing either** — every Save
   button on the Settings screen now says so instead of reporting a save, and
-  the Appearance section does not apply a theme it could not write. Three
+  the Appearance section does not apply a theme it could not write. Four
   places still fail silently rather than wrongly: a column drag on Today, the
-  timer window's position when it closes, and the Next Action dialog's. See
-  `BACKLOG.md`.
+  same drag on Drag Schedule, the timer window's position when it closes, and
+  the Next Action dialog's. See `BACKLOG.md`.
 - If the new file cannot be written — a permissions problem, a full disk — the
   dialog says so and stays open. It does not report the day settings as saved,
   and the day's shape goes back to what it was rather than being left changed

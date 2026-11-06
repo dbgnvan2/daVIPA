@@ -1,6 +1,42 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-06 (the sixth pass of the grid rebuild: the raised save-reporting entry mostly cleared, three below-medium added; the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-06 (the seventh pass of the grid rebuild: four below-medium added; the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Below medium, from the seventh pass of the grid rebuild (2026-11-06)
+
+Cold pass over the sixth round's own fix — seven production call sites across
+two screens, the widest fix in the batch. Two mediums, both in the batch's own
+new tests, fixed there. Four lows, here.
+
+- **"Run Import Now" erases the refusal it just caused.**
+  `run_email_import_now` (`settings_integrations.py:226`) calls
+  `save_email_import_settings`, which now reports a refused write on
+  `gmail_status_label` — and then line 259 sets that same label to
+  "Running import…" and starts the thread, so the import runs against values
+  that were never written and the user is told nothing. Not a regression: the
+  old code wrote a false "Saved (launchd updated)." into the same label and
+  erased that instead. The fix is for `save_email_import_settings` to return
+  the bool and for this caller to stop on False. `run_calendar_import_now`
+  reports on a different label and is unaffected.
+- **A refused database save leaves the entry showing the raw text.**
+  `save_database_settings` skips
+  `self.business_year_start_var.set(...)` on the early return, and
+  `AppSettings.save` normalises that field before it decides whether to write —
+  so the widget shows what was typed while `self.settings` holds the normalised
+  value. Cosmetic: the error is displayed, and the next Save re-reads the entry.
+- **Every section writes its widget values into `self.settings` before the
+  save.** After one successful Appearance save, `self.app.settings` is that same
+  object, so a later refused save in any section leaves the running app holding
+  values the file does not have until relaunch. The ordering is older than this
+  batch and unchanged by it; the new guard makes it visible rather than silent,
+  which is why it is low. The fix is to stage the widget values and commit them
+  on a successful write only.
+- **Nothing pins the mixin's dependency on `_write_settings`.**
+  `SettingsIntegrationsMixin` calls a method defined on `SettingsScreen`, which
+  resolves because `SettingsScreen` is the only class that mixes it in — but the
+  new tests supply `_write_settings` on a `SimpleNamespace` stub, so no test
+  walks that MRO hop. Renaming or moving `_write_settings` would leave the suite
+  green and raise `AttributeError` on the Email Import Save button.
 
 ## Below medium, from the sixth pass of the grid rebuild (2026-11-06)
 
@@ -137,9 +173,12 @@ Severity rated before any fix was written, as above.
   the theme app-wide, Email Import reloading launchd — skip that too.
   `tests/test_settings_save_refusal.py` covers all four behaviours.
   **What remains, at low:** three call sites still ignore the return value and
-  fail silently rather than wrongly — `column_resize.py:104` (a column drag on
-  Today), `timer_window.py:1778` and `timer_window_dialogs.py:452` (window
-  positions saved on close). None of them tells the user anything either way,
+  fail silently rather than wrongly — `column_resize.py:104`,
+  `timer_window.py:1778` and `timer_window_dialogs.py:452` (window positions
+  saved on close). That is three call sites but **four surfaces**:
+  `ColumnResizer` is built twice, by `today.py:70` with `prefix="today"` and by
+  `drag_schedule.py:92` with `prefix="drag_schedule"`, so a column drag on
+  either screen saves silently. None of them tells the user anything either way,
   so none can lie; the setting is simply lost until the settings file is
   dealt with. The user-facing notice that an unreadable file was kept aside is
   still only in the log, and still belongs with whatever fixes these three.
