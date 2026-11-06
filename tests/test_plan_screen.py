@@ -2207,6 +2207,34 @@ def _item_block(label="Draft the proposal"):
     )
 
 
+def _row_columns(widget, title):
+    """The grid column of each of a row's four parts, keyed by role.
+
+    Returned as a mapping so an item row and a task chip can be compared
+    without either test restating the column numbers: a chip renumbered
+    without the item row following is the drift this exists to catch, and a
+    test holding its own copy of the layout stays green through it.
+    """
+    columns = {}
+    for child in widget.winfo_children():
+        placed = child.grid_info()
+        if not placed:
+            continue
+        column = int(placed["column"])
+        if isinstance(child, DepthBarStack):
+            columns["bars"] = column
+        elif isinstance(child, ctk.CTkFrame):
+            if child.cget("width") == STRIPE_WIDTH_PX:
+                columns["stripe"] = column
+        elif isinstance(child, ctk.CTkLabel):
+            shown = str(child.cget("text"))
+            if shown == title:
+                columns["title"] = column
+            elif re.fullmatch(r"\d+m", shown):
+                columns["length"] = column
+    return columns
+
+
 def _find_depth_stacks(widget):
     """Every DepthBarStack under ``widget``, however deeply nested."""
     found = []
@@ -2853,8 +2881,8 @@ def test_pbm61_a_row_too_short_for_its_text_keeps_its_text(root, manager):
 
     A box height of 30 -- the floor, and what the demo's settings file holds --
     gives a half hour 34px in the day. A row matching that showed its title and
-    clipped the depth / ``already blocked`` line and the work-block length: the
-    two facts the colour cannot carry, gone with nothing to say they were there.
+    clipped the ``already blocked`` marker: the one scheduling fact the colour
+    cannot carry, gone with nothing to say it was there.
 
     Asserted as the real relationship rather than against the constant alone:
     below the floor the row is the taller of the two, at and above it the row is
@@ -2880,11 +2908,17 @@ def test_pbm61_the_floor_is_what_the_rows_own_grid_asks_for(root, manager):
     """The floor is the one number here justified by arithmetic, so measure it.
 
     ``ITEM_ROW_MIN_HEIGHT_PX`` is the sum of what the two text rows request:
-    the title's 28px label plus its 5px top pad, and the detail line's 28px
-    plus the work-block length's 6px bottom pad -- the larger of the two bottom
-    pads on that row. Written by hand it was 66, one pixel short, and the row
-    silently lost the last pixel of its bottom padding: no other assertion
-    could see it, because both labels anchor to the top of their cell.
+    the title's 28px label plus its 5px top pad, and the ``already blocked``
+    marker's 28px plus its 5px bottom pad. Written by hand it was 66 against an
+    arithmetic of 67, one pixel short, and the row silently lost the last pixel
+    of its bottom padding: no other assertion could see it, because both labels
+    anchor to the top of their cell.
+
+    It is 66 now for a reason the first version is the argument for keeping
+    this test: PD-M1 moved the ``{minutes}m`` label off the second line and up
+    beside the title, taking its 6px bottom pad -- the larger of that row's two
+    -- with it. Nothing in the layout change says "the floor is a pixel less";
+    only the measurement does.
 
     So this reads the requirement off the widgets the row actually builds
     rather than restating the number. The stripe is skipped: it spans all three
@@ -3006,10 +3040,15 @@ def test_pbm61_a_tall_row_keeps_its_two_lines_together(
     y=100 with its own detail line 124px below it and the depth bars pinned to
     the top, so the row stopped reading as one item. Asserted as a distance,
     because "the title is above the detail line" held in the broken version too.
+
+    The second line used to be the depth word, and is the blocked marker since
+    PD-M1.5 moved the depth onto the bars alone. The item is built blocked for
+    that reason: this test needs two lines of text to measure between, and the
+    marker is the only thing that puts a second line on the row now.
     """
     item = _scored_item(manager, "Draft the proposal", depth="Medium")
     row = build_item_row(
-        root, item, 0, already_blocked=False,
+        root, item, 0, already_blocked=True,
         work_block_minutes=90, box_height=86,
     )
     root.geometry("700x700")
@@ -3018,7 +3057,7 @@ def test_pbm61_a_tall_row_keeps_its_two_lines_together(
     root.update()
 
     title = _find_label(row, "Draft the proposal")
-    detail = _find_label(row, "Medium")
+    detail = _find_label(row, "already blocked")
     assert title is not None and detail is not None, "the row lost a label"
 
     gap = detail.winfo_y() - (title.winfo_y() + title.winfo_height())
@@ -3063,12 +3102,94 @@ def test_pbm62_an_item_row_does_not_print_its_priority_score(root, manager):
     )
 
 
-def test_pbm63_the_work_block_length_is_under_the_depth_bars(root, manager):
-    """PB-M6.3 — "30m" sits below the stacked lines, not in the detail line.
+def test_pdm11_the_item_row_uses_the_chips_column_order(root, manager):
+    """PD-M1.1 - the row's first line is laid out like a task inside a box.
 
-    Position asserted, not just presence: the fact is in the same place on an
-    item row as on a task in a box, which is the point of moving it. Measured
-    off the grid rather than off pixels so it holds on a withdrawn window.
+    The ask was for the left pane's items to be formatted like the right
+    pane's. Asserted against a real chip, not against four numbers written
+    here: the whole point is that the two panes cannot drift apart, and a test
+    carrying its own copy of the widths would pass while they did.
+
+    Both halves are asserted. The roles say the order is the same -- stripe,
+    title, bars, length -- and the minsizes say the columns are the same
+    widths, which is what makes the two panes line up rather than merely
+    agree on sequence.
+    """
+    item = _scored_item(manager, "Draft the proposal")
+    block = _item_block()
+    block.item_id = item.id
+    _pane, slot_row = _one_slot_pane(
+        root, block, width=600, mapped=False, items_by_id={item.id: item}
+    )
+    chip = slot_row.block_widgets[0][1]
+    # Its own container: ``_one_slot_pane`` packs into ``root``, and an item
+    # row grids into whatever it is handed.
+    holder = ctk.CTkFrame(root)
+    holder.pack(fill="both", expand=True)
+    row = build_item_row(
+        holder, item, 0, already_blocked=False, work_block_minutes=30
+    )
+
+    columns = _row_columns(row, item.title)
+    assert set(columns) == {"stripe", "title", "bars", "length"}, (
+        f"the row is missing a part: found {sorted(columns)} -- an incomplete "
+        "row would make the comparison below vacuous"
+    )
+    assert columns == _row_columns(chip, item.title), (
+        f"the item row puts its parts in {columns} and a box chip in "
+        f"{_row_columns(chip, item.title)}"
+    )
+
+    for column in range(4):
+        mine = row.grid_columnconfigure(column)["minsize"]
+        theirs = chip.grid_columnconfigure(column)["minsize"]
+        assert mine == theirs, (
+            f"column {column} is {mine}px on an item row and {theirs}px on a "
+            "box chip -- the two panes do not line up"
+        )
+
+
+def test_pdm15_an_item_rows_title_column_follows_the_same_setting(
+    root, manager, settings
+):
+    """PD-M1.1 — the live width reaches the left pane too, not just the right.
+
+    ``test_pdm11_the_item_row_uses_the_chips_column_order`` compares the two
+    panes at the default, which is the one width they agree on for free.
+    Dropping ``title_width=self.box_title_width()`` from the item-row call site
+    passes that test and leaves the panes lined up at 80px and nowhere else --
+    which is the whole of what the setting is for.
+    """
+    item = _item(manager, "Draft the proposal")
+    _one_block_day(manager, item)
+    settings.drag_schedule_title_col_width = 173
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    root.update_idletasks()
+
+    title = _find_label(panel.items_scroll, item.title)
+    assert title is not None, "the item is not in the left pane at all"
+    row = title.master
+    assert row.grid_columnconfigure(1)["minsize"] == 173, (
+        f"the item row's title column asks for "
+        f"{row.grid_columnconfigure(1)['minsize']}px, not the Drag Schedule "
+        "width the boxes use"
+    )
+    chip = panel._block_widgets[0][0]
+    assert row.grid_columnconfigure(1)["minsize"] == (
+        chip.grid_columnconfigure(1)["minsize"]
+    ), "the two panes' title columns are different widths"
+
+
+def test_pdm12_the_length_sits_beside_the_depth_bars(root, manager):
+    """PD-M1.2 - the length is next to the bars on one line, not under them.
+
+    This replaces ``test_pbm63_the_work_block_length_is_under_the_depth_bars``,
+    which asserted the same column and a lower row. That test is not wrong
+    about what it saw; the behaviour changed intentionally -- PB-M6.3 put the
+    length under the bars to mirror a box, and PD-M1 makes the row mirror the
+    box properly, which puts both on the chip's single line.
     """
     item = _item(manager, "Draft the proposal", depth="Medium")
     row = build_item_row(
@@ -3086,14 +3207,104 @@ def test_pbm63_the_work_block_length_is_under_the_depth_bars(root, manager):
 
     bars_at = bars.grid_info()
     duration_at = duration.grid_info()
-    assert duration_at["column"] == bars_at["column"], (
-        f"the length is in column {duration_at['column']}, the bars in "
-        f"{bars_at['column']} -- it is not under them"
+    assert int(duration_at["row"]) == int(bars_at["row"]), (
+        f"the length is on row {duration_at['row']} and the bars on "
+        f"{bars_at['row']} -- they are not on one line"
     )
-    assert int(duration_at["row"]) > int(bars_at["row"]), (
-        f"the length is on row {duration_at['row']}, the bars on "
-        f"{bars_at['row']} -- it is not under them"
+    assert int(duration_at["column"]) == int(bars_at["column"]) + 1, (
+        f"the length is in column {duration_at['column']} and the bars in "
+        f"{bars_at['column']} -- it is not the next column along"
     )
+
+
+def test_pdm14_the_second_line_is_the_blocked_marker_alone(root, manager):
+    """PD-M1.5 - the depth word is gone from the second line; the marker is not.
+
+    The depth is already on the row three ways over -- the shade it is drawn
+    on, the colour of its stripe, and the bar stack that exists to show it --
+    so the word was a fourth, on the one line a reader checks for something
+    the colours cannot say. "already blocked" is the one thing that line
+    carries, and only when it is true: an item not yet blocked has no second
+    line, which is what keeps the first line at the top of the row.
+    """
+    item = _item(manager, "Draft the proposal", depth="Medium")
+    row = build_item_row(
+        root, item, 0, already_blocked=True, work_block_minutes=30
+    )
+
+    def second_line(widget):
+        return [
+            str(child.cget("text")) for child in widget.winfo_children()
+            if isinstance(child, ctk.CTkLabel)
+            and int(child.grid_info()["row"]) == 1
+        ]
+
+    assert second_line(row) == ["already blocked"], (
+        f"the second line reads {second_line(row)}"
+    )
+    texts = [
+        str(child.cget("text")) for child in row.winfo_children()
+        if isinstance(child, ctk.CTkLabel)
+    ]
+    assert not any(item.depth in shown for shown in texts), (
+        f"the depth word {item.depth!r} is still written on the row: {texts}"
+    )
+
+    plain = build_item_row(
+        root, item, 1, already_blocked=False, work_block_minutes=30
+    )
+    assert second_line(plain) == [], (
+        f"an item that is not blocked has a second line anyway: "
+        f"{second_line(plain)}"
+    )
+
+
+def test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it(
+    root, manager, mapped_windows
+):
+    """PD-M1.4 - four columns in the narrow pane, and nothing squeezed out.
+
+    ``test_pbm61_every_line_of_a_row_is_drawn_inside_it`` measures the row
+    vertically, which was the risk when the row was two stacked lines. Putting
+    the stripe, the title, the bars and the length on one line makes width the
+    risk instead: in a pane the width of the items column the four columns
+    have to fit, and a title column with ``weight=1`` is the one that gives
+    way -- collapsed to a pixel, or pushed past the frame's right edge.
+
+    So this asserts the horizontal edges, at the real column width, which the
+    vertical test does not look at at all.
+    """
+    item = _scored_item(manager, "Draft the proposal")
+    root.geometry(f"{PLAN_ITEMS_COL_WIDTH_PX}x700")
+    root.deiconify()
+    pane = ctk.CTkFrame(root)
+    pane.pack(fill="both", expand=True)
+    pane.grid_columnconfigure(0, weight=1)
+
+    row = build_item_row(
+        pane, item, 0, already_blocked=True, work_block_minutes=30
+    )
+    root.update_idletasks()
+    root.update()
+
+    width = row.winfo_width()
+    assert width > 1, "the row itself was not laid out"
+    for child in row.winfo_children():
+        shown = (
+            child.cget("text") if isinstance(child, ctk.CTkLabel)
+            else type(child).__name__
+        )
+        assert child.winfo_width() > 1, (
+            f"{shown!r} is {child.winfo_width()}px wide in a {width}px row -- "
+            "it has been squeezed out"
+        )
+        assert child.winfo_x() >= 0, (
+            f"{shown!r} starts at x={child.winfo_x()}, left of the row"
+        )
+        right = child.winfo_x() + child.winfo_width()
+        assert right <= width, (
+            f"{shown!r} ends at {right} in a {width}px row -- it is clipped"
+        )
 
 
 def test_pbm71_a_continuation_box_is_the_colour_of_its_task(root, manager):
