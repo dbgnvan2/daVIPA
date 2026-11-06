@@ -12,8 +12,11 @@ from only one surface, and not the one anyone uses).
 
 The windows are withdrawn by conftest, so a run does not throw modals over
 whatever the user is doing. ``winfo_width()`` on a withdrawn window returns 1,
-so the two tests that read real geometry ask for the ``mapped_windows``
-fixture.
+so the tests that read real geometry -- and only those -- ask for the
+``mapped_windows`` fixture. A test that reads ``cget`` or a grid option does
+not need a mapped window, and taking the fixture anyway means it is skipped in
+the local workflow CLAUDE.md documents, which is where the wiring it proves
+most needs to be proved.
 """
 
 from __future__ import annotations
@@ -28,6 +31,8 @@ from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem, BlockType, TimeBlock
 from src.getmoredone.color_contrast import contrast_ratio, pick_text_color
 from src.getmoredone.screens.plan import (
+    NOTE_MIN_WRAP_PX,
+    OUTSIDE_GROUP_HEIGHT_PX,
     PLAN_ITEMS_COL_WIDTH_PX,
     REFUSAL_TEXT,
     RIGHT_CLICK_SEQUENCES,
@@ -42,6 +47,7 @@ from src.getmoredone.screens.plan_blocks import (
     accent_for_block,
     accent_for_item,
     build_item_row,
+    build_outside_group,
     build_slot_row,
     fill_for_item,
     slot_row_height,
@@ -100,6 +106,32 @@ def root():
     window = ctk.CTk()
     yield window
     window.destroy()
+
+
+@pytest.fixture
+def light_appearance():
+    """Pin the appearance mode, so a colour assertion is not host-dependent.
+
+    Nothing in this file sets a mode, so CustomTkinter resolved ``"System"``
+    and the colour tests asserted against whichever theme the machine running
+    them happened to be in. ``test_pbm1_an_item_rows_stripe_uses_the_brighter
+    _table`` was the one that could fail for it: the stripe table is a
+    *different* table from the band table only in light mode -- in dark mode
+    the two are deliberately equal -- so that test passed on a light-mode Mac
+    and would have failed against correct code on a dark-mode one.
+
+    The restore goes back to ``"system"`` when that is what was in force
+    rather than to ``get_appearance_mode()``, which returns the *resolved*
+    mode: saving and re-setting that would quietly convert "follow the OS"
+    into a fixed mode for every test collected after this one.
+    """
+    was_system = ctk.AppearanceModeTracker.appearance_mode_set_by == "system"
+    previous = ctk.get_appearance_mode()
+    ctk.set_appearance_mode("light")
+    try:
+        yield
+    finally:
+        ctk.set_appearance_mode("system" if was_system else previous)
 
 
 @pytest.fixture
@@ -1911,7 +1943,7 @@ def test_pbm31_the_depth_bars_are_inside_the_box(root, manager, mapped_windows):
     )
 
 
-def test_pbm43_a_chip_is_filled_by_its_priority(root, manager, mapped_windows):
+def test_pbm43_a_chip_is_filled_by_its_priority(root, manager, light_appearance):
     """PB-M4.3 — the task is shaded by its band, not by the generic surface.
 
     Asserted against ``fill_for_item`` rather than a literal: a test holding
@@ -2015,7 +2047,7 @@ def test_pbm53_an_unusable_box_height_falls_back(root, manager, settings, bad):
 
 
 def test_pbm54_the_title_column_follows_the_drag_schedule_width(
-    root, manager, settings, mapped_windows
+    root, manager, settings
 ):
     """PB-M5.4 — a box's title column is the width Drag Schedule uses.
 
@@ -2046,7 +2078,9 @@ def test_pbm54_an_unusable_title_width_falls_back(root, manager, settings, bad):
     assert panel.box_title_width() == SLOT_TITLE_WIDTH_PX
 
 
-def test_pbm1_an_item_rows_stripe_uses_the_brighter_table(root, manager):
+def test_pbm1_an_item_rows_stripe_uses_the_brighter_table(
+    root, manager, light_appearance
+):
     """PB-M1 reaches the widget, not just the theme module.
 
     A colour table nothing consumes is a table that passes its own contrast
@@ -2070,7 +2104,7 @@ def test_pbm1_an_item_rows_stripe_uses_the_brighter_table(root, manager):
 
 
 def test_pbm41_a_chips_title_is_coloured_for_the_shade_behind_it(
-    root, manager, mapped_windows
+    root, manager, light_appearance
 ):
     """PB-M4.1 — the renderer picks the title colour from the fill it drew.
 
@@ -2130,4 +2164,214 @@ def test_the_empty_item_note_fits_the_column_it_is_drawn_in(
     assert note.cget("anchor") == "w", (
         f"the note is anchored {note.cget('anchor')!r}, so text that does not "
         "fit is clipped at both ends rather than at one"
+    )
+
+
+# --- the sweep's findings --------------------------------------------------
+#
+# All five below were found by the pre-push sweep, two of them by both passes.
+# Three are the same shape: a size that this batch wired to a setting, in a
+# place the batch did not look. The other two are the fallback bar being
+# "positive" where it had to be "usable".
+
+
+def test_pbm55_an_outside_block_is_sized_like_one_in_a_box(root, manager):
+    """PB-M5.5 — the outside group reads the same two sizes as a box.
+
+    It did not. ``build_outside_group`` called ``_build_block_chip`` with
+    neither size, so its rows kept the 30/80 fallbacks while every row in the
+    day took the setting -- and this batch moved the group into the items
+    column, directly beneath the item rows and across from the boxes it no
+    longer matched. Aligned columns between paired panes are a project design
+    goal, so the mismatch is the defect whichever size is "right".
+    """
+    item = _item(manager, "Rewrite the importer", priority_score=51200)
+    block = TimeBlock(
+        block_date=THURSDAY, start_time="", end_time="",
+        planned_minutes=180, item_id=item.id, label=item.title,
+    )
+
+    pane = ctk.CTkFrame(root)
+    pane.grid(row=0, column=0, sticky="nsew")
+    pane.grid_columnconfigure(0, weight=1)
+    widgets = build_outside_group(
+        pane, [block], {item.id: item}, 0, chip_height=86, title_width=220
+    )
+
+    assert len(widgets) == 1, f"{len(widgets)} outside rows, expected 1"
+    holder = widgets[0][1]
+    assert holder.cget("height") == 86, (
+        f"the outside holder is {holder.cget('height')}px while a task in a "
+        "box is 86px"
+    )
+    chip = next(
+        child for child in holder.winfo_children()
+        if isinstance(child, ctk.CTkFrame)
+    )
+    assert chip.cget("height") == 86 - 4, (
+        f"the outside chip asks for {chip.cget('height')}px, not the setting "
+        "less its padding"
+    )
+    assert chip.grid_columnconfigure(1)["minsize"] == 220, (
+        "the outside chip's title column is "
+        f"{chip.grid_columnconfigure(1)['minsize']}px, not the 220px setting"
+    )
+
+
+def test_pbm55_the_settings_reach_the_outside_group_on_screen(
+    root, manager, settings
+):
+    """The other half of PB-M5.5: the screen passes what the group accepts.
+
+    Separate from the test above for the reason PB-M5.1 and PB-M5.2 are
+    separate: one proves the function can be told, the other proves the screen
+    tells it. A keyword argument with no caller is the failure being fixed.
+    """
+    settings.drag_schedule_box_height_px = 64
+    _add_block(manager, 30, "late afternoon", 16)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    panel.on_settings_saved(DayBounds(day_end="12:00"))
+
+    # Read off what the screen recorded as draggable rather than off the
+    # container's children: a scrollable frame has children of its own.
+    assert len(panel._block_widgets) == 1, (
+        f"{len(panel._block_widgets)} draggable blocks, expected the one"
+    )
+    holder = panel._block_widgets[0][0]
+    assert holder.cget("height") == 64, (
+        f"the outside holder is {holder.cget('height')}px, not the 64px the "
+        "screen draws a box's task at"
+    )
+
+
+def test_pbm56_a_box_height_below_one_line_of_text_is_raised(root, manager, settings):
+    """A box height that parses but cannot hold a line of text is floored.
+
+    ``_positive_setting`` guaranteed only "> 0". A box is pinned to
+    ``chips * chip_height + 4`` and does not grow to its contents, while a
+    chip does grow to its text, so at 14 a two-task half hour is 32px -- the
+    same height as a one-task box, with the second task laid out past the
+    clip edge. That is the PB-M2 defect reached through a setting rather than
+    through a missing ``height=``, and the floor is the line of text that
+    ``SLOT_CHIP_HEIGHT_PX`` already stands for.
+    """
+    settings.drag_schedule_box_height_px = 14
+    panel = PlanScreen(root, manager, _App(settings))
+
+    assert panel.box_height() == SLOT_CHIP_HEIGHT_PX, (
+        f"a box height of 14 was accepted as {panel.box_height()}"
+    )
+    assert slot_row_height(2, panel.box_height()) > slot_row_height(
+        1, panel.box_height()
+    ), "a two-task box is no taller than a one-task box"
+
+
+def test_pbm56_a_usable_box_height_is_not_floored(root, manager, settings):
+    """The floor only floors. A real setting still arrives unchanged.
+
+    Paired with the test above because a clamp written as ``max`` is one typo
+    away from ignoring the setting altogether, and PB-M5's whole criterion is
+    that the setting is honoured.
+    """
+    settings.drag_schedule_box_height_px = 120
+    panel = PlanScreen(root, manager, _App(settings))
+
+    assert panel.box_height() == 120
+
+
+def test_the_outside_group_scrolls_instead_of_growing_past_the_pane(
+    root, manager, settings
+):
+    """A full outside group stays reachable.
+
+    The group has no cap -- shortening Day End can put every block of a full
+    day into it at once -- and this batch moved it out of a scrollable
+    container into a plain frame in the items pane. Every row past the bottom
+    edge was then clipped, while the header went on counting them: the screen
+    telling the user that work it had made undraggable was still there, which
+    is worse than the silent drop P2 is about.
+    """
+    for slot in range(10, 18):
+        _add_block(manager, 30, f"late {slot}", slot)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    panel.on_settings_saved(DayBounds(day_end="10:00"))
+
+    assert len(panel._grid.outside) == 8, (
+        f"{len(panel._grid.outside)} blocks outside the day, expected 8"
+    )
+    assert isinstance(panel.outside_frame, ctk.CTkScrollableFrame), (
+        "the group is in a plain frame, so its lower rows cannot be reached"
+    )
+    assert panel.outside_frame.cget("height") == OUTSIDE_GROUP_HEIGHT_PX, (
+        f"the group asks for {panel.outside_frame.cget('height')}px, so eight "
+        "blocks push the item list it sits under off the pane"
+    )
+
+
+def test_the_outside_group_takes_no_room_on_a_day_without_one(
+    root, manager, settings
+):
+    """A fixed height is only spent on the days that need it.
+
+    The group is held back rather than gridded empty, so an ordinary day gives
+    the whole pane to the item list.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+
+    assert panel._grid.outside == []
+    # grid_info() and not winfo_ismapped(): every window in this suite is
+    # withdrawn, so ismapped is 0 for both states and an assertion on it
+    # could not fail.
+    assert panel.outside_frame.grid_info() == {}, (
+        "the empty group is still taking its height out of the item list"
+    )
+
+    _add_block(manager, 30, "late afternoon", 16)
+    panel.load_blocks()
+    panel.on_settings_saved(DayBounds(day_end="12:00"))
+
+    assert panel.outside_frame.grid_info() != {}, (
+        "the group is not gridded on a day that has blocks outside the day"
+    )
+
+    # And back off again on the next day, which is the state the ``else``
+    # branch in load_blocks exists for: held back at construction only, the
+    # pane would keep the height it took for yesterday's group.
+    panel.selected_date = FRIDAY
+    panel.refresh()
+
+    assert panel.outside_frame.grid_info() == {}, (
+        "the group kept its height after moving to a day without one"
+    )
+
+
+def test_the_empty_item_note_wraps_even_in_a_narrow_column(
+    root, manager, settings
+):
+    """The note's wraplength is floored, because Tk reads 0 as "do not wrap".
+
+    ``items_col_width() - ITEMS_TEXT_INSET_PX`` is zero at a 56px column and
+    negative below it, and Tk documents ``-wraplength`` of zero or less as no
+    wrapping at all -- so the narrowest columns were the ones that got the
+    single long clipped line this batch had just removed.
+    """
+    settings.plan_items_col_width = 50
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+
+    note = next(
+        child for child in panel.items_scroll.winfo_children()
+        if isinstance(child, ctk.CTkLabel)
+        and "No open items start" in child.cget("text")
+    )
+    assert note.cget("wraplength") == NOTE_MIN_WRAP_PX, (
+        f"the note wraps at {note.cget('wraplength')}, which Tk reads as "
+        "'do not wrap' at or below zero"
     )

@@ -20,7 +20,11 @@ from pathlib import Path
 import customtkinter as ctk
 import pytest
 
-from src.getmoredone.color_contrast import contrast_ratio, pick_text_color
+from src.getmoredone.color_contrast import (
+    contrast_ratio,
+    pick_text_color,
+    relative_luminance,
+)
 from src.getmoredone.theme import (
     block_type_colors,
     depth_bar_colors,
@@ -83,9 +87,15 @@ def restore_appearance():
     A module-level setting left switched leaks into every later test in the
     run, which is the class of failure the project's restore rule exists for.
     """
+    was_system = ctk.AppearanceModeTracker.appearance_mode_set_by == "system"
     original = ctk.get_appearance_mode()
-    yield
-    ctk.set_appearance_mode(original)
+    try:
+        yield
+    finally:
+        # "system" and not ``original``: ``get_appearance_mode`` returns the
+        # resolved mode, so restoring that would turn "follow the OS" into a
+        # fixed mode for every test collected after this file.
+        ctk.set_appearance_mode("system" if was_system else original)
 
 
 def test_tbm122_band_colors_meet_contrast_in_both_themes(restore_appearance):
@@ -203,19 +213,22 @@ MIN_NON_TEXT_CONTRAST = 3.0
 MIN_TINT_CONTRAST = 10.0
 
 
-def _relative_luminance(color: str) -> float:
+def _luminance_of(color: str) -> float:
     """WCAG relative luminance, so "brighter" is a number and not a taste.
 
-    Written here rather than imported because ``color_contrast`` exposes only
-    the ratio, and a ratio cannot tell which of two colours is the lighter one.
+    Thin wrapper on ``color_contrast.relative_luminance`` -- the app's own
+    function -- because the value arriving here may be a CustomTkinter
+    (light, dark) tuple that has to be resolved first.
+
+    This was a second copy of the formula, justified by a docstring saying
+    ``color_contrast`` exposed only the ratio. It exposes
+    ``relative_luminance`` publicly, and the copy had drifted already: it
+    linearised at 0.03928 where the source uses the 0.04045 of the current
+    WCAG text. Close enough never to change a verdict, which is what makes a
+    duplicate formula worth deleting rather than correcting -- in the same
+    file that asserts theme.py is the only module defining the band table.
     """
-    text = _as_hex(color).lstrip("#")
-    channels = [int(text[i:i + 2], 16) / 255 for i in (0, 2, 4)]
-    linear = [
-        c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
-        for c in channels
-    ]
-    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+    return relative_luminance(_as_hex(color))
 
 
 def test_pbm11_stripe_colors_cover_every_band(restore_appearance):
@@ -266,7 +279,7 @@ def test_pbm13_stripe_colors_are_brighter_than_the_text_safe_set(restore_appeara
     dimmer = [
         f"{band}: stripe {stripe} is not brighter than band {safe[band]}"
         for band, stripe in priority_stripe_colors().items()
-        if _relative_luminance(stripe) <= _relative_luminance(safe[band])
+        if _luminance_of(stripe) <= _luminance_of(safe[band])
     ]
 
     assert dimmer == [], "; ".join(dimmer)

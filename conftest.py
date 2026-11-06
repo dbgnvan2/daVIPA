@@ -641,9 +641,12 @@ def _destroy_windows_left_behind_by_this_test():
 
 # Setting this makes ``mapped_windows`` skip instead of mapping, for running
 # the suite on a machine someone is working on. It is deliberately an opt-IN
-# with a loud skip reason rather than a default: the three tests it disables
-# are the only ones that read real geometry, and a silent skip would let them
-# rot. tests/test_ci_contract.py asserts no workflow ever sets it.
+# with a loud skip reason rather than a default: the 16 tests it disables are
+# the only ones that read real geometry, and a silent skip would let them rot.
+# tests/test_ci_contract.py asserts no workflow ever sets it, and asserts that
+# count against the suite -- it said "three" while nineteen tests took the
+# fixture, which is how a test that no longer needed a real window kept one
+# and was skipped in the documented local workflow for nothing.
 NO_MAPPED_WINDOWS_ENV = "GETMOREDONE_NO_MAPPED_WINDOWS"
 
 # Values that mean "off". Exported so tests/test_ci_contract.py can import it

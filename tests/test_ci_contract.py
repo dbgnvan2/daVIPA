@@ -26,6 +26,7 @@ than no CI. Phase 5 created them, so they are covered below.
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 import functools
@@ -871,8 +872,8 @@ def test_rm4d_required_archive_files_exist_in_the_repo():
 def test_no_workflow_disables_the_mapped_window_tests():
     """The local focus-stealing opt-out must never become a CI default.
 
-    ``GETMOREDONE_NO_MAPPED_WINDOWS`` makes the three tests that read real
-    Tk geometry skip, so the suite can run on a machine someone is working on.
+    ``GETMOREDONE_NO_MAPPED_WINDOWS`` makes the tests that read real Tk
+    geometry skip, so the suite can run on a machine someone is working on.
     Set in CI it would turn the only coverage of the sash-drag and pin-drag
     contracts into a permanent silent skip.
     """
@@ -887,6 +888,56 @@ def test_no_workflow_disables_the_mapped_window_tests():
         "local convenience for not stealing focus; in CI it silently skips the "
         "geometry tests."
     )
+
+
+def _mapped_window_test_count() -> int:
+    """How many tests actually take the ``mapped_windows`` fixture.
+
+    By AST rather than by a text search: ``mapped_windows`` appears in
+    docstrings, in comments and in this file, and a grep count would include
+    all of them.
+    """
+    total = 0
+    for path in sorted((REPO_ROOT / "tests").glob("test_*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if not node.name.startswith("test_"):
+                    continue
+                if "mapped_windows" in [arg.arg for arg in node.args.args]:
+                    total += 1
+    return total
+
+
+def test_the_documented_mapped_window_count_is_the_real_one():
+    """CLAUDE.md and conftest state how many tests put a window on screen.
+
+    Purpose: a number in prose that nothing checks drifts, and this one did
+             twice -- conftest said "three" and CLAUDE.md "Ten" while nineteen
+             tests took the fixture. The count is what tells a reader how much
+             the documented local workflow skips, so a stale one understates
+             what a green local run did not cover.
+    Spec:    CLAUDE.md -- the GETMOREDONE_NO_MAPPED_WINDOWS workflow
+    Tests:   this test
+
+    An exact count, not a floor: a floor hides the narrowing it exists to
+    catch, and a test that no longer needs a real window should lose the
+    fixture rather than quietly keep it.
+    """
+    actual = _mapped_window_test_count()
+    pattern = re.compile(r"\b(\d+) tests (?:build a real|it disables)")
+
+    for relative in ("CLAUDE.md", "conftest.py"):
+        text = (REPO_ROOT / relative).read_text(encoding="utf-8")
+        stated = pattern.findall(text)
+        assert len(stated) == 1, (
+            f"{relative} states the mapped-window count {len(stated)} times; "
+            "exactly one place per file keeps it fixable"
+        )
+        assert int(stated[0]) == actual, (
+            f"{relative} says {stated[0]} tests put a window on screen; "
+            f"{actual} take the mapped_windows fixture"
+        )
 
 
 def test_the_mapped_window_opt_out_is_off_by_default():
