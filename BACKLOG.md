@@ -84,14 +84,25 @@ Severity rated before any fix was written, as above.
   production callers build a fresh block with `slot_index=None`, so it is
   latent. Low: a contract change in a public-ish method with no guard and no
   test.
-- **Only the Day Settings dialog checks whether a settings save succeeded.**
-  `AppSettings.save` now returns a bool and that dialog acts on it, but every
-  other settings screen still calls it for effect and reports success either
-  way — so a failed write is invisible everywhere else in the app. Adjacent
-  issue, found while fixing the Plan screen's half and deliberately not swept
-  into this batch: it touches every settings surface, and a change that wide
-  belongs in its own reviewed diff. The user-facing notice that an unreadable
-  file was kept aside belongs with it; right now that path is only in the log.
+- **Only the Day Settings dialog checks whether a settings save succeeded, and
+  this batch gave it something new to miss.** `AppSettings.save` returns a bool
+  and that dialog acts on it; the other ten call sites
+  (`screens/settings.py` ×6, `settings_integrations.py`,
+  `timer_window_dialogs.py`, `column_resize.py`) call it for effect and report
+  success either way. Two things are now invisible on those surfaces: a failed
+  write, which was already true, and a **refused** write, which is new — when a
+  settings file that would not parse cannot be copied aside, `save` now returns
+  without writing, where before it printed and wrote anyway. So with a corrupt
+  `settings.json` whose copy also fails, picking a theme shows
+  *"✓ Saved appearance and completion badge settings"* and nothing is written,
+  and a column drag on Today changes nothing silently. The refusal is the right
+  trade -- the alternative is destroying the only copy of a file the app could
+  not read -- but the silence is not, and this entry is the fix for it.
+  **Raised from low: a user can now be told "saved" when nothing was.** Not
+  swept into this batch because it touches every settings surface and a change
+  that wide belongs in its own reviewed diff; the user-facing notice that an
+  unreadable file was kept aside belongs with it, since right now that path is
+  only in the log.
 - **The traceability guard checks test pointers in `docs/spec_coverage.md` but
   not source ones.** Extending the guard to that document found eight rows
   naming deleted tests. Its *Implementation* column has the same class of

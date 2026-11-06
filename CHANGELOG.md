@@ -35,10 +35,12 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   reports how many blocks it placed **and the Day Start it placed them
   against** — and if your settings file exists but cannot be read, it does not
   run at all: the blocks wait under *Outside the day* rather than being written
-  permanently against a day shape the app only guessed at. Saving **Day
-  Settings** is the way back, and the only way: it is the one screen that shows
-  you the day's four times, so it is the one whose save tells the app they are
-  yours. It keeps the unreadable file aside as
+  permanently against a day shape the app only guessed at — and it stays that
+  way across a relaunch, because the settings file itself records that the
+  day's shape was never chosen. Saving **Day Settings** is the way back, and
+  the only way: it is the one screen that shows you the day's four times, so it
+  is the one whose save tells the app they are yours. It keeps the unreadable
+  file aside as
   `settings.json.unreadable-<date>-<time>` first, because saving replaces every
   setting in the file and not just the day's shape; if that copy cannot be
   made, nothing is overwritten; and if the new file cannot be written, the
