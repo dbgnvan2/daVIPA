@@ -18,7 +18,7 @@ import json
 import pytest
 
 from src.getmoredone.app_settings import AppSettings
-from src.getmoredone.time_block_layout import DayBounds
+from src.getmoredone.time_block_layout import DEFAULT_DAY_END, DayBounds
 
 
 @pytest.fixture
@@ -193,3 +193,48 @@ def test_the_loaded_settings_build_usable_day_bounds(settings_file):
     assert bounds.lunch_start_minutes == 12 * 60 + 30
     assert bounds.lunch_end_minutes == 13 * 60 + 15
     assert bounds.day_end_minutes == 17 * 60
+
+
+# --- found by the fix-range re-sweep ---------------------------------------
+
+
+@pytest.mark.parametrize("stored", ["25:00", "24:00", "99:59", "170:0"])
+def test_a_day_end_stored_past_midnight_is_brought_inside_the_day(
+    settings_file, stored
+):
+    """A dirty-state test: the file can already hold what the dialog now refuses.
+
+    The dialog validates new input, but it accepted and stored `25:00` before
+    that check existed, so a file on disk can hold it today. Loaded unbounded,
+    `day_end_minutes` is past every block the planner can make, and the "past
+    day end" warning -- Day End's only job -- stays off permanently with
+    nothing to say so. Guarding only the keyboard would heal new input and
+    leave that file wrong forever.
+    """
+    settings_file.write_text(json.dumps({"plan_day_end": stored}))
+
+    settings = AppSettings.load()
+
+    assert settings.plan_day_end == DEFAULT_DAY_END
+    assert DayBounds.from_settings(settings).day_end_minutes < 24 * 60
+
+
+@pytest.mark.parametrize("field", ["plan_day_start", "plan_lunch_start"])
+def test_the_other_day_bounds_are_bounded_too(settings_file, field):
+    """The sibling fields, so the fix is not applied to one of three."""
+    settings_file.write_text(json.dumps({field: "26:30"}))
+
+    settings = AppSettings.load()
+
+    assert getattr(settings, field) != "26:30"
+    bounds = DayBounds.from_settings(settings)
+    assert bounds.day_start_minutes < 24 * 60
+    assert bounds.lunch_start_minutes < 24 * 60
+
+
+def test_a_day_end_inside_the_day_still_survives_a_round_trip(settings_file):
+    """Paired with the clamping tests so a normaliser that replaced every
+    value would not pass for the right reason."""
+    settings_file.write_text(json.dumps({"plan_day_end": "23:59"}))
+
+    assert AppSettings.load().plan_day_end == "23:59"

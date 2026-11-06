@@ -15,7 +15,7 @@ import pytest
 
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem, BlockType, TimeBlock
-from src.getmoredone.time_block_layout import DayBounds
+from src.getmoredone.time_block_layout import DayBounds, DayTooFullError, parse_hhmm
 
 DAY = "2026-11-05"           # a Thursday
 NEXT_DAY = "2026-11-06"
@@ -438,56 +438,144 @@ def test_tbm4_a_settings_change_repacks_every_day(manager):
     assert _day(manager, NEXT_DAY) == [("friday one", 1, "10:00", "10:30")]
 
 
-class _ExplodingOnTheSecondDay:
-    """Bounds that pack the first day and then raise.
+def _fail_on_the_second_day(manager, monkeypatch):
+    """Make the second day's repack raise, and report which days were packed.
 
-    `_ExplodingBounds` is no use here: it raises on the first day, before
-    anything has been written, so there is nothing to roll back and a repack
-    with no transaction at all would pass the test. The failure has to land
-    *after* one day has been re-timed, which is the only state the outer
-    transaction exists to prevent. pack_day reads each bound exactly once per
-    day, so the second read of day_start_minutes is the second day.
+    The arity of a bounds read is the wrong thing to hang this on. An earlier
+    version of this test exploded on the second *read* of
+    ``day_start_minutes``, which is the second day only for as long as
+    ``pack_day`` reads that property exactly once per call. A refactor that
+    read it twice -- for an overflow or a midnight calculation -- would move
+    the failure back onto day one, before any write, and the test would go
+    green while testing nothing, which is the exact vacuity it was rewritten
+    to escape. Counting the repacks themselves cannot drift that way.
     """
+    packed = []
+    real_repack = manager.repack_day
 
-    default_block_minutes = 30
-    block_weekdays = (True,) * 7
+    def spy(block_date, bounds):
+        packed.append(block_date)
+        if len(packed) > 1:
+            raise RuntimeError("second day unreadable")
+        return real_repack(block_date, bounds)
 
-    def __init__(self, real=BOUNDS):
-        self._real = real
-        self.days_packed = 0
-
-    @property
-    def day_start_minutes(self):
-        self.days_packed += 1
-        if self.days_packed > 1:
-            raise RuntimeError("bounds unreadable")
-        return self._real.day_start_minutes
-
-    def __getattr__(self, name):
-        return getattr(self._real, name)
+    monkeypatch.setattr(manager, "repack_day", spy)
+    return packed
 
 
-def test_tbm4_repacking_every_day_is_all_or_nothing(manager):
+def test_tbm4_repacking_every_day_is_all_or_nothing(manager, monkeypatch):
     """A half-applied bounds change leaves days on two different shapes.
 
     With nothing in the data to say which day is on which, and the next repack
-    starting from that. The failure here lands after the first day has already
-    been re-timed, so the test fails if the per-day repacks are not joined into
-    one transaction.
+    starting from that. The failure lands after the first day has already been
+    re-timed and written, so this fails if the per-day repacks are not joined
+    into one transaction.
     """
     _add(manager, 30, "thursday", block_date=DAY)
     _add(manager, 30, "friday", block_date=NEXT_DAY)
     manager.repack_all_days(BOUNDS)
     before = (_day(manager, DAY), _day(manager, NEXT_DAY))
 
-    bounds = _ExplodingOnTheSecondDay(DayBounds(day_start="10:00"))
+    packed = _fail_on_the_second_day(manager, monkeypatch)
     with pytest.raises(RuntimeError):
-        manager.repack_all_days(bounds)
+        manager.repack_all_days(DayBounds(day_start="10:00"))
 
-    assert bounds.days_packed == 2, "the failure must land after a day was re-timed"
+    assert packed == [DAY, NEXT_DAY], "the failure must land on the second day"
     assert (_day(manager, DAY), _day(manager, NEXT_DAY)) == before
+
+
+def test_tbm4_the_first_day_really_is_written_before_the_failure(manager, monkeypatch):
+    """Guards the test above against becoming vacuous again.
+
+    If the first day's repack stopped writing before the second day failed,
+    the assertion above would hold for a `repack_all_days` with no transaction
+    at all. This pins the thing that makes it load-bearing: run the same
+    failure with the per-day repacks *not* joined, and the first day moves.
+    """
+    _add(manager, 30, "thursday", block_date=DAY)
+    _add(manager, 30, "friday", block_date=NEXT_DAY)
+    manager.repack_all_days(BOUNDS)
+    before = _day(manager, DAY)
+
+    packed = _fail_on_the_second_day(manager, monkeypatch)
+    later = DayBounds(day_start="10:00")
+    with pytest.raises(RuntimeError):
+        for block_date in [DAY, NEXT_DAY]:
+            manager.repack_day(block_date, later)
+
+    assert packed == [DAY, NEXT_DAY]
+    assert _day(manager, DAY) != before, (
+        "the first day must be written before the second fails, or the"
+        " atomicity test above proves nothing"
+    )
 
 
 def test_tbm4_repacking_a_database_with_no_blocks_does_nothing(manager):
     """So the save path cannot fail on a day the user has not planned yet."""
     assert manager.repack_all_days(BOUNDS) == []
+
+
+# --- found by the fix-range re-sweep ---------------------------------------
+
+
+def test_a_day_too_full_to_write_is_refused(manager):
+    """A block ceiling bounds one block; this is a property of the day.
+
+    Four blocks of exactly a day each are individually legal -- the dialog
+    accepts 1440, and a test asserts that it does -- and together they pack
+    past the last time HH:MM can express. format_hhmm clamps there, so the
+    fourth row would be stored claiming 1440 minutes between 85:00 and 99:59,
+    which is 899. Refused before anything is written rather than stored
+    clamped.
+    """
+    for index in range(4):
+        _add(manager, 24 * 60, f"all day {index}", block_date=DAY)
+
+    with pytest.raises(DayTooFullError):
+        manager.repack_day(DAY, BOUNDS)
+
+
+def test_a_refused_day_is_left_exactly_as_it_was(manager):
+    """Nothing half-written, and nothing clamped.
+
+    The refusal happens before the transaction opens, so the rows keep the
+    times the last successful repack gave them.
+    """
+    _add(manager, 30, "first", block_date=DAY)
+    manager.repack_day(DAY, BOUNDS)
+    before = _day(manager, DAY)
+    for index in range(4):
+        _add(manager, 24 * 60, f"all day {index}", block_date=DAY)
+
+    with pytest.raises(DayTooFullError):
+        manager.repack_day(DAY, BOUNDS)
+
+    assert _day(manager, DAY)[0] == before[0]
+
+
+def test_a_day_that_fits_the_clock_is_written(manager):
+    """The boundary the refusal is written against.
+
+    Paired with the refusal so a guard that refused every day would not pass
+    for the right reason. Three blocks of a day each fit: the first straddles
+    lunch so it starts at 13:00 rather than 08:00, and the third still ends at
+    85:00, inside the 99:59 that HH:MM can express. A fourth would not.
+    """
+    for index in range(3):
+        _add(manager, 24 * 60, f"all day {index}", block_date=DAY)
+
+    packed = manager.repack_day(DAY, BOUNDS)
+
+    assert [block.start_time for block in packed] == ["13:00", "37:00", "61:00"]
+    assert [block.end_time for block in packed] == ["37:00", "61:00", "85:00"]
+
+
+def test_every_written_row_says_start_plus_duration(manager):
+    """The invariant the whole ceiling exists to protect, asserted directly."""
+    for minutes in (24 * 60, 90, 24 * 60, 15):
+        _add(manager, minutes, f"block {minutes}", block_date=DAY)
+
+    for block in manager.repack_day(DAY, BOUNDS):
+        start = parse_hhmm(block.start_time)
+        end = parse_hhmm(block.end_time)
+        assert end - start == block.planned_minutes, block.label

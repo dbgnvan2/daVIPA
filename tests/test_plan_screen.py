@@ -26,7 +26,11 @@ import pytest
 from src.getmoredone.app_settings import AppSettings
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem, BlockType, TimeBlock
-from src.getmoredone.screens.plan import RIGHT_CLICK_SEQUENCES, PlanScreen
+from src.getmoredone.screens.plan import (
+    DAY_TOO_FULL,
+    RIGHT_CLICK_SEQUENCES,
+    PlanScreen,
+)
 from src.getmoredone.screens.plan_blocks import (
     DepthBarStack,
     accent_for_block,
@@ -1175,3 +1179,78 @@ def test_a_capped_work_block_is_reported_not_quietly_applied(screen, manager):
     text = screen.status_label.cget("text")
     assert "1440m" in text
     assert "5000m is longer than a day" in text
+
+
+# --- found by the fix-range re-sweep ---------------------------------------
+
+
+def _fill_the_clock(manager, count=4):
+    """Enough all-day blocks that the day can no longer be written.
+
+    Each one is legal on its own -- the dialog accepts 1440 and a test asserts
+    it -- and four of them pack past the last time HH:MM can express.
+    """
+    for index in range(count):
+        _add_block(manager, 24 * 60, f"all day {index}")
+
+
+def test_a_day_too_full_to_write_says_so_instead_of_doing_nothing(screen, manager):
+    """A refused action and a broken one look identical without the message.
+
+    The write rolls back with its transaction, so without a status line the
+    user clicks, nothing changes, and the only record is a traceback on
+    stderr.
+    """
+    _fill_the_clock(manager)
+    item = _item(manager, "one more", THURSDAY)
+    before = _stored(manager)
+
+    screen.block_item(item)
+
+    assert _stored(manager) == before, "nothing should have been written"
+    assert screen.status_label.cget("text") == DAY_TOO_FULL
+
+
+def test_a_padding_block_on_a_full_day_says_so(screen, manager):
+    """The sibling path, so the report is not on one of four."""
+    _fill_the_clock(manager)
+    before = _stored(manager)
+
+    screen.add_padding_block("break")
+
+    assert _stored(manager) == before
+    assert screen.status_label.cget("text") == DAY_TOO_FULL
+
+
+def test_a_resize_that_overfills_the_day_rolls_the_object_back_too(screen, manager):
+    """The in-memory block must not keep the length the database refused.
+
+    It is the same object the row menu hands back on the next click, so a
+    stale value there would offer a size the day does not hold.
+    """
+    _fill_the_clock(manager, count=3)
+    _add_block(manager, 30, "small")
+    manager.repack_day(THURSDAY, screen.bounds)
+    screen.load_blocks()
+    block = [b for b in manager.get_time_blocks(THURSDAY) if b.label == "small"][0]
+    before = _stored(manager)
+
+    screen.set_block_minutes(block, 24 * 60)
+
+    assert _stored(manager) == before
+    assert block.planned_minutes == 30, "the rejected length must not stick"
+    assert screen.status_label.cget("text") == DAY_TOO_FULL
+
+
+def test_a_settings_save_that_cannot_retime_a_day_says_so(screen, manager):
+    """The settings file is already written when the repack is attempted.
+
+    So the one thing the user must be told is that the days did not follow it.
+    """
+    _fill_the_clock(manager)
+
+    screen.on_settings_saved(DayBounds(day_start="10:00"))
+
+    text = screen.status_label.cget("text")
+    assert "too full to re-time" in text
+    assert "shorten a block" in text
