@@ -99,6 +99,19 @@ def refusal_text(reason: str) -> str:
     return REFUSAL_TEXT.get(reason, UNKNOWN_REFUSAL)
 
 
+def _subtree(widget):
+    """``widget`` and every descendant, depth first.
+
+    A chip nests its labels inside a body frame, so "the row's children" is
+    not the same set as "the row's widgets", and a binding loop over the
+    former leaves most of the row inert.
+    """
+    found = [widget]
+    for child in widget.winfo_children():
+        found.extend(_subtree(child))
+    return found
+
+
 def _clock(minutes: int) -> str:
     """A duration as the summary says it: ``45m``, or ``2h 30m``.
 
@@ -393,13 +406,46 @@ class PlanScreen(ctk.CTkFrame):
             # so a day stored by the old model reads as a day rather than as a
             # list of blocks outside it. Idempotent, so this is a no-op on
             # every load after the first.
-            self.db_manager.adopt_legacy_day(self.selected_date, self.bounds)
+            #
+            # Guarded because this is the one irreversible write on this
+            # screen: it turns a stored clock time into a box, the box is
+            # relative to Day Start, and ``_settle_block_on_slot`` overwrites
+            # the stored time that said otherwise. Run against a Day Start we
+            # are only guessing at, it moves planned work to an hour nobody
+            # picked and destroys the record of what was picked. A settings
+            # file that exists and cannot be read is exactly that guess, so
+            # the blocks keep their NULL -- which ``build_day_grid`` surfaces
+            # as outside the day -- until the day's shape is known (P1: a
+            # transient read failure must not be written down as a fact).
+            adopted = []
+            if self._day_shape_is_the_users():
+                adopted = self.db_manager.adopt_legacy_day(
+                    self.selected_date, self.bounds
+                )
 
             blocks = self.db_manager.get_time_blocks(self.selected_date)
             self._grid = build_day_grid(blocks, self.bounds)
             items_by_id = self._items_by_id(blocks)
 
             self.update_day_summary(blocks)
+
+            # Adoption is irreversible and was previously silent: the ids it
+            # returns were thrown away. Named with the Day Start it used, so
+            # the assumption it baked in is visible and checkable rather than
+            # something to infer from blocks that moved.
+            if adopted:
+                self.set_status(
+                    f"Placed {len(adopted)} block(s) from an earlier version"
+                    f" on the grid, using a day start of {self.bounds.day_start}",
+                    "muted",
+                )
+            elif not self._day_shape_is_the_users():
+                self.set_status(
+                    "Day Settings could not be read, so blocks from an earlier"
+                    " version are left off the grid rather than placed at a"
+                    " guessed day start",
+                    "warning",
+                )
 
             row = 0
             for entry in self._grid.slots:
@@ -522,9 +568,12 @@ class PlanScreen(ctk.CTkFrame):
         Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m9
         Tests:   tests/test_plan_screen.py::test_tgm91_a_drop_lands_on_the_slot_under_the_pointer
 
-        With no ``slot_index`` — the item row's own double-click path, where
-        there is no pointer over a box to read — it takes the first box that
-        will hold it.
+        With no ``slot_index`` it takes the first box that will hold it.
+        No UI path passes that today -- every drop names the box under the
+        pointer -- so it is the API's answer for a caller with no pointer to
+        read, and the toolbar's ``add_padding_block`` is the one that needs it.
+        An earlier version of this docstring claimed an item-row double-click
+        used it; there has never been such a binding (`BACKLOG.md`).
         """
         if not self._require_block_day():
             return
@@ -602,7 +651,16 @@ class PlanScreen(ctk.CTkFrame):
     # ================= the block context menu ===============================
 
     def bind_block_handlers(self, frame, block: TimeBlock):
-        for widget in [frame] + list(frame.winfo_children()):
+        """Bind drag and menu to every widget in a block's subtree.
+
+        Every descendant, not only the direct children: an outside-day row
+        wraps its chip in a holder, so the title and minutes labels sit two
+        levels down and a press on the text -- most of the row -- reached
+        nothing at all.
+
+        Tests: tests/test_plan_screen.py::test_every_part_of_an_outside_row_starts_a_drag
+        """
+        for widget in _subtree(frame):
             for sequence in RIGHT_CLICK_SEQUENCES:
                 widget.bind(
                     sequence, lambda event, b=block: self.open_block_menu(event, b)
@@ -654,6 +712,16 @@ class PlanScreen(ctk.CTkFrame):
         it is the same object the row menu hands back on the next click, and a
         refused length left on it would show a size the database refused (P6).
         """
+        if block.slot_index is None:
+            # Reachable by an ordinary gesture: the outside-day group binds
+            # this same menu. Said in the screen's words -- the database's
+            # message is for a programmer and carries the row id.
+            self.set_status(
+                "That block is not on a box yet — drag it onto a half hour first",
+                "error",
+            )
+            return
+
         try:
             resized = self.db_manager.set_block_length(block.id, minutes, self.bounds)
         except SlotRefusedError as refused:
@@ -783,6 +851,11 @@ class PlanScreen(ctk.CTkFrame):
         elif kind == "block" and block is not None:
             if target is not None:
                 self.after_idle(lambda: self.move_block_to_slot(block.id, target))
+            elif self.pointer_over_day():
+                # Same reason as the item branch above, and the same words'
+                # worth of explanation: a move that does nothing and says
+                # nothing is indistinguishable from a drag that missed.
+                self.set_status("Drop a block on a half-hour box", "muted")
 
     def _end_drag(self):
         if self._drag_label is not None:
@@ -790,6 +863,20 @@ class PlanScreen(ctk.CTkFrame):
         self._drag_kind = None
         self._drag_item = None
         self._drag_block = None
+
+    def _day_shape_is_the_users(self) -> bool:
+        """Whether ``self.bounds`` came from settings we could actually read.
+
+        Purpose: TG-M5 -- adoption is irreversible, so it must not run on a
+                 guess. A settings file that exists but failed to parse yields
+                 an all-defaults object, which is indistinguishable from a
+                 real fresh install unless the loader says so.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
+        Tests:   tests/test_plan_screen.py::test_adoption_does_not_run_on_a_guessed_day_start
+        """
+        if self.settings is None:
+            return False
+        return not getattr(self.settings, "settings_unreadable", False)
 
     def pointer_over_day(self) -> bool:
         return widget_contains_pointer(

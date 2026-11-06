@@ -1423,10 +1423,17 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         """
         from .time_block_layout import times_for_slot
 
-        block.slot_index = int(slot_index)
-        block.position = self._next_position_in_slot(
-            block.block_date, slot_index, ignoring=block.id
-        )
+        target = int(slot_index)
+        if block.slot_index != target:
+            # Only a change of box changes the order: the block joins the end
+            # of the box it arrives in. A block staying put keeps the place it
+            # already had -- ``position`` is what a box's order is read from,
+            # and a length change is not a reordering gesture, whatever it
+            # does to the block's size.
+            block.position = self._next_position_in_slot(
+                block.block_date, target, ignoring=block.id
+            )
+        block.slot_index = target
         block.start_time, block.end_time = times_for_slot(
             slot_index, block.planned_minutes, bounds
         )

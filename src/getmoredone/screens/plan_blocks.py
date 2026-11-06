@@ -30,6 +30,7 @@ from ..time_block_layout import (
     MAX_DEPTH_BARS,
     depth_bars,
     priority_band,
+    slots_for_minutes,
     spare_minutes_in_last_slot,
 )
 
@@ -310,12 +311,22 @@ def build_slot_row(
         rendered.block_widgets.append((block, chip))
         inner += 1
     for block in grid_slot.continued:
+        # Which continuation this is, so only the final box can claim the
+        # spare minutes: they are a property of the last box, and a middle box
+        # the task consumes whole has none.
+        offset = grid_slot.slot.index - (block.slot_index or 0)
+        last_box = offset >= slots_for_minutes(block.planned_minutes) - 1
         # Deliberately not added to block_widgets: a press here would start a
         # drag of a block whose home is another box, and a right-click would
         # offer to resize it from a box it does not start in. The box a block
         # starts in is the one that owns it.
         _build_block_chip(
-            body, block, items_by_id.get(block.item_id), inner, continued=True
+            body,
+            block,
+            items_by_id.get(block.item_id),
+            inner,
+            continued=True,
+            last_box=last_box,
         )
         inner += 1
 
@@ -329,6 +340,7 @@ def _build_block_chip(
     row: int,
     *,
     continued: bool,
+    last_box: bool = True,
 ) -> ctk.CTkFrame:
     """One task inside a box.
 
@@ -370,7 +382,7 @@ def _build_block_chip(
         # two boxes ends at 09:45 and leaves 15 of the second box spare, and
         # the whole 45-vs-60 question is why this is written on screen rather
         # than rounded away.
-        spare = spare_minutes_in_last_slot(block)
+        spare = spare_minutes_in_last_slot(block) if last_box else 0
         ctk.CTkLabel(
             chip,
             text=f"{spare}m spare" if spare else "same task",

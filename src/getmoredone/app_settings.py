@@ -15,6 +15,13 @@ from .paths import default_settings_path
 class AppSettings:
     """Application settings."""
 
+    # Not a dataclass field, deliberately: ``asdict`` must not write it to the
+    # settings file and ``load`` must not read it back. It describes *this
+    # load*, not the user's settings -- True when a settings file exists but
+    # could not be read, so every value here is a default standing in for one
+    # we do not know.
+    settings_unreadable = False
+
     obsidian_vault_path: Optional[str] = None
     obsidian_notes_subfolder: str = "GetMoreDone"
     # M7.A.1 — Separate subfolder for Project Notes so they don't mingle with
@@ -150,7 +157,12 @@ class AppSettings:
                 return settings
             except Exception as e:
                 print(f"Error loading settings: {e}")
-                return cls()
+                # Flagged, not just printed: a caller about to write something
+                # derived from these values has to be able to tell a default
+                # that is the user's from one that is a stand-in.
+                unreadable = cls()
+                unreadable.settings_unreadable = True
+                return unreadable
 
         return cls()
 
