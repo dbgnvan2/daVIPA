@@ -53,6 +53,13 @@ STRIPE_WIDTH_PX = 6
 #: a planned box showed nothing but the bar.
 STRIPE_MIN_HEIGHT_PX = 12
 
+#: Height of one task chip, and so what each task adds to a box's height, and
+#: the half-hour unit an item row in the left pane is a multiple of. The
+#: fallback only: PB-M5 takes the live value from
+#: ``AppSettings.drag_schedule_box_height_px``, and this is what a missing or
+#: unusable setting resolves to.
+SLOT_CHIP_HEIGHT_PX = 30
+
 
 def stripe_for_item(item: Optional[ActionItem]) -> str:
     """PB-M1 — the brighter band colour, for the stripe on an item's row."""
@@ -140,18 +147,36 @@ def build_item_row(
     row: int,
     already_blocked: bool,
     work_block_minutes: int,
+    *,
+    box_height: int = SLOT_CHIP_HEIGHT_PX,
 ) -> ctk.CTkFrame:
     """One action item in the left pane, ready to be dragged onto the day.
+
+    Purpose: PB-M6 -- an item is drawn at the size of the space it will take
+             in the day, so the drag has nothing to guess at.
+    Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m6
+    Tests:   tests/test_plan_screen.py::test_pbm61_an_item_row_is_as_tall_as_the_boxes_it_will_fill
 
     Returns the frame, so the caller can bind the drag handlers to it and to
     its children -- a press that lands on a label must start the same drag as
     one that lands on the frame, or half the row is dead to the mouse.
+
+    The height is ``slots_for_minutes`` half hours of ``box_height``, the same
+    arithmetic and the same unit the day's boxes use, so a 90-minute item is
+    three boxes tall on the left because it will be three boxes tall on the
+    right. ``grid_propagate(False)`` is what holds it there; a row that grew
+    to its own text would be telling the user a length it does not have.
     """
     fill = fill_for_item(item)
     on_fill = pick_text_color(fill)
-    frame = ctk.CTkFrame(parent, fg_color=fill, corner_radius=6)
+    span = slots_for_minutes(work_block_minutes)
+    frame = ctk.CTkFrame(
+        parent, fg_color=fill, corner_radius=6, height=span * box_height
+    )
     frame.grid(row=row, column=0, sticky="ew", pady=3, padx=2)
     frame.grid_columnconfigure(1, weight=1)
+    frame.grid_rowconfigure(0, weight=1)
+    frame.grid_propagate(False)
 
     stripe = ctk.CTkFrame(
         frame,
@@ -169,11 +194,13 @@ def build_item_row(
     title.grid(row=0, column=1, sticky="ew", padx=(0, 6), pady=(5, 0))
 
     # The scheduling facts, in the words the item editor uses for them.
-    details = [f"P {item.priority_score}"]
-    if item.work_block:
-        details.append(f"Work Block {work_block_minutes}m")
-    else:
-        details.append(f"{work_block_minutes}m")
+    #
+    # No priority score. The band is already the shade the whole row is drawn
+    # on and the colour of its stripe, so the number was a third way of saying
+    # one thing, in the one place on the row where a reader is looking for
+    # something they cannot see. The length moved too -- it is under the depth
+    # bars now, where the day's own boxes put it.
+    details = []
     if item.depth:
         details.append(item.depth)
     if already_blocked:
@@ -191,7 +218,18 @@ def build_item_row(
     subtitle.grid(row=1, column=1, sticky="ew", padx=(0, 6), pady=(0, 5))
 
     bars = DepthBarStack(frame, item.depth)
-    bars.grid(row=0, column=2, rowspan=2, padx=(4, 10), pady=6)
+    bars.grid(row=0, column=2, padx=(4, 10), pady=(6, 2), sticky="n")
+
+    # Under the bars, in the words and the position a box uses for the same
+    # fact: a task in the day carries "30m" at its right edge, and this is the
+    # same task before it has been dragged there.
+    ctk.CTkLabel(
+        frame,
+        text=f"{work_block_minutes}m",
+        anchor="e",
+        text_color=on_fill,
+        font=ctk.CTkFont(size=11),
+    ).grid(row=1, column=2, padx=(4, 10), pady=(0, 6), sticky="ne")
 
     return frame
 
@@ -239,11 +277,10 @@ SLOT_TIME_WIDTH_PX = 58
 #: struggles to land on is a box the user cannot plan into.
 SLOT_MIN_HEIGHT_PX = 32
 
-#: Height of one task chip, and so what each task adds to a box's height.
-#: The fallback only: PB-M5 takes the live value from
-#: ``AppSettings.drag_schedule_box_height_px``, and this is what a missing or
-#: unusable setting resolves to.
-SLOT_CHIP_HEIGHT_PX = 30
+#: Defined with the stripe constants above, not here with the rest of the box
+#: sizes, because ``build_item_row`` takes it as a default argument and a
+#: default is evaluated where the function is defined.
+#: (``SLOT_CHIP_HEIGHT_PX``)
 
 #: What the chip's title column asks for. Fallback for
 #: ``AppSettings.drag_schedule_title_col_width``, the same way.
@@ -423,12 +460,17 @@ def _build_block_chip(
     kind = BlockType.normalize(block.block_type)
 
     # PB-M4: the task carries its priority as shading, not only as the bar at
-    # its edge. A continuation is left unfilled on purpose -- it is the same
-    # task seen again, and shading it would read as a second task of equal
-    # weight. Padding has no priority to shade with.
-    if continued or kind in (BlockType.BUFFER, BlockType.BREAK):
+    # its edge. Padding has no priority to shade with, so it keeps the bare
+    # surface and the theme's own text.
+    #
+    # PB-M7: a continuation is shaded too. It was left unfilled on the
+    # argument that shading it would read as a second task of equal weight;
+    # on screen the opposite happened -- a 90-minute task was one coloured box
+    # followed by two empty ones, which reads as a task that stops. The arrow
+    # is what says "the same task, continued", and it is enough to say it.
+    if kind in (BlockType.BUFFER, BlockType.BREAK):
         fill = "transparent"
-        body_text = palette["muted_text"] if continued else palette["body_text"]
+        body_text = palette["body_text"]
     else:
         fill = fill_for_item(item)
         body_text = pick_text_color(fill)
@@ -453,7 +495,9 @@ def _build_block_chip(
         chip,
         width=STRIPE_WIDTH_PX,
         height=STRIPE_MIN_HEIGHT_PX,
-        fg_color=palette["border"] if continued else stripe_for_block(block, item),
+        # PB-M7: the continuation's bar is the task's bar. A border-grey one
+        # made the later half hours of a long task look like padding.
+        fg_color=stripe_for_block(block, item),
         corner_radius=3,
     )
     stripe.grid(row=0, column=0, sticky="ns", padx=(0, 8), pady=2)
@@ -479,7 +523,10 @@ def _build_block_chip(
             text=f"{spare}m spare" if spare else "same task",
             width=48,
             anchor="e",
-            text_color=palette["muted_text"],
+            # PB-M7: chosen for the shade now behind it, like the title. The
+            # theme's muted text is the right colour for the theme's surface
+            # and the wrong one for a band tint.
+            text_color=body_text,
             font=ctk.CTkFont(size=11),
         ).grid(row=0, column=3, sticky="e")
         return chip
