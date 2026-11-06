@@ -66,17 +66,29 @@ SLOT_CHIP_HEIGHT_PX = 30
 #: pixels shorter than the N boxes it claims to be the size of.
 SLOT_ROW_GAP_PX = 2
 
-#: The least an item row may be drawn at, whatever the box height says: the
-#: title's 5px top pad, two 28px lines of text, and 5px under them.
+#: The least an item row may be drawn at, whatever the box height says: what
+#: its own two grid rows request. Row 0 is the title's 5px top pad and a 28px
+#: line; row 1 is a 28px line and the larger of its two bottom pads, the
+#: ``{minutes}m`` label's 6px. 33 + 34.
+#:
+#: 66 first, from counting 5px under the second line rather than the label's 6,
+#: which left the row 1px short of its own request and lost the last pixel of
+#: bottom padding off the bottom edge. Nothing was unreadable and the geometry
+#: test still passed, because that label anchors to the top of its cell -- but
+#: this is the one number here justified purely by arithmetic, so the
+#: arithmetic has to be right.
 #:
 #: The 30px floor on the box height was justified for a chip holding one line,
 #: and an item row holds two plus the work-block length. At 30 the day gives a
 #: half hour 34px, and a row matching it showed its title and clipped both the
 #: depth / ``already blocked`` line and the length -- the two facts the colour
-#: cannot carry, gone with no sign they were there. So the match with the day is
-#: exact at every box height the day itself can show a line of text at, and
-#: below that the row stays legible and is the taller of the two.
-ITEM_ROW_MIN_HEIGHT_PX = 66
+#: cannot carry, gone with no sign they were there.
+#:
+#: So the row and the day agree exactly from a box height of 63 up, and below
+#: that the row is the taller of the two. Between 31 and 62 the day can show a
+#: line of text in a box this row is still taller than; the floor is about what
+#: *this* row needs, not about what the day can render.
+ITEM_ROW_MIN_HEIGHT_PX = 67
 
 
 def stripe_for_item(item: Optional[ActionItem]) -> str:
@@ -169,9 +181,14 @@ def item_row_height(span: int, box_height: int = SLOT_CHIP_HEIGHT_PX) -> int:
 
     ``span`` boxes of ``slot_row_height(1, box_height)``, plus the
     ``SLOT_ROW_GAP_PX`` between each pair -- the measurement a user would take
-    from the top edge of the first box to the bottom edge of the last -- and
-    never less than ``ITEM_ROW_MIN_HEIGHT_PX``, so a row that cannot match the
-    day and stay readable stays readable.
+    from the top edge of the first box to the bottom edge of the last, in a day
+    whose boxes hold this task and nothing else -- and never less than
+    ``ITEM_ROW_MIN_HEIGHT_PX``, so a row that cannot match the day and stay
+    readable stays readable.
+
+    A box already holding another task is taller still (``slot_row_height``
+    counts chips), so the equality is with the empty day the item would be
+    dropped into, not with every day.
 
     Named rather than inlined for the reason ``slot_row_height`` is: the first
     version multiplied ``box_height`` by the span, which is 2px per box short
