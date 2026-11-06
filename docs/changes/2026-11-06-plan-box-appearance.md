@@ -218,15 +218,19 @@ the same session:
    its own detail line. The weight is on an empty row 2 now, and
    `ITEM_ROW_MIN_HEIGHT_PX = 66` keeps the row above its own two lines. Two new
    geometry tests measure every child against the frame.
-3. **Three colour and score assertions compared the unscored tint with
-   itself.** `_item(..., priority_score=51200)` does not make a scored item —
+3. **Four colour assertions and one score assertion compared the unscored
+   tint with itself** — three found by the first two passes, a fourth by the
+   re-sweep of the fixes, and `test_pbm62`'s dead `"51200" in text` alongside
+   them.** `_item(..., priority_score=51200)` does not make a scored item —
    `create_action_item` recomputes from four `None` factors and gets 0 — and
    `_one_slot_pane` rendered with an empty `items_by_id`, so the chip's item was
    `None`. Fixed with `_scored_item`, which asserts its own band, and
-   `items_by_id` threaded through the helper. Two of the three were PB-M4 tests
-   from the earlier batch: adjacent, fixed with the third rather than left, and
-   said so in `docs/spec_coverage.md`, because leaving them means that document
-   claims PB-M4.1 and PB-M4.3 are verified when they were not.
+   `items_by_id` threaded through the helper. Three of them were tests from the
+   earlier batch — PB-M1.4's, PB-M4.1's and PB-M4.3's: adjacent, fixed rather
+   than left, and said so in `docs/spec_coverage.md`, because leaving them means
+   that document claims those three criteria are verified when they were not.
+   One more call site of the same family, `test_pbm31`'s, passed no
+   `items_by_id` at all, so its `depth="Deep"` reached nothing.
 
 The mutation gate on PB-M6/PB-M7 came back 9/9 red and could not have caught
 finding 3 — mutating the lines the diff touched does not produce the mutant that
@@ -238,6 +242,52 @@ pinned a `sticky` change that turned out to change nothing, which was reverted
 rather than kept with a false justification.
 
 Three below-medium findings are in `BACKLOG.md`.
+
+### Re-sweep of the fix commits — `b6b1daa...HEAD`
+
+Cold, one lens (correctness and test quality, where the first two passes' useful
+findings came from). **No correctness defect in `src/`**: `item_row_height`
+matches what the day draws, `SLOT_ROW_GAP_PX` is the real gap, the empty
+weighted row 2 adds no dead zone to the drag binding, and the on-screen
+comparison test was checked to compare like with like.
+
+One medium — the fourth unscored-item assertion above, left standing by the
+commit that removed the other three — and five low, of which four are fixed here
+because each is one line or a sentence and leaving them means a document or a
+docstring states something false:
+
+- The floor was 66 and the row's own grid requests 67: row 1's larger bottom pad
+  is the `{minutes}m` label's 6px, not the subtitle's 5. The row lost the last
+  pixel of its bottom padding, which no assertion could see because both labels
+  anchor to the top of their cell. It was the one number in this change
+  justified purely by arithmetic, so it now has a test that measures it:
+  `test_pbm61_the_floor_is_what_the_rows_own_grid_asks_for` sums what each of
+  the row's text rows requests off the real widgets and compares that with the
+  constant. Red at 66.
+- "exact at every box height the day itself can show a line of text at" was
+  false for box heights 31–62, a reachable range: a 44px box renders a 28px
+  label perfectly well and the row is still 67. The claim is now "from 63 up",
+  which is what the code does. The user guide was the one document that had it
+  right.
+- "Exactly the space the item's work block will take in the day" holds only for
+  an empty day — a half hour already holding a task is taller than one box. Said
+  so in all three documents.
+- `test_pbm61_every_line_of_a_row_is_drawn_inside_it`'s docstring implied it
+  guards the row-2 weight on its own. It fails on the combination; with the
+  floor in place the weight alone keeps it green. The docstring now points at
+  the test that does pin the weight.
+
+The sixth, `_scored_item`'s unused `"medium"` factor row, is deleted rather than
+left as a branch no caller reaches.
+
+**Adjacent issues found, not fixed.** Verifying this batch's own `::test_`
+references against `tests/` turned up stale names across the older
+documentation — `docs/VPS_DATA_INTEGRITY_AUDIT.md` and nine earlier handoff
+notes. Two inside `docs/spec_coverage.md` were repointed here, because that file
+is the coverage claim itself and a row naming a test that does not exist is a
+claim that cannot be checked: `test_spec_coverage_doc_mentions_m1_through_m5`
+(renamed to `_m7` in `cf4189d`) and RP-4.2's second test. The rest are in
+`BACKLOG.md` with the meta test that would stop it recurring.
 
 ### Next agent actions
 

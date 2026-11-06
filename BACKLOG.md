@@ -24,6 +24,19 @@ costs.
   applies no `slots_for_minutes` scaling to its own item rows. Already listed
   under the earlier sweep's entry for the same file; the two screens have now
   drifted further apart. One shared helper is the fix.
+- **`docs/` points at test names that no longer exist, and nothing checks it.**
+  Adjacent, found while verifying this batch's own references: a script that
+  pulls every `test_*` token out of `docs/**/*.md` and `CHANGELOG.md` and
+  matches it against `^\s*def test_` across `tests/` finds stale names in
+  `docs/VPS_DATA_INTEGRITY_AUDIT.md` and nine older handoff notes. Two in
+  `docs/spec_coverage.md` were repointed with this batch because that file is
+  the coverage claim itself — `test_spec_coverage_doc_mentions_m1_through_m5`
+  (renamed to `_m7`) and RP-4.2's second test. The rest are left: each needs
+  the real test located or the row marked `partial`, which is its own batch.
+  The fix that stops it recurring is a meta test asserting every
+  `::test_` reference in the documentation index resolves, with the deliberate
+  exceptions (`*test removed with the criterion*`, `*as planned*`) named
+  explicitly rather than skipped by pattern.
 
 ## Below medium, from the plan-box-appearance sweep (2026-11-06)
 

@@ -21,7 +21,7 @@ Plan: [`docs/implementation_plan_2026-06-06_project_notes.md`](implementation_pl
 | M5.A.1 | Old "N notes linked to this project." count-only label removed | Replaced by M3 section header in `load_notes` | `tests/test_project_notes.py::TestM5Cleanup::test_old_count_only_label_removed` | done |
 | M5.A.2 | Create Note / Link Note / Open Notes toolbar buttons unchanged | No edits to `create_note`, `link_note`, `open_note_picker` | Visual check (also the prior `add_note_to_project` chooser delegates to these handlers, exercised by `tests/test_project_note_chooser.py::TestAddNoteToProjectHandler::*`) | done |
 | M6.A.1 | Purpose/Spec/Tests docstrings on new methods | Docstrings present on: `ProjectBoardLink`, `add_project_board_link`, `get_project_board_links`, `complete_project_note`, `reopen_project_note`, `_row_to_project_board_link` (both copies), `load_notes`, `_render_project_note_row`, `_on_complete_project_note`, `_on_reopen_project_note`, `get_project_notes_folder`, `get_project_notes_subfolder_or_default`, `save_obsidian_settings` (updated) | Manual review (diff) | done |
-| M6.A.2 | This file (`docs/spec_coverage.md`) exists and lists every spec ID | This file | `tests/test_project_notes.py::TestM6SpecCoverage::test_spec_coverage_doc_mentions_m1_through_m5` | done |
+| M6.A.2 | This file (`docs/spec_coverage.md`) exists and lists every spec ID | This file | `tests/test_project_notes.py::TestM6SpecCoverage::test_spec_coverage_doc_mentions_m1_through_m7` | done |
 | M7.A.1 | `AppSettings.project_notes_subfolder = "GetMoreDone/Projects"` | `src/getmoredone/app_settings.py` (class AppSettings) | `tests/test_project_notes.py::TestM7Settings::test_settings_has_project_notes_subfolder` | done |
 | M7.A.2 | `AppSettings.get_project_notes_folder()` | `src/getmoredone/app_settings.py::get_project_notes_folder` | `tests/test_project_notes.py::TestM7Settings::test_get_project_notes_folder_returns_path` | done |
 | M7.A.3 | save/load round-trip the new field | `AppSettings.load` / `save` (auto via dataclass asdict/fields) | `tests/test_project_notes.py::TestM7Settings::test_settings_roundtrip_project_subfolder` | done |
@@ -77,7 +77,7 @@ section numbers prefixed `RP`: `RP-2.1` is spec §2.1.
 | RP-3.8 | Thresholds are named config, not literals in the logic | `src/getmoredone/reward_protocol.py` (module constants) | `tests/test_reward_protocol.py::test_rp38_decide_reward_body_has_no_magic_numbers` | done |
 | RP-3.9 | Deterministic under a seed; the injected rng is the only variation | `src/getmoredone/reward_protocol.py::decide_reward` | `tests/test_reward_protocol.py::test_rp39_same_seed_gives_the_same_sequence` | done |
 | RP-4.1 | Deliverable field on the item editor, value reaches the row | `src/getmoredone/screens/item_editor.py`, `item_editor_form.py::build_item_from_form` | `tests/test_ui_presence.py::test_item_editor_ui_elements_presence`, `tests/test_item_editor_new_item_builder.py::test_rp41_deliverable_from_form_reaches_the_saved_item`, `::test_rp41_a_blank_deliverable_is_stored_as_null_not_empty_string`, `tests/test_reward_protocol_timer.py::test_rp41_editor_picks_up_a_deliverable_written_by_the_timer` | done |
-| RP-4.2 | Linked start captures deliverable, board and phase | `src/getmoredone/screens/timer_window_reward.py::prepare_reward_session` | `tests/test_reward_protocol_timer.py::test_rp42_linked_start_captures_the_session_deliverable`, `::test_rp42_the_dialog_is_prefilled_from_the_item` | done |
+| RP-4.2 | Linked start captures deliverable, board and phase | `src/getmoredone/screens/timer_window_reward.py::prepare_reward_session` | `tests/test_reward_protocol_timer.py::test_rp42_linked_start_captures_the_session_deliverable`, `::test_rp42_the_edit_prompt_is_prefilled_and_carries_the_project_context` | done |
 | RP-4.2a | Blank deliverable refused, hint verbatim | `src/getmoredone/screens/timer_window_dialogs.py::DeliverableDialog` | `tests/test_reward_celebration.py::test_rp42a_deliverable_dialog_refuses_blank_and_shows_the_hint`, `::test_rp42a_cancel_returns_no_deliverable` | done |
 | RP-4.2b | Cancel aborts the start; nothing is written | `src/getmoredone/screens/timer_window.py::start_timer` | `tests/test_reward_protocol_timer.py::test_rp42b_cancelling_the_deliverable_dialog_does_not_start_the_timer`, `::test_rp42b_cancelling_does_not_save_an_edited_time_block` | done |
 | RP-4.2c | Unlinked item runs the timer unchanged | `src/getmoredone/screens/timer_window_reward.py::resolve_reward_board` | `tests/test_reward_protocol_timer.py::test_rp42c_unlinked_item_starts_with_no_reward_protocol` | done |
@@ -360,7 +360,8 @@ walkthrough, two more after those five were on screen. All tests are in
 | PB-M5.6 | A box height below one line of text is raised to the 30px floor; a usable value is not floored | `src/getmoredone/screens/plan.py` (_positive_setting, box_height) | `::test_pbm56_a_box_height_below_one_line_of_text_is_raised`, `::test_pbm56_a_usable_box_height_is_not_floored` | done |
 | PB-M6.1 | An item row's requested height is the space the day gives those boxes — 30/45/60/90/120 minutes give 90/182/182/274/366px at a box height of 86, asserted as literals, not as an expression over the module's own constants | `src/getmoredone/screens/plan_blocks.py` (item_row_height, SLOT_ROW_GAP_PX) | `::test_pbm61_an_item_row_is_the_height_the_day_would_give_it` | done |
 | PB-M6.1 | The row equals the span of the real boxes holding the task, measured from the first box's top edge to the last box's bottom edge on screen | `src/getmoredone/screens/plan_blocks.py` (item_row_height, slot_row_height) | `::test_pbm61_a_row_is_as_tall_as_the_boxes_beside_it` *(needs `mapped_windows`)* | done |
-| PB-M6.1 | A row is never shorter than its two lines of text, and at any usable box height it is exactly the day's own height | `src/getmoredone/screens/plan_blocks.py` (ITEM_ROW_MIN_HEIGHT_PX) | `::test_pbm61_a_row_too_short_for_its_text_keeps_its_text` | done |
+| PB-M6.1 | A row is never shorter than its own two lines of text, and from a box height of 63 up it is exactly the day's own height | `src/getmoredone/screens/plan_blocks.py` (ITEM_ROW_MIN_HEIGHT_PX) | `::test_pbm61_a_row_too_short_for_its_text_keeps_its_text` | done |
+| PB-M6.1 | The floor is the height the row's own grid asks for, measured off the widgets rather than restated as a number | `src/getmoredone/screens/plan_blocks.py` (ITEM_ROW_MIN_HEIGHT_PX) | `::test_pbm61_the_floor_is_what_the_rows_own_grid_asks_for` | done |
 | PB-M6.1 | Every child of the row is drawn inside it and none is collapsed, at the floor and above it | `src/getmoredone/screens/plan_blocks.py` (build_item_row, grid_rowconfigure) | `::test_pbm61_every_line_of_a_row_is_drawn_inside_it` *(needs `mapped_windows`)* | done |
 | PB-M6.1 | A tall row keeps its two lines together at the top instead of centring the title in the slack | `src/getmoredone/screens/plan_blocks.py` (build_item_row, grid_rowconfigure) | `::test_pbm61_a_tall_row_keeps_its_two_lines_together` *(needs `mapped_windows`)* | done |
 | PB-M6.1 | The screen passes the setting it draws the day with, read off the rendered row | `src/getmoredone/screens/plan.py` (load_blocks → build_item_row) | `::test_pbm61_the_item_row_height_comes_from_the_setting` | done |
@@ -429,14 +430,22 @@ were in code and tests written in the same session that then reviewed them warm:
 - The title collapsed to one pixel at the lowest box-height setting, and floated
   mid-row at the default on any multi-box row. Neither had a test, because every
   height assertion was `cget` and none measured a child.
-- Three colour and score assertions compared the unscored tint with itself. The
-  mutation gate came back 9/9 red over them and could not have caught it:
-  mutating the lines the diff touched does not produce the mutant that fills
-  every chip with the unscored tint. A green gate there was expected, not
-  reassuring.
-- Two of those three were PB-M4 tests from the earlier batch. Fixed with the
-  third rather than left, and said so here, because leaving them means this
-  table claims PB-M4.1 and PB-M4.3 are verified when they were not.
+- Four colour assertions and one score assertion compared the unscored tint
+  with itself, because `_item(..., priority_score=N)` is recomputed to 0 by
+  `create_action_item` and `_one_slot_pane` rendered with an empty
+  `items_by_id`. The mutation gate came back 9/9 red over them and could not
+  have caught it: mutating the lines the diff touched does not produce the
+  mutant that fills every chip with the unscored tint. A green gate there was
+  expected, not reassuring.
+- Three of them were tests from the earlier batch — PB-M1.4's, PB-M4.1's and
+  PB-M4.3's. Fixed rather than left, and said so here, because leaving them
+  means this table claims those three criteria are verified when they were not.
+  The fourth of that family, PB-M3.1's, passed no `items_by_id` at all, so its
+  `depth` never reached the renderer.
+- A further pass was not run: neither sweep produced a high-severity finding,
+  which is the repo's condition for one. The re-sweep of the fix commits over
+  `b6b1daa...HEAD` found no correctness defect in `src/`, one medium (the fourth
+  assertion above) and five low.
 
 The most useful finding was one neither pass reported as severe: a colour test
 was passing only because this Mac is in light mode. Forced to dark it failed

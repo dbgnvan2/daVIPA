@@ -29,16 +29,18 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed — an item row is the size of the space it will take
 
 - A row in **Items starting** is now as tall as the space its work block will
-  take in the day: a 90-minute item is three boxes, a 45-minute item is two,
-  measured the way a user would — from the top edge of the first box to the
-  bottom edge of the last, gaps included. The row is the shape of the space it
+  take in an empty day: a 90-minute item is three boxes, a 45-minute item is
+  two, measured the way a user would — from the top edge of the first box to the
+  bottom edge of the last, gaps included. A half hour that already holds another
+  task is taller than one box, so the match is with the day the item would be
+  dropped into. The row is the shape of the space it
   is about to take, so the day's room for it is visible before the drag.
-- A row never goes below 66px, two lines of text, whatever the box height says.
-  The 30px floor on the box height was set for a chip holding one line, and an
-  item row holds two plus the work-block length; matched to a 34px box the row
-  showed its title and silently cut the depth / `already blocked` line and the
-  length. So the match with the day is exact at every box height the day itself
-  can show a line of text at, and below that the row is the taller of the two.
+- A row never goes below 67px, its own two lines of text, whatever the box
+  height says. The 30px floor on the box height was set for a chip holding one
+  line, and an item row holds two plus the work-block length; matched to a 34px
+  box the row showed its title and silently cut the depth / `already blocked`
+  line and the length. So the row and the day agree exactly from a box height of
+  63 up, and below that the row is the taller of the two.
 - The priority score has come off the row. The row is drawn in its priority
   band and striped in it, so the number was a third way of saying one thing in
   the one place a reader looks for what the colour cannot tell them.
