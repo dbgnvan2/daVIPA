@@ -7,6 +7,20 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — a box height saved in Settings did nothing until the next launch
+
+- **Drag Schedule box height (px)** and **Plan items column width (px)** were
+  written to the settings file and ignored by the running app. The Settings
+  screen loads its own settings object, and the Plan screen reads the app's;
+  the appearance section hands its object over after a successful save, and the
+  section holding these two did not. Changing the box height now changes the
+  Day Plan and the item rows as soon as you leave Settings, with no relaunch.
+  A refused write still hands nothing over, so the app never shows sizes the
+  file does not hold.
+- Found by running the app after three review passes and a green suite, none of
+  which could see it: every test builds a screen from a settings object it was
+  handed, which is exactly the step the Save button was missing.
+
 ### Fixed — a planned task in the Plan grid showed nothing but its colour bar
 
 - A task placed on a half hour drew as a bare 6px stripe: no title, no

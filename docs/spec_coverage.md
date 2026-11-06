@@ -309,6 +309,32 @@ the test confirmed red, the verbatim original restored. 27 mutations, 27 reds.
   sizes a box from the Drag Schedule box-height setting, so what a 30px chip
   felt like is no longer the question. To be re-walked once PB-M5 is on screen.
 
+### Walked on screen, 2026-11-06, after PB-M6 / PB-M7 (`./start-demo.sh`)
+
+The demo relaunched on the committed code, `drag_schedule_box_height_px = 30`.
+
+- **PB-M6.2, no priority value on a row** — **done.** No score on any of the
+  five rows.
+- **PB-M6.3, the work-block length under the depth bars** — **done.** `30m` /
+  `60m` sits directly beneath the three-bar stack, right-aligned with it, where
+  the same fact sits on a task in a day box.
+- **PB-M7, the continuation** — **done.** The 10:30 box of the 60-minute
+  "Review project proposal" carries the same fill and the same stripe as its
+  10:00 box, with the `↳` prefix and `same task` on the right.
+- **PB-M6.1, a row the height of the space it takes** — **done, and only
+  visible above the floor.** At a box height of 30 a one-box row is 67px and a
+  two-box row 70, so the difference is 3px and the demo's own setting hides the
+  thing the criterion is about. Set to 86 the left pane shows it plainly: the
+  60-minute item is exactly twice the height of each 30-minute item, with its
+  two lines of text at the top and the slack at the bottom.
+- **A saved box height did nothing until the next launch** — **found here, and
+  fixed.** This is what the walk was for: three review passes and a green suite
+  had not touched it, because every test builds a screen from an object it was
+  handed. See the Fixed entry in `CHANGELOG.md` and
+  `tests/test_plan_settings.py::test_a_saved_box_height_reaches_the_running_app`.
+- **Does a drag feel right** — still outstanding. PB-M5 and PB-M6 have changed
+  what a chip and a row are, and no drag was performed in this walk.
+
 A source launch exits silently with status 0 while `/Applications/daVIPA.app`
 holds the single-instance lock, so use `./start-demo.sh`, or quit the packaged
 app and `./start.sh`.
@@ -358,6 +384,7 @@ walkthrough, two more after those five were on screen. All tests are in
 | PB-M5.4 | The chip's title column requests the Drag Schedule title width | `src/getmoredone/screens/plan.py` (box_title_width), `plan_blocks.py` (_build_block_chip) | `::test_pbm54_the_title_column_follows_the_drag_schedule_width` | done |
 | PB-M5.5 | A block outside the day is sized by the same two settings as one in a box | `src/getmoredone/screens/plan_blocks.py` (build_outside_group), `plan.py` (load_blocks) | `::test_pbm55_an_outside_block_is_sized_like_one_in_a_box`, `::test_pbm55_the_settings_reach_the_outside_group_on_screen` | done |
 | PB-M5.6 | A box height below one line of text is raised to the 30px floor; a usable value is not floored | `src/getmoredone/screens/plan.py` (_positive_setting, box_height) | `::test_pbm56_a_box_height_below_one_line_of_text_is_raised`, `::test_pbm56_a_usable_box_height_is_not_floored` | done |
+| PB-M5.7 | A box height saved in Settings reaches the running app, without a relaunch; a refused write does not | `src/getmoredone/screens/settings.py` (save_date_increment_settings) | `tests/test_plan_settings.py::test_a_saved_box_height_reaches_the_running_app`, `::test_a_refused_write_does_not_hand_the_app_the_unsaved_object` | done — found by the walk, not by a pass |
 | PB-M6.1 | An item row's requested height is the space the day gives those boxes — 30/45/60/90/120 minutes give 90/182/182/274/366px at a box height of 86, asserted as literals, not as an expression over the module's own constants | `src/getmoredone/screens/plan_blocks.py` (item_row_height, SLOT_ROW_GAP_PX) | `::test_pbm61_an_item_row_is_the_height_the_day_would_give_it` | done |
 | PB-M6.1 | The row equals the span of the real boxes holding the task, measured from the first box's top edge to the last box's bottom edge on screen | `src/getmoredone/screens/plan_blocks.py` (item_row_height, slot_row_height) | `::test_pbm61_a_row_is_as_tall_as_the_boxes_beside_it` *(needs `mapped_windows`)* | done |
 | PB-M6.1 | A row is never shorter than its own two lines of text, and from a box height of 63 up it is exactly the day's own height | `src/getmoredone/screens/plan_blocks.py` (ITEM_ROW_MIN_HEIGHT_PX) | `::test_pbm61_a_row_too_short_for_its_text_keeps_its_text` | done |

@@ -280,6 +280,33 @@ docstring states something false:
 The sixth, `_scored_item`'s unused `"medium"` factor row, is deleted rather than
 left as a branch no caller reaches.
 
+### Walked on screen — one medium, which is what the walk is for
+
+The demo was relaunched on the committed code and the Plan screen looked at.
+PB-M6.2, PB-M6.3 and PB-M7 are right on screen; PB-M6.1 is right but invisible
+at the demo's own box height of 30, where a one-box row is 67px and a two-box
+row 70. At 86 the 60-minute item is exactly twice the height of each 30-minute
+one, with its text at the top and the slack at the bottom.
+
+Setting it to 86 is how the medium turned up: **the saved value did nothing
+until the next launch.** `SettingsScreen.__init__` does its own
+`AppSettings.load()`, so the object it edits is not the one the app holds, and
+the Plan screen reads `app.settings` when it is built. The appearance section
+hands its object over after a successful write; `save_date_increment_settings`
+— which carries both settings PB-M5 wired to the Plan screen — never did.
+Before PB-M5 the Plan screen used a constant, so this is new surface from this
+batch, not something it inherited.
+
+Fixed after the write and not before, the same ordering and the same reason as
+the appearance section: a refused save leaves the file saying something else.
+Two tests, both red under mutation, and the round trip walked in the demo:
+30 → 86, Save, Settings → Plan, the boxes and the rows change with no restart.
+
+No review pass could have found it. Every test in the suite builds a screen
+from a settings object it was handed, which is precisely the step the Save
+button was missing — the P25 shape again: a path reachable from only one
+surface, and not the one anyone uses.
+
 **Adjacent issues found, not fixed.** Verifying this batch's own `::test_`
 references against `tests/` turned up stale names across the older
 documentation — `docs/VPS_DATA_INTEGRITY_AUDIT.md` and nine earlier handoff
