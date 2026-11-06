@@ -310,30 +310,40 @@ def test_the_date_is_a_picker_not_a_free_text_entry(screen):
     """The free-text entry accepted a typo and wrote blocks under a non-date.
 
     Asserted on the widget's own contract: a DatePickerButton validates and
-    normalises, which is the behaviour being bought here.
+    normalises, and the screen follows it -- which is the behaviour being
+    bought here.
 
-    The date is moved through the picker, which is the only thing that changes
-    it in the app. The first version of this compared the picker against a date
-    the fixture had assigned behind it -- the picker is built from
-    ``date.today()`` in ``__init__``, so the two agreed only on the day this
-    test was written, and it went red at the first midnight.
+    Two earlier versions of this test were wrong in different ways. The first
+    compared the picker against a date the fixture had assigned behind it; the
+    picker is built from ``date.today()`` in ``__init__``, so the two agreed
+    only on the day it was written and it went red at the first midnight. The
+    second moved the date with ``set_date`` and then called
+    ``screen.on_date_changed`` itself -- but ``set_date`` already fires that
+    callback, so the test was satisfying its own assertion, and removing the
+    screen's ``on_date_changed=`` wiring left it green.
+
+    ``set_date`` is given a ``date`` object, not a string, so the normalising
+    the docstring claims is the thing being asserted rather than asserted of an
+    input that needed none.
     """
+    from datetime import date as date_type
+
     from src.getmoredone.widgets.date_picker import DatePickerButton
 
     # Deliberately nowhere near today, so nothing here can pass by calendar
     # accident.
-    a_later_day = "2027-03-03"
+    a_later_day = date_type(2027, 3, 3)
 
     assert isinstance(screen.date_picker, DatePickerButton)
 
     screen.date_picker.set_date(a_later_day)
-    screen.on_date_changed(a_later_day)
 
-    assert screen.date_picker.get_date() == a_later_day, (
-        "the picker did not take the date it was given"
+    assert screen.date_picker.get_date() == "2027-03-03", (
+        "the picker did not normalise the date it was given"
     )
-    assert screen.selected_date == a_later_day, (
-        "the screen did not follow the picker"
+    assert screen.selected_date == "2027-03-03", (
+        "the screen is not wired to the picker: setting the date on the control"
+        " did not reach the screen"
     )
 
 

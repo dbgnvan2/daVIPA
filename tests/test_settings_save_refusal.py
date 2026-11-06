@@ -15,6 +15,7 @@ screen itself needs an app, a sidebar and a mapped window to build.
 
 import json
 import shutil
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -138,22 +139,7 @@ def test_the_theme_is_not_applied_over_a_refused_write(settings_path, monkeypatc
     assert "✓" not in (label.text or ""), f"reported a save: {label.text!r}"
 
 
-def test_launchd_is_not_reloaded_over_a_refused_write(
-    settings_path, monkeypatch
-):
-    """The updater re-reads the file, so a reload over a refusal is a lie twice.
-
-    launchd would be reloaded against the interval already in the file while
-    the user is told "Saved (launchd updated)." about the new one.
-    """
-    _refuse_the_write(monkeypatch, settings_path)
-    ran = []
-    monkeypatch.setattr(
-        settings_integrations.subprocess, "run", lambda *a, **k: ran.append(a)
-    )
-    label = _Label()
-    settings = AppSettings.load()
-
+def _email_import_stub(settings, label):
     stub = SimpleNamespace(
         settings=settings,
         gmail_enabled_var=SimpleNamespace(get=lambda: True),
@@ -167,8 +153,63 @@ def test_launchd_is_not_reloaded_over_a_refused_write(
         stub, lbl, text, level
     )
     stub._write_settings = lambda lbl: SettingsScreen._write_settings(stub, lbl)
+    return stub
 
-    SettingsIntegrationsMixin.save_email_import_settings(stub)
+
+def _watch_launchd(monkeypatch):
+    """Make the launchd reload reachable here, and record whether it ran.
+
+    The call site is guarded by ``updater.exists() and python_exe.exists()``,
+    and the second of those is `./venv/bin/python` -- which is gitignored and
+    does not exist on CI, where this repo's tests are installed into the
+    runner's own Python. Left unpatched, the subprocess is unreachable and an
+    assertion that it did not run passes whatever the code does: a check that
+    can only fail on the one machine it was written on.
+    """
+    ran = []
+    monkeypatch.setattr(
+        settings_integrations.subprocess, "run", lambda *a, **k: ran.append(a)
+    )
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+    return ran
+
+
+def test_launchd_is_reloaded_on_a_successful_write(settings_path, monkeypatch):
+    """The companion, and the proof that the assertion below can fail.
+
+    Without this, the refusal test passes on a machine where the reload was
+    never reachable in the first place.
+    """
+    settings_path.write_text(json.dumps({"gmail_import_interval_seconds": 60}))
+    ran = _watch_launchd(monkeypatch)
+    label = _Label()
+    settings = AppSettings.load()
+
+    SettingsIntegrationsMixin.save_email_import_settings(
+        _email_import_stub(settings, label)
+    )
+
+    assert json.loads(settings_path.read_text())["gmail_import_interval_seconds"] == 120
+    assert len(ran) == 1, "the launchd reload is not reachable in this test"
+    assert label.text == "Saved (launchd updated)."
+
+
+def test_launchd_is_not_reloaded_over_a_refused_write(
+    settings_path, monkeypatch
+):
+    """The updater re-reads the file, so a reload over a refusal is a lie twice.
+
+    launchd would be reloaded against the interval already in the file while
+    the user is told "Saved (launchd updated)." about the new one.
+    """
+    _refuse_the_write(monkeypatch, settings_path)
+    ran = _watch_launchd(monkeypatch)
+    label = _Label()
+    settings = AppSettings.load()
+
+    SettingsIntegrationsMixin.save_email_import_settings(
+        _email_import_stub(settings, label)
+    )
 
     assert ran == [], "reloaded launchd from a settings file that was not written"
     assert "Saved" not in (label.text or ""), (
