@@ -173,8 +173,10 @@ silently. Run `./start-demo.sh`, or quit the packaged app and `./start.sh`.
   block a single drag, so a latent crash becomes reachable in ordinary use.
   Flagged, not fixed, per global rule 10 — the fix is a schema decision, not a
   line. In `BACKLOG.md`.
-- Twelve low-severity items are recorded in `BACKLOG.md` — four deferred
-  during the build, eight more from the two pre-push review passes.
+- Seventeen below-medium items are recorded in `BACKLOG.md` — four deferred
+  during the build, eight from the pre-push review passes, four from the
+  re-sweep of the fix commits, and one adjacent issue found while proving
+  those fixes.
 
 ## Final test counts
 
@@ -185,14 +187,19 @@ so the parametrised cases are included.
 |---|---|---|
 | `tests/test_time_block_schema.py` | 6 | no |
 | `tests/test_time_block_layout.py` | 115 | no |
-| `tests/test_time_block_crud.py` | 25 | no |
-| `tests/test_plan_settings.py` | 19 | no |
-| `tests/test_time_block_colors.py` | 6 | no |
+| `tests/test_time_block_crud.py` | 30 | no |
+| `tests/test_plan_settings.py` | 26 | no |
+| `tests/test_time_block_colors.py` | 6 | sets the appearance mode; builds no widget |
 | `tests/test_drag_schedule_support.py` | 18 (12 new) | one builds a withdrawn Tk root |
-| `tests/test_plan_screen.py` | 58 | real Tk; 5 need `mapped_windows` |
-| **Total new in this batch** | **241** | 182 need no Tk at all |
+| `tests/test_plan_screen.py` | 62 | real Tk; 5 need `mapped_windows` |
+| **Total in these files** | **263** | 200 build no Tk widget |
 
-Whole suite after the batch: 1675 behaviour tests and 212 meta.
+257 of those 263 are new in this batch; the other six predate it. The
+*builds no Tk widget* count is 263 less the 62 in `test_plan_screen.py` and the
+one withdrawn-root test — measured by which modules construct a widget, not
+by which can run headless, since all of them can.
+
+Whole suite after the batch: 1691 behaviour tests and 212 meta.
 
 ## Pre-push review passes
 
@@ -200,7 +207,8 @@ Whole suite after the batch: 1675 behaviour tests and 212 meta.
 |---|---|---|
 | `/code-review` | correctness, reuse, simplification | 5 findings: 1 high, 2 medium, 2 low |
 | `learning-qa` | the failure-pattern catalogue (P1–P39) | 12 findings: 2 high, 1 medium-high, 3 medium, 6 below |
-| `/security-review` | injection, secrets, path traversal, deserialization | run because the diff adds SQL; see the batch report |
+| `/security-review` | injection, secrets, path traversal, deserialization | run because the diff adds SQL; no HIGH or MEDIUM findings |
+| `learning-qa` over the fix commits | the same catalogue, re-run on the least-reviewed code in the change | 8 findings: 0 high, 4 medium, 4 low |
 
 Everything at medium severity or above was fixed in the same session with a
 test, each proved by mutation. Everything below medium is recorded in
@@ -213,3 +221,12 @@ code, and both were corrected as such: one expectation encoded the inverse of
 the design (that `load_blocks` persists derived times), and one atomicity test
 passed against a version with no transaction at all, because its fixture raised
 before anything had been written.
+
+The re-sweep of the fix commits found that the second of those corrections was
+itself fragile: its replacement fixture raised on the second *read* of a bounds
+property, which identifies the second day only while `pack_day` reads that
+property exactly once per call. It does — probed rather than assumed — but the
+test now counts the per-day repacks instead, and a second test asserts the
+first day really is written before the failure, which is the thing that makes
+the atomicity assertion mean anything. Because that pass produced no
+high-severity finding, the budget in `CLAUDE.md` ends the sweep there.

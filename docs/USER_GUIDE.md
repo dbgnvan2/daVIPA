@@ -310,6 +310,14 @@ Day pane (right):
   above it is blocked at 1440 and the status line says so. Why: past a day the
   app can no longer write an end time that is the start plus the length, so the
   block would be drawn claiming minutes it does not own.
+- **A day can be too full to re-time** — What: Blocks that together run past
+  the last time the app can write are refused, with *This day is too full to
+  re-time — shorten or remove a block* on the status line. Nothing is added,
+  resized or deleted; the day is left exactly as it was. Why: a single block
+  stops at a day, but several of them can still add up past that point, and
+  past it a block cannot be written with an end time that is its start plus its
+  length. Refused rather than stored wrong. It takes more than three full days'
+  worth of blocks on a single day to reach this, so an ordinary day will not.
 - **Lunch** — What: A band drawn where the day skips lunch. Why: It is not a
   block: it cannot be dragged, resized or deleted, and exists so the gap is
   visible rather than an unexplained jump in the times.
@@ -331,11 +339,15 @@ Day Settings modal:
   one day must be checked.
 - Times must be written as `HH:MM`, between `00:00` and `23:59`. A time the app
   cannot read — including an hour past 23, such as `24:00` — is rejected in the
-  modal with the field named, never silently replaced.
+  modal with the field named, never silently replaced. A settings file that
+  already holds such a value from an older version loads as the default for
+  that field rather than being taken as given.
 - **Save** re-times **every** day that holds blocks, not only the one on screen,
   and says how many it re-timed. Why: these four values shape every planned day,
   so a day left on the old shape would be showing times that no longer follow
-  from your settings.
+  from your settings. If one of those days is too full to re-time, no day is
+  changed and the status line says so — your settings are saved, but you will
+  need to shorten a block on that day and change a day setting again.
 
 ### Completed
 - What: Shows completed items over the last N days.

@@ -14,7 +14,7 @@ python run.py
 
 # Tests
 pytest                                          # All tests
-pytest -m "not meta"                            # App behaviour only (1675 tests)
+pytest -m "not meta"                            # App behaviour only (1691 tests)
 pytest -m meta                                  # Repo/infra assertions only (212 tests)
 pytest -v                                       # Verbose
 pytest tests/test_vps_integration.py -v        # Single file

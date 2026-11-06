@@ -62,6 +62,20 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   retired the "past day end" warning permanently; `170:0` was stored as `99:59`,
   a value nobody typed. Times outside `00:00`–`23:59` are now rejected in the
   modal with the field named.
+- **A settings file already holding one of those values was still read as
+  given.** Rejecting them in the modal healed new input and left an existing
+  file wrong forever — a Day End of `25:00` written by an earlier version kept
+  the overrun warning switched off with nothing anywhere to say so. All three
+  day-bound values are now read through a parser that refuses an hour of 24 or
+  more and falls back to that field's default.
+- **A day too full to write was written clamped rather than refused.** The
+  length ceiling bounds one block; running past the last time the app can
+  express is a property of the whole day. Four blocks of exactly a day each are
+  individually legal and together pass that point, where the fourth row would
+  have been stored claiming 1440 minutes between two times 899 minutes apart.
+  Such a day is now refused before anything is written, with the reason on the
+  status line, from all four places a block can be added, resized or deleted and
+  from a Day Settings save.
 - **Saving Day Settings re-timed only the day on screen.** Day start, lunch and
   day end shape every planned day, so every other day was left holding times
   derived from settings that no longer existed. Save now re-times every day that

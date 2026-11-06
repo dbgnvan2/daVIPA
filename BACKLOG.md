@@ -1,6 +1,6 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-05 (four deferred from the time-block rebuild added; the five from the timer-endings batch remain cleared, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-05 (the time-block rebuild's deferrals, its sweep findings, and the four from the re-sweep of its own fix commits; the five from the timer-endings batch remain cleared, and older sections from 08-24 and earlier remain)
 
 ## Deferred from the time-block rebuild (2026-11-05)
 
@@ -88,6 +88,61 @@ failure-pattern catalogue.
   (`db_manager.py`, `learning-qa`, low). Correct against `models.py` today, but
   a renamed status would silently empty the Plan screen's left pane rather than
   fail.
+
+### From the re-sweep of this batch's own fix commits
+
+A fix commit is the least-reviewed code in a change — written last, in the
+most anchored state — so the fixes above were themselves swept. That pass
+returned no high-severity finding, three mediums (all fixed with tests), and
+these four. Each was severity-rated before any fix was written.
+
+- **A rolled-back write says nothing unless it was the day-too-full one**
+  (`src/getmoredone/screens/plan.py`, low). The four write paths catch
+  `DayTooFullError` and report it, but any other exception inside those
+  transactions rolls the write back and propagates into Tk's callback
+  machinery. Nothing in the app installs `report_callback_exception`
+  (verified: no occurrence anywhere in `src/`), so the traceback goes to
+  stderr and the user sees a click that did nothing and said nothing. Low
+  because no other exception class is reachable through those paths today;
+  the fix is one default handler for the whole app, not four more `except`
+  clauses, which is why it is not a line.
+- **The settings file is written before the days are re-timed**
+  (`plan_settings_dialog.py:185` then `:188`, low). `save()` writes the file,
+  then `on_saved` re-times every day. A repack refusal therefore leaves the
+  file holding a day shape the stored days do not have. The refusal path says
+  so in as many words, which is why this is low rather than medium — but the
+  honest fix is to re-time first and write the file only if that succeeded.
+- **`set_block_minutes` has no ceiling of its own** (`plan.py`, low, latent).
+  Both of its callers bound their input — the dialog refuses over 1440, and
+  the day-level guard now refuses a day that cannot be written — so the
+  day-level check subsumes it. A third caller that passed an unbounded number
+  would not be stopped by anything in the method itself.
+- **`add_padding_block`'s capped-default report cannot fire** (`plan.py:445`,
+  low). It recomputes `requested` with the same
+  `default_minutes_for_block_type` call that produced `minutes`, and that
+  helper clamps, so `requested > minutes` is never true and the warning branch
+  is dead. The `block_item` sibling reads the raw `item.work_block` and does
+  report, which is the tested one. Reachable only via a hand-edited
+  `default_time_block_minutes` (no screen writes that field), and the clamp
+  itself is correct — only the explanation is missing. Fix: read the raw
+  setting before clamping, as `block_item` does.
+
+### Adjacent, found while proving the fixes above (2026-11-05)
+
+- **`AppSettings.load()` swallows programming errors and resets every
+  setting** (`app_settings.py:151`). The whole load, normalisers included, is
+  wrapped in `except Exception as e: print(...)` and falls through to a
+  defaults object. So a `NameError` or `AttributeError` in any normaliser does
+  not surface as a crash — it silently discards the user's entire settings
+  file for that launch, with one line on stderr. Found because a mutation test
+  of the day-bounds normaliser came back **green**: the mutant was invalid code
+  that raised `NameError`, the broad `except` ate it, the defaults satisfied
+  the assertion, and the test passed for the wrong reason. Pre-existing and
+  outside this batch's scope, so flagged rather than fixed per global rule 10.
+  Wants the corrupt-file cases (`JSONDecodeError`, `OSError`) caught narrowly
+  and everything else allowed to raise. Note that any test asserting a
+  fallback-to-default behaviour through `load()` is weakened by this until it
+  is fixed.
 
 ## ✅ Cleared 2026-08-25 — the five deferred from the timer-endings batch
 

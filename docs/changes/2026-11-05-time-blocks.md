@@ -81,7 +81,8 @@ Modified:
 ## Verification
 
 - Command: `taskpolicy -b ./venv/bin/python -m pytest tests/test_time_block_schema.py tests/test_time_block_layout.py tests/test_time_block_crud.py tests/test_plan_screen.py tests/test_plan_settings.py tests/test_time_block_colors.py tests/test_drag_schedule_support.py -q`
-- Result: PASS — 247 passed (241 of them new in this batch).
+- Result: PASS — 263 passed (257 of them new in this batch). Re-measured
+  after the re-sweep fixes below; it was 247 before them.
 
 - Command: the same seven files plus `tests/test_settings_isolation.py
   tests/test_theme_settings.py tests/test_today_screen.py tests/test_timer.py
@@ -132,7 +133,11 @@ whole range, and `/security-review` because the diff adds SQL.
 Everything at medium or above was fixed in the same session with a test, each
 proved by mutation — ten mutations, ten reds, every original restored verbatim.
 The fixes were then re-swept as their own range, because a fix commit is the
-least-reviewed code in any change.
+least-reviewed code in any change. That fourth pass returned **0 high, 4
+medium, 4 low**; the three mediums still open at the time were fixed with
+tests and seven more mutations, and because the pass produced no high-severity
+finding the budget in `CLAUDE.md` ends the sweep there rather than running a
+fifth.
 
 What the two high findings were:
 
@@ -169,6 +174,44 @@ named a test that existed nowhere, so the one function this batch extracted
 specifically to be shared between two drag surfaces had no direct coverage
 while its docstring claimed otherwise.
 
+### What the re-sweep of the fix commits found
+
+Three mediums, each fixed here with a test:
+
+6. **A day end stored past midnight was still read as given.** Finding 4 above
+   was fixed in the dialog, which heals new input and leaves a settings file
+   written by an earlier version wrong forever: loaded unbounded, a Day End of
+   `25:00` puts the end of the day past every block the planner can make and
+   keeps the overrun warning switched off permanently, with nothing anywhere to
+   say so. `parse_clock_time` is the bounded reader and all three day-bound
+   fields now load through it. `parse_hhmm` stays lenient on purpose —
+   `sort_blocks` parses a stored overflow start time like `25:30` back.
+7. **A day too full to express was written clamped rather than refused.** The
+   ceiling from finding 1 bounds one block; this is a property of the day. Four
+   blocks of exactly a day each are each legal and together pack past
+   `MAX_FORMATTED_MINUTES`, where `format_hhmm` clamps — so the fourth row
+   would have been stored claiming 1440 minutes between `85:00` and `99:59`,
+   which is 899. `repack_day` now raises `DayTooFullError` before it opens its
+   transaction, so nothing is written, and all four screen writes plus the
+   settings save report it.
+8. **The atomicity fixture from finding 2's correction was itself fragile.** It
+   raised on the second *read* of `day_start_minutes`, which is the second day
+   only while `pack_day` reads that property exactly once per call. It does —
+   probed, not assumed — but a refactor that read it twice would move the
+   failure onto day one, before any write, and the test would go green while
+   testing nothing: the exact vacuity the correction existed to escape. It now
+   counts the per-day repacks, and a second test asserts the first day really
+   is written before the second fails.
+
+One mutation of the seven came back green on the first attempt, and the reason
+is worth keeping: the mutant was invalid code that raised `NameError`, and
+`AppSettings.load()` wraps the whole load in `except Exception` and falls back
+to a defaults object, so the error was swallowed and the assertion was
+satisfied for the wrong reason. Re-run with a mutant that compiles, it went
+red. The broad `except` is pre-existing and is recorded in `BACKLOG.md` as an
+adjacent issue: it means any programming error in a normaliser silently
+discards the user's entire settings file for that launch.
+
 ## Risks / Known gaps
 
 - **Not seen on screen.** `/Applications/daVIPA.app` was running throughout, and
@@ -182,10 +225,11 @@ while its docstring claimed otherwise.
 - **The demo instance is a thin test bed as seeded.** All six sample items in
   `demo_data.py` have an empty start date and the item list filters on start
   date exactly, so the left pane is empty on a fresh demo. In `BACKLOG.md`.
-- Twelve low-severity items are in `BACKLOG.md` under *Deferred from the
-  time-block rebuild* — four deferred during the build, eight more from the
-  review passes, each with the pass that found it and the reason it was not
-  fixed in-loop. One is worth naming here because it is a crash rather than a
+- Seventeen below-medium items are in `BACKLOG.md` under *Deferred from the
+  time-block rebuild* — four deferred during the build, eight from the review
+  passes, four from the re-sweep of the fix commits, and one adjacent issue
+  found while proving those fixes, each with the pass that found it and the
+  reason it was not fixed in-loop. One is worth naming here because it is a crash rather than a
   rough edge: deleting an action item that holds a time block raises
   `IntegrityError`, because `time_blocks.item_id` references `action_items(id)`
   with no `ON DELETE` clause. Pre-existing, but this batch makes creating a
