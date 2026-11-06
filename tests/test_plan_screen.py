@@ -21,6 +21,7 @@ most needs to be proved.
 
 from __future__ import annotations
 
+import re
 import tkinter as tk
 
 import customtkinter as ctk
@@ -171,7 +172,6 @@ def _scored_item(manager, title, band="critical", **kwargs):
     """
     factors = {
         "critical": dict(importance=20, urgency=20, size=16, value=8),   # 51200
-        "medium": dict(importance=5, urgency=5, size=4, value=2),        # 200
     }[band]
     item = _item(manager, title, **factors, **kwargs)
     assert item.priority_score > 0, (
@@ -1987,11 +1987,18 @@ def test_pbm31_the_depth_bars_are_inside_the_box(root, manager, mapped_windows):
     grandchild of the box, so it has a way of disappearing that the title
     does not -- the title shares the chip's row, the bars are a frame of
     frames inside it.
+
+    ``items_by_id`` was not passed, so the chip was built with ``item=None`` and
+    the stack drew no filled bars: the ``depth="Deep"`` above read as if it were
+    under test and reached nothing. The last call site of that family, found by
+    the re-sweep after the other five were fixed.
     """
     item = _item(manager, "Draft the proposal", depth="Deep")
     block = _item_block()
     block.item_id = item.id
-    _pane, row = _one_slot_pane(root, block, width=600)
+    _pane, row = _one_slot_pane(
+        root, block, width=600, items_by_id={item.id: item}
+    )
     root.update()
 
     stacks = _find_depth_stacks(row.frame)
@@ -2160,8 +2167,16 @@ def test_pbm1_an_item_rows_stripe_uses_the_brighter_table(
 
     A colour table nothing consumes is a table that passes its own contrast
     tests and changes nothing on screen.
+
+    The fourth test built on an unscored item, and the one the re-sweep of the
+    fixes found still standing. On an unscored item the first assertion compared
+    the unscored stripe with itself, and the second had teeth only because the
+    light unscored stripe and the unscored band happen to differ -- so the whole
+    test exercised the one band whose two tables were never in question.
+    ``stripe_for_item`` pinned to the unscored stripe, or reading the text-safe
+    table for every scored band, passed it.
     """
-    item = _item(manager, "Draft the proposal", priority_score=51200)
+    item = _scored_item(manager, "Draft the proposal")
     row = build_item_row(
         root, item, 0, already_blocked=False, work_block_minutes=30
     )
@@ -2176,6 +2191,9 @@ def test_pbm1_an_item_rows_stripe_uses_the_brighter_table(
     assert _as_hex(row, stripe.cget("fg_color")) != _as_hex(
         row, accent_for_item(item)
     ), "the stripe is still the text-safe band colour"
+    assert _as_hex(row, stripe.cget("fg_color")) != _as_hex(
+        row, stripe_for_item(None)
+    ), "the stripe is the unscored bar, so it says nothing about the band"
 
 
 def test_pbm41_a_chips_title_is_coloured_for_the_shade_behind_it(
@@ -2621,6 +2639,46 @@ def test_pbm61_a_row_too_short_for_its_text_keeps_its_text(root, manager):
     )
 
 
+def test_pbm61_the_floor_is_what_the_rows_own_grid_asks_for(root, manager):
+    """The floor is the one number here justified by arithmetic, so measure it.
+
+    ``ITEM_ROW_MIN_HEIGHT_PX`` is the sum of what the two text rows request:
+    the title's 28px label plus its 5px top pad, and the detail line's 28px
+    plus the work-block length's 6px bottom pad -- the larger of the two bottom
+    pads on that row. Written by hand it was 66, one pixel short, and the row
+    silently lost the last pixel of its bottom padding: no other assertion
+    could see it, because both labels anchor to the top of their cell.
+
+    So this reads the requirement off the widgets the row actually builds
+    rather than restating the number. The stripe is skipped: it spans all three
+    rows and asks for less than their sum, so it constrains nothing.
+    """
+    item = _scored_item(manager, "Draft the proposal", depth="Medium")
+    row = build_item_row(
+        root, item, 0, already_blocked=True, work_block_minutes=30,
+        box_height=SLOT_MIN_HEIGHT_PX - 4,
+    )
+    root.update_idletasks()
+
+    needed = {}
+    for child in row.winfo_children():
+        placed = child.grid_info()
+        if not placed or int(placed.get("rowspan", 1)) > 1:
+            continue
+        pads = [int(n) for n in re.findall(r"\d+", str(placed.get("pady", 0)))]
+        pady = (pads[0] + pads[1]) if len(pads) > 1 else (pads[0] * 2 if pads else 0)
+        where = int(placed["row"])
+        needed[where] = max(needed.get(where, 0), child.winfo_reqheight() + pady)
+
+    assert needed, "no single-row children on the item row to measure"
+    assert sum(needed.values()) == ITEM_ROW_MIN_HEIGHT_PX, (
+        f"the row's grid asks for {sum(needed.values())}px ({needed}) and the "
+        f"floor is {ITEM_ROW_MIN_HEIGHT_PX}px -- at a box height this small "
+        "the floor is the whole height, so the difference is padding the row "
+        "does not get"
+    )
+
+
 def test_pbm61_the_item_row_height_comes_from_the_setting(root, manager, settings):
     """The other half of PB-M6.1: the screen passes the setting it draws with.
 
@@ -2657,12 +2715,16 @@ def test_pbm61_every_line_of_a_row_is_drawn_inside_it(root, manager, mapped_wind
     measurement PB-M2.1 makes on a task chip, applied to the row: every child's
     bottom edge inside the frame's own height.
 
-    It is the test that fails on the defect the first version shipped with.
-    ``grid_rowconfigure(0, weight=1)`` put all the slack -- including a negative
-    shortfall -- on the title's row, so at a 30px box height Tk collapsed the
-    title to a single pixel and the row showed its depth and its length and not
-    which item it was. The weight is on an empty row 2 now, so a row short of
-    space loses from the bottom.
+    It is the test that fails on the defect the first version shipped with --
+    ``grid_rowconfigure(0, weight=1)`` putting all the slack, including a
+    negative shortfall, on the title's row, so at a 30px box height Tk collapsed
+    the title to a single pixel and the row showed its depth and its length and
+    not which item it was.
+
+    It fails on that combination, not on the weight alone: with the floor in
+    place a one-box row is 67px and nothing is collapsed even with the weight
+    back on row 0. ``test_pbm61_a_tall_row_keeps_its_two_lines_together`` is
+    what pins the weight by itself.
     """
     item = _scored_item(manager, "Draft the proposal")
 
