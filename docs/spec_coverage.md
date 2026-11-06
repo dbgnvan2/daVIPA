@@ -292,9 +292,26 @@ the test confirmed red, the verbatim original restored. 27 mutations, 27 reds.
 | Whether macOS delivers right-click as `<Button-3>` or `<Button-2>` on this machine | The OS decides, not the app | Both stay bound, asserted from the screen's own `RIGHT_CLICK_SEQUENCES`, and a real `<Button-3>` on a real chip is asserted to open a menu |
 | Whether dragging a chip between boxes *feels* right — the hover outline, the grab target on a 30px chip | Subjective, and a function of real pointer travel | TG-M11.1 and the item-drop test generate real `<ButtonPress-1>`/`<B1-Motion>`/`<ButtonRelease-1>` at real widgets and assert the stored box |
 
-Both human checks are **outstanding**. `/Applications/daVIPA.app` holds the
-single-instance lock, so a source launch exits silently with status 0 — run
-`./start-demo.sh`, or quit the packaged app and `./start.sh`.
+### Walked on screen, 2026-11-06 (`./start-demo.sh`)
+
+- **Right-click** — **done.** A real right-click on a placed chip opened the
+  menu: 15 / 30 (default) / 45 / 60 / 90 minutes, Custom…, Delete block.
+- **Does the grid read as a day** — **no, and the test that said it did was
+  wrong.** At full size all 18 boxes fit one view with lunch shaded, but every
+  placed task rendered as a bare 4px stripe: no title, no duration, no depth
+  bars. TG-M8.1 and TG-M8.2 passed throughout, because a title laid out below
+  the box it is clipped to is still full-width and still `winfo_ismapped()`.
+  Cause and fix in
+  `docs/implementation_plan_2026-11-06_plan_box_appearance.md` (PB-M2); the
+  gap in the two tests is closed by PB-M2.1, which measures the title's
+  position inside the box rather than its width.
+- **Does a drag feel right** — still outstanding, and now overtaken: PB-M5
+  sizes a box from the Drag Schedule box-height setting, so what a 30px chip
+  felt like is no longer the question. To be re-walked once PB-M5 is on screen.
+
+A source launch exits silently with status 0 while `/Applications/daVIPA.app`
+holds the single-instance lock, so use `./start-demo.sh`, or quit the packaged
+app and `./start.sh`.
 
 ## Adjacent issues found, not fixed
 

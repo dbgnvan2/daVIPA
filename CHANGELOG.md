@@ -7,6 +7,39 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — a planned task in the Plan grid showed nothing but its colour bar
+
+- A task placed on a half hour drew as a bare 6px stripe: no title, no
+  duration, no depth bars. `ctk.CTkFrame` requests 200x200 when neither
+  dimension is given, and the accent stripe set only `width`, so its height
+  request was a constant nobody chose. The chip passed that request up and the
+  box clipped it, leaving the title laid out around y=100 inside a box 34px
+  tall — drawn, but below everything the box shows. The stripe now asks for a
+  height.
+- The same missing `height=` made every row in the **Items starting** list
+  about 200px tall. Those rows are now as tall as their two lines of text.
+- The *no items start on this date* note was clipped at **both** ends, because
+  `CTkLabel` centres its text and the note was wider than the column. It is
+  now anchored left and wraps to the column's width.
+- `tests/test_plan_screen.py` carried a comment stating this sliver bug did
+  not reproduce. It did. TG-M8.1 and TG-M8.2 passed throughout, because a
+  label clipped by its parent is still full-width and still `winfo_ismapped()`
+  — the new PB-M2.1 measures where the title sits inside the box instead.
+
+### Changed — a task in the Plan grid is shaded by its priority
+
+- A task now carries its priority band as the shade it is drawn on, as well as
+  the bar at its edge, on both the Day Plan and the items list. Padding
+  (Buffer, Break) and continuation boxes are left unshaded: neither has a
+  priority to show. Title colour is chosen for the shade behind it.
+- The band stripes are brighter. A second table, `priority_stripe_colors()`,
+  held to the 3:1 WCAG bar for a non-text object; `priority_band_colors()` is
+  unchanged and stays at 4.5:1 for anywhere a band colour sits behind text.
+- A task in a Plan box is now as tall as **Drag Schedule box height (px)** and
+  its title column as wide as the Drag Schedule title column, so a task is the
+  same size on both screens. Empty half hours keep their compact height. An
+  unusable setting falls back rather than flattening the day.
+
 ### Fixed — settings saves that could not happen were reported as done
 
 - Every **Save** button on the Settings screen now reports a write that was
@@ -44,7 +77,8 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Work the grid can no longer hold is shown, never dropped.** A block whose
   box is past a Day End you have moved earlier, whose length now runs off the
   end of the day, or that lunch has since moved onto, appears in an **Outside
-  the day** group under the grid; dragging it onto a box puts it back. Days
+  the day** group beneath the item list, in the left column; dragging it onto
+  a box puts it back. Days
   planned in an older version are mapped onto the grid the first time they are
   opened: a readable start time goes on the box that time names **or nowhere**,
   never slid to the nearest free box. That mapping cannot be undone, so it

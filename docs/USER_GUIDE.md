@@ -297,6 +297,10 @@ Header:
   one number would have to be wrong about one of them.
 
 Items pane (left):
+- **Column width** — What: The items column is a fixed width, set by *Plan
+  items column width (px)* in Settings > Appearance. Why: it holds titles,
+  and the day beside it is what the rest of the window is for. Widening the
+  window widens the day, not the list.
 - **Items starting \<date\>** — What: Open items whose start date is that date,
   highest priority score first. Why: These are the only items the day is built
   from. Each row shows the priority score, the block length it would get, its
@@ -355,6 +359,19 @@ Day pane (right):
   fitting — and the status line names that refusal, not the clamp. Why: past a
   day the app can no longer write an end time that is the start plus the
   length, so the block would be drawn claiming minutes it does not own.
+- **What a task in a box shows** — What: A coloured bar in its priority band,
+  the task's title, a three-bar depth stack, and its length in minutes. The task
+  is also shaded in its priority band, so the day reads as a column of
+  priorities without having to look at the bars. Padding — a Buffer or a Break —
+  is left unshaded and keeps its neutral bar, because it has no priority to
+  show. A continuation box (the second and later boxes of a longer task) is left
+  unshaded too, so it does not read as a second task of equal weight. Why: a box
+  that showed only the bar was the state this screen shipped in; the title is
+  what tells you which task the half hour is spent on.
+- **Task height and title width** — What: Both come from Settings ▸ Appearance:
+  a task is as tall as *Drag Schedule box height (px)* and its title column is
+  as wide as the Drag Schedule title column. Why: a task is the same size and
+  the same shape on the two screens that draw one.
 - **Lunch** — What: A box like any other, labelled `Lunch`, that takes no tasks.
   Why: It is part of the day's shape, so it is drawn in its place rather than as
   a gap you have to infer. A drop on it is refused with *That would run into
@@ -365,12 +382,13 @@ Day pane (right):
   is not on a box yet says *That block is not on a box yet — drag it onto a half
   hour first*. Why: Nothing is written, nothing is moved, and you are told what
   stopped it, in the screen's own words rather than the database's.
-- **Outside the day** — What: A group under the grid, headed *Outside the day
-  (n) — drag onto a box to place*, holding any block the grid can no longer
-  hold: one whose box is past a Day End you have moved earlier, one whose length
-  now runs off the end, or one lunch has since moved onto. Why: planned work is
-  never dropped silently. It stays on screen, and dragging it onto a box puts it
-  back.
+- **Outside the day** — What: A group beneath the item list in the left
+  column, headed *Outside the day (n) — drag onto a box to place*, holding any
+  block the grid can no longer hold: one whose box is past a Day End you have
+  moved earlier, one whose length now runs off the end, or one lunch has since
+  moved onto. Why: planned work is never dropped silently. It stays on screen,
+  and dragging it onto a box puts it back — the same move, from the same
+  column, as an item above it.
 
 Day Settings modal:
 - **Day Start** — What: The time of the first box. Why: A block remembers
@@ -523,7 +541,8 @@ Date Increment Settings:
 - **First day of week (VSP)** — What: Sets week start day for APE Period week generation. Why: Keep weekly planning aligned with your calendar.
 - **Drag Schedule date text color** — What: Hex color for date-box text (default `#FFFFFF`). Why: Improve readability across box colors.
   - Includes **Pick Color** button for visual selection.
-- **Drag Schedule box height (px)** — What: Controls the height of all Drag Schedule date/future boxes. Why: Match readability and spacing preferences.
+- **Drag Schedule box height (px)** — What: Controls the height of all Drag Schedule date/future boxes, and, since 2026-11-06, the height of each task in a Plan half-hour box. Why: Match readability and spacing preferences, and keep a task the same size on both screens. A larger value makes the Plan tasks easier to read but makes the day scroll; empty half hours keep their compact height whatever this is set to. A blank, zero or non-numeric value falls back to 30 for the Plan boxes rather than flattening them.
+- **Plan items column width (px)** — What: Width of the items column on the Plan screen (default 260). Why: Size it to the titles you actually have; the day column takes the rest of the window. A blank, zero or non-numeric value falls back to 260 rather than hiding the list.
 - **Completion Badge** — What: Optional image shown on completed Today items. Why: Replace the default large green check mark with your preferred badge.
 - **Confetti Every N Completions** — What: Controls how often confetti triggers on Today completions. Why: Tune or disable celebration feedback.
 

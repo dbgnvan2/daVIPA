@@ -128,7 +128,9 @@ as four different bugs (the lesson `DAY_TOO_FULL` already taught this batch).
 ### TG-M3 — Blocks the grid cannot hold
 A day whose Day End moved earlier can hold blocks that no longer have a slot.
 They are **returned and flagged, never dropped** (P2). The pane draws them in
-an "outside the day" group under the grid with the reason.
+an "outside the day" group beneath the item list in the left column, with
+the reason. (It was under the grid until 2026-11-06; it moved so a block is
+dragged from the same column every other draggable thing is dragged from.)
 
 ---
 
