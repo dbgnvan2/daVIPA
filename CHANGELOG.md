@@ -31,11 +31,18 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the day** group under the grid; dragging it onto a box puts it back. Days
   planned in an older version are mapped onto the grid the first time they are
   opened: a readable start time goes on the box that time names **or nowhere**,
-  never slid to the nearest free box.
+  never slid to the nearest free box. That mapping cannot be undone, so it
+  reports how many blocks it placed **and the Day Start it placed them
+  against** — and if your settings file exists but cannot be read, it does not
+  run at all: the blocks wait under *Outside the day* rather than being written
+  permanently against a day shape the app only guessed at.
 - **Every refusal says which refusal it is**: outside the day, running into
-  lunch, or that half hour already full. Nothing is written and nothing moves.
-  A release in the day column but on no box creates nothing and says so — the
-  app does not pick an hour for you.
+  lunch, that half hour already full, or — choosing a length for a block that
+  is not on a box yet — *that block is not on a box yet*. Nothing is written
+  and nothing moves. A release in the day column but on no box creates nothing
+  and says so, for a task being moved as well as an item being added — the app
+  does not pick an hour for you, and a gesture that did nothing silently would
+  look exactly like one that missed.
 - **Day Settings for the Plan screen** (⚙ in the Plan header): day start, lunch
   start and length, day end, and seven checkboxes for the weekdays that accept
   blocks. A drop onto a day that is not checked is refused with the reason. A
@@ -43,8 +50,10 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Blocks are readable before they are read.** The stripe down a task's left
   is its item's priority band, and depth is drawn as a three-bar stack (deep 3,
   medium 2, shallow 1, unset 1). The later boxes of a longer task are greyed,
-  marked `↳`, and labelled `same task` or `15m spare`, and carry no drag and no
-  menu — the box a task starts in is the one that owns it. A dropped item's
+  marked `↳`, and carry no drag and no menu — the box a task starts in is the
+  one that owns it. Each continuation reads `same task`, except the last, which
+  reads what the task leaves of it (`15m spare`): only the final box can have
+  minutes to spare, and a middle box is spent in full. A dropped item's
   block takes the item's Work Block value as its length when it has one,
   otherwise 30 minutes.
 - **The day summary reports three numbers, not one**: boxes used, time

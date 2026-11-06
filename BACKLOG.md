@@ -1,6 +1,6 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-05 (the grid rebuild's deferrals added; the time-block rebuild's deferrals, its sweep findings, and the four from the re-sweep of its own fix commits remain, two of them changed by the grid; the five from the timer-endings batch remain cleared, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-05 (the grid rebuild's deferrals, plus the six below-medium findings from its pre-push sweep; the time-block rebuild's deferrals, its sweep findings, and the four from the re-sweep of its own fix commits remain, two of them changed by the grid; the five from the timer-endings batch remain cleared, and older sections from 08-24 and earlier remain)
 
 ## Deferred from the time-block rebuild (2026-11-05)
 
@@ -27,6 +27,53 @@ new unreviewed surface and none of these is above low severity.
   worth doing:* a drag within a day now moves a block between boxes, so this is
   the only gesture a user would reasonably expect and not find.
 
+## Below medium, from the grid rebuild's pre-push sweep (2026-11-05)
+
+Severity-rated before any fix was written. The sweep ran `learning-qa`, a cold
+`/code-review` and a cold `/security-review`; everything medium and above was
+fixed in the same session with a test, each proved by mutation. These are the
+rest, left alone deliberately: a fix commit is the least-reviewed code in a
+change, and a cosmetic fix buys none of the safety it costs.
+
+- **The day summary's box denominator counts lunch** (`plan.py:458`,
+  `learning-qa`, low). `f"{slots_used} of {len(slots)} boxes"` uses the whole
+  grid, but lunch boxes take no tasks, so a completely full default day reads
+  *16 of 18 boxes* and can never reach 18. It is a capacity claim that
+  overstates capacity by the lunch length. Fix: divide by the placeable boxes,
+  or say "16 of 16 workable boxes (2 lunch)".
+- **`clear_hover_target` restores the border width but not its colour**
+  (`plan.py:881`, `/code-review`, low). `update_hover_target` sets
+  `border_width` and `border_color`; the clear path puts only the width back.
+  Release a drag over the sidebar or the items pane and no redraw follows, so
+  the last-hovered box keeps the hover colour at 1px for the rest of the
+  session — the "subtly different from its neighbours" outcome the docstring
+  says the method exists to prevent. Low: a successful drop hides it, because
+  `load_blocks` rebuilds the frames.
+- **`block_item`'s no-box branch has no UI caller** (`plan.py:518`,
+  `/code-review`, low). Every drop names the box under the pointer, so
+  `slot_index=None` is reached only by tests and by the API shape it shares
+  with `add_padding_block`. The docstring claiming an item-row double-click
+  used it was wrong and is now corrected — there has never been such a
+  binding. Decide one way or the other: add the double-click (a plain click on
+  an item row currently does nothing and says nothing) or delete the branch.
+- **`_next_block_position` and `_next_position_in_slot` do not say which is
+  which** (`db_manager.py:1321` and `:1397`, `learning-qa`, low). One counts
+  day-wide, the other per-box, for a single column that now means both things
+  depending on whether `slot_index` is NULL. Traced and coherent — the
+  day-wide counter only ever applies to blocks with no box, where a per-box
+  counter has no meaning, and `test_a_new_block_with_no_box_is_ordered_but_not_placed`
+  pins it — so this is a naming hazard for the next reader, not a defect.
+- **`sort_blocks_by_slot` uses a bare `10**6` sentinel for "unplaced"**
+  (`time_block_layout.py:708`, `learning-qa`, low). A named constant would say
+  what it is (P4).
+- **`test_bad_lunch_length_falls_back_or_clamps` asserts only `>= 0`**
+  (`tests/test_time_block_layout.py:322`, `learning-qa`, low). For three
+  different bad inputs it cannot distinguish the fallback-to-60 case from the
+  clamp-to-0 case its own name offers as the alternative. It is still
+  mutation-killable — removing `max(0, ...)` turns `-10` red — so it is not a
+  dead guard, just a loose one (P29 family). **Pre-existing, not introduced by
+  this batch.**
+
 ## Deferred from the grid rebuild (2026-11-05)
 
 - **Four tasks to a box is a constant nobody is told about.**
@@ -47,6 +94,16 @@ new unreviewed surface and none of these is above low severity.
   *drag onto a box to place*. Correct, and it is the surfacing P2 asks for — but
   the user has to work out for themselves that shortening it may be what is
   needed. Low: a one-line hint naming the reason per block would close it.
+- **A clamped Work Block is no longer reported.** `block_item` used to say
+  *Blocked 1440m for X (Work Block of 5000m is longer than a day)*. The grid
+  rewrite dropped that branch **and** its test
+  (`test_a_capped_work_block_is_reported_not_quietly_applied`), and the
+  retirement table lists neither — found by this batch's own pre-push sweep,
+  not foreseen in the plan. Low rather than medium because the case is now
+  nearly unreachable: 1440 minutes needs 48 boxes, so in any day shorter than
+  a full 24 hours the drop is refused for not fitting and the user is told
+  that. It survives only in a 00:00–24:00 day, where the block is placed at
+  1440 with nothing said about the 5000 that was asked for.
 
 ### From the pre-push review sweeps on this batch
 
@@ -55,14 +112,17 @@ fixed in the same session with a test; these are the rest. Each names the pass
 that found it — `/code-review` for correctness, `learning-qa` for the
 failure-pattern catalogue.
 
-- **`total_planned_minutes` and `pack_day` disagree about an unusable length**
-  (`src/getmoredone/time_block_layout.py`, `/code-review`, low). The summary
-  arithmetic and the packer fall back differently for a block whose
-  `planned_minutes` is zero or unparseable, so a day holding one would show a
-  planned total that does not match the blocks drawn in it. Low: nothing in the
-  app can create such a block — it takes a hand-edited row — and the next
-  repack corrects the drawing. Worth making the fallback one function both
-  call.
+- **`total_planned_minutes` and the grid disagree about an unusable length**
+  (`src/getmoredone/time_block_layout.py`, `/code-review`, low). *Rewritten
+  2026-11-05: the second party was `pack_day`, which the grid deleted.* The
+  summary arithmetic falls back to **0** for a block whose `planned_minutes` is
+  zero or unparseable, while `slots_for_minutes` falls back to
+  `FALLBACK_BLOCK_MINUTES` and gives it a box. The day summary now prints both
+  numbers side by side, so such a block is counted in *occupied* and missing
+  from *planned* — the disagreement is on screen rather than inferred. Low:
+  nothing in the app can create one, it takes a hand-edited row. Note the old
+  mitigation ("the next repack corrects the drawing") is gone with the packer —
+  nothing repacks. Worth making the fallback one function both call.
 - **`db_manager` commits unconditionally in places** (`/code-review`, low).
   Some writers call `commit()` rather than taking `commit=False` and deferring
   to `transaction()`. Pre-existing and untouched by this batch; the four screen
@@ -120,36 +180,33 @@ most anchored state — so the fixes above were themselves swept. That pass
 returned no high-severity finding, three mediums (all fixed with tests), and
 these four. Each was severity-rated before any fix was written.
 
-- **A rolled-back write says nothing unless it was the day-too-full one**
-  (`src/getmoredone/screens/plan.py`, low). The four write paths catch
-  `DayTooFullError` and report it, but any other exception inside those
+- **A rolled-back write says nothing unless it was a slot refusal**
+  (`src/getmoredone/screens/plan.py`, low). *Rewritten 2026-11-05:
+  `DayTooFullError` is gone; the four write paths now catch `SlotRefusedError`,
+  two of them `ValueError` as well.* Any other exception inside those
   transactions rolls the write back and propagates into Tk's callback
   machinery. Nothing in the app installs `report_callback_exception`
-  (verified: no occurrence anywhere in `src/`), so the traceback goes to
-  stderr and the user sees a click that did nothing and said nothing. Low
-  because no other exception class is reachable through those paths today;
-  the fix is one default handler for the whole app, not four more `except`
-  clauses, which is why it is not a line.
-- **The settings file is written before the days are re-timed**
-  (`plan_settings_dialog.py:185` then `:188`, low). `save()` writes the file,
-  then `on_saved` re-times every day. A repack refusal therefore leaves the
-  file holding a day shape the stored days do not have. The refusal path says
-  so in as many words, which is why this is low rather than medium — but the
-  honest fix is to re-time first and write the file only if that succeeded.
-- **`set_block_minutes` has no ceiling of its own** (`plan.py`, low, latent).
-  Both of its callers bound their input — the dialog refuses over 1440, and
-  the day-level guard now refuses a day that cannot be written — so the
-  day-level check subsumes it. A third caller that passed an unbounded number
-  would not be stopped by anything in the method itself.
-- **`add_padding_block`'s capped-default report cannot fire** (`plan.py:445`,
-  low). It recomputes `requested` with the same
-  `default_minutes_for_block_type` call that produced `minutes`, and that
-  helper clamps, so `requested > minutes` is never true and the warning branch
-  is dead. The `block_item` sibling reads the raw `item.work_block` and does
-  report, which is the tested one. Reachable only via a hand-edited
-  `default_time_block_minutes` (no screen writes that field), and the clamp
-  itself is correct — only the explanation is missing. Fix: read the raw
-  setting before clamping, as `block_item` does.
+  (re-verified 2026-11-05: still no occurrence anywhere in `src/`), so the
+  traceback goes to stderr and the user sees a click that did nothing and said
+  nothing. Low because no other exception class is reachable through those
+  paths today; the fix is one default handler for the whole app, not more
+  `except` clauses, which is why it is not a line.
+- ~~**The settings file is written before the days are re-timed**~~
+  **Resolved by the grid rebuild (2026-11-05).** `save()` still writes the file
+  before `on_saved` runs, but `on_settings_saved` now writes nothing: a block's
+  box is stored relative to Day Start, so there is no re-timing left to refuse
+  and no stored day that can disagree with the file.
+- ~~**`set_block_minutes` has no ceiling of its own**~~ **Resolved by the grid
+  rebuild (2026-11-05).** The ceiling no longer depends on the caller:
+  `db_manager.set_block_length` calls `clamp_block_minutes` itself before it
+  writes, so a third caller passing an unbounded number is clamped at the
+  write. (The day-level guard this entry credited is gone — the grid is bounded
+  by Day End, so a day that cannot be written is unreachable.)
+- ~~**`add_padding_block`'s capped-default report cannot fire**~~ **Resolved
+  by the grid rebuild (2026-11-05), by deletion.** The dead
+  `requested > minutes` branch is gone from `add_padding_block`. Its
+  `block_item` sibling's report — the one that did fire — went with it, which
+  is the new entry under the grid rebuild's deferrals above.
 
 ### Adjacent, found while proving the fixes above (2026-11-05)
 

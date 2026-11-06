@@ -15,7 +15,7 @@ A comprehensive Python task management application with GUI interface and SQLite
 🌳 **Hierarchical View** - Visual tree structure showing all parent-child relationships with indentation
 ⚙️ **Intelligent Defaults** - System-wide and per-client default settings with date offsets
 📊 **Time Tracking** - Track planned vs actual time with work logs and productivity insights
-🗓️ **Time Blocks** - Drag the day's items into an ordered column of blocks; clock times are derived from the order, each block's length and your day settings
+🗓️ **Time Blocks** - Drag the day's items onto a grid of half-hour boxes; a block stores which box it sits in, counted from your day start, so the clock times follow from the box and changing the day start re-times every planned day
 📈 **Statistics** - Analyze planned vs actual time with insights by effort-cost and category
 🔄 **Reschedule History** - Never lose track of why dates changed
 📆 **Google Calendar Integration** - Create calendar events directly from action items with automatic linking
@@ -143,8 +143,8 @@ daVIPA/
 │           ├── upcoming.py     # Next N days view
 │           ├── all_items.py    # Complete item list
 │           ├── hierarchical.py # Parent-child tree view
-│           ├── plan.py         # Time block planner (drag, reorder, day settings)
-│           ├── plan_blocks.py  # The item row and block row widgets
+│           ├── plan.py         # Time block planner (the half-hour grid, drag, day settings)
+│           ├── plan_blocks.py  # The item row, the slot row and the task chip widgets
 │           ├── plan_settings_dialog.py # Day Settings modal
 │           ├── completed.py    # Completed items
 │           ├── timer_window.py # Action timer (floating window)
@@ -475,11 +475,13 @@ python3 tools/diagnose_google_auth.py
 2. Go to **Plan** screen and pick the date
 3. Set the shape of the day once under **⚙ Day Settings** (day start, lunch,
    day end, which weekdays accept blocks)
-4. Drag items from the left onto the day to create blocks; add **+ Break** or
-   **+ Buffer** for padding
-5. Drag blocks up and down to order the day — the clock times follow the order
-6. Right-click a block to set its length (default 30 minutes, or the item's
-   Work Block value if it has one)
+4. Drag items from the left onto the half-hour box you want them in; **+ Break**
+   and **+ Buffer** put padding in the first box that will hold it
+5. Drag a task to another box to move it. Gaps are a legitimate day — nothing
+   slides up to close one
+6. Right-click a task to set its length (default 30 minutes, or the item's
+   Work Block value if it has one). Lengths round up to whole boxes: 45 minutes
+   takes two, keeps its own 45, and the second box reads `15m spare`
 
 ### Tracking Progress
 
@@ -525,7 +527,9 @@ GETMOREDONE_NO_MAPPED_WINDOWS=1 pytest
   - **action_items** - Tasks with parent_id for hierarchical relationships, is_meeting flag, and meeting_start_time
   - **contacts** - Clients/contacts with name, type, email, phone, notes
   - **defaults** - System and per-contact default settings
-  - **time_blocks** - Time block planning (`block_type`, `position`: order is stored, times are derived)
+  - **time_blocks** - Time block planning (`block_type`; `slot_index`: which
+    half-hour box, counted from day start, `NULL` when never placed;
+    `position`: order within that one box; clock times derived on read)
   - **work_logs** - Time tracking
   - **reschedule_history** - Change audit trail
   - **item_links** - Attachments and references (including google_calendar links)

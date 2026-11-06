@@ -211,11 +211,17 @@ how the 45/60 question becomes a lie: **boxes used**, **time occupied** (boxes
 | `lunch_window`, `build_lunch_band` | Lunch is a marked box in the grid, drawn like any other box. The separate band between rows has nothing to sit between. |
 | `build_block_row` | Replaced by `build_slot_row`: the pane's unit of drawing is a half hour, not a block. |
 | `sort_blocks_by_slot` kept, `sort_blocks` gone | The ordering survives the model change; what it orders by does not. |
+| `block_item`'s clamped-Work-Block report, and its test | **Not deliberate — found by this batch's own pre-push sweep, after the table above was written.** A Work Block over 1440 was clamped and the status line said so. The grid refuses a 1440-minute block in any day shorter than 24 hours, so the report is nearly unreachable rather than wrong, which is why it is low and recorded in `BACKLOG.md` rather than restored. It is in this table because a deleted user-facing report belongs in it, deliberate or not. |
 
 **This list is wider than the three rows the plan was approved with.** The
-first three were the retirements the grid was expected to force; the rest were
-found during the build, when the grid made them unreachable. They are recorded
-here rather than noticed in a diff.
+first three were the retirements the grid was expected to force; the next six
+were found during the build, when the grid made them unreachable. They are
+recorded here rather than noticed in a diff.
+
+**The last row is different, and is not a credit to this process.** It was
+found by the pre-push sweep, not by the build — a user-facing report and its
+test were deleted without either appearing here, which is the exact omission
+the rest of this table exists to prevent. It is written up as found.
 
 These are removals of code that is correct and tested. **Dead guards left in
 place are the thing this repo's own checklist (P27) warns about**, so they go,

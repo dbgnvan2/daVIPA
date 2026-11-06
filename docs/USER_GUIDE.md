@@ -321,12 +321,20 @@ Day pane (right):
   length in minutes. Why: The box tells you the time; the chip tells you the
   task.
 - **A task that runs through a box** — What: The later boxes of a longer task
-  show it greyed, marked with `↳`, and labelled `same task` or `15m spare`. Why:
-  Drawn plainly it would read as a second copy of the task; left blank the box
-  would read as free. Neither is true.
+  show it greyed and marked with `↳`. Each reads `same task`, except the final
+  one, which reads how many minutes of itself the task leaves — `15m spare` for
+  a 45-minute task in two boxes. Why: Drawn plainly a continuation would read as
+  a second copy of the task; left blank the box would read as free. Neither is
+  true. Only the last box can have minutes left over, so only the last box
+  claims any: a middle box is spent in full.
 - **Colour** — What: The stripe down the left of a task is its item's priority
   band: critical, high, medium, low, or grey for unscored. Why: The shape of
   the day is readable before any of the text is.
+- **Release a task in the day column but not on a box** — What: Nothing moves,
+  and the status line says *Drop a block on a half-hour box*. Why: The same
+  reason as for an item: a release over the heading, the summary or the
+  *Outside the day* group is not a choice of time. A move that did nothing and
+  said nothing would look exactly like a drag that missed.
 - **Drag a task to another box** — What: Moves it there. Why: This is how you
   re-time one piece of work. Nothing else in the day moves. A drag that lands
   on no box is a cancelled drag and changes nothing.
@@ -340,19 +348,23 @@ Day pane (right):
   A length is refused if it would not fit from where the task sits — the task is
   never slid somewhere it does fit, because that would answer a question you did
   not ask.
-- **Block lengths stop at a day** — What: 1440 minutes is the longest block.
-  A custom length above it is refused in the dialog; an item whose Work Block is
-  above it is blocked at 1440 and the status line says so. Why: past a day the
-  app can no longer write an end time that is the start plus the length, so the
-  block would be drawn claiming minutes it does not own.
+- **Block lengths stop at a day** — What: 1440 minutes is the longest block
+  the app will store. A custom length above it is refused in the dialog. An
+  item whose Work Block is above it is clamped to 1440, which needs 48 boxes,
+  so unless your day is a full 24 hours the drop is then refused for not
+  fitting — and the status line names that refusal, not the clamp. Why: past a
+  day the app can no longer write an end time that is the start plus the
+  length, so the block would be drawn claiming minutes it does not own.
 - **Lunch** — What: A box like any other, labelled `Lunch`, that takes no tasks.
   Why: It is part of the day's shape, so it is drawn in its place rather than as
   a gap you have to infer. A drop on it is refused with *That would run into
   lunch — try a later box*.
 - **A refusal always says which** — What: One of *That is outside the day — Day
   Settings sets its hours*, *That would run into lunch — try a later box*, or
-  *That half hour is full — try another box*. Why: Nothing is written, nothing
-  is moved, and you are told what stopped it.
+  *That half hour is full — try another box*. Choosing a length for a block that
+  is not on a box yet says *That block is not on a box yet — drag it onto a half
+  hour first*. Why: Nothing is written, nothing is moved, and you are told what
+  stopped it, in the screen's own words rather than the database's.
 - **Outside the day** — What: A group under the grid, headed *Outside the day
   (n) — drag onto a box to place*, holding any block the grid can no longer
   hold: one whose box is past a Day End you have moved earlier, one whose length
@@ -391,6 +403,17 @@ or — if that box is past your Day End, before your Day Start, in lunch, or
 already full — nowhere, and it appears under **Outside the day** for you to
 place. It is never slid to the nearest free box, because that would move your
 work to an hour you never picked.
+
+The status line says how many blocks were placed **and which Day Start they were
+placed against**, because that mapping cannot be undone: a box is stored
+relative to Day Start, so the Day Start in force at that first open is the one
+the day keeps. Set your day's shape before opening an upgraded day, or expect to
+drag.
+
+If your settings file exists but cannot be read, the mapping does **not** run.
+The blocks stay off the grid, appear under **Outside the day**, and the status
+line says the settings could not be read — rather than being placed permanently
+against a Day Start the app only guessed at.
 
 ### Completed
 - What: Shows completed items over the last N days.
