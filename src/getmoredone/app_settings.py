@@ -185,12 +185,16 @@ class AppSettings:
         destroy the only copy of the one they had, including the fields no
         screen in the app can re-enter by hand.
 
-        A successful write **clears the flag**, because it is what makes it
-        false: the file now holds exactly these values, so the next load reads
-        them back and reports nothing. Leaving it set would make the same
-        values untrusted now and trusted after a restart, and would leave
-        adoption blocked with no way out but relaunching the app (P6 -- a
-        status field reconciled against the artifact it describes).
+        **A successful write does not clear the flag**, and that is not an
+        oversight. Writing the file makes it parseable; it does not make these
+        values the user's. Every settings screen loads its own ``AppSettings``
+        and saves the whole object, and ``screens/settings.py`` then replaces
+        ``app.settings`` with its copy -- so clearing the flag here would mean
+        that changing the *theme* on a corrupt settings file re-enabled the
+        Plan screen's adoption against a day start nobody chose, and did it in
+        the same session. The flag is cleared by the one surface that shows the
+        user the day's shape and takes their confirmation of it: the Day
+        Settings dialog.
 
         The return value is new and additive: callers that ignore it behave as
         before, and the ones that report success to the user should not.
@@ -221,12 +225,22 @@ class AppSettings:
             kept = settings_path.with_name(f"{settings_path.name}.unreadable-{stamp}")
             try:
                 shutil.copy2(settings_path, kept)
-                print(f"Kept the unreadable settings file at {kept}")
             except Exception as e:
-                # The backup failing is not a reason to leave the user with a
-                # settings file the app cannot read, but it is a reason to say
-                # so rather than overwrite quietly.
+                # Refusing to write is the lesser failure. This file is the only
+                # copy of whatever could not be read out of it, and this method
+                # replaces every value in it -- so overwriting after a failed
+                # copy destroys the one thing the copy exists to keep, and the
+                # caller would be told the settings were saved.
                 print(f"Could not keep the unreadable settings file: {e}")
+                return False
+            try:
+                # Outside the copy's ``try`` on purpose. A print that fails --
+                # a packaged app with a closed stdout, a full disk -- must not
+                # be read as a copy that failed, and must not escape a method
+                # whose callers have no handler.
+                print(f"Kept the unreadable settings file at {kept}")
+            except Exception:
+                pass
 
         try:
             with open(settings_path, 'w') as f:
@@ -235,7 +249,6 @@ class AppSettings:
             print(f"Error saving settings: {e}")
             return False
 
-        self.settings_unreadable = False
         return True
 
     def _normalize_plan_day_settings(self) -> None:

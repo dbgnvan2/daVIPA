@@ -180,16 +180,30 @@ class PlanSettingsDialog(ctk.CTkToplevel):
             self.error_label.configure(text=str(exc))
             return
 
+        previous = {field: getattr(self.settings, field) for field in values}
         for field, value in values.items():
             setattr(self.settings, field, value)
         if not self.settings.save():
             # Said here rather than swallowed: ``on_saved`` reports "Day
             # settings saved" to the user, and the day it would then draw is
             # one that exists only in memory.
+            #
+            # And put back: this is the app-wide settings object, Cancel does
+            # not restore it, and the Plan screen is rebuilt from it on every
+            # navigation -- so leaving the new values on it would draw and time
+            # the day against bounds that exist nowhere on disk.
+            for field, value in previous.items():
+                setattr(self.settings, field, value)
             self.error_label.configure(
                 text="Could not write the settings file — see the log"
             )
             return
+
+        # Cleared here and not in ``save``: this is the one surface that shows
+        # the user the day's four times and seven weekday boxes and takes their
+        # confirmation of them, so it is the only place the day's shape stops
+        # being a stand-in for settings nobody could read.
+        self.settings.settings_unreadable = False
 
         if self.on_saved:
             self.on_saved(DayBounds.from_settings(self.settings))
