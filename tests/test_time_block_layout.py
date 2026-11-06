@@ -16,8 +16,11 @@ from src.getmoredone.models import ActionItem, BlockType, TimeBlock
 from src.getmoredone.time_block_layout import (
     DEFAULT_DAY_START,
     FALLBACK_BLOCK_MINUTES,
+    MIN_BLOCK_HEIGHT_PX,
+    PIXELS_PER_MINUTE,
     DayBounds,
     TimeFormatError,
+    block_height,
     default_minutes_for_block_type,
     depth_bars,
     duration_for_item,
@@ -512,3 +515,38 @@ def test_bad_lunch_length_falls_back_or_clamps(bad):
     bounds = DayBounds(lunch_minutes=bad)
 
     assert bounds.lunch_length >= 0
+
+
+def test_block_height_is_proportional_to_minutes():
+    """A 90 is three times a 30, exactly, so the day reads as a bar chart.
+
+    Asserted as a ratio and not just as pixel values: the constant may be
+    retuned, and what must survive the retune is that a block twice as long is
+    twice as tall.
+    """
+    assert block_height(90) == 3 * block_height(30)
+    assert block_height(60) == 2 * block_height(30)
+    assert block_height(30) == round(30 * PIXELS_PER_MINUTE)
+
+
+def test_a_very_short_block_stops_shrinking_at_the_floor():
+    """Proportionality is given up below the floor, on purpose.
+
+    A 5-minute block at the raw rate would be 6 pixels tall -- too small to
+    read or right-click, so a user could create a block they then could not
+    resize or delete.
+    """
+    assert block_height(5) == MIN_BLOCK_HEIGHT_PX
+    assert block_height(1) == MIN_BLOCK_HEIGHT_PX
+    # The floor must not be so high that it flattens a real length.
+    assert block_height(FALLBACK_BLOCK_MINUTES) > MIN_BLOCK_HEIGHT_PX
+
+
+@pytest.mark.parametrize("minutes", [None, 0, -30, "nonsense"])
+def test_an_unusable_length_falls_back_rather_than_vanishing(minutes):
+    """A block with no readable length still gets a visible, clickable row.
+
+    Zero or None would otherwise render a frame of no height: the block is in
+    the database, the user cannot see it, and the day's times no longer add up.
+    """
+    assert block_height(minutes) == block_height(FALLBACK_BLOCK_MINUTES)
