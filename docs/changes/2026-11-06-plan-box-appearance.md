@@ -379,3 +379,23 @@ that is the budget's deliberate stopping point, not an oversight.
 - The box-height round trip was walked in the demo before the alias fix. The
   behaviour it showed is unchanged and tested, but the refusal path has never
   been seen on screen — it needs an unparseable settings file to produce.
+
+### Superseded in part by PD-M1 (same day, `docs/changes/2026-11-06-plan-day-controls.md`)
+
+Read this note with two of its claims amended:
+
+- **PB-M6.3 is superseded by PD-M1.2.** The length no longer sits under the
+  depth bars. A day box writes it beside them, at the right-hand end of the
+  task's one line, and the item row now does the same. PB-M6.3 mirrored a box's
+  facts without mirroring its layout, and on screen the left pane still read as
+  a different kind of thing from the right -- which is what the user asked
+  PD-M1 to fix. `::test_pbm63_the_work_block_length_is_under_the_depth_bars` is
+  replaced by `::test_pdm12_the_length_sits_beside_the_depth_bars`.
+- **The floor is 66, and the exact match with the day starts at 62.** 67 and 63
+  were right for the row described here, where the `{minutes}m` label's 6px
+  bottom pad was the larger of the second row's two. PD-M1 moved that label up
+  onto the title's line, so the second row is the `already blocked` marker and
+  its 5px. The number is measured by
+  `::test_pbm61_the_floor_is_what_the_rows_own_grid_asks_for`, which is why this
+  showed up as a failing measurement rather than as a constant quietly one
+  pixel out -- the same test this batch added for the same reason.

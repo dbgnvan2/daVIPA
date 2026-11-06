@@ -61,6 +61,12 @@ STRIPE_MIN_HEIGHT_PX = 12
 #: unusable setting resolves to.
 SLOT_CHIP_HEIGHT_PX = 30
 
+#: What a task's title column asks for, in a box and in an item row alike: one
+#: width across the two panes is what makes their columns line up. The fallback
+#: only -- PB-M5 takes the live value from
+#: ``AppSettings.drag_schedule_title_col_width``.
+SLOT_TITLE_WIDTH_PX = 80
+
 #: The vertical gap between two consecutive boxes of the day: ``build_slot_row``
 #: grids each box ``pady=1``, so one box's bottom edge and the next box's top
 #: edge are 2px apart. An item row has to add it back, or an N-box row is 2(N-1)
@@ -69,27 +75,34 @@ SLOT_ROW_GAP_PX = 2
 
 #: The least an item row may be drawn at, whatever the box height says: what
 #: its own two grid rows request. Row 0 is the title's 5px top pad and a 28px
-#: line; row 1 is a 28px line and the larger of its two bottom pads, the
-#: ``{minutes}m`` label's 6px. 33 + 34.
+#: line; row 1 is the ``already blocked`` marker's 28px line and its 5px bottom
+#: pad. 33 + 33.
 #:
-#: 66 first, from counting 5px under the second line rather than the label's 6,
-#: which left the row 1px short of its own request and lost the last pixel of
-#: bottom padding off the bottom edge. Nothing was unreadable and the geometry
-#: test still passed, because that label anchors to the top of its cell -- but
-#: this is the one number here justified purely by arithmetic, so the
-#: arithmetic has to be right.
+#: 67 under PB-M6, when the ``{minutes}m`` label sat on row 1 and its 6px
+#: bottom pad was the larger of that row's two. PD-M1 moved the length up onto
+#: the title's line, where a box writes it, so row 1 is the marker alone and
+#: the row needs a pixel less.
+#:
+#: Measured, both times, by
+#: ``test_pbm61_the_floor_is_what_the_rows_own_grid_asks_for``, which reads the
+#: requirement off the widgets the row builds. It is there because the number
+#: was first written by hand as 66 when the arithmetic said 67, and the row
+#: silently lost the last pixel of its bottom padding: nothing was unreadable
+#: and no other assertion could see it, because the labels anchor to the top of
+#: their cells. This is the one number here justified purely by arithmetic, so
+#: the arithmetic is checked rather than restated.
 #:
 #: The 30px floor on the box height was justified for a chip holding one line,
-#: and an item row holds two plus the work-block length. At 30 the day gives a
-#: half hour 34px, and a row matching it showed its title and clipped both the
-#: depth / ``already blocked`` line and the length -- the two facts the colour
-#: cannot carry, gone with no sign they were there.
+#: and an item row can hold two. At 30 the day gives a half hour 34px, and a
+#: row matching it showed its title and clipped the ``already blocked`` marker
+#: -- a scheduling fact the colour cannot carry, gone with no sign it was
+#: there.
 #:
-#: So the row and the day agree exactly from a box height of 63 up, and below
-#: that the row is the taller of the two. Between 31 and 62 the day can show a
+#: So the row and the day agree exactly from a box height of 62 up, and below
+#: that the row is the taller of the two. Between 31 and 61 the day can show a
 #: line of text in a box this row is still taller than; the floor is about what
 #: *this* row needs, not about what the day can render.
-ITEM_ROW_MIN_HEIGHT_PX = 67
+ITEM_ROW_MIN_HEIGHT_PX = 66
 
 
 def stripe_for_item(item: Optional[ActionItem]) -> str:
@@ -213,17 +226,37 @@ def build_item_row(
     work_block_minutes: int,
     *,
     box_height: int = SLOT_CHIP_HEIGHT_PX,
+    title_width: int = SLOT_TITLE_WIDTH_PX,
 ) -> ctk.CTkFrame:
     """One action item in the left pane, ready to be dragged onto the day.
 
-    Purpose: PB-M6 -- an item is drawn at the size of the space it will take
-             in the day, so the drag has nothing to guess at.
-    Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m6
-    Tests:   tests/test_plan_screen.py::test_pbm61_every_line_of_a_row_is_drawn_inside_it
+    Purpose: PD-M1 -- an item is drawn as the thing it is about to become: a
+             task in a box, at the size of the space it will take.
+    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m1
+    Tests:   tests/test_plan_screen.py::test_pdm11_the_item_row_uses_the_chips_column_order
+             tests/test_plan_screen.py::test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it
+             tests/test_plan_screen.py::test_pbm61_every_line_of_a_row_is_drawn_inside_it
 
     Returns the frame, so the caller can bind the drag handlers to it and to
     its children -- a press that lands on a label must start the same drag as
     one that lands on the frame, or half the row is dead to the mouse.
+
+    The first line is ``_build_block_chip``'s line: the same four columns in
+    the same order at the same widths -- stripe, title, depth bars, length --
+    so the two panes read as one list of tasks either side of a divider. PB-M6
+    built it as two stacked lines with the length under the bars, which
+    mirrored a box's facts without mirroring its layout, and on screen the
+    left pane still looked like a different kind of thing from the right.
+
+    ``title_width`` is passed through from the same Drag Schedule setting the
+    boxes use for it. Taken from a constant here instead, the two panes would
+    line up at the default and nowhere else.
+
+    The second line is the "already blocked" marker, and exists only when the
+    marker does: it is the one scheduling fact a box does not already show.
+    The depth word was there too until PD-M1.5 -- a fourth way of saying what
+    the row's shade, its stripe and its bar stack all say, written on the one
+    line a reader checks for something the colours cannot tell them.
 
     The height is the space the day will give those half hours, asked of
     ``slot_row_height`` rather than recomputed: one box plus the 2px gap to the
@@ -238,8 +271,8 @@ def build_item_row(
 
     Row 2 is empty and carries the weight. That is what keeps the two lines
     together at the top of a tall row instead of centring the title in the
-    slack, and it is what makes a row too short for both lines lose the detail
-    line rather than the title -- at a box height of 30 the weight was on row 0
+    slack, and it is what makes a row too short for both lines lose the marker
+    rather than the title -- at a box height of 30 the weight was on row 0
     and Tk took the whole shortfall out of it, collapsing the title to a single
     pixel and leaving a row that showed its depth and its length and not which
     item it was.
@@ -254,7 +287,13 @@ def build_item_row(
         height=item_row_height(span, box_height),
     )
     frame.grid(row=row, column=0, sticky="ew", pady=3, padx=2)
-    frame.grid_columnconfigure(1, weight=1)
+    # The chip's columns, kept in the same order and at the same widths by
+    # ``test_pdm11_the_item_row_uses_the_chips_column_order``, which reads them
+    # off a real chip rather than restating them.
+    frame.grid_columnconfigure(0, minsize=STRIPE_WIDTH_PX + 8)
+    frame.grid_columnconfigure(1, minsize=title_width, weight=1)
+    frame.grid_columnconfigure(2, minsize=22)
+    frame.grid_columnconfigure(3, minsize=48)
     frame.grid_rowconfigure(2, weight=1)
     frame.grid_propagate(False)
 
@@ -265,51 +304,38 @@ def build_item_row(
         fg_color=stripe_for_item(item),
         corner_radius=3,
     )
-    stripe.grid(row=0, column=0, rowspan=3, sticky="ns", padx=(4, 8), pady=4)
+    stripe.grid(row=0, column=0, rowspan=3, sticky="ns", padx=(0, 8), pady=4)
     stripe.grid_propagate(False)
 
     title = ctk.CTkLabel(
         frame, text=item.title, anchor="w", justify="left", text_color=on_fill
     )
-    title.grid(row=0, column=1, sticky="ew", padx=(0, 6), pady=(5, 0))
-
-    # The scheduling facts, in the words the item editor uses for them.
-    #
-    # No priority score. The band is already the shade the whole row is drawn
-    # on and the colour of its stripe, so the number was a third way of saying
-    # one thing, in the one place on the row where a reader is looking for
-    # something they cannot see. The length moved too -- it is under the depth
-    # bars now, where the day's own boxes put it.
-    details = []
-    if item.depth:
-        details.append(item.depth)
-    if already_blocked:
-        # Marked, not hidden: an item can genuinely need two blocks in a day,
-        # and removing it from the list would look like it had vanished.
-        details.append("already blocked")
-
-    subtitle = ctk.CTkLabel(
-        frame,
-        text="  ·  ".join(details),
-        anchor="w",
-        text_color=on_fill,
-        font=ctk.CTkFont(size=11),
-    )
-    subtitle.grid(row=1, column=1, sticky="ew", padx=(0, 6), pady=(0, 5))
+    title.grid(row=0, column=1, sticky="ew", pady=(5, 0))
 
     bars = DepthBarStack(frame, item.depth)
-    bars.grid(row=0, column=2, padx=(4, 10), pady=(6, 2), sticky="n")
+    bars.grid(row=0, column=2, padx=(4, 6), pady=(5, 0), sticky="n")
 
-    # Under the bars, in the words and the position a box uses for the same
-    # fact: a task in the day carries "30m" at its right edge, and this is the
-    # same task before it has been dragged there.
+    # The length, where a box writes it: the right-hand end of the task's own
+    # line. This is the same task before it has been dragged there.
     ctk.CTkLabel(
         frame,
         text=f"{work_block_minutes}m",
+        width=48,
         anchor="e",
         text_color=on_fill,
         font=ctk.CTkFont(size=11),
-    ).grid(row=1, column=2, padx=(4, 10), pady=(0, 6), sticky="ne")
+    ).grid(row=0, column=3, sticky="ne", pady=(5, 0))
+
+    if already_blocked:
+        # Marked, not hidden: an item can genuinely need two blocks in a day,
+        # and removing it from the list would look like it had vanished.
+        ctk.CTkLabel(
+            frame,
+            text="already blocked",
+            anchor="w",
+            text_color=on_fill,
+            font=ctk.CTkFont(size=11),
+        ).grid(row=1, column=1, columnspan=3, sticky="ew", pady=(0, 5))
 
     return frame
 
@@ -362,9 +388,10 @@ SLOT_MIN_HEIGHT_PX = 32
 #: default is evaluated where the function is defined.
 #: (``SLOT_CHIP_HEIGHT_PX``)
 
-#: What the chip's title column asks for. Fallback for
-#: ``AppSettings.drag_schedule_title_col_width``, the same way.
-SLOT_TITLE_WIDTH_PX = 80
+#: Defined with the stripe constants above for the reason
+#: ``SLOT_CHIP_HEIGHT_PX`` is: PD-M1 made it a default argument of
+#: ``build_item_row``, so it has to exist by the time that function is defined.
+#: (``SLOT_TITLE_WIDTH_PX``)
 
 #: PD-M6 -- the completion mark, and the column it sits in to the left of the
 #: time. A column of its own rather than a prefix on the time label: the mark

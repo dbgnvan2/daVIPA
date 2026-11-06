@@ -173,12 +173,20 @@ Starting" row.
   the height against the row's own text, and the slack sits on an empty row
   below the two text rows so a tall row keeps its lines together and a short
   one loses from the bottom.
-- **PB-M6.1 Floor.** Never below `ITEM_ROW_MIN_HEIGHT_PX = 67` -- the title's
-  28px plus its 5px top pad, and the length label's 28 plus its 6px bottom pad,
-  measured off the real widgets rather than counted. The 30px floor
-  on the box height was justified for a chip holding one line; an item row
-  holds two plus the length, and matched to a 34px box it dropped the depth /
-  `already blocked` line and the length with no sign of it.
+- **PB-M6.1 Floor.** Never below `ITEM_ROW_MIN_HEIGHT_PX` -- the title's 28px
+  plus its 5px top pad, and the second line's 28 plus its bottom pad, measured
+  off the real widgets rather than counted. The 30px floor on the box height
+  was justified for a chip holding one line; an item row holds two, and matched
+  to a 34px box it dropped the second line with no sign of it.
+
+  **67 as shipped here, 66 since PD-M1.2.** The second line's bottom pad was
+  the `{minutes}m` label's 6px while the length sat on that row; PD-M1 moved
+  the length up beside the title, leaving the `already blocked` marker's 5px.
+  The number is measured by
+  `::test_pbm61_the_floor_is_what_the_rows_own_grid_asks_for`, which is why the
+  change showed up as a failing measurement rather than as a silently wrong
+  constant. The crossover with the day moved with it: exact from a box height
+  of 62 up, not 63.
 - **PB-M6.2 The priority score comes off.** The band is already the shade the
   row is drawn on and the colour of its stripe, so the number was a third way
   of saying one thing, in the one place a reader looks for what the colour
@@ -186,6 +194,14 @@ Starting" row.
 - **PB-M6.3 The work-block length moves under the depth bars.** `30m` sits
   below the stacked lines rather than in the detail line, which puts the fact
   in the same place on an item row as on a task in a box.
+
+  **Superseded by PD-M1.2.** The intent was right and the position was not: a
+  box does not put the length under the bars, it puts it beside them at the
+  right-hand end of the task's one line. PB-M6.3 mirrored a box's *facts*
+  without mirroring its layout, and on screen the left pane still read as a
+  different kind of thing from the right -- which is what PD-M1 was asked for.
+  The length is now in column 3 on row 0, where a chip writes it. See
+  `docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m1`.
 
 **What the first version of this got wrong, found by the cold sweep over
 `2e4add9...HEAD` and measured before fixing:**
@@ -230,6 +246,9 @@ Starting" row.
   Test: `::test_pbm62_an_item_row_does_not_print_its_priority_score`
 - PB-M6.3 The length label is in the bars' column and on a later row.
   Test: `::test_pbm63_the_work_block_length_is_under_the_depth_bars`
+  **Superseded by PD-M1.2**; the test is replaced by
+  `::test_pdm12_the_length_sits_beside_the_depth_bars`, which asserts the same
+  row and the next column along.
 
 ---
 

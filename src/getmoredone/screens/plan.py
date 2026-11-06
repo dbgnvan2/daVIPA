@@ -523,6 +523,7 @@ class PlanScreen(ctk.CTkFrame):
                             item, self.bounds.default_block_minutes
                         ),
                         box_height=self.box_height(),
+                        title_width=self.box_title_width(),
                     )
                     self.bind_item_drag(frame, item)
 

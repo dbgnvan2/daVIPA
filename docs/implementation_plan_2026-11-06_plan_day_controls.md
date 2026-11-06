@@ -194,16 +194,20 @@ never in it, so a check there would be unreachable code. This criterion is
 about the Day Plan only. `_items_by_id` already fetches the item behind a block
 even when it has been completed since, which is exactly the lookup this needs.
 
-The green comes from the existing `success_strong` token in `theme.py`
-(`semantic_colors()["success"]`), never a literal.
+The green comes from the existing success token in `theme.py`, never a literal.
+
+**Corrected during the build:** `semantic_colors()` has no `"success"` key --
+it has `success_strong`, and reading `["success"]` raises `KeyError`. The token
+used is `status_text_color("success")`, which is the one `theme.py` exposes for
+exactly this.
 
 | ID | Criterion | Verified by |
 |---|---|---|
-| PD-M6.1 | A box whose task's item is completed draws a check left of the time | `tests/test_plan_screen.py::test_pdm61_a_completed_task_shows_a_check` |
+| PD-M6.1 | A box whose task's item is completed draws a check left of the time | `tests/test_plan_screen.py::test_pdm61_a_completed_task_shows_a_check_left_of_the_time` |
 | PD-M6.2 | An open task draws no check, and the row's geometry is unchanged | `::test_pdm62_an_open_task_shows_no_check` |
-| PD-M6.3 | The check uses the theme's success token, not a literal colour | `tests/test_time_block_colors.py::test_pdm63_the_check_uses_the_success_token` |
+| PD-M6.3 | The check uses the theme's success token, not a literal colour | `::test_pdm61_a_completed_task_shows_a_check_left_of_the_time`, second assertion -- the colour is a property of the rendered check, so it is asserted where the check is found, not in a second test that would have to build the same row |
 | PD-M6.4 | A continuation box of a completed task shows it too — the box is spent either way | `::test_pdm64_a_continuation_of_a_completed_task_shows_the_check` |
-| PD-M6.5 | A block whose item has been deleted draws no check and does not raise | `::test_pdm65_a_block_with_no_item_draws_no_check` |
+| PD-M6.5 | A block whose item has been deleted draws no check and does not raise | `::test_pdm65_a_block_whose_item_is_gone_draws_no_check`, `::test_pdm63_a_box_with_one_task_still_open_shows_no_check`, `::test_pdm66_a_break_in_the_box_does_not_hold_it_open` |
 
 ---
 
