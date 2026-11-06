@@ -26,13 +26,14 @@ from ..models import ActionItem, BlockType, TimeBlock
 from ..theme import button_style, semantic_colors, status_text_color
 from ..time_block_layout import (
     DURATION_CHOICES,
+    MAX_BLOCK_MINUTES,
     DayBounds,
     PackedBlock,
     default_minutes_for_block_type,
     duration_for_item,
     is_block_day,
     lunch_window,
-    move_block,
+    move_block_to_gap,
     pack_day,
     sort_blocks,
     total_planned_minutes,
@@ -225,10 +226,19 @@ class PlanScreen(ctk.CTkFrame):
         dialog.wait_window()
 
     def on_settings_saved(self, bounds: DayBounds):
-        """The day's shape changed, so every stored time on it is now stale."""
+        """The day's shape changed, so every stored time on *every* day is stale.
+
+        Not just the date on screen. Day Start, lunch and Day End are settings,
+        so they shape every planned day; a day left holding times derived from
+        bounds that no longer exist stores values that do not follow from their
+        inputs, and the first reader to trust the stored string rather than
+        re-deriving it gets the old shape of the day.
+        """
         self.bounds = bounds
-        self.db_manager.repack_day(self.selected_date, self.bounds)
+        repacked = self.db_manager.repack_all_days(self.bounds)
         self.refresh()
+        if len(repacked) > 1:
+            self.set_status(f"Day settings saved; re-timed {len(repacked)} days", "success")
 
     def load_items(self):
         grid_info = self.items_scroll.grid_info()
@@ -384,16 +394,20 @@ class PlanScreen(ctk.CTkFrame):
             return
 
         minutes = default_minutes_for_block_type(block_type, self.settings)
-        self.db_manager.create_time_block(
-            TimeBlock(
-                block_date=self.selected_date,
-                start_time="",
-                end_time="",
-                planned_minutes=minutes,
-                block_type=block_type,
+        # One transaction, as everywhere a write is followed by its repack: in
+        # between, the new row holds no times at all, and a repack that failed
+        # there would leave it that way with nothing in the day to show it.
+        with self.db_manager.transaction():
+            self.db_manager.create_time_block(
+                TimeBlock(
+                    block_date=self.selected_date,
+                    start_time="",
+                    end_time="",
+                    planned_minutes=minutes,
+                    block_type=block_type,
+                )
             )
-        )
-        self.db_manager.repack_day(self.selected_date, self.bounds)
+            self.db_manager.repack_day(self.selected_date, self.bounds)
         self.load_blocks()
         self.set_status(f"Added a {minutes}m {block_type}", "success")
 
@@ -403,20 +417,34 @@ class PlanScreen(ctk.CTkFrame):
             return
 
         minutes = duration_for_item(item, self.bounds.default_block_minutes)
-        self.db_manager.create_time_block(
-            TimeBlock(
-                block_date=self.selected_date,
-                start_time="",
-                end_time="",
-                planned_minutes=minutes,
-                item_id=item.id,
-                label=item.title,
-                block_type=BlockType.ITEM,
+        with self.db_manager.transaction():
+            self.db_manager.create_time_block(
+                TimeBlock(
+                    block_date=self.selected_date,
+                    start_time="",
+                    end_time="",
+                    planned_minutes=minutes,
+                    item_id=item.id,
+                    label=item.title,
+                    block_type=BlockType.ITEM,
+                )
             )
-        )
-        self.db_manager.repack_day(self.selected_date, self.bounds)
+            self.db_manager.repack_day(self.selected_date, self.bounds)
         self.refresh()
-        self.set_status(f"Blocked {minutes}m for {item.title}", "success")
+        try:
+            requested = int(getattr(item, "work_block", None))
+        except (TypeError, ValueError):
+            requested = 0
+        if requested > minutes:
+            # Said, not swallowed: the item asked for a length the planner
+            # cannot store, and the block it got is not the one it asked for.
+            self.set_status(
+                f"Blocked {minutes}m for {item.title}"
+                f" (Work Block of {requested}m is longer than a day)",
+                "warning",
+            )
+        else:
+            self.set_status(f"Blocked {minutes}m for {item.title}", "success")
 
     def _require_block_day(self) -> bool:
         """Refuse to write a block onto a day the user does not work.
@@ -482,8 +510,13 @@ class PlanScreen(ctk.CTkFrame):
     def set_block_minutes(self, block: TimeBlock, minutes: int):
         """Resize one block, then re-time everything after it."""
         block.planned_minutes = minutes
-        self.db_manager.update_time_block(block)
-        self.db_manager.repack_day(self.selected_date, self.bounds)
+        # One transaction. ``block`` still carries the end_time the last repack
+        # gave it, so between these two writes the row reads as a 30-minute
+        # block that claims 90 minutes, and the block after it still owns the
+        # minutes this one has just taken.
+        with self.db_manager.transaction():
+            self.db_manager.update_time_block(block)
+            self.db_manager.repack_day(self.selected_date, self.bounds)
         self.load_blocks()
         self.set_status(f"Set block to {minutes}m", "success")
 
@@ -502,11 +535,21 @@ class PlanScreen(ctk.CTkFrame):
         if minutes <= 0:
             self.set_status("Block length must be more than zero minutes", "error")
             return
+        if minutes > MAX_BLOCK_MINUTES:
+            # Refused rather than clamped: a block longer than a day would be
+            # stored with an end_time that format_hhmm had clamped, so the row
+            # would no longer say start + duration, and it would be drawn tall
+            # enough to put every block after it out of reach.
+            self.set_status(
+                f"Block length must be {MAX_BLOCK_MINUTES} minutes or less", "error"
+            )
+            return
         self.set_block_minutes(block, minutes)
 
     def delete_block(self, block_id: str):
-        self.db_manager.delete_time_block(block_id)
-        self.db_manager.repack_day(self.selected_date, self.bounds)
+        with self.db_manager.transaction():
+            self.db_manager.delete_time_block(block_id)
+            self.db_manager.repack_day(self.selected_date, self.bounds)
         self.refresh()
         self.set_status("Block deleted", "muted")
 
@@ -624,9 +667,17 @@ class PlanScreen(ctk.CTkFrame):
                 break
         return index
 
-    def reorder_to(self, block_id: str, target_index: int):
+    def reorder_to(self, block_id: str, gap_index: int):
+        """Move one block into the gap the pointer was released in.
+
+        ``gap_index`` is counted against the rendered rows, dragged block
+        included, which is the only thing the screen can measure. The
+        conversion to a list position lives in time_block_layout, because
+        getting it wrong here is invisible: it reorders *something*, just not
+        where the user let go.
+        """
         order = [bid for _frame, bid in self._block_frames]
-        new_order = move_block(order, block_id, target_index)
+        new_order = move_block_to_gap(order, block_id, gap_index)
         if new_order == order:
             return
         self.db_manager.reorder_time_blocks(self.selected_date, new_order, self.bounds)
@@ -652,4 +703,3 @@ class PlanScreen(ctk.CTkFrame):
             except tk.TclError:
                 pass
             self._drag_hover_frame = None
-        self._block_menu: Optional[tk.Menu] = None

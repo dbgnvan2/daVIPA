@@ -1410,6 +1410,30 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             entry.block.end_time = entry.end_time
         return [entry.block for entry in packed]
 
+    def repack_all_days(self, bounds) -> List[str]:
+        """Re-time every day that holds blocks, and say which ones were re-timed.
+
+        Purpose: TB-M4 -- the day bounds are a setting, not a property of the
+                 date on screen. Changing Day Start re-shapes every planned
+                 day, so leaving the others holding times derived from bounds
+                 that no longer exist stores values that do not follow from
+                 their inputs (P6).
+        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
+        Tests:   tests/test_time_block_crud.py::test_tbm4_a_settings_change_repacks_every_day
+
+        One transaction for all of them: a half-applied bounds change would
+        leave some days on the old shape and some on the new, with nothing to
+        say which, and the next repack would start from that.
+        """
+        rows = self.db.conn.execute(
+            "SELECT DISTINCT block_date FROM time_blocks ORDER BY block_date"
+        ).fetchall()
+        dates = [row[0] for row in rows if row[0]]
+        with self.transaction():
+            for block_date in dates:
+                self.repack_day(block_date, bounds)
+        return dates
+
     def reorder_time_blocks(self, block_date: str, ordered_ids: List[str], bounds) -> List[TimeBlock]:
         """Put a day's blocks in the given order and re-time them.
 

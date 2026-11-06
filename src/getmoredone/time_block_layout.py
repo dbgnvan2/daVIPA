@@ -42,6 +42,14 @@ FALLBACK_BLOCK_MINUTES = 30
 # Durations offered on the block context menu.
 DURATION_CHOICES = (15, 30, 45, 60, 90)
 
+MINUTES_PER_DAY = 24 * 60
+
+# The longest block the planner will store. A day is the natural ceiling, and
+# there has to be one: format_hhmm clamps at 99:59, so a block long enough to
+# push its end past that would be stored with an end_time that is not its start
+# plus its duration -- a row that lies about itself to every later reader.
+MAX_BLOCK_MINUTES = MINUTES_PER_DAY
+
 # Depth is stored as a word on the action item; the planner draws it as a stack
 # of three bars. An item with no depth set draws one bar -- "default depth to 1"
 # -- which is also what an unrecognised word gets, because a planner that
@@ -96,6 +104,25 @@ def parse_hhmm(value: Optional[str], *, default: Optional[str] = None) -> int:
         if default is None:
             raise TimeFormatError(f"not a HH:MM time: {value!r}") from None
         return parse_hhmm(default)
+
+
+def parse_clock_time(value: Optional[str]) -> int:
+    """Minutes past midnight for a time that has to be a time *of day*.
+
+    Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
+    Tests: tests/test_time_block_layout.py::test_a_clock_time_past_midnight_is_refused
+
+    ``parse_hhmm`` deliberately accepts an hour past 23, because ``format_hhmm``
+    writes one: a block that overruns the day gets an end_time like ``25:30``,
+    and ``sort_blocks`` has to be able to read that back. A day *bound* is a
+    different thing -- a point on one clock face. Accepting ``25:00`` as a Day
+    End puts the end of the day beyond any block's reach, so the overrun
+    warning that is Day End's only job can never fire again.
+    """
+    minutes = parse_hhmm(value)
+    if minutes >= MINUTES_PER_DAY:
+        raise TimeFormatError(f"not a time of day: {value!r}")
+    return minutes
 
 
 def format_hhmm(minutes: int) -> str:
@@ -233,11 +260,30 @@ def duration_for_item(item: Optional[ActionItem], default_minutes: int = FALLBAC
     hint, and a hint that cannot be honoured should fall back rather than
     produce a zero-length block that the user cannot see or click.
     """
-    fallback = _positive_int(default_minutes, FALLBACK_BLOCK_MINUTES)
+    fallback = clamp_block_minutes(
+        _positive_int(default_minutes, FALLBACK_BLOCK_MINUTES)
+    )
     if item is None:
         return fallback
     work_block = _positive_int(getattr(item, "work_block", None), 0)
-    return work_block or fallback
+    return clamp_block_minutes(work_block) if work_block else fallback
+
+
+def clamp_block_minutes(minutes: int) -> int:
+    """A block length brought inside the day-long ceiling.
+
+    Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m8
+    Tests: tests/test_time_block_layout.py::test_a_work_block_longer_than_a_day_is_capped
+
+    The ceiling is enforced here rather than at the one dialog that asks a
+    human for a length, because the other way in does not ask anybody: a block
+    takes its length from the item's Work Block, which the item editor accepts
+    as any typed integer. Past the ceiling ``format_hhmm`` clamps the end time,
+    so the row stops saying start + duration and starts lying about itself to
+    every later reader. Clamped rather than refused, because there is nobody to
+    refuse to at this depth -- the caller that has a user reports the change.
+    """
+    return min(_positive_int(minutes, FALLBACK_BLOCK_MINUTES), MAX_BLOCK_MINUTES)
 
 
 def _positive_int(value, fallback: int) -> int:
@@ -403,6 +449,29 @@ def move_block(order: Sequence[str], block_id: str, target_index: int) -> List[s
     return ids
 
 
+def move_block_to_gap(order: Sequence[str], block_id: str, gap_index: int) -> List[str]:
+    """The id order after dropping ``block_id`` into the gap at ``gap_index``.
+
+    Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m11
+    Tests: tests/test_time_block_layout.py::test_a_downward_drop_lands_in_the_gap_it_was_dropped_in
+
+    ``gap_index`` is counted against the list **as rendered** -- the dragged
+    block still in it -- because that is the only thing the screen can measure:
+    it compares the pointer against the midpoints of the rows actually on
+    screen. ``move_block`` counts against the list with the block already
+    removed. The two differ by one for a downward move, and passing a rendered
+    gap index straight to ``move_block`` is why every downward drag used to
+    land one place too far.
+    """
+    ids = list(order)
+    if block_id not in ids:
+        return ids
+    gap = max(0, min(int(gap_index), len(ids)))
+    if ids.index(block_id) < gap:
+        gap -= 1
+    return move_block(ids, block_id, gap)
+
+
 def total_planned_minutes(blocks: Iterable[TimeBlock]) -> int:
     """Minutes committed on a day, buffers and breaks included."""
     return sum(
@@ -447,7 +516,11 @@ def default_minutes_for_block_type(block_type: str, settings=None) -> int:
     """
     normalized = BlockType.normalize(block_type)
     if normalized == BlockType.BREAK:
-        return _positive_int(getattr(settings, "default_break_minutes", None), 5)
-    return _positive_int(
-        getattr(settings, "default_time_block_minutes", None), FALLBACK_BLOCK_MINUTES
+        return clamp_block_minutes(
+            _positive_int(getattr(settings, "default_break_minutes", None), 5)
+        )
+    return clamp_block_minutes(
+        _positive_int(
+            getattr(settings, "default_time_block_minutes", None), FALLBACK_BLOCK_MINUTES
+        )
     )

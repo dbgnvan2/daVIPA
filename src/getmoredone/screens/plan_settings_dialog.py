@@ -22,6 +22,7 @@ from ..time_block_layout import (
     TimeFormatError,
     format_hhmm,
     normalize_block_weekdays,
+    parse_clock_time,
     parse_hhmm,
     weekday_names,
 )
@@ -140,7 +141,12 @@ class PlanSettingsDialog(ctk.CTkToplevel):
         ):
             raw = entry.get().strip()
             try:
-                times[field] = format_hhmm(parse_hhmm(raw))
+                # parse_clock_time, not parse_hhmm: the lenient one accepts an
+                # hour past 23 because an overrunning block's end_time needs
+                # that, and format_hhmm would then clamp "170:0" to "99:59" --
+                # storing a value the user never typed, which this dialog
+                # exists to avoid.
+                times[field] = format_hhmm(parse_clock_time(raw))
             except TimeFormatError:
                 raise ValueError(f"{label} must be a time like 09:00") from None
 
