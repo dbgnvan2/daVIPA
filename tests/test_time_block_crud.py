@@ -503,3 +503,22 @@ def test_a_resize_keeps_a_task_where_it_is_in_its_box(manager):
 
     after = [(label, position) for label, _slot, position, _s, _e in _day(manager)]
     assert after == before, f"the resize reordered the box: {before} -> {after}"
+
+
+def test_a_drop_onto_its_own_box_moves_a_task_to_the_end_of_it(manager):
+    """The guard that stopped a resize reordering must not stop a drop.
+
+    ``place_block_at`` documents a block being nudged inside a box it is
+    already in -- the only gesture a box has for ordering what is in it. The
+    fix for the resize went into the shared helper, which turned that drop
+    into a no-op while the screen still reported "Moved to ...".
+    """
+    first = _at(manager, 30, "first", 3)
+    _at(manager, 30, "second", 3)
+    assert [label for label, _s, _p, _a, _b in _day(manager)] == ["first", "second"]
+
+    manager.place_block_at(first.id, 3, BOUNDS)
+
+    assert [label for label, _s, _p, _a, _b in _day(manager)] == ["second", "first"], (
+        "a drop onto its own box did nothing, and the screen said it moved"
+    )

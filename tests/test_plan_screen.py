@@ -1367,3 +1367,105 @@ def test_a_length_chosen_for_an_unplaced_block_does_not_show_the_row_id(screen, 
     assert "not on a box yet" in text, f"status was {text!r}"
     assert block.id not in text, f"the row id reached the status line: {text!r}"
     assert manager.get_time_blocks(THURSDAY)[0].planned_minutes == 30, "it resized anyway"
+
+
+# --- found by the re-sweep of this batch's own fix commits -------------------
+
+
+def test_saving_day_settings_unblocks_adoption(root, manager, settings):
+    """The recovery path has to actually recover.
+
+    Declining to adopt on a day shape nobody could read is only half a fix: the
+    user is told Day Settings could not be read, opens Day Settings, saves --
+    and the flag was never cleared, so adoption stayed blocked and the screen
+    reported "Day settings saved" over it. The only escape was relaunching the
+    app, which nothing in the UI or the guide mentions.
+    """
+    _legacy_block(manager)
+    settings.settings_unreadable = True
+
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    root.update_idletasks()
+    assert manager.get_time_blocks(THURSDAY)[0].slot_index is None
+
+    dialog = PlanSettingsDialog(root, settings)
+    try:
+        dialog.save()
+    finally:
+        if dialog.winfo_exists():
+            dialog.destroy()
+
+    panel.refresh()
+    root.update_idletasks()
+
+    stored = manager.get_time_blocks(THURSDAY)[0]
+    assert stored.slot_index == 2, (
+        "saving the day settings left adoption blocked, with no way out but a restart"
+    )
+
+
+def test_a_failed_settings_write_is_not_reported_as_saved(
+    root, settings, tmp_path, monkeypatch
+):
+    """"Day settings saved" must mean a file was written.
+
+    ``save`` swallowed its own failure, so the dialog closed, the screen
+    reported success, and the day it drew existed only in memory until the
+    process ended. The settings path is a directory here, so the write raises.
+    """
+    unwritable = tmp_path / "unwritable"
+    unwritable.mkdir()
+    monkeypatch.setattr(
+        AppSettings, "get_settings_path", classmethod(lambda cls: unwritable)
+    )
+
+    told = []
+    dialog = PlanSettingsDialog(
+        root, settings, on_saved=lambda bounds: told.append(bounds)
+    )
+    try:
+        dialog.save()
+
+        assert told == [], "a failed write told the screen the day settings were saved"
+        assert "Could not write" in dialog.error_label.cget("text")
+        assert dialog.winfo_exists(), "the dialog closed on a write that did not happen"
+    finally:
+        if dialog.winfo_exists():
+            dialog.destroy()
+
+
+def test_no_settings_object_is_not_reported_as_an_unreadable_file(root, manager):
+    """Two different problems, and only one of them is the user's to fix.
+
+    ``_day_shape_is_the_users`` is false for both a missing settings object and
+    a file that would not parse, and the warning was written off that. A screen
+    built without settings is a wiring mistake; telling the user their Day
+    Settings could not be read sends them to a dialog that will not help.
+    """
+    panel = PlanScreen(root, manager, _App(None))
+
+    assert panel._day_shape_is_the_users() is False
+    assert panel._day_settings_are_unreadable() is False, (
+        "no settings object was reported as a settings file that would not parse"
+    )
+
+
+def test_the_unreadable_warning_needs_a_block_to_be_about(root, manager, settings):
+    """A warning about blocks from an earlier version, with none in existence.
+
+    The branch had no condition on there being anything to adopt, so every
+    date change on an ordinary day warned about work left off the grid that
+    was never there.
+    """
+    settings.settings_unreadable = True
+
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    root.update_idletasks()
+
+    assert "earlier version" not in panel.status_label.cget("text"), (
+        "warned about blocks from an earlier version on a day that has none"
+    )

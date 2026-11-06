@@ -238,3 +238,83 @@ def test_a_day_end_inside_the_day_still_survives_a_round_trip(settings_file):
     settings_file.write_text(json.dumps({"plan_day_end": "23:59"}))
 
     assert AppSettings.load().plan_day_end == "23:59"
+
+
+# --- found by the re-sweep of this batch's own fix commits -------------------
+
+
+def test_an_unreadable_settings_file_is_kept_before_it_is_overwritten(settings_file):
+    """The only copy of the user's settings must survive the recovery.
+
+    ``load`` falls back to all-defaults when the file exists but will not
+    parse, and ``save`` writes the whole object -- so the first save after a
+    corrupt load replaces every value the user ever set, including the ones no
+    screen in the app can re-enter by hand. Overwriting is how they get a
+    working file back; destroying the original on the way is not part of that.
+    """
+    original = '{ "obsidian_vault_path": "/Users/me/vault", this is not json'
+    settings_file.write_text(original)
+
+    loaded = AppSettings.load()
+    assert loaded.settings_unreadable is True
+
+    assert loaded.save() is True
+
+    kept = list(settings_file.parent.glob("settings.json.unreadable-*"))
+    assert len(kept) == 1, f"the unreadable file was not kept aside: {kept}"
+    assert kept[0].read_text() == original, "the kept copy is not what was there"
+    assert json.loads(settings_file.read_text())["plan_day_start"] == "08:00"
+
+
+def test_a_readable_file_is_not_copied_aside_on_every_save(settings_file):
+    """The companion: a backup on every save would be a litter of files.
+
+    Without this, keeping the unreadable file could be implemented as keeping
+    every file, which passes the test above and leaves a new copy in the
+    application data directory each time any settings screen is used.
+    """
+    _write(settings_file, plan_day_start="07:00")
+    loaded = AppSettings.load()
+    assert loaded.settings_unreadable is False
+
+    loaded.save()
+
+    assert list(settings_file.parent.glob("settings.json.unreadable-*")) == []
+
+
+def test_a_successful_write_clears_the_flag(settings_file):
+    """P6 -- the flag describes a load, and a save is what makes it false.
+
+    The file now holds exactly these values, so the next load reads them back
+    and reports nothing. Left set, the same day shape is untrusted now and
+    trusted after a restart, and the Plan screen's adoption stays blocked with
+    no way out but relaunching the app -- which no message or document tells
+    the user to do.
+    """
+    settings_file.write_text("{ not json")
+    loaded = AppSettings.load()
+    assert loaded.settings_unreadable is True
+
+    loaded.save()
+
+    assert loaded.settings_unreadable is False, (
+        "the file is readable and holds these values, and the flag still says otherwise"
+    )
+
+
+def test_a_failed_write_is_reported_and_leaves_the_flag_alone(settings_file):
+    """A write that did not happen must not clear the flag or claim success.
+
+    The settings path is a directory here, so ``open(..., 'w')`` raises. The
+    in-memory object is then the only place these values exist, and the file
+    on disk is still the one nobody could read.
+    """
+    settings_file.write_text("{ not json")
+    loaded = AppSettings.load()
+    settings_file.unlink()
+    settings_file.mkdir()
+
+    assert loaded.save() is False, "a failed write reported success"
+    assert loaded.settings_unreadable is True, (
+        "a failed write cleared the flag, so adoption would run on a guess"
+    )
