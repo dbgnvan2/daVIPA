@@ -256,11 +256,11 @@ Action Items section:
 - **Open Notes** — Browse the project's linked notes in a separate dialog (kept for explicit "show me the notes I have" use).
 
 ### Plan (Time Blocks)
-- What: Build a day by dragging the items that start on that date into an
-  ordered column of time blocks.
-- Why: A planned day is an **order**, not a set of appointments. You arrange
-  the blocks; the clock times are worked out for you from the order, each
-  block's length, and your day settings.
+- What: Build a day by dragging the items that start on that date onto a grid of
+  half-hour boxes.
+- Why: A planned day is a **grid**, not an order. Every half hour from Day Start
+  to Day End is a box, drawn whether you have put anything in it or not, and you
+  drop work on the box you want it in.
 
 > **Before you start: the start dates must be right.**
 > This screen lists the items whose Start Date is **exactly** the date you have
@@ -269,15 +269,32 @@ Action Items section:
 > will tell you it is missing. Fix the start dates first (the Scheduler and the
 > item editor are the places to do it), then come back and plan the day.
 
+Three things follow from the grid, and they are the whole model:
+
+1. **Gaps are a legitimate day.** An empty 09:00 between two filled boxes is a
+   day with a gap in it, not a mistake to be packed away. Nothing slides up to
+   close it, ever.
+2. **Lengths round up to whole boxes.** A 45-minute task takes two boxes. It
+   keeps its own 45 minutes — it ends at 09:45 — and the second box says
+   `15m spare`, because that quarter hour is spent even though the task does not
+   use it. The next task starts at the following box.
+3. **A box is worth 30 minutes however many tasks are in it.** Up to four tasks
+   can share one half hour; the box grows to show them all, and still counts as
+   one half hour of your day.
+
 Header:
 - **Date picker** — What: Chooses the day you are planning. Why: Changing it
   reloads both panes. It is a picker rather than a typed field, so a date that
   cannot be stored cannot be entered.
 - **⚙ Day Settings** — What: Opens the Day Settings modal (below). Why: The
-  shape of the day is what the times are derived from.
-- **+ Break** / **+ Buffer** — What: Appends a 30-minute padding block to the
-  end of the day. Why: Real days are not back-to-back. These carry no item, so
-  they are drawn in a neutral colour rather than a priority one.
+  hours of the day are what the grid is drawn from.
+- **+ Break** / **+ Buffer** — What: Puts a 30-minute padding block in the first
+  box that will hold it. Why: Real days are not back-to-back. These carry no
+  item, so they are drawn in a neutral colour rather than a priority one.
+- **Day summary** — What: `4 of 18 boxes · 2h 00m occupied · 1h 45m planned`.
+  Why: Three separate numbers, because they are three separate facts. A
+  45-minute task occupies a whole hour of your day and plans 45 minutes of it;
+  one number would have to be wrong about one of them.
 
 Items pane (left):
 - **Items starting \<date\>** — What: Open items whose start date is that date,
@@ -285,54 +302,73 @@ Items pane (left):
   from. Each row shows the priority score, the block length it would get, its
   depth, and `already blocked` if the day already holds a block for it — marked
   rather than hidden, because an item can genuinely need two blocks in a day.
-- **Drag a row to the right** — What: Drops it on the day column and creates a
-  block for it. Why: This is how blocks are made. The new block goes on the end
-  of the day and the whole day is re-timed.
+- **Drag a row onto a box** — What: Creates a block for it in that half hour.
+  Why: This is how blocks are made, and the box you drop on is the box you get.
+  If the item needs more than one box, the status line says how many and what is
+  left spare.
+- **Release in the day column but not on a box** — What: Nothing is created, and
+  the status line says *Drop an item on a half-hour box*. Why: The app will not
+  pick an hour for you. A release over the heading or the summary is not a
+  choice of time, so it is reported rather than guessed at.
 - Long lists are capped, and the cap says how many of how many are shown.
 
 Day pane (right):
-- **Blocks, in order** — What: Each block shows its derived start–end time, its
-  title, its depth as a three-bar stack, and its length. Why: The block's
-  **height** tracks its length, so a 90-minute block is three times the height
-  of a 30 without reading either number.
-- **Colour** — What: The stripe down the left of a block is its item's priority
+- **Every half hour, in order** — What: One box per half hour from Day Start to
+  Day End, each labelled with its own start time. Why: An empty box is a place
+  you can drop work; a pane that drew only the filled hours would give you
+  nothing to aim at.
+- **A task in a box** — What: Its title, its depth as a three-bar stack, and its
+  length in minutes. Why: The box tells you the time; the chip tells you the
+  task.
+- **A task that runs through a box** — What: The later boxes of a longer task
+  show it greyed, marked with `↳`, and labelled `same task` or `15m spare`. Why:
+  Drawn plainly it would read as a second copy of the task; left blank the box
+  would read as free. Neither is true.
+- **Colour** — What: The stripe down the left of a task is its item's priority
   band: critical, high, medium, low, or grey for unscored. Why: The shape of
   the day is readable before any of the text is.
-- **Drag a block up or down** — What: Moves it in the order. Why: The entire day
-  is re-timed from the new order — this is the one action that changes what time
-  everything happens.
-- **Right-click a block** — What: Sets its length to 15, 30, 45, 60 or 90
+- **Drag a task to another box** — What: Moves it there. Why: This is how you
+  re-time one piece of work. Nothing else in the day moves. A drag that lands
+  on no box is a cancelled drag and changes nothing.
+- **A continuation cannot be dragged** — What: The `↳` chips in a long task's
+  later boxes carry no drag and no menu. Why: The box a task **starts** in is
+  the one that owns it, so a gesture aimed at an hour the task merely runs
+  through cannot move it.
+- **Right-click a task** — What: Sets its length to 15, 30, 45, 60 or 90
   minutes, or a custom number, or deletes it. Why: 30 minutes is the default for
   a dropped item unless the item has a Work Block value, which is used instead.
-  Changing a length re-times the rest of the day.
+  A length is refused if it would not fit from where the task sits — the task is
+  never slid somewhere it does fit, because that would answer a question you did
+  not ask.
 - **Block lengths stop at a day** — What: 1440 minutes is the longest block.
   A custom length above it is refused in the dialog; an item whose Work Block is
   above it is blocked at 1440 and the status line says so. Why: past a day the
   app can no longer write an end time that is the start plus the length, so the
   block would be drawn claiming minutes it does not own.
-- **A day can be too full to re-time** — What: Blocks that together run past
-  the last time the app can write are refused, with *This day is too full to
-  re-time — shorten or remove a block* on the status line. Nothing is added,
-  resized or deleted; the day is left exactly as it was. Why: a single block
-  stops at a day, but several of them can still add up past that point, and
-  past it a block cannot be written with an end time that is its start plus its
-  length. Refused rather than stored wrong. It takes more than three full days'
-  worth of blocks on a single day to reach this, so an ordinary day will not.
-- **Lunch** — What: A band drawn where the day skips lunch. Why: It is not a
-  block: it cannot be dragged, resized or deleted, and exists so the gap is
-  visible rather than an unexplained jump in the times.
-- **past day end** — What: A warning border and label on any block that runs
-  past your Day End. Why: Over-filling a day is your business, not the app's —
-  the block is kept and flagged, never silently dropped.
+- **Lunch** — What: A box like any other, labelled `Lunch`, that takes no tasks.
+  Why: It is part of the day's shape, so it is drawn in its place rather than as
+  a gap you have to infer. A drop on it is refused with *That would run into
+  lunch — try a later box*.
+- **A refusal always says which** — What: One of *That is outside the day — Day
+  Settings sets its hours*, *That would run into lunch — try a later box*, or
+  *That half hour is full — try another box*. Why: Nothing is written, nothing
+  is moved, and you are told what stopped it.
+- **Outside the day** — What: A group under the grid, headed *Outside the day
+  (n) — drag onto a box to place*, holding any block the grid can no longer
+  hold: one whose box is past a Day End you have moved earlier, one whose length
+  now runs off the end, or one lunch has since moved onto. Why: planned work is
+  never dropped silently. It stays on screen, and dragging it onto a box puts it
+  back.
 
 Day Settings modal:
-- **Day Start** — What: The time the first block begins. Why: Everything is
-  packed forward from here.
+- **Day Start** — What: The time of the first box. Why: A block remembers
+  **which box** it is in, not what time that was, so moving Day Start moves the
+  whole day's times with it and writes nothing to your blocks.
 - **Lunch Start** and **Lunch (minutes)** — What: When the gap is and how long.
-  Why: A block that would straddle lunch is pushed past it **whole**, never
-  split. Set the minutes to 0 for no lunch.
-- **Day End** — What: Where the day is considered over-filled. Why: It does not
-  refuse blocks; it marks the ones that run past it.
+  Why: The boxes it covers are marked and take no tasks; nothing is split across
+  it. Set the minutes to 0 for no lunch.
+- **Day End** — What: The time of the last box. Why: The grid stops here, so
+  there is nowhere past it to drop work.
 - **Days for Blocks** — What: Seven checkboxes, Monday to Sunday. Why: These are
   the weekdays that accept blocks at all. A drop onto a day that is not checked
   is refused and says why, so a weekend cannot be filled by accident. At least
@@ -342,12 +378,19 @@ Day Settings modal:
   modal with the field named, never silently replaced. A settings file that
   already holds such a value from an older version loads as the default for
   that field rather than being taken as given.
-- **Save** re-times **every** day that holds blocks, not only the one on screen,
-  and says how many it re-timed. Why: these four values shape every planned day,
-  so a day left on the old shape would be showing times that no longer follow
-  from your settings. If one of those days is too full to re-time, no day is
-  changed and the status line says so — your settings are saved, but you will
-  need to shorten a block on that day and change a day setting again.
+- **Save** writes **nothing** to your blocks, on any day. Why: every block's box
+  is stored relative to Day Start, so every day re-times itself the next time you
+  open it. There is no day left showing times that no longer follow from your
+  settings, and no day that can be "too full to re-time". If a block no longer
+  fits the day you have just described, it appears under **Outside the day** and
+  the status line says how many — drag it onto a box, or shorten it.
+
+**Days planned in an older version** are mapped onto the grid the first time you
+open them. A block with a readable start time goes on the box that time names,
+or — if that box is past your Day End, before your Day Start, in lunch, or
+already full — nowhere, and it appears under **Outside the day** for you to
+place. It is never slid to the nearest free box, because that would move your
+work to an hour you never picked.
 
 ### Completed
 - What: Shows completed items over the last N days.

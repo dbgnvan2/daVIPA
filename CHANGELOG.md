@@ -9,24 +9,48 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **The Plan screen builds a day by dragging, and derives the clock from the
-  order.** Drag an item from the left pane onto the day to create a block for
-  it; drag blocks up and down to order the day; right-click a block to set its
-  length to 15/30/45/60/90 minutes, a custom number, or delete it. `+ Break`
-  and `+ Buffer` append padding blocks. Block order is now stored (`position`),
-  and start and end times are derived from the order, each block's length and
-  the day settings — so a reorder, a resize or a settings change re-times the
-  whole day at once. A block that would straddle lunch is pushed past it whole,
-  never split; one that runs past Day End is flagged rather than dropped.
+- **The Plan screen builds a day on a grid of half-hour boxes.** Every half
+  hour from Day Start to Day End is a box, drawn whether it holds anything or
+  not. Drag an item from the left pane onto the box you want it in; drag a task
+  to another box to move it; right-click it to set its length to 15/30/45/60/90
+  minutes, a custom number, or delete it. `+ Break` and `+ Buffer` put a
+  padding block in the first box that will hold it. Three consequences, all
+  deliberate: **gaps are a legitimate day** and nothing ever slides up to close
+  one; **lengths round up to whole boxes**, so a 45-minute task takes two,
+  keeps its own 45 and shows `15m spare` on the second; and **a box is worth 30
+  minutes however many tasks share it** — up to four, and the box grows to show
+  them. A block stores *which box* it is in (`slot_index`), relative to Day
+  Start, so the clock times follow from the box on read.
+- **Day Settings saves without writing to a single block.** Moving Day Start
+  re-times every planned day, on every date, because each block's box is stored
+  relative to it. There is no re-packing, no day left on the old shape, and no
+  day that can be "too full to re-time".
+- **Work the grid can no longer hold is shown, never dropped.** A block whose
+  box is past a Day End you have moved earlier, whose length now runs off the
+  end of the day, or that lunch has since moved onto, appears in an **Outside
+  the day** group under the grid; dragging it onto a box puts it back. Days
+  planned in an older version are mapped onto the grid the first time they are
+  opened: a readable start time goes on the box that time names **or nowhere**,
+  never slid to the nearest free box.
+- **Every refusal says which refusal it is**: outside the day, running into
+  lunch, or that half hour already full. Nothing is written and nothing moves.
+  A release in the day column but on no box creates nothing and says so — the
+  app does not pick an hour for you.
 - **Day Settings for the Plan screen** (⚙ in the Plan header): day start, lunch
   start and length, day end, and seven checkboxes for the weekdays that accept
   blocks. A drop onto a day that is not checked is refused with the reason. A
   time the app cannot read is rejected in the modal with the field named.
-- **Blocks are readable before they are read.** A block's height tracks its
-  length, the stripe down its left is its item's priority band, and depth is
-  drawn as a three-bar stack (deep 3, medium 2, shallow 1, unset 1). A dropped
-  item's block takes the item's Work Block value as its length when it has one,
+- **Blocks are readable before they are read.** The stripe down a task's left
+  is its item's priority band, and depth is drawn as a three-bar stack (deep 3,
+  medium 2, shallow 1, unset 1). The later boxes of a longer task are greyed,
+  marked `↳`, and labelled `same task` or `15m spare`, and carry no drag and no
+  menu — the box a task starts in is the one that owns it. A dropped item's
+  block takes the item's Work Block value as its length when it has one,
   otherwise 30 minutes.
+- **The day summary reports three numbers, not one**: boxes used, time
+  occupied, time planned. A 45-minute task occupies an hour of the day and
+  plans 45 minutes of it, and one number would have to be wrong about one of
+  them.
 - **A demo instance that runs beside your real one.** `./start-demo.sh` starts
   a second, fully isolated copy of the app — its own database, settings,
   single-instance lock and logs under
@@ -46,11 +70,12 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   handler destroyed the row widget whose own event it was still dispatching.
   Found by driving real Tk button events at the real row widgets; every test
   that called the handlers directly passed.
-- **Dragging a block down moved it one place too far.** The drop position was
-  counted against the rows as drawn, dragged block included, and passed to a
-  function that counts against the list with that block already removed. A drop
-  in a block's own lower gap moved it past the next block instead of doing
-  nothing.
+- **Dragging a block down moved it one place too far.** *(Superseded before
+  release: there is no order to drag within. A drop names a box, and the drop
+  either lands in one or is a cancelled drag.)* The drop position was counted
+  against the rows as drawn, dragged block included, and passed to a function
+  that counts against the list with that block already removed. A drop in a
+  block's own lower gap moved it past the next block instead of doing nothing.
 - **A block could be longer than a day, and then lie about its own end time.**
   The length ceiling was checked only in the dialog that asks you for a number.
   An item's Work Block value, which the item editor accepts as any integer, went
@@ -68,22 +93,24 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the overrun warning switched off with nothing anywhere to say so. All three
   day-bound values are now read through a parser that refuses an hour of 24 or
   more and falls back to that field's default.
-- **A day too full to write was written clamped rather than refused.** The
-  length ceiling bounds one block; running past the last time the app can
-  express is a property of the whole day. Four blocks of exactly a day each are
-  individually legal and together pass that point, where the fourth row would
-  have been stored claiming 1440 minutes between two times 899 minutes apart.
-  Such a day is now refused before anything is written, with the reason on the
-  status line, from all four places a block can be added, resized or deleted and
-  from a Day Settings save.
-- **Saving Day Settings re-timed only the day on screen.** Day start, lunch and
-  day end shape every planned day, so every other day was left holding times
-  derived from settings that no longer existed. Save now re-times every day that
-  holds blocks, in one transaction, and says how many.
-- **Each block write and its re-timing were two separate commits.** Between
-  them, a newly dropped block had no times at all, and a resized one read as a
-  30-minute block claiming 90 while the next block still held the minutes it had
-  taken. Each write and its re-timing are now one unit.
+- **A day too full to write was written clamped rather than refused.**
+  *(Superseded before release: the grid stops at Day End, so a day cannot run
+  past what `HH:MM` can express and this ceiling is unreachable. The refusals
+  that remain are the three the grid can actually give.)* The length ceiling
+  bounds one block; running past the last time the app can express is a
+  property of the whole day. Four blocks of exactly a day each are individually
+  legal and together pass that point, where the fourth row would have been
+  stored claiming 1440 minutes between two times 899 minutes apart.
+- **Saving Day Settings re-timed only the day on screen.** *(Superseded before
+  release: a block's box is stored relative to Day Start, so a save re-times
+  every day by writing nothing at all.)* Day start, lunch and day end shape
+  every planned day, so every other day was left holding times derived from
+  settings that no longer existed.
+- **Each block write and its derived times were two separate commits.**
+  Between them, a newly dropped block had no times at all, and a resized one
+  read as a 30-minute block claiming 90. A block's box, its order within that
+  box and its clock times are now settled and written as one unit, and a
+  refusal is raised before anything is written rather than rolled back.
 - `tools/create_demo_data.py` could not run at all. It added `tools/src` to the
   import path instead of the repository's `src/`, so the script that both
   README.md and CLAUDE.md tell you to run failed with `ModuleNotFoundError`.

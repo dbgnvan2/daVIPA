@@ -160,11 +160,23 @@ labelled with its time, following `_configure_date_box_columns`' shape: every
 column gets a `minsize` so the row has a width to request.
 
 ### TG-M8 — Row width is asserted, not assumed
-The fix for the sliver bug, and the test that would have caught it: with a
-mapped window, a block row's width is within a few pixels of the pane's, and
-its title label is non-empty and `winfo_ismapped()`. Plus the removal of
-`max(1, …)` from `_aim_pointer_at`, so a collapsed row makes the *drag* tests
-fail too instead of being silently compensated for.
+**Revised during the build, because the diagnosis this section was written on
+turned out to be wrong.** The claim was that `grid_propagate(False)` left a
+block row frame with no width, and that this was the sliver bug. It does not
+reproduce: measured with a mapped window against the real Plan screen a row is
+667px inside a 671px pane, and against a hand-built pane it fills that too. No
+fix was written, because there is nothing here to fix.
+
+What remains is the coverage gap, which was real: no test in the suite asserted
+a row's width at all, so a row collapsed to a sliver would have passed every
+one of them. Two tests now pin it — with a mapped window, a row's width is
+within 8px of its pane's, and its title label is non-empty and
+`winfo_ismapped()`. They are the guard for the grid pane TG-M7 builds.
+
+The planned third change, removing `max(1, …)` from `_aim_pointer_at`, is
+dropped. Its rationale does not hold: the floor only alters the aim at width 0
+or 1, so it never compensated for an 8px row, and at width 0 the hit test fails
+with the floor as readily as without it.
 
 ### TG-M9 — Drop an item on a slot
 The drop target is the slot under the pointer, not the pane. A drop on an
@@ -193,11 +205,25 @@ how the 45/60 question becomes a lie: **boxes used**, **time occupied** (boxes
 | `pack_day`, `repack_day`, `repack_all_days` | A fixed grid derives times from `slot_index`; there is nothing to pack. |
 | `DayTooFullError` and its four screen handlers | The grid is bounded by Day End, so a day cannot run past what `HH:MM` can express. The ceiling becomes unreachable. |
 | The "past day end" overflow warning | Nothing can be placed past Day End, so the warning has no state to report. Replaced by TG-M3's "outside the day" group, which is the case that *can* still happen. |
+| `reorder_time_blocks` | A day was an order, so a drag rewrote the whole day's positions and times. A drag now writes one row's `slot_index`. |
+| `move_block`, `move_block_to_gap`, `sort_blocks`, `renumber` | All four served the packed list: find a gap, slide the neighbours, renumber. A box is a place, so a move is an assignment, not a shuffle. |
+| `block_height`, `PIXELS_PER_MINUTE`, `MIN_BLOCK_HEIGHT_PX` | A row's height encoded its block's length when a row *was* a block. A box is half an hour whatever is in it; its height is how many tasks share it (`plan_blocks.slot_row_height`). |
+| `lunch_window`, `build_lunch_band` | Lunch is a marked box in the grid, drawn like any other box. The separate band between rows has nothing to sit between. |
+| `build_block_row` | Replaced by `build_slot_row`: the pane's unit of drawing is a half hour, not a block. |
+| `sort_blocks_by_slot` kept, `sort_blocks` gone | The ordering survives the model change; what it orders by does not. |
 
-These are removals of code that is correct and tested. They are listed so the
-deletion is a decision on the record rather than something noticed in a diff —
-**dead guards left in place are the thing this repo's own checklist (P27)
-warns about**, so if the plan is approved they go, tests included.
+**This list is wider than the three rows the plan was approved with.** The
+first three were the retirements the grid was expected to force; the rest were
+found during the build, when the grid made them unreachable. They are recorded
+here rather than noticed in a diff.
+
+These are removals of code that is correct and tested. **Dead guards left in
+place are the thing this repo's own checklist (P27) warns about**, so they go,
+tests included — 25 tests from `test_time_block_layout.py`, 18 definitions from
+`test_time_block_crud.py` and 24 from `test_plan_screen.py`, each one covering
+a reorder, a repack, the `DayTooFullError` refusal, the lunch band or the
+per-block row height. Where a test's *property* survived the model change it
+was rewritten rather than dropped.
 
 A compaction action ("tidy the day", pulling blocks up into the earliest slots)
 is the natural home for the packing arithmetic if it is wanted later. It is
@@ -214,27 +240,37 @@ user choice, not a layout rule.
 | TG-M1.2 | Lunch slots are marked unavailable and are **not** omitted from the grid | `::test_tgm12_lunch_slots_are_marked_not_removed` |
 | TG-M1.3 | A Day End that is not on a half hour yields no partial trailing slot | `::test_tgm13_a_ragged_day_end_yields_no_partial_slot` |
 | TG-M2.1 | `slots_for_minutes` rounds up: 30→1, 45→2, 60→2, 1→1 | `::test_tgm21_odd_lengths_round_up` |
+| TG-M2.1a | The minutes a rounded-up block leaves spare in its last box are reported, not rounded away | `::test_the_spare_minutes_of_the_last_box_are_what_the_task_leaves` |
 | TG-M2.2 | **Adversarial (P7)** — a 2-slot block whose second slot is lunch is refused, not drawn across it | `::test_tgm22_a_span_cannot_cross_lunch` |
 | TG-M2.3 | A refusal names its reason; every reason is a distinct named value | `::test_tgm23_each_refusal_has_its_own_reason` |
 | TG-M2.4 | **Real scale (P9)** — a 9-hour day fully occupied: the 19th placement is refused, the 18 placed are all returned | `::test_tgm24_a_full_day_refuses_the_next_one` |
 | TG-M3.1 | A block whose slot no longer exists is returned flagged, never dropped | `::test_tgm31_blocks_outside_the_grid_are_surfaced` |
+| TG-M3.1a | A block sitting in a box lunch has since moved onto is surfaced too — a lunch box draws no tasks, so one left there would vanish | `::test_a_block_sitting_in_a_lunch_box_is_surfaced_not_hidden` |
+| TG-M3.1b | The "outside the day" group is **drawn**, and a settings change that creates one says so | `tests/test_plan_screen.py::test_tgm31_an_outside_block_is_drawn` |
 | TG-M4.1 | Migration adds `slot_index`, is idempotent on a second run | `tests/test_time_block_schema.py::test_tgm41_migration_adds_slot_index_idempotently` |
+| TG-M4.1a | A fresh install gets the column from `CREATE TABLE` too, not only from the migration | `::test_a_fresh_database_has_slot_index_too` |
+| TG-M4.2 | The day is indexed by `(block_date, slot_index, position)`, which is the order every read uses | `::test_the_day_is_indexed_by_box` |
 | TG-M5.1 | A row stored at `09:30` under an 08:00 Day Start migrates to `slot_index` 3 | `::test_tgm51_existing_times_map_to_slots` |
 | TG-M5.2 | **Dirty state (P8)** — a row with an empty `start_time` migrates by `position` and does not raise | `::test_tgm52_a_timeless_row_migrates_by_position` |
 | TG-M6.1 | Two blocks on one `slot_index` round-trip, ordered by `position` | `tests/test_time_block_crud.py::test_tgm61_two_blocks_share_a_slot` |
+| TG-M6.1a | `position` counts **within** a box, not across the day | `::test_position_restarts_in_each_box` |
 | TG-M6.2 | A move writes the slot **and** the derived times in one transaction; a failure writes neither | `::test_tgm62_a_failed_move_writes_nothing` |
 | TG-M6.3 | Every written row satisfies `end == start + planned_minutes` | `::test_tgm63_every_row_says_start_plus_duration` |
 | TG-M6.4 | Day Start changing re-times every day with **no** write to `time_blocks` | `::test_tgm64_a_day_start_change_writes_no_rows` |
+| TG-M6.4a | The same through the screen: `on_settings_saved` writes nothing and the grid re-times | `tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks` |
 | TG-M7.1 | Every slot in the grid is drawn, empty ones included | `tests/test_plan_screen.py::test_tgm71_every_slot_is_drawn` |
-| **TG-M8.1** | **A block row is within 8px of its pane's width** (the sliver bug) | `::test_tgm81_a_block_row_fills_its_pane` *(needs `mapped_windows`)* |
-| **TG-M8.2** | **A block row's title label is non-empty and mapped** | `::test_tgm82_a_block_row_shows_its_title` *(needs `mapped_windows`)* |
-| TG-M8.3 | `_aim_pointer_at` no longer floors the width to 1 — a collapsed row fails the drag tests | `::test_tgm83_the_drag_helper_aims_at_a_real_width` |
+| TG-M8.1 | A half-hour box is within 8px of its pane's width | `::test_tgm81_a_block_row_fills_its_pane` *(needs `mapped_windows`)* |
+| TG-M8.2 | A box's title label is non-empty and mapped | `::test_tgm82_a_block_row_shows_its_title` *(needs `mapped_windows`)* |
+| ~~TG-M8.3~~ | **Dropped.** `_aim_pointer_at`'s `max(1, …)` floor alters nothing at the widths it was blamed for — see TG-M8 above | — |
 | TG-M9.1 | Dropping an item on the 10:00 slot creates a block at `slot_index` 4, not at the end of the day | `::test_tgm91_a_drop_lands_on_the_slot_under_the_pointer` |
 | TG-M9.2 | A drop on a lunch slot is refused, with the reason on the status line and nothing written | `::test_tgm92_a_drop_on_lunch_is_refused_and_says_why` |
-| TG-M10.1 | A second item dropped on a filled box joins it; both titles are drawn | `::test_tgm101_two_tasks_share_a_box` |
+| TG-M9.3 | A release that lands on no box is a cancelled drag — never "the nearest box" | `::test_a_drop_that_lands_on_no_box_is_a_cancelled_drag` |
+| TG-M10.1 | A second item dropped on a filled box joins it; both titles are drawn, and the box is drawn taller | `::test_tgm101_two_tasks_share_a_box` |
+| TG-M10.2 | The later boxes of a longer task are marked as continuations and say what they leave spare | `::test_a_longer_task_marks_the_boxes_it_runs_through` |
+| TG-M10.3 | A continuation chip carries no drag and no menu — the box a block starts in owns it | `::test_a_continuation_chip_carries_no_drag` |
 | TG-M11.1 | A real press-and-release moves a block to the slot it was dropped on | `::test_tgm111_a_real_drag_moves_a_block_between_slots` *(needs `mapped_windows`)* |
-| TG-M11.2 | A resize that would not fit from where the block sits is refused and the block does not move | `::test_tgm112_a_resize_that_does_not_fit_is_refused` |
-| TG-M12.1 | A 45-minute item in a day reports 2 boxes, 60m occupied, 45m planned — all three | `::test_tgm121_the_summary_separates_occupied_from_planned` |
+| TG-M11.2 | A resize that would not fit from where the block sits is refused and the block does not move | `tests/test_time_block_crud.py::test_tgm112_a_resize_that_does_not_fit_is_refused` |
+| TG-M12.1 | A 45-minute item in a day reports 2 boxes, 60m occupied, 45m planned — all three | `tests/test_plan_screen.py::test_tgm121_the_summary_separates_occupied_from_planned` |
 
 ### Criteria that cannot be made code-testable
 
@@ -244,7 +280,9 @@ user choice, not a layout rule.
 | Whether macOS delivers right-click as `<Button-3>` or `<Button-2>` here | Platform behaviour this machine must answer | Both stay bound; Dave confirms the menu opens on his trackpad |
 
 TG-M8.1 and TG-M8.2 are the two that convert "it looks broken" into a
-predicate, which is why they are in the table rather than in this one.
+predicate, which is why they are in the table rather than in this one. They
+now report that it does not look broken, which is the answer a predicate is
+for.
 
 ---
 
@@ -253,9 +291,9 @@ predicate, which is why they are in the table rather than in this one.
 1. **M1 (TG-M1…TG-M3)** — pure arithmetic, no dependencies, all headless.
    Nothing else can be built honestly before the grid rules exist.
 2. **M2 (TG-M4…TG-M6)** — needs M1 for `slots_for_minutes` in the migration.
-3. **TG-M8** — the sliver fix and its tests. **Deliberately before the rest of
-   M3**: it is the one defect a user can see today, it is cheap, and every
-   later pane test is written against a pane that is actually laid out.
+3. **TG-M8** — the width tests. Kept before the rest of M3 so every later pane
+   test is written against a pane that is actually laid out. The sliver fix
+   this step was ordered here for does not exist: see TG-M8 above.
 4. **M3 (TG-M7, TG-M9…TG-M12)** — needs M2 for the writes.
 5. **The retirements** — last, because they delete code the earlier steps may
    still be leaning on while in progress.

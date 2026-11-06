@@ -1,6 +1,6 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-05 (the time-block rebuild's deferrals, its sweep findings, and the four from the re-sweep of its own fix commits; the five from the timer-endings batch remain cleared, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-05 (the grid rebuild's deferrals added; the time-block rebuild's deferrals, its sweep findings, and the four from the re-sweep of its own fix commits remain, two of them changed by the grid; the five from the timer-endings batch remain cleared, and older sections from 08-24 and earlier remain)
 
 ## Deferred from the time-block rebuild (2026-11-05)
 
@@ -12,9 +12,10 @@ new unreviewed surface and none of these is above low severity.
   first. Low: a block holds no content of its own, and dragging the item back
   rebuilds it — but it is inconsistent with the rest of the app.
 - **A depth bar is not draggable.** The three-bar stack is a grandchild of the
-  row frame, and the drag handlers are bound to the frame and its direct
+  task chip, and the drag handlers are bound to the chip and its direct
   children only, so a press that lands exactly on a 14×3px bar does not start a
-  drag. Low: the target is tiny and the rest of the row works.
+  drag. Low: the target is tiny and the rest of the chip works. *(Still true
+  under the grid; the widget it hangs off is now the chip, not the row.)*
 - **The demo instance cannot exercise the Plan screen as seeded.** All six
   sample items in `demo_data.py` have an empty start date, and the Plan item
   list filters on start date exactly, so the left pane is empty on a fresh demo
@@ -22,7 +23,30 @@ new unreviewed surface and none of these is above low severity.
   relative to first launch.
 - **No way to move a block to another day.** Blocks are created on, and belong
   to, the selected date. Re-planning an item for tomorrow means deleting the
-  block and dragging the item again on that day.
+  block and dragging the item again on that day. *Raised by the grid from low to
+  worth doing:* a drag within a day now moves a block between boxes, so this is
+  the only gesture a user would reasonably expect and not find.
+
+## Deferred from the grid rebuild (2026-11-05)
+
+- **Four tasks to a box is a constant nobody is told about.**
+  `MAX_BLOCKS_PER_SLOT = 4` in `time_block_layout.py`. A fifth drop on a box is
+  refused with *That half hour is full — try another box*, which does not name
+  the number, and nothing in the UI or Day Settings does either. Low: the
+  refusal is clear about what happened, just not about the limit. Either say
+  the number in the message or make it a day setting.
+- **No way to tidy a day.** Gaps are legitimate by design (decision 1), so
+  nothing packs them away — which means there is also no single action for "pull
+  everything up", and a day re-planned around a cancelled task has to be dragged
+  box by box. Low, and deliberately out of the approved plan: compaction is a
+  user choice, not a layout rule. The arithmetic for it is in the git history of
+  `pack_day` if it is wanted.
+- **A block adopted from the old model can sit outside the day with no obvious
+  next step.** `adopt_legacy_day` leaves a block's box `NULL` when the time it
+  names will not hold it, so it lands in the *Outside the day* group with
+  *drag onto a box to place*. Correct, and it is the surfacing P2 asks for — but
+  the user has to work out for themselves that shortening it may be what is
+  needed. Low: a one-line hint naming the reason per block would close it.
 
 ### From the pre-push review sweeps on this batch
 

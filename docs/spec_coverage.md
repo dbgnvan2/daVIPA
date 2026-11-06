@@ -121,10 +121,10 @@ the test confirmed red, the verbatim original restored.
 | TB-M1.2 | A `TimeBlock` round-trips type and position through create → read | `src/getmoredone/database.py` (initialize_schema + _run_migrations), `src/getmoredone/models.py` (TimeBlock, BlockType) | `tests/test_time_block_schema.py::test_tbm12_block_type_and_position_round_trip` | done |
 | TB-M1.3 | **Dirty state (P8)** — a row written before the migration reads back with `block_type='item'`, `position=0`, and does not raise | `src/getmoredone/database.py` (initialize_schema + _run_migrations), `src/getmoredone/models.py` (TimeBlock, BlockType) | `tests/test_time_block_schema.py::test_tbm13_pre_migration_row_reads_with_defaults` | done |
 | TB-M2.1 | `update_time_block` persists a changed duration — the row, re-read, holds the new value | `src/getmoredone/db_manager.py` (update_time_block, repack_day, reorder_time_blocks, get_items_for_start_date, get_blocked_item_ids) | `tests/test_time_block_crud.py::test_tbm21_update_persists_duration` | done |
-| TB-M2.2 | `reorder_time_blocks` leaves no two blocks on a day sharing a start time, and no gaps | `src/getmoredone/db_manager.py` (update_time_block, repack_day, reorder_time_blocks, get_items_for_start_date, get_blocked_item_ids) | `tests/test_time_block_crud.py::test_tbm22_reorder_yields_unique_contiguous_times` | done |
-| TB-M2.3 | A reorder that fails partway writes **nothing** | `src/getmoredone/db_manager.py` (update_time_block, repack_day, reorder_time_blocks, get_items_for_start_date, get_blocked_item_ids) | `tests/test_time_block_crud.py::test_tbm23_failed_reorder_is_atomic` | done |
+| TB-M2.2 | `reorder_time_blocks` leaves no two blocks on a day sharing a start time, and no gaps | `src/getmoredone/db_manager.py` (update_time_block, repack_day, reorder_time_blocks, get_items_for_start_date, get_blocked_item_ids) | `tests/test_time_block_crud.py::test_tbm22_reorder_yields_unique_contiguous_times` | superseded by the grid — `reorder_time_blocks` is gone — a drag writes one row's box, so there is no day-wide re-timing to make unique. |
+| TB-M2.3 | A reorder that fails partway writes **nothing** | `src/getmoredone/db_manager.py` (update_time_block, repack_day, reorder_time_blocks, get_items_for_start_date, get_blocked_item_ids) | `tests/test_time_block_crud.py::test_tbm23_failed_reorder_is_atomic` | superseded by the grid — `reorder_time_blocks` is gone. Atomicity now belongs to `add_block_at`/`place_block_at`/`set_block_length`, each covered under TG-M6.2. |
 | TB-M2.4 | `get_items_for_start_date` returns the item starting that day and **not** one starting the day before or after | `src/getmoredone/db_manager.py` (update_time_block, repack_day, reorder_time_blocks, get_items_for_start_date, get_blocked_item_ids) | `tests/test_time_block_crud.py::test_tbm24_start_date_filter_is_exact` | done |
-| TB-M3.1 | `pack_day` packs from day start with no gaps | `src/getmoredone/time_block_layout.py` | `tests/test_time_block_layout.py::test_tbm31_blocks_pack_from_day_start` | done |
+| TB-M3.1 | `pack_day` packs from day start with no gaps | `src/getmoredone/time_block_layout.py` | `tests/test_time_block_layout.py::test_tbm31_blocks_pack_from_day_start` | superseded by the grid — `pack_day` is gone. The grid derives every time from `slot_index`; see TG-M1.1. |
 | TB-M3.2 | **Adversarial (P7)** — a block that fits *up to* lunch start but not through it is pushed whole to after lunch, not split and not overlapped onto lunch | `src/getmoredone/time_block_layout.py` | `tests/test_time_block_layout.py::test_tbm32_block_straddling_lunch_moves_after_lunch` | done |
 | TB-M3.3 | **Real scale (P9)** — a day of 14 × 60 min blocks: those past day end are returned and flagged, never dropped | `src/getmoredone/time_block_layout.py` | `tests/test_time_block_layout.py::test_tbm33_overflow_blocks_are_flagged_not_dropped` | done |
 | TB-M3.4 | `duration_for_item` returns `work_block` when set, 30 when not | `src/getmoredone/time_block_layout.py` | `tests/test_time_block_layout.py::test_tbm34_work_block_wins_over_default` | done |
@@ -139,10 +139,10 @@ the test confirmed red, the verbatim original restored.
 | TB-M8.1 | A drop on the day column creates one block in the database, with the item's work block as its length | `src/getmoredone/screens/plan.py` (bind_item_drag, on_drag_release, block_item, _require_block_day) | `tests/test_plan_screen.py::test_tbm81_drop_creates_block_using_work_block` | done |
 | TB-M8.2 | A drop on an unchecked weekday creates **no** block and reports why | `src/getmoredone/screens/plan.py` (bind_item_drag, on_drag_release, block_item, _require_block_day) | `tests/test_plan_screen.py::test_tbm82_drop_on_non_block_day_is_refused` | done |
 | TB-M9.1 | Both `<Button-3>` and `<Button-2>` are bound on a block widget | `src/getmoredone/screens/plan.py` (bind_block_handlers, open_block_menu, set_block_minutes) | `tests/test_plan_screen.py::test_tbm91_both_right_click_buttons_are_bound` | done |
-| TB-M9.2 | Choosing 60 from the menu updates that block's row to 60 and re-times the blocks after it | `src/getmoredone/screens/plan.py` (bind_block_handlers, open_block_menu, set_block_minutes) | `tests/test_plan_screen.py::test_tbm92_duration_change_repacks_the_day` | done |
+| TB-M9.2 | Choosing 60 from the menu updates that block's row to 60 and re-times the blocks after it | `src/getmoredone/screens/plan.py` (bind_block_handlers, open_block_menu, set_block_minutes) | `tests/test_plan_screen.py::test_tbm92_duration_change_repacks_the_day` | superseded by the grid — The resize no longer re-times the rest of the day — nothing else moves. See TG-M11.2. |
 | TB-M10.1 | Add Buffer and Add Break each create a typed block of the right length | `src/getmoredone/screens/plan.py` (add_padding_block), `models.py` (BlockType) | `tests/test_plan_screen.py::test_tbm101_buffer_and_break_blocks_are_typed` | done |
-| TB-M11.1 | Dragging block 3 above block 1 leaves the database in that order, by position and by time | `src/getmoredone/screens/plan.py` (start_block_drag, drop_index_for_pointer, reorder_to) | `tests/test_plan_screen.py::test_tbm111_reorder_persists_new_order` | done |
-| TB-M12.1 | Block height is proportional to minutes — a 90 is three times a 30 | `src/getmoredone/screens/plan_blocks.py`, `src/getmoredone/theme.py`, `time_block_layout.py` (block_height) | `tests/test_plan_screen.py::test_tbm121_block_height_tracks_minutes` | done |
+| TB-M11.1 | Dragging block 3 above block 1 leaves the database in that order, by position and by time | `src/getmoredone/screens/plan.py` (start_block_drag, drop_index_for_pointer, reorder_to) | `tests/test_plan_screen.py::test_tbm111_reorder_persists_new_order` | superseded by the grid — The reorder gesture is gone. A drag moves a block to the box it was dropped on; see TG-M11.1. |
+| TB-M12.1 | Block height is proportional to minutes — a 90 is three times a 30 | `src/getmoredone/screens/plan_blocks.py`, `src/getmoredone/theme.py`, `time_block_layout.py` (block_height) | `tests/test_plan_screen.py::test_tbm121_block_height_tracks_minutes` | superseded by the grid — `block_height` is gone. A box is half an hour whatever is in it; its height is how many tasks share it. See TG-M10.1. |
 | TB-M12.2 | Every band colour clears the contrast minimum against the block background in **both** light and dark themes (via the existing `color_contrast.py`) | `src/getmoredone/screens/plan_blocks.py`, `src/getmoredone/theme.py`, `time_block_layout.py` (block_height) | `tests/test_time_block_colors.py::test_tbm122_band_colors_meet_contrast_in_both_themes` | done |
 | TB-M12.3 | No hard-coded hex outside the `theme.py` band table — parsed from the AST, asserted as an **exact count of zero** | `src/getmoredone/screens/plan_blocks.py`, `src/getmoredone/theme.py`, `time_block_layout.py` (block_height) | `tests/test_time_block_colors.py::test_tbm123_no_inline_hex_in_plan_screen` | done |
 
@@ -230,3 +230,83 @@ test now counts the per-day repacks instead, and a second test asserts the
 first day really is written before the failure, which is the thing that makes
 the atomicity assertion mean anything. Because that pass produced no
 high-severity finding, the budget in `CLAUDE.md` ends the sweep there.
+
+# Spec Coverage — the Plan screen as a 30-minute grid (2026-11-05)
+
+Plan: [`docs/implementation_plan_2026-11-05_time_grid.md`](implementation_plan_2026-11-05_time_grid.md)
+
+This replaces the **order** model recorded in the section above, which never
+shipped: a planned day was a list whose clock times were re-derived on every
+edit. A day is now a fixed grid of half hours, and a block stores **which box**
+it is in, relative to Day Start. The rows that section marks
+*superseded by the grid* are the criteria that went with the old model.
+
+Every row's test was mutation-proved: the line it names deleted or inverted,
+the test confirmed red, the verbatim original restored. 27 mutations, 27 reds.
+
+| Spec ID | Criterion | Implementation | Test | Status |
+|---|---|---|---|---|
+| TG-M1.1 | `day_grid` yields one slot per half hour from Day Start to Day End inclusive of the last whole slot | `src/getmoredone/time_block_layout.py` (day_grid, Slot) | `tests/test_time_grid.py::test_tgm11_grid_covers_the_day_in_half_hours` | done |
+| TG-M1.2 | Lunch slots are marked unavailable and are **not** omitted from the grid | `src/getmoredone/time_block_layout.py` (day_grid) | `tests/test_time_grid.py::test_tgm12_lunch_slots_are_marked_not_removed` | done |
+| TG-M1.3 | A Day End that is not on a half hour yields no partial trailing slot | `src/getmoredone/time_block_layout.py` (day_grid) | `tests/test_time_grid.py::test_tgm13_a_ragged_day_end_yields_no_partial_slot` | done |
+| TG-M2.1 | `slots_for_minutes` rounds up: 30→1, 45→2, 60→2, 1→1 | `src/getmoredone/time_block_layout.py` (slots_for_minutes, slot_span_of) | `tests/test_time_grid.py::test_tgm21_odd_lengths_round_up` | done |
+| TG-M2.1a | The minutes a rounded-up block leaves spare in its last box are reported, not rounded away | `src/getmoredone/time_block_layout.py` (spare_minutes_in_last_slot), `screens/plan_blocks.py` (_build_block_chip) | `tests/test_time_grid.py::test_the_spare_minutes_of_the_last_box_are_what_the_task_leaves`, `::test_a_block_with_no_length_leaves_nothing_spare` | done |
+| TG-M2.2 | **Adversarial (P7)** — a 2-slot block whose second slot is lunch is refused, not drawn across it | `src/getmoredone/time_block_layout.py` (can_place) | `tests/test_time_grid.py::test_tgm22_a_span_cannot_cross_lunch`, `::test_a_block_may_not_start_on_lunch_either` | done |
+| TG-M2.3 | A refusal names its reason; every reason is a distinct named value | `src/getmoredone/time_block_layout.py` (SlotRefusal, SlotRefusedError, can_place) | `tests/test_time_grid.py::test_tgm23_each_refusal_has_its_own_reason` | done |
+| TG-M2.4 | **Real scale (P9)** — a 9-hour day fully occupied: the next placement is refused, the placed ones are all returned | `src/getmoredone/time_block_layout.py` (can_place, slot_occupancy, MAX_BLOCKS_PER_SLOT) | `tests/test_time_grid.py::test_tgm24_a_full_day_refuses_the_next_one` | done |
+| TG-M3.1 | **P2** — a block whose slot no longer exists is returned flagged, never dropped | `src/getmoredone/time_block_layout.py` (build_day_grid, DayGrid.outside) | `tests/test_time_grid.py::test_tgm31_blocks_outside_the_grid_are_surfaced`, `::test_a_block_whose_span_now_runs_past_the_day_is_surfaced_too`, `::test_a_never_placed_block_is_surfaced_rather_than_assumed_to_be_at_eight` | done |
+| TG-M3.1a | A block sitting in a box lunch has since moved onto is surfaced too — a lunch box draws no tasks, so one left there would vanish | `src/getmoredone/time_block_layout.py` (build_day_grid) | `tests/test_time_grid.py::test_a_block_sitting_in_a_lunch_box_is_surfaced_not_hidden`, `::test_a_span_that_runs_through_lunch_is_surfaced_too` | done |
+| TG-M3.1b | The "outside the day" group is **drawn**, and a settings change that creates one says so | `src/getmoredone/screens/plan_blocks.py` (build_outside_group), `screens/plan.py` (load_blocks, on_settings_saved) | `tests/test_plan_screen.py::test_tgm31_an_outside_block_is_drawn` | done |
+| TG-M4.1 | Migration adds `slot_index`, is idempotent on a second run | `src/getmoredone/database.py` (initialize_schema + _run_migrations), `models.py` (TimeBlock.slot_index) | `tests/test_time_block_schema.py::test_tgm41_migration_adds_slot_index_idempotently` | done |
+| TG-M4.1a | A fresh install gets the column from `CREATE TABLE` too, and it is nullable with no default so "never placed" stays representable | `src/getmoredone/database.py` (initialize_schema) | `tests/test_time_block_schema.py::test_a_fresh_database_has_slot_index_too`, `::test_slot_index_is_nullable_so_never_placed_is_representable` | done |
+| TG-M4.2 | The day is indexed by `(block_date, slot_index, position)`, which is the order every read uses | `src/getmoredone/database.py` (_run_migrations, idx_blocks_date_slot) | `tests/test_time_block_schema.py::test_the_day_is_indexed_by_box` | done |
+| TG-M5.1 | A row stored at `09:30` under an 08:00 Day Start adopts `slot_index` 3 | `src/getmoredone/db_manager.py` (adopt_legacy_day) | `tests/test_time_block_schema.py::test_tgm51_existing_times_map_to_slots` | done |
+| TG-M5.2 | **Dirty state (P8)** — a row with an empty `start_time` adopts the first box that fits and does not raise; adopting twice changes nothing | `src/getmoredone/db_manager.py` (adopt_legacy_day) | `tests/test_time_block_schema.py::test_tgm52_a_timeless_row_migrates_by_position`, `::test_adopting_a_day_twice_changes_nothing_the_second_time` | done |
+| TG-M5.3 | A readable start time goes on the box it names **or nowhere** — never slid to the nearest free box | `src/getmoredone/db_manager.py` (adopt_legacy_day) | `tests/test_time_block_schema.py::test_a_legacy_block_the_grid_cannot_hold_keeps_its_null`, `::test_a_legacy_block_before_day_start_keeps_its_null`, `::test_a_legacy_block_whose_own_box_is_full_keeps_its_null` | done |
+| TG-M6.1 | Two blocks on one `slot_index` round-trip, ordered by `position` | `src/getmoredone/db_manager.py` (add_block_at, _settle_block_on_slot, get_time_blocks) | `tests/test_time_block_crud.py::test_tgm61_two_blocks_share_a_slot` | done |
+| TG-M6.1a | `position` counts **within** a box, not across the day | `src/getmoredone/db_manager.py` (_next_position_in_slot) | `tests/test_time_block_crud.py::test_position_restarts_in_each_box` | done |
+| TG-M6.2 | A write settles the box, the position and the derived times in one transaction; a refusal writes nothing | `src/getmoredone/db_manager.py` (add_block_at, place_block_at, set_block_length, _refuse_unless_it_fits) | `tests/test_time_block_crud.py::test_tgm62_a_failed_move_writes_nothing`, `::test_a_move_rewrites_the_times_with_the_slot`, `::test_a_block_can_be_nudged_inside_a_box_that_is_already_full` | done |
+| TG-M6.3 | Every written row satisfies `end == start + planned_minutes` | `src/getmoredone/time_block_layout.py` (times_for_slot) | `tests/test_time_block_crud.py::test_tgm63_every_row_says_start_plus_duration`, `::test_a_resize_that_fits_rewrites_the_end_time` | done |
+| TG-M6.4 | Day Start changing re-times every day with **no** write to `time_blocks` | `src/getmoredone/time_block_layout.py` (times_for_slot, day_grid) | `tests/test_time_block_crud.py::test_tgm64_a_day_start_change_writes_no_rows` | done |
+| TG-M6.4a | The same through the screen: `on_settings_saved` writes nothing and the grid re-times | `src/getmoredone/screens/plan.py` (on_settings_saved) | `tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks` | done |
+| TG-M7.1 | Every slot in the grid is drawn, empty ones included | `src/getmoredone/screens/plan.py` (load_blocks), `screens/plan_blocks.py` (build_slot_row, build_empty_day_note) | `tests/test_plan_screen.py::test_tgm71_every_slot_is_drawn` | done |
+| TG-M8.1 | A half-hour box is within 8px of its pane's width | `src/getmoredone/screens/plan_blocks.py` (build_slot_row, _configure_slot_columns) | `tests/test_plan_screen.py::test_tgm81_a_block_row_fills_its_pane` *(needs `mapped_windows`)* | done |
+| TG-M8.2 | A box's title label is non-empty and mapped | `src/getmoredone/screens/plan_blocks.py` (_build_block_chip) | `tests/test_plan_screen.py::test_tgm82_a_block_row_shows_its_title` *(needs `mapped_windows`)* | done |
+| ~~TG-M8.3~~ | **Dropped**, not implemented. The sliver bug it was written for does not reproduce, and `_aim_pointer_at`'s `max(1, …)` floor alters the aim only at widths 0 and 1 | — | — | not done — criterion withdrawn, with the measurement, in the plan's TG-M8 section |
+| TG-M9.1 | Dropping an item on the 11:00 box creates a block at `slot_index` 6, not at the end of the day | `src/getmoredone/screens/plan.py` (slot_under_pointer, on_drag_release, block_item) | `tests/test_plan_screen.py::test_tgm91_a_drop_lands_on_the_slot_under_the_pointer` | done |
+| TG-M9.2 | A drop on a lunch slot is refused, with the reason on the status line and nothing written | `src/getmoredone/screens/plan.py` (REFUSAL_TEXT, refusal_text, block_item) | `tests/test_plan_screen.py::test_tgm92_a_drop_on_lunch_is_refused_and_says_why` | done |
+| TG-M9.3 | A release that lands on no box is a cancelled drag — never "the nearest box" | `src/getmoredone/screens/plan.py` (slot_under_pointer) | `tests/test_plan_screen.py::test_a_drop_that_lands_on_no_box_is_a_cancelled_drag` | done |
+| TG-M10.1 | A second item dropped on a filled box joins it; both titles are drawn, and the box is drawn taller | `src/getmoredone/screens/plan_blocks.py` (build_slot_row, slot_row_height) | `tests/test_plan_screen.py::test_tgm101_two_tasks_share_a_box` | done |
+| TG-M10.2 | The later boxes of a longer task are marked as continuations and say what they leave spare | `src/getmoredone/screens/plan_blocks.py` (_build_block_chip) | `tests/test_plan_screen.py::test_a_longer_task_marks_the_boxes_it_runs_through` | done |
+| TG-M10.3 | A continuation chip carries no drag and no menu — the box a block starts in owns it | `src/getmoredone/screens/plan_blocks.py` (build_slot_row), `screens/plan.py` (load_blocks) | `tests/test_plan_screen.py::test_a_continuation_chip_carries_no_drag` | done |
+| TG-M11.1 | A real press-and-release moves a block to the box it was dropped on | `src/getmoredone/screens/plan.py` (bind_block_handlers, on_drag_release, move_block_to_slot) | `tests/test_plan_screen.py::test_tgm111_a_real_drag_moves_a_block_between_slots` *(needs `mapped_windows`)* | done |
+| TG-M11.2 | A resize that would not fit from where the block sits is refused and the block does not move | `src/getmoredone/db_manager.py` (set_block_length), `screens/plan.py` (set_block_minutes) | `tests/test_time_block_crud.py::test_tgm112_a_resize_that_does_not_fit_is_refused` | done |
+| TG-M12.1 | A 45-minute item in a day reports 2 boxes, 1h 00m occupied, 45m planned — all three | `src/getmoredone/screens/plan.py` (update_day_summary, _clock) | `tests/test_plan_screen.py::test_tgm121_the_summary_separates_occupied_from_planned` | done |
+
+## Human review required (not code-testable)
+
+| Item | Why it cannot be a test | What is tested instead |
+|---|---|---|
+| Whether the grid *reads* as a day at full size — 18 boxes in the pane, the empty ones legible, the continuation chips distinguishable from the tasks that own them | Pixel judgement, not a predicate | TG-M8.1/8.2 in real geometry: a box fills its pane within 8px and its title label is mapped and wider than a pixel. TG-M10.1 asserts a shared box is drawn taller than a single one |
+| Whether macOS delivers right-click as `<Button-3>` or `<Button-2>` on this machine | The OS decides, not the app | Both stay bound, asserted from the screen's own `RIGHT_CLICK_SEQUENCES`, and a real `<Button-3>` on a real chip is asserted to open a menu |
+| Whether dragging a chip between boxes *feels* right — the hover outline, the grab target on a 30px chip | Subjective, and a function of real pointer travel | TG-M11.1 and the item-drop test generate real `<ButtonPress-1>`/`<B1-Motion>`/`<ButtonRelease-1>` at real widgets and assert the stored box |
+
+Both human checks are **outstanding**. `/Applications/daVIPA.app` holds the
+single-instance lock, so a source launch exits silently with status 0 — run
+`./start-demo.sh`, or quit the packaged app and `./start.sh`.
+
+## Adjacent issues found, not fixed
+
+- `PIXELS_PER_MINUTE` and `MIN_BLOCK_HEIGHT_PX` became unreachable with
+  `block_height`. Deleted in this batch rather than flagged, since they are
+  this change's own orphans and nothing outside `time_block_layout.py` read
+  them.
+- Three `Tests:` docstring lines named tests that no longer exist, found by
+  `tests/test_traceability_refs.py` rather than by review. Repointed in this
+  batch. The meta test is the only thing that catches this class, and it caught
+  it on the full-suite run, not on the touched files.
+- The four items deferred from the time-block rebuild in `BACKLOG.md` are
+  unchanged by the grid, except that *"No way to move a block to another day"*
+  is now the only way to re-plan work for tomorrow, since a drag within a day
+  moves it between boxes.
+
