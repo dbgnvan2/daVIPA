@@ -4,6 +4,8 @@ Stores user preferences like Obsidian vault path.
 """
 
 import json
+import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, asdict, fields, field
@@ -166,8 +168,33 @@ class AppSettings:
 
         return cls()
 
-    def save(self):
-        """Save settings to file."""
+    def save(self) -> bool:
+        """Write settings to file. Returns whether the write succeeded.
+
+        Purpose: the one destructive step in this class, and the only caller
+                 that can act on ``settings_unreadable``.
+        Tests:   tests/test_plan_settings.py::test_an_unreadable_settings_file_is_kept_before_it_is_overwritten
+
+        Two things happen here that the flag exists for.
+
+        An unreadable file is **copied aside before it is overwritten.** When
+        the file on disk exists but would not parse, every value in this object
+        is a default standing in for one we could not read -- and this method
+        writes all of them, not just the ones a dialog touched. Overwriting is
+        how the user gets a working settings file back, but it would otherwise
+        destroy the only copy of the one they had, including the fields no
+        screen in the app can re-enter by hand.
+
+        A successful write **clears the flag**, because it is what makes it
+        false: the file now holds exactly these values, so the next load reads
+        them back and reports nothing. Leaving it set would make the same
+        values untrusted now and trusted after a restart, and would leave
+        adoption blocked with no way out but relaunching the app (P6 -- a
+        status field reconciled against the artifact it describes).
+
+        The return value is new and additive: callers that ignore it behave as
+        before, and the ones that report success to the user should not.
+        """
         settings_path = self.get_settings_path()
         self.appearance_mode = self._normalize_appearance_mode(
             self.appearance_mode)
@@ -189,11 +216,27 @@ class AppSettings:
         # Ensure data directory exists
         settings_path.parent.mkdir(parents=True, exist_ok=True)
 
+        if self.settings_unreadable and settings_path.exists():
+            stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            kept = settings_path.with_name(f"{settings_path.name}.unreadable-{stamp}")
+            try:
+                shutil.copy2(settings_path, kept)
+                print(f"Kept the unreadable settings file at {kept}")
+            except Exception as e:
+                # The backup failing is not a reason to leave the user with a
+                # settings file the app cannot read, but it is a reason to say
+                # so rather than overwrite quietly.
+                print(f"Could not keep the unreadable settings file: {e}")
+
         try:
             with open(settings_path, 'w') as f:
                 json.dump(asdict(self), f, indent=2)
         except Exception as e:
             print(f"Error saving settings: {e}")
+            return False
+
+        self.settings_unreadable = False
+        return True
 
     def _normalize_plan_day_settings(self) -> None:
         """TB-M4.1/4.2 — coerce the four day values and the seven weekday flags.

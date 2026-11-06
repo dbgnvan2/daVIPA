@@ -105,6 +105,18 @@ def _subtree(widget):
     A chip nests its labels inside a body frame, so "the row's children" is
     not the same set as "the row's widgets", and a binding loop over the
     former leaves most of the row inert.
+
+    **Depth first, parent before child, and that order matters.** A
+    CustomTkinter widget's own ``bind`` forwards the handler to the internal
+    widgets it is made of, with ``add=True``. Binding the parent first and the
+    internals after means the plain ``tkinter`` bind on each internal replaces
+    the forwarded copy, so a press fires once. Reverse this traversal and both
+    survive, every drag starts twice, and nothing says so.
+
+    It also means a loop over this list overwrites ``<Button-1>`` on every
+    descendant, so an interactive widget inside a chip -- a button, a checkbox
+    -- would stop responding. Nothing in a chip is interactive today; the
+    backlog carries the ``isinstance`` skip for when one is.
     """
     found = [widget]
     for child in widget.winfo_children():
@@ -439,7 +451,15 @@ class PlanScreen(ctk.CTkFrame):
                     f" on the grid, using a day start of {self.bounds.day_start}",
                     "muted",
                 )
-            elif not self._day_shape_is_the_users():
+            elif self._day_settings_are_unreadable() and any(
+                block.slot_index is None for block in blocks
+            ):
+                # Both halves are load-bearing. Without the flag check this
+                # also fires when no settings object was supplied at all,
+                # which is a wiring mistake and not a file the user can fix.
+                # Without the second it fires on every date change of an
+                # ordinary day, naming blocks from an earlier version that do
+                # not exist.
                 self.set_status(
                     "Day Settings could not be read, so blocks from an earlier"
                     " version are left off the grid rather than placed at a"
@@ -876,7 +896,21 @@ class PlanScreen(ctk.CTkFrame):
         """
         if self.settings is None:
             return False
-        return not getattr(self.settings, "settings_unreadable", False)
+        return not self._day_settings_are_unreadable()
+
+    def _day_settings_are_unreadable(self) -> bool:
+        """Whether a settings file exists and could not be parsed.
+
+        Purpose: TG-M5 -- the narrower of the two questions. "Not the user's"
+                 covers a missing settings object too, which is a wiring
+                 mistake; only this one is a file the user can do something
+                 about, so only this one is worth telling them about.
+        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
+        Tests:   tests/test_plan_screen.py::test_no_settings_object_is_not_reported_as_an_unreadable_file
+        """
+        if self.settings is None:
+            return False
+        return bool(getattr(self.settings, "settings_unreadable", False))
 
     def pointer_over_day(self) -> bool:
         return widget_contains_pointer(

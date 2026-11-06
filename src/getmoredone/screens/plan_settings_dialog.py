@@ -182,7 +182,14 @@ class PlanSettingsDialog(ctk.CTkToplevel):
 
         for field, value in values.items():
             setattr(self.settings, field, value)
-        self.settings.save()
+        if not self.settings.save():
+            # Said here rather than swallowed: ``on_saved`` reports "Day
+            # settings saved" to the user, and the day it would then draw is
+            # one that exists only in memory.
+            self.error_label.configure(
+                text="Could not write the settings file — see the log"
+            )
+            return
 
         if self.on_saved:
             self.on_saved(DayBounds.from_settings(self.settings))

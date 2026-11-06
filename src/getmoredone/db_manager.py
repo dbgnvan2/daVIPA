@@ -1413,23 +1413,32 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         highest = row["highest"] if row and row["highest"] is not None else 0
         return int(highest) + 1
 
-    def _settle_block_on_slot(self, block: TimeBlock, slot_index: int, bounds) -> None:
+    def _settle_block_on_slot(
+        self,
+        block: TimeBlock,
+        slot_index: int,
+        bounds,
+        keep_position: bool = False,
+    ) -> None:
         """Give a block its box, its order in that box, and its clock times.
 
         One place, because a write that set the box and forgot the times would
         leave a row whose stored start is from wherever it used to be -- and
         nothing on screen reads the stored time, so it would stay wrong until
         somebody opened the database.
+
+        ``keep_position`` is for a caller that is changing something other than
+        where the block sits. A block joins the end of the box it arrives in,
+        which is right for a drop and wrong for a resize: ``position`` is what
+        a box's order is read from, and making a task longer is not a gesture
+        about its order. The default is off, so a drop onto the box a block is
+        already in still moves it to the end -- that is the only reordering
+        gesture a box has, and it is what ``place_block_at`` documents.
         """
         from .time_block_layout import times_for_slot
 
         target = int(slot_index)
-        if block.slot_index != target:
-            # Only a change of box changes the order: the block joins the end
-            # of the box it arrives in. A block staying put keeps the place it
-            # already had -- ``position`` is what a box's order is read from,
-            # and a length change is not a reordering gesture, whatever it
-            # does to the block's size.
+        if not keep_position:
             block.position = self._next_position_in_slot(
                 block.block_date, target, ignoring=block.id
             )
@@ -1522,7 +1531,9 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         )
         with self.transaction():
             block.planned_minutes = wanted
-            self._settle_block_on_slot(block, block.slot_index, bounds)
+            self._settle_block_on_slot(
+                block, block.slot_index, bounds, keep_position=True
+            )
             self.update_time_block(block)
         return block
 
