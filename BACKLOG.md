@@ -1,6 +1,41 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-06 (the seventh pass of the grid rebuild: four below-medium added; the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-06 (the plan-box-appearance sweep: four more below-medium added; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Below medium, from the plan-box-appearance sweep (2026-11-06)
+
+Two review passes over the batch that shaded a task by its priority and sized
+it from the Drag Schedule settings: a failure-pattern pass and a correctness
+pass. Eight findings between them, no high. The five medium ones were fixed
+with tests in the same session; these are the rest, plus two adjacent issues
+flagged rather than fixed (global rule 10).
+
+- **Adjacent: `drag_schedule.py` reads the shared box-height setting without
+  the guard written for the Plan screen.** `screens/drag_schedule.py:115` is
+  `max(20, int(getattr(self.settings, "drag_schedule_box_height_px", 86)))`.
+  A hand-edited `null` or `"86px"` in settings.json raises there and the
+  screen does not open, while the Plan screen falls back to 30. The two
+  readers also disagree on the fallback (86 vs 30) and the floor (20 vs 30),
+  so the user guide's claim that a task is the same size on both screens holds
+  only on the happy path. One `_positive_setting`-style helper shared by both
+  is the fix. Not fixed here: it is outside the batch, and silently widening
+  the diff into another screen is the sweeping-diff half of rule 10.
+- **Adjacent: the four Plan and Drag Schedule size controls sit under
+  "Date Increment Settings".** `create_date_increment_section` renders the two
+  Drag Schedule sizes, the Plan items column width and the date-increment
+  rules together, under a heading and an info paragraph that describe only
+  date incrementing. The docs now say where the controls actually are, which
+  is the honest half; moving them to Appearance is a relocation of existing
+  controls and needs approval under the UI regression standard, so it is
+  recorded rather than done.
+- **A shaded item row has no title/detail hierarchy.** `build_item_row` sets
+  the title and the detail line to the same `pick_text_color(fill)`, because
+  that function has no muted variant. Contrast is fine on both; the title no
+  longer reads as the louder of the two. Wants a `pick_muted_text_color`, or a
+  fixed alpha blend toward the fill.
+- **`docs/USER_GUIDE.md` has two "Date Increment Settings:" headings** in the
+  settings reference, listing different controls under the same name. Older
+  than this batch; found while correcting the section a control lives in.
 
 ## Below medium, from the seventh pass of the grid rebuild (2026-11-06)
 

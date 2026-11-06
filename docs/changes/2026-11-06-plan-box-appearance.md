@@ -76,8 +76,50 @@ bar. The same missing `height=` made every Items-starting row ~200px tall.
 - Item titles longer than the column are still clipped at the right edge.
   Anchored left, so the start is always readable; no ellipsis.
 
+## Sweep (2026-11-06, after the first three commits)
+
+Two passes over `99d438f...cfd6dc5`, both cold: a failure-pattern pass
+(`learning-qa`) and a correctness pass (`/code-review`). Eight findings
+between them, no high, three raised by both. `/security-review` was not run:
+the range has no credential, auth, SQL, subprocess, HTTP or deserialisation
+surface — the only grep hits were the word "request" in prose about
+`CTkFrame` geometry.
+
+Five mediums fixed with tests in `0d48c96` (src) and `cb8c476` (tests):
+
+- The outside-the-day group's rows kept the 30/80 fallbacks while the day took
+  the setting, in the column the group had just been moved into.
+- That group also lost its scrollable container in the move, so a day with a
+  dozen blocks outside it clipped the lower rows out of reach while the header
+  counted them (P2). Scrollable at a fixed height, ungridded when empty.
+- `_positive_setting` guaranteed "> 0", not usable: a box height of 14 made a
+  two-task half hour the same height as a one-task one and clipped the second
+  task. Floored at one line of text.
+- The note's wraplength was unfloored and Tk reads `<= 0` as "do not wrap".
+- Three docstrings and a settings comment named the wrong Settings section.
+
+Plus three test-quality fixes: a colour test that passed only because this Mac
+is in light mode, three tests holding `mapped_windows` without reading
+geometry, and a duplicated WCAG luminance formula whose justification was
+false. The documented mapped-window count (conftest: three, CLAUDE.md: ten;
+actual: nineteen) is now asserted against the suite by AST.
+
+Mutation gate on the fixes: 8 mutations, 8 red, every file restored. The
+appearance pin was probed by forcing dark mode, where the test it protects
+goes red as predicted.
+
+Four below-medium findings went to `BACKLOG.md`, including two adjacent issues
+flagged rather than fixed under rule 10.
+
 ## Adjacent issues found, not fixed
 
+- `screens/drag_schedule.py:115` reads the same box-height setting with a bare
+  `int(getattr(...))`, a different fallback (86) and a different floor (20).
+  Hand-edit a `null` into settings.json and that screen does not open while
+  the Plan screen falls back. One shared helper is the fix; widening this diff
+  into another screen is not.
+- The four Plan/Drag Schedule size controls render under "Date Increment
+  Settings". The docs now say so; moving them needs approval.
 - A press that lands exactly on a 14x3px depth bar does not start a drag
   (already in `BACKLOG.md`; still true, and the bars are now visible on the
   Day Plan too, so the target exists in one more place).

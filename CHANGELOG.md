@@ -39,6 +39,20 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   its title column as wide as the Drag Schedule title column, so a task is the
   same size on both screens. Empty half hours keep their compact height. An
   unusable setting falls back rather than flattening the day.
+- A box height below 30 is raised to 30, which is one line of text. A box does
+  not grow to its contents while a task inside it does, so a shorter box made a
+  half hour holding two tasks the same height as one holding one, with the
+  second task laid out past the box's clip edge.
+- The **Outside the day** group's rows are the size a task is in a box, and the
+  group scrolls. It had moved into the items column on a plain frame, so a day
+  with more than a few blocks outside it clipped the lower rows out of reach
+  while the header still counted them.
+- The *no items start on this date* note wraps at a minimum width. Tk reads a
+  wraplength of zero or less as "do not wrap", so an items column of 56px or
+  narrower got back the single clipped line.
+- *Plan items column width (px)*, the two *Drag Schedule* sizes and the
+  date-increment rules are all in Settings ▸ **Date Increment Settings**. The
+  docs said Appearance for the first two.
 
 ### Fixed — settings saves that could not happen were reported as done
 
