@@ -527,12 +527,21 @@ def build_outside_group(
     blocks: List[TimeBlock],
     items_by_id: Dict[str, ActionItem],
     row: int,
+    *,
+    chip_height: int = SLOT_CHIP_HEIGHT_PX,
+    title_width: int = SLOT_TITLE_WIDTH_PX,
 ) -> List[Tuple[TimeBlock, ctk.CTkFrame]]:
-    """Blocks no box can hold, drawn under the grid rather than dropped.
+    """Blocks no box can hold, drawn beneath the item list rather than dropped.
 
     Purpose: TG-M3 -- surface, never silently drop (P2).
     Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m3
     Tests:   tests/test_plan_screen.py::test_tgm31_an_outside_block_is_drawn
+             tests/test_plan_screen.py::test_pbm55_an_outside_block_is_sized_like_one_in_a_box
+
+    The two size settings are passed through for the same reason they reach a
+    box: a row here sits directly beneath the item rows and across from the
+    boxes, and a task that changes size depending on which of the three it is
+    in reads as three different kinds of thing.
 
     A block gets here when Day End moved earlier than its box, when its length
     now runs past the last box, or when it has never been placed at all. The
@@ -554,7 +563,7 @@ def build_outside_group(
             parent,
             fg_color=palette["surface_subtle"],
             corner_radius=6,
-            height=SLOT_CHIP_HEIGHT_PX,
+            height=chip_height,
             border_width=1,
             border_color=palette["warning"],
         )
@@ -563,7 +572,13 @@ def build_outside_group(
         holder.grid_rowconfigure(0, weight=1)
         holder.grid_propagate(False)
         _build_block_chip(
-            holder, block, items_by_id.get(block.item_id), 0, continued=False
+            holder,
+            block,
+            items_by_id.get(block.item_id),
+            0,
+            continued=False,
+            chip_height=chip_height,
+            title_width=title_width,
         )
         widgets.append((block, holder))
     return widgets

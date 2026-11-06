@@ -79,6 +79,20 @@ PLAN_ITEMS_COL_WIDTH_PX = 260
 #: text. Subtracted from the column width to get a wraplength that fits.
 ITEMS_TEXT_INSET_PX = 56
 
+#: Height (px) of the "Outside the day" group. Fixed and scrollable rather
+#: than as tall as its contents: the group shares the items column with the
+#: item list, and a dozen blocks growing it would push the list it sits under
+#: off the bottom of the pane.
+OUTSIDE_GROUP_HEIGHT_PX = 150
+
+#: The narrowest the empty-items note will wrap to. Tk reads a wraplength of
+#: zero or less as "do not wrap", so a column of 56px or under would have
+#: turned the note back into the one long clipped line that the wrapping was
+#: added to fix. Below this width the note is wider than its column and
+#: clipped at the right edge, which is the readable end: it is anchored west,
+#: so it still starts at the first word.
+NOTE_MIN_WRAP_PX = 120
+
 # How many items the left pane will draw. Announced when it bites, never
 # silently applied (P2): a planner that quietly stopped listing an item would
 # be hiding the work it exists to surface.
@@ -206,7 +220,7 @@ class PlanScreen(ctk.CTkFrame):
         self.refresh()
 
     def items_col_width(self) -> int:
-        """Width (px) of the items column, from Settings > Appearance.
+        """Width (px) of the items column, from Settings.
 
         Purpose: the column is sized by a setting, not by a share of the
                  window.
@@ -222,15 +236,26 @@ class PlanScreen(ctk.CTkFrame):
         )
 
     def box_height(self) -> int:
-        """Height (px) of one task in a day box, from Settings > Appearance.
+        """Height (px) of one task in a day box, from the Drag Schedule setting.
 
         Purpose: PB-M5 -- the Day Plan boxes are sized by the Drag Schedule
                  box-height setting rather than by a constant.
         Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m5
         Tests:   tests/test_plan_screen.py::test_pbm52_the_setting_reaches_the_rendered_box
+                 tests/test_plan_screen.py::test_pbm56_a_box_height_below_one_line_of_text_is_raised
+
+        Floored, not merely positive. A box is pinned to
+        ``chips * chip_height + 4`` and does not let its contents push it
+        taller, while a chip grows to its own text; below one line of text per
+        chip the second task in a half hour is laid out past the box's clip
+        edge, which is the PB-M2 defect reached through a setting instead of a
+        missing ``height=``. ``SLOT_CHIP_HEIGHT_PX`` is that line of text,
+        which is also why it is the fallback.
         """
         return self._positive_setting(
-            "drag_schedule_box_height_px", SLOT_CHIP_HEIGHT_PX
+            "drag_schedule_box_height_px",
+            SLOT_CHIP_HEIGHT_PX,
+            minimum=SLOT_CHIP_HEIGHT_PX,
         )
 
     def box_title_width(self) -> int:
@@ -245,18 +270,31 @@ class PlanScreen(ctk.CTkFrame):
             "drag_schedule_title_col_width", SLOT_TITLE_WIDTH_PX
         )
 
-    def _positive_setting(self, name: str, fallback: int) -> int:
+    def _positive_setting(
+        self, name: str, fallback: int, minimum: Optional[int] = None
+    ) -> int:
         """A settings integer, or ``fallback`` when it is missing or unusable.
 
         A settings file is user-editable, so every size read from one has to
         survive a zero, a negative and a typo. Collapsing a column or a box to
         nothing hides the control the user would need to put it back.
+
+        ``minimum`` raises a value that parses but is too small to draw what
+        the dimension has to hold. Positive is not the same bar as usable, and
+        a caller that needs the stronger one says so rather than discovering
+        it as a clipped widget. The raise is documented in the user guide
+        beside the fallback, which is the only surface a hand-edited settings
+        file has.
         """
         try:
             value = int(getattr(self.settings, name, None))
         except (TypeError, ValueError):
             return fallback
-        return value if value > 0 else fallback
+        if value <= 0:
+            return fallback
+        if minimum is not None:
+            return max(minimum, value)
+        return value
 
     # ================= construction =========================================
 
@@ -339,11 +377,24 @@ class PlanScreen(ctk.CTkFrame):
         # tail of ``items_scroll``: that one is emptied by ``load_items``
         # and this is filled by ``load_blocks``, so sharing it would make
         # the group survive or vanish depending on which ran last.
-        self.outside_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        #
+        # Scrollable, and that is the whole point of the container. The group
+        # has no cap -- shortening Day End can put a dozen blocks here at
+        # once -- and in a plain frame every row past the bottom of the pane
+        # was clipped with no way to reach it. The header counts them, so the
+        # screen would have been telling the user that work it had made
+        # undraggable was still there (P2).
+        self.outside_frame = ctk.CTkScrollableFrame(
+            frame, fg_color="transparent", height=OUTSIDE_GROUP_HEIGHT_PX
+        )
         self.outside_frame.grid(
             row=3, column=0, sticky="ew", padx=5, pady=(0, 5)
         )
         self.outside_frame.grid_columnconfigure(0, weight=1)
+        # Not held back here as well. ``load_blocks`` runs from ``refresh`` in
+        # __init__ and grids or ungrids the group on every redraw, so a second
+        # grid_remove on this path would be a line no test could fail on --
+        # the same reason the chip in a box carries no grid_propagate.
 
     def create_day_pane(self):
         frame = ctk.CTkFrame(self)
@@ -456,7 +507,10 @@ class PlanScreen(ctk.CTkFrame):
                     ),
                     anchor="w",
                     justify="left",
-                    wraplength=self.items_col_width() - ITEMS_TEXT_INSET_PX,
+                    wraplength=max(
+                        NOTE_MIN_WRAP_PX,
+                        self.items_col_width() - ITEMS_TEXT_INSET_PX,
+                    ),
                 ).grid(row=0, column=0, padx=10, pady=20, sticky="w")
             else:
                 for row, item in enumerate(shown):
@@ -593,11 +647,19 @@ class PlanScreen(ctk.CTkFrame):
             # the user has to drag onto a box, which is the same move as
             # an item above it, from the same column.
             if self._grid.outside:
+                self.outside_frame.grid()
                 for block, widget in build_outside_group(
-                    self.outside_frame, self._grid.outside, items_by_id, 0
+                    self.outside_frame,
+                    self._grid.outside,
+                    items_by_id,
+                    0,
+                    chip_height=self.box_height(),
+                    title_width=self.box_title_width(),
                 ):
                     self.bind_block_handlers(widget, block)
                     self._block_widgets.append((widget, block.id))
+            else:
+                self.outside_frame.grid_remove()
         finally:
             self.blocks_scroll.grid(**grid_info)
 

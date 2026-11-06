@@ -94,7 +94,8 @@ class AppSettings:
     drag_schedule_title_col_width: int = 220
     # Plan screen: width (px) of the items column. Fixed, not a share of
     # the window -- it holds titles, and the day beside it is what the
-    # width is for. Editable in Settings > Appearance.
+    # width is for. Editable in Settings > Date Increment Settings,
+    # beside the two Drag Schedule sizes.
     plan_items_col_width: int = 260
     # Today view: width (px) of the resizable Title column
     today_title_col_width: int = 260
