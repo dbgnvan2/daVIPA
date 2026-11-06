@@ -411,6 +411,26 @@ def total_planned_minutes(blocks: Iterable[TimeBlock]) -> int:
     )
 
 
+# TB-M12 — a block's height tracks its length, so a 90 reads as three times a
+# 30 at a glance. 1.1 px per minute keeps the common lengths exactly
+# proportional (30 -> 33, 60 -> 66, 90 -> 99) rather than nearly so.
+PIXELS_PER_MINUTE = 1.1
+# A 5-minute break at 1.1 px/min would be 6 pixels tall: too small to see,
+# read or right-click. Short blocks stop shrinking here, which is the one place
+# proportionality is deliberately given up.
+MIN_BLOCK_HEIGHT_PX = 26
+
+
+def block_height(minutes: Optional[int]) -> int:
+    """Pixel height for a block of this many minutes.
+
+    Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m12
+    Tests: tests/test_time_block_layout.py::test_block_height_is_proportional_to_minutes
+    """
+    length = _positive_int(minutes, FALLBACK_BLOCK_MINUTES)
+    return max(MIN_BLOCK_HEIGHT_PX, round(length * PIXELS_PER_MINUTE))
+
+
 def lunch_window(bounds: DayBounds) -> Optional[Tuple[str, str]]:
     """The lunch band as ``(start, end)``, or None when lunch is zero minutes."""
     if bounds.lunch_length <= 0:

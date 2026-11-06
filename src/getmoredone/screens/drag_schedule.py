@@ -23,6 +23,7 @@ from .drag_schedule_support import (
     date_text_color_for,
     format_day_stats_text,
     future_options_for,
+    widget_contains_pointer,
 )
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .title_format import split_action_item_title, format_column_text
@@ -1486,28 +1487,14 @@ class DragScheduleScreen(ctk.CTkFrame):
 
         # Check date boxes
         for box in self.date_boxes:
-            frame = box["frame"]
-            if not frame.winfo_ismapped():
-                continue
-            x1 = frame.winfo_rootx()
-            y1 = frame.winfo_rooty()
-            x2 = x1 + frame.winfo_width()
-            y2 = y1 + frame.winfo_height()
-            if x1 <= x_root <= x2 and y1 <= y_root <= y2:
+            if widget_contains_pointer(box["frame"], x_root, y_root):
                 return box["date"], None
-                
+
         # Check project boxes
         for box in self.project_boxes:
-            frame = box["frame"]
-            if not frame.winfo_ismapped():
-                continue
-            x1 = frame.winfo_rootx()
-            y1 = frame.winfo_rooty()
-            x2 = x1 + frame.winfo_width()
-            y2 = y1 + frame.winfo_height()
-            if x1 <= x_root <= x2 and y1 <= y_root <= y2:
+            if widget_contains_pointer(box["frame"], x_root, y_root):
                 return None, box["id"]
-                
+
         return None, None
 
     def update_hover_target(self):
@@ -1517,29 +1504,15 @@ class DragScheduleScreen(ctk.CTkFrame):
 
         # Try date boxes
         for box in self.date_boxes:
-            frame = box["frame"]
-            if not frame.winfo_ismapped():
-                continue
-            x1 = frame.winfo_rootx()
-            y1 = frame.winfo_rooty()
-            x2 = x1 + frame.winfo_width()
-            y2 = y1 + frame.winfo_height()
-            if x1 <= x_root <= x2 and y1 <= y_root <= y2:
-                hovered = frame
+            if widget_contains_pointer(box["frame"], x_root, y_root):
+                hovered = box["frame"]
                 break
-        
+
         # Try project boxes if no date box hovered
         if not hovered:
             for box in self.project_boxes:
-                frame = box["frame"]
-                if not frame.winfo_ismapped():
-                    continue
-                x1 = frame.winfo_rootx()
-                y1 = frame.winfo_rooty()
-                x2 = x1 + frame.winfo_width()
-                y2 = y1 + frame.winfo_height()
-                if x1 <= x_root <= x2 and y1 <= y_root <= y2:
-                    hovered = frame
+                if widget_contains_pointer(box["frame"], x_root, y_root):
+                    hovered = box["frame"]
                     break
 
         if hovered is self.drag_hover_frame:

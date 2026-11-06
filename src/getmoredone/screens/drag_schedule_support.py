@@ -114,3 +114,33 @@ def interpolate_hex_color(start_hex: str, end_hex: str, t: float) -> str:
     b = round(sb + (eb - sb) * t)
 
     return f"#{r:02X}{g:02X}{b:02X}"
+
+
+def widget_contains_pointer(widget, x_root: int, y_root: int) -> bool:
+    """Whether a root-coordinate point falls inside a mapped widget.
+
+    Purpose: the drop-target hit test, in one place. This rectangle check was
+             written out four times in drag_schedule.py and was about to be
+             written a fifth and sixth time for the Plan screen's two drag
+             surfaces (global rule 5 -- when you fix one, fix its siblings).
+    Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m8
+    Tests:   tests/test_drag_schedule_support.py::test_widget_contains_pointer_uses_root_coordinates
+
+    An unmapped widget is never a target. Neither is a destroyed one: a drag
+    that outlives a refresh holds references to frames Tk has already thrown
+    away, and ``winfo_rootx`` on one of those raises rather than returning a
+    rectangle nothing can be inside.
+    """
+    import tkinter as tk
+
+    try:
+        if not widget.winfo_ismapped():
+            return False
+        left = widget.winfo_rootx()
+        top = widget.winfo_rooty()
+        right = left + widget.winfo_width()
+        bottom = top + widget.winfo_height()
+    except tk.TclError:
+        return False
+
+    return left <= x_root <= right and top <= y_root <= bottom

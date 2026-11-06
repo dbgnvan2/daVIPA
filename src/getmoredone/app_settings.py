@@ -87,6 +87,25 @@ class AppSettings:
     next_month_offset_days: int = 0
     next_quarter_offset_days: int = 0
 
+    # Plan screen — the shape of a time-blocking day (TB-M4).
+    # The planner derives every block's clock time from the day's order plus
+    # these four values, so they are the day's definition, not decoration.
+    # Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
+    # Tests: tests/test_plan_settings.py::test_tbm43_day_settings_round_trip
+    plan_day_start: str = "08:00"
+    plan_lunch_start: str = "12:00"
+    # Lunch is a start plus a length rather than a start/end pair: a length is
+    # what the packing arithmetic needs, and two times that could disagree with
+    # each other is a state the user can get wrong.
+    plan_lunch_minutes: int = 60
+    plan_day_end: str = "17:00"
+    # Which weekdays accept blocks, Monday first. A date whose weekday is False
+    # is refused as a block day — the planner will not write work onto a day
+    # the user has said they do not work.
+    plan_block_weekdays: list = field(
+        default_factory=lambda: [True, True, True, True, True, False, False]
+    )
+
     # Email → Action Items (Gmail importer)
     gmail_import_enabled: bool = True
     gmail_import_trigger_label: str = "GMD"
@@ -127,6 +146,7 @@ class AppSettings:
                 settings.first_week_of_year_rule = cls._normalize_first_week_of_year_rule(
                     getattr(settings, "first_week_of_year_rule", "iso")
                 )
+                settings._normalize_plan_day_settings()
                 return settings
             except Exception as e:
                 print(f"Error loading settings: {e}")
@@ -152,6 +172,7 @@ class AppSettings:
         self.first_week_of_year_rule = self._normalize_first_week_of_year_rule(
             self.first_week_of_year_rule
         )
+        self._normalize_plan_day_settings()
 
         # Ensure data directory exists
         settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -161,6 +182,57 @@ class AppSettings:
                 json.dump(asdict(self), f, indent=2)
         except Exception as e:
             print(f"Error saving settings: {e}")
+
+    def _normalize_plan_day_settings(self) -> None:
+        """TB-M4.1/4.2 — coerce the four day values and the seven weekday flags.
+
+        Purpose: a hand-edited or corrupt settings file must not stop the app
+                 from starting, and must not hand the packing arithmetic a time
+                 it cannot read.
+        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
+        Tests:   tests/test_plan_settings.py::test_tbm41_bad_time_falls_back_to_default
+
+        Applied on both load and save, like every other normalizer here: a
+        value written by an older build, by hand, or by a future field the
+        dialog does not yet guard arrives through load, and the dialog's own
+        output goes out through save.
+
+        The import is inside the function because time_block_layout imports
+        models, and loading settings must not drag the data model in --
+        _normalize_theme_name defers its import for the same reason.
+        """
+        from .time_block_layout import (
+            DEFAULT_DAY_END,
+            DEFAULT_DAY_START,
+            DEFAULT_LUNCH_MINUTES,
+            DEFAULT_LUNCH_START,
+            format_hhmm,
+            normalize_block_weekdays,
+            parse_hhmm,
+        )
+
+        self.plan_day_start = format_hhmm(
+            parse_hhmm(self.plan_day_start, default=DEFAULT_DAY_START)
+        )
+        self.plan_lunch_start = format_hhmm(
+            parse_hhmm(self.plan_lunch_start, default=DEFAULT_LUNCH_START)
+        )
+        self.plan_day_end = format_hhmm(
+            parse_hhmm(self.plan_day_end, default=DEFAULT_DAY_END)
+        )
+
+        try:
+            lunch = int(self.plan_lunch_minutes)
+        except (TypeError, ValueError):
+            lunch = DEFAULT_LUNCH_MINUTES
+        # Capped at a day: a lunch longer than the day it sits in would push
+        # every block past midnight, which looks like the planner losing them.
+        self.plan_lunch_minutes = max(0, min(lunch, 24 * 60))
+
+        # Stored as a list, not a tuple: asdict() goes straight to JSON.
+        self.plan_block_weekdays = list(
+            normalize_block_weekdays(self.plan_block_weekdays)
+        )
 
     @staticmethod
     def _normalize_first_week_of_year_rule(value: Optional[str]) -> str:

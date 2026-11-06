@@ -234,6 +234,69 @@ def schedule_colors() -> Dict[str, object]:
     }
 
 
+def priority_band_colors() -> Dict[str, str]:
+    """TB-M12 — one accent colour per priority band, light and dark.
+
+    Purpose: colour a block by the priority of the item behind it.
+    Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m12
+    Tests:   tests/test_time_block_colors.py::test_tbm122_band_colors_meet_contrast_in_both_themes
+
+    The band a score falls in is decided by ``time_block_layout.priority_band``,
+    not here: a theme change must not be able to move an item into a different
+    band. This function only says what each band looks like.
+
+    Centralised for the same reason the rest of this module is -- the project
+    rule is no hard-coded colours in widgets, and a one-off hex in plan.py
+    would be a second place a band's colour could be changed from.
+
+    "unscored" is a deliberate fifth value, not a fallback: an item missing one
+    of its four priority factors scores 0, and that is absence of information.
+    Painting it the same grey-green as a genuinely low-priority item would show
+    the user data they never entered.
+    """
+    mode = (ctk.get_appearance_mode() or "Dark").lower()
+    if mode == "light":
+        # Darker than the obvious 600-weight tints: those land at 4.2-4.3
+        # against the light theme's block surface (CTkFrame top_fg_color,
+        # gray81), which clears the 3:1 WCAG bar for a non-text accent but
+        # leaves nothing spare if a band colour is ever put behind text. These
+        # clear 4.5:1 -- measured against that surface, not the lighter page
+        # background, because the stripe is drawn on the block.
+        return {
+            "critical": "#991B1B",
+            "high": "#9A3412",
+            "medium": "#92400E",
+            "low": "#166534",
+            "unscored": "#52525B",
+        }
+    return {
+        "critical": "#F87171",
+        "high": "#FB923C",
+        "medium": "#FBBF24",
+        "low": "#4ADE80",
+        "unscored": "#94A3B8",
+    }
+
+
+def block_type_colors() -> Dict[str, str]:
+    """TB-M10/TB-M12 — the accent for a block that has no priority behind it.
+
+    Buffer and break blocks carry no item, so they are not priority-coloured.
+    A neutral accent says "this is padding" rather than implying an importance
+    the block does not have.
+    """
+    mode = (ctk.get_appearance_mode() or "Dark").lower()
+    if mode == "light":
+        return {"buffer": "#4B5563", "break": "#155E75", "lunch": "#4B5563"}
+    return {"buffer": "#9CA3AF", "break": "#22D3EE", "lunch": "#9CA3AF"}
+
+
+def depth_bar_colors() -> Dict[str, str]:
+    """TB-M12 — the filled and empty states of the three-bar depth stack."""
+    palette = semantic_colors()
+    return {"filled": palette["body_text"], "empty": palette["border"]}
+
+
 def vps_level_colors() -> Dict[str, str]:
     """Shared planning-hierarchy legend colors."""
     return {
