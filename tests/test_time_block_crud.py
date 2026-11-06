@@ -1,21 +1,31 @@
-"""TB-M2 — the writes a planned day needs, including the one that did not exist.
+"""TB-M2/TG-M6 — the writes a planned day needs.
 
-Purpose: hold update_time_block, repack_day, reorder_time_blocks and the
+Purpose: hold update_time_block, the slot-aware writes, and the
          exact-start-date item query to their stated behaviour.
-Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m2
+Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
 Tests:   this file
 
-Before TB-M2 this module could create, read and delete a block and nothing
-else. No block could be resized, retyped or reordered after creation, which is
-what made "right-click to set a time amount" and "drag blocks to rearrange"
-unbuildable rather than merely unbuilt.
+**The reorder and repack tests that used to be most of this file are gone**,
+with the writes they covered. A planned day was an order, so every edit had to
+re-derive and re-store the whole day's clock times; a block now stores which
+half-hour box it sits in, relative to Day Start, and the times follow from the
+box on read. There is nothing to re-pack, nothing to renumber, and no ceiling
+to run past — the last box ends at Day End. TG-M6.4 at the foot of this file is
+the test that says so: a Day Start change writes no rows at all.
 """
 
 import pytest
 
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem, BlockType, TimeBlock
-from src.getmoredone.time_block_layout import DayBounds, DayTooFullError, parse_hhmm
+from src.getmoredone.time_block_layout import (
+    MAX_BLOCKS_PER_SLOT,
+    DayBounds,
+    SlotRefusal,
+    SlotRefusedError,
+    build_day_grid,
+    parse_hhmm,
+)
 
 DAY = "2026-11-05"           # a Thursday
 NEXT_DAY = "2026-11-06"
@@ -49,24 +59,36 @@ def _add(manager, minutes, label, block_date=DAY, block_type=BlockType.ITEM, ite
 
 
 def _day(manager, block_date=DAY):
-    """(label, position, start, end) for each block on a day, in order."""
+    """(label, slot_index, position, start, end) for each block, in order.
+
+    The box is in the tuple because it is now the truth: a snapshot that saw
+    only the label, the position and the times would be satisfied by a block
+    sitting in the wrong box with the right clock string.
+    """
     return [
-        (b.label, b.position, b.start_time, b.end_time)
+        (b.label, b.slot_index, b.position, b.start_time, b.end_time)
         for b in manager.get_time_blocks(block_date)
     ]
 
 
 # --- creating ---------------------------------------------------------------
 
-def test_a_new_block_is_appended_to_its_day(manager):
-    """Position 0 means "append", so the three ways of making a block all land at the end."""
+def test_a_new_block_with_no_box_is_ordered_but_not_placed(manager):
+    """``create_time_block`` is the raw insert, so it places nothing.
+
+    Position 0 still means "append", which gives blocks with no box a stable
+    order among themselves. The box stays NULL: "never placed" and "the first
+    box of the day" are different facts, and a create that quietly chose 08:00
+    would plan the user's work for them.
+    """
     _add(manager, 30, "first")
     _add(manager, 30, "second")
     _add(manager, 30, "third")
 
-    assert [(label, position) for label, position, _, _ in _day(manager)] == [
-        ("first", 1), ("second", 2), ("third", 3),
-    ]
+    assert [
+        (label, slot_index, position)
+        for label, slot_index, position, _, _ in _day(manager)
+    ] == [("first", None, 1), ("second", None, 2), ("third", None, 3)]
 
 
 def test_appending_counts_only_the_day_it_is_appending_to(manager):
@@ -75,18 +97,23 @@ def test_appending_counts_only_the_day_it_is_appending_to(manager):
     _add(manager, 30, "b", block_date=DAY)
     _add(manager, 30, "other-day", block_date=NEXT_DAY)
 
-    assert [position for _, position, _, _ in _day(manager, NEXT_DAY)] == [1]
+    assert [position for _, _, position, _, _ in _day(manager, NEXT_DAY)] == [1]
 
 
 def test_a_caller_with_an_explicit_position_keeps_it(manager):
-    """A reorder and a test fixture both set position themselves."""
+    """``_settle_block_on_slot`` works out a position before the insert.
+
+    So the insert must not overwrite one it was given, or every block placed
+    on a box would be renumbered against the whole day the moment it was
+    written -- and two blocks sharing a box would stop being ordered within it.
+    """
     block = TimeBlock(
         block_date=DAY, start_time="", end_time="", planned_minutes=30,
         label="placed", position=7,
     )
     manager.create_time_block(block)
 
-    assert [position for _, position, _, _ in _day(manager)] == [7]
+    assert [position for _, _, position, _, _ in _day(manager)] == [7]
 
 
 # --- TB-M2.1 : the write that was missing -----------------------------------
@@ -161,173 +188,6 @@ def test_an_edit_cannot_silently_move_a_block_to_another_day(manager):
 
     assert len(manager.get_time_blocks(DAY)) == 1
     assert manager.get_time_blocks(NEXT_DAY) == []
-
-
-# --- TB-M2.2 : re-timing and reordering -------------------------------------
-
-def test_tbm22_reorder_yields_unique_contiguous_times(manager):
-    """TB-M2.2 — after a reorder no two blocks share a start, and there are no gaps.
-
-    Asserted as properties of the day rather than against a hardcoded
-    expectation, so the test still bites when the lengths or the day's bounds
-    change.
-    """
-    ids = [_add(manager, minutes, label) for minutes, label in
-           ((60, "a"), (30, "b"), (45, "c"), (30, "d"))]
-
-    manager.reorder_time_blocks(DAY, [ids[3], ids[0], ids[2], ids[1]], BOUNDS)
-
-    blocks = manager.get_time_blocks(DAY)
-    assert [b.label for b in blocks] == ["d", "a", "c", "b"]
-    assert [b.position for b in blocks] == [1, 2, 3, 4]
-
-    starts = [b.start_time for b in blocks]
-    assert len(set(starts)) == len(starts), "two blocks claim the same minute"
-    for earlier, later in zip(blocks, blocks[1:]):
-        assert later.start_time >= earlier.end_time, "blocks overlap"
-
-
-def test_reorder_moves_the_clock_times_with_the_order(manager):
-    """The times are derived from the order, so reordering re-times the day."""
-    ids = [_add(manager, 60, "a"), _add(manager, 30, "b")]
-
-    manager.repack_day(DAY, BOUNDS)
-    assert _day(manager) == [
-        ("a", 1, "08:00", "09:00"),
-        ("b", 2, "09:00", "09:30"),
-    ]
-
-    manager.reorder_time_blocks(DAY, [ids[1], ids[0]], BOUNDS)
-    assert _day(manager) == [
-        ("b", 1, "08:00", "08:30"),
-        ("a", 2, "08:30", "09:30"),
-    ]
-
-
-def test_reorder_keeps_blocks_the_caller_did_not_name(manager):
-    """A stale id list must not drop a block out of the day by omission.
-
-    A screen that has not refreshed since another surface added a block would
-    otherwise delete it from the order, and the day would show two blocks
-    sharing a minute.
-    """
-    ids = [_add(manager, 30, "a"), _add(manager, 30, "b"), _add(manager, 30, "c")]
-
-    manager.reorder_time_blocks(DAY, [ids[2], ids[0]], BOUNDS)
-
-    blocks = manager.get_time_blocks(DAY)
-    assert [b.label for b in blocks] == ["c", "a", "b"], (
-        "the unnamed block should keep its place after the named ones"
-    )
-    assert [b.position for b in blocks] == [1, 2, 3]
-
-
-def test_reorder_ignores_an_id_from_another_day(manager):
-    _add(manager, 30, "mine")
-    other = _add(manager, 30, "theirs", block_date=NEXT_DAY)
-
-    manager.reorder_time_blocks(DAY, [other], BOUNDS)
-
-    assert [label for label, _, _, _ in _day(manager)] == ["mine"]
-    assert [label for label, _, _, _ in _day(manager, NEXT_DAY)] == ["theirs"]
-
-
-def test_repack_respects_lunch(manager):
-    """The stored times come from the same packing rules as the display."""
-    for minutes, label in ((60, "a"), (60, "b"), (60, "c"), (90, "d")):
-        _add(manager, minutes, label)
-
-    manager.repack_day(DAY, BOUNDS)
-
-    assert _day(manager) == [
-        ("a", 1, "08:00", "09:00"),
-        ("b", 2, "09:00", "10:00"),
-        ("c", 3, "10:00", "11:00"),
-        ("d", 4, "13:00", "14:30"),  # would run through lunch, so moved whole
-    ]
-
-
-def test_repack_renumbers_a_migrated_day(manager):
-    """A day of legacy position-0 rows comes out numbered 1..n in clock order."""
-    for label, start in (("late", "15:00"), ("early", "09:00")):
-        manager.db.conn.execute(
-            "INSERT INTO time_blocks (id, item_id, block_date, start_time, end_time,"
-            " planned_minutes, label, block_type, position, created_at, updated_at)"
-            " VALUES (?, NULL, ?, ?, ?, 30, ?, 'item', 0, '2026-01-01', '2026-01-01')",
-            (label, DAY, start, start, label),
-        )
-    manager.db.conn.commit()
-
-    manager.repack_day(DAY, BOUNDS)
-
-    assert _day(manager) == [
-        ("early", 1, "08:00", "08:30"),
-        ("late", 2, "08:30", "09:00"),
-    ]
-
-
-# --- TB-M2.3 : atomicity ----------------------------------------------------
-
-class _ExplodingBounds:
-    """Bounds that raise the moment packing reads them.
-
-    pack_day asks for day_start_minutes first, which puts the failure *after*
-    reorder_time_blocks has already written its positions and before anything
-    is committed — exactly the half-applied state the transaction exists to
-    prevent.
-    """
-
-    default_block_minutes = 30
-    block_weekdays = (True,) * 7
-
-    @property
-    def day_start_minutes(self):
-        raise RuntimeError("bounds unreadable")
-
-    @property
-    def day_end_minutes(self):
-        raise RuntimeError("bounds unreadable")
-
-    @property
-    def lunch_start_minutes(self):
-        raise RuntimeError("bounds unreadable")
-
-    @property
-    def lunch_end_minutes(self):
-        raise RuntimeError("bounds unreadable")
-
-    @property
-    def lunch_length(self):
-        raise RuntimeError("bounds unreadable")
-
-
-def test_tbm23_failed_reorder_is_atomic(manager):
-    """TB-M2.3 — a reorder that fails partway writes nothing.
-
-    Half of a reorder is worse than none: the day would hold two blocks
-    claiming the same minutes, and the next repack would start from the broken
-    state and reproduce it.
-    """
-    ids = [_add(manager, 30, "a"), _add(manager, 30, "b"), _add(manager, 30, "c")]
-    manager.repack_day(DAY, BOUNDS)
-    before = _day(manager)
-
-    with pytest.raises(RuntimeError):
-        manager.reorder_time_blocks(DAY, [ids[2], ids[1], ids[0]], _ExplodingBounds())
-
-    assert _day(manager) == before, "a failed reorder left the day changed"
-
-
-def test_a_failed_repack_leaves_the_stored_times_alone(manager):
-    _add(manager, 30, "a")
-    _add(manager, 30, "b")
-    manager.repack_day(DAY, BOUNDS)
-    before = _day(manager)
-
-    with pytest.raises(RuntimeError):
-        manager.repack_day(DAY, _ExplodingBounds())
-
-    assert _day(manager) == before
 
 
 # --- TB-M2.4 : the item list ------------------------------------------------
@@ -410,172 +270,202 @@ def test_blocked_item_ids_is_scoped_to_one_day(manager):
     assert manager.get_blocked_item_ids(NEXT_DAY) == {item.id}
 
 
-# --- TB-M4 : the bounds are a setting, not a property of one date -----------
+# --- TG-M6: the grid writes --------------------------------------------------
 
 
-def test_tbm4_a_settings_change_repacks_every_day(manager):
-    """Day Start shapes every planned day, so changing it re-times all of them.
-
-    Found by the pre-push sweep: the screen repacked only the date on screen,
-    which left every other day holding times derived from bounds that no longer
-    exist -- stored values that do not follow from their inputs, which the
-    first reader to trust the stored string rather than re-deriving it gets
-    wrong (P6).
-    """
-    _add(manager, 30, "thursday one", block_date=DAY)
-    _add(manager, 30, "thursday two", block_date=DAY)
-    _add(manager, 30, "friday one", block_date=NEXT_DAY)
-    manager.repack_all_days(BOUNDS)
-    assert _day(manager, NEXT_DAY) == [("friday one", 1, "08:00", "08:30")]
-
-    repacked = manager.repack_all_days(DayBounds(day_start="10:00"))
-
-    assert repacked == [DAY, NEXT_DAY]
-    assert _day(manager, DAY) == [
-        ("thursday one", 1, "10:00", "10:30"),
-        ("thursday two", 2, "10:30", "11:00"),
-    ]
-    assert _day(manager, NEXT_DAY) == [("friday one", 1, "10:00", "10:30")]
-
-
-def _fail_on_the_second_day(manager, monkeypatch):
-    """Make the second day's repack raise, and report which days were packed.
-
-    The arity of a bounds read is the wrong thing to hang this on. An earlier
-    version of this test exploded on the second *read* of
-    ``day_start_minutes``, which is the second day only for as long as
-    ``pack_day`` reads that property exactly once per call. A refactor that
-    read it twice -- for an overflow or a midnight calculation -- would move
-    the failure back onto day one, before any write, and the test would go
-    green while testing nothing, which is the exact vacuity it was rewritten
-    to escape. Counting the repacks themselves cannot drift that way.
-    """
-    packed = []
-    real_repack = manager.repack_day
-
-    def spy(block_date, bounds):
-        packed.append(block_date)
-        if len(packed) > 1:
-            raise RuntimeError("second day unreadable")
-        return real_repack(block_date, bounds)
-
-    monkeypatch.setattr(manager, "repack_day", spy)
-    return packed
-
-
-def test_tbm4_repacking_every_day_is_all_or_nothing(manager, monkeypatch):
-    """A half-applied bounds change leaves days on two different shapes.
-
-    With nothing in the data to say which day is on which, and the next repack
-    starting from that. The failure lands after the first day has already been
-    re-timed and written, so this fails if the per-day repacks are not joined
-    into one transaction.
-    """
-    _add(manager, 30, "thursday", block_date=DAY)
-    _add(manager, 30, "friday", block_date=NEXT_DAY)
-    manager.repack_all_days(BOUNDS)
-    before = (_day(manager, DAY), _day(manager, NEXT_DAY))
-
-    packed = _fail_on_the_second_day(manager, monkeypatch)
-    with pytest.raises(RuntimeError):
-        manager.repack_all_days(DayBounds(day_start="10:00"))
-
-    assert packed == [DAY, NEXT_DAY], "the failure must land on the second day"
-    assert (_day(manager, DAY), _day(manager, NEXT_DAY)) == before
-
-
-def test_tbm4_the_first_day_really_is_written_before_the_failure(manager, monkeypatch):
-    """Guards the test above against becoming vacuous again.
-
-    If the first day's repack stopped writing before the second day failed,
-    the assertion above would hold for a `repack_all_days` with no transaction
-    at all. This pins the thing that makes it load-bearing: run the same
-    failure with the per-day repacks *not* joined, and the first day moves.
-    """
-    _add(manager, 30, "thursday", block_date=DAY)
-    _add(manager, 30, "friday", block_date=NEXT_DAY)
-    manager.repack_all_days(BOUNDS)
-    before = _day(manager, DAY)
-
-    packed = _fail_on_the_second_day(manager, monkeypatch)
-    later = DayBounds(day_start="10:00")
-    with pytest.raises(RuntimeError):
-        for block_date in [DAY, NEXT_DAY]:
-            manager.repack_day(block_date, later)
-
-    assert packed == [DAY, NEXT_DAY]
-    assert _day(manager, DAY) != before, (
-        "the first day must be written before the second fails, or the"
-        " atomicity test above proves nothing"
+def _at(manager, minutes, label, slot_index, block_date=DAY, item_id=None):
+    """Put a block in a box the way the screen does, and return it."""
+    block = TimeBlock(
+        block_date=block_date,
+        start_time="",
+        end_time="",
+        planned_minutes=minutes,
+        label=label,
+        item_id=item_id,
     )
+    return manager.add_block_at(block, slot_index, BOUNDS)
 
 
-def test_tbm4_repacking_a_database_with_no_blocks_does_nothing(manager):
-    """So the save path cannot fail on a day the user has not planned yet."""
-    assert manager.repack_all_days(BOUNDS) == []
+def test_tgm61_two_blocks_share_a_slot(manager):
+    """TG-M6.1 — the user's decision, round-tripped through the database.
 
-
-# --- found by the fix-range re-sweep ---------------------------------------
-
-
-def test_a_day_too_full_to_write_is_refused(manager):
-    """A block ceiling bounds one block; this is a property of the day.
-
-    Four blocks of exactly a day each are individually legal -- the dialog
-    accepts 1440, and a test asserts that it does -- and together they pack
-    past the last time HH:MM can express. format_hhmm clamps there, so the
-    fourth row would be stored claiming 1440 minutes between 85:00 and 99:59,
-    which is 899. Refused before anything is written rather than stored
-    clamped.
+    Both in box 4, ordered by position, and both reading back at 10:00. The
+    ordering assertion is the load-bearing half: two rows in a box with no
+    settled order would draw in a different sequence between loads.
     """
-    for index in range(4):
-        _add(manager, 24 * 60, f"all day {index}", block_date=DAY)
+    _at(manager, 30, "first", 4)
+    _at(manager, 30, "second", 4)
 
-    with pytest.raises(DayTooFullError):
-        manager.repack_day(DAY, BOUNDS)
+    blocks = manager.get_time_blocks(DAY)
+
+    assert [(b.label, b.slot_index, b.position) for b in blocks] == [
+        ("first", 4, 1),
+        ("second", 4, 2),
+    ]
+    assert {b.start_time for b in blocks} == {"10:00"}
 
 
-def test_a_refused_day_is_left_exactly_as_it_was(manager):
-    """Nothing half-written, and nothing clamped.
+def test_position_restarts_in_each_box(manager):
+    """``position`` counts within a box, not across the day.
 
-    The refusal happens before the transaction opens, so the rows keep the
-    times the last successful repack gave them.
+    Day-wide numbering draws the same day, so this is the one assertion that
+    can tell the two apart: the stored number is what
+    ``idx_blocks_date_slot(block_date, slot_index, position)`` is built on, and
+    what a later reader of the column will take it to mean.
     """
-    _add(manager, 30, "first", block_date=DAY)
-    manager.repack_day(DAY, BOUNDS)
-    before = _day(manager, DAY)
-    for index in range(4):
-        _add(manager, 24 * 60, f"all day {index}", block_date=DAY)
+    _at(manager, 30, "box 2 first", 2)
+    _at(manager, 30, "box 2 second", 2)
+    _at(manager, 30, "box 6 first", 6)
+    _at(manager, 30, "box 6 second", 6)
 
-    with pytest.raises(DayTooFullError):
-        manager.repack_day(DAY, BOUNDS)
+    assert [
+        (label, slot_index, position)
+        for label, slot_index, position, _, _ in _day(manager)
+    ] == [
+        ("box 2 first", 2, 1),
+        ("box 2 second", 2, 2),
+        ("box 6 first", 6, 1),
+        ("box 6 second", 6, 2),
+    ]
 
-    assert _day(manager, DAY)[0] == before[0]
 
+def test_a_block_goes_where_it_was_dropped_not_at_the_end_of_the_day(manager):
+    """The whole point of the grid, asserted directly.
 
-def test_a_day_that_fits_the_clock_is_written(manager):
-    """The boundary the refusal is written against.
-
-    Paired with the refusal so a guard that refused every day would not pass
-    for the right reason. Three blocks of a day each fit: the first straddles
-    lunch so it starts at 13:00 rather than 08:00, and the third still ends at
-    85:00, inside the 99:59 that HH:MM can express. A fourth would not.
+    Under the old model every new block was appended; here box 9 means 13:00
+    even though the day is otherwise empty and 08:00 is free.
     """
-    for index in range(3):
-        _add(manager, 24 * 60, f"all day {index}", block_date=DAY)
+    _at(manager, 30, "afternoon", 10)
 
-    packed = manager.repack_day(DAY, BOUNDS)
+    block = manager.get_time_blocks(DAY)[0]
 
-    assert [block.start_time for block in packed] == ["13:00", "37:00", "61:00"]
-    assert [block.end_time for block in packed] == ["37:00", "61:00", "85:00"]
+    assert block.slot_index == 10
+    assert block.start_time == "13:00"
 
 
-def test_every_written_row_says_start_plus_duration(manager):
-    """The invariant the whole ceiling exists to protect, asserted directly."""
-    for minutes in (24 * 60, 90, 24 * 60, 15):
-        _add(manager, minutes, f"block {minutes}", block_date=DAY)
+def test_tgm63_every_row_says_start_plus_duration(manager):
+    """TG-M6.3 — the invariant, including the rounded-up case.
 
-    for block in manager.repack_day(DAY, BOUNDS):
+    A 45-minute block occupies two boxes and ends at 09:45, not 10:00.
+    Writing the end of its second box would be the row claiming fifteen
+    minutes the item does not own.
+    """
+    _at(manager, 45, "forty five", 2)
+    _at(manager, 30, "thirty", 6)
+
+    for block in manager.get_time_blocks(DAY):
         start = parse_hhmm(block.start_time)
         end = parse_hhmm(block.end_time)
         assert end - start == block.planned_minutes, block.label
+
+    assert manager.get_time_blocks(DAY)[0].end_time == "09:45"
+
+
+def test_a_move_rewrites_the_times_with_the_slot(manager):
+    """TG-M11 — the times follow the box, in the same write.
+
+    A move that set the box and left the stored time behind would leave a row
+    whose start is from where it used to be. Nothing on screen reads that
+    string, so it would stay wrong until somebody opened the database.
+    """
+    block = _at(manager, 30, "mover", 2)
+
+    manager.place_block_at(block.id, 8 + 2, BOUNDS)
+
+    moved = manager.get_time_blocks(DAY)[0]
+    assert (moved.slot_index, moved.start_time, moved.end_time) == (10, "13:00", "13:30")
+
+
+def test_tgm62_a_failed_move_writes_nothing(manager):
+    """TG-M6.2 — a refused move leaves the day exactly as it was.
+
+    The fit is checked before the transaction opens, so there is nothing to
+    roll back -- which is the assertion: the block keeps its box *and* its
+    times, not just one of the two.
+    """
+    block = _at(manager, 30, "mover", 2)
+    before = _day(manager)
+
+    with pytest.raises(SlotRefusedError) as refusal:
+        manager.place_block_at(block.id, 8, BOUNDS)   # 12:00 is lunch
+
+    assert refusal.value.reason == SlotRefusal.CROSSES_LUNCH
+    assert _day(manager) == before
+
+
+def test_a_block_can_be_nudged_inside_a_box_that_is_already_full(manager):
+    """It must not be refused by its own presence.
+
+    Without ``ignoring`` the block being moved counts against the room in the
+    box it is already in, so a full box becomes a box nothing can leave.
+    """
+    mover = _at(manager, 30, "mover", 4)
+    for n in range(MAX_BLOCKS_PER_SLOT - 1):
+        _at(manager, 30, f"other {n}", 4)
+
+    manager.place_block_at(mover.id, 4, BOUNDS)
+
+    assert manager.get_time_block(mover.id).slot_index == 4
+
+
+def test_tgm112_a_resize_that_does_not_fit_is_refused(manager):
+    """TG-M11.2 — the block does not move to somewhere the new length fits.
+
+    11:30 holds a 30 happily; the same box cannot hold a 60, because the next
+    box is lunch. Sliding the block to 13:00 to make the number work would
+    answer a question the user did not ask.
+    """
+    block = _at(manager, 30, "resize me", 7)
+    before = _day(manager)
+
+    with pytest.raises(SlotRefusedError) as refusal:
+        manager.set_block_length(block.id, 60, BOUNDS)
+
+    assert refusal.value.reason == SlotRefusal.CROSSES_LUNCH
+    assert _day(manager) == before
+
+
+def test_a_resize_that_fits_rewrites_the_end_time(manager):
+    """Paired with the refusal above so neither passes for the wrong reason."""
+    block = _at(manager, 30, "resize me", 2)
+
+    manager.set_block_length(block.id, 45, BOUNDS)
+
+    resized = manager.get_time_block(block.id)
+    assert (resized.planned_minutes, resized.start_time, resized.end_time) == (
+        45, "09:00", "09:45",
+    )
+
+
+def test_tgm64_a_day_start_change_writes_no_rows(manager):
+    """TG-M6.4 — the reason the box is relative to Day Start.
+
+    The same stored row reads as 10:00 under an 08:00 day and 11:00 under a
+    09:00 one, with **no write in between**. This is what retires the
+    repack-every-day machinery: there is nothing to repack.
+    """
+    block = _at(manager, 30, "steady", 4)
+    stored_before = manager.db.conn.execute(
+        "SELECT slot_index, start_time, updated_at FROM time_blocks WHERE id = ?",
+        (block.id,),
+    ).fetchone()
+
+    later = DayBounds(day_start="09:00")
+    grid = build_day_grid(manager.get_time_blocks(DAY), later)
+
+    assert grid.slots[4].starting[0].id == block.id
+    assert grid.slots[4].slot.start_time == "11:00"
+    stored_after = manager.db.conn.execute(
+        "SELECT slot_index, start_time, updated_at FROM time_blocks WHERE id = ?",
+        (block.id,),
+    ).fetchone()
+    assert tuple(stored_after) == tuple(stored_before), "no row should have been written"
+
+
+def test_a_block_added_past_the_end_of_the_grid_is_refused(manager):
+    """The grid is bounded by Day End, so there is no "past day end" state."""
+    with pytest.raises(SlotRefusedError) as refusal:
+        _at(manager, 30, "too late", 18)
+
+    assert refusal.value.reason == SlotRefusal.OUTSIDE_GRID
+    assert manager.get_time_blocks(DAY) == []

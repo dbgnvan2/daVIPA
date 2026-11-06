@@ -1,13 +1,19 @@
 """TB-M3 — the day-layout arithmetic, proved without a display.
 
-Purpose: hold the packing rules, the item-to-duration rules, the depth bars,
-         the priority bands and the weekday gate to their stated behaviour.
+Purpose: hold the item-to-duration rules, the time parsing, the depth bars,
+         the priority bands, the weekday gate and the length ceiling to their
+         stated behaviour.
 Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m3
 Tests:   this file
 
-These are pure functions on purpose. Correct packing is arithmetic, and
-arithmetic should not need a window to verify — which is also why none of it
-lives in screens/plan.py.
+These are pure functions on purpose. Day arithmetic should not need a window to
+verify — which is also why none of it lives in screens/plan.py.
+
+**The packing tests that used to be the bulk of this file are gone**, with the
+functions they covered: a planned day is a fixed grid of half hours now, not an
+order to walk from Day Start, so there is nothing to pack. Their successors —
+the grid, its refusals, and what happens to a block no box can hold — are in
+tests/test_time_grid.py.
 """
 
 from types import SimpleNamespace
@@ -19,38 +25,30 @@ from src.getmoredone.time_block_layout import (
     DEFAULT_DAY_START,
     FALLBACK_BLOCK_MINUTES,
     MAX_BLOCK_MINUTES,
-    MIN_BLOCK_HEIGHT_PX,
-    PIXELS_PER_MINUTE,
     DayBounds,
     TimeFormatError,
-    block_height,
     default_minutes_for_block_type,
     depth_bars,
     duration_for_item,
     format_hhmm,
     is_block_day,
-    lunch_window,
-    move_block,
-    move_block_to_gap,
     normalize_block_weekdays,
-    pack_day,
     parse_clock_time,
     parse_hhmm,
     priority_band,
-    renumber,
-    sort_blocks,
+    times_for_slot,
     total_planned_minutes,
 )
 
-# A day with no lunch, so packing tests that are not about lunch are not
-# silently shaped by it.
+# A day with no lunch, so a test that is not about lunch is not silently
+# shaped by it.
 NO_LUNCH = DayBounds(day_start="08:00", lunch_minutes=0, day_end="17:00")
 # The default working day: 08:00, lunch 12:00-13:00, ends 17:00.
 STANDARD = DayBounds()
 
 
 def _blocks(*minutes, block_date="2026-11-05"):
-    """Blocks of the given lengths, in position order, with no stored times."""
+    """Blocks of the given lengths, with no stored times or boxes."""
     return [
         TimeBlock(
             block_date=block_date,
@@ -62,147 +60,6 @@ def _blocks(*minutes, block_date="2026-11-05"):
         )
         for index, length in enumerate(minutes, start=1)
     ]
-
-
-# --- TB-M3.1 : packing ------------------------------------------------------
-
-def test_tbm31_blocks_pack_from_day_start():
-    """TB-M3.1 — back to back from the day's start, in the order given."""
-    packed = pack_day(_blocks(30, 60, 30), NO_LUNCH)
-
-    assert [(p.start_time, p.end_time) for p in packed] == [
-        ("08:00", "08:30"),
-        ("08:30", "09:30"),
-        ("09:30", "10:00"),
-    ]
-    assert not any(p.overflows_day_end for p in packed)
-
-
-def test_tbm31a_packing_leaves_no_gaps_between_blocks():
-    """Each block starts exactly where the one before it ended.
-
-    Asserted as a relation across the whole day rather than against a hardcoded
-    list, so it still bites if the lengths change.
-    """
-    packed = pack_day(_blocks(25, 15, 45, 30), NO_LUNCH)
-
-    for earlier, later in zip(packed, packed[1:]):
-        assert later.start_minutes == earlier.end_minutes
-
-
-def test_tbm31b_an_empty_day_packs_to_nothing():
-    assert pack_day([], STANDARD) == []
-
-
-# --- TB-M3.2 : lunch (adversarial, P7) --------------------------------------
-
-def test_tbm32_block_straddling_lunch_moves_after_lunch():
-    """TB-M3.2 — adversarial (P7): a block that *looks* like it fits does not.
-
-    Three 60s from 08:00 reach 11:00, so the fourth has a full hour before the
-    12:00 lunch and fits exactly. The fifth starts at 12:00 — inside lunch — and
-    must move to 13:00.
-
-    The input that "looks right but is wrong" is the sixth case below: a 90 at
-    11:00 has an hour of clear day in front of it and still must not start,
-    because it would run through lunch. A naive implementation that only checks
-    whether the *start* is inside lunch places it at 11:00 and overlaps lunch by
-    half an hour.
-    """
-    packed = pack_day(_blocks(60, 60, 60, 60, 60), STANDARD)
-
-    assert [(p.start_time, p.end_time) for p in packed] == [
-        ("08:00", "09:00"),
-        ("09:00", "10:00"),
-        ("10:00", "11:00"),
-        ("11:00", "12:00"),  # fits exactly up to lunch
-        ("13:00", "14:00"),  # would start inside lunch, so moves past it
-    ]
-    assert packed[4].pushed_after_lunch
-    assert not packed[3].pushed_after_lunch
-
-
-def test_tbm32a_a_block_that_would_run_through_lunch_is_moved_whole():
-    """The adversarial case: an hour of clear day in front of it, still moved.
-
-    Not split into 11:00-12:00 plus 13:00-13:30. Half an hour of deep work
-    before lunch and half an hour after is not the same thing as an hour of it,
-    and the planner must not quietly claim otherwise.
-    """
-    packed = pack_day(_blocks(60, 60, 60, 90), STANDARD)
-
-    straddler = packed[3]
-    assert (straddler.start_time, straddler.end_time) == ("13:00", "14:30")
-    assert straddler.pushed_after_lunch
-    assert straddler.planned_minutes == 90, "the block must not have been split"
-
-
-def test_tbm32b_a_block_longer_than_the_morning_still_starts_after_lunch():
-    """Even the first block of the day moves if it cannot clear lunch.
-
-    08:00 + 5h would run to 13:00, through lunch. There is nowhere before lunch
-    it fits, so it goes after — the day starts at 13:00 and the morning is left
-    visibly empty rather than the block being cut in two.
-    """
-    packed = pack_day(_blocks(300), STANDARD)
-
-    assert (packed[0].start_time, packed[0].end_time) == ("13:00", "18:00")
-    assert packed[0].pushed_after_lunch
-    assert packed[0].overflows_day_end
-
-
-def test_tbm32c_zero_minute_lunch_means_no_push():
-    """A user who sets lunch to 0 minutes gets an unbroken day."""
-    packed = pack_day(_blocks(60, 60, 60, 60, 60), NO_LUNCH)
-
-    assert [p.start_time for p in packed] == [
-        "08:00", "09:00", "10:00", "11:00", "12:00",
-    ]
-    assert not any(p.pushed_after_lunch for p in packed)
-
-
-def test_tbm32d_only_the_first_block_after_lunch_is_marked_pushed():
-    """The marker says where to draw the lunch band, so exactly one block carries it."""
-    packed = pack_day(_blocks(60, 60, 60, 60, 30, 30), STANDARD)
-
-    assert [p.pushed_after_lunch for p in packed] == [
-        False, False, False, False, True, False,
-    ]
-
-
-# --- TB-M3.3 : overflow (real scale, P9) ------------------------------------
-
-def test_tbm33_overflow_blocks_are_flagged_not_dropped():
-    """TB-M3.3 — real scale (P9): a day over-filled past its end keeps every block.
-
-    Fourteen hour-long blocks is far more than a 08:00-17:00 day holds, which is
-    the point: the cap has to actually bite. Every block comes back, the ones
-    past 17:00 are flagged, and nothing is trimmed or refused — over-filling a
-    day is the user's business, and the planner's job is to show it (P2).
-    """
-    packed = pack_day(_blocks(*([60] * 14)), STANDARD)
-
-    assert len(packed) == 14, "no block may be dropped for running past day end"
-
-    overflowing = [p for p in packed if p.overflows_day_end]
-    fitting = [p for p in packed if not p.overflows_day_end]
-
-    # 08:00-12:00 is four, lunch, then 13:00-17:00 is four more.
-    assert len(fitting) == 8
-    assert len(overflowing) == 6
-    assert fitting[-1].end_time == "17:00"
-    assert overflowing[0].start_time == "17:00"
-    # Times stay unique and ordered past midnight rather than wrapping to 01:00.
-    assert len({p.start_minutes for p in packed}) == 14
-    assert overflowing[-1].end_time == "23:00"
-
-
-def test_tbm33a_a_block_ending_exactly_at_day_end_does_not_overflow():
-    """The boundary is inclusive: 16:30-17:00 is a full day, not an overrun."""
-    packed = pack_day(_blocks(240, 240), STANDARD)
-
-    assert packed[-1].end_time == "17:00"
-    assert not packed[-1].overflows_day_end
 
 
 # --- TB-M3.4 : block length from the item -----------------------------------
@@ -350,58 +207,6 @@ def test_format_hhmm_clamps_rather_than_widening_the_field():
     assert format_hhmm(-5) == "00:00"
 
 
-# --- ordering helpers -------------------------------------------------------
-
-def test_sort_blocks_orders_by_position_then_stored_time():
-    """Position first; stored time only breaks ties, which is what carries legacy rows."""
-    legacy_late = TimeBlock(
-        block_date="2026-11-05", start_time="15:00", end_time="15:30",
-        planned_minutes=30, position=0, label="legacy-late",
-    )
-    legacy_early = TimeBlock(
-        block_date="2026-11-05", start_time="09:00", end_time="09:30",
-        planned_minutes=30, position=0, label="legacy-early",
-    )
-    positioned = TimeBlock(
-        block_date="2026-11-05", start_time="07:00", end_time="07:30",
-        planned_minutes=30, position=1, label="positioned",
-    )
-
-    ordered = sort_blocks([legacy_late, positioned, legacy_early])
-
-    assert [b.label for b in ordered] == ["legacy-early", "legacy-late", "positioned"]
-
-
-def test_renumber_stamps_one_based_positions():
-    """Positions start at 1, because 0 is reserved for un-renumbered legacy rows."""
-    blocks = _blocks(30, 30, 30)
-    for block in blocks:
-        block.position = 0
-
-    renumber(blocks)
-
-    assert [b.position for b in blocks] == [1, 2, 3]
-
-
-@pytest.mark.parametrize(
-    "block_id, target, expected",
-    [
-        ("c", 0, ["c", "a", "b"]),
-        ("a", 2, ["b", "c", "a"]),
-        ("a", 99, ["b", "c", "a"]),
-        ("b", -4, ["b", "a", "c"]),
-        ("b", 1, ["a", "b", "c"]),
-    ],
-)
-def test_move_block_places_an_id_at_the_target_index(block_id, target, expected):
-    assert move_block(["a", "b", "c"], block_id, target) == expected
-
-
-def test_move_block_ignores_an_id_that_is_no_longer_there():
-    """A drag of something already deleted must not resurrect it."""
-    assert move_block(["a", "b"], "gone", 0) == ["a", "b"]
-
-
 # --- small helpers the screen leans on --------------------------------------
 
 def test_total_planned_minutes_counts_buffers_and_breaks_too():
@@ -414,11 +219,6 @@ def test_total_planned_minutes_counts_buffers_and_breaks_too():
     )
 
     assert total_planned_minutes(blocks) == 95
-
-
-def test_lunch_window_is_none_when_lunch_is_zero():
-    assert lunch_window(STANDARD) == ("12:00", "13:00")
-    assert lunch_window(NO_LUNCH) is None
 
 
 class _Settings:
@@ -504,15 +304,19 @@ def test_day_bounds_tolerates_a_settings_object_from_an_older_build():
 
 
 def test_tbm41_bad_time_in_bounds_falls_back_to_the_default():
-    """TB-M4.1 — a corrupt stored time does not stop the day being packed."""
+    """TB-M4.1 — a corrupt stored time still gives the day a usable grid.
+
+    The fallbacks are asserted, and then the grid they produce: bounds that
+    read back as defaults but build an empty or mistimed grid would pass the
+    first three assertions and leave the user with a day they cannot plan in.
+    """
     bounds = DayBounds(day_start="not a time", lunch_start="", day_end="99")
 
     assert bounds.day_start_minutes == 8 * 60
     assert bounds.lunch_start_minutes == 12 * 60
     assert bounds.day_end_minutes == 17 * 60
 
-    packed = pack_day(_blocks(30), bounds)
-    assert packed[0].start_time == "08:00"
+    assert times_for_slot(0, 30, bounds) == ("08:00", "08:30")
 
 
 @pytest.mark.parametrize("bad", ["lots", None, -10])
@@ -522,41 +326,6 @@ def test_bad_lunch_length_falls_back_or_clamps(bad):
     assert bounds.lunch_length >= 0
 
 
-def test_block_height_is_proportional_to_minutes():
-    """A 90 is three times a 30, exactly, so the day reads as a bar chart.
-
-    Asserted as a ratio and not just as pixel values: the constant may be
-    retuned, and what must survive the retune is that a block twice as long is
-    twice as tall.
-    """
-    assert block_height(90) == 3 * block_height(30)
-    assert block_height(60) == 2 * block_height(30)
-    assert block_height(30) == round(30 * PIXELS_PER_MINUTE)
-
-
-def test_a_very_short_block_stops_shrinking_at_the_floor():
-    """Proportionality is given up below the floor, on purpose.
-
-    A 5-minute block at the raw rate would be 6 pixels tall -- too small to
-    read or right-click, so a user could create a block they then could not
-    resize or delete.
-    """
-    assert block_height(5) == MIN_BLOCK_HEIGHT_PX
-    assert block_height(1) == MIN_BLOCK_HEIGHT_PX
-    # The floor must not be so high that it flattens a real length.
-    assert block_height(FALLBACK_BLOCK_MINUTES) > MIN_BLOCK_HEIGHT_PX
-
-
-@pytest.mark.parametrize("minutes", [None, 0, -30, "nonsense"])
-def test_an_unusable_length_falls_back_rather_than_vanishing(minutes):
-    """A block with no readable length still gets a visible, clickable row.
-
-    Zero or None would otherwise render a frame of no height: the block is in
-    the database, the user cannot see it, and the day's times no longer add up.
-    """
-    assert block_height(minutes) == block_height(FALLBACK_BLOCK_MINUTES)
-
-
 # --- TB-M11 : the gap a block was dropped in -------------------------------
 #
 # These exist because the screen can only measure one thing -- which rendered
@@ -564,64 +333,6 @@ def test_an_unusable_length_falls_back_rather_than_vanishing(minutes):
 # move_block counts against a list the block has already been taken out of.
 # The two differ by one for a downward move, and getting it wrong is invisible:
 # the day reorders, just not to where the user let go.
-
-
-def test_a_downward_drop_lands_in_the_gap_it_was_dropped_in():
-    """Dragging the first block into the gap before the third puts it second.
-
-    The regression this names: the rendered gap index was passed straight to
-    move_block, which removes the block before inserting, so the result was
-    ['B', 'C', 'A'] -- one place too far, for every downward drag.
-    """
-    assert move_block_to_gap(["A", "B", "C"], "A", 2) == ["B", "A", "C"]
-    assert move_block_to_gap(["A", "B", "C", "D"], "A", 3) == ["B", "C", "A", "D"]
-
-
-def test_a_drop_in_a_block_s_own_gap_changes_nothing():
-    """Releasing a block where it already is must not reorder the day.
-
-    Both gaps that bound a block are its own: the one above it and the one
-    below. A small drag inside its own row is a mis-click, not an instruction,
-    and the old arithmetic turned the lower one into a move past its neighbour.
-    """
-    for gap in (0, 1):
-        assert move_block_to_gap(["A", "B", "C"], "A", gap) == ["A", "B", "C"]
-    for gap in (1, 2):
-        assert move_block_to_gap(["A", "B", "C"], "B", gap) == ["A", "B", "C"]
-
-
-def test_an_upward_drop_lands_in_the_gap_it_was_dropped_in():
-    """The direction that already worked, kept working."""
-    assert move_block_to_gap(["A", "B", "C"], "C", 0) == ["C", "A", "B"]
-    assert move_block_to_gap(["A", "B", "C"], "C", 1) == ["A", "C", "B"]
-
-
-def test_every_gap_in_a_four_block_day_is_reachable():
-    """Each of the four gaps puts the dragged block somewhere different.
-
-    An exhaustive check rather than a sampled one: an off-by-one makes two
-    adjacent gaps produce the same order, and the set below is what proves
-    they do not.
-    """
-    order = ["A", "B", "C", "D"]
-    results = [tuple(move_block_to_gap(order, "B", gap)) for gap in range(5)]
-    assert results == [
-        ("B", "A", "C", "D"),
-        ("A", "B", "C", "D"),
-        ("A", "B", "C", "D"),
-        ("A", "C", "B", "D"),
-        ("A", "C", "D", "B"),
-    ]
-
-
-def test_a_gap_index_past_the_end_puts_the_block_last():
-    """A release below the last block is a move to the end, not an error."""
-    assert move_block_to_gap(["A", "B", "C"], "A", 99) == ["B", "C", "A"]
-
-
-def test_a_block_that_is_no_longer_there_is_not_resurrected():
-    """A stale drag must not add an id the day no longer holds."""
-    assert move_block_to_gap(["A", "B"], "GONE", 0) == ["A", "B"]
 
 
 def test_the_block_length_ceiling_is_a_day():
@@ -634,6 +345,24 @@ def test_the_block_length_ceiling_is_a_day():
     assert MAX_BLOCK_MINUTES == 24 * 60
     assert format_hhmm(DayBounds().day_start_minutes + MAX_BLOCK_MINUTES) == "32:00"
 
+
+def test_a_capped_work_block_still_says_start_plus_duration():
+    """The reason the cap exists, asserted as the property it protects.
+
+    An item asking for 5000 minutes is capped to a day, and the times the grid
+    derives for the capped length still satisfy end == start + duration. Before
+    the cap, ``format_hhmm`` clamped the end and the row stopped saying what it
+    claimed.
+
+    Through ``times_for_slot`` rather than the retired ``pack_day``: the
+    function changed, the property did not.
+    """
+    minutes = duration_for_item(SimpleNamespace(work_block=5000))
+    assert minutes == MAX_BLOCK_MINUTES
+
+    start, end = times_for_slot(0, minutes, NO_LUNCH)
+
+    assert parse_hhmm(end) - parse_hhmm(start) == minutes
 
 
 # --- found by the pre-push sweep: the ceiling has two ways in ---------------
@@ -652,24 +381,6 @@ def test_a_work_block_longer_than_a_day_is_capped(work_block):
     item = SimpleNamespace(work_block=work_block)
 
     assert duration_for_item(item) == MAX_BLOCK_MINUTES
-
-
-def test_a_capped_work_block_still_gives_a_row_that_says_start_plus_duration():
-    """The reason the cap exists, asserted as the property it protects."""
-    item = SimpleNamespace(work_block=5000)
-    minutes = duration_for_item(item)
-    bounds = DayBounds()
-    block = SimpleNamespace(
-        id="b1",
-        planned_minutes=minutes,
-        position=1,
-        block_type="item",
-        start_time="",
-    )
-
-    packed = pack_day([block], bounds)[0]
-
-    assert parse_hhmm(packed.end_time) - parse_hhmm(packed.start_time) == minutes
 
 
 @pytest.mark.parametrize("stored", [5000, MAX_BLOCK_MINUTES + 1])

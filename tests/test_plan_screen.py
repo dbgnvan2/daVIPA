@@ -27,19 +27,30 @@ from src.getmoredone.app_settings import AppSettings
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem, BlockType, TimeBlock
 from src.getmoredone.screens.plan import (
-    DAY_TOO_FULL,
+    REFUSAL_TEXT,
     RIGHT_CLICK_SEQUENCES,
     PlanScreen,
+    refusal_text,
 )
 from src.getmoredone.screens.plan_blocks import (
+    SLOT_CHIP_HEIGHT_PX,
+    SLOT_MIN_HEIGHT_PX,
     DepthBarStack,
     accent_for_block,
     accent_for_item,
-    build_block_row,
+    build_slot_row,
+    slot_row_height,
 )
 from src.getmoredone.screens.plan_settings_dialog import PlanSettingsDialog
 from src.getmoredone.theme import block_type_colors, priority_band_colors
-from src.getmoredone.time_block_layout import DayBounds, block_height
+from src.getmoredone.time_block_layout import (
+    MAX_BLOCKS_PER_SLOT,
+    SLOT_MINUTES,
+    DayBounds,
+    SlotRefusal,
+    build_day_grid,
+    day_grid,
+)
 
 THURSDAY = "2026-11-05"
 SATURDAY = "2026-11-07"
@@ -96,7 +107,13 @@ def _item(manager, title, start_date=THURSDAY, **kwargs):
     return item
 
 
-def _add_block(manager, minutes, label, block_date=THURSDAY, **kwargs):
+def _add_block(manager, minutes, label, slot_index, block_date=THURSDAY, **kwargs):
+    """Put a block on a box, the way every screen path now does.
+
+    ``slot_index`` is required rather than defaulted: a day's shape is the
+    thing under test in most of this file, and a test that did not say where
+    its blocks were would be asserting against whatever box the helper chose.
+    """
     block = TimeBlock(
         block_date=block_date,
         start_time="",
@@ -105,15 +122,33 @@ def _add_block(manager, minutes, label, block_date=THURSDAY, **kwargs):
         label=label,
         **kwargs,
     )
-    manager.create_time_block(block)
-    return block
+    return manager.add_block_at(block, slot_index, DayBounds())
 
 
 def _stored(manager, block_date=THURSDAY):
     return [
-        (b.label, b.position, b.start_time, b.end_time, b.planned_minutes)
+        (b.label, b.slot_index, b.position, b.start_time, b.end_time, b.planned_minutes)
         for b in manager.get_time_blocks(block_date)
     ]
+
+
+def _slot_frames(panel):
+    """The rendered boxes, as the screen recorded them."""
+    return list(panel._slot_frames)
+
+
+def _label_texts(widget):
+    """Every label text under a widget, however deeply nested.
+
+    A box holds a chip per task and a chip holds the title, so a walk one level
+    deep sees only the clock times down the left edge.
+    """
+    found = []
+    for child in widget.winfo_children():
+        if isinstance(child, ctk.CTkLabel):
+            found.append(child.cget("text"))
+        found.extend(_label_texts(child))
+    return found
 
 
 # --- TB-M5 : the settings modal ---------------------------------------------
@@ -253,42 +288,22 @@ def test_the_modal_refuses_a_week_with_no_block_days(root, settings):
             dialog.destroy()
 
 
-def test_saving_settings_repacks_the_day(root, manager, settings):
-    """A new day start makes every stored time on the day stale."""
-    _add_block(manager, 60, "a")
-    _add_block(manager, 60, "b")
-    panel = PlanScreen(root, manager, _App(settings))
-    panel.selected_date = THURSDAY
-    panel.refresh()
-    manager.repack_day(THURSDAY, panel.bounds)
-    assert _stored(manager)[0][2] == "08:00"
-
-    dialog = PlanSettingsDialog(panel, settings, on_saved=panel.on_settings_saved)
-    try:
-        dialog.day_start_entry.delete(0, tk.END)
-        dialog.day_start_entry.insert(0, "10:00")
-        dialog.save()
-    finally:
-        if dialog.winfo_exists():
-            dialog.destroy()
-
-    assert [row[2] for row in _stored(manager)] == ["10:00", "11:00"]
-
-
 # --- TB-M6 : the date picker -------------------------------------------------
 
 def test_tbm61_date_change_reloads_both_panes(screen, manager):
     """TB-M6.1 — the picker drives the item list and the block list together."""
     _item(manager, "thursday item", THURSDAY)
     _item(manager, "friday item", FRIDAY)
-    _add_block(manager, 30, "thursday block", block_date=THURSDAY)
-    _add_block(manager, 30, "friday block", block_date=FRIDAY)
+    _add_block(manager, 30, "thursday block", 0, block_date=THURSDAY)
+    _add_block(manager, 30, "friday block", 0, block_date=FRIDAY)
 
     screen.on_date_changed(FRIDAY)
 
     assert screen.selected_date == FRIDAY
     assert [i.title for i in screen._items] == ["friday item"]
-    assert [entry.block.label for entry in screen._packed] == ["friday block"]
+    assert [
+        block.label for entry in screen._grid.slots for block in entry.starting
+    ] == ["friday block"]
 
 
 def test_the_date_is_a_picker_not_a_free_text_entry(screen):
@@ -453,11 +468,11 @@ def test_tbm91_both_right_click_buttons_are_bound(screen, manager):
     binding it fails here. That the OS delivers one of them is a human check in
     the running app, recorded as such in the plan.
     """
-    _add_block(manager, 30, "a")
+    _add_block(manager, 30, "a", 0)
     screen.load_blocks()
 
-    frame, _block_id = screen._block_frames[0]
-    bound = _bound_sequences(frame)
+    widget, _block_id = screen._block_widgets[0]
+    bound = _bound_sequences(widget)
     for sequence in RIGHT_CLICK_SEQUENCES:
         assert sequence in bound, f"no {sequence} binding on a block"
     assert RIGHT_CLICK_SEQUENCES == ("<Button-3>", "<Button-2>")
@@ -469,7 +484,7 @@ def test_the_block_menu_offers_the_documented_durations(screen, manager, monkeyp
     tk_popup is stubbed out: posting a real menu grabs the pointer and the test
     run would stop on it.
     """
-    _add_block(manager, 30, "a")
+    _add_block(manager, 30, "a", 0)
     screen.load_blocks()
     block = manager.get_time_blocks(THURSDAY)[0]
 
@@ -505,8 +520,8 @@ def test_choosing_a_duration_from_the_menu_resizes_the_block(screen, manager, mo
     command built with the wrong closure variable would render an identical
     menu and resize the wrong block.
     """
-    _add_block(manager, 30, "a")
-    _add_block(manager, 30, "b")
+    _add_block(manager, 30, "a", 0)
+    _add_block(manager, 30, "b", 1)
     screen.load_blocks()
     second = manager.get_time_blocks(THURSDAY)[1]
 
@@ -524,40 +539,7 @@ def test_choosing_a_duration_from_the_menu_resizes_the_block(screen, manager, mo
     )
     menu.invoke(index)
 
-    assert [row[4] for row in _stored(manager)] == [30, 90]
-
-
-def test_tbm92_duration_change_repacks_the_day(screen, manager):
-    """TB-M9.2 — resizing a block re-times every block after it."""
-    _add_block(manager, 30, "a")
-    _add_block(manager, 30, "b")
-    _add_block(manager, 30, "c")
-    screen.load_blocks()
-    manager.repack_day(THURSDAY, screen.bounds)
-
-    first = manager.get_time_blocks(THURSDAY)[0]
-    screen.set_block_minutes(first, 60)
-
-    assert _stored(manager) == [
-        ("a", 1, "08:00", "09:00", 60),
-        ("b", 2, "09:00", "09:30", 30),
-        ("c", 3, "09:30", "10:00", 30),
-    ]
-
-
-def test_deleting_a_block_closes_the_gap_it_leaves(screen, manager):
-    _add_block(manager, 30, "a")
-    _add_block(manager, 30, "b")
-    _add_block(manager, 30, "c")
-    screen.load_blocks()
-    middle = manager.get_time_blocks(THURSDAY)[1]
-
-    screen.delete_block(middle.id)
-
-    assert _stored(manager) == [
-        ("a", 1, "08:00", "08:30", 30),
-        ("c", 2, "08:30", "09:00", 30),
-    ]
+    assert [row[5] for row in _stored(manager)] == [30, 90]
 
 
 # --- TB-M10 : buffer and break ----------------------------------------------
@@ -592,7 +574,7 @@ def test_padding_blocks_are_refused_on_a_non_block_day(root, manager, settings):
 
 def test_a_padding_block_is_not_priority_coloured(screen, manager):
     """Colouring padding by a priority it does not have is information the data does not support."""
-    block = _add_block(manager, 30, "Buffer", block_type=BlockType.BUFFER)
+    block = _add_block(manager, 30, "Buffer", 0, block_type=BlockType.BUFFER)
 
     assert accent_for_block(block, None) == block_type_colors()[BlockType.BUFFER]
     assert accent_for_block(block, None) not in priority_band_colors().values()
@@ -600,82 +582,8 @@ def test_a_padding_block_is_not_priority_coloured(screen, manager):
 
 # --- TB-M11 : drag blocks to rearrange --------------------------------------
 
-def test_tbm111_reorder_persists_new_order(screen, manager):
-    """TB-M11.1 — by position *and* by time, because the two must agree."""
-    _add_block(manager, 30, "a")
-    _add_block(manager, 30, "b")
-    _add_block(manager, 30, "c")
-    screen.load_blocks()
-    third = screen._block_frames[2][1]
-
-    screen.reorder_to(third, 0)
-
-    assert _stored(manager) == [
-        ("c", 1, "08:00", "08:30", 30),
-        ("a", 2, "08:30", "09:00", 30),
-        ("b", 3, "09:00", "09:30", 30),
-    ]
-
-
-def test_a_reorder_that_changes_nothing_writes_nothing(screen, manager):
-    """Dropping a block back where it was must not bump every updated_at."""
-    _add_block(manager, 30, "a")
-    _add_block(manager, 30, "b")
-    screen.load_blocks()
-    manager.repack_day(THURSDAY, screen.bounds)
-    before = [(b.id, b.updated_at) for b in manager.get_time_blocks(THURSDAY)]
-
-    screen.reorder_to(before[0][0], 0)
-
-    assert [(b.id, b.updated_at) for b in manager.get_time_blocks(THURSDAY)] == before
-
-
-def test_a_block_dropped_outside_the_day_column_is_not_reordered(screen, manager, monkeypatch):
-    """A release over the sidebar is a cancelled drag, not a move to the end."""
-    _add_block(manager, 30, "a")
-    _add_block(manager, 30, "b")
-    screen.load_blocks()
-    manager.repack_day(THURSDAY, screen.bounds)
-    before = _stored(manager)
-
-    monkeypatch.setattr(
-        "src.getmoredone.screens.plan.widget_contains_pointer",
-        lambda *args, **kwargs: False,
-    )
-    assert screen.drop_index_for_pointer() is None
-
-    screen._drag_kind = "block"
-    screen._drag_block = manager.get_time_blocks(THURSDAY)[1]
-    screen.on_drag_release(None)
-
-    assert _stored(manager) == before
-
 
 # --- TB-M12 : appearance ----------------------------------------------------
-
-def test_tbm121_block_height_tracks_minutes(root, manager, mapped_windows):
-    """TB-M12.1 — a 90 is three times the height of a 30, in real geometry.
-
-    ``mapped_windows`` because winfo_height() on a withdrawn window returns 1,
-    so this is one of the few tests that needs a window actually on screen.
-    """
-    frame = ctk.CTkFrame(root)
-    frame.pack(fill="both", expand=True)
-
-    short = build_block_row(
-        frame,
-        TimeBlock(block_date=THURSDAY, start_time="08:00", end_time="08:30", planned_minutes=30),
-        None, 0, overflows_day_end=False,
-    )
-    tall = build_block_row(
-        frame,
-        TimeBlock(block_date=THURSDAY, start_time="08:30", end_time="10:00", planned_minutes=90),
-        None, 1, overflows_day_end=False,
-    )
-    root.update_idletasks()
-
-    assert tall.winfo_height() == 3 * short.winfo_height()
-    assert short.winfo_height() == block_height(30)
 
 
 def test_depth_draws_three_bars_with_the_right_number_filled():
@@ -717,39 +625,6 @@ def test_an_unscored_item_is_not_coloured_as_low_priority():
 
 # --- the lunch band ----------------------------------------------------------
 
-def test_the_lunch_band_is_drawn_where_the_day_skips_it(screen, manager):
-    """The hour the day skips is shown, not left as an unexplained jump in times."""
-    for label in ("a", "b", "c", "d", "e"):
-        _add_block(manager, 60, label)
-
-    screen.load_blocks()
-
-    labels = [
-        child.cget("text")
-        for frame in screen.blocks_scroll.winfo_children()
-        for child in frame.winfo_children()
-        if isinstance(child, ctk.CTkLabel)
-    ]
-    assert "Lunch" in labels
-    assert "12:00–13:00" in labels
-
-
-def test_no_lunch_band_when_lunch_is_zero_minutes(screen, manager, settings):
-    settings.plan_lunch_minutes = 0
-    screen.bounds = DayBounds.from_settings(settings)
-    for label in ("a", "b", "c", "d", "e"):
-        _add_block(manager, 60, label)
-
-    screen.load_blocks()
-
-    labels = [
-        child.cget("text")
-        for frame in screen.blocks_scroll.winfo_children()
-        for child in frame.winfo_children()
-        if isinstance(child, ctk.CTkLabel)
-    ]
-    assert "Lunch" not in labels
-
 
 # --- a block whose item is gone ---------------------------------------------
 
@@ -761,16 +636,11 @@ def test_a_block_keeps_its_item_title_when_the_item_starts_on_another_day(screen
     would read "(item no longer exists)".
     """
     item = _item(manager, "started on Monday", "2026-11-02")
-    _add_block(manager, 30, item.title, item_id=item.id)
+    _add_block(manager, 30, item.title, 0, item_id=item.id)
 
     screen.load_blocks()
 
-    titles = [
-        child.cget("text")
-        for frame in screen.blocks_scroll.winfo_children()
-        for child in frame.winfo_children()
-        if isinstance(child, ctk.CTkLabel)
-    ]
+    titles = _label_texts(screen.blocks_scroll)
     assert "started on Monday" in titles
     assert not any("no longer exists" in title for title in titles)
 
@@ -848,24 +718,31 @@ def test_a_real_press_and_release_on_an_item_row_creates_a_block(
     rows = [w for w in panel.items_scroll.winfo_children() if isinstance(w, ctk.CTkFrame)]
     assert rows, "the item pane rendered no draggable row"
 
-    _aim_pointer_at(panel, monkeypatch, panel.day_drop_frame, offset_y=40)
-    assert panel.pointer_over_day(), (
-        "the test aimed outside the day column, so it would prove nothing: "
+    # Aimed at the 09:30 box rather than at the day column, because the drop
+    # target is now a half hour: a release in the column but on no box is
+    # reported, not placed.
+    box = next(frame for frame, index in panel._slot_frames if index == 3)
+    _aim_pointer_at(panel, monkeypatch, box, offset_y=4)
+    assert panel.slot_under_pointer() == 3, (
+        "the test aimed outside box 3, so it would prove nothing: "
         f"pointer={panel.winfo_pointerx()},{panel.winfo_pointery()} "
-        f"day={panel.day_drop_frame.winfo_rootx()},{panel.day_drop_frame.winfo_rooty()} "
-        f"{panel.day_drop_frame.winfo_width()}x{panel.day_drop_frame.winfo_height()} "
-        f"mapped={panel.day_drop_frame.winfo_ismapped()}"
+        f"box={box.winfo_rootx()},{box.winfo_rooty()} "
+        f"{box.winfo_width()}x{box.winfo_height()} "
+        f"mapped={box.winfo_ismapped()}"
     )
     target = _press_target(rows[0])
     target.event_generate("<ButtonPress-1>", x=5, y=5)
     target.event_generate("<B1-Motion>", x=7, y=7)
     target.event_generate("<ButtonRelease-1>", x=7, y=7)
     root.update()
+    root.update_idletasks()
+    root.update()
 
     blocks = manager.get_time_blocks(THURSDAY)
     assert len(blocks) == 1, f"the real drag created {len(blocks)} blocks"
     assert blocks[0].planned_minutes == 45
-    assert blocks[0].start_time == "08:00"
+    assert blocks[0].slot_index == 3
+    assert blocks[0].start_time == "09:30"
 
 
 def test_a_real_release_outside_the_day_creates_nothing(
@@ -890,37 +767,6 @@ def test_a_real_release_outside_the_day_creates_nothing(
     assert manager.get_time_blocks(THURSDAY) == []
 
 
-def test_real_press_and_release_on_a_block_reorders_the_day(
-    root, manager, settings, monkeypatch, mapped_windows
-):
-    """Requirement 6, driven through Tk.
-
-    The second block is picked up and released on the top half of the first,
-    which is the gesture a user makes to move it up one place. The assertion is
-    on the stored order and the stored times together: a reorder that moved the
-    rows and left the clock behind would be the bug worth catching.
-    """
-    _add_block(manager, 30, "First", block_type=BlockType.ITEM)
-    _add_block(manager, 30, "Second", block_type=BlockType.ITEM)
-    panel = _live_screen(root, manager, settings)
-
-    assert [label for label, *_ in _stored(manager)] == ["First", "Second"]
-    first_frame, _first_id = panel._block_frames[0]
-    second_frame, _second_id = panel._block_frames[1]
-
-    _aim_pointer_at(panel, monkeypatch, first_frame, offset_y=2)
-    target = _press_target(second_frame)
-    target.event_generate("<ButtonPress-1>", x=5, y=5)
-    target.event_generate("<B1-Motion>", x=5, y=2)
-    target.event_generate("<ButtonRelease-1>", x=5, y=2)
-    root.update()
-
-    assert _stored(manager) == [
-        ("Second", 1, "08:00", "08:30", 30),
-        ("First", 2, "08:30", "09:00", 30),
-    ]
-
-
 def test_a_real_right_click_on_a_block_opens_the_menu(
     root, manager, settings, monkeypatch, mapped_windows
 ):
@@ -930,15 +776,15 @@ def test_a_real_right_click_on_a_block_opens_the_menu(
     hang the run; what is being proved is that the binding fires and builds a
     menu for the right block.
     """
-    _add_block(manager, 30, "First", block_type=BlockType.ITEM)
+    _add_block(manager, 30, "First", 0, block_type=BlockType.ITEM)
     panel = _live_screen(root, manager, settings)
 
     opened = []
     monkeypatch.setattr(tk.Menu, "tk_popup", lambda self, *a, **k: opened.append(self))
     monkeypatch.setattr(tk.Menu, "grab_release", lambda self: None)
 
-    frame, _block_id = panel._block_frames[0]
-    _press_target(frame).event_generate(RIGHT_CLICK_SEQUENCES[0], x=5, y=5)
+    widget, _block_id = panel._block_widgets[0]
+    _press_target(widget).event_generate(RIGHT_CLICK_SEQUENCES[0], x=5, y=5)
     root.update()
 
     assert len(opened) == 1, "the right-click binding did not open a menu"
@@ -948,50 +794,6 @@ def test_a_real_right_click_on_a_block_opens_the_menu(
 # --- found by the pre-push sweep --------------------------------------------
 
 
-def test_dragging_a_block_down_lands_it_where_it_was_dropped(screen, manager):
-    """The sweep's high-severity finding, at the screen level.
-
-    `reorder_to` is given the gap index the pointer was released in, counted
-    against the rendered rows with the dragged block still among them. It used
-    to pass that straight to `move_block`, which removes the block first, so
-    every downward drag overshot by one: dropping the first block between the
-    second and third put it last instead.
-    """
-    _add_block(manager, 30, "First")
-    _add_block(manager, 30, "Second")
-    _add_block(manager, 30, "Third")
-    screen.load_blocks()
-    first_id = screen._block_frames[0][1]
-
-    # The gap before "Third" — released on the bottom half of "Second".
-    screen.reorder_to(first_id, 2)
-
-    assert _stored(manager) == [
-        ("Second", 1, "08:00", "08:30", 30),
-        ("First", 2, "08:30", "09:00", 30),
-        ("Third", 3, "09:00", "09:30", 30),
-    ]
-
-
-def test_releasing_a_block_in_its_own_gap_writes_nothing(screen, manager):
-    """A mis-click inside a block's own row is not an instruction to move it.
-
-    Both gaps bounding a block are its own. The old arithmetic turned the
-    lower one into a move past the next block, so a two-pixel drag reordered
-    the day.
-    """
-    _add_block(manager, 30, "First")
-    _add_block(manager, 30, "Second")
-    screen.load_blocks()
-    first_id = screen._block_frames[0][1]
-    before = _stored(manager)
-
-    screen.reorder_to(first_id, 0)
-    screen.reorder_to(first_id, 1)
-
-    assert _stored(manager) == before
-
-
 def test_a_custom_block_length_longer_than_a_day_is_refused(screen, manager, monkeypatch):
     """A length that format_hhmm would clamp must not reach the database.
 
@@ -999,7 +801,7 @@ def test_a_custom_block_length_longer_than_a_day_is_refused(screen, manager, mon
     duration — a row that lies about itself to every later reader — and draw a
     block tall enough to put the rest of the day out of reach.
     """
-    _add_block(manager, 30, "First")
+    _add_block(manager, 30, "First", 0)
     screen.load_blocks()
     block = manager.get_time_blocks(THURSDAY)[0]
     before = _stored(manager)
@@ -1013,18 +815,6 @@ def test_a_custom_block_length_longer_than_a_day_is_refused(screen, manager, mon
     assert "1440 minutes or less" in screen.status_label.cget("text")
 
 
-def test_a_custom_block_length_of_exactly_a_day_is_accepted(screen, manager, monkeypatch):
-    """The boundary the refusal is written against, so it cannot creep inward."""
-    _add_block(manager, 30, "First")
-    screen.load_blocks()
-    block = manager.get_time_blocks(THURSDAY)[0]
-
-    monkeypatch.setattr(ctk.CTkInputDialog, "get_input", lambda self: str(24 * 60))
-    screen.ask_custom_minutes(block)
-
-    assert manager.get_time_blocks(THURSDAY)[0].planned_minutes == 24 * 60
-
-
 def test_finishing_a_drag_does_not_drop_the_posted_menu(screen, manager, monkeypatch):
     """`clear_hover_target` must not reset the reference that keeps a menu alive.
 
@@ -1032,7 +822,7 @@ def test_finishing_a_drag_does_not_drop_the_posted_menu(screen, manager, monkeyp
     that method, so ending any drag discarded the reference held to stop a
     posted menu being collected — which takes its commands with it.
     """
-    _add_block(manager, 30, "First")
+    _add_block(manager, 30, "First", 0)
     screen.load_blocks()
     monkeypatch.setattr(tk.Menu, "tk_popup", lambda self, *a, **k: None)
     monkeypatch.setattr(tk.Menu, "grab_release", lambda self: None)
@@ -1045,6 +835,254 @@ def test_finishing_a_drag_does_not_drop_the_posted_menu(screen, manager, monkeyp
     assert screen._block_menu is not None, "the menu reference was discarded"
 
 
+# --- TG-M3/M7/M9/M10/M11/M12 : the day as a fixed grid of half hours --------
+#
+# These replace the reorder and repack tests this file used to hold. A day is
+# no longer an order to be re-derived on every edit: every half hour from Day
+# Start to Day End is a box, drawn whether anything is in it or not, and a
+# block stores which box it sits in. So a gap is a legitimate day, a drop is
+# aimed at one box rather than at a position in a list, and a Day Start change
+# re-times the whole day without writing a row.
+
+
+def test_tgm71_every_slot_is_drawn(screen, manager):
+    """TG-M7.1 — the whole grid, filled boxes and empty ones alike.
+
+    The empty boxes are the feature. A pane that drew only the occupied half
+    hours would be the old list of blocks with clock times written on it, and
+    there would be nothing for a drop to aim at.
+    """
+    _add_block(manager, 30, "only block", 4)
+    screen.load_blocks()
+
+    bounds = DayBounds()
+    expected = [slot.index for slot in day_grid(bounds)]
+    assert [slot_index for _frame, slot_index in _slot_frames(screen)] == expected
+    assert len(expected) == 18, "08:00 to 17:00 is eighteen half hours"
+
+    times = _label_texts(screen.blocks_scroll)
+    assert "08:00" in times and "16:30" in times
+    assert "09:00" in times, "the box after the only block was not drawn"
+
+
+def test_tgm101_two_tasks_share_a_box(screen, manager):
+    """TG-M10.1 — a box is worth 30 minutes however many tasks are in it.
+
+    Both titles in the one box, and the box drawn taller to say so: a second
+    task that silently replaced the first, or a row that stayed one chip high,
+    would both read as a day with one task in that half hour.
+    """
+    _add_block(manager, 30, "first task", 2)
+    _add_block(manager, 30, "second task", 2)
+    screen.load_blocks()
+
+    frame = next(f for f, index in _slot_frames(screen) if index == 2)
+    assert _label_texts(frame).count("first task") == 1
+    assert _label_texts(frame).count("second task") == 1
+    assert frame.cget("height") == slot_row_height(2)
+    assert frame.cget("height") > slot_row_height(1)
+
+    # The box is still one half hour, not two.
+    assert screen._grid.minutes_occupied == SLOT_MINUTES
+
+
+def test_a_longer_task_marks_the_boxes_it_runs_through(screen, manager):
+    """45 minutes takes two boxes, and the second says what it is.
+
+    Drawn as a plain second chip it would read as another task; left blank it
+    would read as a free half hour the user could drop work into. Neither is
+    true, so the continuation is marked and its spare minutes are written on it.
+    """
+    _add_block(manager, 45, "write the brief", 0)
+    screen.load_blocks()
+
+    first = next(f for f, index in _slot_frames(screen) if index == 0)
+    second = next(f for f, index in _slot_frames(screen) if index == 1)
+
+    assert "write the brief" in _label_texts(first)
+    assert "\u21b3 write the brief" in _label_texts(second)
+    assert "15m spare" in _label_texts(second)
+    assert screen._grid.minutes_occupied == 60, "two boxes are 60 minutes of day"
+
+
+def test_tgm31_an_outside_block_is_drawn(screen, manager, settings):
+    """TG-M3.1 — a block no box can hold is shown, not dropped (P2).
+
+    Day End moving earlier is the ordinary way this happens. The block still
+    exists and is still the user's planned work; the day it stops being drawn
+    is the day that work is lost with nothing on screen to say so.
+    """
+    _add_block(manager, 30, "late afternoon", 16)
+    screen.load_blocks()
+    assert screen._grid.outside == []
+
+    screen.on_settings_saved(DayBounds(day_end="12:00"))
+
+    assert [b.label for b in screen._grid.outside] == ["late afternoon"]
+    drawn = _label_texts(screen.blocks_scroll)
+    assert "late afternoon" in drawn
+    assert any("Outside the day (1)" in text for text in drawn)
+    assert "no longer fit the day" in screen.status_label.cget("text")
+
+
+def test_tgm91_a_drop_lands_on_the_slot_under_the_pointer(screen, manager, monkeypatch):
+    """TG-M9.1 — the box the pointer is in, and no other.
+
+    The whole point of a fixed grid is that the user picks the half hour. A
+    drop handler that appended to the end of the day, or picked the first free
+    box, would plan the work somewhere they did not point.
+    """
+    item = _item(manager, "Draft the proposal")
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    monkeypatch.setattr(screen, "_slot_frames", [(frames[6], 6)])
+    monkeypatch.setattr(screen, "winfo_pointerx", lambda: 0)
+    monkeypatch.setattr(screen, "winfo_pointery", lambda: 0)
+    monkeypatch.setattr(
+        "src.getmoredone.screens.plan.widget_contains_pointer",
+        lambda widget, x, y: True,
+    )
+
+    assert screen.slot_under_pointer() == 6
+    screen.block_item(item, screen.slot_under_pointer())
+
+    assert [(row[0], row[1], row[3]) for row in _stored(manager)] == [
+        ("Draft the proposal", 6, "11:00")
+    ]
+
+
+def test_a_drop_that_lands_on_no_box_is_a_cancelled_drag(screen, monkeypatch):
+    """``None`` means nothing happens, never "the nearest box".
+
+    Without this the test above would pass for a screen that resolved every
+    release to a box, so a release over the sidebar would quietly schedule the
+    item at 08:00.
+    """
+    monkeypatch.setattr(screen, "winfo_pointerx", lambda: 0)
+    monkeypatch.setattr(screen, "winfo_pointery", lambda: 0)
+    monkeypatch.setattr(
+        "src.getmoredone.screens.plan.widget_contains_pointer",
+        lambda widget, x, y: widget is screen.blocks_scroll,
+    )
+
+    assert screen.slot_under_pointer() is None
+
+
+def test_tgm92_a_drop_on_lunch_is_refused_and_says_why(screen, manager):
+    """TG-M9.2 — lunch is drawn as a box and takes nothing, with a reason.
+
+    Silently placing the block in the next free box would be the screen
+    choosing where the work goes; silently doing nothing would read as a
+    broken drag.
+    """
+    item = _item(manager, "Draft the proposal")
+
+    screen.block_item(item, 8)
+
+    assert _stored(manager) == []
+    assert screen.status_label.cget("text") == REFUSAL_TEXT[SlotRefusal.CROSSES_LUNCH]
+    assert refusal_text(SlotRefusal.CROSSES_LUNCH) == REFUSAL_TEXT[
+        SlotRefusal.CROSSES_LUNCH
+    ]
+
+
+def test_tgm121_the_summary_separates_occupied_from_planned(screen, manager):
+    """TG-M12.1 — boxes used, time occupied and time planned, all three.
+
+    A 45-minute task occupies 60 minutes of the day and plans 45 of them. One
+    number would have to be wrong about one of those, and the whole reason the
+    grid rounds up is that the difference is real.
+    """
+    _add_block(manager, 45, "write the brief", 0)
+    screen.load_blocks()
+
+    text = screen.day_summary.cget("text")
+    assert "2 of 18 boxes" in text
+    assert "1h 00m occupied" in text
+    assert "45m planned" in text
+
+
+def test_tgm64_saving_settings_writes_no_blocks(screen, manager):
+    """TG-M6.4 — a Day Start change re-times the day without touching a row.
+
+    The box is stored relative to Day Start, so the clock times follow from it
+    on read. This is what retired the packing machinery: there is no stored
+    time to go stale, nothing to renumber, and no half-written day.
+    """
+    _add_block(manager, 30, "first", 0)
+    _add_block(manager, 30, "second", 3)
+    screen.load_blocks()
+    before = _stored(manager)
+    assert [row[3] for row in before] == ["08:00", "09:30"]
+
+    screen.on_settings_saved(DayBounds(day_start="07:00"))
+
+    assert _stored(manager) == before, "a settings change wrote to the blocks table"
+    drawn = _label_texts(screen.blocks_scroll)
+    assert "07:00" in drawn, "the grid did not re-time to the new Day Start"
+    assert "Day settings saved" in screen.status_label.cget("text")
+
+    grid = build_day_grid(manager.get_time_blocks(THURSDAY), DayBounds(day_start="07:00"))
+    starting = {
+        block.label: entry.slot.start_time
+        for entry in grid.slots
+        for block in entry.starting
+    }
+    assert starting == {"first": "07:00", "second": "08:30"}
+
+
+def test_tgm111_a_real_drag_moves_a_block_between_slots(
+    root, manager, settings, monkeypatch, mapped_windows
+):
+    """TG-M11.1 — press, motion, release on a real chip moves it to that box.
+
+    Driven through Tk rather than through the handler, because this screen has
+    already shipped a drag whose handler worked and whose binding was never
+    reached (P25). Press and release go to the same widget: Tk's implicit
+    button grab delivers the release there whatever the pointer moved over.
+    """
+    _add_block(manager, 30, "First", 0, block_type=BlockType.ITEM)
+    panel = _live_screen(root, manager, settings)
+
+    target_frame = next(f for f, index in panel._slot_frames if index == 5)
+    _aim_pointer_at(panel, monkeypatch, target_frame, offset_y=4)
+    assert panel.slot_under_pointer() == 5, (
+        "the test aimed outside box 5, so it would prove nothing: "
+        f"pointer={panel.winfo_pointerx()},{panel.winfo_pointery()} "
+        f"box={target_frame.winfo_rootx()},{target_frame.winfo_rooty()} "
+        f"{target_frame.winfo_width()}x{target_frame.winfo_height()}"
+    )
+
+    widget, _block_id = panel._block_widgets[0]
+    chip = _press_target(widget)
+    chip.event_generate("<ButtonPress-1>", x=5, y=5)
+    chip.event_generate("<B1-Motion>", x=7, y=7)
+    chip.event_generate("<ButtonRelease-1>", x=7, y=7)
+    root.update()
+    root.update_idletasks()
+    root.update()
+
+    assert [(row[0], row[1], row[3]) for row in _stored(manager)] == [
+        ("First", 5, "10:30")
+    ]
+
+
+def test_a_continuation_chip_carries_no_drag(screen, manager):
+    """The box a block starts in is the one that owns it.
+
+    A press on the second box of a 45-minute task would otherwise drag -- or
+    offer to resize -- a block from a box it does not start in, which is how a
+    task ends up moved by a gesture aimed at the half hour it merely runs
+    through.
+    """
+    _add_block(manager, 45, "write the brief", 0)
+    screen.load_blocks()
+
+    assert len(screen._block_widgets) == 1, "the continuation chip was bound too"
+    bound_frames = {widget for widget, _block_id in screen._block_widgets}
+    second = next(f for f, index in _slot_frames(screen) if index == 1)
+    assert all(widget not in second.winfo_children() for widget in bound_frames)
+
+
 class _FakeEvent:
     """The two attributes open_block_menu reads off a Tk event."""
 
@@ -1053,204 +1091,94 @@ class _FakeEvent:
         self.y_root = y_root
 
 
-def test_a_day_settings_change_retimes_the_days_that_are_not_on_screen(
-    screen, manager
-):
-    """The sweep's P6 finding at the screen level.
-
-    `on_settings_saved` used to repack `self.selected_date` alone, so Friday
-    kept the clock times Thursday's old Day Start had given it.
-    """
-    _add_block(manager, 30, "thursday")
-    _add_block(manager, 30, "friday", block_date=FRIDAY)
-    manager.repack_day(THURSDAY, screen.bounds)
-    manager.repack_day(FRIDAY, screen.bounds)
-
-    screen.on_settings_saved(DayBounds(day_start="10:00"))
-
-    assert _stored(manager, THURSDAY)[0][2] == "10:00"
-    assert _stored(manager, FRIDAY)[0][2] == "10:00"
-
-
-def test_a_failed_repack_does_not_leave_a_block_with_no_times(screen, manager):
-    """Each screen write and its repack are one commit.
-
-    In between them the new row holds no times at all, and `set_block_minutes`
-    is worse: the row would read as a 30-minute block claiming 90 minutes while
-    the next block still owned the minutes it had taken.
-    """
-    _add_block(manager, 30, "first")
-    screen.load_blocks()
-    before = _stored(manager)
-    screen.bounds = _ExplodingBounds()
-
-    with pytest.raises(RuntimeError):
-        screen.block_item(_item(manager, "dropped", THURSDAY))
-
-    assert _stored(manager) == before
-
-
-def test_a_failed_repack_does_not_leave_a_resized_block_claiming_two_lengths(
-    screen, manager
-):
-    """The resize half of the same finding."""
-    _add_block(manager, 30, "first")
-    _add_block(manager, 30, "second")
-    manager.repack_day(THURSDAY, screen.bounds)
-    screen.load_blocks()
-    before = _stored(manager)
-    block = manager.get_time_blocks(THURSDAY)[0]
-    screen.bounds = _ExplodingBounds()
-
-    with pytest.raises(RuntimeError):
-        screen.set_block_minutes(block, 90)
-
-    assert _stored(manager) == before
-
-
-class _ExplodingBounds:
-    """Bounds that raise the moment packing reads them.
-
-    The same shape as the fixture in test_time_block_crud, pointed at the
-    screen's methods rather than the manager's: pack_day asks for
-    day_start_minutes first, which puts the failure after the screen's own
-    write and before anything is committed.
-    """
-
-    default_block_minutes = 30
-    block_weekdays = (True,) * 7
-
-    @property
-    def day_start_minutes(self):
-        raise RuntimeError("bounds unreadable")
-
-    @property
-    def day_end_minutes(self):
-        raise RuntimeError("bounds unreadable")
-
-    @property
-    def lunch_start_minutes(self):
-        raise RuntimeError("bounds unreadable")
-
-    @property
-    def lunch_end_minutes(self):
-        raise RuntimeError("bounds unreadable")
-
-    @property
-    def lunch_length(self):
-        raise RuntimeError("bounds unreadable")
-
-
-@pytest.mark.parametrize(
-    "dates,expected",
-    [
-        ([THURSDAY], "Day settings saved; re-timed 1 day"),
-        ([THURSDAY, FRIDAY], "Day settings saved; re-timed 2 days"),
-    ],
-)
-def test_saving_day_settings_says_how_many_days_it_retimed(
-    screen, manager, dates, expected
-):
-    """The user guide promises the count, so the count is a claim under test.
-
-    It matters because the save reaches days that are not on screen: without
-    the message the user has no way to tell whether it did.
-    """
-    for block_date in dates:
-        _add_block(manager, 30, f"block {block_date}", block_date=block_date)
-
-    screen.on_settings_saved(DayBounds(day_start="10:00"))
-
-    assert screen.status_label.cget("text") == expected
-
-
-def test_a_capped_work_block_is_reported_not_quietly_applied(screen, manager):
-    """The item asked for a length the planner cannot store.
-
-    The user guide says the status line says so. Clamping silently would leave
-    the item claiming a Work Block the day does not reflect, with nothing
-    anywhere to say which of the two numbers is real.
-    """
-    item = _item(manager, "far too long", THURSDAY, work_block=5000)
-
-    screen.block_item(item)
-
-    assert manager.get_time_blocks(THURSDAY)[0].planned_minutes == 1440
-    text = screen.status_label.cget("text")
-    assert "1440m" in text
-    assert "5000m is longer than a day" in text
-
-
 # --- found by the fix-range re-sweep ---------------------------------------
 
 
-def _fill_the_clock(manager, count=4):
-    """Enough all-day blocks that the day can no longer be written.
+# --- TG-M8 : the row has a width, and the suite says so ---------------------
+#
+# These were written to catch a sliver bug -- block rows reported as rendering
+# a few pixels wide -- on the theory that grid_propagate(False) left the frame
+# with no width. **The bug does not reproduce.** Measured against the real Plan
+# screen, a row is 667px inside a 671px pane; measured against a hand-built
+# pane, it fills it too. So nothing was fixed here and no fix is claimed.
+#
+# The tests stay because the property they pin had no coverage at all: every
+# geometry test in this file asserts *behaviour* -- a drag creates a block, a
+# drop lands on a box -- and a row collapsed to a sliver does all of that
+# correctly. They are the guard for the grid pane, not a regression test for a
+# defect anyone has seen. They measure a real box of that pane, since the
+# per-block row they were first written against is gone.
 
-    Each one is legal on its own -- the dialog accepts 1440 and a test asserts
-    it -- and four of them pack past the last time HH:MM can express.
+
+def _one_slot_pane(root, block, width=None):
+    """A laid-out pane holding the one box ``block`` starts in."""
+    root.geometry("1200x800")
+    root.deiconify()
+    pane = ctk.CTkFrame(root, width=width) if width else ctk.CTkFrame(root)
+    pane.pack(fill="both", expand=True)
+    pane.grid_columnconfigure(0, weight=1)
+
+    entry = build_day_grid([block], DayBounds()).slots[0]
+    assert entry.starting, "the block was not placed in the first box"
+    return pane, build_slot_row(pane, entry, {}, 0)
+
+
+def _find_label(widget, text):
+    """The label showing ``text``, however deeply nested, or ``None``."""
+    for child in widget.winfo_children():
+        if isinstance(child, ctk.CTkLabel) and child.cget("text") == text:
+            return child
+        found = _find_label(child, text)
+        if found is not None:
+            return found
+    return None
+
+
+def test_tgm81_a_block_row_fills_its_pane(root, manager, mapped_windows):
+    """TG-M8.1 — a box is as wide as the column it is gridded into.
+
+    The sliver bug, as a number. Within 8px for the 2px padx on each side plus
+    a border; anything near zero is the bug.
     """
-    for index in range(count):
-        _add_block(manager, 24 * 60, f"all day {index}")
+    pane, row = _one_slot_pane(
+        root,
+        TimeBlock(
+            block_date=THURSDAY, start_time="08:00", end_time="08:30",
+            planned_minutes=30, label="Draft the proposal", slot_index=0,
+        ),
+        width=600,
+    )
+    root.update()
+
+    assert pane.winfo_width() > 100, (
+        "the pane itself did not lay out, so this would prove nothing: "
+        f"{pane.winfo_width()}px"
+    )
+    assert abs(row.frame.winfo_width() - pane.winfo_width()) <= 8, (
+        f"box is {row.frame.winfo_width()}px inside a {pane.winfo_width()}px pane"
+    )
 
 
-def test_a_day_too_full_to_write_says_so_instead_of_doing_nothing(screen, manager):
-    """A refused action and a broken one look identical without the message.
+def test_tgm82_a_block_row_shows_its_title(root, manager, mapped_windows):
+    """TG-M8.2 — the title label is non-empty and actually on screen.
 
-    The write rolls back with its transaction, so without a status line the
-    user clicks, nothing changes, and the only record is a traceback on
-    stderr.
+    Width alone is not enough: a full-width box whose title column collapsed
+    would pass TG-M8.1 and still show the user nothing. winfo_ismapped() is
+    the half that catches it, because a label squeezed to zero is unmapped.
     """
-    _fill_the_clock(manager)
-    item = _item(manager, "one more", THURSDAY)
-    before = _stored(manager)
+    _pane, row = _one_slot_pane(
+        root,
+        TimeBlock(
+            block_date=THURSDAY, start_time="08:00", end_time="08:30",
+            planned_minutes=30, label="Draft the proposal", slot_index=0,
+        ),
+    )
+    root.update()
 
-    screen.block_item(item)
-
-    assert _stored(manager) == before, "nothing should have been written"
-    assert screen.status_label.cget("text") == DAY_TOO_FULL
-
-
-def test_a_padding_block_on_a_full_day_says_so(screen, manager):
-    """The sibling path, so the report is not on one of four."""
-    _fill_the_clock(manager)
-    before = _stored(manager)
-
-    screen.add_padding_block("break")
-
-    assert _stored(manager) == before
-    assert screen.status_label.cget("text") == DAY_TOO_FULL
-
-
-def test_a_resize_that_overfills_the_day_rolls_the_object_back_too(screen, manager):
-    """The in-memory block must not keep the length the database refused.
-
-    It is the same object the row menu hands back on the next click, so a
-    stale value there would offer a size the day does not hold.
-    """
-    _fill_the_clock(manager, count=3)
-    _add_block(manager, 30, "small")
-    manager.repack_day(THURSDAY, screen.bounds)
-    screen.load_blocks()
-    block = [b for b in manager.get_time_blocks(THURSDAY) if b.label == "small"][0]
-    before = _stored(manager)
-
-    screen.set_block_minutes(block, 24 * 60)
-
-    assert _stored(manager) == before
-    assert block.planned_minutes == 30, "the rejected length must not stick"
-    assert screen.status_label.cget("text") == DAY_TOO_FULL
-
-
-def test_a_settings_save_that_cannot_retime_a_day_says_so(screen, manager):
-    """The settings file is already written when the repack is attempted.
-
-    So the one thing the user must be told is that the days did not follow it.
-    """
-    _fill_the_clock(manager)
-
-    screen.on_settings_saved(DayBounds(day_start="10:00"))
-
-    text = screen.status_label.cget("text")
-    assert "too full to re-time" in text
-    assert "shorten a block" in text
+    title = _find_label(row.frame, "Draft the proposal")
+    assert title is not None, (
+        "no title label in the box; labels were "
+        f"{_label_texts(row.frame)}"
+    )
+    assert title.winfo_ismapped(), "the title label is not on screen"
+    assert title.winfo_width() > 1, f"title label is {title.winfo_width()}px wide"
