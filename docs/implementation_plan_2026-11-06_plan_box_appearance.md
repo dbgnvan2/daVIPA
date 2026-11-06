@@ -164,12 +164,19 @@ say so rather than left claiming a property this change removes.
 Asked for after PB-M1 to PB-M5 were on screen. Three parts, all on the "Items
 Starting" row.
 
-- **PB-M6.1 Height.** The row is `slots_for_minutes(work_block_minutes)` boxes
-  of `box_height()` tall — the same arithmetic and the same unit the day's grid
-  uses, so a 90-minute item is three boxes tall on the left because it will be
-  three boxes tall on the right. 45 minutes is two boxes for the reason it is
-  two boxes in the day: a half-hour grid cannot hold a quarter hour.
-  `grid_propagate(False)` holds the height against the row's own text.
+- **PB-M6.1 Height.** `item_row_height(span, box_height)`: the space the day
+  gives those half hours, asked of `slot_row_height` rather than recomputed,
+  plus the 2px `build_slot_row` grids between consecutive boxes. A 90-minute
+  item is three boxes tall on the left because it will be three boxes tall on
+  the right. 45 minutes is two boxes for the reason it is two boxes in the day:
+  a half-hour grid cannot hold a quarter hour. `grid_propagate(False)` holds
+  the height against the row's own text, and the slack sits on an empty row
+  below the two text rows so a tall row keeps its lines together and a short
+  one loses from the bottom.
+- **PB-M6.1 Floor.** Never below `ITEM_ROW_MIN_HEIGHT_PX = 66`. The 30px floor
+  on the box height was justified for a chip holding one line; an item row
+  holds two plus the length, and matched to a 34px box it dropped the depth /
+  `already blocked` line and the length with no sign of it.
 - **PB-M6.2 The priority score comes off.** The band is already the shade the
   row is drawn on and the colour of its stripe, so the number was a third way
   of saying one thing, in the one place a reader looks for what the colour
@@ -178,14 +185,41 @@ Starting" row.
   below the stacked lines rather than in the detail line, which puts the fact
   in the same place on an item row as on a task in a box.
 
-**Known consequence, not a defect:** at a box height of 30 — what the demo's
-settings file holds — a 30-minute row is 30px and its second line clips. At the
-86px default it does not. The height is pinned because a row that grew to its
-text would stop matching the grid, which is the whole of what was asked for.
+**What the first version of this got wrong, found by the cold sweep over
+`2e4add9...HEAD` and measured before fixing:**
+
+- The height was `span * box_height`, which is 4px short of one box and 6px
+  short per box after the first, because a day box is `box_height + 4` and
+  consecutive boxes are 2px apart. The acceptance test asserted that same
+  product, so the one relationship this change exists for was the one thing
+  unchecked. Both now go through `item_row_height`, and the test asserts
+  literals plus a second test measuring the rendered day.
+- `grid_rowconfigure(0, weight=1)` put all the slack — including a negative
+  shortfall — on the title's row. At a box height of 30 Tk collapsed the title
+  to a single pixel: the row showed its depth and its length and not which item
+  it was. At 86 with a 3-box span the title was centred in 224px of slack, 100px
+  from its own detail line. The weight is on an empty row 2 now.
+- Three colour and score assertions could not fail for what they named, because
+  `_item(..., priority_score=51200)` does not produce a scored item —
+  `create_action_item` recomputes the score from four factors that were all
+  `None`, giving 0 — and `_one_slot_pane` rendered with an empty `items_by_id`,
+  so the chip's item was `None`. Both sides were the unscored tint. Fixed with
+  a `_scored_item` helper that asserts its own band, and two of the three were
+  PB-M4 tests from the earlier batch (adjacent, fixed with it, said so).
 
 **Acceptance**
-- PB-M6.1 A row's requested height is `boxes × box_height` for 30/45/60/90/120
-  minutes. Test: `tests/test_plan_screen.py::test_pbm61_an_item_row_is_as_tall_as_the_boxes_it_will_fill`
+- PB-M6.1 A row's requested height is what the day gives those boxes, for
+  30/45/60/90/120 minutes, asserted as literals rather than as an expression
+  over the module's own constants.
+  Test: `tests/test_plan_screen.py::test_pbm61_an_item_row_is_the_height_the_day_would_give_it`
+- PB-M6.1 The row equals the span of the real boxes holding the task, measured
+  on screen. Test: `::test_pbm61_a_row_is_as_tall_as_the_boxes_beside_it`
+- PB-M6.1 A row is never shorter than its two lines, and above the floor it is
+  exactly the day's height. Test: `::test_pbm61_a_row_too_short_for_its_text_keeps_its_text`
+- PB-M6.1 Every child of the row is drawn inside it, at the floor and above it.
+  Test: `::test_pbm61_every_line_of_a_row_is_drawn_inside_it`
+- PB-M6.1 A tall row keeps its two lines together at the top.
+  Test: `::test_pbm61_a_tall_row_keeps_its_two_lines_together`
 - PB-M6.1 The screen passes the setting it draws the day with, read off the
   rendered row. Test: `::test_pbm61_the_item_row_height_comes_from_the_setting`
 - PB-M6.1 The row lays out at the height it asks for on a real window.

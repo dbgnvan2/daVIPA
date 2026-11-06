@@ -310,15 +310,20 @@ Items pane (left):
   depth bars. The priority score is not printed: the row is drawn in its
   priority band and striped in it, so the number said a third time what the
   colour already says twice.
-- **How tall a row is** — What: The number of half-hour boxes the item will
-  fill, each as tall as a box in the day. A 90-minute item is three boxes tall;
-  a 45-minute item is two, for the reason it takes two in the day — a half-hour
-  grid cannot hold a quarter hour. Why: the row is the shape of the space it is
-  about to take, so you can see whether the day has room for it before
-  dragging. The height comes from *Drag Schedule box height (px)*, the same
-  setting the day's boxes use. At a box height near the 30px floor a row is one
-  line of text tall and its second line is cut off; the 86px default has room
-  for both.
+- **How tall a row is** — What: Exactly the space the item's work block will
+  take in the day — from the top edge of the first box it would fill to the
+  bottom edge of the last. A 90-minute item is three boxes tall; a 45-minute
+  item is two, for the reason it takes two in the day: a half-hour grid cannot
+  hold a quarter hour. Why: the row is the shape of the space it is about to
+  take, so you can see whether the day has room for it before dragging. The
+  height comes from *Drag Schedule box height (px)*, the same setting the day's
+  boxes use.
+- **The shortest a row gets** — What: 66px, two lines of text, whatever the box
+  height is set to. Why: below that the row cannot show its depth, its
+  `already blocked` marker or its length, and it would lose them with nothing
+  to say they were there. So at a box height of 30 — the lowest the setting
+  goes — a one-box row is taller than the 34px box it matches everywhere else.
+  From about 62 up, the row and the day agree exactly.
 - **Drag a row onto a box** — What: Creates a block for it in that half hour.
   Why: This is how blocks are made, and the box you drop on is the box you get.
   If the item needs more than one box, the status line says how many and what is

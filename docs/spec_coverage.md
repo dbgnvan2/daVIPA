@@ -358,7 +358,11 @@ walkthrough, two more after those five were on screen. All tests are in
 | PB-M5.4 | The chip's title column requests the Drag Schedule title width | `src/getmoredone/screens/plan.py` (box_title_width), `plan_blocks.py` (_build_block_chip) | `::test_pbm54_the_title_column_follows_the_drag_schedule_width` | done |
 | PB-M5.5 | A block outside the day is sized by the same two settings as one in a box | `src/getmoredone/screens/plan_blocks.py` (build_outside_group), `plan.py` (load_blocks) | `::test_pbm55_an_outside_block_is_sized_like_one_in_a_box`, `::test_pbm55_the_settings_reach_the_outside_group_on_screen` | done |
 | PB-M5.6 | A box height below one line of text is raised to the 30px floor; a usable value is not floored | `src/getmoredone/screens/plan.py` (_positive_setting, box_height) | `::test_pbm56_a_box_height_below_one_line_of_text_is_raised`, `::test_pbm56_a_usable_box_height_is_not_floored` | done |
-| PB-M6.1 | An item row's requested height is `slots_for_minutes(minutes) × box_height` — 30/45/60/90/120 minutes give 1/2/2/3/4 boxes | `src/getmoredone/screens/plan_blocks.py` (build_item_row) | `::test_pbm61_an_item_row_is_as_tall_as_the_boxes_it_will_fill` | done |
+| PB-M6.1 | An item row's requested height is the space the day gives those boxes — 30/45/60/90/120 minutes give 90/182/182/274/366px at a box height of 86, asserted as literals, not as an expression over the module's own constants | `src/getmoredone/screens/plan_blocks.py` (item_row_height, SLOT_ROW_GAP_PX) | `::test_pbm61_an_item_row_is_the_height_the_day_would_give_it` | done |
+| PB-M6.1 | The row equals the span of the real boxes holding the task, measured from the first box's top edge to the last box's bottom edge on screen | `src/getmoredone/screens/plan_blocks.py` (item_row_height, slot_row_height) | `::test_pbm61_a_row_is_as_tall_as_the_boxes_beside_it` *(needs `mapped_windows`)* | done |
+| PB-M6.1 | A row is never shorter than its two lines of text, and at any usable box height it is exactly the day's own height | `src/getmoredone/screens/plan_blocks.py` (ITEM_ROW_MIN_HEIGHT_PX) | `::test_pbm61_a_row_too_short_for_its_text_keeps_its_text` | done |
+| PB-M6.1 | Every child of the row is drawn inside it and none is collapsed, at the floor and above it | `src/getmoredone/screens/plan_blocks.py` (build_item_row, grid_rowconfigure) | `::test_pbm61_every_line_of_a_row_is_drawn_inside_it` *(needs `mapped_windows`)* | done |
+| PB-M6.1 | A tall row keeps its two lines together at the top instead of centring the title in the slack | `src/getmoredone/screens/plan_blocks.py` (build_item_row, grid_rowconfigure) | `::test_pbm61_a_tall_row_keeps_its_two_lines_together` *(needs `mapped_windows`)* | done |
 | PB-M6.1 | The screen passes the setting it draws the day with, read off the rendered row | `src/getmoredone/screens/plan.py` (load_blocks → build_item_row) | `::test_pbm61_the_item_row_height_comes_from_the_setting` | done |
 | PB-M6.1 | The row lays out at the height it asks for, against its own text | `src/getmoredone/screens/plan_blocks.py` (build_item_row, grid_propagate) | `::test_an_item_row_lays_out_at_the_height_it_asks_for` *(needs `mapped_windows`)* | done |
 | PB-M6.2 | No label on an item row carries the priority score, in any form | `src/getmoredone/screens/plan_blocks.py` (build_item_row) | `::test_pbm62_an_item_row_does_not_print_its_priority_score` | done |
@@ -391,17 +395,48 @@ walkthrough, two more after those five were on screen. All tests are in
 
 ## Pre-push review passes
 
-| Pass | Lens | Result |
-|---|---|---|
-| `learning-qa` (cold) | the failure-pattern catalogue (P1–P40) | 8 findings: 0 high, 3 medium, 5 below |
-| `/code-review` (cold) | correctness, reuse, simplification | 4 findings: 0 high, 2 medium, 2 below |
-| `/security-review` | injection, secrets, path traversal, deserialization | not applicable, established by grep of the added lines rather than by judgement: the diff adds no SQL, no subprocess, no HTTP, no deserializer and no path handling |
+Every row names the range it covered. The first version of this table did not,
+and read as though the three passes over PB-M1 to PB-M5 had also covered PB-M6
+and PB-M7 — which the handoff note, in the same commit, said plainly they had
+not. That is the P6 failure the catalogue is about, in a document whose whole
+job is to say what has been checked.
 
-Both passes were cold — given the range and the diff, not the session's
-narrative. Three findings converged, which is the evidence two lenses are for.
-Everything at medium or above was fixed with a test, each proved by mutation
-(8/8 red for the sweep fixes, 9/9 red for PB-M6/PB-M7). Everything below medium
-is in `BACKLOG.md` with the pass that found it.
+| Pass | Range | Lens | Result |
+|---|---|---|---|
+| `learning-qa` (cold) | `99d438f...2e4add9` | the failure-pattern catalogue (P1–P40) | 8 findings: 0 high, 3 medium, 5 below |
+| `/code-review` (cold) | `99d438f...2e4add9` | correctness, reuse, simplification | 4 findings: 0 high, 2 medium, 2 below |
+| `/security-review` | `99d438f...2e4add9` | injection, secrets, path traversal, deserialization | not applicable, established by grep of the added lines rather than by judgement: no SQL, no subprocess, no HTTP, no deserializer, no path handling |
+| `learning-qa` (cold) | `2e4add9...HEAD` (PB-M6/PB-M7) | the same catalogue | 5 medium, 0 high, 4 below. Of the catalogue, 5 patterns genuinely applied; it said so rather than stretching the rest |
+| `/code-review` (cold) | `2e4add9...HEAD` (PB-M6/PB-M7) | correctness, reuse, simplification | 5 findings: 0 high, 2 medium, 3 below |
+| `/security-review` | `2e4add9...HEAD` | — | not applicable, by the same grep over this range's added lines |
+
+Every pass was cold — given the range and the diff, not the session's
+narrative. On the second range the two lenses converged on four of the same
+findings, which is the evidence two lenses are for, and the useful ones came
+from the two families the pattern catalogue only partly covers: test quality and
+the UI-as-contract lens in `~/.claude/standards/ui-regression.md`.
+
+Everything at medium or above was fixed with a test, each proved by mutation:
+8/8 red for the PB-M1–M5 sweep fixes, 9/9 for PB-M6/PB-M7 as first written, 7/7
+for the fixes to those. Everything below medium is in `BACKLOG.md` with the pass
+that found it.
+
+What the second sweep found is worth stating plainly, because three of the five
+were in code and tests written in the same session that then reviewed them warm:
+
+- The row height was 2px per box short of the day it claimed to match, and its
+  acceptance test asserted the same formula the code used.
+- The title collapsed to one pixel at the lowest box-height setting, and floated
+  mid-row at the default on any multi-box row. Neither had a test, because every
+  height assertion was `cget` and none measured a child.
+- Three colour and score assertions compared the unscored tint with itself. The
+  mutation gate came back 9/9 red over them and could not have caught it:
+  mutating the lines the diff touched does not produce the mutant that fills
+  every chip with the unscored tint. A green gate there was expected, not
+  reassuring.
+- Two of those three were PB-M4 tests from the earlier batch. Fixed with the
+  third rather than left, and said so here, because leaving them means this
+  table claims PB-M4.1 and PB-M4.3 are verified when they were not.
 
 The most useful finding was one neither pass reported as severe: a colour test
 was passing only because this Mac is in light mode. Forced to dark it failed

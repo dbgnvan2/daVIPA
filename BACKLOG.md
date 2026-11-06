@@ -1,6 +1,29 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-06 (the plan-box-appearance sweep: four more below-medium added; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-06 (the PB-M6/PB-M7 sweep: three more below-medium added, after the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Below medium, from the PB-M6/PB-M7 sweep (2026-11-06)
+
+Found by the cold `learning-qa` and `/code-review` passes over
+`2e4add9...HEAD`. Recorded rather than fixed: none is above low severity, and a
+below-medium fix is new unreviewed surface that buys none of the safety it
+costs.
+
+- **The row no longer says whether the length is the item's own.** The detail
+  line used to read `Work Block 30m` when the item carried its own
+  `work_block` and `30m` when the length came from the settings default. The
+  label under the depth bars is always `{minutes}m`, so the distinction is
+  gone. Neither form is pinned by a test. `plan_blocks.py` `build_item_row`.
+- **Nothing bounds an item row's span.** `slots_for_minutes` is capped only at
+  `MINUTES_PER_DAY`, so an item with a long work block — or a user whose
+  `default_time_block_minutes` is 240 — produces a row of 8 to 48 boxes that
+  pushes the rest of the list out of sight with no hint it is there. A cap, or
+  a "needs N boxes" line instead of N boxes of height, is the fix.
+- **`drag_schedule.py:113-116` now disagrees about what one box is.** It reads
+  the same box-height setting with its own fallback (86) and floor (20), and
+  applies no `slots_for_minutes` scaling to its own item rows. Already listed
+  under the earlier sweep's entry for the same file; the two screens have now
+  drifted further apart. One shared helper is the fix.
 
 ## Below medium, from the plan-box-appearance sweep (2026-11-06)
 

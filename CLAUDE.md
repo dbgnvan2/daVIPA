@@ -20,7 +20,7 @@ pytest -v                                       # Verbose
 pytest tests/test_vps_integration.py -v        # Single file
 pytest --cov=src/getmoredone                   # With coverage
 
-# 16 tests build a real on-screen window and take keyboard focus: the
+# 19 tests build a real on-screen window and take keyboard focus: the
 # geometry checks, and the ones that drive real Tk button events. The count is
 # asserted against the suite by tests/test_ci_contract.py, so it cannot drift.
 # Skip them while working on the machine. CI never sets this.

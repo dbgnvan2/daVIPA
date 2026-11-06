@@ -179,11 +179,6 @@ visible.
 
 ### Risks / Known gaps
 
-- **At a box height near the 30px floor a one-box row clips its second line.**
-  The demo's settings file holds 30, so it is visible there; the 86px default
-  has room. The height is pinned on purpose — a row that grew to its text would
-  stop matching the grid, which is what was asked for. Stated in the plan under
-  PB-M6 and in the user guide rather than treated as a defect.
 - One rewritten test, under test rule (b): the behaviour changed intentionally.
   `test_an_item_row_is_as_tall_as_its_text_not_the_stripe_default` asserted the
   opposite of PB-M6.1 and is now
@@ -193,10 +188,59 @@ visible.
 - Two test names the plan doc had named were wrong (`PB-M4.1`'s, and PB-M2.2's
   after the rewrite). Found by checking every `::test_` reference in both docs
   against the suite, not by review. Both corrected.
-- No review pass has run over PB-M6/PB-M7 itself. The sweep covered
-  `99d438f...2e4add9`; this work sits after it.
+- **Not yet seen on screen.** Every height and colour claim here is measured —
+  by `cget`, by `winfo_y`/`winfo_height` on a mapped window, and in one case
+  against the rendered day itself — but nobody has looked at the Plan screen
+  since these changes. The demo was running the pre-change code throughout; it
+  needs restarting.
+
+### Sweep over this range — `2e4add9...HEAD`
+
+Both cold passes run and their findings fixed. `learning-qa`: 5 medium, 0 high,
+4 below. `/code-review`: 2 medium, 3 below. Four findings converged. Five
+patterns of the catalogue genuinely applied to a pure-UI diff and it said so
+rather than stretching the rest. `/security-review` not applicable, by grep of
+this range's added lines.
+
+What they found, all three of the mediums in code written and reviewed warm in
+the same session:
+
+1. **The height was 2px per box short of the day it claimed to match.** A day
+   box is `box_height + 4` and consecutive boxes are 2px apart, so a 3-box row
+   was 258px of row for 274px of day. The acceptance test asserted the same
+   product the code computed. Fixed by `item_row_height`, built on
+   `slot_row_height`; the test now asserts literals, and a second test measures
+   the rendered day the item itself produces.
+2. **The title collapsed to one pixel at a box height of 30, and floated
+   mid-row at the default.** `grid_rowconfigure(0, weight=1)` put the whole
+   shortfall on the title's row, so a one-box row showed its depth and its
+   length and not which item it was; a 3-box row centred the title 100px from
+   its own detail line. The weight is on an empty row 2 now, and
+   `ITEM_ROW_MIN_HEIGHT_PX = 66` keeps the row above its own two lines. Two new
+   geometry tests measure every child against the frame.
+3. **Three colour and score assertions compared the unscored tint with
+   itself.** `_item(..., priority_score=51200)` does not make a scored item —
+   `create_action_item` recomputes from four `None` factors and gets 0 — and
+   `_one_slot_pane` rendered with an empty `items_by_id`, so the chip's item was
+   `None`. Fixed with `_scored_item`, which asserts its own band, and
+   `items_by_id` threaded through the helper. Two of the three were PB-M4 tests
+   from the earlier batch: adjacent, fixed with the third rather than left, and
+   said so in `docs/spec_coverage.md`, because leaving them means that document
+   claims PB-M4.1 and PB-M4.3 are verified when they were not.
+
+The mutation gate on PB-M6/PB-M7 came back 9/9 red and could not have caught
+finding 3 — mutating the lines the diff touched does not produce the mutant that
+fills every chip with the unscored tint. A green gate there was expected, not
+reassuring. The gate on these fixes is 7/7 red, after two green mutants sent two
+of the new tests back: one built its expected height from the same constants the
+code reads (the same self-agreement, in the test written to fix it), and one
+pinned a `sticky` change that turned out to change nothing, which was reverted
+rather than kept with a false justification.
+
+Three below-medium findings are in `BACKLOG.md`.
 
 ### Next agent actions
 
-- Walk the item-row heights and the continuation colours on screen in the demo.
+- Restart the demo and look at the Plan screen: the item-row heights beside the
+  day, the continuation colours, and a row at box height 30 against one at 86.
 - Re-walk the drag feel, still outstanding from PB-M5.
