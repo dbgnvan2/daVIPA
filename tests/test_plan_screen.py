@@ -73,6 +73,7 @@ from src.getmoredone.time_block_layout import (
     SLOT_MINUTES,
     DayBounds,
     SlotRefusal,
+    SlotRefusedError,
     build_day_grid,
     day_grid,
     priority_band,
@@ -3682,3 +3683,317 @@ def test_pdm26_the_grip_and_the_settings_field_are_one_value(
         f"{getattr(opened, 'plan_items_col_width', 260)}, not at the "
         f"{expected}px the grip was left at"
     )
+
+
+# ================= PD-M3 — the AutoLoad button ==========================
+
+
+def _short_day(root, manager, settings, end="09:30"):
+    """A Plan screen on a day with only a few boxes in it.
+
+    ``self.bounds`` is read once in ``__init__``, so the day has to be short
+    before the screen is built. Three boxes is enough to run a day out of room
+    inside a test without filling fourteen of them first.
+    """
+    settings.plan_day_start = "08:00"
+    settings.plan_day_end = end
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    root.update_idletasks()
+    return panel
+
+
+def _priced_item(manager, title, importance, urgency, size, value):
+    """An item whose priority score is chosen, so the list order is chosen."""
+    return _item(
+        manager,
+        title,
+        importance=importance,
+        urgency=urgency,
+        size=size,
+        value=value,
+    )
+
+
+def _placements(manager, block_date=THURSDAY):
+    return {
+        b.label: b.slot_index for b in manager.get_time_blocks(block_date)
+    }
+
+
+def test_pdm31_autoload_fills_in_list_order(screen, manager):
+    """PD-M3.1 — one after another, from the top of the list down the day."""
+    _priced_item(manager, "First", 20, 20, 16, 8)
+    _priced_item(manager, "Second", 10, 10, 8, 4)
+    _priced_item(manager, "Third", 5, 5, 4, 2)
+    screen.refresh()
+
+    order = [i.title for i in manager.get_items_for_start_date(THURSDAY)]
+    assert order == ["First", "Second", "Third"], (
+        f"precondition: the list is not in the order this test assumes: {order}"
+    )
+
+    screen.autoload_day()
+
+    assert _placements(manager) == {"First": 0, "Second": 1, "Third": 2}, (
+        _placements(manager)
+    )
+
+
+def test_pdm31_autoload_gives_a_long_task_its_own_boxes(screen, manager):
+    """PD-M3.1 — a 90m task takes three boxes and the next item starts after.
+
+    Written because the depth a box allows makes "the earliest box that will
+    hold it" and "the earliest empty box" two different answers, and only the
+    second is one after another. A 90m task placed at 08:00 and a 30m task
+    placed at 08:00 beside it is what the first answer produces.
+    """
+    _priced_item(manager, "Long", 20, 20, 16, 8)
+    _priced_item(manager, "Short", 10, 10, 8, 4)
+    long_item = [i for i in manager.get_items_for_start_date(THURSDAY)
+                 if i.title == "Long"][0]
+    long_item.work_block = 90
+    manager.update_action_item(long_item)
+    screen.refresh()
+
+    screen.autoload_day()
+
+    placed = _placements(manager)
+    assert placed == {"Long": 0, "Short": 3}, (
+        f"the 90m task covers boxes 0, 1 and 2, so the next item starts at 3: {placed}"
+    )
+
+
+def test_pdm31_a_long_task_does_not_land_on_a_later_occupied_box(screen, manager):
+    """PD-M3.1 — every box of a multi-box task has to be clear, not just the first.
+
+    A box holding one task is not full, so the box the task *starts* in can be
+    clear while the box it runs into is taken. Checking only the first box puts
+    a 60m task at 08:00 on top of whatever is already sitting at 08:30.
+    """
+    _add_block(manager, 30, "Standing meeting", slot_index=1)
+    _priced_item(manager, "Long", 20, 20, 16, 8)
+    long_item = manager.get_items_for_start_date(THURSDAY)[0]
+    long_item.work_block = 60
+    manager.update_action_item(long_item)
+    screen.refresh()
+
+    screen.autoload_day()
+
+    assert _placements(manager)["Long"] == 2, (
+        "box 0 is clear but the 60m task runs into box 1, which is not: "
+        f"{_placements(manager)}"
+    )
+
+
+def test_pdm32_autoload_skips_an_item_already_blocked(screen, manager):
+    """PD-M3.2 — an item with a block today is not blocked a second time."""
+    first = _priced_item(manager, "First", 20, 20, 16, 8)
+    _priced_item(manager, "Second", 10, 10, 8, 4)
+    manager.add_block_at(
+        TimeBlock(
+            block_date=THURSDAY,
+            start_time="",
+            end_time="",
+            planned_minutes=30,
+            item_id=first.id,
+            label="First",
+            block_type=BlockType.ITEM,
+        ),
+        4,
+        screen.bounds,
+    )
+    screen.refresh()
+
+    screen.autoload_day()
+
+    for_first = [
+        b.slot_index for b in manager.get_time_blocks(THURSDAY)
+        if b.item_id == first.id
+    ]
+    assert for_first == [4], f"First was blocked again: {for_first}"
+    assert _placements(manager) == {"First": 4, "Second": 0}, _placements(manager)
+
+
+def test_pdm33_autoload_leaves_existing_blocks_untouched(screen, manager):
+    """PD-M3.3 — purely additive: nothing already on the day moves or changes."""
+    _add_block(manager, 30, "Standing meeting", slot_index=0)
+    _add_block(manager, 60, "Workshop", slot_index=2)
+    _priced_item(manager, "New", 20, 20, 16, 8)
+    screen.refresh()
+    before = {
+        b.id: (b.slot_index, b.position, b.planned_minutes, b.start_time, b.end_time)
+        for b in manager.get_time_blocks(THURSDAY)
+    }
+    assert len(before) == 2, "precondition: two blocks were put on the day"
+
+    screen.autoload_day()
+
+    after = {
+        b.id: (b.slot_index, b.position, b.planned_minutes, b.start_time, b.end_time)
+        for b in manager.get_time_blocks(THURSDAY)
+    }
+    for block_id, row in before.items():
+        assert after.get(block_id) == row, (
+            f"block {block_id} was {row} and is now {after.get(block_id)}"
+        )
+    assert _placements(manager)["New"] == 1, (
+        f"the new block took the one clear box before the workshop: "
+        f"{_placements(manager)}"
+    )
+
+
+def test_pdm34_autoload_does_not_straddle_lunch(screen, manager):
+    """PD-M3.4 — a task long enough to reach lunch starts after it instead."""
+    for index in range(7):
+        _add_block(manager, 30, f"Taken {index}", slot_index=index)
+    _priced_item(manager, "Long", 20, 20, 16, 8)
+    long_item = manager.get_items_for_start_date(THURSDAY)[0]
+    long_item.work_block = 90
+    manager.update_action_item(long_item)
+    screen.refresh()
+
+    screen.autoload_day()
+
+    placed = _placements(manager)["Long"]
+    assert placed == 10, (
+        "boxes 7, 8 and 9 would cover the 12:00 lunch, so the task starts at "
+        f"10 (12:30); it went to {placed}"
+    )
+
+
+def test_pdm34_autoload_does_not_run_past_the_day_end(screen, manager):
+    """PD-M3.4 — a task that would need a box past Day End does not fit."""
+    for index in list(range(8)) + list(range(10, 17)):
+        _add_block(manager, 30, f"Taken {index}", slot_index=index)
+    _priced_item(manager, "Long", 20, 20, 16, 8)
+    long_item = manager.get_items_for_start_date(THURSDAY)[0]
+    long_item.work_block = 60
+    manager.update_action_item(long_item)
+    screen.refresh()
+    before = len(manager.get_time_blocks(THURSDAY))
+
+    screen.autoload_day()
+
+    assert len(manager.get_time_blocks(THURSDAY)) == before, (
+        "a 60m task needs two boxes and only 16:30 is left"
+    )
+    assert "1 did not fit" in screen.status_label.cget("text")
+
+
+def test_pdm35_autoload_reports_all_three_counts(root, manager, settings):
+    """PD-M3.5 — blocked, did not fit and already blocked, all three, always."""
+    panel = _short_day(root, manager, settings, end="09:30")
+    blocked = _priced_item(manager, "Blocked already", 20, 20, 16, 8)
+    _priced_item(manager, "Fits", 10, 10, 8, 4)
+    _priced_item(manager, "Also fits", 8, 8, 6, 4)
+    _priced_item(manager, "No room", 5, 5, 4, 2)
+    manager.add_block_at(
+        TimeBlock(
+            block_date=THURSDAY,
+            start_time="",
+            end_time="",
+            planned_minutes=30,
+            item_id=blocked.id,
+            label="Blocked already",
+            block_type=BlockType.ITEM,
+        ),
+        0,
+        panel.bounds,
+    )
+    panel.refresh()
+
+    panel.autoload_day()
+
+    text = panel.status_label.cget("text")
+    assert "blocked 2 of 4" in text, text
+    assert "1 did not fit" in text, text
+    assert "1 already blocked" in text, text
+
+
+def test_pdm36_a_full_day_writes_nothing(root, manager, settings):
+    """PD-M3.6 — no room anywhere: nothing written, and the status says so."""
+    panel = _short_day(root, manager, settings, end="09:30")
+    for index in range(3):
+        manager.add_block_at(
+            TimeBlock(
+                block_date=THURSDAY,
+                start_time="",
+                end_time="",
+                planned_minutes=30,
+                label=f"Taken {index}",
+            ),
+            index,
+            panel.bounds,
+        )
+    _priced_item(manager, "Hopeful", 20, 20, 16, 8)
+    panel.refresh()
+    before = _stored(manager)
+
+    panel.autoload_day()
+
+    assert _stored(manager) == before, "AutoLoad wrote onto a full day"
+    text = panel.status_label.cget("text")
+    assert "blocked 0 of 1" in text, text
+    assert "1 did not fit" in text, text
+    assert panel.status_label.cget("text_color") == status_text_color("warning")
+
+
+def test_pdm37_autoload_is_one_transaction(screen, manager, monkeypatch):
+    """PD-M3.7 — a refusal part-way leaves none of the run, not half a day."""
+    _priced_item(manager, "First", 20, 20, 16, 8)
+    _priced_item(manager, "Second", 10, 10, 8, 4)
+    _priced_item(manager, "Third", 5, 5, 4, 2)
+    screen.refresh()
+    assert _stored(manager) == [], "precondition: the day starts empty"
+
+    real = type(manager).add_block_at
+    calls = []
+
+    def explode_on_the_second(self, block, slot_index, bounds):
+        calls.append(block.label)
+        if len(calls) == 2:
+            raise SlotRefusedError(SlotRefusal.SLOT_FULL)
+        return real(self, block, slot_index, bounds)
+
+    monkeypatch.setattr(type(manager), "add_block_at", explode_on_the_second)
+
+    screen.autoload_day()
+
+    assert len(calls) == 2, (
+        f"the run has to get past one successful write to have anything to "
+        f"roll back: {calls}"
+    )
+    assert _stored(manager) == [], (
+        f"the first block survived the refusal: {_stored(manager)}"
+    )
+    text = screen.status_label.cget("text")
+    assert "wrote nothing" in text, text
+    assert "refused after 1 of 3" in text, text
+    assert screen.status_label.cget("text_color") == status_text_color("error")
+
+
+def test_pdm38_autoload_refuses_a_non_working_day(root, manager, settings):
+    """PD-M3.8 — the Saturday refusal, with its reason, not a silent no-op."""
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    _priced_item(manager, "Weekend", 20, 20, 16, 8, )
+    panel.refresh()
+
+    panel.autoload_day()
+
+    assert manager.get_time_blocks(SATURDAY) == [], "a block landed on a Saturday"
+    assert "not a block day" in panel.status_label.cget("text")
+
+
+def test_pdm3_autoload_on_an_empty_list_says_so(screen, manager):
+    """No items is not the same answer as no room, and must not read like it."""
+    assert manager.get_items_for_start_date(THURSDAY) == []
+
+    screen.autoload_day()
+
+    text = screen.status_label.cget("text")
+    assert "nothing to block" in text, text
+    assert _stored(manager) == []
