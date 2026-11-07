@@ -490,9 +490,15 @@ Day Settings modal:
 - **Day End** — What: The time of the last box. Why: The grid stops here, so
   there is nowhere past it to drop work.
 - **Days for Blocks** — What: Seven checkboxes, Monday to Sunday. Why: These are
-  the weekdays that accept blocks at all. A drop onto a day that is not checked
-  is refused and says why, so a weekend cannot be filled by accident. At least
-  one day must be checked.
+  the weekdays a normal week plans work on. A drop, an AutoLoad or a day
+  extension on a day that is not checked asks first — *"<date> is not a regular
+  work day. Day Settings allows Mon, Tue, Wed, Thu, Fri. Schedule anyway?"* —
+  so a weekend cannot be filled by accident, and a weekend you have decided to
+  work takes one Yes. The question is asked once for that date, not once per
+  item, and answering Yes plans that day only: it does not tick the box, and
+  the next time the screen is opened on that date it asks again. Answering No
+  writes nothing and says which days the week allows. At least one day must be
+  checked.
 - Times must be written as `HH:MM`, between `00:00` and `23:59`. A time the app
   cannot read — including an hour past 23, such as `24:00` — is rejected in the
   modal with the field named, never silently replaced. A settings file that

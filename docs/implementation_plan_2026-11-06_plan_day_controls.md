@@ -1,7 +1,7 @@
-# Implementation plan — Plan screen day controls (PD-M1 … PD-M6)
+# Implementation plan — Plan screen day controls (PD-M1 … PD-M7)
 
 Date: 2026-11-06
-Status: **awaiting approval — no implementation code written**
+Status: **PD-M1 … PD-M6 shipped 2026-11-06. PD-M7, and the unplanned PD-M1.6, PD-M2.8 and PD-M2.9, shipped 2026-11-07**
 Screen: `src/getmoredone/screens/plan.py`, `src/getmoredone/screens/plan_blocks.py`
 Follows: `docs/implementation_plan_2026-11-06_plan_box_appearance.md` (PB-M1 … PB-M7, shipped)
 
@@ -44,6 +44,7 @@ removed the priority number for.
 | PD-M1.3 | The row is still `item_row_height(span, box_height)` tall — PB-M6.1 regression | `::test_pbm61_an_item_row_is_the_height_the_day_would_give_it` (existing, must stay green) |
 | PD-M1.4 | Every child is still drawn inside the frame at the floor and above it | `::test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it` (on-screen, `mapped_windows`) |
 | PD-M1.5 | The depth word is gone from the second line; `already blocked` is not | `::test_pdm14_the_second_line_is_the_blocked_marker_alone` |
+| PD-M1.6 | The bar stack's lowest bar ends level with the bottom of the title, not above it | `::test_pdm16_the_depth_bars_line_up_with_the_bottom_of_the_title` — unplanned; reported from the screen |
 
 **Note on the mapped-window count:** PD-M1.4 and PD-M6.1 add on-screen tests.
 `tests/test_ci_contract.py::test_the_documented_mapped_window_count_is_the_real_one`
@@ -84,7 +85,19 @@ the file does not.
 | PD-M2.6 | Settings and the grip agree: a width set in either is read by the other | `::test_pdm26_the_grip_and_the_settings_field_are_one_value` |
 | PD-M2.7 | The items column is never narrower than one of its own rows, by setting or by drag, and the fallback is floored too | `::test_an_unusable_items_column_width_falls_back_rather_than_collapsing`, `::test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it` |
 
+| PD-M2.8 | The gap between the panes is 15px and all of it is grip: no pad between a pane and the grip | `::test_pdm28_the_grip_is_the_whole_gap_between_the_panes` — unplanned; reported from the screen |
+| PD-M2.9 | The clamp measures both floors against the window less the grip and the two edge pads | `::test_pdm29_the_clamp_leaves_room_for_the_grip_and_the_edges` — unplanned; found while widening the grip |
+
 **PD-M2.7 was not planned. It is a defect PD-M1 shipped, found here.**
+
+**PD-M2.8 and PD-M2.9 were not planned either.** The grip shipped at 6px with
+a 2px pad on each side: a 10px gap on screen of which only the middle 6px
+started a drag. Widening it to 15px and taking the pads out makes the gap and
+the grip one thing. PD-M2.9 is the defect that exposed: the clamp compared both
+floors against the whole window width, though 26px of it was grip and edge
+padding and none of it was pane. The day pane has nothing holding it open, so
+all of that came off the day — the clipping the floors exist to prevent — and
+the wider grip would have made it 35px.
 
 Building the clamp meant putting a number on what a row needs, and the number
 came out at 360px: the stripe's column, the 220px Drag Schedule title width,
@@ -265,6 +278,36 @@ exactly this.
 | PD-M6.3 | The check uses the theme's success token, not a literal colour | `::test_pdm61_a_completed_task_shows_a_check_left_of_the_time`, second assertion -- the colour is a property of the rendered check, so it is asserted where the check is found, not in a second test that would have to build the same row |
 | PD-M6.4 | A continuation box of a completed task shows it too — the box is spent either way | `::test_pdm64_a_continuation_of_a_completed_task_shows_the_check` |
 | PD-M6.5 | A block whose item has been deleted draws no check and does not raise | `::test_pdm65_a_block_whose_item_is_gone_draws_no_check`, `::test_pdm63_a_box_with_one_task_still_open_shows_no_check`, `::test_pdm66_a_break_in_the_box_does_not_hold_it_open` |
+
+---
+
+## PD-M7 — A non-working day is a warning, not a wall
+
+The screen opens on today. Today is as likely to be a Saturday as any other
+day, Saturday and Sunday are off in `DEFAULT_BLOCK_WEEKDAYS`, and
+`_require_block_day` returned False at all four write paths: AutoLoad before it
+read a single item, a dropped item before a block was written, a padding block,
+and an extension of the day. Four gestures that did nothing but write a status
+line, which reads as the screen being broken rather than as the day being
+closed. Reported as "AutoLoad doesn't work" and "Drag and Drop doesn't move
+item", and both were this one guard.
+
+The weekday list describes a normal week. It is not a lock on the calendar, and
+a Saturday someone has decided to work is not a mistake to be corrected — so
+the guard asks instead of refusing.
+
+| ID | Criterion | Verified by |
+|---|---|---|
+| PD-M7.1 | A write onto a day outside the weekday list asks before it writes, naming the date and the days the week allows | `tests/test_plan_screen.py::test_pdm7_a_non_work_day_asks_before_scheduling` |
+| PD-M7.2 | Yes writes the block | `::test_pdm7_a_non_work_day_asks_before_scheduling`, second half |
+| PD-M7.3 | No writes nothing and leaves the refusal's own sentence, weekday list included | `::test_pdm7_answering_no_writes_nothing` |
+| PD-M7.4 | The question is asked once per date, not once per drop, and the answer is held on the screen only | `::test_pdm7_the_question_is_asked_once_per_date` |
+| PD-M7.5 | A day inside the weekday list asks nothing | `::test_pdm7_a_work_day_asks_nothing` |
+
+**Not code-testable, human review:** that Yes-for-the-sitting is the right
+scope. It could have been per drop (noisy), or written to the weekday list
+(which would silently change the user's working week from a drag). Held on the
+screen, it lasts as long as the screen does.
 
 ---
 

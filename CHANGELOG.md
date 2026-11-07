@@ -7,6 +7,37 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — reported from the running screen (2026-11-07)
+
+- **A weekend no longer looks like a broken screen.** The Plan screen opens on
+  today, Saturday and Sunday are off in the default week, and every write path
+  checked that first: AutoLoad returned before reading an item, a dropped item
+  before a block was written, and the only sign was a status line. Reported as
+  "AutoLoad doesn't work" and "Drag and Drop doesn't move item" — one guard,
+  not two defects. A day outside the weekday list now asks *"<date> is not a
+  regular work day. Day Settings allows Mon, Tue, Wed, Thu, Fri. Schedule
+  anyway?"*; Yes plans that date for as long as the screen is open and changes
+  nothing in Day Settings, No writes nothing and still says which days the week
+  allows. Asked once per date, not once per drop.
+- **The divider between the panes is 15px of grip.** It was a 6px grip with a
+  2px pad on each side: a 10px gap on screen of which only the middle 6px
+  started a drag. The gap and the grip are now one thing.
+- **A narrow window no longer short-changes the day pane by the grip.** The
+  clamp that keeps both panes above their minimum widths compared them against
+  the whole window, though the grip and the window's two edge pads are 35px of
+  it and none of that is pane — so the day pane could be left under its own
+  minimum, which is the clipping the minimums exist to prevent.
+- **The depth bars sit on the text's line.** The three-bar stack is shorter
+  than a line of text and was aligned to the top of the row, so it floated
+  above the title on every row in the items pane. It is bottom-aligned now, and
+  the stack's own trailing gap is gone so the lowest bar ends level with the
+  title.
+- **A test fixture was reporting other tests' dialogs.** `messageboxes` yielded
+  the session-wide record and trimmed only the tail on teardown, so a test that
+  did not ask for the fixture left its dialogs in it for every later test. One
+  of the new tests above failed on a dialog raised two tests earlier and passed
+  on its own. The record is emptied on the way in as well as out.
+
 ### Fixed — what the cold sweep found
 
 - **Extending the day earlier no longer re-times every other date's work.**
