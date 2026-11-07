@@ -22,6 +22,7 @@ from . import week_calendar
 from .date_utils import QUARTER_OF_MONTH, months_of_quarter, quarter_of_month
 from .weekly_tactic_logging import get_weekly_tactic_logger
 from . import weekly_tactic_titles
+from .weekly_tactic import LINK_PREDICATE_SQL
 from .models import ActionItem
 from .paths import app_data_dir_path
 from .vps_manager_planning import VPSPlanningMixin
@@ -1141,10 +1142,9 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
             )
             return []
 
-        query = """
+        query = f"""
             SELECT * FROM action_items
-            WHERE (weekly_tactic_id = ? OR parent_id = ?)
-              AND item_type != 'week'
+            WHERE {LINK_PREDICATE_SQL}
             ORDER BY status ASC,
                      COALESCE(start_date, due_date) ASC,
                      priority_score DESC

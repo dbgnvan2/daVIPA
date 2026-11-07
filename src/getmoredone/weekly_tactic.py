@@ -145,6 +145,36 @@ def tactic_of(item: Optional[ActionItem]) -> Optional[str]:
     return tactic_id or None
 
 
+# One home for "this Action Item is linked to that Weekly Tactic", in SQL.
+#
+# Purpose: AWA-M2.3 — the same question as `tactic_of` above, asked of a row
+#          instead of an object. It was written twice: once in
+#          `vps_manager.get_action_items_for_weekly_tactic` and once in
+#          `weekly_tactic_maintenance._child_count`, and the two copies had
+#          already drifted — the second counted a nested Weekly Tactic row as
+#          a child, so the dedupe's "most children wins" decided which tactic
+#          survived on a different definition of "child" than the panel shows.
+# Spec:    docs/spec_2026-11-07_ape_week_actions.md#awa-m2
+# Tests:   tests/test_ape_week_actions.py::test_awam23_one_home_for_the_link_predicate
+#
+# `weekly_tactic_id` wins when it is set. Both columns carry the link —
+# the re-filing cascade writes the first, the APE Week Assignment screen's
+# Add button writes the second (AWA-A1) — and an item can end up with one
+# tactic in each: add it from that screen, then pick a different Weekly
+# Tactic in the editor, which sets `weekly_tactic_id` and by design leaves
+# `parent_id` alone. A plain `OR` listed that item under *both* tactics.
+# Preferring the explicit column lists it under the one last chosen, and
+# leaves a `parent_id`-only child reachable.
+#
+# `parent_id` is overloaded with ordinary subtask nesting, so a week row is
+# never a child of a tactic. Takes the tactic id twice.
+LINK_PREDICATE_SQL = (
+    "(weekly_tactic_id = ?"
+    " OR (weekly_tactic_id IS NULL AND parent_id = ?))"
+    " AND item_type != 'week'"
+)
+
+
 def bring_into_week(
     item: ActionItem,
     week_start: date,

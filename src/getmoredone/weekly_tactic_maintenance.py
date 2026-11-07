@@ -18,7 +18,7 @@ from uuid import uuid4
 
 from . import week_calendar
 from .models import ActionItem
-from .weekly_tactic import bring_into_week
+from .weekly_tactic import LINK_PREDICATE_SQL, bring_into_week
 from .weekly_tactic_logging import get_weekly_tactic_logger
 from .weekly_tactic_titles import canonical_weekly_tactic_title
 
@@ -272,11 +272,17 @@ def find_duplicate_weekly_tactics(
 
 
 def _child_count(conn: sqlite3.Connection, tactic_id: str) -> int:
+    """How many Action Items hang off this tactic, by the shared predicate.
+
+    Purpose: WT-M7.A.4 feeds `_choose_survivor`, so this count decides which
+             duplicate tactic survives a dedupe and therefore which links
+             survive. It used to write the predicate itself, without the
+             week-row exclusion, and counted a nested tactic as a child.
+    Spec:    docs/spec_2026-11-07_ape_week_actions.md#awa-m2
+    Tests:   tests/test_weekly_tactic_dedupe.py::test_awam23_child_count_uses_the_shared_predicate
+    """
     return conn.execute(
-        """
-        SELECT COUNT(*) AS n FROM action_items
-        WHERE weekly_tactic_id = ? OR parent_id = ?
-        """,
+        f"SELECT COUNT(*) AS n FROM action_items WHERE {LINK_PREDICATE_SQL}",
         (tactic_id, tactic_id),
     ).fetchone()["n"]
 

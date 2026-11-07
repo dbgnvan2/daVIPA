@@ -26,6 +26,7 @@ from .. import week_options
 from ..models import ActionItem
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
 from .today import TodayScreen
+from .week_collision_notice import notify_weekly_tactic_changes
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
@@ -170,6 +171,15 @@ class WeekTacticActionsPanel(TodayScreen):
             item_type="daily",
         )
         self.db_manager.create_action_item(item, apply_defaults=False)
+        # The create re-files into the Weekly Tactic (`refile` defaults True),
+        # which can refuse a week or build cascade rows, and records what it
+        # did on the manager. Thirteen other screens report that; this one
+        # swallowed it, so a tactic whose Annual Plan Element is detached —
+        # which this tab lists on purpose, D4/AWA-M4.3 — saved the item
+        # un-re-filed with nothing on screen to say so. Before `edit_item`:
+        # that opens a modal, and a notice raised after it stacks behind the
+        # editor where it cannot be read.
+        notify_weekly_tactic_changes(self.db_manager, self)
         self.load_items()
         self.edit_item(item.id)
 
