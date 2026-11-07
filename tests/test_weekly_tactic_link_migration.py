@@ -199,3 +199,92 @@ def test_wt_m1d_migration_on_populated_db_run_two(tmp_path):
         assert after == before, f"run #2 altered links: {before} -> {after}"
     finally:
         reopened.close()
+
+
+def test_awam23_an_explicit_tactic_survives_a_reopen(tmp_path):
+    """The migration must not overwrite a tactic the user chose.
+
+    Dirty-state (P8), and the case the clean-state tests above cannot reach:
+    they all start from rows whose `weekly_tactic_id` is NULL, which is the
+    shape the migration was written for. A row can hold *both* columns, with a
+    different tactic in each, without leaving supported UI - added from APE
+    Week Assignment, whose button writes `parent_id`, then pointed at another
+    Weekly Tactic in the editor, which sets `weekly_tactic_id` and by design
+    leaves `parent_id` alone.
+
+    This migration runs from `Database.initialize_schema` on every
+    `DatabaseManager` construction, so "the next launch" is one reopen. It used
+    to replace the chosen tactic with the `parent_id` one and null `parent_id`,
+    leaving nothing to say it had happened, and the invariant repair then moved
+    the item's dates into the other tactic's week. Asserted here across a real
+    reopen, because nothing in-session can show it.
+    """
+    vps = make_vps(tmp_path, "explicit.db")
+    db_path = vps.db_manager.db.db_path
+    try:
+        ape_id = seed_ape(vps)
+        older = make_week_item(vps, ape_id, start="2026-11-09",
+                               due="2026-11-09", title="A")
+        chosen = make_week_item(vps, ape_id, start="2026-11-16",
+                                due="2026-11-16", title="B")
+        child = make_daily_item(vps, "Both columns", start="2026-11-16",
+                                due="2026-11-16",
+                                weekly_tactic_id=chosen.id,
+                                parent_id=older.id, refile=False)
+
+        row = vps.db.conn.execute(
+            "SELECT weekly_tactic_id, parent_id FROM action_items WHERE id = ?",
+            (child.id,)).fetchone()
+        assert (row["weekly_tactic_id"], row["parent_id"]) == (chosen.id,
+                                                               older.id)
+    finally:
+        vps.close()
+
+    reopened = DatabaseManager(db_path)
+    try:
+        row = reopened.db.conn.execute(
+            "SELECT weekly_tactic_id, parent_id, start_date, due_date "
+            "FROM action_items WHERE id = ?", (child.id,)).fetchone()
+        # The choice survives.
+        assert row["weekly_tactic_id"] == chosen.id
+        # The stale nesting link is still dropped, so the migration stays
+        # idempotent - it just does not take the choice with it.
+        assert row["parent_id"] is None
+        # And nothing moved the item into the other tactic's week.
+        assert row["start_date"] == "2026-11-16"
+        assert row["due_date"] == "2026-11-16"
+    finally:
+        reopened.close()
+
+
+def test_awam23_the_migration_reports_what_it_kept(tmp_path):
+    """P2 - the two outcomes are two numbers, not one.
+
+    A row whose chosen tactic was kept had only its `parent_id` cleared. That
+    is not a move, and reporting it as one would hide the case this fix is
+    about behind the count the old tests already assert.
+    """
+    vps = make_vps(tmp_path, "report.db")
+    try:
+        ape_id = seed_ape(vps)
+        older = make_week_item(vps, ape_id, start="2026-11-09",
+                               due="2026-11-09", title="A")
+        chosen = make_week_item(vps, ape_id, start="2026-11-16",
+                                due="2026-11-16", title="B")
+
+        kept = make_daily_item(vps, "Chose for itself", start="2026-11-16",
+                               due="2026-11-16", weekly_tactic_id=chosen.id,
+                               parent_id=older.id, refile=False)
+        legacy = make_daily_item(vps, "Legacy shape", start="2026-11-09",
+                                 due="2026-11-09", refile=False)
+        _legacy_parent_link(vps, legacy, older)
+
+        report = migrate_parent_links_to_weekly_tactic(vps.db.conn)
+        vps.db.conn.commit()
+
+        assert report["moved"] == 1
+        assert report["moved_ids"] == [legacy.id]
+        assert report["kept_explicit_link"] == 1
+        assert report["kept_explicit_link_ids"] == [kept.id]
+    finally:
+        vps.close()

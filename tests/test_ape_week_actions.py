@@ -253,13 +253,29 @@ def test_awam23_one_home_for_the_link_predicate():
     Matched on the predicate's *shape* rather than on the two column names
     appearing together: ``db_manager``'s INSERT column list and UPDATE SET
     list both name both columns, and neither is an expression of this
-    predicate. ``parent_id = ?`` reached from an ``OR`` is; an INSERT list has
-    no ``= ?`` and a SET list has no preceding ``OR``.
+    predicate. A comparison of one column reached from an ``OR`` is.
 
-    Exact count per file, not a floor: a reintroduced copy anywhere under
-    ``src/`` fails here.
+    **What this does and does not catch.** Case-insensitive, and either branch
+    order, and ``= ?``, ``= :name`` or ``IN (?)`` — the forms a second copy
+    would plausibly be written in. It cannot see a copy split across two
+    ``ast.Constant`` nodes (``"… = ?" + " OR parent_id = ?"``, or an f-string
+    with an interpolation between the halves); the constant below survives the
+    scan only because adjacent string literals are folded at compile time. Nor
+    can it see a copy expressed as a JOIN rather than an ``OR`` — there is one
+    such reader of "a tactic's child" in
+    ``weekly_tactic_maintenance`` (the ``JOIN action_items week ON
+    week.id = child.weekly_tactic_id`` in the invariant repair), which has no
+    ``parent_id`` arm at all and so disagrees with this predicate on exactly
+    the rows the ``parent_id`` arm adds. That is AWA-A1's subject, recorded,
+    not guarded here. So this asserts one home for *this* SQL form, which is
+    what AWA-M2.3 is worth, rather than one definition of "child" everywhere.
+
+    Exact count per file, not a floor.
     """
-    shape = re.compile(r"\bOR\b[\s\S]*?\bparent_id\s*=\s*\?")
+    shape = re.compile(
+        r"\bOR\b[\s\S]*?\b(?:parent_id|weekly_tactic_id)\s*"
+        r"(?:=\s*[?:]|IN\s*\()",
+        re.IGNORECASE)
 
     def docstrings(tree):
         out = set()
@@ -1076,6 +1092,38 @@ def test_awam41d_an_older_week_stays_in_the_picker(tmp_path):
             options = list(screen.week_combo.cget("values"))
             assert old.isoformat() in options
             assert screen.week_var.get() == _this_week()
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam54d_a_clean_create_does_not_report_an_old_collision(tmp_path):
+    """AWA-M5.4 - the notice reports this save, not an earlier one.
+
+    `last_week_collision` is cleared at the start of every *update* save, with
+    a comment in `db_manager` saying why: the manager lives for the session, so
+    a flag that is only ever set reads as permanently true after the first
+    clash. The create path only ever set it. That was harmless while no caller
+    read it after a create - AWA-M5.4 is the first, and it then showed "Week
+    Already Taken" after every Add for the rest of the session, for items that
+    saved perfectly well.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        tactic, _ = _tactic_and_ape(vps, start="2026-11-09")
+        # Whatever an earlier clash in this session left behind.
+        vps.db_manager.last_week_collision = {
+            "attempted_start": "2026-11-09", "kept_start": None,
+        }
+
+        root, panel = _panel(tmp_path, vps, tactic.id)
+        try:
+            panel._prompt_for_title = lambda: "Draft the outline"
+            panel.edit_item = lambda item_id, **kw: None
+            panel.add_action_item()
+
+            assert vps.db_manager.last_week_collision is None
         finally:
             root.destroy()
     finally:

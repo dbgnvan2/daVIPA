@@ -33,6 +33,7 @@ import pytest  # noqa: E402
 
 import customtkinter as ctk  # noqa: E402
 
+from src.getmoredone.color_contrast import pick_text_color  # noqa: E402
 from src.getmoredone.screens import chip_table  # noqa: E402
 from src.getmoredone.screens.ape_assignment import APEAssignmentScreen  # noqa: E402
 
@@ -439,5 +440,37 @@ def test_updm37_missing_lineage_falls_back_instead_of_raising():
         assert cells["subsegment"].cget("text").strip() == ""
         assert cells["segment"].cget("fg_color") == palette_surface
         assert cells["category"].cget("fg_color") == "#cc7744"
+    finally:
+        root.destroy()
+
+
+def test_updm37_the_fallback_chip_does_not_measure_a_named_colour():
+    """UPD-M3.7 — the lineage chip measures its colour; the fallback must not.
+
+    `pick_text_color` parses a hex string. The fallback fill is a theme token,
+    and on 7 of the 10 themes that token is a *named* Tk colour ("gray16" in
+    dark mode), which it cannot parse — it returned the dark default, which is
+    black text on a near-black pill, on exactly the rows the fallback exists
+    for. The fix is not a better parser: the theme's own label colour is
+    readable on the theme's own surface by construction, so the fallback
+    leaves `text_color` unset and inherits it.
+
+    Asserted as the two branches side by side in one row, so a fix that
+    stopped measuring the lineage colour too would be red here.
+    """
+    root, _frame, table = _table()
+    try:
+        inherited = ctk.ThemeManager.theme["CTkLabel"]["text_color"]
+        table.build_header()
+        _row_frame, cells = table.add_row(
+            {"segment": "No colour", "category": "Measured"},
+            {"segment": "", "category": "#cc7744"},
+        )
+        # The fallback pill inherits, and what it inherits is not the dark
+        # default pick_text_color used to hand back for an unparseable fill.
+        assert cells["segment"].cget("text_color") == inherited
+        assert cells["segment"].cget("text_color") != "#000000"
+        # The lineage pill is still measured against its own fill.
+        assert cells["category"].cget("text_color") == pick_text_color("#cc7744")
     finally:
         root.destroy()

@@ -1,6 +1,6 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (the AWA sweep's four below-medium findings added as AWA-S1 to AWA-S4, with its one high and five mediums fixed in-loop and AWA-A3 mostly closed by that fix; four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-07 (the cold re-sweep of the AWA fix commits added its four remaining lows as AWA-S5 to AWA-S8, with its one high, three mediums and one raised low fixed in-loop and one low fixed against the budget with its reason stated there; the AWA sweep's four below-medium findings added as AWA-S1 to AWA-S4, with its one high and five mediums fixed in-loop and AWA-A3 mostly closed by that fix; four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
 
 ## Adjacent issues — APE Week Assignment / APE Week Actions (AWA, 2026-11-07)
 
@@ -145,6 +145,98 @@ silently. (f) Minor: `_panel` and `test_awam51` take `tmp_path` and never use it
 panel leaves another panel's stored width alone, which is the AWA-M5.5 claim.
 **Priority:** Low
 **Effort:** Medium
+
+## Re-sweep findings — APE Week Actions fix commits (AWA, 2026-11-07)
+
+A cold pass over this batch's own fix commits (`8a324cb`, `ac22a78`, `6a112c3`,
+`5fb6af2`), run because a fix commit is the least-reviewed code in any change.
+It found **one high** that none of the three earlier passes saw: the migration
+that runs on every `DatabaseManager` construction overwrote an explicit
+`weekly_tactic_id` with the `parent_id` tactic, so the contract the previous fix
+round had just documented and tested was reversed at the next launch, and the
+invariant repair then moved the item's dates. Reproduced on a throwaway
+database, fixed, and covered by a dirty-state test across a real reopen.
+
+Three mediums fixed with it: the collision flag the create path only ever set,
+the AST guard that claimed to catch copies it could not see, and the
+`chip_table` docstring that described the consolidation as done when nothing
+imports the module. One finding rated low by the reviewer was **raised to
+medium** and fixed — the fallback chip rendered black text on a near-black pill
+in dark mode on 7 of the 10 themes, which is new code producing unreadable text
+on exactly the path the fallback exists for.
+
+**One low was fixed in-loop, against the budget**: `LINK_PREDICATE_SQL` was not
+fully parenthesised and treated `''` differently from `tactic_of`. It is
+recorded here rather than silently: the edit site was the same comment block as
+the medium above it, and splitting it would have left the corrected comment
+describing SQL that still had the old shape.
+
+The four below-medium findings that remain:
+
+### 2026-11-07 - Type: Technical Debt
+
+**Title:** AWA-S5 - a chip's text is clamped to the column width, not to the pill
+**Description:** `ChipTable._chip_width` makes the pill `CHIP_INSET` (12px)
+narrower than its column, but `add_row` calls
+`resizer.cell_text(column.key, full_text)` with the default `reserve=0`, so the
+character budget is computed from the full column width. For the 135px Segment
+column that is 16 characters in a ~123px pill, and the last character is
+clipped. `ColumnResizer.cell_text` already takes `reserve` for exactly this, and
+the cell is registered with `reserve=0` alongside `width_delta=CHIP_INSET`;
+`_apply_live` reproduces the same mismatch on every drag. Cosmetic, and in new
+code nothing imports yet, so it is low - but it should be settled before
+UPD-M4 moves the first screen onto the table, because every adopting screen
+inherits it.
+**Priority:** Low
+**Effort:** Low
+
+### 2026-11-07 - Type: Technical Debt
+
+**Title:** AWA-S6 - ChipTable's lifecycle assumptions are not enforced by its API
+**Description:** Five unenforced assumptions in
+`src/getmoredone/screens/chip_table.py`: (a) `clear()` destroys *every* child of
+`self.container`, not only the widgets the table created, so a screen that puts
+an empty-state label or a second table in the same frame loses it; (b) `clear()`
+calls `resizer.clear_rows()` but leaves `resizer._header` pointing at the
+destroyed header frame and there is no `clear_header()` - harmless in the
+documented order and `_apply_live` is `winfo_exists()`-guarded, but it
+contradicts the comment that explains why rows are cleared; (c) the container's
+column 0 never gets `grid_columnconfigure(0, weight=1)`, so the `sticky="ew"` on
+the header and every row frame does nothing unless the screen sets it, while the
+module docstring says the table owns those frames; (d) `add_row` without a prior
+`build_header()` grids the first row at row 1 and leaves row 0 empty, and calling
+`build_header()` after `add_row` silently destroys the rows; (e) `values={}`
+appends a zero-cell, zero-height row with no error and no signal. None is
+reachable from the documented call order, which is why this is low.
+**Priority:** Low
+**Effort:** Medium
+
+### 2026-11-07 - Type: Technical Debt
+
+**Title:** AWA-S7 - register_row normalisation accepts bad and over-long tuples silently
+**Description:** `ColumnResizer.register_row`
+(`src/getmoredone/screens/column_resize.py:152-157`) reads
+`width_delta = cell[4] if len(cell) > 4 else 0` and ignores elements 5 and beyond
+without complaint, so a mis-ordered tuple normalises cleanly. A non-numeric
+`width_delta` also passes normalisation and fails later inside a drag handler
+(`label.configure(width=max(1, width - width_delta))` raises `TypeError` inside a
+Tk event callback, where it prints to stderr rather than reaching the caller).
+No validation and no test for either. `width_delta` was added in this batch, so
+this is new surface, but both callers in `src/` pass 3- or 4-tuples.
+**Priority:** Low
+**Effort:** Low
+
+### 2026-11-07 - Type: Technical Debt
+
+**Title:** AWA-S8 - the AWA-M5.3 override census cannot see a dunder override
+**Description:** `test_awam53` in `tests/test_ape_week_actions.py` asserts the
+exact set of `WeekTacticActionsPanel` attributes that override `TodayScreen`,
+which is a real improvement on the set-intersection it replaced. But the census
+filters `not name.startswith("__")`, so an added `__init__` or `__getattr__`
+override - the most likely way the Today seam actually gets broken - would not
+appear in `overridden` and the exact-list assertion would stay green.
+**Priority:** Low
+**Effort:** Low
 
 ## Reported from the running screen — Plan / Day Plan (2026-11-07)
 
