@@ -457,6 +457,14 @@ def test_updm37_the_fallback_chip_does_not_measure_a_named_colour():
 
     Asserted as the two branches side by side in one row, so a fix that
     stopped measuring the lineage colour too would be red here.
+
+    The whole verdict for the fallback branch is the equality against the
+    theme's own value. A second line asserting the colour is not `"#000000"`
+    was removed: `ThemeManager.theme["CTkLabel"]["text_color"]` is a two-element
+    light/dark list (`['gray10', '#DCE4EE']` on the active theme), so comparing
+    it to a single hex string could never fail and read as a check while
+    carrying no weight. The equality does the work - the mutation that makes
+    the fallback measure its fill is red at that line.
     """
     root, _frame, table = _table()
     try:
@@ -466,10 +474,8 @@ def test_updm37_the_fallback_chip_does_not_measure_a_named_colour():
             {"segment": "No colour", "category": "Measured"},
             {"segment": "", "category": "#cc7744"},
         )
-        # The fallback pill inherits, and what it inherits is not the dark
-        # default pick_text_color used to hand back for an unparseable fill.
+        # The fallback pill inherits the theme's own label colour.
         assert cells["segment"].cget("text_color") == inherited
-        assert cells["segment"].cget("text_color") != "#000000"
         # The lineage pill is still measured against its own fill.
         assert cells["category"].cget("text_color") == pick_text_color("#cc7744")
     finally:

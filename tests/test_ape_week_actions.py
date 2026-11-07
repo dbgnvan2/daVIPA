@@ -34,6 +34,10 @@ import customtkinter as ctk  # noqa: E402
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem
 from src.getmoredone.screens.today import TodayScreen
+from src.getmoredone.screens.week_collision_notice import (  # noqa: E402
+    describe_week_collision,
+)
+from src.getmoredone.weekly_tactic_maintenance import _child_count  # noqa: E402
 from tests.weekly_tactic_fixtures import (
     make_daily_item,
     make_vps,
@@ -255,22 +259,30 @@ def test_awam23_one_home_for_the_link_predicate():
     list both name both columns, and neither is an expression of this
     predicate. A comparison of one column reached from an ``OR`` is.
 
-    **What this does and does not catch.** Case-insensitive, and either branch
-    order, and ``= ?``, ``= :name`` or ``IN (?)`` — the forms a second copy
-    would plausibly be written in. It cannot see a copy split across two
-    ``ast.Constant`` nodes (``"… = ?" + " OR parent_id = ?"``, or an f-string
-    with an interpolation between the halves); the constant below survives the
-    scan only because adjacent string literals are folded at compile time. Nor
-    can it see a copy expressed as a JOIN rather than an ``OR`` — there is one
-    such reader of "a tactic's child" in
-    ``weekly_tactic_maintenance`` (the ``JOIN action_items week ON
-    week.id = child.weekly_tactic_id`` in the invariant repair), which has no
-    ``parent_id`` arm at all and so disagrees with this predicate on exactly
-    the rows the ``parent_id`` arm adds. That is AWA-A1's subject, recorded,
-    not guarded here. So this asserts one home for *this* SQL form, which is
-    what AWA-M2.3 is worth, rather than one definition of "child" everywhere.
+    **What this does and does not catch.** Case-insensitive — both the
+    membership gate and the pattern, since a flag on one half of a two-part
+    match buys nothing — either branch order, and ``= ?``, ``= :name`` or
+    ``IN (?)``: the forms a second copy would plausibly be written in.
 
-    Exact count per file, not a floor.
+    It cannot see a copy split across two ``ast.Constant`` nodes
+    (``"… = ?" + " OR parent_id = ?"``, or an f-string with an interpolation
+    between the halves); the constant below survives the scan only because
+    adjacent string literals are folded at compile time. Nor can it see a copy
+    expressed as a JOIN rather than an ``OR`` — ``weekly_tactic_maintenance``'s
+    invariant repair has one (``JOIN action_items week ON
+    week.id = child.weekly_tactic_id``). That reader disagrees with this
+    predicate on *more* than the rows the ``parent_id`` arm adds: it constrains
+    only the parent side (``week.item_type = 'week'``) while this predicate
+    also excludes ``child.item_type != 'week'``, so it acts on week rows
+    AWA-M2.2 deliberately keeps out. AWA-A1 is the entry; AWA-S9 records the
+    week-under-week case it makes reachable.
+
+    Exact count per file, not a floor. The exclusion is by value-equality
+    against module, function and class docstrings only, so a non-docstring
+    prose string under ``src/`` naming ``weekly_tactic_id``, then "or", then
+    ``parent_id = ?`` would match and turn this red spuriously. None exists;
+    the cost of that is a one-line edit here, and the cost of a looser gate is
+    the finding this test was written for.
     """
     shape = re.compile(
         r"\bOR\b[\s\S]*?\b(?:parent_id|weekly_tactic_id)\s*"
@@ -298,7 +310,11 @@ def test_awam23_one_home_for_the_link_predicate():
                 continue
             if sub.value in docs:
                 continue
-            if "weekly_tactic_id" in sub.value and shape.search(sub.value):
+            # Lower-cased for the gate as well as the search: the regex
+            # carries re.IGNORECASE, but while this membership test was
+            # case-sensitive the flag only widened the half already pinned.
+            value = sub.value.lower()
+            if "weekly_tactic_id" in value and shape.search(value):
                 hits += 1
         if hits:
             counts[str(path.relative_to(SRC))] = hits
@@ -1098,7 +1114,7 @@ def test_awam41d_an_older_week_stays_in_the_picker(tmp_path):
         vps.close()
 
 
-def test_awam54d_a_clean_create_does_not_report_an_old_collision(tmp_path):
+def test_awam54d_a_clean_create_does_not_report_an_old_collision(tmp_path, messageboxes):
     """AWA-M5.4 - the notice reports this save, not an earlier one.
 
     `last_week_collision` is cleared at the start of every *update* save, with
@@ -1108,14 +1124,28 @@ def test_awam54d_a_clean_create_does_not_report_an_old_collision(tmp_path):
     read it after a create - AWA-M5.4 is the first, and it then showed "Week
     Already Taken" after every Add for the rest of the session, for items that
     saved perfectly well.
+
+    Asserted on the dialog, not on the flag: the flag is the mechanism and the
+    dialog is the claim the test's name makes. `conftest.py` records every
+    messagebox for the whole session instead of showing it, and the
+    `messageboxes` fixture empties that record on the way in, so an equality
+    assertion against it is about this test. The seeded collision uses the keys
+    the two producers in `db_manager` actually write - `item_id`,
+    `kept_start`, `rejected_start`, `error` - because a fake that does not
+    match its producer can go on passing after the producer changes.
     """
     vps = make_vps(tmp_path)
     try:
         tactic, _ = _tactic_and_ape(vps, start="2026-11-09")
-        # Whatever an earlier clash in this session left behind.
+        # Exactly what the create path's own handler leaves behind after a real
+        # clash: no kept start, because nothing was created to keep.
         vps.db_manager.last_week_collision = {
-            "attempted_start": "2026-11-09", "kept_start": None,
+            "item_id": "some-earlier-item",
+            "kept_start": None,
+            "rejected_start": "2026-11-09",
+            "error": "UNIQUE constraint failed",
         }
+        assert describe_week_collision(vps.db_manager.last_week_collision)
 
         root, panel = _panel(tmp_path, vps, tactic.id)
         try:
@@ -1123,8 +1153,59 @@ def test_awam54d_a_clean_create_does_not_report_an_old_collision(tmp_path):
             panel.edit_item = lambda item_id, **kw: None
             panel.add_action_item()
 
+            assert [title for _func, title, _msg in messageboxes] == []
             assert vps.db_manager.last_week_collision is None
         finally:
             root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam23_an_empty_string_link_counts_as_no_link(tmp_path):
+    """AWA-M2.1 - the SQL answers `''` the way `tactic_of` answers it.
+
+    The predicate used to read `weekly_tactic_id IS NULL`, so a row holding the
+    empty string matched neither arm and vanished from the panel *and* from
+    `_child_count`, which decides which duplicate tactic a dedupe deletes.
+    `tactic_of` has always treated `''` as no link - it tests the value's
+    truthiness - and the two must agree or they are not one definition.
+
+    P8 dirty state, the same shape as AWA-M2.5 above and reachable the same
+    way. `_validate_weekly_tactic_link` returns early on a falsy value, so the
+    validator lets `''` through - but the column is declared `REFERENCES
+    action_items(id)` and the connection runs with `PRAGMA foreign_keys = ON`,
+    so with foreign keys on the write is refused (measured: writing it raises
+    `IntegrityError: FOREIGN KEY constraint failed`). The state that survives
+    is one written with foreign keys off: an older build, a direct sqlite3
+    edit, a restored backup. So this is seeded the way AWA-M2.5 is, and the
+    claim is about the read.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        tactic, _ = _tactic_and_ape(vps, start="2026-11-09")
+        child = make_daily_item(vps, "Empty string link", start="2026-11-09",
+                                due="2026-11-09", parent_id=tactic.id,
+                                refile=False)
+        vps.db.conn.execute("PRAGMA foreign_keys = OFF")
+        try:
+            vps.db.conn.execute(
+                "UPDATE action_items SET weekly_tactic_id = '' WHERE id = ?",
+                (child.id,))
+            vps.db.conn.commit()
+        finally:
+            vps.db.conn.execute("PRAGMA foreign_keys = ON")
+
+        # The dirty state really is dirty, so the assertions below are about
+        # the predicate and not about a row that quietly stayed NULL.
+        stored = vps.db.conn.execute(
+            "SELECT weekly_tactic_id FROM action_items WHERE id = ?",
+            (child.id,)).fetchone()["weekly_tactic_id"]
+        assert stored == ""
+
+        listed = vps.get_action_items_for_weekly_tactic(tactic.id)
+        assert [item.id for item in listed] == [child.id]
+
+        # And the same row, counted by the other consumer of the predicate.
+        assert _child_count(vps.db.conn, tactic.id) == 1
     finally:
         vps.close()

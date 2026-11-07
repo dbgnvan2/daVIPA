@@ -7,12 +7,17 @@ ordinary daily-to-daily nesting rows and 49 week-to-daily tactic links (WT-F9).
 Writing either silently destroyed the other.
 """
 
+import logging
+import sqlite3
+
 import pytest
 
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem
 from src.getmoredone.weekly_tactic_migrations import (
+    logger,
     migrate_parent_links_to_weekly_tactic,
+    run_weekly_tactic_migrations,
 )
 from tests.weekly_tactic_fixtures import make_daily_item, make_vps, make_week_item, seed_ape
 
@@ -288,3 +293,69 @@ def test_awam23_the_migration_reports_what_it_kept(tmp_path):
         assert report["kept_explicit_link_ids"] == [kept.id]
     finally:
         vps.close()
+
+
+def test_awam23_the_kept_link_reaches_the_log(tmp_path, caplog):
+    """P2 - a write to the user's rows that the launch says nothing about.
+
+    The module's own docstring says nothing here is silent, and `_log_report`
+    says it is the only surface where the user can see what happened to their
+    rows. Before the explicit-link fix, a row holding both columns was logged -
+    because it was miscounted as a move. Counting it correctly without logging
+    it would have made every launch silent about clearing that row's
+    `parent_id`, which is a net loss of coverage over an automatic data change.
+
+    Asserted on the logger the migration actually writes to, after a real
+    `run_weekly_tactic_migrations`, because `_log_report` is called from there
+    and not from the step under test.
+    """
+    vps = make_vps(tmp_path, "logged.db")
+    try:
+        ape_id = seed_ape(vps)
+        older = make_week_item(vps, ape_id, start="2026-11-09",
+                               due="2026-11-09", title="A")
+        chosen = make_week_item(vps, ape_id, start="2026-11-16",
+                                due="2026-11-16", title="B")
+        child = make_daily_item(vps, "Both columns", start="2026-11-16",
+                                due="2026-11-16",
+                                weekly_tactic_id=chosen.id,
+                                parent_id=older.id, refile=False)
+
+        with caplog.at_level(logging.INFO, logger=logger.name):
+            report = run_weekly_tactic_migrations(vps.db.conn)
+
+        assert report["link_migration"]["kept_explicit_link"] == 1
+        kept_lines = [rec.getMessage() for rec in caplog.records
+                      if "named a Weekly Tactic of their own" in rec.getMessage()]
+        assert len(kept_lines) == 1
+        assert child.id in kept_lines[0]
+    finally:
+        vps.close()
+
+
+def test_awam23_the_early_return_has_the_same_keys(tmp_path):
+    """The two exits report the same shape, or the new keys are a trap.
+
+    The guard returns early on a database with no `weekly_tactic_id` column,
+    and that return did not carry the two keys the normal return always does -
+    so a caller reading `kept_explicit_link` got a `KeyError` on exactly the
+    databases the guard exists for. The tests reach this function directly, not
+    only through `run_weekly_tactic_migrations`, so the shapes must match.
+    """
+    vps = make_vps(tmp_path, "shapes.db")
+    try:
+        normal = migrate_parent_links_to_weekly_tactic(vps.db.conn)
+    finally:
+        vps.close()
+
+    bare = sqlite3.connect(":memory:")
+    try:
+        bare.row_factory = sqlite3.Row
+        bare.execute("CREATE TABLE action_items (id TEXT PRIMARY KEY)")
+        early = migrate_parent_links_to_weekly_tactic(bare)
+    finally:
+        bare.close()
+
+    assert set(early) == set(normal)
+    assert early == {"moved": 0, "nesting_preserved": 0, "moved_ids": [],
+                     "kept_explicit_link": 0, "kept_explicit_link_ids": []}
