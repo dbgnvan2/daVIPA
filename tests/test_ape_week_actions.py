@@ -307,20 +307,39 @@ def test_awam24_ordinary_subtasks_are_not_tactic_children(tmp_path):
 
 
 def test_awam25_orphaned_child_is_not_returned(tmp_path):
-    """AWA-M2.5 — P8 dirty state: the tactic row is gone, the child is not.
+    """AWA-M2.5 — P8 dirty state: a link that outlived the row it points at.
 
-    Deleting a tactic row directly, as an older build's cascade could,
-    leaves children pointing at an id with no row. The helper returns
-    nothing and does not raise.
+    Both link columns are declared ``REFERENCES action_items(id) ON DELETE
+    SET NULL``, so with ``PRAGMA foreign_keys = ON`` an ordinary delete
+    clears them and no dangling link survives. The first version of this
+    test deleted the tactic that way, and was vacuous: it asserted an
+    outcome the schema already guaranteed, and stayed green with the
+    helper's guard removed. The mutation gate caught it.
+
+    The state that does survive is one written with foreign keys off — an
+    older build, a direct sqlite3 edit, a restored backup. This repo already
+    carries rows "no supported path can create" from exactly that. Here the
+    guard is the only thing between the panel and a row whose tactic is
+    gone, and removing it makes this red.
     """
     vps = make_vps(tmp_path)
     try:
         tactic, _ = _tactic_and_ape(vps)
         make_daily_item(vps, title="orphan", weekly_tactic_id=tactic.id,
                         refile=False)
-        vps.db.conn.execute("DELETE FROM action_items WHERE id = ?",
-                            (tactic.id,))
-        vps.db.conn.commit()
+        vps.db.conn.execute("PRAGMA foreign_keys = OFF")
+        try:
+            vps.db.conn.execute("DELETE FROM action_items WHERE id = ?",
+                                (tactic.id,))
+            vps.db.conn.commit()
+        finally:
+            vps.db.conn.execute("PRAGMA foreign_keys = ON")
+
+        # The dirty state really is dirty: the link outlived its row.
+        dangling = vps.db.conn.execute(
+            "SELECT COUNT(*) AS n FROM action_items WHERE weekly_tactic_id = ?",
+            (tactic.id,)).fetchone()["n"]
+        assert dangling == 1
 
         assert vps.get_action_items_for_weekly_tactic(tactic.id) == []
     finally:
