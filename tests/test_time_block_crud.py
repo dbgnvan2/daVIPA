@@ -557,7 +557,7 @@ def test_pdm55_blocks_keep_their_times_when_the_day_grows(manager):
     _at(manager, 60, "09:00 workshop", 2)
     before = _rows(manager)
 
-    moved = manager.shift_day_slots(DAY, 1)
+    moved = manager.shift_all_slots(1)
 
     assert moved == 2, f"both blocks should have been renumbered, not {moved}"
     grid = build_day_grid(
@@ -585,7 +585,7 @@ def test_pdm55_a_shift_of_zero_writes_nothing(manager):
         "SELECT slot_index, updated_at FROM time_blocks"
     ).fetchone()
 
-    assert manager.shift_day_slots(DAY, 0) == 0
+    assert manager.shift_all_slots(0) == 0
 
     after = manager.db.conn.execute(
         "SELECT slot_index, updated_at FROM time_blocks"
@@ -605,19 +605,44 @@ def test_pdm55_a_block_outside_the_grid_is_not_given_a_box(manager):
         )
     )
 
-    assert manager.shift_day_slots(DAY, 2) == 0
+    assert manager.shift_all_slots(2) == 0
 
     assert _rows(manager)["from an older version"] == (None, "10:00", "10:30"), (
         f"a block that was outside the grid was moved onto it: {_rows(manager)}"
     )
 
 
-def test_pdm55_only_the_named_day_is_renumbered(manager):
-    """Each date's boxes count from its own Day Start, and days are independent."""
+def test_pdm55_every_date_is_renumbered_not_only_the_one_on_screen(manager):
+    """PD-M5.5 — Day Start is one setting, so a renumber of one date is a bug.
+
+    This test used to assert the opposite, on the premise that "each date's
+    boxes count from its own Day Start, and days are independent". There is no
+    per-date Day Start: ``plan_day_start`` is a single ``AppSettings`` field and
+    ``DayBounds.from_settings`` reads it for whatever date is on screen. So a
+    renumber scoped to one date left every other date's blocks drawn earlier on
+    the clock than their own rows said -- the disagreement the renumber exists
+    to prevent, moved one date over. The code was wrong; the test had pinned it.
+    """
     _at(manager, 30, "today", 4)
     _at(manager, 30, "tomorrow", 4, block_date=NEXT_DAY)
 
-    assert manager.shift_day_slots(DAY, 1) == 1
+    assert manager.shift_all_slots(1) == 2, "a date was left behind"
 
     placed = {label: row[0] for label, row in _rows(manager).items()}
-    assert placed == {"today": 5, "tomorrow": 4}, placed
+    assert placed == {"today": 5, "tomorrow": 5}, placed
+
+    # The point of the renumber, stated as the time rather than the index:
+    # under the day that now starts half an hour earlier, both are where the
+    # person put them.
+    for date in (DAY, NEXT_DAY):
+        grid = build_day_grid(
+            manager.get_time_blocks(date), DayBounds(day_start="07:30")
+        )
+        drawn = {
+            entry.starting[0].label: entry.slot.start_time
+            for entry in grid.slots
+            if entry.starting
+        }
+        assert drawn == {
+            DAY: {"today": "10:00"}, NEXT_DAY: {"tomorrow": "10:00"}
+        }[date], (date, drawn)

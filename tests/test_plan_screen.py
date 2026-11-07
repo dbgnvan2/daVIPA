@@ -3784,6 +3784,52 @@ def test_pdm22_the_day_pane_cannot_be_dragged_shut(
     )
 
 
+def test_pdm22_a_narrow_window_takes_the_width_from_the_items_pane(
+    root, manager, settings, monkeypatch
+):
+    """PD-M2.2 — the window is as able to squeeze a pane shut as the grip is.
+
+    Column 0 has a minsize and column 2 has a weight, so in a window too narrow
+    for both floors the entire shortfall came out of the day pane -- the side
+    with nothing holding it open -- and the block length was laid out past the
+    right edge of every box. The clamp only ran while the grip was held, so
+    narrowing the window, or simply setting a wide title column, reached a state
+    no drag could have reached.
+
+    ``winfo_width`` is patched rather than the window resized: this is the
+    division of a known width, and a real window would make the test depend on
+    the host's screen. ``monkeypatch`` puts the real method back.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    floor = panel.items_width_floor()
+    settings.plan_items_col_width = floor + 200
+    panel.on_resize()
+    assert panel.grid_columnconfigure(0)["minsize"] == floor + 200, (
+        "precondition: with no width to measure the setting is drawn as asked"
+    )
+
+    monkeypatch.setattr(panel, "winfo_width", lambda: floor + panel.day_width_floor() + 40)
+    panel.on_resize()
+    assert panel.grid_columnconfigure(0)["minsize"] == floor + 40, (
+        f"the items column kept {panel.grid_columnconfigure(0)['minsize']}px of a "
+        f"{floor + panel.day_width_floor() + 40}px window, leaving the day less "
+        f"than the {panel.day_width_floor()}px one of its rows needs"
+    )
+
+    monkeypatch.setattr(panel, "winfo_width", lambda: 400)
+    panel.on_resize()
+    assert panel.grid_columnconfigure(0)["minsize"] == floor, (
+        "a window narrower than both floors has to stop at the items floor, "
+        "not below it"
+    )
+
+    monkeypatch.setattr(panel, "winfo_width", lambda: 4000)
+    panel.on_resize()
+    assert panel.grid_columnconfigure(0)["minsize"] == floor + 200, (
+        "widening the window did not give back the width a narrow one took"
+    )
+
+
 def test_pdm23_the_file_is_written_once_on_release_not_per_motion(
     root, manager, settings, monkeypatch
 ):
@@ -4157,6 +4203,78 @@ def test_pdm35_autoload_reports_all_three_counts(root, manager, settings):
     assert "1 already blocked" in text, text
 
 
+def test_pdm35_the_counts_cover_the_whole_list_not_just_the_rows_shown(
+    root, manager, settings
+):
+    """PD-M3.5/P2/P9 — the four numbers add up to every item, including the capped.
+
+    AutoLoad reads the item list and takes the first ``MAX_ITEM_ROWS`` of it,
+    the same cap the pane draws. It then reported "blocked N of 60", so on a day
+    with more items than that, the ones past the cap were in neither the
+    numerator nor the denominator nor any of the other counts -- planned work
+    silently absent from a report whose whole purpose is to say what was left
+    out. The pane announces its cap; the button did not.
+
+    Real-scale by construction: the fixture is three items past the cap, so the
+    cap actually bites rather than being asserted against a list that fits.
+    """
+    from src.getmoredone.screens.plan import MAX_ITEM_ROWS
+
+    panel = _short_day(root, manager, settings, end="09:30")
+    total = MAX_ITEM_ROWS + 3
+    for index in range(total):
+        _item(manager, f"item {index:03d}")
+    panel.refresh()
+
+    panel.autoload_day()
+
+    text = panel.status_label.cget("text")
+    boxes = len(day_grid(panel.bounds))
+    assert f"blocked {boxes} of {total}" in text, text
+    assert f"{MAX_ITEM_ROWS - boxes} did not fit" in text, text
+    assert "0 already blocked" in text, text
+    assert f"3 past the {MAX_ITEM_ROWS}-row list" in text, text
+
+
+def test_pdm35_an_uncapped_run_does_not_mention_the_cap(screen, manager):
+    """The capped count is said only when there is one, so it means something."""
+    _item(manager, "Only one")
+
+    screen.autoload_day()
+
+    text = screen.status_label.cget("text")
+    assert "blocked 1 of 1" in text, text
+    assert "row list" not in text, text
+
+
+def test_pdm37_a_failure_that_is_not_a_refusal_is_still_reported(
+    screen, manager, monkeypatch
+):
+    """PD-M3.7 — AutoLoad caught only ``SlotRefusedError``.
+
+    Any other exception escaped the Tk callback, which has no handler: nothing
+    redrawn, nothing said, and a press that failed indistinguishable on screen
+    from a press that found nothing to do. The transaction had already rolled
+    back, so the day really was unchanged -- the defect is that the user was
+    never told.
+    """
+    _item(manager, "Hopeful")
+    before = _stored(manager)
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("the database went away")
+
+    monkeypatch.setattr(manager, "add_block_at", boom)
+
+    screen.autoload_day()
+
+    assert _stored(manager) == before, "something was written after all"
+    text = screen.status_label.cget("text")
+    assert "AutoLoad wrote nothing" in text, text
+    assert "the database went away" in text, text
+    assert screen.status_label.cget("text_color") == status_text_color("error")
+
+
 def test_pdm36_a_full_day_writes_nothing(root, manager, settings):
     """PD-M3.6 — no room anywhere: nothing written, and the status says so."""
     panel = _short_day(root, manager, settings, end="09:30")
@@ -4388,6 +4506,41 @@ def test_pdm52_existing_blocks_keep_their_clock_times(screen, manager, settings)
     assert placed["Early start"] == (0, "07:30"), placed["Early start"]
 
 
+def test_pdm55_a_block_on_another_date_keeps_its_clock_time(
+    screen, manager, settings
+):
+    """PD-M5.5 — "every existing block" is every date's, because Day Start is one.
+
+    The renumber was scoped to the date being looked at. Extending Thursday
+    earlier then moved the single ``plan_day_start`` that Friday is drawn from
+    too, while Friday's blocks kept their old indexes: a 10:00 task drawn at
+    09:30 with "10:00" still in its own row, on a screen the user was not even
+    on when they dropped the item. Asserted as the time it is drawn at, not as
+    the index, because the index moving is the fix and not the promise.
+    """
+    friday = _add_block(manager, 30, "Friday standup", slot_index=4, block_date=FRIDAY)
+    assert friday.start_time == "10:00", (
+        f"precondition: the Friday block is stored at 10:00, not {friday.start_time}"
+    )
+    item = _item(manager, "Early start")
+
+    screen.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+    later = DayBounds.from_settings(settings)
+    assert later.day_start == "07:30", f"precondition: the day moved ({later.day_start})"
+    grid = build_day_grid(manager.get_time_blocks(FRIDAY), later)
+    drawn = {
+        entry.starting[0].label: entry.slot.start_time
+        for entry in grid.slots
+        if entry.starting
+    }
+    assert drawn == {"Friday standup": "10:00"}, drawn
+    stored = {row[0]: row[3] for row in _stored(manager, FRIDAY)}
+    assert stored == {"Friday standup": "10:00"}, (
+        f"the stored time was rewritten rather than kept: {stored}"
+    )
+
+
 def test_pdm53_a_drop_below_moves_day_end_forward(screen, manager, settings):
     """PD-M5.3 — Day End moves forward by the span and the item lands there."""
     item = _item(manager, "Late finish")
@@ -4435,6 +4588,31 @@ def test_pdm56_a_refused_write_leaves_the_day_unchanged(
     )
     text = screen.status_label.cget("text")
     assert "was not extended" in text, text
+
+
+def test_pdm56_a_failure_with_no_message_still_names_itself(
+    screen, manager, settings, monkeypatch
+):
+    """The status said "The day was not extended — " and then stopped.
+
+    Several built-in exceptions carry no message at all, and ``str`` of one is
+    the empty string. The sentence then ended at the dash: the user was told
+    the day had not been extended and given nothing about why, on the one path
+    that exists to report why. Same hole as the AutoLoad arm, which reports the
+    class name for the same reason.
+    """
+    item = _item(manager, "Early start")
+
+    def boom(*args, **kwargs):
+        raise KeyError()
+
+    monkeypatch.setattr(manager, "add_block_at", boom)
+
+    screen.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+    text = screen.status_label.cget("text")
+    assert "KeyError" in text, text
+    assert not text.rstrip().endswith("—"), text
 
 
 def test_pdm56_a_refused_write_is_not_reported_as_a_longer_day(
