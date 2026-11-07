@@ -1,6 +1,6 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-06 (six findings from the plan day-controls cold sweep added, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-07 (the third cold pass's three test-quality findings added, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
 
 ## Deferred from the plan day-controls cold sweep (2026-11-06)
 
@@ -66,6 +66,51 @@ surface and the repo's budget stops in-loop fixes below medium.
   rather than as a defect: nothing calls it with one, Day Start only ever moves
   back on this path, and a negative shift would be the correct write if a
   shortening path is ever added.
+
+## Deferred from the third cold pass — test quality (2026-11-07)
+
+A cold pass over `14d9199...HEAD` with a test-quality lens: eight mutations of
+`plan.py`, seven red on the test that names the line. No finding of medium or
+higher, so by the review budget none was fixed in the loop. Two of its lows
+were factual errors in prose written in the same batch and were corrected
+there; these three are the rest.
+
+- **`caplog.at_level` names a logger the code never touches.** Low.
+  `tests/test_plan_screen.py::test_pdm37_a_failure_that_is_not_a_refusal_is_still_reported`
+  passes `logger="getmoredone.screens.plan"`, but the test file imports the
+  module as `src.getmoredone.screens.plan`, so that is the logger's real name.
+  The two `caplog` assertions still pass for the right reason today — and go
+  red when the `logger.exception` call is deleted or demoted — but only because
+  ERROR clears the root logger's default level. Demote that log line to WARNING
+  or INFO later and they fail against correct code, with a misdirected
+  `at_level` as the cause. One word: `logger=plan.__name__`, or drop the
+  argument.
+- **Two drag tests measure from the setting, not from the drawn width.** Low.
+  `test_pdm21_dragging_the_grip_changes_the_items_column` and
+  `test_pdm26_the_grip_and_the_settings_field_are_one_value` take their
+  reference from `items_col_width()`, while `on_divider_press` now snapshots
+  `_items_width`. The two agree only because the screen is unmapped, where
+  `winfo_width()` is 1 and the clamp applies no right-hand bound — which is the
+  distinction both docstrings were rewritten to explain. If either test ever
+  takes `mapped_windows`, its expectation comes from the side the fix removed.
+  Read `panel._items_width`.
+- **The `sizer` screen is an expensive way to read a floor.** Low. Both tests
+  above build a whole second `PlanScreen` — 50-odd widgets and a full
+  `refresh()` against the database — to obtain `items_width_floor()`, which
+  reads `drag_schedule_title_col_width` and never `plan_items_col_width`. The
+  sequencing is right (the setting must be in place before the screen is
+  built); the second screen is not needed to get there, in a file whose runtime
+  is already throttled.
+- **`apply_items_width`'s "only on a change" guard is pinned by nothing.** Low.
+  Its docstring says a grid change from inside `<Configure>` "would not
+  settle". Removing the `if held != self._items_width:` guard and running
+  `test_pdm22_a_resize_alone_rebalances_the_panes` against a real mapped window
+  with two `root.update()` calls stayed green in 2.9s: Tk emits no
+  `<Configure>` for a `minsize` set to the value it already holds, so the
+  stated hazard is not reachable by this route and the justification is
+  unverified either way. Low because no regression is observable — but a future
+  change that reconfigures with a *different* value from inside that handler
+  would reintroduce the loop with nothing to catch it.
 
 ## Adjacent issues from the plan day-controls batch (2026-11-06)
 

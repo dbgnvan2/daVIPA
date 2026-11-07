@@ -213,13 +213,14 @@ four high and medium findings are fixed in `2b65574`, with tests in `f122967`.
 The lows were recorded; the one worth keeping is folded into the `BACKLOG.md`
 entry on the empty-day note's wrap.
 
-That pass also found a test of the first round's that could not fail, and
-`test_pdm22_a_real_configure_event_rebalances_the_panes` is gone because of
-it — a synthetic `<Configure>` cannot reach an unmapped screen, so it asserted
-nothing, and its `root.update()` spun for 8.5 hours of wall clock and 11 hours
-of CPU in a background run before it was killed.
-`test_pdm22_a_resize_alone_rebalances_the_panes` replaces it with a real
-window, which takes the mapped-window count to 22.
+That pass also found a test that could not fail. It was written during the
+first round and never committed, so `git log` shows no deletion:
+`test_pdm22_a_real_configure_event_rebalances_the_panes` existed only in the
+working tree, and `test_pdm22_a_resize_alone_rebalances_the_panes` is what
+went in instead. A synthetic `<Configure>` cannot reach an unmapped screen, so
+it asserted nothing, and its `root.update()` spun for 8.5 hours of wall clock
+and 11 hours of CPU in a background run before it was killed. The replacement
+takes a real window, which puts the mapped-window count at 22.
 
 ## Risks / Known gaps
 
