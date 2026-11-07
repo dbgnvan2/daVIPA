@@ -11,14 +11,24 @@ the mapped-window count that tests/test_ci_contract.py pins at 22
 """
 
 import ast
+import sys
 from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import pytest
+# Self-contained path bootstrap, for the same reason test_ape_period_consistency
+# carries one: tests/test_ci_contract.py imports every test file with the repo
+# root stripped from sys.path, and this file sorts early, so it cannot rely on
+# another file having put the root back.
+_ROOT = Path(__file__).resolve().parents[1]
+for _entry in (str(_ROOT), str(_ROOT / "src")):
+    if _entry not in sys.path:
+        sys.path.insert(0, _entry)
 
-import customtkinter as ctk
+import pytest  # noqa: E402
+
+import customtkinter as ctk  # noqa: E402
 
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem
@@ -242,18 +252,28 @@ def test_awam23_one_home_for_the_link_predicate():
     which is what the criterion means, and what is asserted here.
     """
     def bodies_naming_both(path):
+        """Functions holding one string that names both columns — a query.
+
+        A docstring that discusses the two columns in prose is not an
+        expression of the predicate, so the function's own docstring is
+        excluded and both names must appear in the *same* string constant,
+        the way a WHERE clause has them.
+        """
         tree = ast.parse(path.read_text())
         hits = []
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            strings = [
-                sub.value for sub in ast.walk(node)
-                if isinstance(sub, ast.Constant) and isinstance(sub.value, str)
-            ]
-            if any("weekly_tactic_id" in s for s in strings) and \
-               any("parent_id" in s for s in strings):
-                hits.append(node.name)
+            docstring = ast.get_docstring(node, clean=False)
+            for sub in ast.walk(node):
+                if not (isinstance(sub, ast.Constant)
+                        and isinstance(sub.value, str)):
+                    continue
+                if sub.value == docstring:
+                    continue
+                if "weekly_tactic_id" in sub.value and "parent_id" in sub.value:
+                    hits.append(node.name)
+                    break
         return hits
 
     screen_hits = []
@@ -303,5 +323,596 @@ def test_awam25_orphaned_child_is_not_returned(tmp_path):
         vps.db.conn.commit()
 
         assert vps.get_action_items_for_weekly_tactic(tactic.id) == []
+    finally:
+        vps.close()
+
+
+# --------------------------------- AWA-M5: the right panel behaves like Today
+
+def _panel(tmp_path, vps, tactic_id=None):
+    """A WeekTacticActionsPanel on a withdrawn root (AWA-M3.3)."""
+    from src.getmoredone.screens.week_actions import WeekTacticActionsPanel
+    root = _root()
+    panel = WeekTacticActionsPanel(root, vps.db_manager, _app_stub(vps.db_manager, vps))
+    if tactic_id is not None:
+        panel.set_tactic(_tactic_row(vps, tactic_id))
+    panel.update_idletasks()
+    return root, panel
+
+
+def _tactic_row(vps, tactic_id):
+    row = vps.db.conn.execute(
+        "SELECT * FROM action_items WHERE id = ?", (tactic_id,)).fetchone()
+    return dict(row)
+
+
+def _complete_on(vps, item, when):
+    """Complete an item with an explicit completion timestamp."""
+    item.status = "completed"
+    item.completed_at = f"{when}T09:00:00"
+    assert vps.db_manager.update_action_item(item, refile=False)
+    return item
+
+
+def test_awam54_add_action_item_links_by_weekly_tactic_id(tmp_path):
+    """AWA-M5.4 — the new row carries weekly_tactic_id and the week's dates.
+
+    Writing parent_id instead is what split the link in two (spec §1.3);
+    this panel writes the column weekly_tactic_migrations.py exists to
+    establish. The editor then opens on the row that was just created, so
+    the user lands where D5 says they do.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        tactic, _ = _tactic_and_ape(vps, start="2026-11-09")
+        root, panel = _panel(tmp_path, vps, tactic.id)
+        try:
+            panel._prompt_for_title = lambda: "Draft the outline"
+            opened = []
+            panel.edit_item = lambda item_id, **kw: opened.append(item_id)
+
+            panel.add_action_item()
+
+            rows = vps.db.conn.execute(
+                "SELECT id, weekly_tactic_id, parent_id, start_date, due_date, "
+                "item_type FROM action_items WHERE title = ?",
+                ("Draft the outline",)).fetchall()
+            assert len(rows) == 1
+            row = rows[0]
+            assert row["weekly_tactic_id"] == tactic.id
+            assert row["start_date"] == "2026-11-09"
+            assert row["due_date"] == "2026-11-09"
+            assert row["item_type"] == "daily"
+            assert opened == [row["id"]]
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam54b_empty_title_creates_nothing(tmp_path):
+    """AWA-M5.4 — cancelling the prompt writes no row and opens no editor."""
+    vps = make_vps(tmp_path)
+    try:
+        tactic, _ = _tactic_and_ape(vps)
+        root, panel = _panel(tmp_path, vps, tactic.id)
+        try:
+            before = vps.db.conn.execute(
+                "SELECT COUNT(*) AS n FROM action_items").fetchone()["n"]
+            panel._prompt_for_title = lambda: "   "
+            opened = []
+            panel.edit_item = lambda item_id, **kw: opened.append(item_id)
+
+            panel.add_action_item()
+
+            after = vps.db.conn.execute(
+                "SELECT COUNT(*) AS n FROM action_items").fetchone()["n"]
+            assert after == before
+            assert opened == []
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam58_completed_children_are_not_date_filtered(tmp_path):
+    """AWA-M5.8 — D6: completed children show whatever the completion date.
+
+    Adversarial (P7): the 90-day-old child is the one a date filter would
+    silently drop, and the other tactic's child completed *today* is the one
+    a leftover date filter would wrongly let through. A panel filtered by
+    tactic has no business reading the clock at all.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        ours, _ = _tactic_and_ape(vps, start="2026-11-09", title="ours")
+        theirs = make_week_item(vps, seed_second_ape(vps), start="2026-11-09",
+                                due="2026-11-09", title="theirs")
+
+        old = make_daily_item(vps, title="done 90 days ago",
+                              weekly_tactic_id=ours.id, refile=False)
+        _complete_on(vps, old, (date.today() - timedelta(days=90)).isoformat())
+        still_open = make_daily_item(vps, title="open on ours",
+                                     weekly_tactic_id=ours.id, refile=False)
+        other = make_daily_item(vps, title="done today on theirs",
+                                weekly_tactic_id=theirs.id, refile=False)
+        _complete_on(vps, other, date.today().isoformat())
+
+        root, panel = _panel(tmp_path, vps, ours.id)
+        try:
+            found = {item.id for item in panel.get_todays_items()}
+            assert found == {old.id, still_open.id}
+            assert other.id not in found
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam51_right_panel_subclasses_today(tmp_path):
+    """AWA-M5.1 — the panel is a TodayScreen, not a second copy of one."""
+    from src.getmoredone.screens.week_actions import WeekTacticActionsPanel
+    assert issubclass(WeekTacticActionsPanel, TodayScreen)
+
+
+def test_awam52_right_panel_queries_by_tactic_not_date(tmp_path):
+    """AWA-M5.2 — the item query is the AWA-M2 helper, with no date filter.
+
+    Driven by behaviour, not by reading the source: the helper is recorded,
+    and the panel's answer is whatever the helper returned. A panel that
+    still consulted the clock could not pass both halves.
+    """
+    from src.getmoredone.screens.week_actions import WeekTacticActionsPanel
+
+    vps = make_vps(tmp_path)
+    try:
+        tactic, _ = _tactic_and_ape(vps)
+        child = make_daily_item(vps, title="child",
+                                weekly_tactic_id=tactic.id, refile=False)
+        root, panel = _panel(tmp_path, vps, tactic.id)
+        try:
+            calls = []
+            real = vps.get_action_items_for_weekly_tactic
+
+            def recording(tactic_id):
+                calls.append(tactic_id)
+                return real(tactic_id)
+
+            panel.app.vps_manager.get_action_items_for_weekly_tactic = recording
+            items = panel.get_todays_items()
+
+            assert calls == [tactic.id]
+            assert [item.id for item in items] == [child.id]
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam53_row_behaviours_are_inherited_not_copied():
+    """AWA-M5.3 — every row behaviour comes from Today, unredefined.
+
+    Exact list, not a floor. Redefining any of these on the subclass is how
+    "works like the Today tab" quietly stops being true.
+    """
+    from src.getmoredone.screens.week_actions import WeekTacticActionsPanel
+
+    inherited = [
+        "edit_item",
+        "complete_item",
+        "start_timer",
+        "push_item",
+        "edit_start_date_inline",
+        "edit_due_date_inline",
+        "edit_priority_inline",
+        "create_item_row",
+        "load_items",
+    ]
+    redefined = [name for name in inherited
+                 if name in vars(WeekTacticActionsPanel)]
+    assert redefined == []
+    for name in inherited:
+        assert getattr(WeekTacticActionsPanel, name) is \
+            getattr(TodayScreen, name)
+
+    # The three seams, and only those three, are overridden.
+    assert set(vars(WeekTacticActionsPanel)) & {
+        "EMPTY_TEXT", "COLUMN_PREFIX", "_build_toolbar", "get_todays_items"
+    } == {"EMPTY_TEXT", "COLUMN_PREFIX", "_build_toolbar", "get_todays_items"}
+
+
+def test_awam55_column_prefix_is_its_own(tmp_path):
+    """AWA-M5.5 — its Title width is stored apart from Today's.
+
+    Same prefix would mean dragging either panel's divider moved the other,
+    and the setting that holds it must exist or the width would not persist
+    at all (AppSettings writes declared fields only).
+    """
+    from dataclasses import fields
+
+    from src.getmoredone.app_settings import AppSettings
+    from src.getmoredone.screens.week_actions import WeekTacticActionsPanel
+
+    assert WeekTacticActionsPanel.COLUMN_PREFIX != TodayScreen.COLUMN_PREFIX
+    assert WeekTacticActionsPanel.COLUMN_PREFIX == "week_actions"
+    declared = {f.name for f in fields(AppSettings)}
+    assert "week_actions_col_widths" in declared
+
+    vps = make_vps(tmp_path)
+    try:
+        root, panel = _panel(tmp_path, vps)
+        try:
+            assert panel.resizer.prefix == "week_actions"
+            assert panel.resizer._setting_attr() == "week_actions_col_widths"
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam56_empty_state_names_the_tactic(tmp_path):
+    """AWA-M5.6 — a selected tactic with no children names the tactic.
+
+    "No items for today" would be wrong twice over on this panel: nothing
+    here is about today, and it would not say which tactic is empty.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        tactic, _ = _tactic_and_ape(vps, title="Publish the essay")
+        root, panel = _panel(tmp_path, vps, tactic.id)
+        try:
+            texts = _scroll_texts(panel)
+            assert "No items for today" not in texts
+            assert any("Publish the essay" in text for text in texts), texts
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam57_no_selection_is_not_an_error(tmp_path):
+    """AWA-M5.7 — with nothing selected the panel prompts and raises nothing.
+
+    The panel is built before anything can be selected, so this is also the
+    state every construction passes through.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        root, panel = _panel(tmp_path, vps)
+        try:
+            from src.getmoredone.screens.week_actions import (
+                WeekTacticActionsPanel,
+            )
+            assert panel.selected_tactic is None
+            assert panel.get_todays_items() == []
+            assert WeekTacticActionsPanel.EMPTY_TEXT in _scroll_texts(panel)
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+# --------------------------- AWA-M4: left panel, the week's Weekly Tactics
+
+def _week_screen(tmp_path, vps, first_day=0):
+    """A WeekActionsScreen on a withdrawn root, Monday-start by default."""
+    from src.getmoredone.screens.week_actions import WeekActionsScreen
+    root = _root()
+    app = _app_stub(vps.db_manager, vps)
+    app.settings = SimpleNamespace(first_day_of_week=first_day)
+    screen = WeekActionsScreen(root, vps, app)
+    screen.update_idletasks()
+    return root, screen
+
+
+def _this_week(first_day=0):
+    from src.getmoredone import week_options
+    return week_options.week_start_for(date.today(), first_day).isoformat()
+
+
+def test_awam41_week_defaults_to_current_week(tmp_path):
+    """AWA-M4.1 — the picker opens on this week, from the shared helper.
+
+    Compared against week_options, not against arithmetic rewritten here: a
+    test that recomputes the rule cannot catch the screen recomputing it
+    differently, which is the defect the shared helper exists to prevent.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        root, screen = _week_screen(tmp_path, vps)
+        try:
+            assert screen.week_var.get() == _this_week()
+            assert screen.week_combo.cget("values")[0] == _this_week()
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam42_left_panel_lists_the_weeks_tactics(tmp_path):
+    """AWA-M4.2 — this week's tactics are listed; another week's are not."""
+    vps = make_vps(tmp_path)
+    try:
+        this_week = _this_week()
+        other_week = (date.fromisoformat(this_week) + timedelta(days=7)).isoformat()
+        mine = make_week_item(vps, seed_ape(vps), start=this_week,
+                              due=this_week, title="in this week")
+        theirs = make_week_item(vps, seed_second_ape(vps), start=other_week,
+                                due=other_week, title="next week")
+
+        root, screen = _week_screen(tmp_path, vps)
+        try:
+            listed = {row["id"] for row in screen.tactic_rows}
+            assert listed == {mine.id}
+            assert theirs.id not in listed
+            assert set(screen.tactic_buttons) == {mine.id}
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam43_no_tactic_is_silently_dropped(tmp_path):
+    """AWA-M4.3 — ape_only=False, and the count is on screen (D4, P2).
+
+    A Weekly Tactic whose Annual Plan Element has been detached still has
+    Action Items under it. ape_only=True would hide the row and leave those
+    items unreachable from this tab with nothing on screen to say so.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        this_week = _this_week()
+        kept = make_week_item(vps, seed_ape(vps), start=this_week,
+                              due=this_week, title="has an APE")
+        orphan = make_week_item(vps, seed_second_ape(vps), start=this_week,
+                                due=this_week, title="APE detached")
+        # No supported path can write this: item_type='week' requires an APE
+        # (WT-M1.C.4). An older APE delete produced it, which is why the
+        # panel has to cope with it.
+        vps.db.conn.execute(
+            "UPDATE action_items SET annual_plan_element_id = NULL WHERE id = ?",
+            (orphan.id,),
+        )
+        vps.db.conn.commit()
+
+        recorded = {}
+        real = vps.get_weekly_action_items
+
+        def recording(week_start_date=None, ape_only=True):
+            recorded["ape_only"] = ape_only
+            return real(week_start_date=week_start_date, ape_only=ape_only)
+
+        root, screen = _week_screen(tmp_path, vps)
+        try:
+            screen.vps_manager.get_weekly_action_items = recording
+            screen.load_selected_week()
+
+            assert recorded["ape_only"] is False
+            listed = {row["id"] for row in screen.tactic_rows}
+            assert listed == {kept.id, orphan.id}
+            assert "2" in screen.status_label.cget("text")
+            assert screen.left_title_label.cget("text") == "Weekly Tactics (2)"
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam44_selecting_a_tactic_reloads_the_right_panel(tmp_path):
+    """AWA-M4.4 — one selection, one reload, and the right tactic."""
+    vps = make_vps(tmp_path)
+    try:
+        this_week = _this_week()
+        tactic = make_week_item(vps, seed_ape(vps), start=this_week,
+                                due=this_week, title="pick me")
+        child = make_daily_item(vps, title="under it",
+                                weekly_tactic_id=tactic.id, refile=False)
+
+        root, screen = _week_screen(tmp_path, vps)
+        try:
+            calls = []
+            real_set = screen.actions_panel.set_tactic
+
+            def recording(row):
+                calls.append(row["id"] if row else None)
+                return real_set(row)
+
+            screen.actions_panel.set_tactic = recording
+            screen.select_tactic(tactic.id)
+
+            assert calls == [tactic.id]
+            assert screen.selected_tactic_id == tactic.id
+            assert [item.id for item in
+                    screen.actions_panel.get_todays_items()] == [child.id]
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam45_changing_week_clears_the_selection(tmp_path):
+    """AWA-M4.5 — the right panel cannot keep a tactic from another week.
+
+    Without this the panel shows last week's tactic's items beside this
+    week's list, and nothing on screen says which week they belong to.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        this_week = _this_week()
+        next_week = (date.fromisoformat(this_week) + timedelta(days=7)).isoformat()
+        tactic = make_week_item(vps, seed_ape(vps), start=this_week,
+                                due=this_week, title="this week only")
+
+        root, screen = _week_screen(tmp_path, vps)
+        try:
+            screen.select_tactic(tactic.id)
+            assert screen.actions_panel.selected_tactic is not None
+
+            screen.week_var.set(next_week)
+            screen.load_selected_week()
+
+            assert screen.selected_tactic_id is None
+            assert screen.actions_panel.selected_tactic is None
+            assert screen.actions_panel.get_todays_items() == []
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+# ------------------------- AWA-M1 / AWA-M3: the rename and the new tab
+
+def _hub(tmp_path, vps):
+    """The Vision Planning hub on a withdrawn root."""
+    from src.getmoredone.screens.vision_planning_hub import (
+        VisionPlanningHubScreen,
+    )
+    root = _root()
+    app = _app_stub(vps.db_manager, vps)
+    app.settings = SimpleNamespace(first_day_of_week=0)
+    hub = VisionPlanningHubScreen(root, vps, app)
+    hub.update_idletasks()
+    return root, hub
+
+
+def test_awam11_and_m31_hub_nav_labels(tmp_path):
+    """AWA-M1.1, AWA-M3.1 — the six nav buttons, in order, exact text.
+
+    One list, asserted whole: the rename and the new tab are both visible
+    here, and so is any reordering or any seventh button nobody meant to add.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        root, hub = _hub(tmp_path, vps)
+        try:
+            labels = [button.cget("text")
+                      for button in hub.nav_buttons.values()]
+            assert labels == [
+                "Vision Elements",
+                "Annual Plan Elements",
+                "APE Quarter Assignment",
+                "APE Month Assignment",
+                "APE Week Assignment",
+                "APE Week Actions",
+            ]
+            assert list(hub.nav_buttons)[5] == "ape_week_actions"
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam12_screen_header_matches_the_tab(tmp_path):
+    """AWA-M1.2 — the screen's own header says what the tab says.
+
+    It read "APE Weekly Assignment" while the tab read "APE Weekly": two
+    different names on one screen, which is the drift the rename fixes.
+    """
+    from src.getmoredone.screens.weekly_items import WeeklyItemsScreen
+
+    vps = make_vps(tmp_path)
+    try:
+        root = _root()
+        app = _app_stub(vps.db_manager, vps)
+        app.settings = SimpleNamespace(first_day_of_week=0)
+        try:
+            screen = WeeklyItemsScreen(root, vps, app)
+            screen.update_idletasks()
+            headers = [
+                child.cget("text")
+                for child in screen.winfo_children()[0].winfo_children()
+                if isinstance(child, ctk.CTkLabel)
+            ]
+            assert "APE Week Assignment" in headers
+            assert "APE Weekly Assignment" not in headers
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam13_no_ape_weekly_label_remains():
+    """AWA-M1.3 — the old name is gone from both files, counted exactly.
+
+    Parsed from the AST's string constants rather than grepped, and asserted
+    as a count of zero rather than a floor. vision_planning.py keeps its own
+    "APE Weekly" placeholder caption on a screen no sidebar entry reaches;
+    that is AWA-A2, recorded and deliberately out of scope.
+    """
+    offenders = []
+    for path in (SRC / "screens" / "vision_planning_hub.py",
+                 SRC / "screens" / "weekly_items.py"):
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if "APE Weekly" in node.value:
+                    offenders.append(f"{path.name}:{node.lineno}")
+    assert offenders == []
+
+
+def test_awam14_and_m32_every_nav_key_opens_its_own_screen(tmp_path):
+    """AWA-M1.4, AWA-M3.2 — each key routes to its own screen class.
+
+    ``open_screen`` falls back to VisionSegmentsScreen for a key that is not
+    in ``mapping``, so a mistyped key looks like a working tab. Opening every
+    one and naming the class it lands on is what catches that; a key/mapping
+    comparison would not, since both would read the same typo.
+    """
+    from src.getmoredone.screens.annual_vision_segments import (
+        AnnualVisionSegmentsScreen,
+    )
+    from src.getmoredone.screens.ape_assignment import APEAssignmentScreen
+    from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen
+    from src.getmoredone.screens.vision_segments import VisionSegmentsScreen
+    from src.getmoredone.screens.week_actions import WeekActionsScreen
+    from src.getmoredone.screens.weekly_items import WeeklyItemsScreen
+
+    expected = {
+        "vision_segments": VisionSegmentsScreen,
+        "annual_vision_segments": AnnualVisionSegmentsScreen,
+        "ape_assignment": APEAssignmentScreen,
+        "ape_period_view": APEPeriodViewScreen,
+        "ape_weekly": WeeklyItemsScreen,
+        "ape_week_actions": WeekActionsScreen,
+    }
+
+    vps = make_vps(tmp_path)
+    try:
+        root, hub = _hub(tmp_path, vps)
+        try:
+            assert set(hub.nav_buttons) == set(expected)
+            for key, screen_cls in expected.items():
+                hub.open_screen(key)
+                assert type(hub.current_screen) is screen_cls, key
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam33_screen_constructs_withdrawn(tmp_path):
+    """AWA-M3.3 — the new screen builds and tears down with no mapped window.
+
+    tests/test_ci_contract.py pins the suite's mapped-window count at 22;
+    a screen that needed a real on-screen window would move it.
+    """
+    from src.getmoredone.screens.week_actions import WeekActionsScreen
+
+    vps = make_vps(tmp_path)
+    try:
+        root, screen = _week_screen(tmp_path, vps)
+        try:
+            assert isinstance(screen, WeekActionsScreen)
+            assert root.winfo_viewable() == 0  # withdrawn, never mapped
+            panel = screen.actions_panel
+            assert panel.winfo_exists()
+
+            # Destroyed while the interpreter is still up, so the teardown is
+            # observable: after root.destroy() every winfo call raises
+            # TclError and nothing about the screen can be asserted at all.
+            screen.destroy()
+            assert not screen.winfo_exists()
+            assert not panel.winfo_exists()
+        finally:
+            root.destroy()
     finally:
         vps.close()
