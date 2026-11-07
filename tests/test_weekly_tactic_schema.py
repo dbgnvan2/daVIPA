@@ -416,7 +416,7 @@ def test_wt_m1c3_both_creation_paths_report_collisions(tmp_path):
         right_list=object(),
         winfo_containing=lambda *_: "target",
         _is_descendant=lambda *_: True,
-        _selected_week_context=lambda: ("2026-02-23", 2026, 1, 2),
+        _selected_week_context=lambda: ("2026-02-23", 2026, 2),
         vps_manager=SimpleNamespace(
             create_week_action_items_for_ape=lambda *_a, **_k: {
                 "created_count": 0, "skipped_count": 0, "collided_count": 1,
@@ -470,7 +470,7 @@ def test_wt_m1c3_drag_reports_a_stale_ape_instead_of_a_traceback(tmp_path):
         right_list=object(),
         winfo_containing=lambda *_: "target",
         _is_descendant=lambda *_: True,
-        _selected_week_context=lambda: ("2026-02-23", 2026, 1, 2),
+        _selected_week_context=lambda: ("2026-02-23", 2026, 2),
         vps_manager=SimpleNamespace(create_week_action_items_for_ape=_raise),
         refresh=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
