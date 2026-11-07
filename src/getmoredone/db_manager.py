@@ -144,6 +144,13 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         Spec:  docs/spec_2026-08-18_weekly_tactic_scheduling.md#wt-m3a
         Tests: tests/test_weekly_tactic_linking.py::test_wt_m3a1_attach_at_create_time_stamps_too
         """
+        # WT-M1.C.5, the same reasoning as update_action_item's clear below:
+        # the DatabaseManager lives for the session, so a flag that is only
+        # ever set reads as permanently true after the first clash. The create
+        # path only ever set it, and had no reader until AWA-M5.4 added one -
+        # which then reported an old collision after a save that went fine.
+        self.last_week_collision = None
+
         if apply_defaults:
             self._apply_defaults(item)
 

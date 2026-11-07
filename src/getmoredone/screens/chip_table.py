@@ -5,12 +5,14 @@ Purpose: UPD-M3 — one renderer for the VSP tabs' lists, with the draggable,
 Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m3
 Tests:   tests/test_unified_panel_design.py::test_updm31_table_renders_header_and_rows
 
-Five screens each wrote their own version of this: `_render_rows` in
-`ape_assignment`, `ape_period_view` and `annual_vision_segments`,
-`_render_left_rows` + `_render_right_rows` in `weekly_items`, and three
-similar blocks in `vision_segments`. The bodies were the same header frame,
-the same `grid_columnconfigure(minsize=…)` calls and the same chip labels,
-with the widths already drifting between the copies.
+**Nothing uses this yet.** It is UPD-M3, the module and its tests; the five
+screens are moved onto it one at a time in UPD-M4 to UPD-M7, and until then
+their own renderers are still in place and still drifting. The five:
+`_render_rows` in `ape_assignment`, `ape_period_view` and
+`annual_vision_segments`, `_render_left_rows` + `_render_right_rows` in
+`weekly_items`, and three similar blocks in `vision_segments`. Their bodies
+are the same header frame, the same `grid_columnconfigure(minsize=…)` calls
+and the same chip labels, with the widths already drifted between the copies.
 
 The split of responsibility is deliberate: this module owns the header, the
 row frames, the chips and the widths, and knows nothing about Annual Plan
@@ -186,16 +188,29 @@ class ChipTable:
                 continue
             full_text = values.get(column.key) or ""
             if column.chip:
-                color = (colors.get(column.key) or "").strip() \
-                    or palette[DEFAULT_CHIP_KEY]
+                lineage = (colors.get(column.key) or "").strip()
+                if lineage:
+                    chip_colors = {
+                        "fg_color": lineage,
+                        "text_color": pick_text_color(lineage),
+                    }
+                else:
+                    # No lineage colour: the pill is the panel's own surface,
+                    # and the theme's default label colour is readable on it
+                    # by construction. Measuring it is what breaks — the
+                    # fallback token is a *named* Tk colour on 7 of the 10
+                    # themes ("gray16" in dark mode), which pick_text_color
+                    # cannot parse, so it returned black: black text on a
+                    # near-black pill, on exactly the rows this fallback is
+                    # for.
+                    chip_colors = {"fg_color": palette[DEFAULT_CHIP_KEY]}
                 label = ctk.CTkLabel(
                     frame,
                     text=self.resizer.cell_text(column.key, full_text),
                     width=self._chip_width(column.key),
-                    fg_color=color,
-                    text_color=pick_text_color(color),
                     corner_radius=6,
                     anchor="w",
+                    **chip_colors,
                 )
                 registered.append(
                     (column.key, label, full_text, 0, CHIP_INSET))

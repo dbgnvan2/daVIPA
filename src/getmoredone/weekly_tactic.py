@@ -145,10 +145,18 @@ def tactic_of(item: Optional[ActionItem]) -> Optional[str]:
     return tactic_id or None
 
 
-# One home for "this Action Item is linked to that Weekly Tactic", in SQL.
+# One home for "which Weekly Tactic's panel lists this Action Item", in SQL.
 #
-# Purpose: AWA-M2.3 — the same question as `tactic_of` above, asked of a row
-#          instead of an object. It was written twice: once in
+# Deliberately *wider* than `tactic_of` above, and not the same question.
+# `tactic_of` answers "is this item week-filed", from `weekly_tactic_id`
+# alone, because WT-INV6 turns on that and a `parent_id`-only child must not
+# be moved by a rule it never opted into. This predicate answers which panel
+# shows the row, and includes those children so they are not stranded
+# unreachable. The consequence is AWA-A1's: such a child is listed but is not
+# week-filed, so it does not cascade when its date is edited, while the row
+# beside it does. Fixing AWA-A1 collapses the two questions into one.
+#
+# Purpose: AWA-M2.3 — one home for the SQL form. It was written twice: once in
 #          `vps_manager.get_action_items_for_weekly_tactic` and once in
 #          `weekly_tactic_maintenance._child_count`, and the two copies had
 #          already drifted — the second counted a nested Weekly Tactic row as
@@ -168,10 +176,13 @@ def tactic_of(item: Optional[ActionItem]) -> Optional[str]:
 #
 # `parent_id` is overloaded with ordinary subtask nesting, so a week row is
 # never a child of a tactic. Takes the tactic id twice.
+# Fully parenthesised: a consumer that writes `WHERE x OR {...}` gets the
+# rows it asked for. COALESCE rather than `IS NULL`, so an empty string counts
+# as no link, the same test `tactic_of` applies.
 LINK_PREDICATE_SQL = (
-    "(weekly_tactic_id = ?"
-    " OR (weekly_tactic_id IS NULL AND parent_id = ?))"
-    " AND item_type != 'week'"
+    "((weekly_tactic_id = ?"
+    " OR (COALESCE(weekly_tactic_id, '') = '' AND parent_id = ?))"
+    " AND item_type != 'week')"
 )
 
 

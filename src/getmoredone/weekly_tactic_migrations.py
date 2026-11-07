@@ -136,25 +136,61 @@ def migrate_parent_links_to_weekly_tactic(conn: sqlite3.Connection) -> Dict[str,
     Spec:    docs/spec_2026-08-18_weekly_tactic_scheduling.md#wt-m1d1
     Tests:   tests/test_weekly_tactic_link_migration.py::test_wt_m1d1_tactic_links_migrated_nesting_preserved
              tests/test_weekly_tactic_link_migration.py::test_wt_m1d4_link_migration_idempotent
+             tests/test_weekly_tactic_link_migration.py::test_awam23_an_explicit_tactic_survives_a_reopen
 
     Idempotent: a second run finds nothing to move and reports zero.
+
+    An item that already names a Weekly Tactic explicitly keeps it. This
+    migration runs from ``Database.initialize_schema`` on **every**
+    ``DatabaseManager`` construction, and it used to overwrite
+    ``weekly_tactic_id`` with the ``parent_id`` tactic for every row whose
+    parent was a week item. An item can hold a different tactic in each
+    column without leaving supported UI - added from APE Week Assignment,
+    whose button writes ``parent_id``, then pointed at another Weekly Tactic
+    in the editor, which sets ``weekly_tactic_id`` and leaves ``parent_id``
+    alone - and for that item the next launch silently replaced the user's
+    own last choice with the older link, nulled ``parent_id`` so nothing
+    recorded that it had happened, and then let the invariant repair move the
+    item's dates into the other tactic's week. Reproduced on a throwaway
+    database before the fix: ``weekly_tactic_id`` B became A and the dates
+    moved 2026-11-16 to 2026-11-09.
+
+    Such a row still has its stale nesting link dropped - that is what makes
+    the migration idempotent - but only ``parent_id`` is cleared, and the
+    count is reported separately so the two outcomes are not one number (P2).
     """
     if 'weekly_tactic_id' not in _columns(conn, 'action_items'):
         return {"moved": 0, "nesting_preserved": 0, "moved_ids": []}
 
     rows = conn.execute("""
-        SELECT child.id AS child_id, parent.id AS tactic_id
+        SELECT child.id AS child_id,
+               parent.id AS tactic_id,
+               child.weekly_tactic_id AS existing_link
         FROM action_items child
         JOIN action_items parent ON parent.id = child.parent_id
         WHERE parent.item_type = 'week'
     """).fetchall()
-    moved_ids: List[str] = [row["child_id"] for row in rows]
+
+    # Truthiness, not `IS NULL`, so an empty string counts as no link - the
+    # same test `tactic_of` applies to the object.
+    moved_ids: List[str] = [row["child_id"] for row in rows
+                            if not row["existing_link"]]
+    kept_ids: List[str] = [row["child_id"] for row in rows
+                           if row["existing_link"]]
 
     for row in rows:
-        conn.execute(
-            "UPDATE action_items SET weekly_tactic_id = ?, parent_id = NULL WHERE id = ?",
-            (row["tactic_id"], row["child_id"]),
-        )
+        if row["existing_link"]:
+            # The item names a Weekly Tactic of its own. Drop the stale
+            # nesting link; do not overwrite the choice with the older one.
+            conn.execute(
+                "UPDATE action_items SET parent_id = NULL WHERE id = ?",
+                (row["child_id"],),
+            )
+        else:
+            conn.execute(
+                "UPDATE action_items SET weekly_tactic_id = ?, parent_id = NULL WHERE id = ?",
+                (row["tactic_id"], row["child_id"]),
+            )
 
     nesting_preserved = conn.execute("""
         SELECT COUNT(*) AS n
@@ -167,6 +203,8 @@ def migrate_parent_links_to_weekly_tactic(conn: sqlite3.Connection) -> Dict[str,
         "moved": len(moved_ids),
         "nesting_preserved": nesting_preserved,
         "moved_ids": moved_ids,
+        "kept_explicit_link": len(kept_ids),
+        "kept_explicit_link_ids": kept_ids,
     }
 
 
