@@ -31,6 +31,7 @@ for path in (ROOT, ROOT / "src"):
 # Keep the test suite out of the user's real application data directory.
 # ---------------------------------------------------------------------------
 
+import importlib
 import logging
 import weakref
 
@@ -529,6 +530,74 @@ def _messageboxes_never_block(request):
         # otherwise inherit the patch from a session that had finished.
         for name, original in originals.items():
             setattr(messagebox, name, original)
+
+
+# Every in-app question asked during the run, newest last:
+# (title, message, yes_text).
+_CONFIRMS: list = []
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _confirm_dialogs_never_block():
+    """Record the app's own yes/no dialogs; never build one.
+
+    Purpose: PD-M12 replaced ``messagebox.askyesno`` on the Plan screen's drop
+             path with ``widgets.confirm_dialog.ask_yes_no``, which is a real
+             toplevel with a grab and ``wait_window``. Under this conftest
+             every window is withdrawn, so the dialog would never become
+             visible and ``wait_window`` would hold the run until its own
+             visibility timeout -- four seconds per question, and without that
+             timeout, until someone killed the run. Exactly the hole
+             ``_messageboxes_never_block`` was written to close, one module
+             over (P5).
+    Tests:   tests/test_plan_screen.py::test_pdm124_a_test_cannot_open_a_real_dialog
+
+    Answers False, like the ask* defaults above and for the same reason: an
+    unanswered question in a test must not authorise anything.
+
+    Patched on the module object, which is what every caller imports, so a
+    test that wants a different answer patches the same attribute and wins.
+    """
+    def recorder(parent, title=None, message=None, **kwargs):
+        _CONFIRMS.append((title, message, kwargs.get("yes_text")))
+        return False
+
+    # Both spellings, because this suite has both on sys.path (see the module
+    # docstring) and they are two distinct module objects: a screen imported
+    # as ``src.getmoredone.screens.plan`` resolves its relative import to
+    # ``src.getmoredone.widgets.confirm_dialog``, and one imported as
+    # ``getmoredone.screens.plan`` to the other. Patching one leaves the other
+    # able to build a real window. The messagebox guard above needs no such
+    # care: ``tkinter.messagebox`` is one module either way.
+    patched = []
+    for name in (
+        "src.getmoredone.widgets.confirm_dialog",
+        "getmoredone.widgets.confirm_dialog",
+    ):
+        try:
+            module = importlib.import_module(name)
+        except ImportError:
+            continue
+        patched.append((module, module.ask_yes_no))
+        module.ask_yes_no = recorder
+    try:
+        yield
+    finally:
+        for module, original in patched:
+            module.ask_yes_no = original
+
+
+@pytest.fixture
+def confirms():
+    """The in-app questions this test would have asked: (title, message, yes).
+
+    Emptied on the way in as well as the way out, for the reason written out
+    under ``messageboxes``: the recorder runs for every test whether or not
+    one asked for this fixture.
+    """
+    del _CONFIRMS[:]
+    yield _CONFIRMS
+    del _CONFIRMS[:]
 
 
 @pytest.fixture
