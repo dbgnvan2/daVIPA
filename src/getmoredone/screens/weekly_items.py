@@ -1,16 +1,15 @@
-"""APE Weekly assignment screen with month-to-week workflow."""
+"""APE Week Assignment screen with month-to-week workflow."""
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from tkinter import messagebox
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 import customtkinter as ctk
 import tkinter as tk
 
-from ..app_settings import AppSettings
-from .. import week_calendar
+from .. import week_options
 from ..weekly_tactic_logging import get_weekly_tactic_logger
 from ..color_contrast import pick_text_color
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
@@ -71,7 +70,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
 
         ctk.CTkLabel(
             header,
-            text="APE Weekly Assignment",
+            text="APE Week Assignment",
             font=ctk.CTkFont(size=20, weight="bold"),
         ).grid(row=0, column=0, columnspan=13, padx=(10, 20), pady=(8, 6), sticky="w")
 
@@ -241,24 +240,24 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         return week_start, week_date.year, week_date.month
 
     def _first_day_of_week(self) -> int:
-        try:
-            settings = getattr(self.app, "settings", None) or AppSettings.load()
-            value = int(getattr(settings, "first_day_of_week", 0))
-        except Exception:
-            value = 0
-        return value if 0 <= value <= 6 else 0
+        return week_options.first_day_of_week(self.app)
 
     def _week_start_for(self, target_date: date) -> date:
         """WT-M2.B — week identity comes from the one helper, not local arithmetic."""
-        return week_calendar.week_start(target_date, self._first_day_of_week())
+        return week_options.week_start_for(target_date, self._first_day_of_week())
 
     def _build_selectable_week_options(self, existing_starts: List[str]) -> List[str]:
-        current_start = self._week_start_for(date.today())
-        options = [(current_start + timedelta(days=7 * index)).isoformat() for index in range(4)]
-        for week_start in existing_starts:
-            if week_start not in options:
-                options.append(week_start)
-        return options
+        """The picker's week starts, from the shared helper.
+
+        ``date.today()`` is resolved here rather than inside the helper, which
+        keeps the helper pure and keeps this module the one place a test has
+        to pin the clock.
+        Spec:  docs/spec_2026-11-07_ape_week_actions.md#4
+        Tests: tests/test_weekly_items_week_options.py
+        """
+        return week_options.selectable_week_options(
+            date.today(), existing_starts, self._first_day_of_week()
+        )
 
     def _refresh_filter_options(self, left_rows: List[Dict[str, object]], right_rows: List[Dict[str, object]]):
         combined_parts = [self._ape_parts(row) for row in left_rows] + [self._weekly_parts(row) for row in right_rows]
