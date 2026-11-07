@@ -42,7 +42,12 @@ from src.getmoredone.screens.plan import (
     refusal_text,
 )
 from src.getmoredone.screens.plan_blocks import (
+    CHIP_BARS_COLUMN,
+    CHIP_LENGTH_COLUMN,
+    CHIP_MARKER_COLUMN,
+    CHIP_RIGHT_INSET_PX,
     ITEM_ROW_MIN_HEIGHT_PX,
+    PD_BLOCKED_TEXT,
     PD_CHECK_TEXT,
     PD_EARLIER_HINT,
     PD_EARLIER_TEXT,
@@ -50,8 +55,10 @@ from src.getmoredone.screens.plan_blocks import (
     PD_LATER_TEXT,
     STRIPE_WIDTH_PX,
     SLOT_CHIP_HEIGHT_PX,
+    SLOT_LENGTH_WIDTH_PX,
     SLOT_MIN_HEIGHT_PX,
     SLOT_ROW_GAP_PX,
+    SLOT_MARKER_WIDTH_PX,
     SLOT_TITLE_WIDTH_PX,
     DepthBarStack,
     accent_for_block,
@@ -59,6 +66,7 @@ from src.getmoredone.screens.plan_blocks import (
     build_item_row,
     build_outside_group,
     build_slot_row,
+    chip_column_minsizes,
     fill_for_item,
     item_row_height,
     slot_row_height,
@@ -1289,6 +1297,16 @@ def _find_label(widget, text):
     return None
 
 
+def _descendant_labels(widget):
+    """Every CTkLabel under a widget, however deeply nested."""
+    found = []
+    for child in widget.winfo_children():
+        if isinstance(child, ctk.CTkLabel):
+            found.append(child)
+        found.extend(_descendant_labels(child))
+    return found
+
+
 def _stripe_colors(widget):
     """Every stripe frame's colour under a widget, in render order.
 
@@ -1301,6 +1319,98 @@ def _stripe_colors(widget):
             found.append(child.cget("fg_color"))
         found.extend(_stripe_colors(child))
     return found
+
+
+def _padding_blocks():
+    return [
+        TimeBlock(
+            block_date=THURSDAY, start_time="08:00", end_time="08:30",
+            planned_minutes=30, block_type=BlockType.BREAK, slot_index=0,
+        ),
+        TimeBlock(
+            block_date=THURSDAY, start_time="08:30", end_time="09:00",
+            planned_minutes=30, block_type=BlockType.BUFFER, slot_index=1,
+        ),
+    ]
+
+
+def test_pdm42_a_padding_box_is_drawn_like_the_lunch_box(root):
+    """PD-M4.2 — the whole box, not only the stripe.
+
+    PD-M4 gave break, buffer and lunch one stripe colour and stopped there,
+    which left a break and a buffer drawn on the surface every task box uses
+    while lunch kept its own lighter one. The stripes matched and the boxes did
+    not, and the boxes are what a user compares. Lunch is the reference, since
+    it is the one of the three the day owns.
+
+    An empty box is excluded deliberately: it is room, not padding, and the
+    assertion would be vacuous if everything that is not a task matched.
+    """
+    pane = ctk.CTkFrame(root)
+    pane.grid_columnconfigure(0, weight=1)
+
+    fills = {}
+    for row, entry in enumerate(build_day_grid(_padding_blocks(), DayBounds()).slots):
+        rendered = build_slot_row(pane, entry, {}, row)
+        if entry.slot.is_lunch:
+            fills.setdefault("lunch", rendered.frame.cget("fg_color"))
+        elif entry.slot.index == 0:
+            fills["break"] = rendered.frame.cget("fg_color")
+        elif entry.slot.index == 1:
+            fills["buffer"] = rendered.frame.cget("fg_color")
+        elif entry.is_empty:
+            fills.setdefault("empty", rendered.frame.cget("fg_color"))
+
+    assert set(fills) == {"lunch", "break", "buffer", "empty"}, (
+        f"the day did not draw all four kinds of box: {sorted(fills)}"
+    )
+    assert fills["break"] == fills["lunch"], (
+        f"a break box is drawn on {fills['break']} and a lunch box on "
+        f"{fills['lunch']}"
+    )
+    assert fills["buffer"] == fills["lunch"], (
+        f"a buffer box is drawn on {fills['buffer']} and a lunch box on "
+        f"{fills['lunch']}"
+    )
+    assert fills["empty"] != fills["lunch"], (
+        "an empty box is drawn like padding, so the comparison above says "
+        "nothing: everything that is not a task would pass it"
+    )
+
+
+def test_pdm42_the_lunch_word_is_body_text_like_a_breaks(root):
+    """PD-M4.2 — "Lunch" is as readable as "Break", and the same size.
+
+    It was the theme's muted text at 11pt on the surface a lunch box is drawn
+    on, which in light mode left the word within a few values of its own
+    background: measured off a screenshot at (239, 234, 252) on (240, 231, 255).
+    Asserted against a break's word, because the complaint is that the three
+    kinds of padding do not read alike.
+    """
+    pane = ctk.CTkFrame(root)
+    pane.grid_columnconfigure(0, weight=1)
+
+    words = {}
+    for row, entry in enumerate(build_day_grid(_padding_blocks(), DayBounds()).slots):
+        rendered = build_slot_row(pane, entry, {}, row)
+        for label in _descendant_labels(rendered.frame):
+            shown = str(label.cget("text"))
+            if shown in ("Lunch", "Break"):
+                words.setdefault(shown, label)
+
+    assert set(words) == {"Lunch", "Break"}, (
+        f"both words have to be on screen to compare them: found {sorted(words)}"
+    )
+    assert words["Lunch"].cget("font").cget("size") == (
+        words["Break"].cget("font").cget("size")
+    ), (
+        f"Lunch is {words['Lunch'].cget('font').cget('size')}pt and Break is "
+        f"{words['Break'].cget('font').cget('size')}pt"
+    )
+    assert words["Lunch"].cget("text_color") == words["Break"].cget("text_color"), (
+        f"Lunch is drawn in {words['Lunch'].cget('text_color')} and Break in "
+        f"{words['Break'].cget('text_color')}"
+    )
 
 
 def test_pdm42_break_buffer_and_lunch_render_in_the_shared_colour(root):
@@ -2233,7 +2343,7 @@ def _item_block(label="Draft the proposal"):
 
 
 def _row_columns(widget, title):
-    """The grid column of each of a row's four parts, keyed by role.
+    """The grid column of each of a row's parts, keyed by role.
 
     Returned as a mapping so an item row and a task chip can be compared
     without either test restating the column numbers: a chip renumbered
@@ -2257,6 +2367,8 @@ def _row_columns(widget, title):
                 columns["title"] = column
             elif re.fullmatch(r"\d+m", shown):
                 columns["length"] = column
+            elif shown == PD_BLOCKED_TEXT:
+                columns["marker"] = column
     return columns
 
 
@@ -2926,31 +3038,43 @@ def test_pbm61_a_row_is_as_tall_as_the_boxes_beside_it(
     )
 
 
-def test_pbm61_a_row_too_short_for_its_text_keeps_its_text(root, manager):
-    """PB-M6.1 — the floor, and why the match with the day stops at it.
+def test_pbm61_a_row_is_the_days_own_height_at_every_usable_box_height(root, manager):
+    """PB-M6.1 — the row is its boxes, at 30 as well as at 86.
 
-    A box height of 30 -- the floor, and what the demo's settings file holds --
-    gives a half hour 34px in the day. A row matching that showed its title and
-    clipped the ``already blocked`` marker: the one scheduling fact the colour
-    cannot carry, gone with nothing to say it was there.
+    This asserted the opposite until the marker became a glyph: the row had a
+    second line for the ``already blocked`` words, the floor that line imposed
+    was 66px, and at any box height a user is likely to set that floor was two
+    boxes' worth. So a 30-minute row and a 60-minute row came out within a few
+    pixels of each other, and the left pane stopped showing how much of the day
+    an item would take -- which is the only reason the row is the height it is.
+    Changed deliberately, not because the test was wrong about the old code.
 
-    Asserted as the real relationship rather than against the constant alone:
-    below the floor the row is the taller of the two, at and above it the row is
-    exactly what the day gives.
+    Asserted as the relationship rather than against the constant: a one-box
+    row is one box, and a two-box row is two boxes and the gap between them, at
+    the lowest box height the setting allows and at a comfortable one.
     """
-    assert item_row_height(1, 30) == ITEM_ROW_MIN_HEIGHT_PX, (
-        "a one-box row at the box-height floor is not held at the row floor"
-    )
-    assert item_row_height(1, 30) > slot_row_height(1, 30), (
-        "the row is no taller than a 34px box, so its second line is still cut"
-    )
+    for box_height in (SLOT_MIN_HEIGHT_PX - 2, 86):
+        assert item_row_height(1, box_height) == slot_row_height(1, box_height), (
+            f"at a box height of {box_height} a 30-minute row is "
+            f"{item_row_height(1, box_height)}px and the box it will fill is "
+            f"{slot_row_height(1, box_height)}px"
+        )
+        assert item_row_height(2, box_height) == (
+            2 * slot_row_height(1, box_height) + SLOT_ROW_GAP_PX
+        ), (
+            f"at a box height of {box_height} an hour-long row is "
+            f"{item_row_height(2, box_height)}px, not the two boxes and the "
+            "gap between them that the day will give it"
+        )
 
-    tall_enough = 86
-    assert item_row_height(1, tall_enough) == slot_row_height(1, tall_enough), (
-        "at a usable box height the row is no longer the day's own height"
+    assert item_row_height(2, 86) > item_row_height(1, 86), (
+        "an hour-long row is no taller than a half-hour one -- the floor is "
+        "swallowing the difference again"
     )
-    assert item_row_height(3, tall_enough) > ITEM_ROW_MIN_HEIGHT_PX, (
-        "the floor is swallowing a multi-box row"
+    # The floor is still there, and still only for a box height no setting can
+    # produce: a row cannot be drawn shorter than its own line of text.
+    assert item_row_height(1, 1) == ITEM_ROW_MIN_HEIGHT_PX, (
+        "the row floor no longer protects the text at an absurd box height"
     )
 
 
@@ -3190,7 +3314,10 @@ def test_pdm11_the_item_row_uses_the_chips_column_order(root, manager):
         f"{_row_columns(chip, item.title)}"
     )
 
-    for column in range(4):
+    # Every column, counted off the shared table rather than written here:
+    # the marker column was added to both panes at once and a hard-coded 4
+    # would have stopped looking at the one column it changed.
+    for column in range(len(chip_column_minsizes())):
         mine = row.grid_columnconfigure(column)["minsize"]
         theirs = chip.grid_columnconfigure(column)["minsize"]
         assert mine == theirs, (
@@ -3267,31 +3394,141 @@ def test_pdm12_the_length_sits_beside_the_depth_bars(root, manager):
     )
 
 
-def test_pdm14_the_second_line_is_the_blocked_marker_alone(root, manager):
-    """PD-M1.5 - the depth word is gone from the second line; the marker is not.
+def _length_label(widget):
+    """The ``NNm`` label on a task's line, in either pane."""
+    for child in widget.winfo_children():
+        if isinstance(child, ctk.CTkLabel) and re.fullmatch(
+            r"\d+m", str(child.cget("text"))
+        ):
+            return child
+    raise AssertionError(
+        f"no length label on {widget}: "
+        f"{[str(c.cget('text')) for c in widget.winfo_children() if isinstance(c, ctk.CTkLabel)]}"
+    )
 
-    The depth is already on the row three ways over -- the shade it is drawn
-    on, the colour of its stripe, and the bar stack that exists to show it --
-    so the word was a fourth, on the one line a reader checks for something
-    the colours cannot say. "already blocked" is the one thing that line
-    carries, and only when it is true: an item not yet blocked has no second
-    line, which is what keeps the first line at the top of the row.
+
+def _right_pad(widget):
+    """The right-hand padx a widget was gridded with."""
+    pads = [int(n) for n in re.findall(r"\d+", str(widget.grid_info().get("padx", 0)))]
+    return pads[-1] if pads else 0
+
+
+def test_pd2_every_block_ends_short_of_its_right_edge(root, manager):
+    """The length does not run to the edge of the box or the row it is in.
+
+    Asked for as a 5-10px buffer on the right end of the blocks, all of them,
+    and so asserted in both panes from one constant: the length label is the
+    last thing on a task's line either side of the divider, and before this it
+    was gridded hard against the edge.
+
+    The inset is counted into the length's own column in
+    ``chip_column_minsizes``, which is what keeps PD-M2's width floor and the
+    two panes' alignment honest about it.
+    """
+    item = _scored_item(manager, "Draft the proposal")
+    block = _item_block()
+    block.item_id = item.id
+    _pane, slot_row = _one_slot_pane(
+        root, block, width=600, mapped=False, items_by_id={item.id: item}
+    )
+    chip = slot_row.block_widgets[0][1]
+    holder = ctk.CTkFrame(root)
+    holder.pack(fill="both", expand=True)
+    row = build_item_row(
+        holder, item, 0, already_blocked=False, work_block_minutes=30
+    )
+
+    assert CHIP_RIGHT_INSET_PX >= 5, (
+        f"the inset is {CHIP_RIGHT_INSET_PX}px, below the 5px asked for"
+    )
+    for name, widget in (("a day box", chip), ("an item row", row)):
+        assert _right_pad(_length_label(widget)) == CHIP_RIGHT_INSET_PX, (
+            f"the length on {name} is gridded {_right_pad(_length_label(widget))}px "
+            f"from the right edge, not {CHIP_RIGHT_INSET_PX}px"
+        )
+
+    assert chip_column_minsizes()[CHIP_LENGTH_COLUMN] == (
+        SLOT_LENGTH_WIDTH_PX + CHIP_RIGHT_INSET_PX
+    ), (
+        "the inset is not counted into the length's column, so the pane can be "
+        "dragged to a width that cuts it off"
+    )
+
+
+def test_pd3_the_length_is_body_size_in_both_panes(root, manager):
+    """``30m`` is read as often as the title beside it, so it is as big.
+
+    Asserted against the title's own font rather than a number: the two sit on
+    one line and the complaint was that one of them was smaller than the text
+    around it, which is a relationship, not a value.
+    """
+    item = _scored_item(manager, "Draft the proposal")
+    block = _item_block()
+    block.item_id = item.id
+    _pane, slot_row = _one_slot_pane(
+        root, block, width=600, mapped=False, items_by_id={item.id: item}
+    )
+    chip = slot_row.block_widgets[0][1]
+    holder = ctk.CTkFrame(root)
+    holder.pack(fill="both", expand=True)
+    row = build_item_row(
+        holder, item, 0, already_blocked=False, work_block_minutes=30
+    )
+
+    def title_label(widget):
+        for child in widget.winfo_children():
+            if isinstance(child, ctk.CTkLabel) and str(child.cget("text")) == item.title:
+                return child
+        raise AssertionError(f"no title label on {widget}")
+
+    for name, widget in (("a day box", chip), ("an item row", row)):
+        shown = _length_label(widget).cget("font")
+        beside = title_label(widget).cget("font")
+        assert shown.cget("size") == beside.cget("size"), (
+            f"on {name} the length is {shown.cget('size')}pt and the title "
+            f"beside it is {beside.cget('size')}pt"
+        )
+
+
+def test_pdm14_the_blocked_marker_is_a_glyph_left_of_the_depth_bars(root, manager):
+    """PD-M1.5 — one line: the marker is a glyph in its own column, not words.
+
+    It was "already blocked" on a second line until the row had to be the size
+    of the space the item will take. A second line needs 66px whatever the box
+    height is, which at any realistic setting is two boxes' worth, so every row
+    was drawn at that floor and a half-hour item looked the size of an hour.
+    Changed deliberately: the fact is still on the row, in a column left of the
+    depth bars, and the row is one line tall.
+
+    The depth word is still absent, and for its own reason -- the shade, the
+    stripe and the bar stack all say it already.
     """
     item = _item(manager, "Draft the proposal", depth="Medium")
     row = build_item_row(
         root, item, 0, already_blocked=True, work_block_minutes=30
     )
 
-    def second_line(widget):
-        return [
-            str(child.cget("text")) for child in widget.winfo_children()
-            if isinstance(child, ctk.CTkLabel)
-            and int(child.grid_info()["row"]) == 1
-        ]
+    def lines(widget):
+        return {
+            int(child.grid_info()["row"])
+            for child in widget.winfo_children()
+            if isinstance(child, ctk.CTkLabel) and child.grid_info()
+        }
 
-    assert second_line(row) == ["already blocked"], (
-        f"the second line reads {second_line(row)}"
+    assert lines(row) == {0}, (
+        f"the row writes text on more than its own line: rows {sorted(lines(row))}"
     )
+
+    columns = _row_columns(row, item.title)
+    assert columns.get("marker") == CHIP_MARKER_COLUMN, (
+        f"the blocked marker is in column {columns.get('marker')}, not the "
+        f"marker column {CHIP_MARKER_COLUMN}"
+    )
+    assert columns["marker"] < columns["bars"], (
+        f"the marker is in column {columns['marker']} and the depth bars in "
+        f"{columns['bars']} -- the marker goes to the left of the bars"
+    )
+
     texts = [
         str(child.cget("text")) for child in row.winfo_children()
         if isinstance(child, ctk.CTkLabel)
@@ -3299,13 +3536,15 @@ def test_pdm14_the_second_line_is_the_blocked_marker_alone(root, manager):
     assert not any(item.depth in shown for shown in texts), (
         f"the depth word {item.depth!r} is still written on the row: {texts}"
     )
+    assert not any("blocked" in shown.lower() for shown in texts), (
+        f"the words came back: {texts}"
+    )
 
     plain = build_item_row(
         root, item, 1, already_blocked=False, work_block_minutes=30
     )
-    assert second_line(plain) == [], (
-        f"an item that is not blocked has a second line anyway: "
-        f"{second_line(plain)}"
+    assert "marker" not in _row_columns(plain, item.title), (
+        "an item with no block today is marked as having one"
     )
 
 
