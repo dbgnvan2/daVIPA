@@ -52,6 +52,7 @@ from src.getmoredone.screens.plan_blocks import (
     CHIP_RIGHT_INSET_PX,
     ITEM_ROW_MIN_HEIGHT_PX,
     PD_BLOCKED_TEXT,
+    PD_UNSCHEDULED_TEXT,
     PD_CHECK_TEXT,
     PD_EARLIER_HINT,
     PD_EARLIER_TEXT,
@@ -660,6 +661,183 @@ def test_pdm7_a_work_day_asks_nothing(screen, manager, messageboxes):
 
     assert messageboxes == [], f"a work day asked anyway: {messageboxes}"
     assert len(manager.get_time_blocks(THURSDAY)) == 1
+
+
+def test_pdm8_the_header_has_a_clear_day_button(screen):
+    """PD-M8 — reachable from the screen, not only from a test.
+
+    A method no button calls is a feature nobody has (P25): the whole of this
+    ask was a button, and ``clear_day`` was written before it had one.
+    """
+    assert screen.btn_clear_day.cget("text") == "Clear Day", (
+        screen.btn_clear_day.cget("text")
+    )
+    assert screen.btn_clear_day.cget("command") == screen.clear_day, (
+        "the Clear Day button does not call clear_day"
+    )
+    assert screen.btn_clear_day.master is screen.btn_autoload.master, (
+        "Clear Day is not in the header beside AutoLoad"
+    )
+    assert (
+        screen.btn_clear_day.cget("fg_color")
+        != screen.btn_autoload.cget("fg_color")
+    ), (
+        "the destructive button is the same colour as the primary one, so a "
+        "misclick looks like the button the user meant"
+    )
+
+
+def test_pdm8_clear_day_removes_every_item_block(
+    root, manager, settings, monkeypatch
+):
+    """PD-M8 — the reverse of AutoLoad: the day's tasks come back off it.
+
+    The count is in the question, so the answer is given against the real day
+    rather than against the word "all".
+    """
+    asked = []
+
+    def say_yes(*args, **kwargs):
+        asked.append((args[0], args[1]))
+        return True
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", say_yes)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    _add_block(manager, 30, "First", 0, block_type=BlockType.ITEM)
+    _add_block(manager, 30, "Second", 1, block_type=BlockType.ITEM)
+
+    panel.clear_day()
+
+    assert len(asked) == 1, f"Clear Day asked {len(asked)} times, not once"
+    title, message = asked[0]
+    assert "clear day" in title.lower(), title
+    assert "2 scheduled items" in message, message
+    assert THURSDAY in message, message
+    assert "cannot be undone" in message, message
+    assert manager.get_time_blocks(THURSDAY) == [], (
+        "the day still holds blocks after Clear Day"
+    )
+    assert "removed 2 of 2" in panel.status_label.cget("text"), (
+        panel.status_label.cget("text")
+    )
+
+
+def test_pdm8_clear_day_leaves_breaks_and_buffers(
+    root, manager, settings, monkeypatch
+):
+    """PD-M8 — it is the reverse of AutoLoad, and AutoLoad writes no breaks.
+
+    A break or a buffer was put there by hand, one gesture each, so taking
+    them out would be a deletion nobody asked for. The question says how many
+    are staying, because a button called Clear Day that leaves two blocks
+    behind has to account for them where the user is looking.
+    """
+    asked = []
+
+    def say_yes(*args, **kwargs):
+        asked.append((args[0], args[1]))
+        return True
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", say_yes)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    _add_block(manager, 30, "Draft the proposal", 0, block_type=BlockType.ITEM)
+    _add_block(manager, 30, "Break", 1, block_type=BlockType.BREAK)
+    _add_block(manager, 30, "Buffer", 2, block_type=BlockType.BUFFER)
+
+    panel.clear_day()
+
+    left = [(b.label, b.block_type) for b in manager.get_time_blocks(THURSDAY)]
+    assert left == [("Break", BlockType.BREAK), ("Buffer", BlockType.BUFFER)], (
+        f"Clear Day took the wrong blocks: {left} left"
+    )
+    assert "2 break and buffer blocks stay" in asked[0][1], asked[0][1]
+    said = panel.status_label.cget("text")
+    assert "removed 1 of 3" in said and "2 break and buffer" in said, said
+
+
+def test_pdm8_answering_no_removes_nothing(
+    root, manager, settings, messageboxes
+):
+    """PD-M8 — No leaves the day alone and says so.
+
+    ``askyesno`` answers False under the suite's own stub, so this is the
+    declining path with nothing patched.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    _add_block(manager, 30, "Draft the proposal", 0, block_type=BlockType.ITEM)
+
+    panel.clear_day()
+
+    assert [name for name, _, _ in messageboxes] == ["askyesno"], (
+        f"Clear Day did not ask before deleting: {messageboxes}"
+    )
+    assert len(manager.get_time_blocks(THURSDAY)) == 1, (
+        "the block was deleted though the question was answered No"
+    )
+    assert "nothing removed" in panel.status_label.cget("text"), (
+        panel.status_label.cget("text")
+    )
+
+
+def test_pdm8_a_day_with_no_items_says_so_and_asks_nothing(
+    root, manager, settings, messageboxes
+):
+    """PD-M8 — nothing to remove is not a question, it is an answer.
+
+    A break on the day and no items: the day is not empty, and the sentence
+    has to be about items rather than about blocks.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    _add_block(manager, 30, "Break", 0, block_type=BlockType.BREAK)
+
+    panel.clear_day()
+
+    assert messageboxes == [], f"it asked about a day with no items: {messageboxes}"
+    assert len(manager.get_time_blocks(THURSDAY)) == 1, "the break was removed"
+    said = panel.status_label.cget("text")
+    assert "nothing to remove" in said and "no items" in said, said
+
+
+def test_pdm8_clear_day_asks_nothing_about_the_weekday_list(
+    root, manager, settings, monkeypatch
+):
+    """PD-M8 — taking work off a day is not planning work onto it.
+
+    A Saturday that was filled -- by a Yes to PD-M7, or before the week was
+    narrowed -- has to be clearable without being asked about the week again.
+    So the only question Clear Day asks on a Saturday is its own.
+    """
+    asked = []
+
+    def say_yes(*args, **kwargs):
+        asked.append((args[0], args[1]))
+        return True
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", say_yes)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    _add_block(
+        manager, 30, "weekend work", 0,
+        block_date=SATURDAY, block_type=BlockType.ITEM,
+    )
+
+    panel.clear_day()
+
+    assert [title for title, _ in asked] == ["Clear Day"], (
+        f"Clear Day on a Saturday asked: {[t for t, _ in asked]}"
+    )
+    assert manager.get_time_blocks(SATURDAY) == [], (
+        "the Saturday was not cleared"
+    )
 
 
 def test_the_day_summary_flags_a_day_that_takes_no_blocks(root, manager, settings):
@@ -2465,7 +2643,7 @@ def _row_columns(widget, title):
                 columns["title"] = column
             elif re.fullmatch(r"\d+m", shown):
                 columns["length"] = column
-            elif shown == PD_BLOCKED_TEXT:
+            elif shown in (PD_BLOCKED_TEXT, PD_UNSCHEDULED_TEXT):
                 columns["marker"] = column
     return columns
 
@@ -3403,13 +3581,22 @@ def test_pdm11_the_item_row_uses_the_chips_column_order(root, manager):
     )
 
     columns = _row_columns(row, item.title)
-    assert set(columns) == {"stripe", "title", "bars", "length"}, (
+    # Changed with PD-M9: every row now carries a mark, so an unblocked row
+    # has a marker too. The behaviour changed intentionally -- the column used
+    # to be empty unless the item was blocked -- and the set is asserted
+    # whole rather than loosened, so a row that lost a part still fails here.
+    assert set(columns) == {"stripe", "title", "marker", "bars", "length"}, (
         f"the row is missing a part: found {sorted(columns)} -- an incomplete "
         "row would make the comparison below vacuous"
     )
-    assert columns == _row_columns(chip, item.title), (
-        f"the item row puts its parts in {columns} and a box chip in "
-        f"{_row_columns(chip, item.title)}"
+    # The chip's marker column is empty by design: the mark is about the item
+    # list, and a box the task is already in has nothing to say about whether
+    # it is scheduled. So the comparison is over the parts both panes draw.
+    chip_columns = _row_columns(chip, item.title)
+    shared = {role: column for role, column in columns.items() if role != "marker"}
+    assert shared == chip_columns, (
+        f"the item row puts its parts in {shared} and a box chip in "
+        f"{chip_columns}"
     )
 
     # Every column, counted off the shared table rather than written here:
@@ -3492,14 +3679,23 @@ def test_pdm12_the_length_sits_beside_the_depth_bars(root, manager):
     )
 
 
-def test_pdm16_the_depth_bars_line_up_with_the_bottom_of_the_title(root, manager):
-    """PD-M1.6 — the stack sits on the text's line, not above it.
+def test_pdm16_the_depth_bars_are_justified_like_the_text_on_the_line(
+    root, manager
+):
+    """PD-M1.6 — the stack takes the title's own vertical justification.
 
-    The stack is 13px and a line of text is taller, so a stack gridded
-    ``sticky="n"`` floated above the title on every row in the pane. Bottom of
-    the stack level with the bottom of the title is what lines them up, and the
-    gap inside the stack had to come off the last bar for the two to meet
-    exactly.
+    Three versions of this, each reported from the screen. ``sticky="n"``
+    floated the stack above the title, because the stack is 13px and a line of
+    text is taller. ``sticky="s"`` sat it under the title's baseline. Neither
+    is how the text beside it is placed: the label is centred on the line, so
+    the stack is centred too -- "justify vertically like TEXT on the line".
+
+    Two claims, each with its own assertion, because they fail separately:
+    the stack is centred in its cell rather than pinned to an edge, and the
+    bars fill the stack with no slack at either end. The second is why the
+    gap comes off the last bar -- a trailing gap inside a centred frame puts
+    every bar 1px high, which is exactly the kind of off-by-one that reads as
+    "still not lined up".
     """
     item = _item(manager, "Draft the proposal", depth="Deep")
     row = build_item_row(
@@ -3516,21 +3712,38 @@ def test_pdm16_the_depth_bars_line_up_with_the_bottom_of_the_title(root, manager
         if isinstance(child, ctk.CTkLabel) and child.cget("text") == item.title
     )
 
-    # The bottom of the lowest bar, not of the frame around it. The frame
-    # bottom-aligns whatever is inside it, so measuring the frame cannot see a
-    # gap under the last bar -- which is the 2px the stack used to carry, and
-    # the whole of what is left to line up once the sticky is right.
-    lowest = max(
-        (child for child in bars.winfo_children()
-         if isinstance(child, ctk.CTkFrame)),
-        key=lambda bar: bar.winfo_y(),
+    sticky = str(bars.grid_info()["sticky"])
+    assert "n" not in sticky and "s" not in sticky, (
+        f"the stack is gridded sticky={sticky!r}, which pins it to an edge of "
+        "its cell rather than centring it the way the title is placed"
     )
-    bars_bottom = bars.winfo_y() + lowest.winfo_y() + lowest.winfo_reqheight()
-    title_bottom = title.winfo_y() + title.winfo_reqheight()
-    assert bars_bottom == title_bottom, (
-        f"the lowest bar ends at y={bars_bottom} and the title at "
-        f"y={title_bottom} -- {abs(title_bottom - bars_bottom)}px apart, so "
-        "they are not on the same line"
+
+    # Measured on the bars, not on the frame around them: a frame centres
+    # whatever is inside it, so a frame-level measurement cannot see a gap
+    # under the last bar.
+    stack_bars = [
+        child for child in bars.winfo_children()
+        if isinstance(child, ctk.CTkFrame)
+    ]
+    assert len(stack_bars) == MAX_DEPTH_BARS, (
+        f"the stack holds {len(stack_bars)} bars, not {MAX_DEPTH_BARS}"
+    )
+    above = min(bar.winfo_y() for bar in stack_bars)
+    below = bars.winfo_reqheight() - max(
+        bar.winfo_y() + bar.winfo_reqheight() for bar in stack_bars
+    )
+    assert (above, below) == (0, 0), (
+        f"the bars sit {above}px from the top of the stack and {below}px from "
+        "its bottom, so centring the stack does not centre the bars"
+    )
+
+    # What the two claims add up to, with the 1px Tk's own integer centring
+    # can introduce on a cell of odd height.
+    bars_middle = 2 * bars.winfo_y() + bars.winfo_reqheight()
+    title_middle = 2 * title.winfo_y() + title.winfo_reqheight()
+    assert abs(bars_middle - title_middle) <= 1, (
+        f"the stack's middle is at {bars_middle / 2}px and the title's at "
+        f"{title_middle / 2}px -- they are not on the same line"
     )
 
 
@@ -3683,9 +3896,71 @@ def test_pdm14_the_blocked_marker_is_a_glyph_left_of_the_depth_bars(root, manage
     plain = build_item_row(
         root, item, 1, already_blocked=False, work_block_minutes=30
     )
-    assert "marker" not in _row_columns(plain, item.title), (
-        "an item with no block today is marked as having one"
+    # Changed with PD-M9: the column now says something either way, so the
+    # claim is that it says the right one. The original assertion was that an
+    # unblocked row had no marker at all, and it would have gone on passing
+    # for the wrong reason -- ``_row_columns`` knew only the blocked glyph, so
+    # a row marked with the new one read as unmarked.
+    plain_marks = [
+        str(child.cget("text")) for child in plain.winfo_children()
+        if isinstance(child, ctk.CTkLabel)
+        and str(child.cget("text")) in (PD_BLOCKED_TEXT, PD_UNSCHEDULED_TEXT)
+    ]
+    assert plain_marks == [PD_UNSCHEDULED_TEXT], (
+        f"an item with no block today is marked {plain_marks}, not as "
+        f"unscheduled"
     )
+
+
+def test_pdm9_a_scheduled_item_is_checked_and_an_unscheduled_one_questioned(
+    root, manager
+):
+    """PD-M9 — "a schedule item gets a GREEN Check Mark, an unscheduled item
+    gets a RED ?".
+
+    One column, two answers, drawn either way: before this the column said
+    something about a blocked item and nothing at all about the rest, so an
+    unscheduled item and an unmarked row looked the same.
+    """
+    item = _item(manager, "Draft the proposal", depth="Medium")
+
+    scheduled = build_item_row(
+        root, item, 0, already_blocked=True, work_block_minutes=30
+    )
+    unscheduled = build_item_row(
+        root, item, 1, already_blocked=False, work_block_minutes=30
+    )
+
+    def marker(row):
+        found = [
+            child for child in row.winfo_children()
+            if isinstance(child, ctk.CTkLabel)
+            and str(child.cget("text")) in (PD_BLOCKED_TEXT, PD_UNSCHEDULED_TEXT)
+        ]
+        assert len(found) == 1, (
+            f"the row draws {len(found)} marks, not one: "
+            f"{[str(c.cget('text')) for c in found]}"
+        )
+        return found[0]
+
+    palette = semantic_colors()
+    check = marker(scheduled)
+    assert str(check.cget("text")) == PD_BLOCKED_TEXT
+    assert check.cget("text_color") == palette["scheduled_mark"], (
+        f"the check is {check.cget('text_color')}, not the scheduled mark "
+        f"{palette['scheduled_mark']}"
+    )
+    question = marker(unscheduled)
+    assert str(question.cget("text")) == PD_UNSCHEDULED_TEXT
+    assert question.cget("text_color") == palette["unscheduled_mark"], (
+        f"the question mark is {question.cget('text_color')}, not the "
+        f"unscheduled mark {palette['unscheduled_mark']}"
+    )
+    assert (
+        palette["scheduled_mark"] != palette["unscheduled_mark"]
+    ), "the two marks are the same colour, so only the glyph tells them apart"
+    assert int(check.grid_info()["column"]) == CHIP_MARKER_COLUMN
+    assert int(question.grid_info()["column"]) == CHIP_MARKER_COLUMN
 
 
 def test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it(

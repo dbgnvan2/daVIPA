@@ -347,6 +347,42 @@ def test_pbm41_pick_text_color_is_not_what_makes_a_fill_legible(restore_appearan
     )
 
 
+def test_pdm9_the_two_marks_are_legible_on_every_fill(restore_appearance):
+    """PD-M9 — the green check and the red question mark are text on a fill.
+
+    They sit on a priority fill, which is a pale tint in the light theme and a
+    deep one in the dark theme, so one pair of colours cannot serve both: the
+    dark green `success_strong` carries measures 1.63:1 against the dark
+    theme's green fill, which is a mark nobody can see. Held to the 4.5:1 text
+    bar, not the 3:1 non-text one -- they are glyphs, and the whole of what
+    each one says is which glyph it is.
+    """
+    failures = []
+    for mode in THEMES:
+        ctk.set_appearance_mode(mode)
+        palette = semantic_colors()
+        marks = {
+            "scheduled": palette["scheduled_mark"],
+            "unscheduled": palette["unscheduled_mark"],
+        }
+        assert marks["scheduled"] != marks["unscheduled"], (
+            f"{mode}: the two marks are the same colour, so only the glyph "
+            "tells them apart"
+        )
+        for band, fill in priority_fill_colors().items():
+            for role, mark in marks.items():
+                ratio = contrast_ratio(_as_hex(mark), _as_hex(fill))
+                if ratio < MIN_CONTRAST:
+                    failures.append(
+                        f"{mode}/{band}: {role} {mark} on {fill} is {ratio:.2f}"
+                    )
+
+    assert not failures, (
+        f"marks closer than {MIN_CONTRAST}:1 to the fill behind them: "
+        + "; ".join(failures)
+    )
+
+
 def test_pbm42_a_stripe_is_visible_on_its_own_fill(restore_appearance):
     """PB-M4.2 — the bar still reads once the task behind it is shaded.
 
