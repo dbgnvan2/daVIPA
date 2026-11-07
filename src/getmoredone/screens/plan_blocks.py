@@ -249,7 +249,11 @@ class DepthBarStack(ctk.CTkFrame):
                 corner_radius=1,
                 fg_color=colors["filled"] if is_filled else colors["empty"],
             )
-            bar.grid(row=index, column=0, pady=(0, self.BAR_GAP_PX))
+            # The gap goes between the bars and not under the last one: the
+            # stack is bottom-aligned on an item row, and a trailing gap put
+            # the bottom bar 2px above the text it is meant to line up with.
+            gap = self.BAR_GAP_PX if index < MAX_DEPTH_BARS - 1 else 0
+            bar.grid(row=index, column=0, pady=(0, gap))
             bar.grid_propagate(False)
 
 
@@ -303,6 +307,7 @@ def build_item_row(
     Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m1
     Tests:   tests/test_plan_screen.py::test_pdm11_the_item_row_uses_the_chips_column_order
              tests/test_plan_screen.py::test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it
+             tests/test_plan_screen.py::test_pdm16_the_depth_bars_line_up_with_the_bottom_of_the_title
              tests/test_plan_screen.py::test_pbm61_every_line_of_a_row_is_drawn_inside_it
 
     Returns the frame, so the caller can bind the drag handlers to it and to
@@ -398,8 +403,11 @@ def build_item_row(
         ).grid(row=0, column=CHIP_MARKER_COLUMN, sticky="nw", pady=(5, 0))
 
     bars = DepthBarStack(frame, item.depth)
+    # Bottom of the stack level with the bottom of the title, not the top. The
+    # stack is shorter than a line of text, so "n" left it floating above the
+    # text on every row in the pane.
     bars.grid(
-        row=0, column=CHIP_BARS_COLUMN, padx=(4, 6), pady=(5, 0), sticky="n"
+        row=0, column=CHIP_BARS_COLUMN, padx=(4, 6), pady=(5, 0), sticky="s"
     )
 
     # The length, where a box writes it: the right-hand end of the task's own

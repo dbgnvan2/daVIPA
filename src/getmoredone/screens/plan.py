@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 import tkinter as tk
+from tkinter import messagebox
 from datetime import date
 from typing import TYPE_CHECKING, Dict, List, Optional
 
@@ -96,8 +97,20 @@ ITEMS_TEXT_INSET_PX = 56
 
 #: Width (px) of the grip between the two panes. Narrow enough to read as a
 #: divider and wide enough to press: it is the whole of column 1, so what is
-#: here is what the pointer has to land on.
-PLAN_DIVIDER_WIDTH_PX = 6
+#: here is what the pointer has to land on. The first version was 6px with a
+#: 2px pad on each side, which drew a 10px gap of which only the middle 6
+#: could be grabbed.
+PLAN_DIVIDER_WIDTH_PX = 15
+
+#: Padding (px) between a pane and the window's edge. The panes have none
+#: between themselves and the grip, so the gap the user aims at is the grip.
+PLAN_PANE_EDGE_PAD_PX = 10
+
+#: Width (px) of the screen that is not either pane: the grip between them and
+#: the padding at each outside edge. Subtracted before the two floors are
+#: measured against the window, because a window is only as wide as the panes
+#: plus this.
+PLAN_PANE_CHROME_PX = PLAN_DIVIDER_WIDTH_PX + 2 * PLAN_PANE_EDGE_PAD_PX
 
 #: Height (px) of the "Outside the day" group. Fixed and scrollable rather
 #: than as tall as its contents: the group shares the items column with the
@@ -204,6 +217,12 @@ class PlanScreen(ctk.CTkFrame):
         # the guard: the date is still recorded, but nothing is drawn until
         # construction has finished and refresh() runs for the first time.
         self._ready = False
+
+        #: Dates the user has said to schedule on anyway, though the
+        #: weekday list calls them non-working. The question is about the day,
+        #: so it is asked once per date rather than once per drop -- five
+        #: items onto a Saturday is one decision, not five.
+        self._work_anyway: set = set()
 
         # Drag state. One drag at a time, and its kind decides what a release
         # means: an item drop creates a block, a block drop reorders the day.
@@ -435,7 +454,10 @@ class PlanScreen(ctk.CTkFrame):
 
     def create_items_pane(self):
         frame = ctk.CTkFrame(self)
-        frame.grid(row=1, column=0, sticky="nsew", padx=(10, 2), pady=10)
+        frame.grid(
+            row=1, column=0, sticky="nsew",
+            padx=(PLAN_PANE_EDGE_PAD_PX, 0), pady=10,
+        )
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_rowconfigure(2, weight=1)
 
@@ -524,12 +546,22 @@ class PlanScreen(ctk.CTkFrame):
         out ``winfo_width`` is 1, and clamping to that would pin the column to
         its floor for a drag that has not happened yet -- so with no width to
         measure there is no right-hand end, only the floor.
+
+        ``PLAN_PANE_CHROME_PX`` comes off the window first. The window holds
+        the two panes, the grip between them and the padding at each edge, and
+        the first version compared the floors against the whole of it -- so the
+        day pane could be left 26px under its own floor, which is the clipping
+        the floors exist to prevent, and widening the grip to 15px would have
+        made it 35.
+
+        Tests:   tests/test_plan_screen.py::test_pdm29_the_clamp_leaves_room_for_the_grip_and_the_edges
         """
         floor = self.items_width_floor()
         width = max(floor, int(width))
         room = self.winfo_width()
         if room > 1:
-            width = min(width, max(floor, room - self.day_width_floor()))
+            for_panes = room - PLAN_PANE_CHROME_PX
+            width = min(width, max(floor, for_panes - self.day_width_floor()))
         return width
 
     def apply_items_width(self, width: int) -> int:
@@ -578,8 +610,10 @@ class PlanScreen(ctk.CTkFrame):
                  should slide right and left to resize the two areas."
         Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m2
         Tests:   tests/test_plan_screen.py::test_pdm21_dragging_the_grip_changes_the_items_column
+                 tests/test_plan_screen.py::test_pdm28_the_grip_is_the_whole_gap_between_the_panes
 
-        Its own 6px column rather than a border on either pane: a border
+        Its own ``PLAN_DIVIDER_WIDTH_PX`` column rather than a border on
+        either pane: a border
         belongs to the frame that draws it and cannot be pressed without
         pressing the pane, and a pane here is a drag surface already.
 
@@ -670,7 +704,10 @@ class PlanScreen(ctk.CTkFrame):
 
     def create_day_pane(self):
         frame = ctk.CTkFrame(self)
-        frame.grid(row=1, column=2, sticky="nsew", padx=(2, 10), pady=10)
+        frame.grid(
+            row=1, column=2, sticky="nsew",
+            padx=(0, PLAN_PANE_EDGE_PAD_PX), pady=10,
+        )
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_rowconfigure(2, weight=1)
 
@@ -1288,20 +1325,56 @@ class PlanScreen(ctk.CTkFrame):
         return None
 
     def _require_block_day(self) -> bool:
-        """Refuse to write a block onto a day the user does not work.
+        """Ask before writing a block onto a day the user does not work.
 
-        Refused with the reason, not silently: a drop that does nothing and
-        says nothing is indistinguishable from a drag that missed.
+        Purpose: PD-M7 -- a day outside the working week is a warning, not a
+                 wall.
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m7
+        Tests:   tests/test_plan_screen.py::test_pdm7_a_non_work_day_asks_before_scheduling
+                 tests/test_plan_screen.py::test_pdm7_answering_no_writes_nothing
+                 tests/test_plan_screen.py::test_pdm7_a_work_day_asks_nothing
+
+        Asked rather than refused. The weekday list describes a normal week;
+        it is not a lock on the calendar, and a Saturday someone has decided
+        to work is not a mistake to be corrected. The screen opens on today,
+        so on a weekend every write path returned before doing anything --
+        AutoLoad before it read a single item, a dropped item before it wrote
+        one -- and four separate gestures doing nothing read as the screen
+        being broken rather than as the day being closed.
+
+        Once per date, not once per drop: the question is about the day, so
+        five items onto the same Saturday is one decision. The answer is held
+        on the screen rather than written anywhere, so it lasts as long as the
+        screen does and no longer -- it is permission for this sitting, not a
+        change to the working week, which is what Day Settings is for.
+
+        Declining leaves the same sentence the refusal used to, which is why
+        the weekday list is in it: the answer to "why did nothing happen" is
+        the days the week is set to.
         """
         if is_block_day(self.selected_date, self.bounds):
             return True
+        if self.selected_date in self._work_anyway:
+            return True
+
         allowed = [
             name for name, on in zip(weekday_names(), self.bounds.block_weekdays) if on
         ]
+        week = ", ".join(allowed) if allowed else "no days"
+        if messagebox.askyesno(
+            "Not a work day",
+            f"{self.selected_date} is not a regular work day.\n\n"
+            f"Day Settings allows {week}.\n\n"
+            "Schedule anyway?",
+            icon="warning",
+            parent=self,
+        ):
+            self._work_anyway.add(self.selected_date)
+            return True
+
         self.set_status(
             f"{self.selected_date} is not a block day (Day Settings allows "
-            + (", ".join(allowed) if allowed else "no days")
-            + ")",
+            f"{week})",
             "warning",
         )
         return False
