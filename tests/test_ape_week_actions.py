@@ -11,6 +11,7 @@ the mapped-window count that tests/test_ci_contract.py pins at 22
 """
 
 import ast
+import re
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -239,52 +240,94 @@ def test_awam22_week_rows_are_never_children(tmp_path):
 
 
 def test_awam23_one_home_for_the_link_predicate():
-    """AWA-M2.3 — the union predicate is written in exactly one place.
+    """AWA-M2.3 - the union predicate is written in exactly one place.
 
-    Counted over function bodies whose string constants name *both*
-    columns. Exact lists, not floors: a second copy in vps_manager fails,
-    and so does any screen writing the predicate itself instead of calling
-    the helper.
+    Scanned over **all** of ``src/getmoredone``, not just ``screens/`` and
+    ``vps_manager.py``. The narrower scan this replaces asserted a claim that
+    was already false: ``weekly_tactic_maintenance._child_count`` held a
+    second copy, and the two had drifted - that one lacked the
+    ``item_type != 'week'`` exclusion, so the dedupe's "most children wins"
+    chose a survivor on a different definition of "child" than the panel
+    renders. Nothing went red, because the file was out of scope.
 
-    Scope note: the spec's §3 table says "AST walk over screens/: exactly
-    one", written before §4 settled the helper into vps_manager. With the
-    helper there, screens/ must hold **none** and vps_manager exactly one —
-    which is what the criterion means, and what is asserted here.
+    Matched on the predicate's *shape* rather than on the two column names
+    appearing together: ``db_manager``'s INSERT column list and UPDATE SET
+    list both name both columns, and neither is an expression of this
+    predicate. ``parent_id = ?`` reached from an ``OR`` is; an INSERT list has
+    no ``= ?`` and a SET list has no preceding ``OR``.
+
+    Exact count per file, not a floor: a reintroduced copy anywhere under
+    ``src/`` fails here.
     """
-    def bodies_naming_both(path):
-        """Functions holding one string that names both columns — a query.
+    shape = re.compile(r"\bOR\b[\s\S]*?\bparent_id\s*=\s*\?")
 
-        A docstring that discusses the two columns in prose is not an
-        expression of the predicate, so the function's own docstring is
-        excluded and both names must appear in the *same* string constant,
-        the way a WHERE clause has them.
-        """
-        tree = ast.parse(path.read_text())
-        hits = []
+    def docstrings(tree):
+        out = set()
         for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if isinstance(node, (ast.Module, ast.FunctionDef,
+                                 ast.AsyncFunctionDef, ast.ClassDef)):
+                text = ast.get_docstring(node, clean=False)
+                if text is not None:
+                    out.add(text)
+        return out
+
+    counts = {}
+    for path in sorted(SRC.rglob("*.py")):
+        tree = ast.parse(path.read_text())
+        docs = docstrings(tree)
+        hits = 0
+        for sub in ast.walk(tree):
+            if not (isinstance(sub, ast.Constant)
+                    and isinstance(sub.value, str)):
                 continue
-            docstring = ast.get_docstring(node, clean=False)
-            for sub in ast.walk(node):
-                if not (isinstance(sub, ast.Constant)
-                        and isinstance(sub.value, str)):
-                    continue
-                if sub.value == docstring:
-                    continue
-                if "weekly_tactic_id" in sub.value and "parent_id" in sub.value:
-                    hits.append(node.name)
-                    break
-        return hits
+            if sub.value in docs:
+                continue
+            if "weekly_tactic_id" in sub.value and shape.search(sub.value):
+                hits += 1
+        if hits:
+            counts[str(path.relative_to(SRC))] = hits
 
-    screen_hits = []
-    for path in sorted((SRC / "screens").glob("*.py")):
-        screen_hits.extend(f"{path.name}::{name}"
-                           for name in bodies_naming_both(path))
-    assert screen_hits == []
+    assert counts == {"weekly_tactic.py": 1}
 
-    assert bodies_naming_both(SRC / "vps_manager.py") == [
-        "get_action_items_for_weekly_tactic"
-    ]
+    # And it is the constant both callers use, not a third thing.
+    from src.getmoredone import vps_manager, weekly_tactic_maintenance
+    from src.getmoredone.weekly_tactic import LINK_PREDICATE_SQL
+    assert vps_manager.LINK_PREDICATE_SQL is LINK_PREDICATE_SQL
+    assert weekly_tactic_maintenance.LINK_PREDICATE_SQL is LINK_PREDICATE_SQL
+
+
+def test_awam23_an_item_is_listed_under_one_tactic_only(tmp_path):
+    """AWA-M2.3 - both columns set means one tactic, not both.
+
+    Reachable through supported UI: add an Action Item from APE Week
+    Assignment, whose button writes ``parent_id`` (AWA-A1), then pick a
+    different Weekly Tactic in the editor, which sets ``weekly_tactic_id``
+    and by design leaves ``parent_id`` alone (``item_editor.py``). A plain
+    ``weekly_tactic_id = ? OR parent_id = ?`` listed that one item under
+    *both* tactics - two panels each claiming it, and a dedupe counting it
+    twice. ``weekly_tactic_id`` wins when set: the tactic last chosen.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        first, ape_id = _tactic_and_ape(vps, start="2026-11-09", title="W1")
+        second = make_week_item(vps, ape_id, start="2026-11-16",
+                                due="2026-11-16", title="W2")
+        child = make_daily_item(
+            vps, title="Moved by hand", start="2026-11-16", due="2026-11-16",
+            weekly_tactic_id=second.id, parent_id=first.id, refile=False)
+
+        row = vps.db.conn.execute(
+            "SELECT weekly_tactic_id, parent_id FROM action_items WHERE id = ?",
+            (child.id,)).fetchone()
+        assert row["weekly_tactic_id"] == second.id
+        assert row["parent_id"] == first.id
+
+        under_first = vps.get_action_items_for_weekly_tactic(first.id)
+        under_second = vps.get_action_items_for_weekly_tactic(second.id)
+        assert [item.id for item in under_second] == [child.id]
+        assert [item.id for item in under_first] == []
+    finally:
+        vps.close()
 
 
 def test_awam24_ordinary_subtasks_are_not_tactic_children(tmp_path):
@@ -534,10 +577,17 @@ def test_awam53_row_behaviours_are_inherited_not_copied():
         assert getattr(WeekTacticActionsPanel, name) is \
             getattr(TodayScreen, name)
 
-    # The three seams, and only those three, are overridden.
-    assert set(vars(WeekTacticActionsPanel)) & {
-        "EMPTY_TEXT", "COLUMN_PREFIX", "_build_toolbar", "get_todays_items"
-    } == {"EMPTY_TEXT", "COLUMN_PREFIX", "_build_toolbar", "get_todays_items"}
+    # The four seams, and only those four, override anything of Today's.
+    # A set *intersection* only proved those four were present; it could not
+    # see a fifth override appear, which is the drift this criterion is about.
+    # The panel's own new names (set_tactic, add_action_item, ...) shadow
+    # nothing on Today, so they are not overrides and are not listed.
+    overridden = sorted(name for name in vars(WeekTacticActionsPanel)
+                        if not name.startswith("__")
+                        and hasattr(TodayScreen, name))
+    assert overridden == [
+        "COLUMN_PREFIX", "EMPTY_TEXT", "_build_toolbar", "get_todays_items"
+    ]
 
 
 def test_awam55_column_prefix_is_its_own(tmp_path):
@@ -709,7 +759,11 @@ def test_awam43_no_tactic_is_silently_dropped(tmp_path):
             assert recorded["ape_only"] is False
             listed = {row["id"] for row in screen.tactic_rows}
             assert listed == {kept.id, orphan.id}
-            assert "2" in screen.status_label.cget("text")
+            # Not `"2" in ...`: the text ends in an ISO date in 2026, so
+            # every value it can take contains a "2" and the assertion held
+            # for a count of 0, of 1, or for no count at all.
+            assert screen.status_label.cget("text").startswith(
+                "2 Weekly Tactic(s) for week of ")
             assert screen.left_title_label.cget("text") == "Weekly Tactics (2)"
         finally:
             root.destroy()
@@ -931,6 +985,97 @@ def test_awam33_screen_constructs_withdrawn(tmp_path):
             screen.destroy()
             assert not screen.winfo_exists()
             assert not panel.winfo_exists()
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam54c_add_action_item_reports_what_the_refile_did(tmp_path):
+    """AWA-M5.4 - the create's cascade report reaches the user.
+
+    ``create_action_item`` re-files into the Weekly Tactic by default, which
+    can refuse a week or build cascade rows, and records what it did on the
+    manager. Thirteen other screen modules report that with
+    ``notify_weekly_tactic_changes``; this one dropped it, so an item saved
+    un-re-filed looked identical to one that was filed. The notice has to be
+    raised *before* ``edit_item``, which opens a modal: one issued after it
+    stacks behind the editor.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        tactic, _ = _tactic_and_ape(vps, start="2026-11-09")
+        root, panel = _panel(tmp_path, vps, tactic.id)
+        try:
+            from src.getmoredone.screens import week_actions as module
+            order = []
+            panel._prompt_for_title = lambda: "Draft the outline"
+            panel.edit_item = lambda item_id, **kw: order.append("edit")
+            original = module.notify_weekly_tactic_changes
+            module.notify_weekly_tactic_changes = \
+                lambda db, parent=None: order.append("notify")
+            try:
+                panel.add_action_item()
+            finally:
+                module.notify_weekly_tactic_changes = original
+
+            assert order == ["notify", "edit"]
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_awam41c_week_start_follows_the_first_day_setting(tmp_path):
+    """AWA-M4.1 - the week comes from the setting, not from a hardcoded Monday.
+
+    Every other test here builds the screen with ``first_day=0``, and the
+    oracle for the default week calls the same production helper the screen
+    does, so ``_first_day_of_week`` could have ignored
+    ``app.settings.first_day_of_week`` entirely and stayed green. The oracle
+    here is independent of that helper: a Monday-start week begins on a
+    Monday, a Sunday-start week on a Sunday, and for any date the two differ.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        starts = {}
+        for first_day in (0, 6):
+            root, screen = _week_screen(tmp_path, vps, first_day=first_day)
+            try:
+                starts[first_day] = screen.week_combo.cget("values")[0]
+            finally:
+                root.destroy()
+
+        assert date.fromisoformat(starts[0]).weekday() == 0
+        assert date.fromisoformat(starts[6]).weekday() == 6
+        assert starts[0] != starts[6]
+    finally:
+        vps.close()
+
+
+def test_awam41d_an_older_week_stays_in_the_picker(tmp_path):
+    """AWA-M4.1 - a tactic filed against a past week is still reachable (P2).
+
+    The picker offers four generated weeks around today; ``week_options``
+    adds the weeks that tactics actually sit in, and its docstring makes that
+    P2 claim. No test exercised it on this screen - both tactics in
+    ``test_awam42`` fall inside the generated four - so
+    ``_existing_week_starts`` could return nothing and every historical week
+    would vanish from the picker with nothing red.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        ape_id = seed_ape(vps)
+        old = date.today() - timedelta(days=120)
+        old -= timedelta(days=old.weekday())
+        make_week_item(vps, ape_id, start=old.isoformat(),
+                       due=(old + timedelta(days=6)).isoformat(), title="Old")
+
+        root, screen = _week_screen(tmp_path, vps)
+        try:
+            options = list(screen.week_combo.cget("values"))
+            assert old.isoformat() in options
+            assert screen.week_var.get() == _this_week()
         finally:
             root.destroy()
     finally:

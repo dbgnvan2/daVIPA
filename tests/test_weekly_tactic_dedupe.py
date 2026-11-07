@@ -1155,3 +1155,54 @@ def test_bc2_5_the_repair_does_not_treat_a_snapped_survivor_as_blocked(tmp_path)
             f"the repair still calls a fixed tactic unrepairable: {skipped_reasons}")
     finally:
         vps.close()
+
+
+def test_awam23_child_count_uses_the_shared_predicate(tmp_path):
+    """AWA-M2.3 — the dedupe counts children the way the panel lists them.
+
+    ``_child_count`` feeds ``_choose_survivor``: it decides which duplicate
+    Weekly Tactic survives, and therefore which links survive. It used to
+    write the union predicate itself, without the ``item_type != 'week'``
+    exclusion the panel's query has, so a nested Weekly Tactic counted as a
+    child here and not there — the survivor was chosen on a different
+    definition of "child" than the one the app renders.
+
+    Both halves are asserted: a nested week row does not count, and an item
+    carrying both link columns counts once, under the tactic
+    ``weekly_tactic_id`` names.
+    """
+    from src.getmoredone.weekly_tactic_maintenance import _child_count
+
+    vps = make_vps(tmp_path)
+    try:
+        ape_id = seed_ape(vps)
+        tactic = make_week_item(vps, ape_id, start="2026-02-23",
+                                due="2026-03-01", title="W8")
+        other = make_week_item(vps, ape_id, start="2026-03-02",
+                               due="2026-03-08", title="W9")
+
+        make_daily_item(vps, title="A real child", start="2026-02-25",
+                        due="2026-02-25", weekly_tactic_id=tactic.id,
+                        refile=False)
+        assert _child_count(vps.db.conn, tactic.id) == 1
+
+        # A week row nested under the tactic is not one of its Action Items.
+        # Its own week: one Weekly Tactic per APE per week is indexed, and
+        # the nesting is the point here, not the week.
+        nested = make_week_item(vps, ape_id, start="2026-03-09",
+                                due="2026-03-15", title="W8 nested")
+        vps.db.conn.execute(
+            "UPDATE action_items SET parent_id = ? WHERE id = ?",
+            (tactic.id, nested.id))
+        vps.db.conn.commit()
+        assert _child_count(vps.db.conn, tactic.id) == 1
+
+        # Both columns set: counted under weekly_tactic_id only, so the two
+        # tactics cannot both claim it when the survivor is chosen.
+        make_daily_item(vps, title="Both columns", start="2026-03-03",
+                        due="2026-03-03", weekly_tactic_id=other.id,
+                        parent_id=tactic.id, refile=False)
+        assert _child_count(vps.db.conn, tactic.id) == 1
+        assert _child_count(vps.db.conn, other.id) == 1
+    finally:
+        vps.close()
