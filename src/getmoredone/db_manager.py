@@ -1482,8 +1482,8 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             self.create_time_block(block)
         return block
 
-    def shift_day_slots(self, block_date: str, by: int) -> int:
-        """Renumber a day's blocks so they keep their clock times when Day Start moves.
+    def shift_all_slots(self, by: int) -> int:
+        """Renumber every date's blocks so they keep their clock times when Day Start moves.
 
         Purpose: PD-M5.5 -- a block's ``slot_index`` is its position counted
                  from Day Start, not a time. Moving Day Start back two boxes
@@ -1493,6 +1493,14 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
                  disagree and neither is marked wrong.
         Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
         Tests:   tests/test_time_block_crud.py::test_pdm55_blocks_keep_their_times_when_the_day_grows
+
+        Every date, not the one being looked at. ``plan_day_start`` is a single
+        setting and ``DayBounds.from_settings`` reads it for whatever date is
+        on screen, so there is no such thing as renumbering one day: a version
+        of this that filtered on ``block_date`` left every *other* date drawn
+        half an hour early with its own row still saying the old time -- the
+        exact disagreement above, one date over, and the reason the method
+        exists at all.
 
         ``start_time`` and ``end_time`` are deliberately not touched: they are
         the fact being preserved. Blocks with no slot index are left alone --
@@ -1506,9 +1514,9 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
                 """
                 UPDATE time_blocks
                 SET slot_index = slot_index + ?, updated_at = ?
-                WHERE block_date = ? AND slot_index IS NOT NULL
+                WHERE slot_index IS NOT NULL
                 """,
-                (int(by), datetime.now().isoformat(), block_date),
+                (int(by), datetime.now().isoformat()),
             )
             return cursor.rowcount
 

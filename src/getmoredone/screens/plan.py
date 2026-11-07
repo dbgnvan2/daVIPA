@@ -249,7 +249,10 @@ class PlanScreen(ctk.CTkFrame):
         # dragged onto. The width is a setting so it can be sized to the
         # titles the user actually has -- by typing it into Settings, or
         # since PD-M2 by dragging the grip in column 1.
-        self.grid_columnconfigure(0, weight=0, minsize=self.items_col_width())
+        #: The width the items column is actually drawn at, which is the
+        #: setting held inside what both panes need -- not the setting itself.
+        self._items_width: int = self.items_col_width()
+        self.grid_columnconfigure(0, weight=0, minsize=self._items_width)
         self.grid_columnconfigure(1, weight=0, minsize=PLAN_DIVIDER_WIDTH_PX)
         self.grid_columnconfigure(2, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -258,6 +261,10 @@ class PlanScreen(ctk.CTkFrame):
         self.create_items_pane()
         self.create_divider()
         self.create_day_pane()
+
+        # PD-M2.2 at the other end: the window's own size is as able to squeeze
+        # a pane shut as the grip is.
+        self.bind("<Configure>", self.on_resize)
 
         self._ready = True
         self.refresh()
@@ -522,6 +529,45 @@ class PlanScreen(ctk.CTkFrame):
             width = min(width, max(floor, room - self.day_width_floor()))
         return width
 
+    def apply_items_width(self, width: int) -> int:
+        """Draw the items column at ``width``, held inside what both panes need.
+
+        Purpose: PD-M2.2 -- one place that puts a width on the column, so the
+                 clamp cannot be bypassed by a caller that sets the minsize
+                 itself.
+        Tests:   tests/test_plan_screen.py::test_pdm22_a_narrow_window_takes_the_width_from_the_items_pane
+
+        Reconfigures only on a change, because this runs from ``<Configure>``
+        and a grid change that fires another ``<Configure>`` would not settle.
+        """
+        held = self._clamp_items_width(width)
+        if held != self._items_width:
+            self._items_width = held
+            self.grid_columnconfigure(0, minsize=held)
+        return held
+
+    def on_resize(self, event=None):
+        """Re-divide the two panes when the window's size changes.
+
+        Purpose: PD-M2.2 -- neither pane can be squeezed shut.
+        Tests:   tests/test_plan_screen.py::test_pdm22_a_narrow_window_takes_the_width_from_the_items_pane
+
+        The clamp used to run only while the grip was held. Column 0 has a
+        minsize and column 2 has a weight, so in a window too narrow for both
+        floors the whole shortfall came out of the day pane -- the side with
+        nothing holding it open -- and the block length clipped off the right
+        edge, which is the defect the floors were added to prevent. A resize
+        divides the room by the same rule a drag does: the items column gives
+        up width down to its own floor so the day keeps its floor.
+
+        The width asked for is the setting every time, not the width currently
+        drawn, so widening the window gives the items pane back what a narrower
+        one took off it.
+        """
+        if not self._ready or self._divider_from_x is not None:
+            return
+        self.apply_items_width(self.items_col_width())
+
     def create_divider(self):
         """The grip between the two panes, which drags them wider and narrower.
 
@@ -575,10 +621,9 @@ class PlanScreen(ctk.CTkFrame):
         if self._divider_from_x is None:
             return
         moved = event.x_root - self._divider_from_x
-        self._divider_width = self._clamp_items_width(
+        self._divider_width = self.apply_items_width(
             self._divider_from_width + moved
         )
-        self.grid_columnconfigure(0, minsize=self._divider_width)
 
     def on_divider_release(self, event):
         """Take the final position and write it, once.
@@ -603,7 +648,7 @@ class PlanScreen(ctk.CTkFrame):
         self.settings.plan_items_col_width = width
         if not self.settings.save():
             self.settings.plan_items_col_width = previous
-            self.grid_columnconfigure(0, minsize=self.items_col_width())
+            self.apply_items_width(self.items_col_width())
             self.items_hint.configure(
                 text=(
                     getattr(self.settings, "last_save_error", None)
@@ -1082,6 +1127,10 @@ class PlanScreen(ctk.CTkFrame):
 
         items = self.db_manager.get_items_for_start_date(self.selected_date)
         shown = items[:MAX_ITEM_ROWS]
+        # What the row cap takes off the end, counted so the report can say it
+        # (P2/P9). The pane announces its own cap; a button that silently
+        # planned 60 of 73 items and reported "blocked 12 of 60" would not.
+        unseen = len(items) - len(shown)
         if not shown:
             self.set_status(
                 "AutoLoad: nothing to block — no open items start on "
@@ -1123,26 +1172,41 @@ class PlanScreen(ctk.CTkFrame):
                     placed += 1
         except SlotRefusedError as refused:
             # Counted and said, never swallowed. A refusal here is the day
-            # disagreeing with the box first_free_slot just offered, which is
+            # disagreeing with the box first_clear_slot just offered, which is
             # a bug rather than a full day -- and the transaction has already
             # taken the earlier items back out, so the number that would have
             # been written is part of the report.
             self.refresh()
             self.set_status(
                 f"AutoLoad wrote nothing — {refusal_text(refused.reason)} "
-                f"(refused after {placed} of {len(shown)})",
+                f"(refused after {placed} of {len(items)})",
+                "error",
+            )
+            return
+        except Exception as problem:
+            # Anything else. The transaction has rolled back, so the day on
+            # screen is the day in the database -- but without this arm the
+            # exception leaves a Tk callback with nothing redrawn and nothing
+            # said, and a press that failed looks exactly like a press that
+            # found nothing to do.
+            self.refresh()
+            self.set_status(
+                f"AutoLoad wrote nothing — {problem or type(problem).__name__}",
                 "error",
             )
             return
 
         self.refresh()
-        # All three counts, every time (P2): "blocked 4" alone cannot be told
-        # apart from "blocked 4 and quietly dropped 7".
-        self.set_status(
-            f"AutoLoad: blocked {placed} of {len(shown)} — "
-            f"{no_room} did not fit, {already} already blocked",
-            "success" if placed else "warning",
+        # Every count, every time (P2): "blocked 4" alone cannot be told apart
+        # from "blocked 4 and quietly dropped 7", and the four numbers add up
+        # to the whole list rather than to the part of it that was tried.
+        said = (
+            f"AutoLoad: blocked {placed} of {len(items)} — "
+            f"{no_room} did not fit, {already} already blocked"
         )
+        if unseen:
+            said += f", {unseen} past the {MAX_ITEM_ROWS}-row list"
+        self.set_status(said, "success" if placed else "warning")
 
     def first_clear_slot(self, minutes: int) -> Optional[int]:
         """The earliest box in today's grid with nothing in it at all.
@@ -1537,8 +1601,11 @@ class PlanScreen(ctk.CTkFrame):
         Tests:   tests/test_plan_screen.py::test_pdm52_a_drop_above_moves_day_start_back
 
         ``plan_day_shape_unconfirmed`` is left exactly as it was found
-        (PD-M5.4), by not being touched at all -- ``AppSettings.save`` does not
-        write it either. Lengthening a day is not the user confirming the four
+        (PD-M5.4), by not being touched at all. ``AppSettings.save`` does write
+        the field -- it writes every field -- but it never changes its value,
+        and ``_day_shape_was_confirmed`` only reads a literal ``False``, so a
+        save here cannot confirm a day shape. Lengthening a day is not the user
+        confirming the four
         values the flag gates, and that flag is what stops the irreversible
         grid adoption running against a day shape nobody chose. An earlier
         version of this method snapshotted it and put it back on the failure
@@ -1550,6 +1617,14 @@ class PlanScreen(ctk.CTkFrame):
         new block back out with it rather than leaving the file and the day
         disagreeing about where the day starts (P41: ``self.settings`` is the
         app's own object, so the attribute has to go back too).
+
+        This renumbers and ``on_settings_saved`` (TG-M6.4) does not, and the
+        difference is the gesture rather than an inconsistency. Typing a new
+        Day Start into Settings is a decision about what the day is, and
+        re-timing the work inside it is what that decision means. Dropping one
+        item above the first box is a decision about that item: the bound moves
+        as a side effect, so everything already planned -- on this date and
+        every other -- has to stay where the person put it.
         """
         if not self._require_block_day():
             return
@@ -1599,8 +1674,9 @@ class PlanScreen(ctk.CTkFrame):
                     # Before the new block, and before anything reads the day:
                     # a slot index counts boxes from Day Start, so moving Day
                     # Start without renumbering slides every planned task
-                    # earlier on the clock (PD-M5.5).
-                    self.db_manager.shift_day_slots(self.selected_date, span)
+                    # earlier on the clock (PD-M5.5). Every date, because
+                    # Day Start is one setting for all of them.
+                    self.db_manager.shift_all_slots(span)
                 self.db_manager.add_block_at(block, slot_index, new_bounds)
                 if not self.settings.save():
                     raise _DayNotWritten(
@@ -1623,7 +1699,11 @@ class PlanScreen(ctk.CTkFrame):
             if isinstance(problem, SlotRefusedError):
                 said = refusal_text(problem.reason)
             else:
-                said = str(problem)
+                # The class name when the exception carries no message, which
+                # several built-ins do: "The day was not extended — " with
+                # nothing after the dash is a sentence that says less than the
+                # failure it is reporting.
+                said = str(problem) or type(problem).__name__
             if not restored:
                 said += (
                     " — and the day's hours could not be put back; "

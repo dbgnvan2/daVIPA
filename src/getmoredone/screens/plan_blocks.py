@@ -89,10 +89,10 @@ SLOT_MARKER_WIDTH_PX = 16
 #: widths and PD-M2's clamp both account for it.
 CHIP_RIGHT_INSET_PX = 8
 
-#: The marker itself. A chevron rather than the green check: the check already
-#: means "this task is finished" on a day box (PD-M6), and one glyph cannot
-#: carry both "done" and "has a block today" without saying the wrong one half
-#: the time.
+#: The marker itself: a plain ASCII greater-than, not the green check. The
+#: check already means "this task is finished" on a day box (PD-M6), and one
+#: glyph cannot carry both "done" and "has a block today" without saying the
+#: wrong one half the time.
 PD_BLOCKED_TEXT = ">"
 
 #: The chip's columns by name, so a renderer and a test can refer to the same
