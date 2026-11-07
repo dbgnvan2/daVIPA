@@ -1,0 +1,252 @@
+"""Tests for one panel design across the VSP tabs.
+
+Spec: docs/spec_2026-11-07_unified_panel_design.md
+
+Every test name carries the criterion ID it verifies (UPD-M1 … UPD-M7).
+
+This file opens with the **characterisation** tests (UPD-M4.1). They were
+written against the screens as they stood before a line of the consolidation
+was removed, and they exist to hold the layout in place while the splitter,
+the row drag and the chip table move out into shared modules. A
+characterisation test is allowed to be fussy about pixel widths and column
+order in a way an ordinary test should not be: that fussiness is the point,
+because the refactor's promise is that none of it changes.
+
+Screens are built on a **withdrawn** root, so none of them adds to the mapped
+window count that tests/test_ci_contract.py pins at 22.
+"""
+
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
+# Self-contained path bootstrap, for the same reason test_ape_week_actions.py
+# carries one: tests/test_ci_contract.py imports every test file with the repo
+# root stripped from sys.path, and this file cannot rely on another having put
+# it back.
+_ROOT = Path(__file__).resolve().parents[1]
+for _entry in (str(_ROOT), str(_ROOT / "src")):
+    if _entry not in sys.path:
+        sys.path.insert(0, _entry)
+
+import pytest  # noqa: E402
+
+import customtkinter as ctk  # noqa: E402
+
+from src.getmoredone.screens.ape_assignment import APEAssignmentScreen  # noqa: E402
+
+SRC = Path(__file__).resolve().parents[1] / "src" / "getmoredone"
+
+
+# --------------------------------------------------------------------- helpers
+
+def _root():
+    """A withdrawn Tk root, or a skip when there is no display."""
+    try:
+        root = ctk.CTk()
+    except Exception as exc:  # Headless without a display.
+        pytest.skip(f"Tk display unavailable: {exc}")
+    root.geometry("1400x900+0+0")
+    root.withdraw()
+    return root
+
+
+def _ape_row(idx, segment="Purposeful Work", subsegment="Living Systems",
+             category="Blog"):
+    return {
+        "id": f"ape-{idx}",
+        "segment_name": segment,
+        "subsegment_name": subsegment,
+        "category_name": category,
+    }
+
+
+def _fake_vps(left_rows, right_rows):
+    """A VPS manager double returning real dicts, not MagicMock attributes.
+
+    The screen passes these straight into the lineage colour helpers, which
+    call `.strip()` and `.get()` on what comes back, so a MagicMock would
+    sail past the assertions this file makes about rendered text.
+    """
+    return SimpleNamespace(
+        get_annual_plan_elements=lambda year: list(left_rows),
+        get_annual_plan_elements_for_quarter=lambda year, quarter: list(right_rows),
+        get_vision_categories=lambda: [],
+        get_vision_subsegments=lambda: [],
+        get_segment_color_map=lambda: {},
+        get_segment_colors_by_id=lambda: {},
+        resolve_segment_color=lambda name, colors: "",
+    )
+
+
+def _quarter_screen(left_rows=(), right_rows=()):
+    """APE Quarter Assignment on a withdrawn root, already rendered."""
+    root = _root()
+    vps = _fake_vps(left_rows, right_rows)
+    screen = APEAssignmentScreen(root, vps, SimpleNamespace(vps_manager=vps))
+    screen.update_idletasks()
+    return root, screen
+
+
+def _header_frame(scroll_frame):
+    """The first child of a rendered list: its header row."""
+    children = [c for c in scroll_frame.winfo_children() if c.grid_info()]
+    children.sort(key=lambda c: int(c.grid_info()["row"]))
+    return children[0]
+
+
+def _row_frames(scroll_frame):
+    """Every rendered row frame below the header, in grid order."""
+    children = [c for c in scroll_frame.winfo_children() if c.grid_info()]
+    children.sort(key=lambda c: int(c.grid_info()["row"]))
+    return children[1:]
+
+
+def _cells(frame):
+    """[(grid column, class name, text)] for a header or row frame."""
+    out = []
+    for child in frame.winfo_children():
+        info = child.grid_info()
+        if not info:
+            continue
+        try:
+            text = child.cget("text")
+        except Exception:
+            text = None
+        out.append((int(info["column"]), type(child).__name__, text))
+    out.sort(key=lambda cell: cell[0])
+    return out
+
+
+def _bound_sequences(widget) -> tuple:
+    """The event sequences bound on a widget.
+
+    A CustomTkinter widget forwards `bind` to an internal canvas, so
+    `widget.bind()` with no handler reports nothing while the canvas holds the
+    binding. Reading the private attribute is the only way to assert a binding
+    exists, and these assertions matter: a drag source that silently stops
+    being bound looks exactly like a row that was never draggable.
+    """
+    canvas = getattr(widget, "_canvas", None)
+    return tuple(canvas.bind() or ()) if canvas is not None else tuple(widget.bind() or ())
+
+
+def _minsizes(frame, columns):
+    """The grid minsize of each named column on a frame."""
+    return [frame.grid_columnconfigure(col).get("minsize") for col in columns]
+
+
+# ------------------------------- UPD-M4.1: APE Quarter Assignment, as it stands
+
+def test_updm41_ape_quarter_layout_is_unchanged():
+    """UPD-M4.1 — the body is left | divider | right, and the divider drags.
+
+    Pins the three-column body, the panels either side of it and the three
+    bindings that make the middle column a splitter rather than a line. The
+    consolidation moves the handlers into screens/split_panel.py; what this
+    test describes must survive that move.
+    """
+    root, screen = _quarter_screen()
+    try:
+        body = screen.body
+        assert int(screen.left_frame.grid_info()["column"]) == 0
+        assert int(screen.divider.grid_info()["column"]) == 1
+        assert int(screen.right_frame.grid_info()["column"]) == 2
+
+        # The middle column is the splitter's width, not a panel's.
+        assert body.grid_columnconfigure(1).get("minsize") == screen.SPLITTER_WIDTH
+
+        bound = set(_bound_sequences(screen.divider))
+        assert {"<Button-1>", "<B1-Motion>", "<ButtonRelease-1>"} <= bound
+    finally:
+        root.destroy()
+
+
+def test_updm41_ape_quarter_left_header_columns_are_unchanged():
+    """UPD-M4.1 — left header: an empty checkbox cell, then the four names.
+
+    The left panel is the selectable one, so its first cell is the blank
+    header over the checkbox column. Column order is asserted by position,
+    not by set membership, because the order is the thing the shared table has
+    to reproduce.
+    """
+    root, screen = _quarter_screen(left_rows=[_ape_row(1)])
+    try:
+        header = _header_frame(screen.left_list)
+        texts = [text for _col, _cls, text in _cells(header)]
+        assert texts == ["", "#", "Segment", "SubSegment", "Category"]
+    finally:
+        root.destroy()
+
+
+def test_updm41_ape_quarter_right_header_ends_with_actions():
+    """UPD-M4.1 — right header: the four names, then Actions.
+
+    The right panel has no checkbox and does have an Actions column. This is
+    the shape the image in the spec shows, and the shape UPD-M5 has to give
+    APE Week Assignment's right panel.
+    """
+    root, screen = _quarter_screen(right_rows=[_ape_row(1)])
+    try:
+        header = _header_frame(screen.right_list)
+        texts = [text for _col, _cls, text in _cells(header)]
+        assert texts == ["#", "Segment", "SubSegment", "Category", "Actions"]
+    finally:
+        root.destroy()
+
+
+def test_updm41_ape_quarter_column_widths_are_unchanged():
+    """UPD-M4.1 — the header's pixel minsizes, pinned before they move.
+
+    These are the numbers the shared table has to start from: once widths come
+    from a ColumnResizer the defaults must be these, or every saved layout
+    shifts under the user on first launch after the change.
+    """
+    root, screen = _quarter_screen(left_rows=[_ape_row(1)])
+    try:
+        header = _header_frame(screen.left_list)
+        # checkbox, index, segment, subsegment, category
+        assert _minsizes(header, (0, 1, 2, 3, 4)) == [34, 34, 135, 155, 125]
+    finally:
+        root.destroy()
+
+
+def test_updm41_ape_quarter_left_row_is_a_drag_source():
+    """UPD-M4.1 — every cell of a left row starts a drag, and the row has a box.
+
+    `_bind_drag_widgets` binds the frame and all four cells, so a drag starts
+    wherever in the row the pointer goes down. UPD-M2 moves that into
+    screens/row_drag.py; the binding has to still be on all five widgets
+    afterwards.
+    """
+    root, screen = _quarter_screen(left_rows=[_ape_row(1)])
+    try:
+        row = _row_frames(screen.left_list)[0]
+        classes = [cls for _col, cls, _text in _cells(row)]
+        assert classes[0] == "CTkCheckBox"
+
+        draggable = [row] + [c for c in row.winfo_children()
+                             if not isinstance(c, ctk.CTkCheckBox)]
+        assert len(draggable) == 5
+        for widget in draggable:
+            assert "<Button-1>" in set(_bound_sequences(widget))
+    finally:
+        root.destroy()
+
+
+def test_updm41_ape_quarter_right_row_ends_with_a_delete_button():
+    """UPD-M4.1 — the right row's last cell is its own Delete.
+
+    Per-row Delete in the Actions column is what the right panel has today and
+    what UPD-M5.2 adds to APE Week Assignment. A right row is not a drag
+    source: dragging is one-way, left to right.
+    """
+    root, screen = _quarter_screen(right_rows=[_ape_row(1)])
+    try:
+        row = _row_frames(screen.right_list)[0]
+        cells = _cells(row)
+        assert cells[-1][1] == "CTkButton"
+        assert cells[-1][2] == "Delete"
+        assert "<Button-1>" not in set(_bound_sequences(row))
+    finally:
+        root.destroy()
