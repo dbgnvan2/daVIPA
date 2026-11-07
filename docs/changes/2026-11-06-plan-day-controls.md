@@ -130,12 +130,33 @@ Docs:
 - Command (the sweep's fixes):
   `GETMOREDONE_NO_MAPPED_WINDOWS=1 pytest tests/test_plan_screen.py
   tests/test_time_block_crud.py tests/test_ci_contract.py -q`
-- Result: PASS — 264 passed, 17 skipped (the mapped-window set).
-- Command: `mutate_fixes.py` in the session scratchpad — ten mutations across
-  the four fixes, each reverting a line a test names.
+- Result: PASS — 264 passed, 17 skipped: sixteen are `test_plan_screen.py`'s
+  mapped-window tests and the seventeenth is `test_ci_contract.py`'s own
+  CI-only skip, which is not part of that set.
+- Command: `mutate_fixes.py` in the session scratchpad — nine mutations across
+  the four fixes, each reverting a line a test names, plus a tenth run on its
+  own for `test_pdm56_a_failure_with_no_message_still_names_itself`.
 - Result: PASS — 10/10 red. One anchor was wrong on the first run and is
   recorded as an anchor failure rather than a green, which is the distinction
   that makes the gate worth running.
+- Command (the second round's fixes, `2b65574` / `f122967`):
+  `GETMOREDONE_NO_MAPPED_WINDOWS=1 pytest tests/test_plan_screen.py
+  tests/test_ci_contract.py -q`
+- Result: PASS — 235 passed, 18 skipped (one more mapped-window test than
+  before). An earlier run of the same two files was 2 failed / 233 passed:
+  `test_pdm21_dragging_the_grip_changes_the_items_column` and
+  `test_pdm26_the_grip_and_the_settings_field_are_one_value` both set
+  `plan_items_col_width` on a screen already built and leaned on the press
+  re-reading it, which the press no longer does. Both now set the width before
+  building the screen, which is the app's own order.
+- Command: `mutate_round2.py` in the session scratchpad — five mutations, plus
+  one run on its own for the `<Configure>` bind.
+- Result: PASS — 6/6 red. One selector was wrong on the first run and came back
+  as a green: `test_pdm56...` names `extend_day_for`'s failure arm, not
+  AutoLoad's, so it could not have failed for a mutation in AutoLoad. Recorded
+  rather than accepted, and re-run against the test that does name that arm.
+- Not run: the rest of the suite, on this machine, by instruction. CI runs it
+  on push.
 
 Five gate findings were defects in the tests or the code rather than in the
 mutations, and each is recorded in the commit that fixed it:
@@ -182,7 +203,23 @@ Recorded rather than fixed, with the reason on each, in `BACKLOG.md` under
 file, which is an app-wide change to every save and not a thing for a fix pass
 at the end of a batch), and five lows.
 
-The fix commits were themselves swept — see *Verification*.
+**The fix commits were themselves swept**, cold, over `5fce498...HEAD`: one
+high, three mediums and five lows. The high was a bug in one of the first
+round's own fixes — AutoLoad's new broad-exception arm wrote
+`{problem or type(problem).__name__}`, and an exception instance is always
+truthy, so a message-less `KeyError()` still ended the sentence at the dash,
+which is the defect the same pass had fixed correctly two methods away. All
+four high and medium findings are fixed in `2b65574`, with tests in `f122967`.
+The lows were recorded; the one worth keeping is folded into the `BACKLOG.md`
+entry on the empty-day note's wrap.
+
+That pass also found a test of the first round's that could not fail, and
+`test_pdm22_a_real_configure_event_rebalances_the_panes` is gone because of
+it — a synthetic `<Configure>` cannot reach an unmapped screen, so it asserted
+nothing, and its `root.update()` spun for 8.5 hours of wall clock and 11 hours
+of CPU in a background run before it was killed.
+`test_pdm22_a_resize_alone_rebalances_the_panes` replaces it with a real
+window, which takes the mapped-window count to 22.
 
 ## Risks / Known gaps
 

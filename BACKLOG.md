@@ -43,10 +43,16 @@ surface and the repo's budget stops in-loop fixes below medium.
   database back and leaves `self.settings.plan_day_start` on the new, unsaved
   value for the life of the process — the P41 case the method's own docstring
   is about. Unreachable in the packaged app, which is why it is low.
-- **A successful divider drag does not redraw the items pane.** Low. The
-  empty-day note's `wraplength` is computed from `items_col_width()` when the
-  note is built, so after a drag that widens the pane the note keeps the old
-  wrap until the next refresh.
+- **The empty-day note wraps to the setting, not to the column.** Low, and
+  wider than it first looked. The note's `wraplength` is computed from
+  `items_col_width()` when the note is built, so after a drag that widens the
+  pane it keeps the old wrap until the next refresh — and, since the resize
+  clamp made a drawn width narrower than the setting an ordinary state, it also
+  wraps to a width the column does not have whenever the window is too narrow,
+  clipping the note with no gesture from the user at all. One line: read
+  `_items_width`, which is the width drawn. Left out of the fix round because
+  the note is one sentence on an empty day and the round had already produced a
+  high-severity finding of its own.
 - **The depth-bars column is 2px narrower than what is gridded into it, and a
   padding chip's length sits 2px left of a task's.** Low.
   `SLOT_BARS_WIDTH_PX` is 22, but `DepthBarStack` is gridded with

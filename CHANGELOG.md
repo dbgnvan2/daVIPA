@@ -30,6 +30,17 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   day pane and laid the `30m` label past the right edge of every box. Narrowing
   the window now takes the width off the items pane first, down to its floor,
   and widening gives it back.
+- **A click on the divider no longer changes the width you set.** Pressing the
+  grip took the width from the settings file rather than the width on screen.
+  The two differ whenever the window is too narrow for the setting, so a click
+  that moved nothing saved the narrowed width over the one you had chosen, with
+  nothing said — and widening the window afterwards no longer gave it back. A
+  press now starts from the column as drawn, so a click that moves nothing
+  writes nothing, and a drag moves the edge from its first pixel.
+- **A failed AutoLoad says what failed.** A failure carrying no message of its
+  own ended the sentence at the dash; it now names the fault, and the fault is
+  written to the log as well, since the status line is replaced by the next
+  thing that happens.
 
 ### Changed — the two panes, read side by side
 
