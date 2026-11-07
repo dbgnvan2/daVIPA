@@ -5463,3 +5463,140 @@ def test_pdm5_an_item_that_would_cross_midnight_is_refused(
     assert manager.get_time_blocks(THURSDAY) == []
     text = panel.status_label.cget("text")
     assert "before midnight" in text, text
+
+
+# ================= PD-M10 — a rebuilt pane is drawn before the next event ===
+#
+# Reported from the running app as three things: a block dragged to another
+# half hour "doesn't seem to work", the dragged item's name stuck beside the
+# pointer, and the day pane "seems to wait for a mouse movement of the app
+# window". All three are one cause. Tk draws from an idle handler, every
+# rebuild on this screen runs inside an event callback or an after_idle of
+# one, and nothing here ever flushed.
+
+
+def _count_flushes(screen, monkeypatch):
+    """Count the screen's own ``update_idletasks`` calls, still doing the work.
+
+    monkeypatch rather than a bare setattr: the name is found on the class, so
+    an unrestored instance attribute would shadow the bound method for every
+    test collected after this one.
+    """
+    calls = []
+    real = screen.update_idletasks
+
+    def counted():
+        calls.append(1)
+        real()
+
+    monkeypatch.setattr(screen, "update_idletasks", counted)
+    return calls
+
+
+def test_pdm101_rebuilding_the_day_pane_flushes_the_redraw(screen, monkeypatch):
+    """PD-M10.1 — ``load_blocks`` leaves the pane drawn, not queued.
+
+    This is the path the report was about: ``move_block_to_slot``,
+    ``set_block_minutes`` and ``add_padding_block`` all end in ``load_blocks``
+    alone, and all three wrote the day correctly and showed nothing until the
+    pointer moved over the window.
+    """
+    calls = _count_flushes(screen, monkeypatch)
+
+    screen.load_blocks()
+
+    assert len(calls) == 1, f"the day pane flushed {len(calls)} times, not once"
+
+
+def test_pdm102_rebuilding_the_items_pane_flushes_the_redraw(screen, monkeypatch):
+    """PD-M10.2 — the items pane is rebuilt the same way, so it owes the same.
+
+    Only the day pane was reported, but both panes are rebuilt by taking the
+    scroll frame out of the grid and putting it back, and a mark that appears
+    on an item row only once the pointer moves is the same defect.
+    """
+    calls = _count_flushes(screen, monkeypatch)
+
+    screen.load_items()
+
+    assert len(calls) == 1, f"the items pane flushed {len(calls)} times, not once"
+
+
+def test_pdm103_a_press_without_motion_shows_no_drag_label(screen, manager):
+    """PD-M10.3 — a click is not a drag, so it puts nothing beside the pointer.
+
+    The reported symptom was an item's title sitting next to the pointer with
+    no drag in progress. Every press on a row starts a drag as far as these
+    handlers know, so the label was built and placed on the press; the
+    release hid it again, but the hiding was not drawn either.
+    """
+    item = _item(manager, "Fix login bug")
+    screen.refresh()
+
+    screen.start_item_drag(None, item)
+
+    assert screen._drag_label is None, "the press alone built the drag label"
+    assert screen._drag_label_text == "Fix login bug", screen._drag_label_text
+
+
+def test_pdm104_the_first_motion_shows_the_label_and_the_second_moves_it(
+    screen, manager
+):
+    """PD-M10.4 — the pointer moving is what turns a press into a drag."""
+    item = _item(manager, "Fix login bug")
+    screen.refresh()
+    screen.start_item_drag(None, item)
+
+    screen.on_drag_motion(None)
+
+    label = screen._drag_label
+    assert label is not None, "the first motion did not show the label"
+    assert label.cget("text") == "Fix login bug", label.cget("text")
+    assert label.winfo_manager() == "place", label.winfo_manager()
+    assert screen._drag_label_text is None, "the armed text outlived the label"
+
+    screen.on_drag_motion(None)
+
+    assert screen._drag_label is label, "the second motion built a second label"
+
+
+def test_pdm105_ending_a_drag_hides_the_label_and_flushes(
+    screen, manager, monkeypatch
+):
+    """PD-M10.5 — a release that lands on nothing redraws nothing by itself.
+
+    A drop onto a box gets its flush from the rebuild that follows it. A
+    release over the sidebar writes nothing and rebuilds nothing, so without
+    the flush here the label stayed on screen until something else repainted.
+    """
+    item = _item(manager, "Fix login bug")
+    screen.refresh()
+    screen.start_item_drag(None, item)
+    screen.on_drag_motion(None)
+    label = screen._drag_label
+    assert label.winfo_manager() == "place", "the label was never placed"
+    calls = _count_flushes(screen, monkeypatch)
+
+    screen._end_drag()
+
+    assert label.winfo_manager() == "", "the label is still placed"
+    assert len(calls) == 1, f"the hide flushed {len(calls)} times, not once"
+    assert screen._drag_label_text is None, screen._drag_label_text
+
+
+def test_pdm106_a_flush_on_a_screen_that_is_gone_does_not_raise(
+    screen, monkeypatch
+):
+    """PD-M10.6 — the flush is called from a ``finally``, so it must not throw.
+
+    A queued rebuild can outlive the window: a date change or a close whose
+    redraw runs after Tk has gone. An exception raised there would replace
+    whatever brought the code into the ``finally``, which on the failure paths
+    is the error the user needs to be told about.
+    """
+    def gone():
+        raise tk.TclError("application has been destroyed")
+
+    monkeypatch.setattr(screen, "update_idletasks", gone)
+
+    screen._flush_redraw()
