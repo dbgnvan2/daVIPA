@@ -158,9 +158,19 @@ def migrate_parent_links_to_weekly_tactic(conn: sqlite3.Connection) -> Dict[str,
     Such a row still has its stale nesting link dropped - that is what makes
     the migration idempotent - but only ``parent_id`` is cleared, and the
     count is reported separately so the two outcomes are not one number (P2).
+    ``_log_report`` writes that second count on its own line, because
+    separating it from ``moved`` is only half of not losing it: while the two
+    were one number the row was logged because it was miscounted, and counting
+    it correctly without logging it would have made the launch silent about a
+    write to the user's data.
     """
     if 'weekly_tactic_id' not in _columns(conn, 'action_items'):
-        return {"moved": 0, "nesting_preserved": 0, "moved_ids": []}
+        # Same keys as the normal return below. A caller reading
+        # `kept_explicit_link` would otherwise get a KeyError on exactly the
+        # databases this branch exists for, and the tests reach this function
+        # directly rather than only through `run_weekly_tactic_migrations`.
+        return {"moved": 0, "nesting_preserved": 0, "moved_ids": [],
+                "kept_explicit_link": 0, "kept_explicit_link_ids": []}
 
     rows = conn.execute("""
         SELECT child.id AS child_id,
@@ -354,13 +364,30 @@ def _log_report(report: Dict[str, Any]) -> None:
     that did nothing (P2). This is the only surface where the user can see
     what happened to their rows.
     """
-    moved = report["link_migration"]["moved"]
+    link = report["link_migration"]
+    moved = link["moved"]
     if moved:
         logger.info(
             "[weekly_tactic_migration] moved %d tactic link(s) off parent_id; "
             "%d daily nesting link(s) preserved",
             moved,
-            report["link_migration"]["nesting_preserved"],
+            link["nesting_preserved"],
+        )
+    # Reported on its own line, and not folded into the gate above. A row whose
+    # explicit tactic was kept still had its `parent_id` cleared, so it is a
+    # write to the user's data; while `moved` was the only count, such a row
+    # was logged *because* it was miscounted as a move, and the fix that
+    # stopped miscounting it made the whole launch silent about it. That is a
+    # net loss of coverage over an automatic data change, which is what P2 is
+    # about.
+    kept = link.get("kept_explicit_link", 0)
+    if kept:
+        logger.info(
+            "[weekly_tactic_migration] dropped the stale parent_id on %d "
+            "item(s) that named a Weekly Tactic of their own, keeping that "
+            "choice: %s",
+            kept,
+            ", ".join(link.get("kept_explicit_link_ids", [])),
         )
 
     normalization = report.get("week_start_normalization", {})

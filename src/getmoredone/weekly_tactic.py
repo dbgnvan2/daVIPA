@@ -176,9 +176,20 @@ def tactic_of(item: Optional[ActionItem]) -> Optional[str]:
 #
 # `parent_id` is overloaded with ordinary subtask nesting, so a week row is
 # never a child of a tactic. Takes the tactic id twice.
-# Fully parenthesised: a consumer that writes `WHERE x OR {...}` gets the
-# rows it asked for. COALESCE rather than `IS NULL`, so an empty string counts
-# as no link, the same test `tactic_of` applies.
+# COALESCE rather than `IS NULL`, so an empty string counts as no link - the
+# same test `tactic_of` applies. That one is a behaviour fix, and
+# `test_awam23_an_empty_string_link_counts_as_no_link` covers it.
+#
+# The outer parentheses are not. They were added on a review finding that said
+# a consumer writing `WHERE x OR {...}` would silently get the wrong rows. That
+# is false: AND binds tighter than OR in SQL and the trailing clause is an AND,
+# so `x OR (A OR B) AND T` already groups as `x OR ((A OR B) AND T)`. Measured
+# on an in-memory table - `WHERE x OR {p}`, `WHERE {p} OR x` and
+# `WHERE x AND {p}` return identical rows with and without them. The mutation
+# gate is what found it: the test written for the claim stayed green when the
+# parentheses were removed. They are kept because they say the grouping out
+# loud rather than leaving it to operator precedence; no test asserts them,
+# because no behaviour depends on them.
 LINK_PREDICATE_SQL = (
     "((weekly_tactic_id = ?"
     " OR (COALESCE(weekly_tactic_id, '') = '' AND parent_id = ?))"
