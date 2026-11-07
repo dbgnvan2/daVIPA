@@ -5594,9 +5594,18 @@ def test_pdm106_a_flush_on_a_screen_that_is_gone_does_not_raise(
     whatever brought the code into the ``finally``, which on the failure paths
     is the error the user needs to be told about.
     """
+    calls = []
+
     def gone():
+        calls.append(1)
         raise tk.TclError("application has been destroyed")
 
     monkeypatch.setattr(screen, "update_idletasks", gone)
 
     screen._flush_redraw()
+
+    # The verdict is not "nothing was raised" -- pytest gives that for free,
+    # and it would still hold if ``_flush_redraw`` stopped drawing entirely.
+    # What has to be true is that the raising path was actually entered and
+    # swallowed: ``update_idletasks`` was called, and it threw.
+    assert calls == [1], f"update_idletasks was called {len(calls)} times, not once"
