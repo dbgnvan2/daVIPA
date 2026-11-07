@@ -640,6 +640,42 @@ def test_b51c_a_test_may_still_answer_for_itself(monkeypatch, messageboxes):
     )
 
 
+def test_b51d_the_record_starts_empty_for_each_test():
+    """B5.1 — the fixture shows this test's boxes and not an earlier test's.
+
+    The recorder is installed for the session and appends whether or not the
+    running test asked for the fixture, so a version that only trimmed the
+    tail on teardown left an unrequesting test's dialogs in the list for the
+    rest of the run. The fixture yields the list itself, so they showed up in
+    every later test that read it: an equality assertion was unusable and a
+    membership assertion was only accidentally right.
+
+    Driven by calling the fixture function rather than by pairing two tests,
+    so the proof does not depend on collection order. The residue is put in
+    deliberately and the list is left as it was found.
+    """
+    import contextlib
+
+    import conftest
+
+    before = list(conftest._MESSAGEBOXES)
+    conftest._MESSAGEBOXES.append(("showerror", "left over", "from another test"))
+    try:
+        generator = conftest.messageboxes.__wrapped__()
+        shown = next(generator)
+        assert shown == [], (
+            f"the fixture handed this test an earlier one's dialogs: {shown}"
+        )
+        with contextlib.suppress(StopIteration):
+            next(generator)
+        assert conftest._MESSAGEBOXES == [], (
+            "teardown left dialogs behind for the next test: "
+            f"{conftest._MESSAGEBOXES}"
+        )
+    finally:
+        conftest._MESSAGEBOXES[:] = before
+
+
 def test_b52_a_failing_timer_ending_does_not_hang_the_run(tmp_path, messageboxes):
     """B5.2 — the case that actually cost two minutes of a review pass.
 

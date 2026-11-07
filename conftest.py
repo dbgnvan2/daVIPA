@@ -536,10 +536,23 @@ def messageboxes():
     """The messageboxes this test would have shown, as (func, title, message).
 
     So a test can assert what the user was told without patching its own stub.
+
+    Tests:   tests/test_tk_offscreen.py::test_b51d_the_record_starts_empty_for_each_test
+
+    Emptied on the way in, not only on the way out. The recorder is installed
+    for the whole session and appends whether or not a test asked for this
+    fixture, so trimming the tail on teardown left behind everything an
+    unrequesting test had recorded -- and this fixture yields the list itself,
+    so every later test saw all of it. Measured:
+    ``test_pdm8_a_work_day_asks_nothing`` asserting ``messageboxes == []``
+    failed on a dialog raised two tests earlier, and passed when run on its
+    own. A fixture documented as "this test" has to mean it, or an equality
+    assertion against it is unusable and a membership assertion is only
+    accidentally right.
     """
-    before = len(_MESSAGEBOXES)
+    del _MESSAGEBOXES[:]
     yield _MESSAGEBOXES
-    del _MESSAGEBOXES[before:]
+    del _MESSAGEBOXES[:]
 
 
 # ``mapped_windows`` fixture). Everything else is withdrawn on creation.

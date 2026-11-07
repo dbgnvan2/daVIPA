@@ -36,7 +36,10 @@ from src.getmoredone.screens.plan import (
     ITEMS_TEXT_INSET_PX,
     NOTE_MIN_WRAP_PX,
     OUTSIDE_GROUP_HEIGHT_PX,
+    PLAN_DIVIDER_WIDTH_PX,
     PLAN_ITEMS_COL_WIDTH_PX,
+    PLAN_PANE_CHROME_PX,
+    PLAN_PANE_EDGE_PAD_PX,
     REFUSAL_TEXT,
     RIGHT_CLICK_SEQUENCES,
     PlanScreen,
@@ -563,6 +566,100 @@ def test_a_weekend_accepts_blocks_once_it_is_checked(root, manager, settings):
     panel.block_item(item)
 
     assert len(manager.get_time_blocks(SATURDAY)) == 1
+
+
+def test_pdm7_a_non_work_day_asks_before_scheduling(
+    root, manager, settings, monkeypatch
+):
+    """PD-M7 — a day outside the working week is a warning, not a wall.
+
+    The screen opens on today, so on a weekend every write path returned
+    before doing anything: AutoLoad before it read an item, a dropped item
+    before it wrote one. Four gestures doing nothing read as the screen being
+    broken. The weekday list describes a normal week; it does not get a veto
+    over a Saturday someone has decided to work.
+    """
+    asked = []
+
+    def say_yes(*args, **kwargs):
+        asked.append((args[0], args[1]))
+        return True
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", say_yes)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    item = _item(manager, "weekend work", SATURDAY)
+
+    panel.block_item(item)
+
+    assert len(asked) == 1, f"the drop asked {len(asked)} times, not once: {asked}"
+    title, message = asked[0]
+    assert "work day" in title.lower(), title
+    assert SATURDAY in message, message
+    assert "Mon, Tue, Wed, Thu, Fri" in message, message
+    assert "Schedule anyway?" in message, message
+    assert len(manager.get_time_blocks(SATURDAY)) == 1, (
+        "the user said to schedule it and nothing was written"
+    )
+
+
+def test_pdm7_the_question_is_asked_once_per_date(
+    root, manager, settings, monkeypatch
+):
+    """One decision about the day, not one per item dropped on it."""
+    asked = []
+    monkeypatch.setattr(
+        "tkinter.messagebox.askyesno",
+        lambda *a, **k: asked.append(1) or True,
+    )
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    first = _item(manager, "first", SATURDAY)
+    second = _item(manager, "second", SATURDAY)
+
+    panel.block_item(first)
+    panel.block_item(second)
+
+    assert len(asked) == 1, f"two drops onto one Saturday asked {len(asked)} times"
+    assert len(manager.get_time_blocks(SATURDAY)) == 2, (
+        "the second drop was refused on a day already allowed"
+    )
+
+
+def test_pdm7_answering_no_writes_nothing(
+    root, manager, settings, messageboxes
+):
+    """No means no, and the reason stays on screen.
+
+    ``askyesno`` answers False under the suite's own stub, so this is the
+    declining path without patching anything: the sentence is the one the flat
+    refusal used to leave, because the answer to "why did nothing happen" is
+    the days the week is set to.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    item = _item(manager, "weekend work", SATURDAY)
+
+    panel.block_item(item)
+
+    assert [name for name, _, _ in messageboxes] == ["askyesno"], messageboxes
+    assert manager.get_time_blocks(SATURDAY) == []
+    status = panel.status_label.cget("text")
+    assert "not a block day" in status
+    assert "Mon, Tue, Wed, Thu, Fri" in status
+
+
+def test_pdm7_a_work_day_asks_nothing(screen, manager, messageboxes):
+    """The question is for the exception, so a Thursday must not see it."""
+    item = _item(manager, "ordinary Thursday work")
+
+    screen.block_item(item)
+
+    assert messageboxes == [], f"a work day asked anyway: {messageboxes}"
+    assert len(manager.get_time_blocks(THURSDAY)) == 1
 
 
 def test_the_day_summary_flags_a_day_that_takes_no_blocks(root, manager, settings):
@@ -3395,6 +3492,48 @@ def test_pdm12_the_length_sits_beside_the_depth_bars(root, manager):
     )
 
 
+def test_pdm16_the_depth_bars_line_up_with_the_bottom_of_the_title(root, manager):
+    """PD-M1.6 — the stack sits on the text's line, not above it.
+
+    The stack is 13px and a line of text is taller, so a stack gridded
+    ``sticky="n"`` floated above the title on every row in the pane. Bottom of
+    the stack level with the bottom of the title is what lines them up, and the
+    gap inside the stack had to come off the last bar for the two to meet
+    exactly.
+    """
+    item = _item(manager, "Draft the proposal", depth="Deep")
+    row = build_item_row(
+        root, item, 0, already_blocked=False, work_block_minutes=45
+    )
+    root.update_idletasks()
+
+    bars = next(
+        child for child in row.winfo_children()
+        if isinstance(child, DepthBarStack)
+    )
+    title = next(
+        child for child in row.winfo_children()
+        if isinstance(child, ctk.CTkLabel) and child.cget("text") == item.title
+    )
+
+    # The bottom of the lowest bar, not of the frame around it. The frame
+    # bottom-aligns whatever is inside it, so measuring the frame cannot see a
+    # gap under the last bar -- which is the 2px the stack used to carry, and
+    # the whole of what is left to line up once the sticky is right.
+    lowest = max(
+        (child for child in bars.winfo_children()
+         if isinstance(child, ctk.CTkFrame)),
+        key=lambda bar: bar.winfo_y(),
+    )
+    bars_bottom = bars.winfo_y() + lowest.winfo_y() + lowest.winfo_reqheight()
+    title_bottom = title.winfo_y() + title.winfo_reqheight()
+    assert bars_bottom == title_bottom, (
+        f"the lowest bar ends at y={bars_bottom} and the title at "
+        f"y={title_bottom} -- {abs(title_bottom - bars_bottom)}px apart, so "
+        "they are not on the same line"
+    )
+
+
 def _length_label(widget):
     """The ``NNm`` label on a task's line, in either pane."""
     for child in widget.winfo_children():
@@ -3699,6 +3838,41 @@ def _drag_the_grip(panel, pixels, *, release=True, start=500):
         panel.on_divider_motion(_FakeEvent(start + pixels, 0))
 
 
+def test_pdm28_the_grip_is_the_whole_gap_between_the_panes(
+    root, manager, settings
+):
+    """PD-M2.8 — 15px of grip, and nothing beside it that is not grip.
+
+    The first version drew a 6px grip with a 2px pad on each side: a 10px gap
+    in which only the middle 6px started a drag. The gap and the grip are now
+    one thing, so a press anywhere in the gap is a press on the grip.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+
+    assert int(panel.divider.cget("width")) == 15, (
+        f"the grip is {panel.divider.cget('width')}px wide, not 15"
+    )
+    assert panel.grid_columnconfigure(1)["minsize"] == PLAN_DIVIDER_WIDTH_PX, (
+        "the grip's column is not the width of the grip, so the gap on screen "
+        "is not what can be pressed"
+    )
+
+    def inner_pads(column):
+        """The two panes' padx, as (left, right) integers."""
+        frame = panel.grid_slaves(row=1, column=column)[0]
+        pads = re.findall(r"-?\d+", str(frame.grid_info()["padx"]))
+        return (int(pads[0]), int(pads[-1]))
+
+    assert inner_pads(0) == (PLAN_PANE_EDGE_PAD_PX, 0), (
+        f"the items pane's padx is {inner_pads(0)} -- a pad between it and "
+        "the grip is gap the pointer cannot press"
+    )
+    assert inner_pads(2) == (0, PLAN_PANE_EDGE_PAD_PX), (
+        f"the day pane's padx is {inner_pads(2)} -- a pad between it and the "
+        "grip is gap the pointer cannot press"
+    )
+
+
 def test_pdm21_dragging_the_grip_changes_the_items_column(
     root, manager, settings
 ):
@@ -3787,7 +3961,7 @@ def test_pdm22_the_day_pane_cannot_be_dragged_shut(
     assert room > 1, "the panel was not laid out, so there is nothing to clamp"
 
     _drag_the_grip(panel, 5000, release=False)
-    widest = room - panel.day_width_floor()
+    widest = room - PLAN_PANE_CHROME_PX - panel.day_width_floor()
     assert panel.grid_columnconfigure(0)["minsize"] == widest, (
         f"dragged to {panel.grid_columnconfigure(0)['minsize']}px in a "
         f"{room}px screen, leaving the day less than the "
@@ -3819,12 +3993,21 @@ def test_pdm22_a_narrow_window_takes_the_width_from_the_items_pane(
         "precondition: with no width to measure the setting is drawn as asked"
     )
 
-    monkeypatch.setattr(panel, "winfo_width", lambda: floor + panel.day_width_floor() + 40)
+    # Both floors, the grip and the two edge pads, and 40px of slack. The
+    # chrome is in the sum because the clamp takes it off the window before it
+    # divides what is left: the behaviour changed when the grip was widened,
+    # and a window of both floors plus 40 no longer has 40px of slack in it.
+    monkeypatch.setattr(
+        panel,
+        "winfo_width",
+        lambda: floor + panel.day_width_floor() + PLAN_PANE_CHROME_PX + 40,
+    )
     panel.on_resize()
     assert panel.grid_columnconfigure(0)["minsize"] == floor + 40, (
         f"the items column kept {panel.grid_columnconfigure(0)['minsize']}px of a "
-        f"{floor + panel.day_width_floor() + 40}px window, leaving the day less "
-        f"than the {panel.day_width_floor()}px one of its rows needs"
+        f"{floor + panel.day_width_floor() + PLAN_PANE_CHROME_PX + 40}px window, "
+        f"leaving the day less than the {panel.day_width_floor()}px one of its "
+        "rows needs"
     )
 
     monkeypatch.setattr(panel, "winfo_width", lambda: 400)
@@ -3838,6 +4021,43 @@ def test_pdm22_a_narrow_window_takes_the_width_from_the_items_pane(
     panel.on_resize()
     assert panel.grid_columnconfigure(0)["minsize"] == floor + 200, (
         "widening the window did not give back the width a narrow one took"
+    )
+
+
+def test_pdm29_the_clamp_leaves_room_for_the_grip_and_the_edges(
+    root, manager, settings, monkeypatch
+):
+    """PD-M2.9 — a window is the two panes plus the grip plus the edges.
+
+    The first version measured both floors against the whole window width,
+    though ``PLAN_PANE_CHROME_PX`` of it is not pane at all. The day pane has
+    nothing holding it open, so it absorbed all of that -- it could be left
+    26px under its own floor, which is the clipping the floors were added to
+    prevent, and widening the grip to 15px would have made it 35.
+
+    ``winfo_width`` is patched rather than the window resized, as in
+    ``::test_pdm22_a_narrow_window_takes_the_width_from_the_items_pane``: this
+    is the division of a known width.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    floor = panel.items_width_floor()
+    settings.plan_items_col_width = floor + 500
+    exactly_both_floors = floor + panel.day_width_floor() + PLAN_PANE_CHROME_PX
+
+    monkeypatch.setattr(panel, "winfo_width", lambda: exactly_both_floors + 40)
+    panel.on_resize()
+    assert panel.grid_columnconfigure(0)["minsize"] == floor + 40, (
+        f"the items column took {panel.grid_columnconfigure(0)['minsize']}px "
+        f"of a {exactly_both_floors + 40}px window, which leaves the day pane "
+        f"less than the {panel.day_width_floor()}px one of its rows needs "
+        f"once the {PLAN_PANE_CHROME_PX}px of grip and edges are counted"
+    )
+
+    monkeypatch.setattr(panel, "winfo_width", lambda: exactly_both_floors)
+    panel.on_resize()
+    assert panel.grid_columnconfigure(0)["minsize"] == floor, (
+        "a window holding exactly both floors and the chrome has to draw the "
+        "items column at its floor, leaving the day pane its own"
     )
 
 
@@ -3881,18 +4101,22 @@ def test_pdm22_a_resize_alone_rebalances_the_panes(
         "setting, so no resize reached the clamp at all"
     )
 
-    root.geometry(f"{floor + panel.day_width_floor() + 40}x700")
+    root.geometry(
+        f"{floor + panel.day_width_floor() + PLAN_PANE_CHROME_PX + 40}x700"
+    )
     root.update_idletasks()
     root.update()
 
     room = panel.winfo_width()
     assert room > 1, "the panel was not laid out, so there is nothing to clamp"
-    assert room - panel.day_width_floor() < asked, (
+    for_panes = room - PLAN_PANE_CHROME_PX
+    assert for_panes - panel.day_width_floor() < asked, (
         f"a {room}px window still has room for the {asked}px setting, so this "
         "resize asks nothing of the clamp"
     )
     assert (
-        panel.grid_columnconfigure(0)["minsize"] == room - panel.day_width_floor()
+        panel.grid_columnconfigure(0)["minsize"]
+        == for_panes - panel.day_width_floor()
     ), (
         f"the items column kept {panel.grid_columnconfigure(0)['minsize']}px of "
         f"a {room}px window, leaving the day less than the "
@@ -3920,7 +4144,9 @@ def test_pdm23_a_click_on_the_grip_does_not_save_the_clamped_width(
     asked = floor + 300
     settings.plan_items_col_width = asked
     monkeypatch.setattr(
-        panel, "winfo_width", lambda: floor + panel.day_width_floor() + 40
+        panel,
+        "winfo_width",
+        lambda: floor + panel.day_width_floor() + PLAN_PANE_CHROME_PX + 40,
     )
     panel.on_resize()
     assert panel.grid_columnconfigure(0)["minsize"] == floor + 40, (
