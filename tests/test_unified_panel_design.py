@@ -33,6 +33,7 @@ import pytest  # noqa: E402
 
 import customtkinter as ctk  # noqa: E402
 
+from src.getmoredone.screens import chip_table  # noqa: E402
 from src.getmoredone.screens.ape_assignment import APEAssignmentScreen  # noqa: E402
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "getmoredone"
@@ -248,5 +249,195 @@ def test_updm41_ape_quarter_right_row_ends_with_a_delete_button():
         assert cells[-1][1] == "CTkButton"
         assert cells[-1][2] == "Delete"
         assert "<Button-1>" not in set(_bound_sequences(row))
+    finally:
+        root.destroy()
+
+
+# ------------------------------------------- UPD-M3: the shared chip table
+
+def _table(prefix="ape_quarter_left", columns=None, settings=None):
+    """A ChipTable in a scrollable frame on a withdrawn root."""
+    root = _root()
+    frame = ctk.CTkScrollableFrame(root)
+    frame.grid(row=0, column=0, sticky="nsew")
+    cols = columns if columns is not None else list(chip_table.APE_COLUMNS)
+    table = chip_table.ChipTable(
+        frame, settings if settings is not None else FakeSettings(), prefix, cols
+    )
+    return root, frame, table
+
+
+class FakeSettings:
+    """Attribute bag with a save() counter, as tests/test_column_resize.py uses."""
+
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+        self.saved = 0
+
+    def save(self):
+        self.saved += 1
+
+
+def test_updm31_table_renders_header_and_rows():
+    """UPD-M3.1 — a header in column order, then one frame per row.
+
+    The table owns the header and the row frames; the screen owns what goes in
+    the checkbox and actions columns. This is the split that lets five
+    renderers become one.
+    """
+    root, _frame, table = _table()
+    try:
+        table.build_header()
+        for idx in range(3):
+            table.add_row(
+                {"index": str(idx + 1), "segment": "Purposeful Work",
+                 "subsegment": "Living Systems", "category": "Blog"},
+                {"segment": "#3366cc", "subsegment": "#44aa88", "category": "#cc7744"},
+            )
+        assert [c.heading for c in table.columns] == [
+            "", "#", "Segment", "SubSegment", "Category", "Actions"]
+        assert len(table.rows) == 3
+        texts = [lbl.cget("text").strip() for lbl in table.rows[0][1].values()]
+        assert "Purposeful Work" in texts
+    finally:
+        root.destroy()
+
+
+def test_updm32_every_resizable_column_has_a_handle():
+    """UPD-M3.2 — a drag handle per resizable column, and none on the others.
+
+    Exact count, not a floor: the checkbox and Actions columns are fixed
+    width, and a handle on them would let a user drag a column that has
+    nothing to show.
+    """
+    root, _frame, table = _table()
+    try:
+        header = table.build_header()
+        handles = [c for c in header.winfo_children()
+                   if c.cget("cursor") == "sb_h_double_arrow"]
+        resizable = [c for c in table.columns if c.resizable]
+        # Segment, SubSegment, Category. The checkbox, # and Actions columns
+        # are fixed: a 34px number has nothing to widen into.
+        assert len(handles) == len(resizable) == 3
+    finally:
+        root.destroy()
+
+
+def test_updm33_resizing_one_column_leaves_the_others():
+    """UPD-M3.3 — a drag moves its own column's width and no other's."""
+    settings = FakeSettings()
+    root, _frame, table = _table(settings=settings)
+    try:
+        table.build_header()
+        before = {c.key: table.resizer.width(c.key) for c in table.columns}
+        table.resizer._on_start(SimpleNamespace(x_root=500), "segment")
+        table.resizer._on_drag(SimpleNamespace(x_root=560), "segment")
+        table.resizer._on_stop(SimpleNamespace(x_root=560), "segment")
+
+        assert table.resizer.width("segment") == before["segment"] + 60
+        for key, width in before.items():
+            if key != "segment":
+                assert table.resizer.width(key) == width
+    finally:
+        root.destroy()
+
+
+def test_updm34_column_width_is_clamped():
+    """UPD-M3.4 — a drag past either bound stops at the bound.
+
+    Without this a column can be dragged to nothing and never dragged back,
+    because the handle goes with it.
+    """
+    root, _frame, table = _table()
+    try:
+        table.build_header()
+        spec = table.resizer.specs["segment"]
+
+        table.resizer._on_start(SimpleNamespace(x_root=500), "segment")
+        table.resizer._on_drag(SimpleNamespace(x_root=0), "segment")
+        assert table.resizer.width("segment") == spec.min_width
+
+        table.resizer._on_start(SimpleNamespace(x_root=500), "segment")
+        table.resizer._on_drag(SimpleNamespace(x_root=9000), "segment")
+        assert table.resizer.width("segment") == spec.max_width
+    finally:
+        root.destroy()
+
+
+def test_updm35_chip_text_follows_the_column_width():
+    """UPD-M3.5 — narrowing a column re-clamps the chip text inside it.
+
+    A chip is a solid pill whose fill is the column width, so text that is not
+    re-clamped does not overflow invisibly -- it widens the pill and pushes
+    the next column off the panel.
+    """
+    root, _frame, table = _table()
+    try:
+        table.build_header()
+        _frame_row, cells = table.add_row(
+            {"segment": "Purposeful Work and then some more words"},
+            {"segment": "#3366cc"},
+        )
+        wide = cells["segment"].cget("text")
+
+        table.resizer._on_start(SimpleNamespace(x_root=500), "segment")
+        table.resizer._on_drag(SimpleNamespace(x_root=440), "segment")
+        narrow = cells["segment"].cget("text")
+
+        assert len(narrow) < len(wide)
+    finally:
+        root.destroy()
+
+
+def test_updm36_panels_keep_their_own_widths():
+    """UPD-M3.6 — two tables with different prefixes do not share a width.
+
+    The left and right panel of one tab are different shapes and different
+    widths; one store for both would make a drag in one panel move the other.
+    """
+    settings = FakeSettings()
+    root = _root()
+    try:
+        left_frame = ctk.CTkScrollableFrame(root)
+        right_frame = ctk.CTkScrollableFrame(root)
+        left = chip_table.ChipTable(left_frame, settings, "ape_quarter_left",
+                                    list(chip_table.APE_COLUMNS))
+        right = chip_table.ChipTable(right_frame, settings, "ape_quarter_right",
+                                     list(chip_table.APE_COLUMNS))
+        start = right.resizer.width("segment")
+
+        left.resizer._on_start(SimpleNamespace(x_root=500), "segment")
+        left.resizer._on_drag(SimpleNamespace(x_root=580), "segment")
+        left.resizer._on_stop(SimpleNamespace(x_root=580), "segment")
+
+        assert left.resizer.width("segment") == start + 80
+        assert right.resizer.width("segment") == start
+        assert settings.ape_quarter_left_col_widths["segment"] == start + 80
+        assert not getattr(settings, "ape_quarter_right_col_widths", {})
+    finally:
+        root.destroy()
+
+
+def test_updm37_missing_lineage_falls_back_instead_of_raising():
+    """UPD-M3.7 — an empty name renders empty, an empty colour gets the surface.
+
+    APEs with no subsegment or category exist in the live database. "It did
+    not raise" is not a verdict -- pytest gives that for free and it would
+    still hold if the chip rendered the string "None" on a transparent
+    background. So this asserts the two things the fallbacks actually do:
+    a missing value is empty text, not "None", and a missing colour is the
+    panel surface, not an empty colour Tk would reject.
+    """
+    root, _frame, table = _table()
+    try:
+        palette_surface = chip_table.semantic_colors()[chip_table.DEFAULT_CHIP_KEY]
+        table.build_header()
+        _row_frame, cells = table.add_row(
+            {"segment": "", "subsegment": None, "category": "Blog"},
+            {"segment": "", "subsegment": "", "category": "#cc7744"},
+        )
+        assert cells["subsegment"].cget("text").strip() == ""
+        assert cells["segment"].cget("fg_color") == palette_surface
+        assert cells["category"].cget("fg_color") == "#cc7744"
     finally:
         root.destroy()
