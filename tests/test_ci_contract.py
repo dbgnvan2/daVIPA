@@ -427,19 +427,55 @@ def test_rm3d_no_test_files_at_the_repo_root():
     )
 
 
+# Directories whose test files pytest never collects, so this file must not
+# report them as uncollected.
+#
+# ``.gmd-optout-probe`` is written and removed inside
+# test_the_mapped_window_opt_out_is_off_by_default; ``.claude`` holds the
+# desktop app's per-session git worktrees, each a full checkout with its own
+# ``tests/`` tree. pytest's default norecursedirs skips dot-directories, so
+# neither is ever collected — without these entries a killed run, or any
+# worktree session, turns this assertion red against files that are not even
+# part of this checkout.
+UNCOLLECTED_DIRS = frozenset({
+    "venv", ".venv", "dist", "build", ".git", "__pycache__",
+    ".gmd-optout-probe", ".claude",
+})
+
+
+def is_outside_collection(path) -> bool:
+    """True when pytest will never collect ``path`` because of its directory."""
+    return any(part in UNCOLLECTED_DIRS for part in path.parts)
+
+
+def test_rm3d_worktree_tests_are_not_counted_as_uncollected():
+    """A session worktree's tests belong to that checkout, not this one.
+
+    The desktop app puts each session's git worktree under
+    ``.claude/worktrees/<name>/``, a full checkout carrying its own
+    ``tests/`` tree. pytest skips dot-directories, so those files are never
+    collected here and must not be reported as rotting. Before ``.claude``
+    was excluded, opening one worktree session turned
+    test_rm3d_all_test_files_are_collected red against 115 files that are
+    not part of this working tree at all.
+    """
+    from pathlib import Path as _Path
+
+    assert is_outside_collection(
+        _Path(".claude/worktrees/some-session/tests/test_thing.py"))
+    assert is_outside_collection(_Path("venv/lib/tests/test_vendored.py"))
+    # The repo's own tests are still counted, or the assertion it guards
+    # would pass by excluding everything.
+    assert not is_outside_collection(_Path("tests/test_ci_contract.py"))
+    assert not is_outside_collection(_Path("tests/test_ape_week_actions.py"))
+
+
 def test_rm3d_all_test_files_are_collected():
     """Ask pytest what it collects and compare against what exists on disk."""
     on_disk = {
         p.relative_to(REPO_ROOT).as_posix()
         for p in REPO_ROOT.rglob("test_*.py")
-        # .gmd-optout-probe is written and removed inside
-        # test_the_mapped_window_opt_out_is_off_by_default. pytest's default
-        # norecursedirs skips dot-directories, so it is never collected — this
-        # glob would otherwise report it as an uncollected file if a run were
-        # killed mid-test.
-        if not any(part in {"venv", ".venv", "dist", "build", ".git",
-                            "__pycache__", ".gmd-optout-probe"}
-                   for part in p.parts)
+        if not is_outside_collection(p)
     }
     assert on_disk, "no test files found at all — the glob is wrong"
 
