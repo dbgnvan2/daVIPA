@@ -290,7 +290,10 @@ Header:
   hours of the day are what the grid is drawn from.
 - **+ Break** / **+ Buffer** — What: Puts a 30-minute padding block in the first
   box that will hold it. Why: Real days are not back-to-back. These carry no
-  item, so they are drawn in a neutral colour rather than a priority one.
+  item, so they are drawn in a neutral colour rather than a priority one — the
+  same stripe colour and the same box surface as lunch, because the three are
+  one kind of thing: time the day is not working. An empty box is not drawn
+  that way; it is room, and it is drawn as room.
 - **AutoLoad** — What: Blocks every item in the left-hand list that the day
   still has room for, one after another: from the top of the list down the
   day, each at the earliest half hour with nothing in it. A task longer than
@@ -357,13 +360,15 @@ Items pane (left):
   because nothing on disk would hold it.
 - **Items starting \<date\>** — What: Open items whose start date is that date,
   highest priority score first. Why: These are the only items the day is built
-  from. Each row shows its depth, `already blocked` if the day already holds a
-  block for it — marked rather than hidden, because an item can genuinely need
-  two blocks in a day — and the block length it would get (`30m`), beside the
-  depth bars at the right-hand end of the row's first line, where a task in a
-  day box carries the same fact. The priority score is not printed: the row is drawn in its
-  priority band and striped in it, so the number said a third time what the
-  colour already says twice.
+  from. Each row is one line, laid out exactly like a task inside a day box:
+  colour stripe, title, a `>` marker when the day already holds a block for
+  this item, the depth bars, and the block length it would get (`30m`) at the
+  right-hand end. The marker is there rather than the words it replaced because
+  the words needed a second line, and a second line set a floor that made every
+  row the same height — see *How tall a row is* below. It is marked rather than
+  hidden, because an item can genuinely need two blocks in a day. The priority
+  score is not printed: the row is drawn in its priority band and striped in
+  it, so the number said a third time what the colour already says twice.
 - **How tall a row is** — What: The space the item's work block will take in an
   empty day — from the top edge of the first box it would fill to the bottom
   edge of the last. A half hour that already holds a task is taller than one
@@ -373,12 +378,14 @@ Items pane (left):
   take, so you can see whether the day has room for it before dragging. The
   height comes from *Drag Schedule box height (px)*, the same setting the day's
   boxes use.
-- **The shortest a row gets** — What: 66px, two lines of text, whatever the box
-  height is set to. Why: below that the row cannot show its `already blocked`
-  marker, and it would lose it with nothing to say it was there. So at a box
-  height of 30 — the lowest the setting goes — a one-box row is taller than the
-  34px box it matches everywhere else. From 62 up, the row and the day agree
-  exactly.
+- **The shortest a row gets** — What: 33px, one line of text, whatever the box
+  height is set to. Why: a row cannot be drawn shorter than the line it has to
+  show. At every box height the setting allows this is below what the day gives
+  a half hour, so the row and the day agree everywhere and the floor never
+  changes a row's height in practice. It was 66px — two lines — until the
+  `already blocked` words became a marker on the first line; at that floor a
+  30-minute row and a 60-minute row were drawn within a few pixels of each
+  other, which defeated the point of sizing rows at all.
 - **Drag a row onto a box** — What: Creates a block for it in that half hour.
   Why: This is how blocks are made, and the box you drop on is the box you get.
   If the item needs more than one box, the status line says how many and what is

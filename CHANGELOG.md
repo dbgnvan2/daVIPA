@@ -7,6 +7,34 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — the two panes, read side by side
+
+Six corrections from looking at the built screen.
+
+- **An item row is now the height of the space it will take, at every box
+  height.** It was meant to be since PB-M6, but the row had a second line for
+  the `already blocked` words, and the floor that line imposed was 66px — two
+  boxes' worth at any box height anyone sets. So a 30-minute row and a
+  60-minute row came out within a few pixels of each other, and the pane
+  stopped showing the one thing its row heights are for. A 90-minute item is
+  three boxes tall because the day will give it three boxes.
+- **`already blocked` is a `>` marker**, in a column of its own left of the
+  depth bars, on both panes' layout so nothing shifts out of line when it
+  appears. Not the green check: that already means *this task is finished* on
+  a day box, and one glyph cannot carry both.
+- **Every block ends 8px short of its right edge**, in both panes. The length
+  was gridded hard against the edge. The inset is counted into the length's own
+  column, so the width the items pane can be dragged to accounts for it.
+- **`30m` is the size of the text beside it.** It was 11pt against the title's
+  13, which made the one number on the row the smallest thing on it.
+- **A break or a buffer is now drawn on the same surface as lunch.** The
+  previous change gave the three one stripe colour and stopped there, so the
+  stripes matched while the boxes did not — and the boxes are what you compare.
+  An empty box still looks like an empty box: it is room, not padding.
+- **The word "Lunch" is body text at body size.** At the theme's muted text on
+  the surface a lunch box is drawn on it was within a few values of its own
+  background — measured off the screenshot at (239, 234, 252) on (240, 231, 255).
+
 ### Added — an item dropped above or below the day lengthens it
 
 - There is now a box at each end of the day, above the first half hour and

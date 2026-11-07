@@ -77,9 +77,35 @@ SLOT_STRIPE_GAP_PX = 8
 SLOT_BARS_WIDTH_PX = 22
 SLOT_LENGTH_WIDTH_PX = 48
 
+#: The column left of the depth bars. In the left pane it carries the marker
+#: that says the day already holds a block for this item; in a day box it is
+#: empty. It is a column in both so the two panes stay in step: a marker drawn
+#: inside the title column would push the bars and the length of a blocked row
+#: out of line with every other row and with the day beside it.
+SLOT_MARKER_WIDTH_PX = 16
+
+#: The gap between the end of a task's line and the right edge of the box or
+#: row it is drawn in. Counted into the length's own column, so the panes'
+#: widths and PD-M2's clamp both account for it.
+CHIP_RIGHT_INSET_PX = 8
+
+#: The marker itself. A chevron rather than the green check: the check already
+#: means "this task is finished" on a day box (PD-M6), and one glyph cannot
+#: carry both "done" and "has a block today" without saying the wrong one half
+#: the time.
+PD_BLOCKED_TEXT = ">"
+
+#: The chip's columns by name, so a renderer and a test can refer to the same
+#: index without counting.
+CHIP_STRIPE_COLUMN = 0
+CHIP_TITLE_COLUMN = 1
+CHIP_MARKER_COLUMN = 2
+CHIP_BARS_COLUMN = 3
+CHIP_LENGTH_COLUMN = 4
+
 
 def chip_column_minsizes(title_width: int = SLOT_TITLE_WIDTH_PX):
-    """The four column widths one task's line is laid out in, in order.
+    """The column widths one task's line is laid out in, in order.
 
     Purpose: PD-M1.1 -- a day box and an item row are the same four columns,
              so there is one place that says what those columns are.
@@ -94,9 +120,24 @@ def chip_column_minsizes(title_width: int = SLOT_TITLE_WIDTH_PX):
     return (
         STRIPE_WIDTH_PX + SLOT_STRIPE_GAP_PX,
         title_width,
+        SLOT_MARKER_WIDTH_PX,
         SLOT_BARS_WIDTH_PX,
-        SLOT_LENGTH_WIDTH_PX,
+        SLOT_LENGTH_WIDTH_PX + CHIP_RIGHT_INSET_PX,
     )
+
+
+def configure_chip_columns(widget, title_width: int = SLOT_TITLE_WIDTH_PX) -> None:
+    """Lay a widget out in the chip's columns, whatever there are of them.
+
+    Both renderers call this rather than configuring columns by index, so a
+    column added to ``chip_column_minsizes`` reaches both panes or neither.
+    The title takes the slack; every other column is the width it asks for.
+    """
+    for column, width in enumerate(chip_column_minsizes(title_width)):
+        widget.grid_columnconfigure(
+            column, minsize=width, weight=1 if column == CHIP_TITLE_COLUMN else 0
+        )
+
 
 #: The vertical gap between two consecutive boxes of the day: ``build_slot_row``
 #: grids each box ``pady=1``, so one box's bottom edge and the next box's top
@@ -105,16 +146,19 @@ def chip_column_minsizes(title_width: int = SLOT_TITLE_WIDTH_PX):
 SLOT_ROW_GAP_PX = 2
 
 #: The least an item row may be drawn at, whatever the box height says: what
-#: its own two grid rows request. Row 0 is the title's 5px top pad and a 28px
-#: line; row 1 is the ``already blocked`` marker's 28px line and its 5px bottom
-#: pad. 33 + 33.
+#: its own grid asks for. One line now -- the title's 5px top pad and its 28px
+#: line -- because the ``already blocked`` words became a glyph on that same
+#: line and took the second row away with them.
 #:
-#: 67 under PB-M6, when the ``{minutes}m`` label sat on row 1 and its 6px
-#: bottom pad was the larger of that row's two. PD-M1 moved the length up onto
-#: the title's line, where a box writes it, so row 1 is the marker alone and
-#: the row needs a pixel less.
+#: It was 67 under PB-M6 and 66 under PD-M1, when the row had a second line for
+#: the ``already blocked`` words. That floor was two boxes' worth of height at
+#: any box height a user is likely to set, so a 30-minute row and a 60-minute
+#: row were drawn within a few pixels of each other and the left pane stopped
+#: showing how much of the day an item would take -- the one thing it is the
+#: height it is in order to show. The words are a glyph on the title's line
+#: now, and with them the second row and the floor they imposed.
 #:
-#: Measured, both times, by
+#: Measured, every time it has changed, by
 #: ``test_pbm61_the_floor_is_what_the_rows_own_grid_asks_for``, which reads the
 #: requirement off the widgets the row builds. It is there because the number
 #: was first written by hand as 66 when the arithmetic said 67, and the row
@@ -123,17 +167,10 @@ SLOT_ROW_GAP_PX = 2
 #: their cells. This is the one number here justified purely by arithmetic, so
 #: the arithmetic is checked rather than restated.
 #:
-#: The 30px floor on the box height was justified for a chip holding one line,
-#: and an item row can hold two. At 30 the day gives a half hour 34px, and a
-#: row matching it showed its title and clipped the ``already blocked`` marker
-#: -- a scheduling fact the colour cannot carry, gone with no sign it was
-#: there.
-#:
-#: So the row and the day agree exactly from a box height of 62 up, and below
-#: that the row is the taller of the two. Between 31 and 61 the day can show a
-#: line of text in a box this row is still taller than; the floor is about what
-#: *this* row needs, not about what the day can render.
-ITEM_ROW_MIN_HEIGHT_PX = 66
+#: At one line the floor is below ``SLOT_MIN_HEIGHT_PX``, so the row and the
+#: day now agree at every box height: a 90-minute item is three boxes tall
+#: because the day will give it three boxes.
+ITEM_ROW_MIN_HEIGHT_PX = 33
 
 
 def stripe_for_item(item: Optional[ActionItem]) -> str:
@@ -283,11 +320,14 @@ def build_item_row(
     boxes use for it. Taken from a constant here instead, the two panes would
     line up at the default and nowhere else.
 
-    The second line is the "already blocked" marker, and exists only when the
-    marker does: it is the one scheduling fact a box does not already show.
-    The depth word was there too until PD-M1.5 -- a fourth way of saying what
-    the row's shade, its stripe and its bar stack all say, written on the one
-    line a reader checks for something the colours cannot tell them.
+    ``PD_BLOCKED_TEXT`` sits in its own column left of the depth bars, and only
+    when the day already holds a block for this item: the one scheduling fact a
+    box does not already show. It was two words on a second line until the row
+    had to be the height of the space it will take, which a second line made
+    impossible -- the floor that line imposed was two boxes tall, so every row
+    shorter than that was drawn at the floor and a 30-minute item looked the
+    size of an hour. The depth word went at PD-M1.5, a fourth way of saying
+    what the row's shade, its stripe and its bar stack all say.
 
     The height is the space the day will give those half hours, asked of
     ``slot_row_height`` rather than recomputed: one box plus the 2px gap to the
@@ -300,13 +340,14 @@ def build_item_row(
     the test asserted the same formula the code used, so the one relationship
     this function exists for was the one thing unchecked.
 
-    Row 2 is empty and carries the weight. That is what keeps the two lines
-    together at the top of a tall row instead of centring the title in the
-    slack, and it is what makes a row too short for both lines lose the marker
-    rather than the title -- at a box height of 30 the weight was on row 0
-    and Tk took the whole shortfall out of it, collapsing the title to a single
-    pixel and leaving a row that showed its depth and its length and not which
-    item it was.
+    No row carries weight any more. A second row did, which kept the two lines
+    at the top of a tall row and made a row too short for both lose the empty
+    space rather than the text: with the weight on row 0, Tk took the whole
+    shortfall out of it and collapsed the title to a single pixel. With one
+    line and a floor that is that line's own height the shortfall cannot
+    happen, Tk leaves the slack unallocated at the bottom, and the text sits at
+    the top either way -- so the line was kept until the mutation gate showed
+    that moving the weight changed nothing it could see.
     """
     fill = fill_for_item(item)
     on_fill = pick_text_color(fill)
@@ -321,12 +362,7 @@ def build_item_row(
     # The chip's columns, kept in the same order and at the same widths by
     # ``test_pdm11_the_item_row_uses_the_chips_column_order``, which reads them
     # off a real chip rather than restating them.
-    widths = chip_column_minsizes(title_width)
-    frame.grid_columnconfigure(0, minsize=widths[0])
-    frame.grid_columnconfigure(1, minsize=widths[1], weight=1)
-    frame.grid_columnconfigure(2, minsize=widths[2])
-    frame.grid_columnconfigure(3, minsize=widths[3])
-    frame.grid_rowconfigure(2, weight=1)
+    configure_chip_columns(frame, title_width)
     frame.grid_propagate(False)
 
     stripe = ctk.CTkFrame(
@@ -336,16 +372,35 @@ def build_item_row(
         fg_color=stripe_for_item(item),
         corner_radius=3,
     )
-    stripe.grid(row=0, column=0, rowspan=3, sticky="ns", padx=(0, 8), pady=4)
+    stripe.grid(
+        row=0, column=CHIP_STRIPE_COLUMN, rowspan=2, sticky="ns",
+        padx=(0, 8), pady=4,
+    )
     stripe.grid_propagate(False)
 
     title = ctk.CTkLabel(
         frame, text=item.title, anchor="w", justify="left", text_color=on_fill
     )
-    title.grid(row=0, column=1, sticky="ew", pady=(5, 0))
+    title.grid(row=0, column=CHIP_TITLE_COLUMN, sticky="ew", pady=(5, 0))
+
+    if already_blocked:
+        # Marked, not hidden: an item can genuinely need two blocks in a day,
+        # and removing it from the list would look like it had vanished. A
+        # glyph rather than the words it replaced, which cost the row a second
+        # line and so cost every row in the pane the height that made it the
+        # size of the space it will take.
+        ctk.CTkLabel(
+            frame,
+            text=PD_BLOCKED_TEXT,
+            width=SLOT_MARKER_WIDTH_PX,
+            anchor="w",
+            text_color=on_fill,
+        ).grid(row=0, column=CHIP_MARKER_COLUMN, sticky="nw", pady=(5, 0))
 
     bars = DepthBarStack(frame, item.depth)
-    bars.grid(row=0, column=2, padx=(4, 6), pady=(5, 0), sticky="n")
+    bars.grid(
+        row=0, column=CHIP_BARS_COLUMN, padx=(4, 6), pady=(5, 0), sticky="n"
+    )
 
     # The length, where a box writes it: the right-hand end of the task's own
     # line. This is the same task before it has been dragged there.
@@ -355,19 +410,10 @@ def build_item_row(
         width=SLOT_LENGTH_WIDTH_PX,
         anchor="e",
         text_color=on_fill,
-        font=ctk.CTkFont(size=11),
-    ).grid(row=0, column=3, sticky="ne", pady=(5, 0))
-
-    if already_blocked:
-        # Marked, not hidden: an item can genuinely need two blocks in a day,
-        # and removing it from the list would look like it had vanished.
-        ctk.CTkLabel(
-            frame,
-            text="already blocked",
-            anchor="w",
-            text_color=on_fill,
-            font=ctk.CTkFont(size=11),
-        ).grid(row=1, column=1, columnspan=3, sticky="ew", pady=(0, 5))
+    ).grid(
+        row=0, column=CHIP_LENGTH_COLUMN, sticky="ne",
+        padx=(0, CHIP_RIGHT_INSET_PX), pady=(5, 0),
+    )
 
     return frame
 
@@ -501,7 +547,7 @@ def build_slot_row(
     slot = grid_slot.slot
     chips = len(grid_slot.starting) + len(grid_slot.continued)
 
-    if slot.is_lunch:
+    if slot.is_lunch or slot_is_padding(grid_slot):
         fill = palette["surface"]
     elif grid_slot.is_empty:
         fill = "transparent"
@@ -633,6 +679,31 @@ def slot_is_complete(grid_slot, items_by_id: Dict[str, ActionItem]) -> bool:
     return all(item_is_complete(items_by_id.get(block.item_id)) for block in tasks)
 
 
+def slot_is_padding(grid_slot) -> bool:
+    """True when this box holds padding and nothing else.
+
+    Purpose: PD-M4 -- break, buffer and lunch are one kind of thing, so they
+             are drawn as one kind of thing.
+    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m4
+    Tests:   tests/test_plan_screen.py::test_pdm42_a_padding_box_is_drawn_like_the_lunch_box
+
+    PD-M4 gave the three one stripe colour and stopped there, which left the
+    row behind a break or a buffer drawn on the surface every task box uses
+    while lunch had its own lighter one. On screen the stripes matched and the
+    boxes did not, which is the comparison a user actually makes.
+
+    An empty box is not padding: it is room, and it is drawn as room.
+    """
+    chips = list(grid_slot.starting) + list(grid_slot.continued)
+    if not chips:
+        return False
+    return all(
+        BlockType.normalize(block.block_type)
+        in (BlockType.BUFFER, BlockType.BREAK)
+        for block in chips
+    )
+
+
 def _build_lunch_chip(parent, row: int) -> ctk.CTkFrame:
     """The lunch box's own row: the padding stripe, and the word.
 
@@ -662,13 +733,15 @@ def _build_lunch_chip(parent, row: int) -> ctk.CTkFrame:
     stripe.grid(row=0, column=0, sticky="ns", padx=(0, 8), pady=2)
     stripe.grid_propagate(False)
 
+    # Body size and body colour, like a break's word and a buffer's. At the
+    # theme's muted text on the surface a lunch box is drawn on, the word was
+    # within a few values of its own background.
     ctk.CTkLabel(
         chip,
         text="Lunch",
         anchor="w",
-        text_color=semantic_colors()["muted_text"],
-        font=ctk.CTkFont(size=11),
-    ).grid(row=0, column=1, sticky="w")
+        text_color=semantic_colors()["body_text"],
+    ).grid(row=0, column=1, sticky="w", padx=(0, CHIP_RIGHT_INSET_PX))
     return chip
 
 
@@ -712,11 +785,7 @@ def _build_block_chip(
         parent, fg_color=fill, corner_radius=4, height=chip_height - 4
     )
     chip.grid(row=row, column=0, sticky="ew", pady=1)
-    widths = chip_column_minsizes(title_width)
-    chip.grid_columnconfigure(0, minsize=widths[0])
-    chip.grid_columnconfigure(1, minsize=widths[1], weight=1)
-    chip.grid_columnconfigure(2, minsize=widths[2])
-    chip.grid_columnconfigure(3, minsize=widths[3])
+    configure_chip_columns(chip, title_width)
     chip.grid_rowconfigure(0, weight=1)
     # No grid_propagate(False) here, deliberately. It would also hold the chip
     # to its height, but then neither it nor the stripe's height= could be
@@ -734,7 +803,9 @@ def _build_block_chip(
         fg_color=stripe_for_block(block, item),
         corner_radius=3,
     )
-    stripe.grid(row=0, column=0, sticky="ns", padx=(0, 8), pady=2)
+    stripe.grid(
+        row=0, column=CHIP_STRIPE_COLUMN, sticky="ns", padx=(0, 8), pady=2
+    )
     stripe.grid_propagate(False)
 
     title = _block_title(block, item)
@@ -744,7 +815,7 @@ def _build_block_chip(
         anchor="w",
         justify="left",
         text_color=body_text,
-    ).grid(row=0, column=1, sticky="ew")
+    ).grid(row=0, column=CHIP_TITLE_COLUMN, sticky="ew")
 
     if continued:
         # The minutes this box gives the task that the task does not use. 45 in
@@ -761,13 +832,15 @@ def _build_block_chip(
             # theme's muted text is the right colour for the theme's surface
             # and the wrong one for a band tint.
             text_color=body_text,
-            font=ctk.CTkFont(size=11),
-        ).grid(row=0, column=3, sticky="e")
+        ).grid(
+            row=0, column=CHIP_LENGTH_COLUMN, sticky="e",
+            padx=(0, CHIP_RIGHT_INSET_PX),
+        )
         return chip
 
     if kind == BlockType.ITEM:
         DepthBarStack(chip, item.depth if item else None).grid(
-            row=0, column=2, padx=(4, 6)
+            row=0, column=CHIP_BARS_COLUMN, padx=(4, 6)
         )
 
     ctk.CTkLabel(
@@ -776,8 +849,10 @@ def _build_block_chip(
         width=SLOT_LENGTH_WIDTH_PX,
         anchor="e",
         text_color=body_text,
-        font=ctk.CTkFont(size=11),
-    ).grid(row=0, column=3, sticky="e")
+    ).grid(
+        row=0, column=CHIP_LENGTH_COLUMN, sticky="e",
+        padx=(0, CHIP_RIGHT_INSET_PX),
+    )
 
     return chip
 

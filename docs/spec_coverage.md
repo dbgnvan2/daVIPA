@@ -443,6 +443,26 @@ walkthrough, two more after those five were on screen. All tests are in
 | PD-M5.10 | The drop gesture itself routes to the right end, not only the method | `src/getmoredone/screens/plan.py` (on_drag_release, virtual_under_pointer) | `::test_pdm5_an_item_drag_onto_a_virtual_box_extends_the_day`, `::test_pdm5_a_drop_in_the_day_but_on_no_box_still_does_nothing` | done — unplanned; without the first, the extension is only reachable by calling `extend_day_for`. The second came out of the mutation gate: a release that hit neither box returning an end of the day instead of `None` passed everything else, and would have lengthened the day for a drop on the heading |
 | PD-M5.11 | Extending is refused on a non-working day, like every other write on this screen | `src/getmoredone/screens/plan.py` (extend_day_for — `_require_block_day`) | `::test_pdm5_the_day_cannot_be_extended_onto_a_non_block_day` | done — unplanned |
 
+## PD-S — the six corrections from the built screen (2026-11-06)
+
+Asked for against a screenshot of the finished batch, so each row is a defect
+in what PD-M1 … PD-M6 shipped rather than a new feature.
+
+| ID | Criterion | Where | Test | Status |
+|---|---|---|---|---|
+| PD-S1 | An item row is exactly the boxes the day will give it, at every box height the setting allows | `src/getmoredone/screens/plan_blocks.py` (ITEM_ROW_MIN_HEIGHT_PX, item_row_height) | `tests/test_plan_screen.py::test_pbm61_a_row_is_the_days_own_height_at_every_usable_box_height` | done — the 66px floor PD-M1 left was two boxes' worth at any realistic box height, so every row was drawn at it and PB-M6.1's purpose was defeated on screen while its tests stayed green: they asserted the floor, which was correct, and never that a 60-minute row is taller than a 30-minute one |
+| PD-S2 | Every block ends `CHIP_RIGHT_INSET_PX` short of its right edge, in both panes, and the inset is counted into the pane's width floor | `src/getmoredone/screens/plan_blocks.py` (CHIP_RIGHT_INSET_PX, chip_column_minsizes) | `::test_pd2_every_block_ends_short_of_its_right_edge` | done |
+| PD-S3 | The `NNm` length is the size of the title beside it, in both panes | `src/getmoredone/screens/plan_blocks.py` (build_item_row, _build_block_chip) | `::test_pd3_the_length_is_body_size_in_both_panes` | done — asserted against the title's own font, because the complaint is a relationship between two labels on one line, not a value |
+| PD-S4 | The blocked marker is a glyph in its own column left of the depth bars, and the row is one line | `src/getmoredone/screens/plan_blocks.py` (PD_BLOCKED_TEXT, CHIP_MARKER_COLUMN, build_item_row) | `::test_pdm14_the_blocked_marker_is_a_glyph_left_of_the_depth_bars` | done — replaces `::test_pdm14_the_second_line_is_the_blocked_marker_alone`. The marker column is in `chip_column_minsizes`, so the day pane carries it too and a blocked row's bars and length stay in line with every other row |
+| PD-S5 | A box holding only break or buffer is drawn on the same surface as a lunch box; an empty box is not | `src/getmoredone/screens/plan_blocks.py` (slot_is_padding, build_slot_row) | `::test_pdm42_a_padding_box_is_drawn_like_the_lunch_box` | done — PD-M4 matched the three stripes and left the box fills apart, which is the comparison a user makes. The empty-box assertion is there because without it the test passes for an implementation that fills every non-task box alike |
+| PD-S6 | The word "Lunch" is the size and colour of a break's word | `src/getmoredone/screens/plan_blocks.py` (_build_lunch_chip) | `::test_pdm42_the_lunch_word_is_body_text_like_a_breaks` | done — it was 11pt muted text on the lunch surface, within a few values of its own background |
+
+Fifteen mutations over these six, fourteen red on the first run. The fifteenth
+found a dead line: with one text row and a floor equal to that row's height,
+`grid_rowconfigure(1, weight=1)` could no longer change anything, because the
+shortfall it was written for cannot occur. Removed rather than left as a line
+no test can fail on.
+
 ## Human review required (not code-testable)
 
 | Item | Why it cannot be a test | What is tested instead |
