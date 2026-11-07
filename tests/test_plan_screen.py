@@ -5071,10 +5071,12 @@ def test_pdm3_autoload_on_an_empty_list_says_so(screen, manager):
 def _pointer_on(screen, monkeypatch, *widgets):
     """Put the pointer inside these widgets, and nothing else.
 
-    ``blocks_scroll`` is always included: both ``slot_under_pointer`` and
-    ``virtual_under_pointer`` refuse outright unless the pointer is in the day
-    pane, so a test that left it out would be asserting against that guard
-    rather than against the box it meant to drop on.
+    ``blocks_scroll`` is always included: ``slot_under_pointer`` refuses
+    outright unless the pointer is in the day pane, so a test that left it out
+    would be asserting against that guard rather than against the box it meant
+    to drop on. ``virtual_under_pointer`` has no such guard since PD-M11.3 --
+    the two ends of the day are outside the scroll frame -- so including it
+    makes no difference there.
     """
     inside = {id(screen.blocks_scroll)} | {id(w) for w in widgets}
     monkeypatch.setattr(screen, "winfo_pointerx", lambda: 0)
@@ -5090,17 +5092,27 @@ def _virtual(screen, edge):
 
 
 def test_pdm51_a_virtual_box_sits_at_each_end(screen, manager):
-    """PD-M5.1 — one above the first box and one below the last, every redraw."""
+    """PD-M5.1 — one above the first box and one below the last, every redraw.
+
+    Measured against the day pane's rows rather than the grid's since PD-M11.3.
+    This asserted that the Earlier box was a row of the scrolling grid above
+    every slot row and the Later box a row below them all, which was true of
+    the arrangement that put both ends inside the scroll frame -- where the
+    Later one was unreachable. Both ends now sit in holders of their own, one
+    above the scroll frame and one below it, so "above the first box and below
+    the last" is a statement about the pane. The criterion is unchanged; the
+    rows it is counted in are not.
+    """
     assert [edge for _, edge in screen._virtual_frames] == [
         DAY_EXTEND_EARLIER,
         DAY_EXTEND_LATER,
     ], screen._virtual_frames
 
-    slot_rows = [frame.grid_info()["row"] for frame, _ in _slot_frames(screen)]
-    above = _virtual(screen, DAY_EXTEND_EARLIER).grid_info()["row"]
-    below = _virtual(screen, DAY_EXTEND_LATER).grid_info()["row"]
-    assert above < min(slot_rows), f"the Earlier box is at row {above}, not above {min(slot_rows)}"
-    assert below > max(slot_rows), f"the Later box is at row {below}, not below {max(slot_rows)}"
+    above = screen.earlier_holder.grid_info()["row"]
+    grid = screen.blocks_scroll.grid_info()["row"]
+    below = screen.later_holder.grid_info()["row"]
+    assert above < grid, f"the Earlier box is at row {above}, not above the grid at {grid}"
+    assert below > grid, f"the Later box is at row {below}, not below the grid at {grid}"
 
 
 def test_pdm51_the_virtual_boxes_survive_a_redraw_with_blocks_on_the_day(
@@ -5609,3 +5621,316 @@ def test_pdm106_a_flush_on_a_screen_that_is_gone_does_not_raise(
     # What has to be true is that the raising path was actually entered and
     # swallowed: ``update_idletasks`` was called, and it threw.
     assert calls == [1], f"update_idletasks was called {len(calls)} times, not once"
+
+
+# ================= PD-M11 — the pane repaints, the ends are reachable ====
+
+
+class _FakeCanvas:
+    """A day canvas whose rectangle and scroll increment the test chooses.
+
+    The real one's size is whatever the window gives it, which is nothing to
+    assert arithmetic against. ``test_pdm115_the_day_canvas_is_the_scroll_frames_master``
+    is what ties this stand-in to the widget it stands in for.
+    """
+
+    def __init__(self, *, top=100, height=200, left=0, width=300, increment=8):
+        self._top, self._height = top, height
+        self._left, self._width = left, width
+        self._increment = increment
+        self.scrolled = []
+
+    def winfo_ismapped(self):
+        return True
+
+    def winfo_rootx(self):
+        return self._left
+
+    def winfo_rooty(self):
+        return self._top
+
+    def winfo_width(self):
+        return self._width
+
+    def winfo_height(self):
+        return self._height
+
+    def cget(self, name):
+        assert name == "yscrollincrement", name
+        return self._increment
+
+    def yview_scroll(self, amount, what):
+        self.scrolled.append((amount, what))
+
+
+def _fake_canvas(screen, monkeypatch, **kwargs):
+    canvas = _FakeCanvas(**kwargs)
+    monkeypatch.setattr(screen, "_day_canvas", lambda: canvas)
+    return canvas
+
+
+def _pointer_at(screen, monkeypatch, x, y):
+    monkeypatch.setattr(screen, "winfo_pointerx", lambda: x)
+    monkeypatch.setattr(screen, "winfo_pointery", lambda: y)
+
+
+def test_pdm111_a_rebuild_leaves_the_day_pane_in_the_grid(screen, monkeypatch):
+    """PD-M11.1 — the day pane is rebuilt where it is.
+
+    It used to leave the grid for the duration and come back in a ``finally``.
+    A ``CTkScrollableFrame`` leaving the grid unmaps the canvas its rows are
+    drawn in, and the width of that canvas's window on the rows, and the
+    scrollregion, are both put back by ``<Configure>`` handlers that run when
+    the event queue is next serviced. A flush of idle tasks does not service
+    it, so the pane came back blank and filled itself in on the next mouse
+    movement -- which is the report.
+    """
+    removed = []
+    monkeypatch.setattr(
+        screen.blocks_scroll, "grid_remove", lambda *a, **k: removed.append(1)
+    )
+    row = screen.blocks_scroll.grid_info()["row"]
+
+    screen.load_blocks()
+
+    assert removed == [], "the day pane was taken out of the grid to be rebuilt"
+    assert screen.blocks_scroll.grid_info()["row"] == row, screen.blocks_scroll.grid_info()
+
+
+def test_pdm111_a_rebuild_leaves_the_items_pane_in_the_grid(screen, monkeypatch):
+    """PD-M11.1 — the items pane is rebuilt the same way and owes the same.
+
+    Only the day pane was reported, but a mark on an item row that appears
+    only once the pointer moves is the same defect one pane over.
+    """
+    removed = []
+    monkeypatch.setattr(
+        screen.items_scroll, "grid_remove", lambda *a, **k: removed.append(1)
+    )
+    row = screen.items_scroll.grid_info()["row"]
+
+    screen.load_items()
+
+    assert removed == [], "the items pane was taken out of the grid to be rebuilt"
+    assert screen.items_scroll.grid_info()["row"] == row, screen.items_scroll.grid_info()
+
+
+def test_pdm112_the_two_ends_of_the_day_are_outside_the_scrolling_grid(screen):
+    """PD-M11.2 — neither end of the day can be scrolled off the screen.
+
+    This is the report: an item could not be dropped on the Later box. With
+    eighteen half hours in a day the grid is several hundred pixels taller
+    than the pane, so the Later box was below the bottom of it, and until
+    PD-M11.6 there was no way to scroll while holding a drag.
+    """
+    for edge, holder in (
+        (DAY_EXTEND_EARLIER, screen.earlier_holder),
+        (DAY_EXTEND_LATER, screen.later_holder),
+    ):
+        frame = _virtual(screen, edge)
+        assert frame.master is holder, f"the {edge} box is in {frame.master}"
+        assert holder.master is screen.day_drop_frame, (
+            f"the {edge} holder is in {holder.master}, not the day pane"
+        )
+        assert holder.master is not screen.blocks_scroll
+
+
+def test_pdm113_a_redraw_does_not_leave_a_second_box_at_either_end(
+    screen, manager
+):
+    """PD-M11.3 — the holders are cleared by the rebuild that refills them.
+
+    The ends used to be children of the scroll frame, which ``load_blocks``
+    empties wholesale. They are not any more, so a rebuild that cleared only
+    the scroll frame would stack a new Earlier box under the old one on every
+    redraw -- and the stale one would still be a live drop target.
+    """
+    _add_block(manager, 30, "Something", slot_index=3)
+    screen.refresh()
+    screen.refresh()
+
+    assert len(screen.earlier_holder.winfo_children()) == 1, (
+        screen.earlier_holder.winfo_children()
+    )
+    assert len(screen.later_holder.winfo_children()) == 1, (
+        screen.later_holder.winfo_children()
+    )
+    assert len(screen._virtual_frames) == 2, screen._virtual_frames
+
+
+def test_pdm114_a_drop_on_an_end_needs_no_pointer_in_the_scrolling_grid(
+    screen, monkeypatch
+):
+    """PD-M11.4 — the guard that refused every drop on an end of the day.
+
+    ``virtual_under_pointer`` began by refusing unless the pointer was inside
+    ``blocks_scroll``, which was right while the two boxes were rows of that
+    grid. Since PD-M11.3 they are not in it, so the guard refused the gesture
+    it was written to serve. Every existing test of this passed, because the
+    helper that places the pointer puts it inside ``blocks_scroll`` as well.
+    """
+    frame = _virtual(screen, DAY_EXTEND_LATER)
+    _pointer_at(screen, monkeypatch, 0, 0)
+    monkeypatch.setattr(
+        "src.getmoredone.screens.plan.widget_contains_pointer",
+        lambda widget, x, y: widget is frame,
+    )
+
+    assert screen.slot_under_pointer() is None, "the pointer is not on a half hour"
+    assert screen.virtual_under_pointer() == DAY_EXTEND_LATER
+
+
+def test_pdm115_the_day_canvas_is_the_scroll_frames_master(screen):
+    """PD-M11.5 — what the autoscroll scrolls, and what ``_FakeCanvas`` stands for.
+
+    ``CTkScrollableFrame`` exposes no accessor for the canvas it scrolls its
+    rows in, so this reads Tk's own ``master``. If a later version of the
+    library puts something else there, this is the test that says so rather
+    than the day quietly stopping scrolling.
+    """
+    canvas = screen._day_canvas()
+
+    assert isinstance(canvas, tk.Canvas), canvas
+    assert canvas is screen.blocks_scroll.master
+    assert screen.blocks_scroll.winfo_parent() == str(canvas)
+
+
+def test_pdm115_the_pointer_at_the_bottom_edge_scrolls_down(screen, monkeypatch):
+    """PD-M11.5 — "the Day Plan window should scroll as I drag an item ... down"."""
+    _fake_canvas(screen, monkeypatch, top=100, height=200)
+    _pointer_at(screen, monkeypatch, 150, 299)
+
+    assert screen._autoscroll_direction() == 1
+
+
+def test_pdm115_the_pointer_at_the_top_edge_scrolls_up(screen, monkeypatch):
+    """PD-M11.5 — and up, which is the same gesture at the other end."""
+    _fake_canvas(screen, monkeypatch, top=100, height=200)
+    _pointer_at(screen, monkeypatch, 150, 110)
+
+    assert screen._autoscroll_direction() == -1
+
+
+def test_pdm115_the_pointer_in_the_middle_scrolls_nothing(screen, monkeypatch):
+    """PD-M11.5 — a drag across the day is not a request to move the day."""
+    _fake_canvas(screen, monkeypatch, top=100, height=200)
+    _pointer_at(screen, monkeypatch, 150, 200)
+
+    assert screen._autoscroll_direction() == 0
+
+
+def test_pdm115_a_pointer_beside_the_day_scrolls_nothing(screen, monkeypatch):
+    """PD-M11.5 — the edge zone is the viewport's, not the whole window's height.
+
+    Without the horizontal check a drag down the item list -- which is at the
+    same height as the day and nowhere near it -- would scroll the day.
+    """
+    _fake_canvas(screen, monkeypatch, top=100, height=200, left=0, width=300)
+    _pointer_at(screen, monkeypatch, 400, 299)
+
+    assert screen._autoscroll_direction() == 0
+
+
+def test_pdm115_a_tick_is_the_same_distance_on_any_platform(screen):
+    """PD-M11.5 — a scroll unit is whatever ``yscrollincrement`` says it is.
+
+    CustomTkinter sets it per platform: 8px on macOS, 1px on Windows. A fixed
+    number of units would scroll a Windows day an eighth as far per tick. With
+    no increment set at all Tk reads a unit as a tenth of the view, where one
+    is the only sane answer.
+    """
+    assert screen._autoscroll_steps(_FakeCanvas(increment=8)) == 3
+    assert screen._autoscroll_steps(_FakeCanvas(increment=1)) == 24
+    assert screen._autoscroll_steps(_FakeCanvas(increment=0)) == 1
+
+
+def test_pdm115_a_drag_held_at_the_bottom_edge_scrolls_the_day(
+    screen, manager, monkeypatch
+):
+    """PD-M11.5 — the motion starts it and the tick keeps it going.
+
+    The reschedule is the whole feature: a pointer held still at the bottom of
+    the pane delivers no motion events, so a scroll driven by motion alone
+    would stop exactly where the day most needs to move.
+    """
+    item = _item(manager, "Draft the proposal")
+    screen.refresh()
+    canvas = _fake_canvas(screen, monkeypatch, top=100, height=200)
+    _pointer_at(screen, monkeypatch, 150, 299)
+    screen.start_item_drag(None, item)
+
+    screen.on_drag_motion(None)
+
+    assert canvas.scrolled == [(3, "units")], canvas.scrolled
+    assert screen._autoscroll_job is not None, "the scroll scheduled no next tick"
+
+    # Never leave the job pending: it would fire into a later test's screen.
+    screen._end_drag()
+    assert screen._autoscroll_job is None
+
+
+def test_pdm116_a_tick_outside_the_edge_zone_stops_the_scroll(
+    screen, monkeypatch
+):
+    """PD-M11.6 — the pointer leaving the edge ends the scroll, not a motion event.
+
+    The loop is its own clock, so it has to be able to stop itself: a drag
+    dragged back into the middle of the day and held there would otherwise
+    scroll until it was released.
+    """
+    canvas = _fake_canvas(screen, monkeypatch, top=100, height=200)
+    _pointer_at(screen, monkeypatch, 150, 200)
+    screen._drag_kind = "item"
+
+    screen._tick_autoscroll()
+
+    assert canvas.scrolled == [], canvas.scrolled
+    assert screen._autoscroll_job is None, "the scroll scheduled another tick"
+    screen._drag_kind = None
+
+
+def test_pdm116_a_tick_with_no_drag_scrolls_nothing(screen, monkeypatch):
+    """PD-M11.6 — a tick that outlives its drag must not move the day.
+
+    The pointer can still be at the edge when the button comes up, and a tick
+    already scheduled fires after the release. Scrolling then would move the
+    day under a pointer that is holding nothing.
+    """
+    canvas = _fake_canvas(screen, monkeypatch, top=100, height=200)
+    _pointer_at(screen, monkeypatch, 150, 299)
+    assert screen._drag_kind is None, "precondition: no drag is in progress"
+
+    screen._tick_autoscroll()
+
+    assert canvas.scrolled == [], canvas.scrolled
+    assert screen._autoscroll_job is None
+
+
+def test_pdm117_ending_a_drag_cancels_the_scroll(screen, manager, monkeypatch):
+    """PD-M11.7 — the pending tick is cancelled, not just forgotten.
+
+    Clearing the attribute alone would leave the ``after`` job in Tk's queue,
+    firing once into a screen that is no longer dragging -- and, for a drag
+    that ended with the window, into one that is no longer there.
+    """
+    item = _item(manager, "Draft the proposal")
+    screen.refresh()
+    _fake_canvas(screen, monkeypatch, top=100, height=200)
+    _pointer_at(screen, monkeypatch, 150, 299)
+    screen.start_item_drag(None, item)
+    screen.on_drag_motion(None)
+    job = screen._autoscroll_job
+    assert job is not None, "precondition: a tick is pending"
+    cancelled = []
+    monkeypatch.setattr(screen, "after_cancel", lambda token: cancelled.append(token))
+
+    screen._end_drag()
+
+    assert cancelled == [job], cancelled
+    assert screen._autoscroll_job is None
+
+    # The cancel was intercepted, so the job is still in Tk's queue. Put the
+    # real method back and cancel it for real, rather than leaving a timer to
+    # fire into the next test's screen.
+    monkeypatch.undo()
+    screen.after_cancel(job)
