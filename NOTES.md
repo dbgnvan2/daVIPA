@@ -40,6 +40,49 @@
   has isolated `AppSettings` for the whole suite since long before this batch —
   with the reason written in `ac22a78`. Four below-medium went to `BACKLOG.md`
   as AWA-S1 to AWA-S4. The security pass found nothing.
+- ✅ **A migration that runs on every launch replaced the tactic the user
+  chose.** The re-sweep of those fix commits - a cold pass over the fixes
+  themselves - found one high that none of the three earlier passes saw.
+  `migrate_parent_links_to_weekly_tactic` runs from
+  `Database.initialize_schema` on every `DatabaseManager` construction, and its
+  UPDATE set `weekly_tactic_id` from `parent_id` for every row whose parent is
+  a week item, including rows that already named a Weekly Tactic. So for the
+  one item the correction above is about, the next launch replaced the user's
+  last choice with the older link and the invariant repair then moved the
+  item's dates. Reproduced on a throwaway database before the fix:
+  `weekly_tactic_id` B became A, dates moved 2026-11-16 to 2026-11-09. What
+  made it a high rather than an old defect is that the first fix round
+  documented and tested the opposite rule, in a test that passes only because
+  it never reopens the database - the dirty-state case (P8). Fixed in
+  `a97b402`, with the reopen test in `e8b9eb7`. Three mediums with it: a create
+  showed a "Week Already Taken" notice left over from an earlier clash in the
+  session; the AWA-M2.3 guard claimed to catch copies its pattern could not
+  see; and `chip_table`'s docstring described the five-renderer consolidation
+  as done while nothing imports the module. One low was raised to medium and
+  fixed - the fallback chip drew black text on a near-black pill in dark mode
+  on 7 of the 10 themes - and one low was fixed in-loop against the sweep
+  budget, recorded in `BACKLOG.md` with the reason. Four remain there as
+  AWA-S5 to AWA-S8.
+- ✅ **A third cold pass, on a different failure family, found no high.** Two
+  mediums: the migration's new "kept the user's choice" count reached its
+  return value and no log, so a launch that cleared a row's `parent_id` said
+  nothing about it; and the `''` behaviour change above shipped with no test,
+  in a predicate one of whose two consumers decides which duplicate tactic a
+  dedupe deletes. One low was raised to medium - the AWA-M2.3 guard's
+  "case-insensitive" claim was empty, because the membership test in front of
+  the regex was still case-sensitive. Three lows are `AWA-S9` to `AWA-S11` in
+  `BACKLOG.md`, one of them a pre-existing path where a week item nested under
+  another week item could stop the app opening (reachability **not**
+  established - that is the first step, not the fix).
+- ⚠️ **One thing fixed last round was not a defect, and the mutation gate said
+  so.** The outer parentheses added to `LINK_PREDICATE_SQL` change no result:
+  `AND` binds tighter than `OR` in SQL and the predicate's trailing clause is
+  an `AND`, so the grouping was already right. The mutation written for that
+  claim came back green, and a direct check on an in-memory table returned
+  identical rows either way. The parentheses are kept for readability, the test
+  is gone as vacuous, and the claim is retracted in the spec's §6, in
+  `BACKLOG.md` and in the predicate's own comment. Fixing something that was
+  not broken is cheap here; believing it was is not.
 - ⚠️ **The on-screen check has not been run.** Everything above is tests plus
   one refactor verified by an existing suite. The nine-step checklist at the
   end of that spec's §6 is what settles "works like the Today tab", and until

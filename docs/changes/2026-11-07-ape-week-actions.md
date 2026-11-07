@@ -73,6 +73,14 @@ existing week-options tests are untouched and green.
   (sweep fix)
 - `src/getmoredone/weekly_tactic_maintenance.py` — `_child_count` reads the
   shared predicate (sweep fix)
+- `src/getmoredone/weekly_tactic_migrations.py` —
+  `migrate_parent_links_to_weekly_tactic` keeps an explicit `weekly_tactic_id`
+  and reports what it kept (re-sweep fix, the high)
+- `src/getmoredone/db_manager.py` — `create_action_item` clears
+  `last_week_collision` (re-sweep fix)
+- `src/getmoredone/screens/chip_table.py` — the fallback chip inherits its text
+  colour instead of measuring a named Tk colour; the docstring says nothing
+  imports the module yet (re-sweep fixes)
 - `src/getmoredone/screens/vision_planning_hub.py` — the rename, the sixth
   button, its route, and a subtitle that was a tab short
 - `src/getmoredone/app_settings.py` — `week_actions_col_widths`, so the
@@ -83,6 +91,10 @@ existing week-options tests are untouched and green.
   (27 in the batch, 4 from the sweep)
 - `tests/test_weekly_tactic_dedupe.py` — one test: the dedupe counts children
   by the shared predicate (sweep fix)
+- `tests/test_weekly_tactic_link_migration.py` — two tests: an explicit tactic
+  survives a reopen, and the migration reports what it kept (re-sweep fixes)
+- `tests/test_unified_panel_design.py` — one test: the fallback chip does not
+  measure a named colour (re-sweep fix)
 - `tests/test_ci_contract.py` — session worktrees are not uncollected test
   files (see Risks)
 - `docs/spec_2026-11-07_ape_week_actions.md` — §6 status report, mutation
@@ -93,7 +105,7 @@ existing week-options tests are untouched and green.
 ## Verification
 
 - Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 taskpolicy -b ./venv/bin/python -m pytest tests/test_ape_week_actions.py -q`
-- Result: PASS — 31 passed
+- Result: PASS — 32 passed
 
 - Command: the five Today files plus `test_weekly_items_week_options.py`,
   `test_weekly_tactic_schema.py`, `test_weekly_tactic_dedupe.py`
@@ -121,7 +133,46 @@ existing week-options tests are untouched and green.
 - Command: the fix commits re-swept cold, as a separate narrower range
   (`3d69956..HEAD`, limited to this batch's files — the Plan / Day Plan
   session's commits are interleaved and out of scope)
-- Result: see below; a fix commit is the least-reviewed code in any change.
+- Result: **one high, three medium, six low** — and the high is the argument
+  for the pass: the migration that runs on every `DatabaseManager`
+  construction overwrote an explicit `weekly_tactic_id` with the `parent_id`
+  one, so the contract AWA-M2.1 had just been corrected to state, and tested,
+  was reversed at the next app launch, and the invariant repair then moved the
+  item's dates. Reproduced on a throwaway database before the fix. None of the
+  three earlier passes saw it, because the first round's own test never
+  reopened the database. Fixed in `a97b402` with tests in `e8b9eb7`; the three
+  mediums with it, plus one low raised to medium (the fallback chip's
+  unreadable text) and one low fixed in-loop against the budget with its
+  reason stated in `BACKLOG.md`. The four remaining lows are AWA-S5 to AWA-S8.
+  Full account in the spec's §6 under "The re-sweep of this batch's own fix
+  commits".
+
+- Command: a third cold pass over the re-sweep's fix commits (`c6142d1..HEAD`),
+  required because the previous pass produced a high-severity finding, and run
+  on a different failure family — the changed migration's data-path safety and
+  test quality, rather than correctness again
+- Result: **no high.** Two mediums — the migration's new `kept_explicit_link`
+  count reached the return dict and no log, so a launch that cleared a row's
+  `parent_id` said nothing about it (P2); and the `''`/`COALESCE` behaviour
+  change shipped with no test, in a predicate one of whose consumers decides
+  which duplicate tactic a dedupe deletes. One low raised to medium: the
+  AWA-M2.3 guard's "case-insensitive" claim was empty, because the membership
+  gate in front of the regex was still case-sensitive. Two lows in tests
+  written the same round were corrected rather than filed (a `!= "#000000"`
+  assertion that could never fail against a two-element theme value, and a
+  collision fake using a key no producer writes). Three lows went to
+  `BACKLOG.md` as AWA-S9 to AWA-S11. The pass also led to a **retraction**: the
+  outer parentheses added to `LINK_PREDICATE_SQL` in `a97b402` fixed nothing —
+  the mutation written for that claim stayed green, and a direct check showed
+  identical rows with and without them. No fourth pass: the budget takes one
+  only on a high.
+
+- Command: the mutation gate over the re-sweep's fixes — 7 mutations, each the
+  verbatim original, each run alone, each file restored and sha256-compared
+- Result: PASS — 7 red, 7 identical restores. Two of them plant a verbatim
+  second copy of the link predicate in `vps_manager` — once as it was written,
+  once with the branches reversed and the keywords lower-case — to prove the
+  two forms the widened AWA-M2.3 matcher now claims to catch.
 
 - Command: the mutation gate over the fixes — 10 mutations, each the verbatim
   original, each run alone, each file restored and sha256-compared
@@ -145,6 +196,12 @@ existing week-options tests are untouched and green.
   panel writes `today_pin_rank` and so also floats it to the top of Today,
   because the grip comes with the inherited row builder. Recorded, not fixed:
   either fix is a behaviour change beyond what was asked.
+- **The link migration runs on every launch, and now branches.** It is the
+  one piece of this batch that writes to an existing production database
+  without being asked, and the re-sweep showed what that costs when it gets a
+  row shape it was not written for. The fix narrows what it overwrites; it does
+  not remove the class. Any future change to either link column should be
+  checked against it across a reopen, not only in-session.
 - **AWA-A3 is mostly closed, not by plan.** It was recorded as a Low
   refactor — "three readers disagree about what a child is" — and the sweep
   showed that two of those readers were a *drifted duplicate* deciding which

@@ -625,29 +625,57 @@ AWA-M1 through AWA-M6: **done**, except the one criterion §3 flagged as not
 code-testable — "works like the Today tab", on screen, which carries no ID
 because it is a window rather than a function. That one is `not done` and stays
 that way until the nine-step checklist at the end of that §6 has been walked at
-the keyboard. 31 tests in
+the keyboard. 33 tests in
 `tests/test_ape_week_actions.py`, plus one in
-`tests/test_weekly_tactic_dedupe.py`, every behavioural claim proved by
-mutation: 28 mutations for the batch and 10 for the sweep's fixes, each the
-verbatim original line, each run alone, each file restored and
-sha256-compared.
+`tests/test_weekly_tactic_dedupe.py` and four in
+`tests/test_weekly_tactic_link_migration.py`, every behavioural claim proved by
+mutation: 28 mutations for the batch, 10 for the sweep's fixes, 7 for the
+re-sweep's and 6 for the third pass's, each the verbatim original line, each run
+alone, each file restored and sha256-compared.
 
-Three criteria were corrected after the pre-push sweep, and the corrections
-are in §3 and §6 of the spec with their reasons:
+A seventh mutation in that last round came back **green**, and that is how the
+batch found it had fixed a non-defect: the outer parentheses added to
+`LINK_PREDICATE_SQL` change no result, because `AND` binds tighter than `OR` in
+SQL and the predicate's trailing clause is an `AND`. Confirmed on an in-memory
+table: `WHERE x OR {p}`, `WHERE {p} OR x` and `WHERE x AND {p}` return identical
+rows with and without them. The test written for the claim was removed as
+vacuous — (c), and in the stronger sense that no test could exist for it — the
+parentheses were kept for readability, and the claim is retracted in the spec's
+§6, in `BACKLOG.md` and in the predicate's own comment.
+
+Three criteria were corrected after the pre-push sweep, and two of them again
+after the cold re-sweep of that sweep's own fix commits. The corrections are in
+§3 and §6 of the spec with their reasons:
 
 - **AWA-M2.1** said the predicate was a plain `weekly_tactic_id = ? OR
   parent_id = ?`. An item can hold a different tactic in each column, and a
   plain `OR` listed that one item under both. `weekly_tactic_id` now wins when
-  it is set.
+  it is set. Corrected a second time after the re-sweep: that rule has to
+  survive a restart, and it did not. `migrate_parent_links_to_weekly_tactic`
+  runs from `Database.initialize_schema` on every `DatabaseManager`
+  construction and overwrote an explicit `weekly_tactic_id` with the
+  `parent_id` one, so the next launch replaced the user's last choice and the
+  invariant repair then moved the item's dates. The criterion is now asserted
+  across a real reopen — the dirty-state case (P8) the first round's test could
+  not reach. This was the re-sweep's one high, and none of the three earlier
+  passes saw it.
 - **AWA-M2.3** asserted the predicate had one home while it had two: the scan
   covered `screens/` and `vps_manager.py`, and the second copy was in
   `weekly_tactic_maintenance._child_count`, which feeds the dedupe that deletes
   a duplicate tactic — and had already drifted. The scan now covers all of
   `src/getmoredone`. This was the batch's one high finding and it was found by a
-  cold pass, not by the context that wrote the test.
+  cold pass, not by the context that wrote the test. Corrected a second time
+  after the re-sweep: the matcher behind the scan was case-sensitive, required
+  `parent_id` to be the second branch and matched only `= ?`, so the criterion's
+  claim that any reintroduced copy fails the test was itself false. It now
+  matches either order, any case, and `= ?` / `= :name` / `IN (?)`, and the
+  criterion states what it still cannot see.
 - **AWA-M5.4** did not require the create's cascade report to be reported.
   Thirteen other screens report it; this one dropped it, so an item saved
-  un-re-filed looked identical to one that was filed.
+  un-re-filed looked identical to one that was filed. The re-sweep then found
+  that the notice it now shows could be an old one: `last_week_collision` is
+  cleared on every update save but was only ever *set* on the create path, and
+  AWA-M5.4 was its first create-path reader.
 
 **AWA-M4.1** gained two tests rather than a correction: nothing checked that
 the screen reads the user's `first_day_of_week` at all, and nothing exercised

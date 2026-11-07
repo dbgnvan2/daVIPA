@@ -58,6 +58,21 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed — the pre-push sweep of that batch (2026-11-07)
 
+- **Restarting the app no longer changes which Weekly Tactic an item is filed
+  under, or its dates.** An Action Item can hold a tactic in each of the two
+  link columns - added from APE Week Assignment, then pointed at a different
+  Weekly Tactic in the editor. A repair that runs at every startup replaced the
+  tactic you chose with the older one, cleared the other column so nothing
+  recorded that it had happened, and then moved the item's dates into the other
+  tactic's week. The repair still clears the stale link, which is what it is
+  for; it no longer takes your choice with it, and it now reports the two
+  outcomes separately.
+- **"Week Already Taken" no longer appears for an item that saved fine.** The
+  warning is raised from a flag the app sets when a Weekly Tactic cannot move
+  onto a week that already has one. Every save that *edits* an item cleared the
+  flag first; a save that *creates* one did not, so after a single real clash
+  every Add on the new APE Week Actions tab warned about it again for the rest
+  of the session.
 - **An Action Item no longer appears under two different Weekly Tactics.** Both
   columns carry the link, and an item can end up holding a different tactic in
   each: add it from APE Week Assignment, whose button writes `parent_id`, then

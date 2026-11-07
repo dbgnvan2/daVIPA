@@ -187,9 +187,9 @@ Every criterion names the automated test that verifies it. New tests go in
 
 | ID | Criterion | Test |
 |---|---|---|
-| AWA-M2.1 | A single helper returns the Action Items linked to a tactic id, matching `weekly_tactic_id = ?` **OR** (`weekly_tactic_id IS NULL` **AND** `parent_id = ?`). Given a tactic with one child linked each way, it returns both. (Corrected after the sweep: the row said a plain `OR`. An item can hold a *different* tactic in each column — add from APE Week Assignment, then pick another tactic in the editor — and a plain `OR` listed that one item under **both** tactics. `weekly_tactic_id` wins when set; a `parent_id`-only child stays reachable, which is why the union exists.) | `test_awam21_both_link_shapes_are_returned`, `test_awam23_an_item_is_listed_under_one_tactic_only` |
+| AWA-M2.1 | A single helper returns the Action Items linked to a tactic id, matching `weekly_tactic_id = ?` **OR** (`weekly_tactic_id IS NULL` **AND** `parent_id = ?`). Given a tactic with one child linked each way, it returns both. (Corrected after the sweep: the row said a plain `OR`. An item can hold a *different* tactic in each column — add from APE Week Assignment, then pick another tactic in the editor — and a plain `OR` listed that one item under **both** tactics. `weekly_tactic_id` wins when set; a `parent_id`-only child stays reachable, which is why the union exists. **Extended again after the re-sweep of this batch's fix commits:** the resolution must still hold after the app is restarted. `migrate_parent_links_to_weekly_tactic` runs from `Database.initialize_schema` on every `DatabaseManager` construction and overwrote an explicit `weekly_tactic_id` with the `parent_id` one, so the rule above was reversed at the next launch and the invariant repair then moved the item's dates. The criterion is therefore asserted across a real reopen, not only in-session — the dirty-state case (P8) the first round's test could not reach.) | `test_awam21_both_link_shapes_are_returned`, `test_awam23_an_item_is_listed_under_one_tactic_only`, `tests/test_weekly_tactic_link_migration.py::test_awam23_an_explicit_tactic_survives_a_reopen` |
 | AWA-M2.2 | It never returns a row with `item_type = 'week'`: a tactic is not its own child, and two tactics in one week must not nest. | `test_awam22_week_rows_are_never_children` |
-| AWA-M2.3 | It is the only place the linkage is expressed. AST walk over **all** of `src/getmoredone`: exactly **one** string constant, in `weekly_tactic.py`, is predicate-shaped — names `weekly_tactic_id` and reaches `parent_id = ?` from an `OR`. Exact count per file, not a floor. (Corrected twice. At implementation, the row said "screens/: exactly one", written before §4 settled the helper into `vps_manager`. After the sweep, because scanning only `screens/` and `vps_manager.py` is what let `weekly_tactic_maintenance._child_count` hold a second, drifted copy with nothing red — the high finding of this batch. Matched on shape rather than on the two names appearing together, because `db_manager`'s INSERT column list and UPDATE SET list both name both columns and neither expresses this predicate.) | `test_awam23_one_home_for_the_link_predicate` |
+| AWA-M2.3 | It is the only place the linkage is expressed. AST walk over **all** of `src/getmoredone`: exactly **one** string constant, in `weekly_tactic.py`, is predicate-shaped — names `weekly_tactic_id` and reaches `parent_id = ?` from an `OR`. Exact count per file, not a floor. (Corrected twice. At implementation, the row said "screens/: exactly one", written before §4 settled the helper into `vps_manager`. After the sweep, because scanning only `screens/` and `vps_manager.py` is what let `weekly_tactic_maintenance._child_count` hold a second, drifted copy with nothing red — the high finding of this batch. Matched on shape rather than on the two names appearing together, because `db_manager`'s INSERT column list and UPDATE SET list both name both columns and neither expresses this predicate. **Narrowed in wording after the re-sweep:** the matcher was case-sensitive, required `parent_id` to be the second branch and matched only `= ?`, so the row's previous claim that *any* reintroduced copy fails the test was wrong. It is now case-insensitive, matches either branch order, and matches `= ?`, `= :name` and `IN (?)`. It still cannot see a copy split across two `ast.Constant` nodes, nor one expressed as a JOIN rather than an `OR` — of which `weekly_tactic_maintenance`'s invariant repair is one, with no `parent_id` arm at all. So the criterion is one home for *this SQL form*, not one definition of "child" everywhere; the latter is AWA-A1.) | `test_awam23_one_home_for_the_link_predicate` |
 | AWA-M2.4 | A row linked by `parent_id` to a **non-week** parent (ordinary subtask nesting) is *not* returned for that parent's tactic. | `test_awam24_ordinary_subtasks_are_not_tactic_children` |
 | AWA-M2.5 | Dirty-state (P8): a link that outlived the row it points at is not returned, and the call does not raise. (Corrected at implementation: an ordinary delete cannot produce that state — both link columns are `REFERENCES action_items(id) ON DELETE SET NULL` and the connection runs with `PRAGMA foreign_keys = ON`. The test seeds the link with foreign keys off, the way an older build or a restored backup leaves it.) | `test_awam25_orphaned_child_is_not_returned` |
 
@@ -330,9 +330,9 @@ checklist for it is at the end of this section.
 | AWA-M1.2 | done | `screens/weekly_items.py:72` — `test_awam12_screen_header_matches_the_tab` |
 | AWA-M1.3 | done | `test_awam13_no_ape_weekly_label_remains` — zero `APE Weekly` string constants in either file, counted from the AST |
 | AWA-M1.4 | done | `test_awam14_and_m32_every_nav_key_opens_its_own_screen` — every key opened, class named |
-| AWA-M2.1 | done | `weekly_tactic.LINK_PREDICATE_SQL`, read by `vps_manager.get_action_items_for_weekly_tactic` — `test_awam21_both_link_shapes_are_returned`, `test_awam23_an_item_is_listed_under_one_tactic_only` (as corrected in §3) |
+| AWA-M2.1 | done | `weekly_tactic.LINK_PREDICATE_SQL`, read by `vps_manager.get_action_items_for_weekly_tactic`, and `weekly_tactic_migrations.migrate_parent_links_to_weekly_tactic` keeping an explicit link — `test_awam21_both_link_shapes_are_returned`, `test_awam23_an_item_is_listed_under_one_tactic_only`, `tests/test_weekly_tactic_link_migration.py::test_awam23_an_explicit_tactic_survives_a_reopen` (as corrected in §3, twice) |
 | AWA-M2.2 | done | `AND item_type != 'week'` — `test_awam22_week_rows_are_never_children` |
-| AWA-M2.3 | done | `weekly_tactic.LINK_PREDICATE_SQL`, read by both SQL callers — `test_awam23_one_home_for_the_link_predicate` and `tests/test_weekly_tactic_dedupe.py::test_awam23_child_count_uses_the_shared_predicate` (as corrected twice in §3) |
+| AWA-M2.3 | done | `weekly_tactic.LINK_PREDICATE_SQL`, read by both SQL callers — `test_awam23_one_home_for_the_link_predicate` and `tests/test_weekly_tactic_dedupe.py::test_awam23_child_count_uses_the_shared_predicate` (as corrected three times in §3 - the scan's scope at implementation, again after the sweep, and the matcher's own reach after the re-sweep) |
 | AWA-M2.4 | done | the `is_tactic` guard — `test_awam24_ordinary_subtasks_are_not_tactic_children` |
 | AWA-M2.5 | done | `test_awam25_orphaned_child_is_not_returned`, as corrected in §3 |
 | AWA-M3.1 | done | `screens/vision_planning_hub.py:59` — `test_awam11_and_m31_hub_nav_labels` |
@@ -346,7 +346,7 @@ checklist for it is at the end of this section.
 | AWA-M5.1 | done | `test_awam51_right_panel_subclasses_today` |
 | AWA-M5.2 | done | `test_awam52_right_panel_queries_by_tactic_not_date` records the helper call and compares the panel's answer against it |
 | AWA-M5.3 | done | `test_awam53_row_behaviours_are_inherited_not_copied` — nine behaviours, identity-compared against `TodayScreen`, exact list |
-| AWA-M5.4 | done | `WeekTacticActionsPanel.add_action_item` — `test_awam54_add_action_item_links_by_weekly_tactic_id`, `test_awam54b_empty_title_creates_nothing`, `test_awam54c_add_action_item_reports_what_the_refile_did` (as corrected in §3) |
+| AWA-M5.4 | done | `WeekTacticActionsPanel.add_action_item`, plus `db_manager.create_action_item` clearing `last_week_collision` so the notice reports this save — `test_awam54_add_action_item_links_by_weekly_tactic_id`, `test_awam54b_empty_title_creates_nothing`, `test_awam54c_add_action_item_reports_what_the_refile_did`, `test_awam54d_a_clean_create_does_not_report_an_old_collision` (as corrected in §3) |
 | AWA-M5.5 | done | `COLUMN_PREFIX = "week_actions"` plus `AppSettings.week_actions_col_widths` — `test_awam55_column_prefix_is_its_own` |
 | AWA-M5.6 | done | `set_tactic` — `test_awam56_empty_state_names_the_tactic` |
 | AWA-M5.7 | done | `test_awam57_no_selection_is_not_an_error` |
@@ -360,7 +360,8 @@ checklist for it is at the end of this section.
 
 Every new test was mutated with the **verbatim** original line, run alone,
 confirmed red, and the file restored and compared by sha256. 28 mutations, 28
-red, 28 byte-identical restores.
+red, 28 byte-identical restores. The two fix rounds add 10 and 7 more, all red,
+all restores identical; both are accounted for in their own sections below.
 
 Two mutations did not come back red on the first pass, and both were real:
 
@@ -447,6 +448,158 @@ were written before `conftest.py` was read, and both were reverted.
 restored and sha256-compared. 10 red. Two of them are the AWA-M5.4 notice in
 both directions — removed, and moved after `edit_item` — because the order is
 half the fix.
+
+### The re-sweep of this batch's own fix commits
+
+Run because a fix commit is the least-reviewed code in any change — written
+last, fastest, and in the most anchored state. Range `3d69956..HEAD` limited to
+this batch's files; the Plan / Day Plan session's commits are interleaved and
+out of scope. It found **one high that none of the three earlier passes saw**,
+which is the whole argument for the pass.
+
+**High — the contract AWA-M2.1 had just documented was reversed at the next
+launch.** `migrate_parent_links_to_weekly_tactic` runs from
+`Database.initialize_schema` on every `DatabaseManager` construction, and its
+`UPDATE action_items SET weekly_tactic_id = ?, parent_id = NULL` fired for
+every row whose parent is a week item — including rows that already named a
+Weekly Tactic of their own. So for the exact item AWA-M2.1 is about, the next
+launch replaced the user's last choice with the older link, nulled `parent_id`
+so nothing recorded that it had happened, and let the invariant repair that
+runs next in the same migration move the item's dates into the other tactic's
+week. Reproduced on a throwaway database: `weekly_tactic_id` B became A and the
+dates moved 2026-11-16 → 2026-11-09 with an `inv_repair` history row.
+
+What makes it a high rather than a defect in old code is that the first fix
+round *documented and tested* the opposite rule, in a test that passes only
+because it never reopens the database. The fix keeps an explicit link, still
+drops the stale `parent_id` so the migration stays idempotent, and reports the
+two outcomes as two numbers (P2). The test reopens the file.
+
+**Medium — a create reported a collision from earlier in the session.**
+`last_week_collision` is cleared at the start of every *update* save, with a
+comment saying why: the manager lives for the session, so a flag that is only
+ever set reads as permanently true after the first clash. The create path only
+ever set it, which was harmless until AWA-M5.4 added the first reader — and
+that reader then showed "Week Already Taken" after every Add for the rest of
+the session, for items that saved fine. `create_action_item` now clears it too.
+
+**Medium — AWA-M2.3's guard claimed to catch copies it could not see.** Its
+docstring said a reintroduced copy anywhere under `src/` fails the test. The
+pattern was case-sensitive, required `parent_id` to be the second branch, and
+matched only `= ?`. Widened, and the docstring now states its limits; §3 has
+the detail. Two of the fix round's mutations plant a verbatim second copy —
+once as it was written, once with the branches reversed and the keywords
+lower-case — to prove the two forms the new pattern claims.
+
+**Medium — `chip_table`'s docstring described the consolidation as done.**
+Nothing imports the module: it is UPD-M3 of the unified-panel spec, and the
+five renderers move onto it in UPD-M4 to UPD-M7. Rule 13 applies to a module
+docstring as much as to a status line, so it now opens by saying nothing uses
+it yet.
+
+**One low raised to medium, and fixed.** The fallback chip measured a colour it
+cannot parse: `semantic_colors()["surface_subtle"]` is a *named* Tk colour on 7
+of the 10 themes (`gray16` in dark mode), `pick_text_color` cannot read it and
+returned black, so a chip with no lineage colour drew black text on a
+near-black pill. The reviewer rated it low. It is new code rendering unreadable
+text on exactly the path the fallback exists for, so it was raised. The
+fallback now leaves `text_color` unset and inherits the theme's own, which is
+readable on the theme's own surface by construction.
+
+**One low fixed in-loop against the budget, with the reason.**
+`weekly_tactic_id IS NULL` was not the test `tactic_of` applies, so a row
+holding `''` matched neither arm and vanished from the panel and from
+`_child_count`. Fixed with `COALESCE`. The edit site is the same comment block
+as the medium above it, and splitting them would have left a corrected comment
+describing SQL that still had the old shape.
+
+The same edit added outer parentheses to the constant, on the finding's claim
+that a consumer writing `WHERE x OR {...}` would silently get the wrong rows
+without them. **That half was not a defect**, and the third pass's mutation
+gate is what established it: the test written for the claim stayed *green* when
+the parentheses were removed. Checked directly afterwards on an in-memory
+table — `WHERE x OR {p}`, `WHERE {p} OR x` and `WHERE x AND {p}` return
+identical rows either way, because `AND` binds tighter than `OR` in SQL and the
+predicate's trailing clause is an `AND`. The parentheses are kept, because
+saying the grouping out loud beats relying on precedence, but no test asserts
+them and nothing should claim they fixed anything. `a97b402`'s message
+overstates them; the correction is here, in `BACKLOG.md` and in the
+predicate's own comment, rather than quietly dropped.
+
+The same pass corrected the predicate's own comment, which claimed to ask "the
+same question as `tactic_of`". It does not, and should not: it is deliberately
+wider, because a `parent_id`-only child must be listed somewhere rather than
+stranded, while WT-INV6 turns on `tactic_of` and must not move an item that
+never opted in. AWA-A1 is named there as the consequence.
+
+**Four below-medium** are `AWA-S5` to `AWA-S8` in `BACKLOG.md`: the chip text
+clamped to the column rather than to the pill, five unenforced `ChipTable`
+lifecycle assumptions, `register_row` accepting bad and over-long tuples
+silently, and the AWA-M5.3 override census not seeing a dunder override.
+
+**Fix mutations:** 7, each the verbatim original, each run alone, every file
+restored and sha256-compared. 7 red.
+
+### The third cold pass over those fixes
+
+Required by the budget, because the previous pass produced a high. Run on a
+different failure family rather than correctness again: the changed migration's
+data-path safety against every row shape a real database can hold, and test
+quality. **No high.** Two mediums, one low raised to medium, three lows to
+`BACKLOG.md` as AWA-S9 to AWA-S11, and one claim retracted.
+
+**Medium — the new count reached the return dict and no log.** The module's own
+docstring says nothing here is silent, and `_log_report` says it is the only
+surface where the user can see what happened to their rows. It reads `moved`
+and gates its line on `if moved:`. A row whose explicit tactic was kept still
+had its `parent_id` cleared, and while the two outcomes were one number that
+row was logged *because* it was miscounted — so counting it correctly without
+logging it made the launch silent about a write to the user's data. That is a
+net loss of coverage, which is what P2 is about. `kept_explicit_link` now has
+its own line, with the item ids in it.
+
+**Medium — the `''` change shipped untested.** A fix is not done without a
+test, and one of this predicate's two consumers decides which duplicate tactic
+a dedupe *deletes*. Now covered, and the test is honest about reachability:
+with foreign keys on, writing `''` raises `IntegrityError: FOREIGN KEY
+constraint failed`, because the column is `REFERENCES action_items(id)`. So it
+is a dirty state (P8) seeded with foreign keys off, exactly as AWA-M2.5 is, not
+a live write path.
+
+**Low raised to medium — AWA-M2.3's "case-insensitive" claim was empty.** The
+widened regex carries `re.IGNORECASE`, but the membership gate in front of it
+(`"weekly_tactic_id" in sub.value`) did not, so the flag only widened the half
+already pinned. Confirmed by running: a fully upper-case copy did not match.
+Raised because a guard stating a guarantee it does not give is the same defect
+this batch already rated medium one pass earlier. Both halves are lower-cased
+now, and a mutation plants a shouted copy to prove it.
+
+**One claim retracted.** The parenthesisation half of the previous round's
+in-loop low was not a defect; the paragraph above has the measurement.
+
+**Two lows corrected rather than filed**, because both were false claims in
+docstrings written in the same round (rule 13) and the fixes are one deleted
+line and one corrected fake: an assertion that the fallback chip's text colour
+is not `"#000000"`, which could never fail because the theme value it compares
+is a two-element light/dark list; and a seeded `last_week_collision` using
+`attempted_start`, a key neither producer in `db_manager` writes nor
+`describe_week_collision` reads. That test now asserts the dialog through
+`conftest.py`'s `messageboxes` fixture, which is what its name claims.
+
+**Three lows remain** as AWA-S9 to AWA-S11: the invariant repair's "child" is
+wider than this predicate's and makes a week-under-week row able to stop the
+app opening (pre-existing, and reachability **not** established); the P5 sibling
+of the migration fix in `_repoint_children`, left because it is unreachable
+within a single run; and the scan's docstring-only exclusion, which a prose
+string under `src/` could turn red.
+
+**Fix mutations:** 6, each the verbatim original, each run alone, every file
+restored and sha256-compared. 6 red — after a seventh came back **green** and
+was removed with its test, which is how the retraction above was found. That is
+the gate doing the job it exists for.
+
+**No fourth pass.** The budget takes a further pass only on a high-severity
+finding, and this one produced none.
 
 ### The on-screen check — for the user, not for a test
 

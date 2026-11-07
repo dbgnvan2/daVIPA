@@ -1,6 +1,6 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (the cold re-sweep of the AWA fix commits added its four remaining lows as AWA-S5 to AWA-S8, with its one high, three mediums and one raised low fixed in-loop and one low fixed against the budget with its reason stated there; the AWA sweep's four below-medium findings added as AWA-S1 to AWA-S4, with its one high and five mediums fixed in-loop and AWA-A3 mostly closed by that fix; four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-07 (a third cold pass over the AWA re-sweep's fixes added AWA-S9 to AWA-S11, found no high, and showed that half of one low fixed in the previous round was not a defect; the cold re-sweep of the AWA fix commits added its four remaining lows as AWA-S5 to AWA-S8, with its one high, three mediums and one raised low fixed in-loop and one low fixed against the budget with its reason stated there; the AWA sweep's four below-medium findings added as AWA-S1 to AWA-S4, with its one high and five mediums fixed in-loop and AWA-A3 mostly closed by that fix; four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
 
 ## Adjacent issues — APE Week Assignment / APE Week Actions (AWA, 2026-11-07)
 
@@ -165,11 +165,24 @@ medium** and fixed — the fallback chip rendered black text on a near-black pil
 in dark mode on 7 of the 10 themes, which is new code producing unreadable text
 on exactly the path the fallback exists for.
 
-**One low was fixed in-loop, against the budget**: `LINK_PREDICATE_SQL` was not
-fully parenthesised and treated `''` differently from `tactic_of`. It is
-recorded here rather than silently: the edit site was the same comment block as
-the medium above it, and splitting it would have left the corrected comment
+**One low was fixed in-loop, against the budget**: `LINK_PREDICATE_SQL`
+treated `''` differently from `tactic_of`, and was not fully parenthesised. It
+is recorded here rather than silently: the edit site was the same comment block
+as the medium above it, and splitting it would have left the corrected comment
 describing SQL that still had the old shape.
+
+**Half of that low was not a defect, and the mutation gate is what said so.**
+The finding claimed a consumer writing `WHERE x OR {...}` would silently get
+the wrong rows without outer parentheses. It would not: AND binds tighter than
+OR in SQL and the predicate's trailing clause is an AND, so the grouping was
+already right. The test written for the claim stayed **green** when the
+parentheses were removed, and a direct check on an in-memory table returned
+identical rows for `WHERE x OR {p}`, `WHERE {p} OR x` and `WHERE x AND {p}`
+either way. The parentheses are kept, because saying the grouping out loud
+beats relying on precedence, but they carry no test and the commit message of
+`a97b402` overstates them - corrected here, in the spec's §6 and in the
+predicate's own comment, rather than left standing. The `''` half is a real
+behaviour change and has a test.
 
 The four below-medium findings that remain:
 
@@ -235,6 +248,104 @@ which is a real improvement on the set-intersection it replaced. But the census
 filters `not name.startswith("__")`, so an added `__init__` or `__getattr__`
 override - the most likely way the Today seam actually gets broken - would not
 appear in `overridden` and the exact-list assertion would stay green.
+**Priority:** Low
+**Effort:** Low
+
+## Third cold pass — APE Week Actions re-sweep fixes (AWA, 2026-11-07)
+
+A third cold pass over the re-sweep's own fix commits (`a97b402`, `e8b9eb7`),
+run on a different failure family: the changed migration's data-path safety
+against every real row shape, and test quality. **No high.** Two mediums and
+one low raised to medium were fixed with tests; three lows are below, and one
+"low" turned out not to be a defect at all.
+
+- **The kept count reached the return dict and no log.** `_log_report` reads
+  only `moved` and gates the line on `if moved:`. A row whose explicit tactic
+  was kept still had its `parent_id` cleared - a write to the user's data - and
+  while the two outcomes were one number that row was logged *because* it was
+  miscounted. Counting it correctly without logging it made the launch silent
+  about it, which is a net loss of coverage (P2). Fixed; `kept_explicit_link`
+  now has its own line with the item ids.
+- **The `''` behaviour change shipped untested.** `COALESCE(weekly_tactic_id,
+  '') = ''` makes the SQL agree with `tactic_of`, and one of the predicate's
+  two consumers decides which duplicate tactic a dedupe *deletes*. Now covered,
+  seeded with foreign keys off the way AWA-M2.5 is - measured: with foreign
+  keys on, writing `''` raises `IntegrityError`, so the state is a dirty one
+  (P8), not a live write path.
+- **The AWA-M2.3 guard's "case-insensitive" claim was empty.** The regex
+  carried `re.IGNORECASE` but the membership gate in front of it did not, so
+  the flag only widened the half already pinned. Confirmed by running:
+  `"WEEKLY_TACTIC_ID = ? OR PARENT_ID = ?"` did not match. Raised from low,
+  because a guard that states a guarantee it does not give is the same defect
+  this batch already rated medium once. Fixed, with a mutation planting a
+  shouted copy.
+- **Half of a low fixed last round was not a defect.** See the note in the
+  re-sweep section above: the outer parentheses on `LINK_PREDICATE_SQL` change
+  no result, the test written for the claim stayed green under mutation, and
+  the claim is corrected in three places rather than left standing.
+
+Two lows in new tests were corrected rather than filed, because both were false
+claims in docstrings written in the same round (rule 13) and the fixes are a
+deleted line and a corrected fake: a `!= "#000000"` assertion that could never
+fail, since the theme value it compares is a two-element list; and a seeded
+`last_week_collision` using a key (`attempted_start`) that neither producer in
+`db_manager` writes nor `describe_week_collision` reads. That test now asserts
+the dialog through the `messageboxes` fixture, which is what its name claims.
+
+The three that remain:
+
+### 2026-11-07 - Type: Bug
+
+**Title:** AWA-S9 - the invariant repair's "child" is wider than the predicate's, and a week-under-week row can stop the app opening
+**Description:** `LINK_PREDICATE_SQL` excludes `child.item_type != 'week'`;
+the invariant repair's query
+(`src/getmoredone/weekly_tactic_maintenance.py:591-603`) constrains only the
+parent side (`WHERE week.item_type = 'week'`). So the repair acts on week rows
+AWA-M2.2 deliberately keeps out, which is more than the disagreement AWA-A1
+describes. It has teeth: for `W1` and `W2` both week items of one APE with
+`W2.parent_id = W1`, the link migration's else-branch sets
+`W2.weekly_tactic_id = W1`, and the repair then rewrites `W2.start_date` to
+W1's week start (`:686-689`, an unguarded `UPDATE`), which violates the WT-INV5
+unique index on `(annual_plan_element_id, start_date) WHERE item_type='week'`.
+`repair_weekly_tactic_invariants` is called with no `try/except`
+(`weekly_tactic_migrations.py:296-298`), so the `IntegrityError` would
+propagate out of `Database.initialize_schema` and the app would not open. Low
+because whether the UI can set a week item's `parent_id` to another week item
+was **not established** - the parent picker's row filter was not traced - so
+reachability is unknown rather than shown. Pre-existing; not introduced by the
+AWA batch. Establishing reachability is the first step, not the fix.
+**Priority:** Low
+**Effort:** Medium
+
+### 2026-11-07 - Type: Technical Debt
+
+**Title:** AWA-S10 - the P5 sibling of the migration fix was not fixed with it
+**Description:** `_repoint_children`
+(`src/getmoredone/weekly_tactic_maintenance.py:322-326`) still runs
+`UPDATE action_items SET weekly_tactic_id = ?, parent_id = NULL WHERE
+parent_id = ?` with no branch on an existing explicit link - exactly the shape
+`migrate_parent_links_to_weekly_tactic` was changed away from in `a97b402`. P5
+says fix a class, not an instance. It was left because it is unreachable within
+a single run: the link migration (step 2) clears every `parent_id` whose parent
+is a week item before the dedupe (step 3) runs, and its own comment says it
+exists for "stragglers written by an older build between migration and
+dedupe". Recorded rather than fixed silently (rule 10), and rather than swept
+in on a low severity.
+**Priority:** Low
+**Effort:** Low
+
+### 2026-11-07 - Type: Technical Debt
+
+**Title:** AWA-S11 - the AWA-M2.3 scan can be turned red by a prose string
+**Description:** `test_awam23_one_home_for_the_link_predicate` excludes strings
+by value-equality against module, function and class docstrings only. A
+non-docstring prose string under `src/getmoredone` that names
+`weekly_tactic_id`, then "or", then `parent_id = ?` would match the shape and
+fail the exact-count assertion. Confirmed by running: `"either
+weekly_tactic_id is set, or the legacy shape where parent_id = ? was used"`
+matches. None exists today. Low, and deliberately so: the cost is a one-line
+edit to this test, and the cost of a looser gate is the high finding the test
+was written for. The docstring states it.
 **Priority:** Low
 **Effort:** Low
 
