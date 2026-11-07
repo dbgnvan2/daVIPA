@@ -21,6 +21,15 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   rows it changed. Both screens report a refused assignment instead of letting
   it look like a successful one, on the Save button and on the drop target
   alike.
+- **What those screens tell you is read off the record, not off the save.**
+  A save can fail halfway: the APE is filed in the month with no month tactic
+  behind it. Counting what the save reported made that look like a save that
+  did nothing, with the row visible in the panel beside the message. Both
+  screens now read the sentence from the same list the panel is drawn from,
+  and say which of four things happened to each APE — assigned, partly
+  assigned, could not be assigned, or reported assigned but missing from the
+  month. Remove says the same three things about itself: removed, still there,
+  or gone but with the removal reporting a problem.
 
 ### Added — reported from the running screen (2026-11-07)
 

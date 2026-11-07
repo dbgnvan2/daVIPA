@@ -69,8 +69,8 @@ Tests:
   intentionally; they assert nothing about the quarter)
 
 From the sweep (`de2067f` source, `a1bc1d3` tests):
-- `src/getmoredone/vps_manager.py` — APC-M4.4, the type-safe month guard and a
-  column name built from `int(month)`
+- `src/getmoredone/vps_manager.py` — APC-M4.4, the month guard that refuses the
+  junk a caller can reach it with, and a column name built from `int(month)`
 - `src/getmoredone/vps_schema.py` — APC-M5.4, the repair returns and logs the
   rows it changed and stamps `updated_at`
 - `src/getmoredone/screens/ape_period_view.py` — APC-M2.4, `_assign_one`; the
@@ -79,6 +79,19 @@ From the sweep (`de2067f` source, `a1bc1d3` tests):
   `_assign_one`, `_describe_quarter_assignment`, both write paths reporting
 - `tests/test_ape_period_consistency.py` — seven more tests (48 total) and
   `_bind`, which binds a real method onto a `SimpleNamespace` stub
+
+From the re-sweep of those fix commits (spec §5.11):
+- `src/getmoredone/screens/ape_period_view.py` — APC-M2.5 `_ids_in_month` and
+  the four-state `_describe_month_assignment`; APC-M2.6 `_remove_one` and a
+  three-outcome report in `delete_month_item`
+- `src/getmoredone/screens/ape_assignment.py` — the same two as APC-M6.3 and
+  APC-M6.4 (`_ids_in_quarter`, `_remove_one`)
+- `src/getmoredone/vps_schema.py` — APC-M5.5 recorded in the docstring; the
+  code was already right, the test was missing
+- `tests/test_ape_period_consistency.py` — five more tests (53 total), the
+  `_break_segment_link` helper, both drag tests now asserting the manager call,
+  and `test_apcm44_month_lookup_guard_is_type_safe` renamed to
+  `..._refuses_junk_and_normalises_a_float`
 
 Docs:
 - `docs/spec_2026-11-07_ape_period_consistency.md` — spec, plan, departures,
@@ -92,7 +105,11 @@ Docs:
 ## Verification
 
 - Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 taskpolicy -b ./venv/bin/python -m pytest tests/test_ape_period_consistency.py -q`
-- Result: PASS (48 passed, after the sweep's seven new tests)
+- Result: PASS (53 passed, after the re-sweep's five new tests)
+
+- Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 taskpolicy -b ./venv/bin/python -m pytest tests/test_ape_period_consistency.py tests/test_traceability_refs.py tests/test_no_vacuous_tests.py tests/test_ci_contract.py tests/test_weekly_tactic_schema.py tests/test_weekly_tactic_dedupe.py tests/test_vps_hub_crud.py tests/test_vps_integration.py tests/test_rename_safe_links.py -q`
+- Result: PASS (306 passed, 1 skipped — the skip is `test_ci_contract.py:371`,
+  meaningful only on CI)
 
 - Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 taskpolicy -b ./venv/bin/python -m pytest tests/test_weekly_tactic_schema.py tests/test_vps_hub_crud.py tests/test_weekly_tactic_cascade.py tests/test_rename_safe_links.py tests/test_vps_integration.py -q`
 - Result: PASS (160 passed)
@@ -104,8 +121,9 @@ Docs:
 - Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 taskpolicy -b ./venv/bin/python -m pytest tests/test_plan_screen.py tests/test_time_block_colors.py tests/test_tk_offscreen.py tests/test_plan_settings.py tests/test_time_block_crud.py -q`
 - Result: PASS (the PD-\* batch's files; all skips are the mapped-window opt-out)
 
-- Mutation proofs: 20 mutations, 20 reds, each restored byte-identical. Twelve
-  for the original criteria (spec §5.4) and eight for the sweep fixes (§5.9).
+- Mutation proofs: 25 mutations, 25 reds, each restored byte-identical. Twelve
+  for the original criteria (spec §5.4), eight for the sweep fixes (§5.9) and
+  five for the re-sweep fixes (§5.11).
 
 - On screen in the running app, 2026-11-07 10:51-10:53, against the **real**
   demo database (table in the spec, §5.6): APE Month opened on Q4 / M11; its
@@ -144,7 +162,12 @@ Docs:
   the app next opens it. Nothing was hand-edited.
 - **`assign_ape_to_month` returns a bare boolean** and refuses for more than one
   reason, so the Save message counts what did not happen rather than saying why.
-  The log line carries the reason.
+  The log line carries the reason. The re-sweep found the sharper half of this:
+  the boolean is also returned *after* a write, so the status line is now read
+  off the row rather than off the return code (APC-M2.5, spec §5.11).
+- **The two removes report, the cascade's call site does not.**
+  `weekly_tactic.py:294` is the seventh write path in the class and is in
+  `BACKLOG.md` as an adjacent issue, not fixed: it has its own `CascadeReport`.
 
 ## The sweep (2026-11-07)
 
@@ -159,7 +182,9 @@ and the nine unpushed plan-screen (PD-\*) commits. Full account in the spec,
 | `/security-review` | injection, secrets, path traversal, deserialisation, data exposure | no findings at the ≥8 confidence bar |
 
 Fixed here, with tests and mutation proofs, as APC-M2.4, APC-M4.4, APC-M5.4 and
-APC-M6.2 (`de2067f` source, `a1bc1d3` tests):
+APC-M6.2 (`de2067f` source, `a1bc1d3` tests) — graded one medium-high, two
+medium and one low-medium; the low-medium (APC-M4.4) was fixed in-loop against
+the budget's own rule, recorded as an exception taken rather than relabelled:
 
 - `add_selected` had no `try` around the per-APE call, and
   `assign_ape_to_month` raises when an APE's segment resolves to nothing: the
@@ -170,8 +195,8 @@ APC-M6.2 (`de2067f` source, `a1bc1d3` tests):
   describes, with the denominator counted on one screen.
 - `_repair_orphan_month_flags` changed the user's real rows on every open and
   reported nothing (P2).
-- `get_annual_plan_elements_for_month`'s range comparison was not type-safe and
-  the month is interpolated as a column name.
+- `get_annual_plan_elements_for_month`'s range comparison raised on a string
+  and passed a float, and the month is interpolated as a column name.
 
 Recorded in `BACKLOG.md` instead of fixed, per the repo's sweep budget: two low
 findings (`quarter_of_month` truncates a float; `_require_block_day`'s modal
@@ -184,6 +209,28 @@ APC-M4.4 guarded with `month not in QUARTER_OF_MONTH` alone and claimed that
 rejected floats; `11.0 in {11: ...}` is `True`, because a dict is keyed by hash
 and equality. The fix needs the membership test *and* `int(month)`, and the
 test asserts the float case rather than assuming the guard covers it.
+
+## The re-sweep of the fix commits (2026-11-07)
+
+`c31fce7...HEAD` — the three fix commits, 1,080 lines over 10 files — went back
+through `learning-qa`, per the budget's rule that every in-loop fix is in scope
+for the next pass. Four findings, one of them a defect in the sweep's own fix:
+
+| # | Severity | Finding | Outcome |
+|---|---|---|---|
+| F1 | medium-high | The status line was computed from `_assign_one`'s boolean, and the manager writes before it can fail — so "Assigned 0 APE(s) to M11" appeared beside a panel showing the row | fixed, APC-M2.5 / M6.3 |
+| F2 | medium | "Four write paths across two screens" was wrong; the class is seven, including both removes and the cascade's call site | removes fixed (APC-M2.6 / M6.4); cascade flagged in `BACKLOG.md` |
+| F3 | medium | The repair's `logger.info` had no test, and the spec's stated reason for that was contradicted by an existing test in this repo | fixed, APC-M5.5 |
+| F4 | medium-low | `_assign_one`'s broad `except Exception` swallowed stub assertion errors, so four published assertions could not fail | fixed: both drag tests record and assert the manager call |
+
+The published APC-M2.4 tests could not have caught F1 — their stubs raise
+instead of writing. The new tests use the real manager on a real database in
+the one state that half-writes, and assert both that the call raised and that
+the row is in the month.
+
+Two further lows went to `BACKLOG.md`: the guard still raises on an unhashable
+month and accepts `True`, and a transient `sqlite3.OperationalError` reads as a
+permanent refusal.
 
 ## Next agent actions
 

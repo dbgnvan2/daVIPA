@@ -590,6 +590,10 @@ Spec and full per-criterion status report:
 open in the tree when APC landed, and two batches editing one table is how a
 status line ends up describing neither.
 
-All of APC-M1 through APC-M6: **done**, 41 tests in
-`tests/test_ape_period_consistency.py`, each of the twelve behavioural claims
-proved by mutation (§5.4 of that spec).
+All of APC-M1 through APC-M6: **done**, 53 tests in
+`tests/test_ape_period_consistency.py`, every behavioural claim proved by
+mutation — twenty-five mutations in all, twelve for the original criteria
+(§5.4 of that spec), eight for the pre-push sweep's four fixes (§5.9) and five
+for the re-sweep of those fixes (§5.11). The criteria grew with the sweeps:
+APC-M2.4, M4.4, M5.4 and M6.2 came from the sweep, and APC-M2.5, M2.6, M5.5,
+M6.3 and M6.4 from the re-sweep over its own fix commits.

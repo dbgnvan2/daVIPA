@@ -1,14 +1,14 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (the APE period-consistency sweep's two low findings and two adjacent issues added; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-07 (the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
 
 ## Deferred from the APE period-consistency sweep (2026-11-07)
 
 Found by the three passes over `7aa601d...HEAD` — learning-qa, a correctness
 pass over the source diff, and a security pass (which found nothing). Four
-medium findings were fixed in the batch with tests. These are what was recorded
-instead, each with the reason, because the repo's budget stops in-loop fixes
-below medium.
+findings were fixed in the batch with tests: one medium-high, two medium and
+one low-medium. These are what was recorded instead, each with the reason,
+because the repo's budget stops in-loop fixes below medium.
 
 - **`date_utils.quarter_of_month` silently truncates a float and accepts a
   bool.** Low. `int(month)` runs inside the `try`, so `quarter_of_month(11.7)`
@@ -46,6 +46,45 @@ below medium.
   quarter beside it. A week starting Mon 2026-11-30 runs into December and its
   APEs are looked up for November only. Whether that is the intended reading of
   a straddling week is a product question, not a defect to patch blind.
+
+## Deferred from the APE re-sweep of that batch's own fix commits (2026-11-07)
+
+The fix commits from the sweep above went back through learning-qa as
+`c31fce7...HEAD` — the budget's rule that every in-loop fix is itself in scope
+for the next pass. It returned four findings: three were fixed with tests
+(APC-M2.5/M2.6, APC-M5.5, APC-M6.3/M6.4, plus the drag tests' assertions), and
+these are what was recorded instead. Full account in spec §5.11 and §5.12.
+
+- **`get_annual_plan_elements_for_month`'s guard raises on an unhashable month
+  and accepts `True`.** Low. `month not in QUARTER_OF_MONTH` raises
+  `TypeError` for `[]`, `{}` or `set()`, and `True` passes the membership test
+  (because `True == 1`) and becomes column `m1`. **Not fixed here** for the
+  same reason as `quarter_of_month` above: both screens parse the month with
+  `int()`, so no caller can reach it. What was fixed is the claim — the test
+  was named `..._is_type_safe` and `NOTES.md` said "type-safe"; both now say
+  what the guard actually does. The fix is an `isinstance` check that excludes
+  `bool`, and it belongs with the `quarter_of_month` entry above as one small
+  change to the two guards.
+- **A transient database error reads as a permanent refusal.** Low, P1 nuance.
+  Both screens' `_assign_one` and `_remove_one` catch `Exception`, so a
+  `sqlite3.OperationalError` ("database is locked") produces the same sentence
+  as an APE whose segment cannot be resolved — "could not be assigned", which
+  invites a retry for one and not the other. The log line carries the
+  exception, so the information exists; the status line does not use it.
+  **Not fixed here** because telling retryable from terminal means classifying
+  the exception, and the honest version of that is a shared helper for every
+  screen that writes, not two more `except` clauses on these two.
+
+### Adjacent issues found, not fixed
+
+- **`weekly_tactic.py:294` calls `assign_ape_to_month` with no `try` and
+  discards the return.** It is the seventh member of the class the two screens'
+  six write paths belong to, and it was the one the first fix round's "four
+  paths across two screens" claim missed. **Not fixed here** because it sits in
+  the re-filing cascade, which already has its own `CascadeReport` surface for
+  telling the user what a cascade did: hardening it means reporting through
+  that, not bolting a status label onto a different subsystem. It should be
+  done with the next cascade change.
 
 ## Deferred from the plan day-controls cold sweep (2026-11-06)
 

@@ -48,18 +48,36 @@
   so the only trace was the changed data: an APE in a quarter nobody remembers assigning (P2).
   It now returns the `(ape_id, quarter)` list, stamps `updated_at`, and logs the list when
   non-empty. That also makes its idempotence provable rather than inferred.
-- ✅ **The month lookup's guard is type-safe** (APC-M4.4, from the sweep). `month < 1 or
-  month > 12` raises `TypeError` on a string and *passes* a float, and the month is
-  interpolated as a column name, so `11.0` reached SQLite as `m11.0` and raised from inside a
-  Tk callback where nothing is on screen to show it.
+- ✅ **The month lookup refuses the junk a caller can reach it with** (APC-M4.4, from the
+  sweep). `month < 1 or month > 12` raises `TypeError` on a string and *passes* a float, and
+  the month is interpolated as a column name, so `11.0` reached SQLite as `m11.0` and raised
+  from inside a Tk callback where nothing is on screen to show it. Not "type-safe", which is
+  what this entry first said: an unhashable month still raises and `True` becomes `m1`. Both
+  are unreachable from a caller and both are in `BACKLOG.md`.
+- ✅ **The status line is read off the row, not off the return code** (APC-M2.5 / M6.3, from
+  the re-sweep over the first round's own fixes). `assign_ape_to_month` writes before it can
+  fail, so counting its booleans produced "Assigned 0 APE(s) to M11" beside a panel showing
+  the row. Both screens now compute the sentence from the same unfiltered query the panel is
+  drawn from, and name four states: assigned, partly assigned, could not be assigned, and
+  reported assigned but not in the month.
+- ✅ **Remove reports too, on both screens** (APC-M2.6 / M6.4). The first round hardened the
+  two assign paths and left the two removes silent — the same P5 shape, one layer down. The
+  cascade's own call site (`weekly_tactic.py:294`) is the seventh path in that class and is
+  flagged in `BACKLOG.md`, not fixed: it has its own `CascadeReport` surface.
+- ✅ **The repair's log line is tested** (APC-M5.5). Deleting it left every other APC test
+  green, and the spec's reason for not testing it — that it goes to the user's log — was
+  already disproved by `test_wt_m7a5_dedupe_log_reaches_a_handler` in this repo.
 - Spec: `docs/spec_2026-11-07_ape_period_consistency.md`. Tests:
-  `tests/test_ape_period_consistency.py` (48), twenty mutation proofs. Verified
-  against copies of both real databases: the demo row is repaired and appears
-  in APE Weekly; the installed app's 17 APE rows were already consistent and
-  the migration changed none of them. Verified on screen against the **real**
-  demo database on 2026-11-07 (spec §5.6). Swept by `learning-qa`,
-  `/code-review` and `/security-review` (§5.8): four medium findings fixed
-  here, two lows and two adjacent issues in `BACKLOG.md`, no security finding.
+  `tests/test_ape_period_consistency.py` (53), twenty-five mutation proofs.
+  Verified against copies of both real databases: the demo row is repaired and
+  appears in APE Weekly; the installed app's 17 APE rows were already
+  consistent and the migration changed none of them. Verified on screen against
+  the **real** demo database on 2026-11-07 (spec §5.6). Swept by `learning-qa`,
+  `/code-review` and `/security-review` (§5.8) — four findings fixed here, one
+  medium-high, two medium and one low-medium, with two lows and two adjacent
+  issues in `BACKLOG.md` and no security finding — and then re-swept over the
+  fix commits themselves (§5.11), which found four more including a defect in
+  one of the fixes.
 
 ## Recent Changes (2026-08-24)
 

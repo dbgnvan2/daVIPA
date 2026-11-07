@@ -89,6 +89,8 @@ it. Test file: `tests/test_ape_period_consistency.py` unless stated.
 | APC-M2.2 | A consistent pair still succeeds — `assign_ape_to_month(ape, 4, 11)` is `True` | `test_apcm22_matching_quarter_and_month_still_assigns` |
 | APC-M2.3 | The Month screen's Save reports a refusal instead of silently skipping it (P2 — surface, never drop) | `test_apcm23_save_reports_refused_assignments` |
 | APC-M2.4 | A raising assignment is counted as refused, not allowed out of the loop: the APEs that did not raise are still written, the redraw still happens, and the line says how many | `test_apcm24_a_raising_assignment_is_counted_not_escaped` |
+| APC-M2.5 | The Save line is computed from the rows the panel is drawn from, not from the call's boolean, and names all four states: assigned, partly assigned (the call failed and the month holds the row anyway), could not be assigned, and reported assigned but not in the month | `test_apcm25_a_half_written_assignment_is_reported_as_partial`, `test_apcm23_save_reports_refused_assignments` |
+| APC-M2.6 | The Month screen's **Remove** reports against the row too, in all three outcomes: removed, still in the month, and out of the month with the call reporting a problem | `test_apcm26_a_failed_remove_is_reported` |
 
 ### APC-M3 — the pickers cannot produce an invalid pair
 
@@ -121,11 +123,15 @@ APC-M3.1–3.4 build no window: the defaults moved into
 | APC-M5.2 | Dirty-state (P8): a file DB written with `q1=1, q3=1, m11=1`, then reopened, reads `q1=1, q3=1, q4=1, m11=1` | `test_apcm52_dirty_state_orphan_quarter_flag_is_repaired_on_reopen` |
 | APC-M5.3 | Idempotent — a second open changes no row (`updated_at` untouched for already-consistent rows) | `test_apcm53_migration_is_idempotent` |
 | APC-M5.4 | The repair returns the `(ape_id, quarter)` list it changed, stamps `updated_at` on those rows, and logs the list at `info` when non-empty; a second run returns `[]` (P2 — an automatic data change that says nothing is indistinguishable from one that did nothing) | `test_apcm54_the_repair_reports_every_row_it_changed` |
+| APC-M5.5 | That `info` line is asserted from a handler attached to the logger, naming the repaired row, and a no-op run logs nothing. The only caller discards the return value, so in the running app the log line is the whole trace | `test_apcm55_the_repair_log_reaches_a_handler` |
 
-Home: `VPSSchema._extend_annual_plan_elements` in
-`src/getmoredone/vps_schema.py:777`, alongside the flags it is repairing, in the
-same idempotent-`UPDATE` style as the existing `action_items` group repair in
-`database.py:521`.
+Home: `VPSSchema._extend_annual_plan_elements`, which calls
+`_repair_orphan_month_flags` alongside the flags it is repairing, in the same
+idempotent-`UPDATE` style as the existing `action_items` group repair in
+`database.py`. Named by function rather than by line: the first version of this
+paragraph said `vps_schema.py:777`, and the sweep's own fix moved the function
+past it. A line number in a document is a claim like any other (P6), and this
+one went stale inside the same batch that wrote it.
 
 ### APC-M6 — adjacent issue found, **not** silently fixed
 
@@ -141,6 +147,8 @@ and leaving it means the two APE screens disagree about what quarter you are in.
 |---|---|---|
 | APC-M6.1 | APE Quarter's Quarter picker opens on the current calendar quarter | `test_apcm61_quarter_screen_defaults_to_current_quarter` |
 | APC-M6.2 | APE Quarter reports what Save did on **both** its write paths, says so when nothing is checked, and counts a raise as refused rather than letting it escape | `test_apcm62_quarter_save_reports_refused_assignments`, `test_apcm62_quarter_save_with_nothing_checked_says_so`, `test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped`, `test_apcm62_quarter_drag_path_reaches_the_same_reporting` |
+| APC-M6.3 | APE Quarter's Save line is computed from the rows, not the boolean, with the same four states as APC-M2.5 | `test_apcm63_a_half_written_quarter_assignment_is_reported_as_partial` |
+| APC-M6.4 | APE Quarter's **Remove** reports against the row, in the same three outcomes as APC-M2.6 | `test_apcm64_a_failed_quarter_remove_is_reported` |
 
 APC-M6.2 came out of the sweep, not the plan. `_describe_month_assignment`'s
 docstring claimed the reporting class was covered because both of the *Month*
@@ -237,6 +245,8 @@ only the one the suite happens to run in.
 | APC-M2.2 | done | `test_apcm22_matching_quarter_and_month_still_assigns` |
 | APC-M2.3 | done | `APEPeriodViewScreen._describe_month_assignment`; `test_apcm23_save_reports_refused_assignments`, `test_apcm23_save_button_reaches_the_reporting`, `test_apcm23_drag_path_reaches_the_same_reporting` |
 | APC-M2.4 | done, from the sweep — see §5.8 | `APEPeriodViewScreen._assign_one`; `test_apcm24_a_raising_assignment_is_counted_not_escaped` |
+| APC-M2.5 | done, from the re-sweep — see §5.11 | `APEPeriodViewScreen._ids_in_month`, `_describe_month_assignment`; `test_apcm25_a_half_written_assignment_is_reported_as_partial` |
+| APC-M2.6 | done, from the re-sweep — see §5.11 | `APEPeriodViewScreen._remove_one`, `delete_month_item`; `test_apcm26_a_failed_remove_is_reported` |
 | APC-M3.1 | done | `APEPeriodViewScreen.default_period`; `test_apcm31_quarter_defaults_to_current_quarter` |
 | APC-M3.2 | done | `APEPeriodViewScreen._sync_month_choices`; `test_apcm32_month_combo_offers_only_that_quarters_months` |
 | APC-M3.3 | done | `test_apcm33_changing_quarter_moves_month_into_range`, `test_apcm33_every_quarter_leaves_the_month_in_range` |
@@ -249,8 +259,11 @@ only the one the suite happens to run in.
 | APC-M5.2 | done | `test_apcm52_dirty_state_orphan_quarter_flag_is_repaired_on_reopen` |
 | APC-M5.3 | done | `test_apcm53_migration_is_idempotent` |
 | APC-M5.4 | done, from the sweep — see §5.8 | `VPSSchema._repair_orphan_month_flags`; `test_apcm54_the_repair_reports_every_row_it_changed` |
+| APC-M5.5 | done, from the re-sweep — see §5.11 | `VPSSchema._repair_orphan_month_flags`; `test_apcm55_the_repair_log_reaches_a_handler` |
 | APC-M6.1 | done | `src/getmoredone/screens/ape_assignment.py`; `test_apcm61_quarter_screen_defaults_to_current_quarter` |
 | APC-M6.2 | done, from the sweep — see §5.8 | `APEAssignmentScreen._assign_one`, `_describe_quarter_assignment`, `status_label`; `test_apcm62_quarter_save_reports_refused_assignments`, `test_apcm62_quarter_save_with_nothing_checked_says_so`, `test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped`, `test_apcm62_quarter_drag_path_reaches_the_same_reporting` |
+| APC-M6.3 | done, from the re-sweep — see §5.11 | `APEAssignmentScreen._ids_in_quarter`, `_describe_quarter_assignment`; `test_apcm63_a_half_written_quarter_assignment_is_reported_as_partial` |
+| APC-M6.4 | done, from the re-sweep — see §5.11 | `APEAssignmentScreen._remove_one`, `delete_quarter_item`; `test_apcm64_a_failed_quarter_remove_is_reported` |
 
 ### 5.4 Mutation proofs
 
@@ -327,9 +340,14 @@ and the nine unpushed plan-screen (PD-\*) commits:
 | `/code-review` (high) | correctness over the 1,135-line source-only diff, hunk by hunk | 6 findings — the same four, plus two lows |
 | `/security-review` | injection, secrets, path traversal, unsafe deserialisation, data exposure | **no findings at the ≥8 confidence bar** |
 
-Four medium findings were fixed, with tests, as APC-M2.4, APC-M4.4, APC-M5.4
-and APC-M6.2. Two lows and two adjacent issues went to `BACKLOG.md` rather
-than being fixed in-loop, per the repo's sweep budget:
+Four findings were fixed, with tests, as APC-M2.4, APC-M4.4, APC-M5.4 and
+APC-M6.2 — graded, as the table above grades them, one medium-high, two
+medium and one low-medium. The first version of this paragraph called all
+four "medium", which both overstated three of them and quietly broke the
+repo's own budget rule that below-medium findings go to `BACKLOG.md` instead
+of being fixed in-loop. The low-medium one (APC-M4.4, the month lookup guard)
+was fixed anyway; it belongs in this record as an exception taken, not as a
+medium. Two lows and two adjacent issues did go to `BACKLOG.md`:
 
 - `date_utils.quarter_of_month` truncates a float and accepts a bool
   (`quarter_of_month(11.7)` → 4, `quarter_of_month(True)` → 1; measured). No
@@ -376,9 +394,13 @@ Eight mutations, eight reds, each restored byte-identical:
   the Month screen's in §5.7: showing it means writing an assignment to the
   user's live demo data. Both are covered by stub-driven wiring tests
   (`test_apcm62_*`), which is coverage of the call, not of the pixels.
-- **`_repair_orphan_month_flags`' new log line was not read from the real log
-  file.** The return value is asserted; the `logger.info` call is not, because
-  it writes to the user's own `weekly_tactic_debug.log`.
+- ~~**`_repair_orphan_month_flags`' new log line was not read from the real
+  log file.**~~ Covered as APC-M5.5 in the second fix round — see §5.11. The
+  reason given here was wrong: the line going to the user's log does not make
+  a behavioural check impractical, and
+  `test_wt_m7a5_dedupe_log_reaches_a_handler` in this same repo was already
+  the counter-example. What remains untested is the real file handler's path
+  and rotation, not whether the record is emitted.
 - **The PD-\* plan-screen batch had no `learning-qa`-family finding**, and
   `learning-qa` said plainly that its catalogue does not cover that batch's
   likely failure family (Tk geometry, layout and UI contract). The
@@ -386,3 +408,66 @@ Eight mutations, eight reds, each restored byte-identical:
   arithmetic, the depth-bar loop bounds, the marker-glyph collision, the redraw
   flush ordering and the `CTkComboBox` variable/command ordering, finding one
   PLAUSIBLE low. No separate UI-regression pass was run over the 50+ screens.
+
+### 5.11 The re-sweep over the fix commits, and the second fix round
+
+The repo's sweep budget says every in-loop fix is itself in scope for the next
+pass, so `c31fce7...HEAD` — the three fix commits from §5.8, 1,080 lines over
+10 files — went back through `learning-qa`. It returned four findings, one of
+them a defect in §5.8's own fix. That is the budget's premise holding: the fix
+commit is the least-reviewed code in a change, written last and in the most
+anchored state.
+
+| # | Severity | Finding | Outcome |
+|---|---|---|---|
+| F1 | medium-high | The status line was computed from `_assign_one`'s boolean. `assign_ape_to_month` writes before it can fail, so `False` does not mean nothing was written — the line said "Assigned 0 APE(s) to M11" beside a panel showing the row | fixed, APC-M2.5 / APC-M6.3 |
+| F2 | medium | The class claim was wrong. "Four write paths across two screens" is really seven: the two assigns on each screen, the two **removes**, and the cascade's own call site | two removes fixed, APC-M2.6 / APC-M6.4; the cascade flagged, below |
+| F3 | medium | `_repair_orphan_month_flags`' `logger.info` had no test — deleting it left every other APC test green — and §5.10's stated reason for that was contradicted by an existing test in this repo | fixed, APC-M5.5 |
+| F4 | medium-low | `_assign_one`'s broad `except Exception` swallows a stub's `AssertionError`, so four assertions in the published tests could not fail on a malformed manager call | fixed: both drag tests now record the manager call and assert it |
+
+F1 is the one worth keeping. `_assign_one` returning `False` after a raise is
+not "nothing happened": `assign_ape_to_quarter` commits the quarter flag and
+*then* raises on a segment it cannot resolve, and `assign_ape_to_month` has two
+`return False` exits after both flags are committed. Reporting from a return
+code instead of from the artifact is P6 inverted — the status is a claim, and
+the only thing that can settle it is a re-read of the row. Both screens now
+read `self.right_items` after `refresh_lists()`, which is the same unfiltered
+query the panel is drawn from, so the sentence and the panel cannot disagree.
+
+The published APC-M2.4 tests could not have caught F1: their stubs raise
+*instead of* writing, so a boolean-counted line passes them. `test_apcm25_*`
+and `test_apcm63_*` therefore use the real manager on a real database in the
+one state that makes it half-write — the APE already in Q4, its segment
+unresolvable — and assert both halves, that the call raised and that the row is
+in the month. A fixture that only fails is the fixture that cannot catch this.
+
+**Adjacent issue found, not fixed.** `weekly_tactic.py:294` calls
+`assign_ape_to_month` inside the re-filing cascade, discards the return value
+and has no `try`. It is the seventh member of F2's class, left alone
+deliberately: it is a different subsystem with its own `CascadeReport`
+surface, so hardening it belongs with that reporting rather than bolted on
+here. Recorded in `BACKLOG.md`.
+
+Five mutations for the five new tests, five reds, each restored byte-identical:
+
+| Mutation | Test that went red |
+|---|---|
+| APC-M2.5 month Save reports from `claimed` instead of `self._ids_in_month()` | `test_apcm25_a_half_written_assignment_is_reported_as_partial` |
+| APC-M2.6 `delete_month_item` stops re-reading the row (`still_there = False`) | `test_apcm26_a_failed_remove_is_reported` |
+| APC-M6.3 quarter Save reports from `claimed` instead of `self._ids_in_quarter()` | `test_apcm63_a_half_written_quarter_assignment_is_reported_as_partial` |
+| APC-M6.4 `delete_quarter_item` stops re-reading the row | `test_apcm64_a_failed_quarter_remove_is_reported` |
+| APC-M5.5 the repair's `logger.info` never fires (`if False:`) | `test_apcm55_the_repair_log_reaches_a_handler` |
+
+### 5.12 Re-sweep findings recorded rather than fixed
+
+Below the medium bar, so `BACKLOG.md` per the budget:
+
+- `month not in QUARTER_OF_MONTH` still raises `TypeError` for an unhashable
+  month (`[]`, `{}`, `set()`), and `True` passes the membership test and
+  becomes column `m1`. The APC-M4.4 docstring and the `NOTES.md` entry both
+  called the guard "type-safe"; it is range-safe and int-safe, which is what
+  its reachable callers need, and both wordings are corrected.
+- P1 nuance: a transient `sqlite3.OperationalError` ("database is locked")
+  produces the same status sentence as a permanent refusal. The log line
+  carries the exception; the sentence does not distinguish retryable from
+  terminal.
