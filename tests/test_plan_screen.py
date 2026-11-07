@@ -21,6 +21,7 @@ most needs to be proved.
 
 from __future__ import annotations
 
+import logging
 import re
 import tkinter as tk
 
@@ -3707,11 +3708,21 @@ def test_pdm21_dragging_the_grip_changes_the_items_column(
     handler works from where the press was and not from where the last motion
     left off: a handler that applied each motion's delta to the current width
     would pass a single rightward drag and double every one after it.
+
+    The width is set before the screen is built, which is the only way it
+    changes under the app: the Settings entry hands the app a fresh settings
+    object and the Plan screen reads the field when it is next built, so a
+    live screen never has a setting it has not drawn. This test used to set it
+    on a screen already up and lean on the press re-reading it -- the premise
+    the press no longer has, because reading the setting there wrote a clamped
+    width over it on a click that moved nothing
+    (``::test_pdm23_a_click_on_the_grip_does_not_save_the_clamped_width``).
     """
-    panel = PlanScreen(root, manager, _App(settings))
     # Well clear of the floor at both ends, so this test is about the delta
     # and not about the clamp.
-    settings.plan_items_col_width = panel.items_width_floor() + 100
+    sizer = PlanScreen(root, manager, _App(settings))
+    settings.plan_items_col_width = sizer.items_width_floor() + 100
+    panel = PlanScreen(root, manager, _App(settings))
     before = panel.items_col_width()
 
     panel.on_divider_press(_FakeEvent(500, 0))
@@ -3827,6 +3838,116 @@ def test_pdm22_a_narrow_window_takes_the_width_from_the_items_pane(
     panel.on_resize()
     assert panel.grid_columnconfigure(0)["minsize"] == floor + 200, (
         "widening the window did not give back the width a narrow one took"
+    )
+
+
+def test_pdm22_a_resize_alone_rebalances_the_panes(
+    root, manager, settings, mapped_windows
+):
+    """PD-M2.2 — the binding is the whole fix, so it is pinned on its own.
+
+    ``on_resize`` divides the room correctly, and the test above proves it --
+    by calling the method. Nothing called the *binding*: delete
+    ``self.bind("<Configure>", self.on_resize)`` and the suite stayed green
+    while the shipped screen never re-divided the panes at all. That is the
+    same shape as the dead ``grid_rowconfigure`` this batch removed, except
+    load-bearing -- a line no test could fail on, holding up the fix.
+
+    A real window, because a synthetic event cannot stand in for one. The
+    screen is unmapped in these fixtures: ``winfo_ismapped`` is 0 and
+    ``winfo_manager`` is empty, and Tk delivers no ``<Configure>`` to a window
+    that was never laid out, so ``event_generate`` on the frame's canvas --
+    immediate or queued -- reached the binding not once. The first version of
+    this test generated one and asserted against ``apply_items_width``: it
+    could only have passed by patching the class, which the binding does not
+    go through because it holds the bound method captured in ``__init__``.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    floor = panel.items_width_floor()
+    asked = floor + 300
+    settings.plan_items_col_width = asked
+    panel.pack(fill="both", expand=True)
+    root.geometry(f"{asked + panel.day_width_floor() + 200}x700")
+    root.deiconify()
+    root.update_idletasks()
+    root.update()
+
+    assert panel.grid_columnconfigure(0)["minsize"] == asked, (
+        f"a window with room for both panes drew the items column at "
+        f"{panel.grid_columnconfigure(0)['minsize']}px, not the {asked}px "
+        "setting, so no resize reached the clamp at all"
+    )
+
+    root.geometry(f"{floor + panel.day_width_floor() + 40}x700")
+    root.update_idletasks()
+    root.update()
+
+    room = panel.winfo_width()
+    assert room > 1, "the panel was not laid out, so there is nothing to clamp"
+    assert room - panel.day_width_floor() < asked, (
+        f"a {room}px window still has room for the {asked}px setting, so this "
+        "resize asks nothing of the clamp"
+    )
+    assert (
+        panel.grid_columnconfigure(0)["minsize"] == room - panel.day_width_floor()
+    ), (
+        f"the items column kept {panel.grid_columnconfigure(0)['minsize']}px of "
+        f"a {room}px window, leaving the day less than the "
+        f"{panel.day_width_floor()}px one of its rows needs"
+    )
+
+
+def test_pdm23_a_click_on_the_grip_does_not_save_the_clamped_width(
+    root, manager, settings, monkeypatch
+):
+    """PD-M2.3 — a gesture that moved nothing writes nothing.
+
+    The press snapshots the width *drawn*, not the width in the settings file.
+    The two differ whenever the window is too narrow for the setting, which the
+    resize clamp turned from an edge case into an ordinary state, and
+    snapshotting the setting meant the release saw a width that differed from
+    it and wrote the clamped number over it -- on a click that moved nothing.
+
+    The second half is the same bug seen from the other side: a drag that
+    starts from the setting rather than from the column spends its first
+    pixels inside the clamp, where the column does not move.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    floor = panel.items_width_floor()
+    asked = floor + 300
+    settings.plan_items_col_width = asked
+    monkeypatch.setattr(
+        panel, "winfo_width", lambda: floor + panel.day_width_floor() + 40
+    )
+    panel.on_resize()
+    assert panel.grid_columnconfigure(0)["minsize"] == floor + 40, (
+        "precondition: the window is too narrow for the setting, so the width "
+        "drawn and the width in the file differ"
+    )
+
+    saved = []
+    monkeypatch.setattr(
+        settings,
+        "save",
+        lambda: saved.append(settings.plan_items_col_width) or True,
+    )
+
+    panel.on_divider_press(_FakeEvent(500, 0))
+    panel.on_divider_release(_FakeEvent(500, 0))
+
+    assert saved == [], f"a click that moved nothing wrote {saved}"
+    assert settings.plan_items_col_width == asked, (
+        f"the clamped width went over the {asked}px setting: "
+        f"{settings.plan_items_col_width}"
+    )
+
+    panel.on_divider_press(_FakeEvent(500, 0))
+    panel.on_divider_motion(_FakeEvent(460, 0))
+    assert panel.grid_columnconfigure(0)["minsize"] == floor, (
+        f"40px left of a {floor + 40}px column gave "
+        f"{panel.grid_columnconfigure(0)['minsize']}px: the drag is measured "
+        f"from the {asked}px setting, so its first {asked - floor - 40}px "
+        "move nothing"
     )
 
 
@@ -3960,9 +4081,15 @@ def test_pdm26_the_grip_and_the_settings_field_are_one_value(
     ``test_the_items_column_is_the_width_the_setting_asks_for``; this is the
     other direction, asserted through the entry rather than through the
     attribute name, so a grip that wrote a field of its own would fail it.
+
+    Built after the width is set, for the reason given in
+    ``::test_pdm21_dragging_the_grip_changes_the_items_column``: the press
+    takes the width the column is drawn at, not the one in the file, so a
+    screen that was up before the field changed would drag from the old one.
     """
+    sizer = PlanScreen(root, manager, _App(settings))
+    settings.plan_items_col_width = sizer.items_width_floor() + 100
     panel = PlanScreen(root, manager, _App(settings))
-    settings.plan_items_col_width = panel.items_width_floor() + 100
     expected = panel.items_col_width() + 25
     _drag_the_grip(panel, 25)
 
@@ -4247,32 +4374,101 @@ def test_pdm35_an_uncapped_run_does_not_mention_the_cap(screen, manager):
     assert "row list" not in text, text
 
 
-def test_pdm37_a_failure_that_is_not_a_refusal_is_still_reported(
+def test_pdm35_a_refusal_counts_what_it_tried_not_the_whole_list(
     screen, manager, monkeypatch
+):
+    """PD-M3.5 — the refusal arm's denominator is the run, not the item list.
+
+    The success line counts every item, the capped ones included, because it
+    reports on the whole list. The refusal line counts how far the run got
+    through what it was *going* to try, which is the capped list: the items
+    past the cap were never candidates, so putting them in the denominator
+    would say the run refused with work outstanding that it had never looked
+    at. They are still named, so the sentence accounts for the whole list.
+
+    Both numbers are the same whenever the list fits, which is why the
+    existing refusal test could not tell them apart: this one is three items
+    past the cap, so they differ.
+    """
+    from src.getmoredone.screens.plan import MAX_ITEM_ROWS
+
+    total = MAX_ITEM_ROWS + 3
+    for index in range(total):
+        _priced_item(manager, f"item {index:03d}", 20, 20, 16, 8)
+    screen.refresh()
+
+    real = type(manager).add_block_at
+    calls = []
+
+    def refuse_on_the_second(self, block, slot_index, bounds):
+        calls.append(block.label)
+        if len(calls) == 2:
+            raise SlotRefusedError(SlotRefusal.SLOT_FULL)
+        return real(self, block, slot_index, bounds)
+
+    monkeypatch.setattr(type(manager), "add_block_at", refuse_on_the_second)
+
+    screen.autoload_day()
+
+    text = screen.status_label.cget("text")
+    assert f"refused after 1 of {MAX_ITEM_ROWS} tried" in text, text
+    assert f"3 past the {MAX_ITEM_ROWS}-row list" in text, text
+    assert str(total) not in text, (
+        f"the refusal counted all {total} items, including the "
+        f"{total - MAX_ITEM_ROWS} the run was never going to try: {text}"
+    )
+
+
+def test_pdm37_a_failure_that_is_not_a_refusal_is_still_reported(
+    screen, manager, monkeypatch, caplog
 ):
     """PD-M3.7 — AutoLoad caught only ``SlotRefusedError``.
 
     Any other exception escaped the Tk callback, which has no handler: nothing
     redrawn, nothing said, and a press that failed indistinguishable on screen
-    from a press that found nothing to do. The transaction had already rolled
-    back, so the day really was unchanged -- the defect is that the user was
-    never told.
+    from a press that found nothing to do.
+
+    The failure is on the *second* item, so the rollback assertion can fail: a
+    version that stubbed out the only write there is could not have written
+    anything whether the transaction rolled back or not, and
+    ``_stored(manager) == before`` would have held against no transaction at
+    all. Here the first item really is written before the second raises.
+
+    The exception carries no message, which is the other half of this. ``str``
+    of a message-less built-in is the empty string, and the arm reported
+    ``problem or type(problem).__name__`` -- an exception instance is always
+    truthy, so that second branch could never be taken and the sentence ended
+    at the dash.
     """
-    _item(manager, "Hopeful")
+    _priced_item(manager, "First", 20, 20, 16, 8)
+    _priced_item(manager, "Second", 10, 10, 8, 4)
     before = _stored(manager)
+    real = manager.add_block_at
+    calls = []
 
     def boom(*args, **kwargs):
-        raise RuntimeError("the database went away")
+        calls.append(1)
+        if len(calls) == 2:
+            raise KeyError()
+        return real(*args, **kwargs)
 
     monkeypatch.setattr(manager, "add_block_at", boom)
 
-    screen.autoload_day()
+    with caplog.at_level(logging.ERROR, logger="getmoredone.screens.plan"):
+        screen.autoload_day()
 
-    assert _stored(manager) == before, "something was written after all"
+    assert len(calls) == 2, f"the run did not reach a second item: {calls}"
+    assert _stored(manager) == before, (
+        f"the first item's block survived a failed run: {_stored(manager)}"
+    )
     text = screen.status_label.cget("text")
     assert "AutoLoad wrote nothing" in text, text
-    assert "the database went away" in text, text
+    assert "KeyError" in text, text
+    assert not text.rstrip().endswith("—"), text
     assert screen.status_label.cget("text_color") == status_text_color("error")
+    # The status line is transient; the log is what is left to diagnose by.
+    assert "AutoLoad failed" in caplog.text, caplog.text
+    assert "KeyError" in caplog.text, caplog.text
 
 
 def test_pdm36_a_full_day_writes_nothing(root, manager, settings):
@@ -4334,6 +4530,9 @@ def test_pdm37_autoload_is_one_transaction(screen, manager, monkeypatch):
     text = screen.status_label.cget("text")
     assert "wrote nothing" in text, text
     assert "refused after 1 of 3" in text, text
+    # Pins the ``if unseen`` guard: a run that passed over nothing says
+    # nothing about the cap, so the clause means something when it appears.
+    assert "row list" not in text, text
     assert screen.status_label.cget("text_color") == status_text_color("error")
 
 
