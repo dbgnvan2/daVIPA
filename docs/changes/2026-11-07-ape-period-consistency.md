@@ -68,9 +68,22 @@ Tests:
   moved from a 4-tuple to a 3-tuple (reason (b): the behaviour changed
   intentionally; they assert nothing about the quarter)
 
+From the sweep (`de2067f` source, `a1bc1d3` tests):
+- `src/getmoredone/vps_manager.py` — APC-M4.4, the type-safe month guard and a
+  column name built from `int(month)`
+- `src/getmoredone/vps_schema.py` — APC-M5.4, the repair returns and logs the
+  rows it changed and stamps `updated_at`
+- `src/getmoredone/screens/ape_period_view.py` — APC-M2.4, `_assign_one`; the
+  corrected class claim in `_describe_month_assignment`
+- `src/getmoredone/screens/ape_assignment.py` — APC-M6.2, `status_label`,
+  `_assign_one`, `_describe_quarter_assignment`, both write paths reporting
+- `tests/test_ape_period_consistency.py` — seven more tests (48 total) and
+  `_bind`, which binds a real method onto a `SimpleNamespace` stub
+
 Docs:
 - `docs/spec_2026-11-07_ape_period_consistency.md` — spec, plan, departures,
-  status report
+  status report, and §5.8–§5.10 for the sweep
+- `BACKLOG.md` — the two low findings and the two adjacent issues
 - `docs/DOCUMENTATION_INDEX.md` — the spec doc listed
 - `docs/USER_GUIDE.md` — APE assignment and APE Weekly behaviour
 - `NOTES.md` — 2026-11-07 entry
@@ -79,22 +92,20 @@ Docs:
 ## Verification
 
 - Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 taskpolicy -b ./venv/bin/python -m pytest tests/test_ape_period_consistency.py -q`
-- Result: PASS (40 passed)
+- Result: PASS (48 passed, after the sweep's seven new tests)
 
 - Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 taskpolicy -b ./venv/bin/python -m pytest tests/test_weekly_tactic_schema.py tests/test_vps_hub_crud.py tests/test_weekly_tactic_cascade.py tests/test_rename_safe_links.py tests/test_vps_integration.py -q`
 - Result: PASS (160 passed)
 
-- Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 taskpolicy -b ./venv/bin/python -m pytest tests/ -m meta -q`
-- Result: see §Risks — three failures, all in `tests/test_traceability_refs.py`,
-  two of them pre-existing and from uncommitted `plan.py` work unrelated to this
-  change.
+- Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 taskpolicy -b ./venv/bin/python -m pytest tests/test_ape_period_consistency.py tests/test_ci_contract.py tests/test_traceability_refs.py tests/test_no_vacuous_tests.py tests/test_weekly_tactic_schema.py tests/test_vps_hub_crud.py tests/test_vps_integration.py -q`
+- Result: PASS (203 passed, 1 skipped — the skip is `test_ci_contract.py:371`,
+  meaningful only on CI)
 
-- Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 taskpolicy -b ./venv/bin/python -m pytest tests/test_ci_contract.py tests/test_traceability_refs.py tests/test_no_vacuous_tests.py -q`
-- Result: `test_ci_contract.py` PASS. The other two fail, naming only
-  `plan.py`, `plan_blocks.py` and `test_plan_screen.py` — see §Risks.
+- Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 taskpolicy -b ./venv/bin/python -m pytest tests/test_plan_screen.py tests/test_time_block_colors.py tests/test_tk_offscreen.py tests/test_plan_settings.py tests/test_time_block_crud.py -q`
+- Result: PASS (the PD-\* batch's files; all skips are the mapped-window opt-out)
 
-- Mutation proofs: 12 mutations, 12 reds, each restored byte-identical.
-  Table in `docs/spec_2026-11-07_ape_period_consistency.md` §5.4.
+- Mutation proofs: 20 mutations, 20 reds, each restored byte-identical. Twelve
+  for the original criteria (spec §5.4) and eight for the sweep fixes (§5.9).
 
 - On screen in the running app, 2026-11-07 10:51-10:53, against the **real**
   demo database (table in the spec, §5.6): APE Month opened on Q4 / M11; its
@@ -111,13 +122,14 @@ Docs:
 
 ## Risks / Known gaps
 
-- **Pre-existing meta failures.** `tests/test_traceability_refs.py` reports
-  `src/getmoredone/screens/plan.py` and `src/getmoredone/screens/plan_blocks.py`
-  naming tests that do not exist (`test_pdm8_a_day_with_no_items_says_so`,
-  `test_pdm16_the_depth_bars_line_up_with_the_bottom_of_the_title`). Those files
-  are not touched by this change — the Plan-screen work is committed (`dbc1901`,
-  `f799be3`, `b010cae`), so these failures are pre-existing on `main` and not
-  this change's to fix.
+- **The three meta failures are fixed.** `tests/test_traceability_refs.py` was
+  red on `main` for two `Tests:` refs in `plan.py` and `plan_blocks.py` naming
+  tests that had been renamed, and `tests/test_no_vacuous_tests.py` was red on
+  `test_pdm106_a_flush_on_a_screen_that_is_gone_does_not_raise`, which asserted
+  nothing. Both belonged to the unpushed PD-\* batch rather than to this change;
+  fixed in `0f85168` and `c31fce7` because they were in the sweep's range.
+  `test_ci_contract.py`, `test_traceability_refs.py` and
+  `test_no_vacuous_tests.py` are all green.
 - **The Save status message was not seen on screen.**
   `_describe_month_assignment` is covered by `test_apcm23_*`, but its wording in
   the real header was not checked, because showing it means writing an
@@ -134,8 +146,49 @@ Docs:
   reason, so the Save message counts what did not happen rather than saying why.
   The log line carries the reason.
 
+## The sweep (2026-11-07)
+
+Three passes over the unpushed range `7aa601d...HEAD`, which carried this batch
+and the nine unpushed plan-screen (PD-\*) commits. Full account in the spec,
+§5.8–§5.10.
+
+| Pass | Lens | Result |
+|---|---|---|
+| `learning-qa` | the failure-pattern catalogue; P2, P4, P5, P6, P8 applicable | 4 findings (1 medium-high, 2 medium, 1 low-medium), 2 adjacent notes, no high |
+| `/code-review` (high) | correctness over the 1,135-line source-only diff | 6 findings — the same four, plus two lows |
+| `/security-review` | injection, secrets, path traversal, deserialisation, data exposure | no findings at the ≥8 confidence bar |
+
+Fixed here, with tests and mutation proofs, as APC-M2.4, APC-M4.4, APC-M5.4 and
+APC-M6.2 (`de2067f` source, `a1bc1d3` tests):
+
+- `add_selected` had no `try` around the per-APE call, and
+  `assign_ape_to_month` raises when an APE's segment resolves to nothing: the
+  raise left the earlier APEs written and the previous press's success message
+  on screen.
+- The sibling APE Quarter screen was silent on the same axis, on both write
+  paths, with no status surface at all — the "fixed as a class" shape P5
+  describes, with the denominator counted on one screen.
+- `_repair_orphan_month_flags` changed the user's real rows on every open and
+  reported nothing (P2).
+- `get_annual_plan_elements_for_month`'s range comparison was not type-safe and
+  the month is interpolated as a column name.
+
+Recorded in `BACKLOG.md` instead of fixed, per the repo's sweep budget: two low
+findings (`quarter_of_month` truncates a float; `_require_block_day`'s modal
+pumps the event queue from inside a drop's `after_idle`, PLAUSIBLE only) and
+two adjacent issues (the Plan screen's failure arm is on 3 of 8 write paths;
+`weekly_items` files a straddling week under its start date's month).
+
+**The security pass caught an error in one of the fixes.** The first version of
+APC-M4.4 guarded with `month not in QUARTER_OF_MONTH` alone and claimed that
+rejected floats; `11.0 in {11: ...}` is `True`, because a dict is keyed by hash
+and equality. The fix needs the membership test *and* `int(month)`, and the
+test asserts the float case rather than assuming the guard covers it.
+
 ## Next agent actions
 
-- Finalise the batch with `/csdp` — nothing here is committed yet.
-- Decide whether the two pre-existing `test_traceability_refs.py` failures belong
-  to the open Plan-screen batch or need their own fix.
+- Start the APE Week Assignment work (`docs/spec_2026-11-07_ape_week_actions.md`,
+  approved, not built) from a clean `main`.
+- Open decision carried into that batch: AWA-A1 — whether
+  `weekly_items.py:442` should write `weekly_tactic_id` as well as `parent_id`.
+  Recommended, not approved.

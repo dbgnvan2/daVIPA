@@ -1,6 +1,51 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (the third cold pass's three test-quality findings added, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-07 (the APE period-consistency sweep's two low findings and two adjacent issues added; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Deferred from the APE period-consistency sweep (2026-11-07)
+
+Found by the three passes over `7aa601d...HEAD` — learning-qa, a correctness
+pass over the source diff, and a security pass (which found nothing). Four
+medium findings were fixed in the batch with tests. These are what was recorded
+instead, each with the reason, because the repo's budget stops in-loop fixes
+below medium.
+
+- **`date_utils.quarter_of_month` silently truncates a float and accepts a
+  bool.** Low. `int(month)` runs inside the `try`, so `quarter_of_month(11.7)`
+  returns 4 and `quarter_of_month(True)` returns 1 — measured, not inferred.
+  The docstring's stated reason for raising at all is that "a caller holding
+  month 0 or 13 has a bug, and a silent answer is what let the bad pair reach
+  the database"; a caller holding 11.7 has the same bug and gets the silent
+  answer. **Not fixed here** because no production caller can reach it with a
+  non-integer: every one goes through `int()` or `date.month`. The fix is a
+  type check before the coercion, and it wants its own small change rather than
+  a fix-pass edit to the one function this batch made four callers share.
+- **`plan._require_block_day` opens a modal from inside a drop's
+  `after_idle`.** Low, and PLAUSIBLE rather than confirmed. `messagebox.askyesno`
+  pumps the Tk event queue, which is exactly what `_flush_redraw` picks
+  `update_idletasks` over `update` to avoid; the permission is recorded against
+  `self.selected_date` and the caller reads `self.selected_date` again after
+  the modal returns (`plan.py:1169`) to decide where the block goes. **Not
+  fixed here** because neither pass could drive a date change through Tk's
+  modal grab, so there is no demonstrated misbehaviour to write a test against
+  — only a latent coupling between a permission keyed on one read of the date
+  and a write that takes another.
+
+### Adjacent issues found, not fixed
+
+- **The Plan screen's failure arm is on 3 of its 8 write paths.** Pre-existing,
+  raised because `clear_day`'s new docstring says it adopts "the same arm
+  AutoLoad has", which reads as a class that is 3/8. `autoload_day`,
+  `extend_day_for` and `clear_day` have it. `add_padding_block`, `block_item`
+  (whose `try` catches only `SlotRefusedError`, deliberately), `delete_block`,
+  `set_block_minutes` and `move_block_to_slot` do not — a failed
+  `create_time_block`/`delete_time_block` in any of them raises inside a Tk
+  callback and presents as a gesture that did nothing.
+- **`weekly_items` files a week under the calendar month of its start date.**
+  Pre-existing and unchanged by this batch, which only removed the derived
+  quarter beside it. A week starting Mon 2026-11-30 runs into December and its
+  APEs are looked up for November only. Whether that is the intended reading of
+  a straddling week is a product question, not a defect to patch blind.
 
 ## Deferred from the plan day-controls cold sweep (2026-11-06)
 

@@ -30,11 +30,36 @@
 - ✅ **APE Month Save reports what it did.** The screen had no status surface, so a refused
   assignment looked exactly like a successful one. One wording, reached by both the Save button
   and the drop target (P5).
+- ✅ **APE Quarter Save reports what it did too** (APC-M6.2, from the sweep). The month
+  screen's docstring claimed the reporting class was covered because both of *its* paths
+  reported through one wording. The class is four paths across two screens, and APE Quarter —
+  edited in the same change for its quarter default — discarded `assign_ape_to_quarter`'s
+  boolean on both of its paths and had no status surface at all, so a rejected APE simply did
+  not appear in the right-hand panel: what a click on the wrong row looks like. It now has the
+  same wording with Q for M, on Save and on drop, and says so when nothing is checked.
+- ✅ **A raising assignment is counted, not allowed out of the loop** (APC-M2.4, from the
+  sweep). `assign_ape_to_month` does not only return `False` — it raises when an APE's segment
+  resolves to nothing. The raise left the earlier APEs written, skipped both the redraw and the
+  status line, and left the previous press's "Assigned 3 APE(s)" on screen: a success message
+  for a save that half happened, with the traceback going to a stderr a double-clicked app does
+  not have.
+- ✅ **The repair says which rows it changed** (APC-M5.4, from the sweep). It runs against the
+  real database on every open and reported nothing — no count, no log line, no `updated_at` —
+  so the only trace was the changed data: an APE in a quarter nobody remembers assigning (P2).
+  It now returns the `(ape_id, quarter)` list, stamps `updated_at`, and logs the list when
+  non-empty. That also makes its idempotence provable rather than inferred.
+- ✅ **The month lookup's guard is type-safe** (APC-M4.4, from the sweep). `month < 1 or
+  month > 12` raises `TypeError` on a string and *passes* a float, and the month is
+  interpolated as a column name, so `11.0` reached SQLite as `m11.0` and raised from inside a
+  Tk callback where nothing is on screen to show it.
 - Spec: `docs/spec_2026-11-07_ape_period_consistency.md`. Tests:
-  `tests/test_ape_period_consistency.py` (41), twelve mutation proofs. Verified
+  `tests/test_ape_period_consistency.py` (48), twenty mutation proofs. Verified
   against copies of both real databases: the demo row is repaired and appears
   in APE Weekly; the installed app's 17 APE rows were already consistent and
-  the migration changed none of them.
+  the migration changed none of them. Verified on screen against the **real**
+  demo database on 2026-11-07 (spec §5.6). Swept by `learning-qa`,
+  `/code-review` and `/security-review` (§5.8): four medium findings fixed
+  here, two lows and two adjacent issues in `BACKLOG.md`, no security finding.
 
 ## Recent Changes (2026-08-24)
 

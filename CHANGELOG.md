@@ -7,6 +7,21 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — the APE quarter/month consistency batch (2026-11-07)
+
+- **APE Month and APE Quarter both open on the period you are actually in,
+  and both say what Save did.** The Quarter picker on each screen opened on the
+  literal "1" while the Month picker opened on today's month, so on 7 November
+  APE Month offered Q1 + M11 and saved it — an APE filed in a quarter that does
+  not contain its month, which APE Weekly then could not find, every November
+  week, with nothing on screen to say why. Both pickers now agree, APE Month
+  offers only the selected quarter's three months, and a mismatched pair is
+  refused before anything is written. Records already stored that way are
+  repaired when the app next opens, and the repair now says in the log which
+  rows it changed. Both screens report a refused assignment instead of letting
+  it look like a successful one, on the Save button and on the drop target
+  alike.
+
 ### Added — reported from the running screen (2026-11-07)
 
 - **A "Clear Day" button**, the reverse of AutoLoad: it takes every scheduled

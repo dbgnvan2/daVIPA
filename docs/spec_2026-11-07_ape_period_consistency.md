@@ -88,6 +88,7 @@ it. Test file: `tests/test_ape_period_consistency.py` unless stated.
 | APC-M2.1 | `assign_ape_to_month(ape, 1, 11)` returns `False` and writes **nothing** (`q1` and `m11` unchanged) | `test_apcm21_mismatched_quarter_and_month_is_refused_and_writes_nothing` |
 | APC-M2.2 | A consistent pair still succeeds — `assign_ape_to_month(ape, 4, 11)` is `True` | `test_apcm22_matching_quarter_and_month_still_assigns` |
 | APC-M2.3 | The Month screen's Save reports a refusal instead of silently skipping it (P2 — surface, never drop) | `test_apcm23_save_reports_refused_assignments` |
+| APC-M2.4 | A raising assignment is counted as refused, not allowed out of the loop: the APEs that did not raise are still written, the redraw still happens, and the line says how many | `test_apcm24_a_raising_assignment_is_counted_not_escaped` |
 
 ### APC-M3 — the pickers cannot produce an invalid pair
 
@@ -110,6 +111,7 @@ APC-M3.1–3.4 build no window: the defaults moved into
 | APC-M4.1 | `get_annual_plan_elements_for_month(year, month)` exists and matches on the month flag alone | `test_apcm41_month_lookup_matches_on_month_flag_alone` |
 | APC-M4.2 | A row with `m11 = 1, q4 = 0` is returned for November — the already-stored orphan appears | `test_apcm42_orphan_month_flag_still_appears_in_november` |
 | APC-M4.3 | `WeeklyItemsScreen` left panel and the Month screen's right panel both use the month lookup; `get_annual_plan_elements_for_period` is removed (it has no other caller) | `test_apcm43_screens_use_month_lookup` |
+| APC-M4.4 | A non-integer month returns `[]` rather than raising: `"11"`, `None`, `(11,)` are refused, and `11.0` — which the membership test alone passes, since `11.0 in {11: ...}` is `True` — reaches SQLite as `m11` because the column name is built from `int(month)` | `test_apcm44_month_lookup_guard_is_type_safe` |
 
 ### APC-M5 — existing orphan flags repaired
 
@@ -118,6 +120,7 @@ APC-M3.1–3.4 build no window: the defaults moved into
 | APC-M5.1 | Opening a database sets `q{N} = 1` for any APE with a month flag inside quarter N; never clears a quarter flag | `test_apcm51_migration_backfills_the_implied_quarter_flag` |
 | APC-M5.2 | Dirty-state (P8): a file DB written with `q1=1, q3=1, m11=1`, then reopened, reads `q1=1, q3=1, q4=1, m11=1` | `test_apcm52_dirty_state_orphan_quarter_flag_is_repaired_on_reopen` |
 | APC-M5.3 | Idempotent — a second open changes no row (`updated_at` untouched for already-consistent rows) | `test_apcm53_migration_is_idempotent` |
+| APC-M5.4 | The repair returns the `(ape_id, quarter)` list it changed, stamps `updated_at` on those rows, and logs the list at `info` when non-empty; a second run returns `[]` (P2 — an automatic data change that says nothing is indistinguishable from one that did nothing) | `test_apcm54_the_repair_reports_every_row_it_changed` |
 
 Home: `VPSSchema._extend_annual_plan_elements` in
 `src/getmoredone/vps_schema.py:777`, alongside the flags it is repairing, in the
@@ -133,6 +136,21 @@ project's rule 10 this is flagged rather than swept in.
 **Approved and fixed** in this change — one line plus
 `test_apcm61_quarter_screen_defaults_to_current_quarter`. It is the same defect,
 and leaving it means the two APE screens disagree about what quarter you are in.
+
+| ID | Criterion | Test |
+|---|---|---|
+| APC-M6.1 | APE Quarter's Quarter picker opens on the current calendar quarter | `test_apcm61_quarter_screen_defaults_to_current_quarter` |
+| APC-M6.2 | APE Quarter reports what Save did on **both** its write paths, says so when nothing is checked, and counts a raise as refused rather than letting it escape | `test_apcm62_quarter_save_reports_refused_assignments`, `test_apcm62_quarter_save_with_nothing_checked_says_so`, `test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped`, `test_apcm62_quarter_drag_path_reaches_the_same_reporting` |
+
+APC-M6.2 came out of the sweep, not the plan. `_describe_month_assignment`'s
+docstring claimed the reporting class was covered because both of the *Month*
+screen's paths reported through it. The class is four paths across two screens.
+APE Quarter — edited in this same change for APC-M6.1 — discarded
+`assign_ape_to_quarter`'s boolean on both of its paths and had no status
+surface at all, so a rejected APE simply did not appear in the right-hand
+panel, which is what a click on the wrong row looks like. This is the "fixed as
+a class" shape P5 describes, with the denominator counted on one screen. The
+month docstring's claim is corrected along with the code.
 
 ---
 
@@ -218,6 +236,7 @@ only the one the suite happens to run in.
 | APC-M2.1 | done | `VPSManager.assign_ape_to_month`; `test_apcm21_mismatched_quarter_and_month_is_refused_and_writes_nothing`, `test_apcm21_every_mismatched_pair_is_refused` |
 | APC-M2.2 | done | `test_apcm22_matching_quarter_and_month_still_assigns` |
 | APC-M2.3 | done | `APEPeriodViewScreen._describe_month_assignment`; `test_apcm23_save_reports_refused_assignments`, `test_apcm23_save_button_reaches_the_reporting`, `test_apcm23_drag_path_reaches_the_same_reporting` |
+| APC-M2.4 | done, from the sweep — see §5.8 | `APEPeriodViewScreen._assign_one`; `test_apcm24_a_raising_assignment_is_counted_not_escaped` |
 | APC-M3.1 | done | `APEPeriodViewScreen.default_period`; `test_apcm31_quarter_defaults_to_current_quarter` |
 | APC-M3.2 | done | `APEPeriodViewScreen._sync_month_choices`; `test_apcm32_month_combo_offers_only_that_quarters_months` |
 | APC-M3.3 | done | `test_apcm33_changing_quarter_moves_month_into_range`, `test_apcm33_every_quarter_leaves_the_month_in_range` |
@@ -225,10 +244,13 @@ only the one the suite happens to run in.
 | APC-M4.1 | done | `VPSManager.get_annual_plan_elements_for_month`; `test_apcm41_month_lookup_matches_on_month_flag_alone` |
 | APC-M4.2 | done | `test_apcm42_orphan_month_flag_still_appears_in_november` |
 | APC-M4.3 | done | `test_apcm43_screens_use_month_lookup`, `test_apcm43_weekly_screen_left_panel_asks_by_month_only` |
+| APC-M4.4 | done, from the sweep — see §5.8 | `VPSManager.get_annual_plan_elements_for_month`; `test_apcm44_month_lookup_guard_is_type_safe` |
 | APC-M5.1 | done | `VPSSchema._repair_orphan_month_flags`; `test_apcm51_migration_backfills_the_implied_quarter_flag`, `test_apcm5_every_stored_month_flag_implies_its_quarter` |
 | APC-M5.2 | done | `test_apcm52_dirty_state_orphan_quarter_flag_is_repaired_on_reopen` |
 | APC-M5.3 | done | `test_apcm53_migration_is_idempotent` |
-| APC-M6 | done | `src/getmoredone/screens/ape_assignment.py`; `test_apcm61_quarter_screen_defaults_to_current_quarter` |
+| APC-M5.4 | done, from the sweep — see §5.8 | `VPSSchema._repair_orphan_month_flags`; `test_apcm54_the_repair_reports_every_row_it_changed` |
+| APC-M6.1 | done | `src/getmoredone/screens/ape_assignment.py`; `test_apcm61_quarter_screen_defaults_to_current_quarter` |
+| APC-M6.2 | done, from the sweep — see §5.8 | `APEAssignmentScreen._assign_one`, `_describe_quarter_assignment`, `status_label`; `test_apcm62_quarter_save_reports_refused_assignments`, `test_apcm62_quarter_save_with_nothing_checked_says_so`, `test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped`, `test_apcm62_quarter_drag_path_reaches_the_same_reporting` |
 
 ### 5.4 Mutation proofs
 
@@ -293,3 +315,74 @@ the user's demo data.
 - **The Save status message was not seen on screen.** `_describe_month_assignment`
   is covered by `test_apcm23_*`, but its wording in the real header was not
   checked, since showing it means writing an assignment to live data.
+
+### 5.8 The sweep, and the four criteria it added
+
+Three passes over the unpushed range `7aa601d...HEAD`, which carries this batch
+and the nine unpushed plan-screen (PD-\*) commits:
+
+| Pass | Lens | Result |
+|---|---|---|
+| `learning-qa` | the project's failure-pattern catalogue; P2, P4, P5, P6 and P8 applicable | 4 findings (1 medium-high, 2 medium, 1 low-medium), 2 adjacent notes, no high |
+| `/code-review` (high) | correctness over the 1,135-line source-only diff, hunk by hunk | 6 findings — the same four, plus two lows |
+| `/security-review` | injection, secrets, path traversal, unsafe deserialisation, data exposure | **no findings at the ≥8 confidence bar** |
+
+Four medium findings were fixed, with tests, as APC-M2.4, APC-M4.4, APC-M5.4
+and APC-M6.2. Two lows and two adjacent issues went to `BACKLOG.md` rather
+than being fixed in-loop, per the repo's sweep budget:
+
+- `date_utils.quarter_of_month` truncates a float and accepts a bool
+  (`quarter_of_month(11.7)` → 4, `quarter_of_month(True)` → 1; measured). No
+  production caller can reach it with a non-integer.
+- `plan._require_block_day` opens a modal from inside a drop's `after_idle`,
+  which pumps the event queue. PLAUSIBLE, not confirmed — neither pass could
+  drive a date change through Tk's modal grab.
+- Adjacent: the Plan screen's failure arm is on 3 of its 8 write paths;
+  `weekly_items` files a straddling week under its start date's month.
+
+**The security pass caught an error in one of the fixes**, which is worth
+recording because it is the kind a warm pass does not catch. The first version
+of APC-M4.4 guarded with `if month not in QUARTER_OF_MONTH` alone, and its
+docstring claimed that rejected the float case. It does not: `11.0 in {11: ...}`
+is `True`, because a dict is keyed by hash and equality. The fix needs both the
+membership test *and* a column name built from `int(month)`, and the test now
+asserts the float case explicitly rather than assuming the guard covers it.
+
+What the SQL review found safe, traced rather than assumed: every f-string
+column name in the range resolves to a module constant built from `range(1, 13)`
+(`MONTHS_OF_QUARTER`, nothing in `src/` mutates it) or to an `int()`-parsed
+caller argument, and the one free-text field on either screen — the year entry —
+is bound as a `?` parameter. The new `messagebox` text and log lines carry an
+opaque APE id and integers, to a local file in the app's own data directory.
+
+### 5.9 Mutation proofs for the sweep fixes
+
+Eight mutations, eight reds, each restored byte-identical:
+
+| Mutation | Test that caught it |
+|---|---|
+| APC-M4.4 guard back to `month < 1 or month > 12` | `test_apcm44_month_lookup_guard_is_type_safe` |
+| APC-M5.4 repair returns `[]` instead of `repaired` | `test_apcm54_the_repair_reports_every_row_it_changed` |
+| APC-M5.4 repair stops stamping `updated_at` | `test_apcm54_the_repair_reports_every_row_it_changed` |
+| APC-M2.4 month `_assign_one` loses its `except` arm | `test_apcm24_a_raising_assignment_is_counted_not_escaped` |
+| APC-M6.2 quarter `_assign_one` loses its `except` arm | `test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped` |
+| APC-M6.2 wording drops the refused count | `test_apcm62_quarter_save_reports_refused_assignments` |
+| APC-M6.2 nothing-checked goes silent again | `test_apcm62_quarter_save_with_nothing_checked_says_so` |
+| APC-M6.2 drop target stops reporting | `test_apcm62_quarter_drag_path_reaches_the_same_reporting` |
+
+### 5.10 Still not covered after the sweep
+
+- **APE Quarter's new status label was not seen on screen.** Same reason as
+  the Month screen's in §5.7: showing it means writing an assignment to the
+  user's live demo data. Both are covered by stub-driven wiring tests
+  (`test_apcm62_*`), which is coverage of the call, not of the pixels.
+- **`_repair_orphan_month_flags`' new log line was not read from the real log
+  file.** The return value is asserted; the `logger.info` call is not, because
+  it writes to the user's own `weekly_tactic_debug.log`.
+- **The PD-\* plan-screen batch had no `learning-qa`-family finding**, and
+  `learning-qa` said plainly that its catalogue does not cover that batch's
+  likely failure family (Tk geometry, layout and UI contract). The
+  `/code-review` pass did read every plan-screen hunk and traced the pane
+  arithmetic, the depth-bar loop bounds, the marker-glyph collision, the redraw
+  flush ordering and the `CTkComboBox` variable/command ordering, finding one
+  PLAUSIBLE low. No separate UI-regression pass was run over the 50+ screens.
