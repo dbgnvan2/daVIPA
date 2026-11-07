@@ -42,6 +42,20 @@ class TodayScreen(ctk.CTkFrame):
     # rather than an accidental click.
     PIN_DRAG_THRESHOLD = 12
 
+    # AWA-M6 — the three seams a subclass needs to reuse this screen's list
+    # without reimplementing it. Everything in ``load_items`` and
+    # ``create_item_row`` works on any list of ActionItem; only the empty-state
+    # wording, the stored column widths, and the toolbar are about *today*.
+    #
+    # Purpose: let a panel filtered by something other than today's date reuse
+    #          the row builder, the open/completed split and every row
+    #          behaviour, by overriding three names instead of copying 450
+    #          lines.
+    # Spec:    docs/spec_2026-11-07_ape_week_actions.md#awa-m6
+    # Tests:   tests/test_ape_week_actions.py::test_awam61_today_exposes_the_seam
+    EMPTY_TEXT = "No items for today"
+    COLUMN_PREFIX = "today"
+
     def __init__(self, parent, db_manager: DatabaseManager, app: 'GetMoreDoneApp'):
         super().__init__(parent)
         self.db_manager = db_manager
@@ -70,7 +84,7 @@ class TodayScreen(ctk.CTkFrame):
         self.resizer = ColumnResizer(
             owner=self,
             settings=self.settings,
-            prefix="today",
+            prefix=self.COLUMN_PREFIX,
             set_cell_width=False,  # title label sits inside a sub-frame
             specs=[ColumnSpec("title", grid_col=1, default_width=260, min_width=120)],
         )
@@ -80,9 +94,35 @@ class TodayScreen(ctk.CTkFrame):
         self.grid_rowconfigure(2, weight=1)
 
         # Header
-        header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self._build_toolbar(self)
+
+        # Pinned column-header row (does not scroll with the list)
+        self.column_header = None
+        self._header_title_label = None
+
+        # Scrollable frame for items
+        self.scroll_frame = ctk.CTkScrollableFrame(self)
+        self.scroll_frame.grid(
+            row=2, column=0, sticky="nsew", padx=20, pady=(0, 20))
+        self.scroll_frame.grid_columnconfigure(0, weight=1)
+
+        # Build the pinned header, then load items
+        self._build_column_header()
+        self.load_items()
+
+    def _build_toolbar(self, parent):
+        """Build row 0: the title and Today's own six controls.
+
+        Purpose: the one part of this screen that is about *today* rather than
+                 about a list of Action Items. A subclass overrides this alone
+                 to put its own controls above the inherited list.
+        Spec:    docs/spec_2026-11-07_ape_week_actions.md#awa-m6
+        Tests:   tests/test_ape_week_actions.py::test_awam62_today_toolbar_unchanged
+        """
+        header_frame = ctk.CTkFrame(parent, fg_color="transparent")
         header_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
         header_frame.grid_columnconfigure(5, weight=1)
+        self.toolbar_frame = header_frame
 
         ctk.CTkLabel(
             header_frame,
@@ -148,20 +188,6 @@ class TodayScreen(ctk.CTkFrame):
             command=self.refresh
         )
         btn_refresh.grid(row=0, column=7, padx=5)
-
-        # Pinned column-header row (does not scroll with the list)
-        self.column_header = None
-        self._header_title_label = None
-
-        # Scrollable frame for items
-        self.scroll_frame = ctk.CTkScrollableFrame(self)
-        self.scroll_frame.grid(
-            row=2, column=0, sticky="nsew", padx=20, pady=(0, 20))
-        self.scroll_frame.grid_columnconfigure(0, weight=1)
-
-        # Build the pinned header, then load items
-        self._build_column_header()
-        self.load_items()
 
     def _build_column_header(self):
         """Build the pinned column-heading row with a draggable Title divider."""
@@ -265,7 +291,7 @@ class TodayScreen(ctk.CTkFrame):
             if not items:
                 label = ctk.CTkLabel(
                     self.scroll_frame,
-                    text="No items for today",
+                    text=self.EMPTY_TEXT,
                     font=ctk.CTkFont(size=14)
                 )
                 label.grid(row=0, column=0, pady=20)
