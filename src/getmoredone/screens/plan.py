@@ -230,6 +230,8 @@ class PlanScreen(ctk.CTkFrame):
         self._drag_item: Optional[ActionItem] = None
         self._drag_block: Optional[TimeBlock] = None
         self._drag_label: Optional[ctk.CTkLabel] = None
+        # What the label will say once the pointer actually moves (PD-M10.3).
+        self._drag_label_text: Optional[str] = None
         self._drag_hover_frame = None
         #: The hovered box's own border width, so clearing the hover puts it
         #: back instead of flattening it to 0.
@@ -751,6 +753,37 @@ class PlanScreen(ctk.CTkFrame):
         self.load_items()
         self.load_blocks()
 
+    def _flush_redraw(self):
+        """Put a rebuilt pane on screen now, rather than at the next event.
+
+        Purpose: PD-M10 -- both panes are rebuilt by taking the scroll frame
+                 out of the grid, destroying its children and putting it back.
+                 Tk draws from an idle handler, and every one of these rebuilds
+                 runs inside an event callback or an ``after_idle`` of one, so
+                 the re-gridded frame could stay undrawn until some later event
+                 arrived. In the app that event was the next mouse movement
+                 over the window: moving a block, resizing one or deleting one
+                 wrote the day correctly and looked like a gesture that had
+                 done nothing.
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m10
+        Tests:   tests/test_plan_screen.py::test_pdm101_rebuilding_the_day_pane_flushes_the_redraw
+
+        ``update_idletasks`` and not ``update``: idle tasks are geometry and
+        redisplay, which is all that is owed here. ``update`` also services the
+        event queue, and these rebuilds run from drag handlers -- dispatching a
+        queued click in the middle of one would re-enter a rebuild that is
+        destroying the widget the click is for, which is the hang the
+        ``after_idle`` in ``on_drag_release`` exists to avoid.
+        """
+        try:
+            self.update_idletasks()
+        except tk.TclError:
+            # The screen went away while a rebuild was in flight: a window
+            # closing, or a date change whose redraw outlived the screen.
+            # There is nothing left to draw, and raising here would turn a
+            # closed window into an error on the way out.
+            pass
+
     def on_date_changed(self, new_date: str):
         self.selected_date = new_date
         if self._ready:
@@ -863,6 +896,7 @@ class PlanScreen(ctk.CTkFrame):
                 )
         finally:
             self.items_scroll.grid(**grid_info)
+            self._flush_redraw()
 
     def load_blocks(self):
         """Draw the day as its grid of half hours.
@@ -1015,6 +1049,7 @@ class PlanScreen(ctk.CTkFrame):
                 self.outside_frame.grid_remove()
         finally:
             self.blocks_scroll.grid(**grid_info)
+            self._flush_redraw()
 
     def _items_by_id(self, blocks) -> Dict[str, ActionItem]:
         """The items behind these blocks, including ones not in the left pane.
@@ -1624,13 +1659,31 @@ class PlanScreen(ctk.CTkFrame):
         self._drag_kind = "item"
         self._drag_item = item
         self._drag_block = None
-        self._show_drag_label(item.title)
+        self._arm_drag_label(item.title)
 
     def start_block_drag(self, _event, block: TimeBlock):
         self._drag_kind = "block"
         self._drag_block = block
         self._drag_item = None
-        self._show_drag_label(block.label or block.block_type.title())
+        self._arm_drag_label(block.label or block.block_type.title())
+
+    def _arm_drag_label(self, text: str):
+        """Hold the label's text until the pointer moves.
+
+        Purpose: PD-M10.3 -- every press on a row is the start of a drag as far
+                 as these handlers know, so showing the label here put one
+                 under the pointer on an ordinary click as well. The click's
+                 release hid it again, but on a platform that draws at idle the
+                 hiding was not on screen either, and the name of whatever was
+                 clicked sat beside the pointer until something else repainted
+                 the screen.
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m10
+        Tests:   tests/test_plan_screen.py::test_pdm103_a_press_without_motion_shows_no_drag_label
+
+        A press with no motion is not a drag, so it gets no label at all. The
+        first motion is what makes it one.
+        """
+        self._drag_label_text = text
 
     def _show_drag_label(self, text: str):
         palette = semantic_colors()
@@ -1659,7 +1712,15 @@ class PlanScreen(ctk.CTkFrame):
     def on_drag_motion(self, _event):
         if not self._drag_kind:
             return
-        self._position_drag_label()
+        armed = self._drag_label_text
+        if armed is not None:
+            # PD-M10.4 -- the pointer has moved, so this is a drag. Cleared
+            # first: _show_drag_label is what puts it on screen, and a second
+            # motion must reposition the label rather than build it again.
+            self._drag_label_text = None
+            self._show_drag_label(armed)
+        else:
+            self._position_drag_label()
         self.update_hover_target()
 
     def on_drag_release(self, _event):
@@ -1713,8 +1774,23 @@ class PlanScreen(ctk.CTkFrame):
                 self.set_status("Drop a block on a half-hour box", "muted")
 
     def _end_drag(self):
+        """Take the label off the screen and forget what was being dragged.
+
+        Purpose: PD-M10.5 -- a release that lands on nothing writes nothing and
+                 redraws nothing, so without the flush here the label stayed
+                 visible until some later event repainted the screen.
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m10
+        Tests:   tests/test_plan_screen.py::test_pdm105_ending_a_drag_hides_the_label_and_flushes
+
+        Flushing from inside the ButtonRelease handler is safe here and only
+        here: ``on_drag_release`` calls this before it schedules the drop's own
+        ``after_idle``, so there is no queued rebuild for the flush to dispatch
+        into the widget that is dispatching this event.
+        """
+        self._drag_label_text = None
         if self._drag_label is not None:
             self._drag_label.place_forget()
+            self._flush_redraw()
         self._drag_kind = None
         self._drag_item = None
         self._drag_block = None
