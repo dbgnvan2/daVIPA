@@ -27,6 +27,7 @@ The arithmetic lives in ``time_block_layout``, which has no Tk in it.
 
 from __future__ import annotations
 
+import logging
 import tkinter as tk
 from datetime import date
 from typing import TYPE_CHECKING, Dict, List, Optional
@@ -74,6 +75,8 @@ from .plan_blocks import (
     chip_column_minsizes,
 )
 from .plan_settings_dialog import PlanSettingsDialog
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ..db_manager import DatabaseManager
@@ -606,9 +609,18 @@ class PlanScreen(ctk.CTkFrame):
         self.divider.bind("<ButtonRelease-1>", self.on_divider_release)
 
     def on_divider_press(self, event):
-        """Remember where the grip was pressed, and at what width."""
+        """Remember where the grip was pressed, and at what width.
+
+        The width drawn, not the width in the settings file. They differ
+        whenever the window is too narrow for the setting -- which the resize
+        clamp made an ordinary state rather than an edge case -- and taking the
+        setting here meant a bare click on the grip saved the clamped width
+        over it. A 600px setting in a 900px pane became 442px on a click that
+        moved nothing, so widening the window afterwards no longer gave the
+        600 back, and the first 158px of a leftward drag did nothing.
+        """
         self._divider_from_x = event.x_root
-        self._divider_from_width = self.items_col_width()
+        self._divider_from_width = self._items_width
         self._divider_width = self._divider_from_width
 
     def on_divider_motion(self, event):
@@ -1177,9 +1189,16 @@ class PlanScreen(ctk.CTkFrame):
             # taken the earlier items back out, so the number that would have
             # been written is part of the report.
             self.refresh()
+            # ``len(shown)`` here, not ``len(items)``: this is how far the run
+            # got through what it was going to try, and the items past the cap
+            # were never going to be tried at all. They are still named, so the
+            # sentence accounts for the whole list either way.
+            tried = f"{placed} of {len(shown)} tried"
+            if unseen:
+                tried += f", {unseen} past the {MAX_ITEM_ROWS}-row list"
             self.set_status(
                 f"AutoLoad wrote nothing — {refusal_text(refused.reason)} "
-                f"(refused after {placed} of {len(items)})",
+                f"(refused after {tried})",
                 "error",
             )
             return
@@ -1189,9 +1208,19 @@ class PlanScreen(ctk.CTkFrame):
             # exception leaves a Tk callback with nothing redrawn and nothing
             # said, and a press that failed looks exactly like a press that
             # found nothing to do.
+            # Logged as well as said. The status line is transient -- the next
+            # set_status overwrites it -- and this arm turns what would have
+            # been a traceback into one sentence, so without the log an
+            # AttributeError in here leaves nothing behind to diagnose it by.
+            logger.exception("AutoLoad failed")
             self.refresh()
             self.set_status(
-                f"AutoLoad wrote nothing — {problem or type(problem).__name__}",
+                # ``str(problem)``, not ``problem``: an exception instance is
+                # always truthy, so ``problem or ...`` can never take its
+                # second branch, and a message-less built-in such as
+                # ``KeyError()`` ended the sentence at the dash.
+                f"AutoLoad wrote nothing — "
+                f"{str(problem) or type(problem).__name__}",
                 "error",
             )
             return
