@@ -16,6 +16,9 @@ Screens are built on a **withdrawn** root, so none of them adds to the mapped
 window count that tests/test_ci_contract.py pins at 22.
 """
 
+import ast
+import dataclasses
+import logging
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -33,8 +36,9 @@ import pytest  # noqa: E402
 
 import customtkinter as ctk  # noqa: E402
 
+from src.getmoredone.app_settings import AppSettings  # noqa: E402
 from src.getmoredone.color_contrast import pick_text_color  # noqa: E402
-from src.getmoredone.screens import chip_table  # noqa: E402
+from src.getmoredone.screens import chip_table, split_panel  # noqa: E402
 from src.getmoredone.screens.ape_assignment import APEAssignmentScreen  # noqa: E402
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "getmoredone"
@@ -81,11 +85,19 @@ def _fake_vps(left_rows, right_rows):
     )
 
 
-def _quarter_screen(left_rows=(), right_rows=()):
-    """APE Quarter Assignment on a withdrawn root, already rendered."""
+def _quarter_screen(left_rows=(), right_rows=(), settings=None):
+    """APE Quarter Assignment on a withdrawn root, already rendered.
+
+    With `settings`, the screen takes it from the app the way the running app
+    hands over its own instance; without one it loads its own, which
+    conftest.py's settings isolation points at a temporary file.
+    """
     root = _root()
     vps = _fake_vps(left_rows, right_rows)
-    screen = APEAssignmentScreen(root, vps, SimpleNamespace(vps_manager=vps))
+    app = SimpleNamespace(vps_manager=vps)
+    if settings is not None:
+        app.settings = settings
+    screen = APEAssignmentScreen(root, vps, app)
     screen.update_idletasks()
     return root, screen
 
@@ -155,8 +167,10 @@ def test_updm41_ape_quarter_layout_is_unchanged():
         assert int(screen.divider.grid_info()["column"]) == 1
         assert int(screen.right_frame.grid_info()["column"]) == 2
 
-        # The middle column is the splitter's width, not a panel's.
-        assert body.grid_columnconfigure(1).get("minsize") == screen.SPLITTER_WIDTH
+        # The middle column is the splitter's width, not a panel's. UPD-M1
+        # moved the number into screens/split_panel.py, which is the whole
+        # point of that step; the column it sizes is unchanged.
+        assert body.grid_columnconfigure(1).get("minsize") == split_panel.SPLITTER_WIDTH
 
         bound = set(_bound_sequences(screen.divider))
         assert {"<Button-1>", "<B1-Motion>", "<ButtonRelease-1>"} <= bound
@@ -478,5 +492,305 @@ def test_updm37_the_fallback_chip_does_not_measure_a_named_colour():
         assert cells["segment"].cget("text_color") == inherited
         # The lineage pill is still measured against its own fill.
         assert cells["category"].cget("text_color") == pick_text_color("#cc7744")
+    finally:
+        root.destroy()
+
+
+# ----------------------------------------------- UPD-M1: one splitter, not four
+
+SPLITTER_METHODS = ("_apply_split_ratio", "_on_divider_drag")
+
+# The screens that still carry their own copy of the splitter. UPD-M1 adopts
+# ape_assignment only (the spec's implementation order, step 2); these three
+# adopt at UPD-M4, and this set must shrink to empty as they do. It is asserted
+# as an exact set rather than a ceiling, so it cannot quietly grow a fourth
+# entry and it cannot stay stale after an adoption.
+SPLITTER_HOLDOUTS = {
+    "annual_vision_segments.py",
+    "ape_period_view.py",
+    "weekly_items.py",
+}
+
+# A fifth copy, older than the four and not one of them: a different minimum
+# (300), a different default ratio (0.6), a clamp that holds both panels, and
+# no _apply_split_ratio of its own. project_boards.py is not a VSP tab, so it
+# is outside this spec's scope and is recorded as an adjacent issue rather
+# than swept into this change. It is listed here, not excluded from the scan,
+# so that it cannot be forgotten and cannot grow a sixth variant unnoticed.
+SPLITTER_OUT_OF_SCOPE = {"project_boards.py"}
+
+
+def _event(x_root):
+    """A press/motion/release event, which is read for x_root and nothing else."""
+    return SimpleNamespace(x_root=x_root)
+
+
+def _splitter(body_width=1208, ratio=None, settings=None, prefix=None):
+    """A real three-column body with a real divider, on a withdrawn root.
+
+    Real widgets rather than a double: the arithmetic under test reads
+    `winfo_width()` and writes grid minsizes, and a double would assert the
+    test's own idea of what Tk reports rather than what it reports.
+    """
+    root = _root()
+    body = ctk.CTkFrame(root, width=body_width, height=400)
+    body.grid(row=0, column=0)
+    body.grid_propagate(False)
+    body.grid_rowconfigure(0, weight=1)
+    left = ctk.CTkFrame(body)
+    left.grid(row=0, column=0, sticky="nsew")
+    divider = ctk.CTkFrame(body, width=split_panel.SPLITTER_WIDTH)
+    divider.grid(row=0, column=1, sticky="ns")
+    right = ctk.CTkFrame(body)
+    right.grid(row=0, column=2, sticky="nsew")
+    root.update_idletasks()
+    panel = split_panel.SplitPanel(
+        body, left, divider, settings=settings, prefix=prefix
+    )
+    if ratio is not None:
+        panel.ratio = ratio
+    panel.apply()
+    root.update_idletasks()
+    return root, body, left, divider, panel
+
+
+def test_updm11_split_panel_module_owns_the_divider():
+    """UPD-M1.1 — the module holds the ratio, the clamp and the handlers.
+
+    Asserted by use, not by reading the source: constructing a SplitPanel must
+    leave the three divider events and the body's resize bound to it, and the
+    ratio and the clamp must be reachable on the instance. If any of this were
+    left in a screen, there would be nothing here to bind.
+    """
+    root, body, left, divider, panel = _splitter()
+    try:
+        assert panel.ratio == split_panel.DEFAULT_SPLIT_RATIO
+        assert panel.clamp_left(0, 1200) == split_panel.MIN_PANEL_WIDTH
+        assert panel.clamp_left(1200, 1200) == 1200 - split_panel.MIN_PANEL_WIDTH
+
+        on_divider = set(_bound_sequences(divider))
+        assert {"<Button-1>", "<B1-Motion>", "<ButtonRelease-1>"} <= on_divider
+        assert "<Configure>" in set(_bound_sequences(body))
+
+        # The handlers the screens used to own, now reachable only here.
+        for name in ("apply", "on_body_resize", "on_press", "on_drag", "on_release"):
+            assert callable(getattr(panel, name)), name
+    finally:
+        root.destroy()
+
+
+def test_updm12_drag_moves_both_panels_by_the_same_amount():
+    """UPD-M1.2 — 60px right widens the left by 60 and narrows the right by 60.
+
+    The press is asserted to have captured the left panel's applied width: with
+    an unlaid-out panel the clamp would absorb the drag and the equal-and-
+    opposite assertion below would hold while measuring nothing.
+    """
+    root, body, left, divider, panel = _splitter()
+    try:
+        before = _minsizes(body, (0, 2))
+        assert before == [600, 600]          # 1208 - 8 splitter, halved
+        start_left = left.winfo_width()
+        assert start_left == before[0]
+
+        panel.on_press(_event(1000))
+        panel.on_drag(_event(1060))
+        after = _minsizes(body, (0, 2))
+
+        assert after[0] == start_left + 60
+        assert after[0] > before[0]           # right, past the midpoint
+        assert after[0] - before[0] == -(after[1] - before[1])
+        assert after[0] + after[1] == before[0] + before[1]
+    finally:
+        root.destroy()
+
+
+def test_updm13_neither_panel_can_be_crushed():
+    """UPD-M1.3 — the minimum wins over the ratio, at every body width.
+
+    Two regimes, and the second one is the honest limit rather than a promise
+    the code does not keep: while the body can seat both minimums, a drag to
+    either edge leaves the far panel at exactly MIN_PANEL_WIDTH; below that the
+    left panel keeps its minimum and the right is given what is left, which can
+    be less than a minimum. A body that narrow cannot satisfy both.
+    """
+    minimum = split_panel.MIN_PANEL_WIDTH
+    roomy = [2 * minimum + split_panel.SPLITTER_WIDTH, 1208, 1920]
+    for width in roomy:
+        root, body, left, divider, panel = _splitter(body_width=width)
+        try:
+            total = width - split_panel.SPLITTER_WIDTH
+            for ratio in (-5.0, 0.0, 0.01, 0.5, 0.99, 5.0):
+                panel.ratio = ratio
+                panel.apply()
+                got = _minsizes(body, (0, 2))
+                assert got[0] >= minimum, (width, ratio, got)
+                assert got[1] >= minimum, (width, ratio, got)
+                assert got[0] + got[1] == total, (width, ratio, got)
+            # A drag to either edge stops at the far panel's minimum.
+            panel.on_press(_event(0))
+            panel.on_drag(_event(10_000))
+            assert _minsizes(body, (0, 2)) == [total - minimum, minimum]
+            panel.on_drag(_event(-10_000))
+            assert _minsizes(body, (0, 2)) == [minimum, total - minimum]
+        finally:
+            root.destroy()
+
+    # Below two minimums the body overflows rather than crushing a panel.
+    for cramped in (2 * minimum + split_panel.SPLITTER_WIDTH - 100, minimum, 40):
+        root, body, left, divider, panel = _splitter(body_width=cramped)
+        try:
+            for ratio in (0.01, 0.5, 0.99):
+                panel.ratio = ratio
+                panel.apply()
+                got = _minsizes(body, (0, 2))
+                assert got[0] >= minimum, (cramped, ratio, got)
+                assert got[1] >= minimum, (cramped, ratio, got)
+                assert got[0] + got[1] > cramped - split_panel.SPLITTER_WIDTH
+        finally:
+            root.destroy()
+
+
+def test_updm14_zero_width_body_is_a_noop():
+    """UPD-M1.4 — a body with nothing to divide is left alone.
+
+    Reached on every screen before the first layout pass, when winfo_width() is
+    1. apply() and on_drag() must leave the columns as they were rather than
+    divide by a total of zero.
+    """
+    minimum = split_panel.MIN_PANEL_WIDTH
+    for body_width in (split_panel.SPLITTER_WIDTH, 4, 1):
+        root, body, left, divider, panel = _splitter(body_width=1208)
+        try:
+            panel.apply()
+            laid_out = _minsizes(body, (0, 2))
+            body.configure(width=body_width)
+            root.update_idletasks()
+            assert body.winfo_width() <= split_panel.SPLITTER_WIDTH
+
+            panel.ratio = 0.75
+            panel.apply()
+            assert _minsizes(body, (0, 2)) == laid_out, body_width
+
+            panel.on_press(_event(500))
+            panel.on_drag(_event(900))
+            assert _minsizes(body, (0, 2)) == laid_out, body_width
+            assert panel.ratio == 0.75, body_width
+            assert laid_out[0] >= minimum
+        finally:
+            root.destroy()
+
+
+def _screens_with_their_own_splitter():
+    """{filename: the splitter names it defines} across screens/, by AST.
+
+    split_panel.py is excluded because it is the file that must define them.
+    Nothing else is excluded, so a seventh screen that grows its own copy
+    appears here.
+    """
+    found = {}
+    for path in sorted((SRC / "screens").glob("*.py")):
+        if path.name == "split_panel.py":
+            continue
+        names = set()
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name in SPLITTER_METHODS:
+                    names.add(node.name)
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "SPLITTER_WIDTH":
+                        names.add("SPLITTER_WIDTH")
+            elif isinstance(node, ast.AnnAssign):
+                if isinstance(node.target, ast.Name) and node.target.id == "SPLITTER_WIDTH":
+                    names.add("SPLITTER_WIDTH")
+        if names:
+            found[path.name] = names
+    return found
+
+
+def test_updm15_no_screen_keeps_its_own_splitter():
+    """UPD-M1.5 — counted from the AST, as an exact set.
+
+    UPD-M1 adopts ape_assignment only, so the count is not yet zero and saying
+    it is would be a false claim. What is asserted instead is exact: the files
+    that still define a splitter are the three the spec's order leaves for
+    UPD-M4, and each defines the whole copy rather than part of one. The set
+    goes red when a fourth screen grows one, and again when a holdout adopts
+    and is not struck off here.
+    """
+    found = _screens_with_their_own_splitter()
+    assert set(found) == SPLITTER_HOLDOUTS | SPLITTER_OUT_OF_SCOPE
+    assert "ape_assignment.py" not in found
+    whole_copy = {"_apply_split_ratio", "_on_divider_drag", "SPLITTER_WIDTH"}
+    for name in SPLITTER_HOLDOUTS:
+        assert found[name] == whole_copy, (name, sorted(found[name]))
+    # project_boards.py inlines its apply into _on_body_resize, so it has no
+    # _apply_split_ratio to find. Asserted exactly, so that the day it is
+    # consolidated this test says so.
+    assert found["project_boards.py"] == {"_on_divider_drag", "SPLITTER_WIDTH"}
+
+
+def test_updm16_split_ratio_survives_a_relaunch():
+    """UPD-M1.6 — dragged, saved, and back where it was on the next build.
+
+    Through the real screen, because the field name is the screen's to get
+    right: a prefix with no AppSettings field persists nothing.
+    """
+    settings = FakeSettings(ape_quarter_split_ratio=0.5)
+    root, screen = _quarter_screen(settings=settings)
+    try:
+        assert screen.split.setting_attr() == "ape_quarter_split_ratio"
+        screen.split.ratio = 0.7
+        screen.split.on_press(_event(0))
+        screen.split.on_release(_event(0))
+        assert settings.ape_quarter_split_ratio == 0.7
+        assert settings.saved == 1
+    finally:
+        root.destroy()
+
+    root, screen = _quarter_screen(settings=settings)
+    try:
+        assert screen.split.ratio == 0.7
+    finally:
+        root.destroy()
+
+
+def test_updm16_the_ratio_has_a_settings_field_to_land_in():
+    """UPD-M1.6 — the field is declared, so the real app saves it.
+
+    AppSettings.save() writes declared dataclass fields only, so an attribute
+    set on the instance by name alone would be dropped at the next write and
+    the divider would silently reopen at 0.5.
+    """
+    names = {f.name for f in dataclasses.fields(AppSettings)}
+    assert APEAssignmentScreen.SETTINGS_PREFIX == "ape_quarter"
+    assert f"{APEAssignmentScreen.SETTINGS_PREFIX}_split_ratio" in names
+    assert AppSettings().ape_quarter_split_ratio == split_panel.DEFAULT_SPLIT_RATIO
+
+
+def test_updm16_a_prefix_with_no_settings_field_says_so(caplog):
+    """UPD-M1.6 (P2) — an unpersistable prefix is reported, not swallowed.
+
+    The failure is invisible from the screen: everything drags, and only the
+    next launch shows the divider back at the middle. The warning is the only
+    surface that can say why, so it is asserted rather than assumed.
+    """
+    settings = FakeSettings()
+    with caplog.at_level(logging.WARNING, logger=split_panel.logger.name):
+        root, body, left, divider, panel = _splitter(
+            settings=settings, prefix="nowhere"
+        )
+    try:
+        assert panel.ratio == split_panel.DEFAULT_SPLIT_RATIO
+        assert any(
+            "nowhere_split_ratio" in record.getMessage()
+            for record in caplog.records
+        ), [r.getMessage() for r in caplog.records]
+
+        panel.on_press(_event(0))
+        panel.on_release(_event(0))
+        assert settings.saved == 0
+        assert not hasattr(settings, "nowhere_split_ratio")
     finally:
         root.destroy()
