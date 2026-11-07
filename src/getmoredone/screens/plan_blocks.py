@@ -318,7 +318,7 @@ def build_item_row(
     Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m1
     Tests:   tests/test_plan_screen.py::test_pdm11_the_item_row_uses_the_chips_column_order
              tests/test_plan_screen.py::test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it
-             tests/test_plan_screen.py::test_pdm16_the_depth_bars_line_up_with_the_bottom_of_the_title
+             tests/test_plan_screen.py::test_pdm16_the_depth_bars_are_justified_like_the_text_on_the_line
              tests/test_plan_screen.py::test_pbm61_every_line_of_a_row_is_drawn_inside_it
 
     Returns the frame, so the caller can bind the drag handlers to it and to

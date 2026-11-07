@@ -1331,7 +1331,7 @@ class PlanScreen(ctk.CTkFrame):
         Tests:   tests/test_plan_screen.py::test_pdm8_clear_day_removes_every_item_block
                  tests/test_plan_screen.py::test_pdm8_clear_day_leaves_breaks_and_buffers
                  tests/test_plan_screen.py::test_pdm8_answering_no_removes_nothing
-                 tests/test_plan_screen.py::test_pdm8_a_day_with_no_items_says_so
+                 tests/test_plan_screen.py::test_pdm8_a_day_with_no_items_says_so_and_asks_nothing
 
         Item blocks only, because that is what AutoLoad writes. A break or a
         buffer was put there by hand, one gesture each, and taking them out
