@@ -45,12 +45,40 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   of the first — so a panel reading either column alone is right on one machine
   and shows an empty list on the other.
   `VPSManager.get_action_items_for_weekly_tactic` reads both, and is the only
-  place that predicate is written.
+  place that predicate is written. Corrected by this batch's pre-push sweep:
+  it was not the only place — `weekly_tactic_maintenance._child_count` held a
+  second copy, and the guard test could not see it because it scanned only
+  `screens/` and `vps_manager.py`. Both now read
+  `weekly_tactic.LINK_PREDICATE_SQL`.
 - **Week identity has one home**, `week_options.py`: which day a week starts
   on, which week a date falls in, and which week starts the picker offers. The
   three helpers were private to the APE Week Assignment screen and now have a
   second caller; two owners of one rule is how the APE quarter/month defect
   started.
+
+### Fixed — the pre-push sweep of that batch (2026-11-07)
+
+- **An Action Item no longer appears under two different Weekly Tactics.** Both
+  columns carry the link, and an item can end up holding a different tactic in
+  each: add it from APE Week Assignment, whose button writes `parent_id`, then
+  pick another Weekly Tactic in the editor, which sets `weekly_tactic_id` and
+  leaves `parent_id` as it was. Two tactics then each listed that one item. The
+  explicit column now wins — the item appears under the tactic last chosen for
+  it — and an item linked only the older way is still reachable, which is the
+  whole reason both columns are read.
+- **Adding an Action Item from APE Week Actions says when it could not be filed
+  into the week.** Saving an item against a Weekly Tactic re-files it, and that
+  can be refused — most plainly when the tactic's Annual Plan Element has been
+  detached, which this tab lists on purpose so the items under it stay
+  reachable. Thirteen other screens report the outcome; this one saved the item
+  and said nothing, so a filed item and an unfiled one looked the same. The
+  notice now appears before the editor opens, not behind it.
+- **Duplicate Weekly Tactics are merged by the same count the screen shows.**
+  When startup finds two tactics for one Annual Plan Element in one week it
+  keeps the one with more Action Items under it. That count was taken with its
+  own copy of the link rule, which counted a nested Weekly Tactic as an Action
+  Item — so the row that was kept, and the links that survived with it, could
+  be decided by something no screen displays.
 
 ### Fixed — reported from the running screen (2026-11-07, second pass)
 

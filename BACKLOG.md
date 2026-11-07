@@ -1,6 +1,6 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-07 (the AWA sweep's four below-medium findings added as AWA-S1 to AWA-S4, with its one high and five mediums fixed in-loop and AWA-A3 mostly closed by that fix; four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
 
 ## Adjacent issues — APE Week Assignment / APE Week Actions (AWA, 2026-11-07)
 
@@ -45,11 +45,24 @@ change beyond what the tab was asked to do, so neither was made.
 
 **Title:** AWA-A3 - three readers disagree about what a Weekly Tactic's child is
 **Description:** `weekly_tactic_maintenance._child_count` (line 278) already
-reads both link columns while `tactic_id_of` reads one. AWA-M2 adds a third
+reads both link columns while `tactic_of` reads one. AWA-M2 adds a third
 reader, matching `_child_count`. Consolidating all three onto one helper is the
 right end state and is larger than the AWA feature was.
+
+**Mostly resolved 2026-11-07** (`8a324cb`), after the AWA sweep raised the same
+duplication as a high finding: the two *SQL* readers now share
+`weekly_tactic.LINK_PREDICATE_SQL`, and they had already drifted - `_child_count`
+lacked the `item_type != 'week'` exclusion, so the dedupe chose which duplicate
+tactic survived by counting a nested tactic as a child. What this entry recorded
+as a Low refactor was, by then, deciding which rows a delete kept. The guard test
+could not see it: it scanned `screens/` and `vps_manager.py` only.
+
+What remains is the object-level reader: `tactic_of` answers "is this item
+week-filed" from `weekly_tactic_id` alone, which WT-INV6 depends on, and so still
+returns None for a `parent_id`-only child. That is AWA-A1's subject, not this
+one. Closing this entry means fixing AWA-A1.
 **Priority:** Low
-**Effort:** Medium
+**Effort:** Low (what is left)
 
 ### 2026-11-07 - Type: Cleanup
 
@@ -63,6 +76,75 @@ screen of placeholders behind an unreachable entry point. Decide that, rather
 than renaming a label inside it.
 **Priority:** Low
 **Effort:** Small
+
+## Sweep findings — APE Week Actions (AWA, 2026-11-07)
+
+Three passes over the AWA range: `learning-qa` (failure patterns), a cold
+correctness pass, and a cold test-quality + security pass. One high and five
+medium were fixed in-loop with tests (`8a324cb`, `ac22a78`); one medium was
+dismissed as a false positive with its reason in that commit's message; the
+below-medium ones are here, per the project's sweep budget. The security pass
+reported nothing.
+
+### 2026-11-07 - Type: Bug
+
+**Title:** AWA-S1 - a third status renders the right panel completely blank
+**Description:** `vps_manager.get_action_items_for_weekly_tactic` has no status
+predicate, while `TodayScreen.load_items` renders only `open` and `completed`
+items. An item in any other status is fetched and rendered nowhere. If *every*
+child of a tactic is in that state the panel draws nothing at all - not even the
+empty-state message, because the branch at `today.py:291` is skipped while
+`items` is non-empty. Nothing writes a third status today, which is why this is
+low; the Today screen's own query restricts status in SQL, so matching it is
+also the consistent fix. Found by two of the three passes independently (P2).
+**Priority:** Low
+**Effort:** Low
+
+### 2026-11-07 - Type: Bug
+
+**Title:** AWA-S2 - the Add button acts on a snapshot and does not check the result
+**Description:** `week_actions.set_tactic` stores the tactic as a dict;
+`add_action_item` writes from that snapshot without re-reading the row, discards
+`create_action_item`'s return value, and calls `edit_item` unconditionally. A
+tactic deleted in another tab mid-session makes the INSERT raise on the foreign
+key and the button look dead - no row, no message (P6/P42).
+**Priority:** Low
+**Effort:** Low
+
+### 2026-11-07 - Type: Bug
+
+**Title:** AWA-S3 - only Jump to current week rebuilds the week picker
+**Description:** `WeekActionsScreen.refresh_week_options` has exactly one
+caller, `jump_to_current_week()`. Neither **Load** nor `refresh()` rebuilds the
+combo, so a Weekly Tactic created in a week outside the four generated ones does
+not appear in the picker until the user happens to jump to the current week.
+`_existing_week_starts` is now covered at construction
+(`test_awam41d_an_older_week_stays_in_the_picker`); the missing *re*-build is
+not.
+**Priority:** Low
+**Effort:** Low
+
+### 2026-11-07 - Type: Test
+
+**Title:** AWA-S4 - six coverage gaps in tests/test_ape_week_actions.py
+**Description:** All low, from the cold test-quality pass; the high and the four
+mediums it found are fixed in `ac22a78`. (a) `test_awam33`'s two assertions are
+near-vacuous - `isinstance` is guaranteed by the helper that built the object and
+`winfo_viewable() == 0` by `_root()` withdrawing the root; only its teardown half
+is real. (b) `test_awam54` selects `parent_id` and never asserts it, though which
+of the two columns the button writes is the whole point of AWA-M5.4 - one
+`assert row["parent_id"] is None` closes it. (c) The helper's `ORDER BY status,
+COALESCE(start_date, due_date), priority_score DESC` is unverified: every test
+compares sets or single-element lists, while the rendered order is user-visible.
+(d) `add_action_item`'s no-selection warning branch is untested; removing it turns
+a real click into a `TypeError`. (e) `test_awam21` asserts only the returned id
+set, so if `create_action_item` ever repointed `parent_id` onto
+`weekly_tactic_id` at create time the `parent_id` half would stop being exercised
+silently. (f) Minor: `_panel` and `test_awam51` take `tmp_path` and never use it;
+`test_awam55` restates `_setting_attr` twice; no test checks that a drag on one
+panel leaves another panel's stored width alone, which is the AWA-M5.5 claim.
+**Priority:** Low
+**Effort:** Medium
 
 ## Reported from the running screen — Plan / Day Plan (2026-11-07)
 

@@ -11,9 +11,12 @@
   `Add Action Item` button writes `parent_id` and leaves the other NULL.
   Counted before writing anything: 49 / 0 in the main database, 0 / 1 in the
   demo one. A reader of one column is correct on this Mac and empty on the
-  other. `VPSManager.get_action_items_for_weekly_tactic` reads the union, and
-  `test_awam23_one_home_for_the_link_predicate` walks the AST to assert it is
-  the only function in `src/` naming both columns in one query string.
+  other. `weekly_tactic.LINK_PREDICATE_SQL` is the union, and
+  `test_awam23_one_home_for_the_link_predicate` walks the AST over all of
+  `src/getmoredone` to assert exactly one string constant expresses it.
+  Corrected by the sweep: this entry claimed the scan already covered `src/`
+  and it did not — it covered `screens/` and `vps_manager.py`, and a second,
+  drifted copy sat in `weekly_tactic_maintenance._child_count`, outside both.
 - ✅ **The right panel subclasses `TodayScreen` rather than copying it.**
   `load_items` and `create_item_row` were already generic; three things in that
   screen were about *today* and were written inline. They became
@@ -26,6 +29,17 @@
   private to `weekly_items.py` and now have a second caller. All three are pure
   — the clock and the settings object are passed in — so `date.today()` stays
   resolved in the screen and the existing week-options tests are untouched.
+- ✅ **The pre-push sweep found one high and five mediums in this batch, all
+  fixed with tests** (`8a324cb`, `ac22a78`). The high was the predicate above.
+  The mediums: an item holding a different tactic in each link column was
+  listed under both; `add_action_item` dropped the create's cascade report, so
+  an item that could not be filed into the week looked exactly like one that
+  was; and four tests held while the thing they name was broken, including an
+  `assert "2" in ...` against a string that ends in a 2026 date and so always
+  contained a "2". One medium was dismissed as a false positive — `conftest.py`
+  has isolated `AppSettings` for the whole suite since long before this batch —
+  with the reason written in `ac22a78`. Four below-medium went to `BACKLOG.md`
+  as AWA-S1 to AWA-S4. The security pass found nothing.
 - ⚠️ **The on-screen check has not been run.** Everything above is tests plus
   one refactor verified by an existing suite. The nine-step checklist at the
   end of that spec's §6 is what settles "works like the Today tab", and until

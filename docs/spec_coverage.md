@@ -625,10 +625,34 @@ AWA-M1 through AWA-M6: **done**, except the one criterion §3 flagged as not
 code-testable — "works like the Today tab", on screen, which carries no ID
 because it is a window rather than a function. That one is `not done` and stays
 that way until the nine-step checklist at the end of that §6 has been walked at
-the keyboard. 27 tests in
-`tests/test_ape_week_actions.py`, every behavioural claim proved by mutation:
-28 mutations, each the verbatim original line, each run alone, each file
-restored and sha256-compared.
+the keyboard. 31 tests in
+`tests/test_ape_week_actions.py`, plus one in
+`tests/test_weekly_tactic_dedupe.py`, every behavioural claim proved by
+mutation: 28 mutations for the batch and 10 for the sweep's fixes, each the
+verbatim original line, each run alone, each file restored and
+sha256-compared.
+
+Three criteria were corrected after the pre-push sweep, and the corrections
+are in §3 and §6 of the spec with their reasons:
+
+- **AWA-M2.1** said the predicate was a plain `weekly_tactic_id = ? OR
+  parent_id = ?`. An item can hold a different tactic in each column, and a
+  plain `OR` listed that one item under both. `weekly_tactic_id` now wins when
+  it is set.
+- **AWA-M2.3** asserted the predicate had one home while it had two: the scan
+  covered `screens/` and `vps_manager.py`, and the second copy was in
+  `weekly_tactic_maintenance._child_count`, which feeds the dedupe that deletes
+  a duplicate tactic — and had already drifted. The scan now covers all of
+  `src/getmoredone`. This was the batch's one high finding and it was found by a
+  cold pass, not by the context that wrote the test.
+- **AWA-M5.4** did not require the create's cascade report to be reported.
+  Thirteen other screens report it; this one dropped it, so an item saved
+  un-re-filed looked identical to one that was filed.
+
+**AWA-M4.1** gained two tests rather than a correction: nothing checked that
+the screen reads the user's `first_day_of_week` at all, and nothing exercised
+`_existing_week_starts`, whose P2 claim is that a tactic filed against an older
+week stays reachable in the picker.
 
 Two of those mutations did not come back red first time, and both are recorded
 in §6's mutation table:

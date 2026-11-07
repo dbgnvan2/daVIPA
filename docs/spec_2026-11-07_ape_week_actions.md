@@ -187,9 +187,9 @@ Every criterion names the automated test that verifies it. New tests go in
 
 | ID | Criterion | Test |
 |---|---|---|
-| AWA-M2.1 | A single helper returns the Action Items linked to a tactic id, matching `weekly_tactic_id = ?` **OR** `parent_id = ?`. Given a tactic with one child linked each way, it returns both. | `test_awam21_both_link_shapes_are_returned` |
+| AWA-M2.1 | A single helper returns the Action Items linked to a tactic id, matching `weekly_tactic_id = ?` **OR** (`weekly_tactic_id IS NULL` **AND** `parent_id = ?`). Given a tactic with one child linked each way, it returns both. (Corrected after the sweep: the row said a plain `OR`. An item can hold a *different* tactic in each column — add from APE Week Assignment, then pick another tactic in the editor — and a plain `OR` listed that one item under **both** tactics. `weekly_tactic_id` wins when set; a `parent_id`-only child stays reachable, which is why the union exists.) | `test_awam21_both_link_shapes_are_returned`, `test_awam23_an_item_is_listed_under_one_tactic_only` |
 | AWA-M2.2 | It never returns a row with `item_type = 'week'`: a tactic is not its own child, and two tactics in one week must not nest. | `test_awam22_week_rows_are_never_children` |
-| AWA-M2.3 | It is the only place the linkage is expressed. AST walk: **zero** function bodies under `src/getmoredone/screens/` and exactly **one** in `vps_manager.py` hold a single string naming both `weekly_tactic_id` and `parent_id`. (Corrected at implementation: this row said "screens/: exactly one", written before §4 settled the helper into `vps_manager`. A function's own docstring is excluded — `add_action_item`'s discusses both columns in prose, which is not an expression of the predicate.) | `test_awam23_one_home_for_the_link_predicate` |
+| AWA-M2.3 | It is the only place the linkage is expressed. AST walk over **all** of `src/getmoredone`: exactly **one** string constant, in `weekly_tactic.py`, is predicate-shaped — names `weekly_tactic_id` and reaches `parent_id = ?` from an `OR`. Exact count per file, not a floor. (Corrected twice. At implementation, the row said "screens/: exactly one", written before §4 settled the helper into `vps_manager`. After the sweep, because scanning only `screens/` and `vps_manager.py` is what let `weekly_tactic_maintenance._child_count` hold a second, drifted copy with nothing red — the high finding of this batch. Matched on shape rather than on the two names appearing together, because `db_manager`'s INSERT column list and UPDATE SET list both name both columns and neither expresses this predicate.) | `test_awam23_one_home_for_the_link_predicate` |
 | AWA-M2.4 | A row linked by `parent_id` to a **non-week** parent (ordinary subtask nesting) is *not* returned for that parent's tactic. | `test_awam24_ordinary_subtasks_are_not_tactic_children` |
 | AWA-M2.5 | Dirty-state (P8): a link that outlived the row it points at is not returned, and the call does not raise. (Corrected at implementation: an ordinary delete cannot produce that state — both link columns are `REFERENCES action_items(id) ON DELETE SET NULL` and the connection runs with `PRAGMA foreign_keys = ON`. The test seeds the link with foreign keys off, the way an older build or a restored backup leaves it.) | `test_awam25_orphaned_child_is_not_returned` |
 
@@ -218,7 +218,7 @@ Every criterion names the automated test that verifies it. New tests go in
 | AWA-M5.1 | The right panel class is a subclass of `TodayScreen`. | `test_awam51_right_panel_subclasses_today` |
 | AWA-M5.2 | Its item query is the AWA-M2 helper, scoped to the selected tactic — it overrides `get_todays_items` and calls no date filter. | `test_awam52_right_panel_queries_by_tactic_not_date` |
 | AWA-M5.3 | It inherits Today's row behaviours unchanged: `edit_item`, `complete_item`, `start_timer`, `push_item` and the three inline editors are not redefined on the subclass. | `test_awam53_row_behaviours_are_inherited_not_copied` |
-| AWA-M5.4 | `Add Action Item` creates a row with `weekly_tactic_id` set to the selected tactic, `start_date`/`due_date` inside the week, and then opens the editor on the new id. An empty title creates nothing. | `test_awam54_add_action_item_links_by_weekly_tactic_id`, `test_awam54b_empty_title_creates_nothing` |
+| AWA-M5.4 | `Add Action Item` creates a row with `weekly_tactic_id` set to the selected tactic, `start_date`/`due_date` inside the week, reports what the create's re-file did, and then opens the editor on the new id. An empty title creates nothing. (Added after the sweep: the create re-files by default and records whether it refused a week or built cascade rows; thirteen other screens report that and this one dropped it. The notice has to precede `edit_item`, which opens a modal.) | `test_awam54_add_action_item_links_by_weekly_tactic_id`, `test_awam54b_empty_title_creates_nothing`, `test_awam54c_add_action_item_reports_what_the_refile_did` |
 | AWA-M5.5 | Its `ColumnResizer` prefix is **not** `"today"`, so its Title-column width is stored separately and resizing one panel does not move the other. | `test_awam55_column_prefix_is_its_own` |
 | AWA-M5.6 | With a tactic selected and no children, the empty state names the tactic rather than saying "No items for today". | `test_awam56_empty_state_names_the_tactic` |
 | AWA-M5.7 | With no tactic selected, the panel shows a prompt and raises nothing. | `test_awam57_no_selection_is_not_an_error` |
@@ -330,15 +330,15 @@ checklist for it is at the end of this section.
 | AWA-M1.2 | done | `screens/weekly_items.py:72` — `test_awam12_screen_header_matches_the_tab` |
 | AWA-M1.3 | done | `test_awam13_no_ape_weekly_label_remains` — zero `APE Weekly` string constants in either file, counted from the AST |
 | AWA-M1.4 | done | `test_awam14_and_m32_every_nav_key_opens_its_own_screen` — every key opened, class named |
-| AWA-M2.1 | done | `vps_manager.get_action_items_for_weekly_tactic` — `test_awam21_both_link_shapes_are_returned` |
+| AWA-M2.1 | done | `weekly_tactic.LINK_PREDICATE_SQL`, read by `vps_manager.get_action_items_for_weekly_tactic` — `test_awam21_both_link_shapes_are_returned`, `test_awam23_an_item_is_listed_under_one_tactic_only` (as corrected in §3) |
 | AWA-M2.2 | done | `AND item_type != 'week'` — `test_awam22_week_rows_are_never_children` |
-| AWA-M2.3 | done | `test_awam23_one_home_for_the_link_predicate`, as corrected in §3 |
+| AWA-M2.3 | done | `weekly_tactic.LINK_PREDICATE_SQL`, read by both SQL callers — `test_awam23_one_home_for_the_link_predicate` and `tests/test_weekly_tactic_dedupe.py::test_awam23_child_count_uses_the_shared_predicate` (as corrected twice in §3) |
 | AWA-M2.4 | done | the `is_tactic` guard — `test_awam24_ordinary_subtasks_are_not_tactic_children` |
 | AWA-M2.5 | done | `test_awam25_orphaned_child_is_not_returned`, as corrected in §3 |
 | AWA-M3.1 | done | `screens/vision_planning_hub.py:59` — `test_awam11_and_m31_hub_nav_labels` |
 | AWA-M3.2 | done | `screens/vision_planning_hub.py:96` — `test_awam14_and_m32_every_nav_key_opens_its_own_screen` |
 | AWA-M3.3 | done | `test_awam33_screen_constructs_withdrawn`; `tests/test_ci_contract.py`'s mapped-window count is still 22 |
-| AWA-M4.1 | done | `WeekActionsScreen.jump_to_current_week` — `test_awam41_week_defaults_to_current_week`, compared against `week_options`, not against arithmetic rewritten in the test |
+| AWA-M4.1 | done | `WeekActionsScreen.jump_to_current_week` — `test_awam41_week_defaults_to_current_week`, compared against `week_options`, not against arithmetic rewritten in the test | Extended after the sweep: `test_awam41c_week_start_follows_the_first_day_setting` checks the setting is read at all, against an oracle that does not call that helper (a Monday-start week begins on a Monday, a Sunday-start week on a Sunday), and `test_awam41d_an_older_week_stays_in_the_picker` exercises `_existing_week_starts`, whose P2 claim no test reached on this screen.
 | AWA-M4.2 | done | `test_awam42_left_panel_lists_the_weeks_tactics` |
 | AWA-M4.3 | done | `test_awam43_no_tactic_is_silently_dropped` records the `ape_only` argument the screen actually passed, and asserts the count in both the panel heading and the status line |
 | AWA-M4.4 | done | `test_awam44_selecting_a_tactic_reloads_the_right_panel` — one call, recorded |
@@ -346,7 +346,7 @@ checklist for it is at the end of this section.
 | AWA-M5.1 | done | `test_awam51_right_panel_subclasses_today` |
 | AWA-M5.2 | done | `test_awam52_right_panel_queries_by_tactic_not_date` records the helper call and compares the panel's answer against it |
 | AWA-M5.3 | done | `test_awam53_row_behaviours_are_inherited_not_copied` — nine behaviours, identity-compared against `TodayScreen`, exact list |
-| AWA-M5.4 | done | `WeekTacticActionsPanel.add_action_item` — `test_awam54_add_action_item_links_by_weekly_tactic_id`, `test_awam54b_empty_title_creates_nothing` |
+| AWA-M5.4 | done | `WeekTacticActionsPanel.add_action_item` — `test_awam54_add_action_item_links_by_weekly_tactic_id`, `test_awam54b_empty_title_creates_nothing`, `test_awam54c_add_action_item_reports_what_the_refile_did` (as corrected in §3) |
 | AWA-M5.5 | done | `COLUMN_PREFIX = "week_actions"` plus `AppSettings.week_actions_col_widths` — `test_awam55_column_prefix_is_its_own` |
 | AWA-M5.6 | done | `set_tactic` — `test_awam56_empty_state_names_the_tactic` |
 | AWA-M5.7 | done | `test_awam57_no_selection_is_not_an_error` |
@@ -375,6 +375,78 @@ Two mutations did not come back red on the first pass, and both were real:
 2. `test_awam56_empty_state_names_the_tactic`'s mutation did not apply — the
    escaping in the mutation script, not the test. Re-run against the real
    characters, it is red.
+
+### The sweep, and what it found in this batch
+
+Three passes over the AWA range, per the project's sweep budget: `learning-qa`
+(failure patterns), a cold correctness pass, and a cold test-quality +
+security pass. One high and five medium were fixed in-loop with tests
+(`8a324cb` for the code, `ac22a78` for the tests); one medium was dismissed as
+a false positive; four below-medium went to `BACKLOG.md` as AWA-S1 to AWA-S4.
+The security pass reported nothing — both new queries are parameterised and
+the tab adds no subprocess, no deserialisation and no path from user text.
+
+**High — the predicate had two homes, and the guard test could not see the
+second.** AWA-M2.3 says the union predicate is written in exactly one place,
+and `test_awam23_one_home_for_the_link_predicate` asserted it. The test
+scanned `screens/` and `vps_manager.py`; the second copy was in
+`weekly_tactic_maintenance._child_count`, outside both. The two had already
+drifted — `_child_count` lacked the `item_type != 'week'` exclusion — and
+`_child_count` feeds `_choose_survivor`, so a dedupe chose which duplicate
+tactic to **delete** by counting a nested tactic as a child, a definition the
+panel never uses. This is §7's AWA-A3, recorded in this batch as a Low
+refactor; by the time the sweep reached it, it was deciding which rows a
+delete kept. Both readers now share `weekly_tactic.LINK_PREDICATE_SQL`, and
+the scan covers all of `src/getmoredone` with an exact count per file.
+
+**Medium — an item with both link columns set was listed under two tactics.**
+§1.3 records that both columns carry the link. It did not consider an item
+holding a *different* tactic in each, which is reachable without leaving
+supported UI: add from APE Week Assignment, whose button writes `parent_id`
+(AWA-A1), then pick another Weekly Tactic in the editor, which sets
+`weekly_tactic_id` and by design leaves `parent_id` alone. A plain `OR`
+matched both, so two panels each claimed the row and the dedupe counted it
+twice. `weekly_tactic_id` now wins when set — the tactic last chosen — and a
+`parent_id`-only child stays reachable, which is why the union exists.
+
+**Medium — AWA-M5.4 swallowed the create's cascade report.**
+`create_action_item` re-files into the Weekly Tactic unless told not to, and
+records on the manager whether it refused a week or built cascade rows.
+Thirteen screen modules report that with `notify_weekly_tactic_changes`;
+`week_actions.add_action_item` did not, so an item saved un-re-filed looked
+identical to one that was filed. Reachable *because* of D4/AWA-M4.3, which
+lists tactics whose Annual Plan Element has been detached — the re-file
+refuses exactly those. The call goes before `edit_item`, which opens a modal;
+a notice raised after it stacks behind the editor.
+
+**Four medium test-quality findings, all tests that held while what they name
+was broken.** `assert "2" in status_label.cget("text")` could not fail — the
+text ends in an ISO date in 2026, so every value it can take contains a "2".
+The AWA-M5.3 seam check used a set *intersection*, which proves four names are
+present but cannot see a fifth override appear, which is the drift the
+criterion is about; it is now a set difference by exact list. Two AWA-M4 paths
+had no test at all: every week-screen test built it with `first_day=0` and the
+oracle called the same production helper, so `_first_day_of_week` could have
+ignored the user's setting entirely; and `_existing_week_starts`, whose P2
+claim is that an older week stays reachable, was never exercised on this
+screen because both tactics in `test_awam42` fall inside the four generated
+weeks.
+
+**One medium dismissed, with the reason.** The pass reported that ten tests
+read the machine's own settings file through `AppSettings.load()` in
+`TodayScreen.__init__`. They do not: `conftest.py:296` `_isolate_user_settings`
+is a session-scoped autouse fixture that redirects `get_settings_path` to a
+`tmp_path_factory` file for the whole run, in both import spellings of the
+module, and restores it after; `tests/test_settings_isolation.py` covers it.
+The second half is wrong too — the `ColumnResizer` is built with
+`self.settings`, a real `AppSettings`, never with the app stub's `MagicMock`,
+so no column width was being clamped. A redundant fixture and a test for it
+were written before `conftest.py` was read, and both were reverted.
+
+**Fix mutations:** 10, each the verbatim original, each run alone, every file
+restored and sha256-compared. 10 red. Two of them are the AWA-M5.4 notice in
+both directions — removed, and moved after `edit_item` — because the order is
+half the fix.
 
 ### The on-screen check — for the user, not for a test
 
@@ -451,10 +523,19 @@ They are **not** fixed by this spec, and none is a prerequisite.
   them. `.claude` is now excluded, with the exclusion predicate under test.
   Not caused by this feature; it fires for any worktree session.
 - **AWA-A3 — `weekly_tactic_maintenance._child_count` already reads both
-  columns** (line 278) while `tactic_id_of` reads one. The two disagree about
+  columns** (line 278) while `tactic_of` reads one. The two disagree about
   what a child is. AWA-M2 adds a third reader that matches `_child_count`.
   Consolidating all three onto one helper is the right end state and is larger
   than this feature.
+
+  **Mostly resolved in this batch's sweep** (`8a324cb`), which raised the same
+  duplication as a high finding rather than a low refactor — and was right to:
+  the two copies had already drifted, and `_child_count` feeds the dedupe that
+  deletes a duplicate tactic. The two SQL readers now share
+  `weekly_tactic.LINK_PREDICATE_SQL`. What is left is `tactic_of`, which answers
+  the object-level question from `weekly_tactic_id` alone because WT-INV6 depends
+  on it, and so still returns None for a `parent_id`-only child. That is AWA-A1's
+  subject: closing this entry means fixing AWA-A1.
 
 ---
 
