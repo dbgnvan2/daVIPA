@@ -403,7 +403,9 @@ Items pane (left):
 - **Drag a row onto a box** — What: Creates a block for it in that half hour.
   Why: This is how blocks are made, and the box you drop on is the box you get.
   If the item needs more than one box, the status line says how many and what is
-  left spare.
+  left spare. A label with the item's name follows the pointer once you start
+  to move it — not on the press, so an ordinary click on a row leaves nothing
+  behind.
 - **Release in the day column but not on a box** — What: Nothing is created, and
   the status line says *Drop an item on a half-hour box*. Why: The app will not
   pick an hour for you. A release over the heading or the summary is not a
@@ -663,8 +665,8 @@ Date Increment Settings:
 Top buttons:
 - **Vision Elements** — Create and maintain Segment|SubSegment|Category keys.
 - **Annual Plan Elements** — Promote Vision Elements into annual records for a selected year.
-- **APE Assignment** — Assign Annual Plan Elements into a selected quarter.
-- **APE Period View** — Assign quarter-selected APEs into a selected month.
+- **APE Assignment** — Assign Annual Plan Elements into a selected quarter. Opens on the current calendar quarter.
+- **APE Period View** — Assign quarter-selected APEs into a selected month. Opens on the current quarter and the current month, and the Month picker only ever offers the three months the selected Quarter contains.
 - **APE Weekly** — Work weekly parent records and their daily child Action Items.
 
 Deletion protection (child records):
@@ -674,9 +676,12 @@ Deletion protection (child records):
 APE assignment behavior:
 - **Checkbox + Save** — What: The assignment screens still support explicit checkbox selection and save. Why: Keep the existing bulk workflow available.
 - **Drag and drop** — What: The APE screens also support dragging left-side records onto the right-side assignment panel. Why: Speed up planning when working item by item.
+- **Quarter and Month always agree** — What: Since 2026-11-07 the Quarter picker on both APE assignment screens opens on the current calendar quarter, and the Month picker on APE Period View offers only that quarter's three months (Q4 offers 10, 11 and 12). Changing the Quarter moves the Month into it: a month already inside the new quarter is kept, one outside it moves to that quarter's first month. Why: Before this the Quarter picker always opened on Q1 while the Month picker opened on the current month, so for eight months of the year the screen offered a pair that cannot both be true — Q1 with M11, for instance — and Save wrote it. An APE filed in a quarter that does not contain its month was then invisible in APE Weekly.
+- **Save says what it did** — What: APE Period View reports how many APEs were assigned, and names any that were not, below the pickers. Both the Save button and the drop target report there. Why: A refused assignment used to look exactly like a successful one.
+- **Existing mismatched records are repaired** — What: On first launch after this change, any APE with a month flag set but not the quarter flag that month implies has the quarter flag added. Nothing is ever removed, so an APE assigned to a quarter but not yet to a month keeps that state. Why: Make records created before the fix visible again without re-entering them.
 
 APE Weekly behavior:
-- Left list shows Annual Plan Elements already assigned to the selected month.
+- Left list shows Annual Plan Elements already assigned to the selected month. Since 2026-11-07 that list is matched on the month assignment alone; it previously also required the APE to carry the flag for the quarter containing that month, which hid any record whose quarter and month disagreed.
 - Right list shows weekly tactics for the selected Week Start.
 - **Week Start selector** — What: Always includes the current week plus up to 3 future week starts, even when no weekly tactics exist there yet. Why: Lets you create a weekly tactic for the current or near-future week without being limited to existing records.
 - **Create weekly assignments** — What: Check month-assigned APEs on the left and click `Save`, or drag a left-side row onto the right panel. Why: Mirrors the same assignment pattern used by Year → Quarter and Quarter → Month screens.

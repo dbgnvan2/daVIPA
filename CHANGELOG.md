@@ -28,6 +28,19 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed — reported from the running screen (2026-11-07)
 
+- **The Plan screen's panes repaint when they are rebuilt.** Both panes are
+  redrawn by taking the scroll frame out of the grid, destroying its children
+  and putting it back, and Tk draws from an idle handler. Every one of those
+  rebuilds runs inside an event callback, so the re-gridded pane could stay
+  undrawn until the next mouse movement over the window. Moving a block to
+  another half hour, resizing one and adding a break all wrote the day
+  correctly and looked like a gesture that had done nothing.
+- **A click on an item no longer leaves its title beside the pointer.** The
+  floating drag label was built on the button *press*, so an ordinary click put
+  one on screen; the release hid it again, but the hiding was not drawn either.
+  The label now waits for the pointer to move — a press with no motion is not a
+  drag — and hiding it repaints, so a drag released over nothing clears too.
+
 - **A weekend no longer looks like a broken screen.** The Plan screen opens on
   today, Saturday and Sunday are off in the default week, and every write path
   checked that first: AutoLoad returned before reading an item, a dropped item

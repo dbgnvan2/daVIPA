@@ -1,7 +1,7 @@
-# Implementation plan — Plan screen day controls (PD-M1 … PD-M9)
+# Implementation plan — Plan screen day controls (PD-M1 … PD-M10)
 
 Date: 2026-11-06
-Status: **PD-M1 … PD-M6 shipped 2026-11-06. PD-M7, PD-M8, PD-M9 and the unplanned PD-M1.6, PD-M2.8 and PD-M2.9 shipped 2026-11-07**
+Status: **PD-M1 … PD-M6 shipped 2026-11-06. PD-M7, PD-M8, PD-M9, PD-M10 and the unplanned PD-M1.6, PD-M2.8 and PD-M2.9 shipped 2026-11-07**
 Screen: `src/getmoredone/screens/plan.py`, `src/getmoredone/screens/plan_blocks.py`
 Follows: `docs/implementation_plan_2026-11-06_plan_box_appearance.md` (PB-M1 … PB-M7, shipped)
 
@@ -363,6 +363,55 @@ are. The marks sit on a priority *fill*: pale tints in the light theme, deep
 ones in the dark theme, where `success_strong`'s dark green measures 1.63:1
 against the green fill. So the light theme takes the dark pair and the dark
 theme the light one, and the test above is what holds them to the text bar.
+
+---
+
+## PD-M10 — A rebuilt pane is on screen before the next event
+
+Three things reported from the running app, which turned out to be one cause:
+
+1. "Drag inside a day to earlier or later doesn't seem to work."
+2. The pointer carried the message "Fix login bug" with no drag in progress.
+3. "The Day block pane isn't refreshing right away, seems to wait for a mouse
+   movement of the app window."
+
+Both panes are rebuilt by taking the scroll frame out of the grid, destroying
+its children and putting it back. Tk draws from an idle handler, and every one
+of those rebuilds runs inside an event callback or an `after_idle` of one, so
+the re-gridded frame could stay undrawn until some later event arrived. In the
+app that event was the next mouse movement over the window.
+
+That accounts for all three. `move_block_to_slot`, `set_block_minutes` and
+`add_padding_block` end in `load_blocks` alone, so a block moved to an earlier
+or later half hour was written and not drawn — report 1 with no defect in the
+move itself. And `_end_drag` hid the drag label without drawing the hiding,
+which is report 2, made reachable in the first place because the label was
+built on the *press*: an ordinary click on an item row put its title beside the
+pointer and left it there.
+
+| ID | Criterion | Verified by |
+|---|---|---|
+| PD-M10.1 | `load_blocks` flushes the redraw once after re-gridding the pane | `tests/test_plan_screen.py::test_pdm101_rebuilding_the_day_pane_flushes_the_redraw` |
+| PD-M10.2 | `load_items` does the same | `::test_pdm102_rebuilding_the_items_pane_flushes_the_redraw` |
+| PD-M10.3 | A press with no motion builds no drag label | `::test_pdm103_a_press_without_motion_shows_no_drag_label` |
+| PD-M10.4 | The first motion shows it with the dragged thing's name; a later motion moves that label rather than building another | `::test_pdm104_the_first_motion_shows_the_label_and_the_second_moves_it` |
+| PD-M10.5 | Ending a drag unplaces the label and flushes, so a release that lands on nothing still clears it | `::test_pdm105_ending_a_drag_hides_the_label_and_flushes` |
+| PD-M10.6 | A flush on a screen Tk has already torn down does not raise out of the `finally` it is called from | `::test_pdm106_a_flush_on_a_screen_that_is_gone_does_not_raise` |
+
+**`update_idletasks`, not `update`.** Idle tasks are geometry and redisplay,
+which is all that is owed. `update` also services the event queue, and these
+rebuilds run from drag handlers: dispatching a queued click in the middle of
+one would re-enter a rebuild that is destroying the widget the click is for —
+the hang the `after_idle` in `on_drag_release` exists to avoid.
+
+**Not code-testable, human review:** that the panes now repaint on the machine
+that reported it. No test can see the screen; the tests pin that the flush is
+asked for, at the end of each rebuild and when the label is hidden.
+
+**Left as it is:** a block dropped on the Earlier or Later box is still
+refused (PD-M5.7), and that refusal is a decision, not this defect. Its warning
+was one of the messages the missing flush could hide, so it is worth re-reading
+on the running screen before deciding whether the rule itself should change.
 
 ---
 

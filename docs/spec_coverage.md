@@ -461,6 +461,13 @@ walkthrough, two more after those five were on screen. All tests are in
 | PD-M9.2 | Exactly one mark per row, either way | `src/getmoredone/screens/plan_blocks.py` (build_item_row) | same test | done — asserted as an exact count, so a row carrying both marks fails |
 | PD-M9.3 | Both marks clear 4.5:1 against every priority fill in both themes | `src/getmoredone/theme.py` (scheduled_mark, unscheduled_mark) | `tests/test_time_block_colors.py::test_pdm9_the_two_marks_are_legible_on_every_fill` | done — the first pair was measured against `priority_band_colors`, which is not the table a row is filled from; against the real fills `success_strong` is 1.63:1 in the dark theme |
 | PD-M9.4 | The colours are theme tokens, not literals in a screen file | `src/getmoredone/theme.py` | the screen reads them by name in `build_item_row` | done |
+| PD-M10.1 | `load_blocks` flushes the redraw once after re-gridding the day pane, so a move, a resize or a padding block is on screen without waiting for an event | `src/getmoredone/screens/plan.py` (load_blocks, _flush_redraw) | `tests/test_plan_screen.py::test_pdm101_rebuilding_the_day_pane_flushes_the_redraw` | done |
+| PD-M10.2 | `load_items` flushes the same way | `src/getmoredone/screens/plan.py` (load_items) | `::test_pdm102_rebuilding_the_items_pane_flushes_the_redraw` | done |
+| PD-M10.3 | A press with no motion builds no drag label | `src/getmoredone/screens/plan.py` (_arm_drag_label) | `::test_pdm103_a_press_without_motion_shows_no_drag_label` | done |
+| PD-M10.4 | The first motion shows the label with the dragged thing's name; a later motion moves that label rather than building another | `src/getmoredone/screens/plan.py` (on_drag_motion) | `::test_pdm104_the_first_motion_shows_the_label_and_the_second_moves_it` | done |
+| PD-M10.5 | Ending a drag unplaces the label and flushes, so a release that lands on nothing still clears it | `src/getmoredone/screens/plan.py` (_end_drag) | `::test_pdm105_ending_a_drag_hides_the_label_and_flushes` | done |
+| PD-M10.6 | A flush on a screen Tk has already torn down does not raise out of the `finally` it is called from | `src/getmoredone/screens/plan.py` (_flush_redraw) | `::test_pdm106_a_flush_on_a_screen_that_is_gone_does_not_raise` | done |
+| PD-M10.7 | The panes repaint on the machine that reported it | — | *(not code-testable — no test can see the screen; human review on the running app)* | human review |
 
 ## PD-S — the six corrections from the built screen (2026-11-06)
 
