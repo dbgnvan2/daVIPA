@@ -198,8 +198,8 @@ class WeeklyItemsScreen(ctk.CTkFrame):
             self.status_label.configure(text="Choose a Week Start.")
             return
 
-        week_start, year, quarter, month = parsed
-        self.left_items = self.vps_manager.get_annual_plan_elements_for_period(year, quarter, month)
+        week_start, year, month = parsed
+        self.left_items = self.vps_manager.get_annual_plan_elements_for_month(year, month)
         all_weekly_items = self.vps_manager.get_weekly_action_items(week_start_date=week_start, ape_only=True)
 
         self._refresh_filter_options(self.left_items, all_weekly_items)
@@ -219,15 +219,26 @@ class WeeklyItemsScreen(ctk.CTkFrame):
             self.week_var.set(current_week_start)
             self.load_selected_week()
 
-    def _selected_week_context(self) -> Optional[tuple[str, int, int, int]]:
+    def _selected_week_context(self) -> Optional[tuple[str, int, int]]:
+        """The week start and the year and month it falls in.
+
+        Purpose: give every caller on this screen one reading of the selected
+                 week.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m1
+        Tests:   tests/test_ape_period_consistency.py::test_apcm14_week_context_carries_no_derived_quarter
+
+        APC-M1.4 — no quarter. This used to derive one with
+        ``((month - 1) // 3) + 1`` so the left-panel lookup could demand the
+        matching quarter flag as well as the month flag. The lookup matches on
+        the month alone now (APC-M4.1), and no other caller here ever read the
+        quarter, so the derivation is gone rather than re-pointed at the shared
+        mapping.
+        """
         week_start = self.week_var.get().strip()
         if not week_start:
             return None
         week_date = date.fromisoformat(week_start)
-        year = week_date.year
-        month = week_date.month
-        quarter = ((month - 1) // 3) + 1
-        return week_start, year, quarter, month
+        return week_start, week_date.year, week_date.month
 
     def _first_day_of_week(self) -> int:
         try:
@@ -274,7 +285,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         if not parsed:
             messagebox.showwarning("No Week Selected", "Choose a Week Start first.")
             return
-        week_start, year, _quarter, month = parsed
+        week_start, year, month = parsed
         selected_ids = [ape_id for ape_id, var in self.left_checks.items() if var.get()]
         if not selected_ids:
             messagebox.showwarning("No APE Selected", "Check one or more month-assigned APEs on the left first.")
@@ -483,7 +494,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
                     text="Select a Week Start before dragging an Annual Plan Element."
                 )
                 return
-            week_start, year, _quarter, month = parsed
+            week_start, year, month = parsed
             try:
                 result = self.vps_manager.create_week_action_items_for_ape(
                     row["id"], year, month, [week_start])

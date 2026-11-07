@@ -19,6 +19,7 @@ from .link_integrity import (
     resolve_segment_id_exact,
 )
 from . import week_calendar
+from .date_utils import months_of_quarter, quarter_of_month
 from .weekly_tactic_logging import get_weekly_tactic_logger
 from . import weekly_tactic_titles
 from .models import ActionItem
@@ -395,15 +396,28 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
             self.db.conn.commit()
         return True
 
-    def get_annual_plan_elements_for_period(self, year: int, quarter: int, month: int) -> List[Dict[str, Any]]:
-        if quarter not in (1, 2, 3, 4) or month < 1 or month > 12:
+    def get_annual_plan_elements_for_month(self, year: int, month: int) -> List[Dict[str, Any]]:
+        """Every APE assigned to one month of one year.
+
+        Purpose: answer "what is filed in November 2026" from the month flag,
+                 which is the month assignment.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m4
+        Tests:   tests/test_ape_period_consistency.py::test_apcm41_month_lookup_matches_on_month_flag_alone
+                 tests/test_ape_period_consistency.py::test_apcm42_orphan_month_flag_still_appears_in_november
+
+        APC-M4.1 — the month alone, not the month and its quarter. This
+        replaced ``get_annual_plan_elements_for_period(year, quarter, month)``,
+        whose callers both derived the quarter from the month and then required
+        the matching quarter flag as well. That bought nothing when the flags
+        agreed and hid the row when they did not: an APE with ``m11 = 1`` and
+        ``q4 = 0`` was invisible in APE Weekly for every November week.
+        """
+        if month < 1 or month > 12:
             return []
-        q_col = f"q{quarter}"
         m_col = f"m{month}"
         cursor = self.db.conn.execute(f"""
             SELECT * FROM annual_plan_elements
             WHERE year = ?
-              AND {q_col} = 1
               AND {m_col} = 1
             ORDER BY segment_name COLLATE NOCASE ASC, subsegment_name COLLATE NOCASE ASC, category_name COLLATE NOCASE ASC
         """, (year,))
@@ -460,7 +474,27 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
         return True
 
     def assign_ape_to_month(self, ape_id: str, quarter: int, month: int) -> bool:
+        """Assign an APE to a month, and to the quarter that month belongs to.
+
+        Purpose: file an APE into one month without letting the quarter and the
+                 month disagree.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m2
+        Tests:   tests/test_ape_period_consistency.py::test_apcm21_mismatched_quarter_and_month_is_refused_and_writes_nothing
+                 tests/test_ape_period_consistency.py::test_apcm22_matching_quarter_and_month_still_assigns
+
+        APC-M2.1 — a pair that cannot both be true is refused before anything
+        is written. The old check validated each argument's range and never
+        their relationship, so Q1 with M11 wrote ``q1 = 1`` and ``m11 = 1``:
+        an APE filed in a quarter that does not contain its month, which APE
+        Weekly then could not find.
+        """
         if quarter not in (1, 2, 3, 4) or month < 1 or month > 12:
+            return False
+        if quarter_of_month(month) != quarter:
+            self.logger.warning(
+                "Refused APE %s month assignment: month %d is in Q%d, not Q%d.",
+                ape_id, month, quarter_of_month(month), quarter,
+            )
             return False
         ape = self._get_annual_plan_element_row(ape_id)
         if not ape:
@@ -870,12 +904,7 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
 
     def _clear_quarter_month_flags(self, ape_id: str, quarter: int,
                                    commit: bool = True) -> None:
-        quarter_months = {
-            1: (1, 2, 3),
-            2: (4, 5, 6),
-            3: (7, 8, 9),
-            4: (10, 11, 12),
-        }[quarter]
+        quarter_months = months_of_quarter(quarter)
         now = datetime.now().isoformat()
         assignments = ", ".join(f"m{month} = 0" for month in quarter_months)
         self.db.conn.execute(

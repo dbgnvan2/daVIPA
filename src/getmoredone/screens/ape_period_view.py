@@ -1,18 +1,23 @@
 """APE month assignment screen with two-panel APE workflow."""
 
-from datetime import datetime
+from datetime import date
 from tkinter import messagebox
 from typing import TYPE_CHECKING, Optional
 
 import customtkinter as ctk
 
 from ..color_contrast import pick_text_color
-from ..theme import button_style, semantic_colors
+from ..date_utils import months_of_quarter, quarter_of_month
+from ..theme import button_style, semantic_colors, status_text_color
+from ..weekly_tactic_logging import get_weekly_tactic_logger
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
     from ..vps_manager import VPSManager
+
+
+logger = get_weekly_tactic_logger()
 
 
 class APEPeriodViewScreen(ctk.CTkFrame):
@@ -25,9 +30,10 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         self.vps_manager = vps_manager
         self.app = app
 
-        self.year_var = ctk.StringVar(value=str(datetime.now().year))
-        self.quarter_var = ctk.StringVar(value="1")
-        self.month_var = ctk.StringVar(value=str(datetime.now().month))
+        year, quarter, month = self.default_period(date.today())
+        self.year_var = ctk.StringVar(value=str(year))
+        self.quarter_var = ctk.StringVar(value=str(quarter))
+        self.month_var = ctk.StringVar(value=str(month))
         self.segment_filter_var = ctk.StringVar(value="All")
         self.subsegment_filter_var = ctk.StringVar(value="All")
         self.category_filter_var = ctk.StringVar(value="All")
@@ -63,13 +69,18 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         ctk.CTkLabel(header, text="Year:").grid(row=1, column=0, padx=(8, 4), pady=(0, 8), sticky="e")
         ctk.CTkEntry(header, width=86, textvariable=self.year_var).grid(row=1, column=1, padx=4, pady=(0, 8), sticky="w")
         ctk.CTkLabel(header, text="Quarter:").grid(row=1, column=2, padx=(8, 4), pady=(0, 8), sticky="e")
-        ctk.CTkComboBox(header, width=74, values=["1", "2", "3", "4"], variable=self.quarter_var).grid(
-            row=1, column=3, padx=4, pady=(0, 8), sticky="w"
+        self.quarter_combo = ctk.CTkComboBox(
+            header,
+            width=74,
+            values=["1", "2", "3", "4"],
+            variable=self.quarter_var,
+            command=lambda _v: self.on_quarter_changed(),
         )
+        self.quarter_combo.grid(row=1, column=3, padx=4, pady=(0, 8), sticky="w")
         ctk.CTkLabel(header, text="Month:").grid(row=1, column=4, padx=(8, 4), pady=(0, 8), sticky="e")
-        ctk.CTkComboBox(header, width=74, values=[str(i) for i in range(1, 13)], variable=self.month_var).grid(
-            row=1, column=5, padx=4, pady=(0, 8), sticky="w"
-        )
+        self.month_combo = ctk.CTkComboBox(header, width=74, values=["1"], variable=self.month_var)
+        self.month_combo.grid(row=1, column=5, padx=4, pady=(0, 8), sticky="w")
+        self._sync_month_choices()
         ctk.CTkButton(header, text="Load", width=88, command=self.refresh_lists, **button_style("secondary")).grid(
             row=1, column=6, padx=(8, 4), pady=(0, 8), sticky="w"
         )
@@ -97,6 +108,12 @@ class APEPeriodViewScreen(ctk.CTkFrame):
             header, width=150, values=["All"], variable=self.category_filter_var, command=lambda _v: self.on_filters_changed()
         )
         self.category_filter_combo.grid(row=1, column=14, padx=4, pady=(0, 8), sticky="w")
+
+        # APC-M2.3 — somewhere for Save to say what it did. Both the button and
+        # the drag write through here; before this the screen reported neither
+        # a success nor a refusal.
+        self.status_label = ctk.CTkLabel(header, text="", text_color=status_text_color("muted"))
+        self.status_label.grid(row=2, column=0, columnspan=15, sticky="w", padx=8, pady=(0, 8))
 
         body = ctk.CTkFrame(self)
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
@@ -145,6 +162,59 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         self.right_list.grid_columnconfigure(0, weight=1)
         body.bind("<Configure>", self._on_body_resize)
 
+    @staticmethod
+    def default_period(today: date) -> tuple[int, int, int]:
+        """The year, quarter and month the screen opens on.
+
+        Purpose: open on a period that exists, with a quarter and a month that
+                 agree.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m3
+        Tests:   tests/test_ape_period_consistency.py::test_apcm31_quarter_defaults_to_current_quarter
+                 tests/test_ape_period_consistency.py::test_apcm34_default_month_is_always_inside_the_default_quarter
+
+        APC-M3.1 / APC-M3.4. The quarter used to be the literal ``"1"`` while
+        the month was today's, so for eight months of the year the screen
+        opened on a pair that cannot both be true — and on 7 November it
+        offered Q1 + M11, which Save then wrote.
+
+        Takes ``today`` rather than reading the clock so the pairing can be
+        checked for every month of the year, not just the one the suite
+        happens to run in.
+        """
+        return today.year, quarter_of_month(today.month), today.month
+
+    def _sync_month_choices(self):
+        """Offer only the months the selected quarter contains.
+
+        Purpose: make an impossible quarter/month pair unpickable rather than
+                 merely rejected after the fact.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m3
+        Tests:   tests/test_ape_period_consistency.py::test_apcm32_month_combo_offers_only_that_quarters_months
+                 tests/test_ape_period_consistency.py::test_apcm33_changing_quarter_moves_month_into_range
+
+        APC-M3.2 / APC-M3.3. One code path builds the month list, at startup
+        and on every quarter change, so the opening state cannot drift from the
+        state a change produces. A month already inside the new quarter is
+        kept; one outside it moves to that quarter's first month, because
+        leaving it would recreate the pair this change exists to prevent.
+        """
+        try:
+            quarter = int(self.quarter_var.get().strip())
+            allowed = months_of_quarter(quarter)
+        except (ValueError, TypeError):
+            return
+        self.month_combo.configure(values=[str(month) for month in allowed])
+        try:
+            current = int(self.month_var.get().strip())
+        except (ValueError, TypeError):
+            current = None
+        if current not in allowed:
+            self.month_var.set(str(allowed[0]))
+
+    def on_quarter_changed(self):
+        self._sync_month_choices()
+        self.refresh_lists()
+
     def _parse_period(self) -> Optional[tuple[int, int, int]]:
         try:
             year = int(self.year_var.get().strip())
@@ -158,6 +228,15 @@ class APEPeriodViewScreen(ctk.CTkFrame):
             return None
         if month < 1 or month > 12:
             messagebox.showerror("Invalid Month", "Month must be between 1 and 12.")
+            return None
+        # APC-M3 — the pickers cannot produce this pair, but a stale variable
+        # or a hand-typed year still reaches here, and the manager refuses the
+        # write anyway (APC-M2.1). Saying so beats a Save that does nothing.
+        if quarter_of_month(month) != quarter:
+            messagebox.showerror(
+                "Quarter and Month Disagree",
+                f"Month M{month} is in Q{quarter_of_month(month)}, not Q{quarter}.",
+            )
             return None
         return year, quarter, month
 
@@ -177,7 +256,7 @@ class APEPeriodViewScreen(ctk.CTkFrame):
             for r in self.vps_manager.get_vision_categories()
         }
         self.left_items = self.vps_manager.get_annual_plan_elements_for_quarter(year, quarter)
-        self.right_items = self.vps_manager.get_annual_plan_elements_for_period(year, quarter, month)
+        self.right_items = self.vps_manager.get_annual_plan_elements_for_month(year, month)
         self._refresh_filter_options()
         self.left_title_label.configure(text=f"APE For Quarter Q{quarter} (check APEs to add to Month M{month} and hit save)")
         self.right_title_label.configure(text=f"APE For Month M{month}")
@@ -237,10 +316,39 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         _year, quarter, month = parsed
         selected_ids = [row_id for row_id, var in self.left_checks.items() if var.get()]
         if not selected_ids:
+            self.status_label.configure(text="Check one or more APEs on the left first.")
             return
+        assigned = 0
+        refused = 0
         for ape_id in selected_ids:
-            self.vps_manager.assign_ape_to_month(ape_id, quarter, month)
+            if self.vps_manager.assign_ape_to_month(ape_id, quarter, month):
+                assigned += 1
+            else:
+                refused += 1
+                logger.warning(
+                    "[ape_period_view] APE %s was not assigned to %d/%d.", ape_id, quarter, month
+                )
         self.refresh_lists()
+        self.status_label.configure(text=self._describe_month_assignment(assigned, refused, month))
+
+    @staticmethod
+    def _describe_month_assignment(assigned: int, refused: int, month: int) -> str:
+        """APC-M2.3 — one wording for every path that assigns a month.
+
+        Purpose: never let a refused assignment look like a successful one.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m2
+        Tests:   tests/test_ape_period_consistency.py::test_apcm23_save_reports_refused_assignments
+
+        ``assign_ape_to_month`` returns a bare boolean and refuses for more
+        than one reason, so this counts what did not happen rather than
+        guessing why. Both the Save button and the drop target report through
+        here: hardening one and leaving the other silent is the sibling problem
+        P5 describes.
+        """
+        text = f"Assigned {assigned} APE(s) to M{month}."
+        if refused:
+            text += f" {refused} could not be assigned — see the log."
+        return text
 
     def _render_rows(self, container: ctk.CTkScrollableFrame, rows: list[dict], selectable: bool):
         for w in container.winfo_children():
@@ -393,8 +501,16 @@ class APEPeriodViewScreen(ctk.CTkFrame):
             parsed = self._parse_period()
             if parsed:
                 _year, quarter, month = parsed
-                self.vps_manager.assign_ape_to_month(row["id"], quarter, month)
+                ok = self.vps_manager.assign_ape_to_month(row["id"], quarter, month)
+                if not ok:
+                    logger.warning(
+                        "[ape_period_view] dragged APE %s was not assigned to %d/%d.",
+                        row["id"], quarter, month,
+                    )
                 self.refresh_lists()
+                self.status_label.configure(
+                    text=self._describe_month_assignment(1 if ok else 0, 0 if ok else 1, month)
+                )
 
     def _on_body_resize(self, _event):
         if self._drag_start_x is None:

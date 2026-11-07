@@ -12,6 +12,8 @@ Based on simplified architecture where:
 import sqlite3
 from typing import List, Optional, Tuple
 
+from .date_utils import MONTHS_OF_QUARTER
+
 
 class VPSSchema:
     """Manages VSP table creation and migrations."""
@@ -789,6 +791,39 @@ class VPSSchema:
             col = f"m{i}"
             if col not in columns:
                 conn.execute(f"ALTER TABLE annual_plan_elements ADD COLUMN {col} INTEGER DEFAULT 0")
+
+        VPSSchema._repair_orphan_month_flags(conn)
+
+    @staticmethod
+    def _repair_orphan_month_flags(conn: sqlite3.Connection):
+        """APC-M5 — set the quarter flag every stored month flag implies.
+
+        Purpose: make a month assignment visible to every screen that reads it,
+                 including the ones that match on the quarter flag too.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m5
+        Tests:   tests/test_ape_period_consistency.py::test_apcm51_migration_backfills_the_implied_quarter_flag
+                 tests/test_ape_period_consistency.py::test_apcm52_dirty_state_orphan_quarter_flag_is_repaired_on_reopen
+                 tests/test_ape_period_consistency.py::test_apcm53_migration_is_idempotent
+
+        Until APC-M2 guarded it, ``assign_ape_to_month`` wrote whatever quarter
+        the picker happened to show, so an APE could end up with ``m11 = 1``
+        and ``q4 = 0``. APE Weekly asks for both and showed nothing for it.
+
+        Additive only: it sets the implied quarter and never clears one. A
+        quarter flag with no month flags in it is a legitimate state — an APE
+        assigned to the quarter but not yet to a month — so clearing anything
+        here would destroy real assignments. Idempotent: the ``WHERE`` clause
+        matches nothing on a second run, so ``updated_at`` is left alone on
+        rows that were already consistent.
+        """
+        for quarter, months in MONTHS_OF_QUARTER.items():
+            month_test = " OR ".join(f"m{month} = 1" for month in months)
+            conn.execute(f"""
+                UPDATE annual_plan_elements
+                SET q{quarter} = 1
+                WHERE COALESCE(q{quarter}, 0) = 0
+                  AND ({month_test})
+            """)
 
     @staticmethod
     def _extend_vision_subsegments(conn: sqlite3.Connection):

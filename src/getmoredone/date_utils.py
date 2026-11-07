@@ -106,14 +106,12 @@ def first_of_next_month(today_date: date) -> date:
 
 
 def first_of_next_quarter(today_date: date) -> date:
-    current_quarter = (today_date.month - 1) // 3 + 1
-    next_quarter = current_quarter + 1
+    next_quarter = QUARTER_OF_MONTH[today_date.month] + 1
     year = today_date.year
     if next_quarter == 5:
         next_quarter = 1
         year += 1
-    month = (next_quarter - 1) * 3 + 1
-    return date(year, month, 1)
+    return date(year, MONTHS_OF_QUARTER[next_quarter][0], 1)
 
 
 def future_date_targets(
@@ -130,3 +128,63 @@ def future_date_targets(
     month_date = first_of_next_month(today_date) + timedelta(days=int(next_month_offset_days))
     quarter_date = first_of_next_quarter(today_date) + timedelta(days=int(next_quarter_offset_days))
     return near_date, long_date, month_date, quarter_date
+
+
+# ---------------------------------------------------------------------------
+# APC-M1 — the one quarter <-> month mapping
+# ---------------------------------------------------------------------------
+#
+# Calendar quarters. Before this lived here it was written three times: a dict
+# in ``weekly_tactic``, a second dict inside
+# ``VPSManager._clear_quarter_month_flags``, and ``((month - 1) // 3) + 1`` in
+# the APE Weekly screen. Three copies that happened to agree, and nothing that
+# owned the rule — which is how an APE came to be filed under Q3 and M11 at
+# once, invisible to APE Weekly ever after.
+
+QUARTER_OF_MONTH: dict[int, int] = {month: ((month - 1) // 3) + 1 for month in range(1, 13)}
+
+MONTHS_OF_QUARTER: dict[int, tuple[int, int, int]] = {
+    quarter: tuple(month for month in range(1, 13) if QUARTER_OF_MONTH[month] == quarter)
+    for quarter in (1, 2, 3, 4)
+}
+
+
+def quarter_of_month(month: int) -> int:
+    """The calendar quarter a month belongs to.
+
+    Purpose: one answer to "which quarter is month 11 in", for every caller.
+    Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m1
+    Tests:   tests/test_ape_period_consistency.py::test_apcm11_quarter_of_month_covers_every_month
+
+    Raises ``ValueError`` on a month outside 1-12 rather than returning a
+    plausible-looking quarter: a caller holding month 0 or 13 has a bug, and a
+    silent answer is what let the bad pair reach the database.
+    """
+    try:
+        return QUARTER_OF_MONTH[int(month)]
+    except (KeyError, TypeError, ValueError):
+        raise ValueError(f"month must be 1-12, got {month!r}")
+
+
+def months_of_quarter(quarter: int) -> tuple[int, int, int]:
+    """The three months a calendar quarter contains.
+
+    Purpose: one answer to "which months may be picked for Q4".
+    Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m1
+    Tests:   tests/test_ape_period_consistency.py::test_apcm11_months_of_quarter_covers_every_quarter
+    """
+    try:
+        return MONTHS_OF_QUARTER[int(quarter)]
+    except (KeyError, TypeError, ValueError):
+        raise ValueError(f"quarter must be 1-4, got {quarter!r}")
+
+
+def current_quarter(today_date: date) -> int:
+    """The quarter a date falls in — what a quarter picker should open on.
+
+    Purpose: give the APE screens a default that cannot disagree with the
+             month picker beside it.
+    Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m3
+    Tests:   tests/test_ape_period_consistency.py::test_apcm31_quarter_defaults_to_current_quarter
+    """
+    return quarter_of_month(today_date.month)

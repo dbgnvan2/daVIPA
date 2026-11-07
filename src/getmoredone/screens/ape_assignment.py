@@ -1,12 +1,13 @@
 """APE quarter assignment screen with two-panel APE workflow."""
 
-from datetime import datetime
+from datetime import date, datetime
 from tkinter import messagebox
 from typing import TYPE_CHECKING, Optional
 
 import customtkinter as ctk
 
 from ..color_contrast import pick_text_color
+from ..date_utils import current_quarter
 from ..theme import button_style, semantic_colors
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 
@@ -25,8 +26,11 @@ class APEAssignmentScreen(ctk.CTkFrame):
         self.vps_manager = vps_manager
         self.app = app
 
+        # APC-M6 — the same hard-coded Q1 the Month screen had. Two APE
+        # screens that disagree about which quarter you are in is how an APE
+        # ends up filed in one quarter and worked in another.
         self.year_var = ctk.StringVar(value=str(datetime.now().year))
-        self.quarter_var = ctk.StringVar(value="1")
+        self.quarter_var = ctk.StringVar(value=str(current_quarter(date.today())))
         self.segment_filter_var = ctk.StringVar(value="All")
         self.subsegment_filter_var = ctk.StringVar(value="All")
         self.category_filter_var = ctk.StringVar(value="All")

@@ -17,6 +17,7 @@ from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
 from . import week_calendar
+from .date_utils import QUARTER_OF_MONTH as _QUARTER_OF_MONTH
 from .models import ActionItem
 from .weekly_tactic_logging import get_weekly_tactic_logger
 from .weekly_tactic_titles import canonical_weekly_tactic_title, title_prefix
@@ -32,12 +33,9 @@ ROLLOVER_BLANK_FIELDS = {
     "annual_plans": ("theme", "objective", "description"),
 }
 
-QUARTER_OF_MONTH = {
-    1: 1, 2: 1, 3: 1,
-    4: 2, 5: 2, 6: 2,
-    7: 3, 8: 3, 9: 3,
-    10: 4, 11: 4, 12: 4,
-}
+# APC-M1 — re-exported, not redefined. The mapping has one home in
+# ``date_utils``; this name stays so existing callers keep working.
+QUARTER_OF_MONTH = _QUARTER_OF_MONTH
 
 
 @dataclass
