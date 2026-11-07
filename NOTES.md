@@ -1,3 +1,41 @@
+## Recent Changes (2026-11-07)
+
+### APE quarter/month consistency (APC-M1 - APC-M6)
+
+- ✅ **An APE could be filed under a quarter that does not contain its month.** The APE Month
+  screen's Quarter picker opened on the literal `"1"` while its Month picker opened on today's
+  month, so on 7 November it offered Q1 + M11 and `assign_ape_to_month` wrote it — the old
+  check validated each argument's range and never their relationship. The Quarter picker now
+  opens on the current calendar quarter, the Month picker offers only that quarter's three
+  months, changing the quarter pulls the month into it, and the manager refuses a mismatched
+  pair before writing anything. The APE Quarter screen had the identical hard-coded `"1"`;
+  fixed in the same change.
+- ✅ **Such a record was then invisible in APE Weekly.** The weekly screen derived the quarter
+  from the selected week and asked for `q4 = 1 AND m11 = 1`. A row with `m11 = 1` and
+  `q4 = 0` matched nothing, every November week, with nothing on screen to say why. The month
+  flag *is* the month assignment, so `get_annual_plan_elements_for_month(year, month)`
+  replaces `get_annual_plan_elements_for_period(year, quarter, month)` and both APE screens
+  use it. The weekly screen's derived quarter had no other reader and is gone, not renamed.
+- ✅ **The rule was written three times and owned nowhere** — a dict in `weekly_tactic`, a
+  second dict inside `VPSManager._clear_quarter_month_flags`, and `((month - 1) // 3) + 1` in
+  the weekly screen. `date_utils` now holds `QUARTER_OF_MONTH`, `MONTHS_OF_QUARTER`,
+  `quarter_of_month()`, `months_of_quarter()` and `current_quarter()`; the three copies point
+  at it, as does `first_of_next_quarter`, which had a fourth. Two AST tests keep a fifth from
+  appearing.
+- ✅ **Stored orphan flags are repaired on open.** `VPSSchema._repair_orphan_month_flags` sets
+  the quarter flag every month flag implies. Additive only — a quarter flag with no month in
+  it is a real state (assigned to the quarter, not yet to a month), so clearing anything there
+  would destroy real assignments. Idempotent, with a dirty-state test (P8) that writes the row,
+  closes the manager and reopens the file.
+- ✅ **APE Month Save reports what it did.** The screen had no status surface, so a refused
+  assignment looked exactly like a successful one. One wording, reached by both the Save button
+  and the drop target (P5).
+- Spec: `docs/spec_2026-11-07_ape_period_consistency.md`. Tests:
+  `tests/test_ape_period_consistency.py` (41), twelve mutation proofs. Verified
+  against copies of both real databases: the demo row is repaired and appears
+  in APE Weekly; the installed app's 17 APE rows were already consistent and
+  the migration changed none of them.
+
 ## Recent Changes (2026-08-24)
 
 ### Reward-contingent task chunking (the dopamine protocol)

@@ -579,3 +579,17 @@ identical there. On Mac Mini1, which runs dark, it would have gone red.
 - The four size controls live under **Settings ▸ Date Increment Settings**,
   which is not where a user would look for them. Relocating a shipped control
   needs approval, so it is in `BACKLOG.md`.
+
+---
+
+## APC — APE quarter/month consistency (2026-11-07)
+
+Spec and full per-criterion status report:
+[`docs/spec_2026-11-07_ape_period_consistency.md`](spec_2026-11-07_ape_period_consistency.md)
+§5.3. Kept there rather than inlined here because that batch (PD-*) was still
+open in the tree when APC landed, and two batches editing one table is how a
+status line ends up describing neither.
+
+All of APC-M1 through APC-M6: **done**, 41 tests in
+`tests/test_ape_period_consistency.py`, each of the twelve behavioural claims
+proved by mutation (§5.4 of that spec).

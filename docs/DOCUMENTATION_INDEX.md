@@ -124,6 +124,28 @@ Summary of documentation and test updates:
 - Verification checklist
 - Complete test results
 
+### docs/spec_2026-11-07_ape_period_consistency.md
+
+Spec and implementation plan for APE quarter/month consistency (APC-M1 - APC-M6):
+
+- Why an APE filed under Q3 and M11 at once was invisible in APE Weekly
+- One quarter<->month mapping in `date_utils`, replacing three copies
+- The manager guard that refuses a pair which cannot both be true
+- APE Month pickers that cannot produce such a pair
+- The month-only lookup both APE screens now use
+- The idempotent migration that repairs stored orphan month flags
+
+### docs/spec_2026-11-07_ape_week_actions.md
+
+Spec and implementation plan for the APE Week Assignment rename and a new
+APE Week Actions tab (AWA-M1 - AWA-M6). Approved 2026-11-07; not yet built:
+
+- Why "linked to the week tactic" means two different columns in live data
+- The one predicate that reads both, and the counts behind that decision
+- The seam cut into `today.py` so the right panel can subclass it
+- The six decisions taken where the request admitted more than one reading
+- Three adjacent issues found and deliberately not fixed
+
 ## Feature-Specific Documentation
 
 ### Requirements (Consolidated)
