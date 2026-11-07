@@ -7,6 +7,29 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — reported from the running screen (2026-11-07, second pass)
+
+- **The day pane is rebuilt where it is, so it stops going blank.** Moving a
+  block, resizing one or deleting one left an empty pane that filled itself in
+  the moment the pointer moved. Both panes were rebuilt by lifting the scroll
+  area out of the layout, rebuilding its rows and putting it back; a scrolling
+  area taken out of the layout loses the size of the window its rows are drawn
+  in, and gets it back from a handler that only runs when the next event
+  arrives. The rows are now destroyed and rebuilt where they are. The same
+  cause was behind a drop on **Earlier** or **Later** looking like it had done
+  nothing, and behind *Schedule anyway* on a non-work day writing a block that
+  did not appear: both wrote correctly and redrew a pane that had not come
+  back.
+- **Earlier and Later are now fixed strips above and below the day, not rows
+  inside it.** A day of eighteen half hours is taller than the pane, so the
+  **Later** box sat below the bottom of it and no drag could reach it — there
+  was no way to scroll while holding one. Both ends are now always on screen.
+- **The day scrolls itself while you drag.** Hold a dragged item or block near
+  the top or bottom edge of the day pane and the day scrolls that way until you
+  move off the edge or let go, so a half hour that is out of sight can be
+  dropped on. It keeps scrolling while the pointer is held still, and the
+  outline follows whichever box has moved under it.
+
 ### Added — the APE quarter/month consistency batch (2026-11-07)
 
 - **APE Month and APE Quarter both open on the period you are actually in,

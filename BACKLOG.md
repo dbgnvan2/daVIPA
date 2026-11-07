@@ -1,6 +1,6 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (four Plan / Day Plan faults reported from the running screen added at the top, recorded and not investigated; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-07 (the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
 
 ## Reported from the running screen — Plan / Day Plan (2026-11-07)
 
@@ -8,6 +8,18 @@ Four faults reported by the user after the PD-* batch shipped. **Recorded, not
 investigated**: the descriptions below are the report, not a diagnosis. Nothing
 here has been reproduced, read in the code, or confirmed against a running app
 by this session.
+
+**All four are addressed by PD-M11** (`docs/implementation_plan_2026-11-06_plan_day_controls.md`),
+on 2026-11-07, pending the on-screen check that is PD-M11.8. The first three
+turned out to be one cause and not the one PD-M10 treated: the panes were
+rebuilt by lifting the scroll frame out of the grid, which unmaps the canvas
+the rows are drawn in and leaves its window width and scrollregion to
+`<Configure>` handlers that an idle flush does not run. They are rebuilt in
+place now. The second report had a cause of its own as well - the two ends of
+the day were rows of the scrolling grid, so **Later** sat below the bottom of
+a pane too short for eighteen half hours - and the fourth is built as the
+autoscroll (PD-M11.5). Leave these entries here until the running app says
+they are gone.
 
 ### 2026-11-07 - Type: Bug
 
@@ -56,6 +68,30 @@ item cannot be dragged to a time that is not already visible.
 **Priority:** Medium
 **Effort:** Unknown
 
+
+## Adjacent issue from the PD-M11 batch (2026-11-07)
+
+### 2026-11-07 - Type: Bug
+
+**Title:** Six other screens rebuild a scrolling pane by taking it out of the grid
+**Description:** `today.py`, `upcoming.py`, `all_items.py`, `completed.py`,
+`hierarchical.py` and `vps_planning.py` all call `grid_remove()` on a
+`CTkScrollableFrame`, destroy and rebuild its rows, and put it back in a
+`finally`. All six come from `9525d94` ("Fix GUI flickering by preventing
+intermediate renders during screen refresh"), which is where the Plan screen
+got the pattern too. Taking that frame out of the grid unmaps the canvas its
+rows are drawn in, and the width of the canvas window and the scrollregion are
+both restored by `<Configure>` handlers that run only when the event queue is
+next serviced - which is the blank-pane defect PD-M11.1 fixed on the Plan
+screen.
+**Priority:** Medium
+**Effort:** Medium - six screens, each with its own on-screen contract
+**Notes:** Not fixed with PD-M11. None of the six was reported, and six
+screens' worth of UI regression is not a change to make alongside a fix to a
+seventh. The fix is mechanical and identical in each: delete the
+`grid_info()`/`grid_remove()` pair and the `grid(**grid_info)` in the
+`finally`, keep the destroy-and-rebuild. What it needs is a walk of each
+screen afterwards, which is the actual cost.
 
 ## Deferred from the APE period-consistency sweep (2026-11-07)
 

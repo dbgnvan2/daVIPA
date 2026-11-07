@@ -327,7 +327,10 @@ Header:
   work onto it, so a Saturday you filled can be cleared without being asked
   about the week again.
 - **Earlier** / **Later** — What: A box at each end of the day column, above
-  the first half hour and below the last. Drop an item on one and the day
+  the first half hour and below the last. They sit outside the scrolling grid,
+  so both are on screen whatever the day is scrolled to — a day with more half
+  hours than the pane can show used to put **Later** below the bottom of it,
+  where no drag could reach it. Drop an item on one and the day
   lengthens to hold it: *Day Start* moves back, or *Day End* moves forward, by
   the item's own work-block length, and the item is blocked in the new half
   hours. Why: the day you planned is not always the day you get, and the
@@ -406,6 +409,12 @@ Items pane (left):
   left spare. A label with the item's name follows the pointer once you start
   to move it — not on the press, so an ordinary click on a row leaves nothing
   behind.
+- **The day scrolls itself while you drag** — What: Hold a dragged item or
+  block near the top or bottom edge of the day pane and the day scrolls that
+  way, until you move off the edge or let go. Why: A half hour you cannot see
+  is a half hour you cannot drop on, and a hand holding a drag cannot work the
+  scroll wheel. It keeps going while the pointer is held still, and the
+  outline follows whichever box has moved under it.
 - **Release in the day column but not on a box** — What: Nothing is created, and
   the status line says *Drop an item on a half-hour box*. Why: The app will not
   pick an hour for you. A release over the heading or the summary is not a

@@ -1,7 +1,7 @@
-# Implementation plan — Plan screen day controls (PD-M1 … PD-M10)
+# Implementation plan — Plan screen day controls (PD-M1 … PD-M11)
 
 Date: 2026-11-06
-Status: **PD-M1 … PD-M6 shipped 2026-11-06. PD-M7, PD-M8, PD-M9, PD-M10 and the unplanned PD-M1.6, PD-M2.8 and PD-M2.9 shipped 2026-11-07**
+Status: **PD-M1 … PD-M6 shipped 2026-11-06. PD-M7, PD-M8, PD-M9, PD-M10, PD-M11 and the unplanned PD-M1.6, PD-M2.8 and PD-M2.9 shipped 2026-11-07. PD-M11 corrects PD-M10, which treated the symptom and not the cause**
 Screen: `src/getmoredone/screens/plan.py`, `src/getmoredone/screens/plan_blocks.py`
 Follows: `docs/implementation_plan_2026-11-06_plan_box_appearance.md` (PB-M1 … PB-M7, shipped)
 
@@ -404,6 +404,12 @@ rebuilds run from drag handlers: dispatching a queued click in the middle of
 one would re-enter a rebuild that is destroying the widget the click is for —
 the hang the `after_idle` in `on_drag_release` exists to avoid.
 
+**Superseded in part by PD-M11.** The flush added here was not wrong, but it
+was not the fix: the rebuild it was added to — which takes the scroll frame out
+of the grid — is what kept the pane off the screen, and PD-M11.1 is the
+correction. The reasoning below about `update_idletasks` still holds, and
+PD-M11 has the measurement that settles it.
+
 **Not code-testable, human review:** that the panes now repaint on the machine
 that reported it. No test can see the screen; the tests pin that the flush is
 asked for, at the end of each rebuild and when the label is hidden.
@@ -412,6 +418,96 @@ asked for, at the end of each rebuild and when the label is hidden.
 refused (PD-M5.7), and that refusal is a decision, not this defect. Its warning
 was one of the messages the missing flush could hide, so it is worth re-reading
 on the running screen before deciding whether the rule itself should change.
+
+---
+
+## PD-M11 — The pane repaints, and both ends of the day can be reached
+
+Four more reported from the running app. The first three are one cause, and it
+is the cause PD-M10 got half right.
+
+1. "Moving a Day Block creates a blank panel that immediately shows if the
+   mouse moves outside the panel area."
+2. "I can't move an item into the early or late extended sections."
+3. "Scheduling on a non work day creates a message, but *schedule anyway*
+   doesn't work (or the item doesn't show up)."
+4. "The Day Plan window should scroll as I drag an item up or down to an area
+   not shown."
+
+**What PD-M10 missed.** It read the symptom as a missing flush and added one.
+The flush was not the problem: the rebuild around it was. Both panes were
+rebuilt by taking the scroll frame out of the grid, destroying its children,
+building the new rows and putting the frame back. A `CTkScrollableFrame` is a
+frame of rows inside a canvas inside a frame, and it is the outer frame that
+leaves the grid — so the canvas is unmapped with it, and on the way back both
+the width of the canvas window the rows are drawn in and the scrollregion are
+restored by `<Configure>` handlers, which run when the event queue is next
+serviced. An idle flush does not service it. The pane came back blank and
+filled itself in on the next event, which in use was the next mouse movement.
+That is report 1 in its own words, and it is why PD-M10's flush changed the
+symptom from stale to blank rather than curing it. Rebuilt in place there is
+nothing to restore: destroying and rebuilding rows where they are costs one
+more layout pass and nothing else, because Tk does its geometry at idle and
+draws no intermediate state unless something asks it to mid-rebuild.
+
+Reports 2 and 3 are that pane, twice. A drop on **Earlier** writes the day's
+new hours and the block (`test_pdm52_a_drop_above_moves_day_start_back` covers
+the write), and *Schedule anyway* writes the block
+(`test_pdm7_a_non_work_day_asks_before_scheduling` covers that one); both then
+redraw a pane that did not come back. Report 2 had a second cause of its own,
+below.
+
+**`update` was tried and rejected, with a measurement.** The macOS display
+path draws on a pass of the platform run loop, which `update` turns and
+`update_idletasks` does not, so `update` is the call that paints. It costs too
+much to have in this path: with it at the end of every pane rebuild, six tests
+of this screen took four minutes and 120% of a CPU, on the machine the user was
+working on. It is also the hang `on_drag_release`'s `after_idle` exists to
+avoid. So the flush stays at idle tasks, and whether that is now enough — with
+no unmap for it to recover from — is PD-M11.8, a look at the screen.
+
+**The two ends of the day were unreachable, and not only unpainted.** They were
+rows of the scrolling grid, above the first half hour and below the last. A
+day of eighteen half hours is several hundred pixels taller than the pane, so
+the **Later** box was below the bottom of it, and there was no way to scroll
+while holding a drag — no gesture reached it at all. Both ends now sit in
+holders of their own, outside the scroll frame: one above it, one below it,
+always on screen. That moved them out from under `virtual_under_pointer`'s
+first guard, which refused unless the pointer was inside `blocks_scroll` —
+correct while they were rows of that grid, and a refusal of every drop on them
+once they were not. Every existing test of that drop passed either way, because
+the helper that places the pointer puts it inside `blocks_scroll` as well;
+PD-M11.4 is the test that does not.
+
+| ID | Criterion | Verified by |
+|---|---|---|
+| PD-M11.1 | Both panes are rebuilt in place — neither leaves the grid to be rebuilt | `tests/test_plan_screen.py::test_pdm111_a_rebuild_leaves_the_day_pane_in_the_grid`, `::test_pdm111_a_rebuild_leaves_the_items_pane_in_the_grid` |
+| PD-M11.2 | The two ends of the day are drawn outside the scrolling grid, in holders of their own in the day pane | `::test_pdm112_the_two_ends_of_the_day_are_outside_the_scrolling_grid` |
+| PD-M11.3 | A redraw refills those holders instead of stacking a second box in them | `::test_pdm113_a_redraw_does_not_leave_a_second_box_at_either_end` |
+| PD-M11.4 | A drop on an end is recognised with the pointer nowhere near the scrolling grid | `::test_pdm114_a_drop_on_an_end_needs_no_pointer_in_the_scrolling_grid` |
+| PD-M11.5 | A drag held at the top or bottom edge of the day's viewport scrolls the day, on its own clock, the same distance per tick whatever the platform's scroll increment is | `::test_pdm115_the_day_canvas_is_the_scroll_frames_master`, `::test_pdm115_the_pointer_at_the_bottom_edge_scrolls_down`, `::test_pdm115_the_pointer_at_the_top_edge_scrolls_up`, `::test_pdm115_the_pointer_in_the_middle_scrolls_nothing`, `::test_pdm115_a_pointer_beside_the_day_scrolls_nothing`, `::test_pdm115_a_tick_is_the_same_distance_on_any_platform`, `::test_pdm115_a_drag_held_at_the_bottom_edge_scrolls_the_day` |
+| PD-M11.6 | A tick with the pointer out of the edge zone, or with no drag in progress, scrolls nothing and schedules nothing | `::test_pdm116_a_tick_outside_the_edge_zone_stops_the_scroll`, `::test_pdm116_a_tick_with_no_drag_scrolls_nothing` |
+| PD-M11.7 | Ending a drag cancels the pending tick rather than forgetting it | `::test_pdm117_ending_a_drag_cancels_the_scroll` |
+| PD-M11.8 | On the running app: the day pane is on screen as soon as a block moves; an item dropped on **Earlier** and on **Later** lengthens the day; *Schedule anyway* shows the block it wrote | *(not code-testable — no test can see the screen)* |
+
+**PD-M5.1's test changed, and why.** It asserted that the Earlier box was a row
+of the scrolling grid above every slot row and the Later box a row below them
+all. That was a true statement about the arrangement where the Later box could
+not be reached. The criterion — one above the first box, one below the last —
+is unchanged; it is now counted in the day pane's rows rather than the grid's.
+Case (b) of the repo's test rule: the behaviour changed on purpose.
+
+**Adjacent issues found, not fixed.**
+
+- **The same remove-and-rebuild pattern is on six other screens** —
+  `today.py`, `upcoming.py`, `all_items.py`, `completed.py`, `hierarchical.py`
+  and `vps_planning.py`, all from `9525d94` ("Fix GUI flickering by preventing
+  intermediate renders during screen refresh"). Every one of them unmaps a
+  `CTkScrollableFrame` to rebuild it, which is the defect above. None was
+  reported, and six screens' worth of UI regression is not a change to make
+  alongside this one. Recorded in `BACKLOG.md`.
+- **`drag_schedule.py` still builds its drag label on the press**
+  (`drag_schedule.py:1340`, `:1344`), the defect PD-M10.3 fixed here.
 
 ---
 
