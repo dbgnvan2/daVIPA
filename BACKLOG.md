@@ -1,6 +1,65 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-06 (one adjacent issue from the plan day-controls batch added; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-06 (six findings from the plan day-controls cold sweep added, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Deferred from the plan day-controls cold sweep (2026-11-06)
+
+Found by the three sweep passes over `6976b49...HEAD` — learning-qa, a cold
+correctness pass and a security pass. The high-severity finding and the three
+mediums were fixed in the batch (`aead482`). These are what was recorded
+instead of fixed, each with the reason, because a fix pass is new unreviewed
+surface and the repo's budget stops in-loop fixes below medium.
+
+- **The app holds two live `AppSettings` objects, and either one's save reverts
+  the other's fields.** Medium-high, and the only finding above low that was
+  not fixed. `AppSettings.save` writes `asdict(self)` — every field — and
+  `screens/settings.py:34` loads a settings object of its own. So: launch,
+  change the theme in Settings and save (the file is updated, `app.settings` is
+  stale), then drag the Plan divider or drop an item on *Earlier*. The Plan
+  screen writes `asdict(app.settings)` over the file and the theme change is
+  gone, with nothing said. The write itself is not new — `plan_settings_dialog`
+  has done it since TG-M6 — but PD-M2 and PD-M5 added two triggers that fire on
+  a casual drag rather than on an explicit Save, which is what makes it likely
+  to be hit. **Not fixed here because the defect is the two objects, not the
+  two new call sites**: the fix is one owner for the settings file (either the
+  Settings screen writes through `app.settings`, or `save` merges what it did
+  not load), and that is an app-wide change to the semantics of every save in
+  the app. It is not a thing to do in a fix pass at the end of a batch, and
+  patching only the two new triggers would leave the same defect behind three
+  older ones.
+- **The *Earlier* and *Later* boxes get no hover outline.** Low.
+  `update_hover_target` reads `self._slot_frames`, which holds the real
+  half-hour boxes only, so dragging over the two virtual boxes outlines
+  nothing — while every real box does. The one target on the screen that has to
+  announce itself is the only one that does not.
+- **Extending the day earlier into lunch is refused with a message about the
+  wrong thing.** Low. With Day Start at 13:00 and lunch at 12:00, a drop on
+  *Earlier* makes box 0 a lunch box, `can_place` returns `CROSSES_LUNCH`, and
+  the user is told "That block cannot go there" — a sentence about a box, when
+  the fact is that the day cannot start inside lunch. The rollback is correct;
+  only the wording is wrong.
+- **`extend_day_for` catches `Exception` where its transaction rolls back on
+  `BaseException`.** Low. A `KeyboardInterrupt` inside the block takes the
+  database back and leaves `self.settings.plan_day_start` on the new, unsaved
+  value for the life of the process — the P41 case the method's own docstring
+  is about. Unreachable in the packaged app, which is why it is low.
+- **A successful divider drag does not redraw the items pane.** Low. The
+  empty-day note's `wraplength` is computed from `items_col_width()` when the
+  note is built, so after a drag that widens the pane the note keeps the old
+  wrap until the next refresh.
+- **The depth-bars column is 2px narrower than what is gridded into it, and a
+  padding chip's length sits 2px left of a task's.** Low.
+  `SLOT_BARS_WIDTH_PX` is 22, but `DepthBarStack` is gridded with
+  `padx=(4, 6)` around a 14px stack in both renderers, so the column needs 24
+  and both width floors are 2px short. Separately, `_build_block_chip` grids
+  the bars only for `BlockType.ITEM`, so a buffer or break chip's length label
+  lands 2px left of a task's in the same pane. The two *panes* stay in step
+  with each other; rows within one pane do not. Fixing it means changing the
+  chip column contract and the tests that assert it, for 2px.
+- **`shift_all_slots` accepts a negative `by`.** Low, and listed for the record
+  rather than as a defect: nothing calls it with one, Day Start only ever moves
+  back on this path, and a negative shift would be the correct write if a
+  shortening path is ever added.
 
 ## Adjacent issues from the plan day-controls batch (2026-11-06)
 

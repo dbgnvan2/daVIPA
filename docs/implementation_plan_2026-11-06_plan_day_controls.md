@@ -89,6 +89,9 @@ the file does not.
 Building the clamp meant putting a number on what a row needs, and the number
 came out at 360px: the stripe's column, the 220px Drag Schedule title width,
 the bars, the length, and the pane's chrome. The items column ships at 260. So
+(PD-S later added the marker column and the right-hand inset, taking the same
+floor to 384px -- the number below is the one PD-M2 shipped, kept as the record
+of what was measured then.)
 at the app's own default settings an item row asked for 306px of content inside
 a 256px pane and the `30m` label was laid out from x=258 to x=306 -- entirely
 past the right edge, invisible, in every row.
@@ -104,7 +107,7 @@ The fix is the floor, for the same reason PB-M5.6 floors the box height: a
 column too narrow to draw what it holds is a clipped widget with nothing on
 screen to say so. It makes the default left pane 360px rather than 260, which
 is the honest cost of the two panes lining up -- and PD-M2's own grip is what
-lets the user move it from there.
+lets the user move it from there. PD-S took it to 384px.
 
 `_positive_setting` turned out to apply `minimum` to a parsed value and not to
 the fallback. For the box height that could never show, since there the two are
@@ -212,7 +215,7 @@ half hour that drop created.
    `tests/test_time_block_crud.py::test_tgm64_a_day_start_change_writes_no_rows`
    documents as the design, and it is the right design for a Day Settings
    change. It is not what a drop above the day asks for. So the extend path
-   renumbers: `DatabaseManager.shift_day_slots(block_date, by)`, inside the
+   renumbers: `DatabaseManager.shift_all_slots(by)`, inside the
    same transaction, before the new block, leaving `start_time` and `end_time`
    untouched because they are the fact being preserved. That module's own
    docstring, which said there was "nothing to renumber", is corrected in the
@@ -224,7 +227,7 @@ half hour that drop created.
 | PD-M5.2 | A drop on the top box moves Day Start back by the item's span and blocks it there | `::test_pdm52_a_drop_above_moves_day_start_back` |
 | PD-M5.3 | A drop on the bottom box moves Day End forward by the span and blocks it there | `::test_pdm53_a_drop_below_moves_day_end_forward` |
 | PD-M5.4 | Extending does **not** clear `plan_day_shape_unconfirmed` | `tests/test_plan_settings.py::test_pdm54_extending_the_day_is_not_confirming_it` |
-| PD-M5.5 | Every existing block keeps its clock time when either bound moves | `tests/test_time_block_crud.py::test_pdm55_blocks_keep_their_times_when_the_day_grows` (+ `::test_pdm55_a_shift_of_zero_writes_nothing`, `::test_pdm55_a_block_outside_the_grid_is_not_given_a_box`, `::test_pdm55_only_the_named_day_is_renumbered`), and `tests/test_plan_screen.py::test_pdm52_existing_blocks_keep_their_clock_times` — in `test_time_block_crud.py` rather than `test_time_block_layout.py` as planned, because keeping the time turned out to need a *write*, not arithmetic |
+| PD-M5.5 | Every existing block keeps its clock time when either bound moves | `tests/test_time_block_crud.py::test_pdm55_blocks_keep_their_times_when_the_day_grows` (+ `::test_pdm55_a_shift_of_zero_writes_nothing`, `::test_pdm55_a_block_outside_the_grid_is_not_given_a_box`, `::test_pdm55_every_date_is_renumbered_not_only_the_one_on_screen`), and `tests/test_plan_screen.py::test_pdm52_existing_blocks_keep_their_clock_times` — in `test_time_block_crud.py` rather than `test_time_block_layout.py` as planned, because keeping the time turned out to need a *write*, not arithmetic |
 | PD-M5.6 | A refused settings write leaves the day, the grid and the app as they were | `tests/test_plan_screen.py::test_pdm56_a_refused_write_leaves_the_day_unchanged` (P41) |
 | PD-M5.7 | The virtual boxes are not droppable for a *block* drag — a block cannot invent a half hour | `::test_pdm57_a_block_drag_onto_a_virtual_box_is_refused` |
 | PD-M5.9 | A real box always wins over a virtual one, so a box flush against the Earlier box still gets its own drops | `::test_pdm5_a_real_box_wins_over_a_virtual_one` — unplanned; the read order is a one-line change nothing else would notice |

@@ -7,6 +7,30 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — what the cold sweep found
+
+- **Extending the day earlier no longer re-times every other date's work.**
+  A block's box is stored as a count from Day Start, and Day Start is one
+  setting for every date — so moving it back half an hour and renumbering only
+  the date on screen left every other date's blocks drawn half an hour early,
+  with their own rows still showing the old time and nothing marked wrong. A
+  10:00 Monday meeting read 09:30 after an item was dropped on Tuesday. The
+  renumber now covers every date, which is what "every existing block keeps its
+  clock time" has to mean when there is one Day Start.
+- **AutoLoad's counts cover the whole list.** It plans the first 60 items, the
+  same cap the pane draws, but reported "blocked N of 60" — so on a day with
+  more items than that, the ones past the cap appeared in none of the counts.
+  The denominator is now every item on the day and the capped number is named,
+  so the counts add up to the list. A failure that is not a refused box is now
+  reported too: before, anything else left the screen unchanged and silent, so
+  a press that failed looked like a press with nothing to do.
+- **A narrow window no longer clips the block length off the day boxes.** The
+  two panes each have a minimum width, but only the items pane was held to its
+  own — so a window too narrow for both took the whole difference out of the
+  day pane and laid the `30m` label past the right edge of every box. Narrowing
+  the window now takes the width off the items pane first, down to its floor,
+  and widening gives it back.
+
 ### Changed — the two panes, read side by side
 
 Six corrections from looking at the built screen.
