@@ -1,6 +1,68 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-07 (four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Adjacent issues — APE Week Assignment / APE Week Actions (AWA, 2026-11-07)
+
+Found while reading the surrounding code for the AWA batch, recorded under the
+standing rule rather than fixed in a sweeping diff. Full text, with the line
+numbers and the reasoning, in `docs/spec_2026-11-07_ape_week_actions.md` §7.
+One of the five, AWA-A5, was fixed in that batch instead of recorded, because
+it made the meta test suite red and blocked verification.
+
+### 2026-11-07 - Type: Bug
+
+**Title:** AWA-A1 - APE Week Assignment's Add Action Item writes the wrong link column
+**Description:** `screens/weekly_items.py:442` sets `parent_id` and leaves
+`weekly_tactic_id` NULL, against `weekly_tactic_migrations.py:135`, which
+exists to keep the two apart, and against `tactic_id_of`
+(`weekly_tactic.py:144`), the predicate WT-M3.D.1 names as the single
+authority. That one button is why the demo database's only tactic child is
+linked by `parent_id`. The new APE Week Actions tab's own Add button writes
+`weekly_tactic_id`, so the two buttons on two tabs now disagree in a way a user
+can see. Nothing is lost today, because
+`get_action_items_for_weekly_tactic` reads both columns. The spec recommends
+setting both columns on create — one line plus a test. It was left out because
+it is beyond what was asked and is the user's call.
+**Priority:** Medium
+**Effort:** Small
+
+### 2026-11-07 - Type: Bug
+
+**Title:** AWA-A4 - the APE Week Actions panel inherits Today's pin, and the pin is shared
+**Description:** `create_item_row` binds the drag grip to `_start_pin_drag` /
+`_finish_pin_drag` (`today.py:541-542`), which write
+`action_items.today_pin_rank` — the column the Today screen orders by.
+Inherited unchanged, as AWA-M5.3 requires, dragging a row to the top of the new
+panel also floats it to the top of Today. Found after implementation, by
+reading the inherited row builder, not by a test. Either fix — suppressing the
+grip on this panel, or giving the panel its own rank column — is a behaviour
+change beyond what the tab was asked to do, so neither was made.
+**Priority:** Medium
+**Effort:** Small
+
+### 2026-11-07 - Type: Refactor
+
+**Title:** AWA-A3 - three readers disagree about what a Weekly Tactic's child is
+**Description:** `weekly_tactic_maintenance._child_count` (line 278) already
+reads both link columns while `tactic_id_of` reads one. AWA-M2 adds a third
+reader, matching `_child_count`. Consolidating all three onto one helper is the
+right end state and is larger than the AWA feature was.
+**Priority:** Low
+**Effort:** Medium
+
+### 2026-11-07 - Type: Cleanup
+
+**Title:** AWA-A2 - a second "APE Weekly" label survives in dead code
+**Description:** `screens/vision_planning.py:186` captions a placeholder tab
+`"APE Weekly"`. `VisionPlanningScreen` is reachable only through
+`app.show_vision_planning`, which no sidebar entry calls. Renaming the label is
+harmless; leaving it means a grep for "APE Weekly" still hits. The real
+question is whether `vision_planning.py` should exist at all — it is a whole
+screen of placeholders behind an unreachable entry point. Decide that, rather
+than renaming a label inside it.
+**Priority:** Low
+**Effort:** Small
 
 ## Reported from the running screen — Plan / Day Plan (2026-11-07)
 

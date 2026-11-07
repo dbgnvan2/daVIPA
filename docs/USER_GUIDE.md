@@ -676,7 +676,8 @@ Top buttons:
 - **Annual Plan Elements** — Promote Vision Elements into annual records for a selected year.
 - **APE Assignment** — Assign Annual Plan Elements into a selected quarter. Opens on the current calendar quarter.
 - **APE Period View** — Assign quarter-selected APEs into a selected month. Opens on the current quarter and the current month, and the Month picker only ever offers the three months the selected Quarter contains.
-- **APE Weekly** — Work weekly parent records and their daily child Action Items.
+- **APE Week Assignment** — Assign month-assigned APEs into a selected week, and work the weekly tactics for that week. Called **APE Weekly** before 2026-11-07.
+- **APE Week Actions** — Pick a Weekly Tactic from the selected week on the left; the right panel lists that tactic's Action Items and works the way the Today tab does.
 
 Deletion protection (child records):
 - **Delete a Vision Element** — What: Blocked when child records still exist (annual plan records, attached projects, or linked action items). A dialog lists what is attached and tells you to delete or reassign those child items first. Why: Prevent a single delete from silently cascading away annual records and projects.
@@ -685,11 +686,11 @@ Deletion protection (child records):
 APE assignment behavior:
 - **Checkbox + Save** — What: The assignment screens still support explicit checkbox selection and save. Why: Keep the existing bulk workflow available.
 - **Drag and drop** — What: The APE screens also support dragging left-side records onto the right-side assignment panel. Why: Speed up planning when working item by item.
-- **Quarter and Month always agree** — What: Since 2026-11-07 the Quarter picker on both APE assignment screens opens on the current calendar quarter, and the Month picker on APE Period View offers only that quarter's three months (Q4 offers 10, 11 and 12). Changing the Quarter moves the Month into it: a month already inside the new quarter is kept, one outside it moves to that quarter's first month. Why: Before this the Quarter picker always opened on Q1 while the Month picker opened on the current month, so for eight months of the year the screen offered a pair that cannot both be true — Q1 with M11, for instance — and Save wrote it. An APE filed in a quarter that does not contain its month was then invisible in APE Weekly.
+- **Quarter and Month always agree** — What: Since 2026-11-07 the Quarter picker on both APE assignment screens opens on the current calendar quarter, and the Month picker on APE Period View offers only that quarter's three months (Q4 offers 10, 11 and 12). Changing the Quarter moves the Month into it: a month already inside the new quarter is kept, one outside it moves to that quarter's first month. Why: Before this the Quarter picker always opened on Q1 while the Month picker opened on the current month, so for eight months of the year the screen offered a pair that cannot both be true — Q1 with M11, for instance — and Save wrote it. An APE filed in a quarter that does not contain its month was then invisible in APE Week Assignment (named APE Weekly at the time).
 - **Save says what it did** — What: APE Period View reports how many APEs were assigned, and names any that were not, below the pickers. Both the Save button and the drop target report there. Why: A refused assignment used to look exactly like a successful one.
 - **Existing mismatched records are repaired** — What: On first launch after this change, any APE with a month flag set but not the quarter flag that month implies has the quarter flag added. Nothing is ever removed, so an APE assigned to a quarter but not yet to a month keeps that state. Why: Make records created before the fix visible again without re-entering them.
 
-APE Weekly behavior:
+APE Week Assignment behavior:
 - Left list shows Annual Plan Elements already assigned to the selected month. Since 2026-11-07 that list is matched on the month assignment alone; it previously also required the APE to carry the flag for the quarter containing that month, which hid any record whose quarter and month disagreed.
 - Right list shows weekly tactics for the selected Week Start.
 - **Week Start selector** — What: Always includes the current week plus up to 3 future week starts, even when no weekly tactics exist there yet. Why: Lets you create a weekly tactic for the current or near-future week without being limited to existing records.
@@ -699,6 +700,17 @@ APE Weekly behavior:
 - Prefix shortening rule: first two pipe-delimited parts become initials.
   - Example: `Purposeful Work|Living Systems|Blog` → `PW|LS|Blog`.
 - Week token normalization: `Week 8` is normalized to `W8` in generated/normalized titles.
+
+APE Week Actions behavior:
+- **What the tab is for** — What: A second view of the same week, turned the other way round: APE Week Assignment answers "which APEs get a tactic this week", and this tab answers "what am I actually doing for this week's tactics". Why: The Action Items under a weekly tactic previously had no screen that listed them together — they were reachable only one at a time, from the tactic that made them.
+- **Week Start picker** — What: Opens on the current week, and offers the same week starts APE Week Assignment offers: the current week, any week that already has tactics, and up to 3 future weeks. `This Week` jumps back to today's week. Why: One rule for what a week is, shared by both tabs.
+- **Left panel** — What: Lists the selected week's Weekly Tactics, with the count in the panel heading and in the status line. Why: An empty list and a list you cannot see the end of look the same without a count.
+- **Every tactic in the week is listed** — What: Including a tactic whose Annual Plan Element has since been detached. Why: Hiding it would leave its Action Items unreachable from this tab with nothing on screen to say they exist.
+- **Right panel** — What: The Action Items linked to the tactic you clicked, in the same rows the Today tab uses — same checkbox, same inline Title, Who and Date editing, same timer, same push buttons, same drag-to-reorder grip, same column widths you can drag. Why: It is the Today screen, filtered by tactic instead of by date, rather than a second screen that looks like it.
+- **Column widths are its own** — What: Dragging a column divider here does not change the Today tab's columns, and the width is remembered between launches. Why: The panel is half a window wide; Today is a whole one.
+- **A row's date is not filtered** — What: A completed Action Item stays listed whatever day it was completed on. Why: Once the list is filtered by tactic, "completed today" has no meaning.
+- **Add Action Item** — What: Asks for a title, creates the item linked to the selected tactic and dated to the week start, then opens it in the editor. An empty title creates nothing. Why: Most of what a new item needs is in the editor, not in a one-field dialog.
+- **Known gap** — What: Dragging a row to the top of this panel also floats it to the top of the Today tab, because the pin it writes is the one Today orders by. Why: Recorded in `BACKLOG.md` as AWA-A4; both fixes are behaviour changes beyond what the tab was asked to do.
 
 Appearance:
 - **Theme** — What: Dark/light/system. Why: Choose a comfortable look.

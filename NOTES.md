@@ -1,5 +1,45 @@
 ## Recent Changes (2026-11-07)
 
+### APE Week Assignment, and the week's Action Items (AWA-M1 - AWA-M6)
+
+- ✅ **"APE Weekly" is now "APE Week Assignment", and there is a sixth tab,
+  "APE Week Actions".** Weekly Tactics for the selected week on the left; click
+  one and its Action Items fill the right panel. Spec and per-criterion status:
+  `docs/spec_2026-11-07_ape_week_actions.md` §6.
+- ✅ **"Linked to the week tactic" meant two different columns in live data.**
+  The re-filing cascade writes `weekly_tactic_id`; APE Week Assignment's own
+  `Add Action Item` button writes `parent_id` and leaves the other NULL.
+  Counted before writing anything: 49 / 0 in the main database, 0 / 1 in the
+  demo one. A reader of one column is correct on this Mac and empty on the
+  other. `VPSManager.get_action_items_for_weekly_tactic` reads the union, and
+  `test_awam23_one_home_for_the_link_predicate` walks the AST to assert it is
+  the only function in `src/` naming both columns in one query string.
+- ✅ **The right panel subclasses `TodayScreen` rather than copying it.**
+  `load_items` and `create_item_row` were already generic; three things in that
+  screen were about *today* and were written inline. They became
+  `_build_toolbar(parent)`, `EMPTY_TEXT` and `COLUMN_PREFIX` — a pure move,
+  checked against the five existing Today test files before anything depended
+  on it (26 passed, 1 skipped). `WeekTacticActionsPanel` overrides those three
+  plus `get_todays_items`, and nothing else, so edit, complete, timer, push and
+  the three inline editors are the same code, not a second copy.
+- ✅ **Week identity moved to `week_options.py`.** The three week helpers were
+  private to `weekly_items.py` and now have a second caller. All three are pure
+  — the clock and the settings object are passed in — so `date.today()` stays
+  resolved in the screen and the existing week-options tests are untouched.
+- ⚠️ **The on-screen check has not been run.** Everything above is tests plus
+  one refactor verified by an existing suite. The nine-step checklist at the
+  end of that spec's §6 is what settles "works like the Today tab", and until
+  it is walked that criterion is `not done`.
+- ⚠️ **Known gap (AWA-A4):** the inherited drag grip writes `today_pin_rank`,
+  the column Today orders by, so dragging a row to the top of the new panel
+  also floats it to the top of Today. In `BACKLOG.md`; both fixes are
+  behaviour changes beyond what the tab was asked to do.
+- ⚠️ **AWA-A1 is open and is now user-visible:** APE Week Assignment's Add
+  button still writes `parent_id` while the new tab's writes
+  `weekly_tactic_id`. Both are read, so nothing is lost, but the two buttons
+  disagree. One line plus a test; the spec recommends it; not in what was
+  asked.
+
 ### APE quarter/month consistency (APC-M1 - APC-M6)
 
 - ✅ **An APE could be filed under a quarter that does not contain its month.** The APE Month

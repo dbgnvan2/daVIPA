@@ -2,8 +2,8 @@
 
 **Date:** 2026-11-07
 **Area:** VSP Plan → Vision Planning hub
-**Status:** spec and plan only. No implementation code is written under this
-document until it is approved.
+**Status:** built 2026-11-07. Approved as written, then implemented; §6 holds
+the per-criterion status report and the mutation table.
 **Prefix for all IDs below:** `AWA`
 
 ---
@@ -189,9 +189,9 @@ Every criterion names the automated test that verifies it. New tests go in
 |---|---|---|
 | AWA-M2.1 | A single helper returns the Action Items linked to a tactic id, matching `weekly_tactic_id = ?` **OR** `parent_id = ?`. Given a tactic with one child linked each way, it returns both. | `test_awam21_both_link_shapes_are_returned` |
 | AWA-M2.2 | It never returns a row with `item_type = 'week'`: a tactic is not its own child, and two tactics in one week must not nest. | `test_awam22_week_rows_are_never_children` |
-| AWA-M2.3 | It is the only place the linkage is expressed. AST walk over `src/getmoredone/screens/`: exactly **one** function body mentions both `weekly_tactic_id` and `parent_id` in a query string. | `test_awam23_one_home_for_the_link_predicate` |
+| AWA-M2.3 | It is the only place the linkage is expressed. AST walk: **zero** function bodies under `src/getmoredone/screens/` and exactly **one** in `vps_manager.py` hold a single string naming both `weekly_tactic_id` and `parent_id`. (Corrected at implementation: this row said "screens/: exactly one", written before §4 settled the helper into `vps_manager`. A function's own docstring is excluded — `add_action_item`'s discusses both columns in prose, which is not an expression of the predicate.) | `test_awam23_one_home_for_the_link_predicate` |
 | AWA-M2.4 | A row linked by `parent_id` to a **non-week** parent (ordinary subtask nesting) is *not* returned for that parent's tactic. | `test_awam24_ordinary_subtasks_are_not_tactic_children` |
-| AWA-M2.5 | Dirty-state (P8): a child whose tactic was deleted is not returned, and the call does not raise. | `test_awam25_orphaned_child_is_not_returned` |
+| AWA-M2.5 | Dirty-state (P8): a link that outlived the row it points at is not returned, and the call does not raise. (Corrected at implementation: an ordinary delete cannot produce that state — both link columns are `REFERENCES action_items(id) ON DELETE SET NULL` and the connection runs with `PRAGMA foreign_keys = ON`. The test seeds the link with foreign keys off, the way an older build or a restored backup leaves it.) | `test_awam25_orphaned_child_is_not_returned` |
 
 ### AWA-M3 — the new tab exists and is reachable
 
@@ -319,10 +319,95 @@ Each step is committable on its own and leaves the suite green.
 
 ## 6. Status report
 
-To be completed at implementation, one line per criterion above, each `done` /
-`partial` / `not done` with the file path, test name or output string proving
-it. Plus a mutation table: every new test mutated with the **verbatim**
-original line, confirmed red, restored byte-identical.
+Implemented 2026-11-07. Every criterion is `done` except AWA-M6.3, which is
+`done` by running the five files unchanged, and the one criterion §3 flagged as
+not code-testable, which is `not done` and needs the user at a keyboard — the
+checklist for it is at the end of this section.
+
+| ID | Status | Proof |
+|---|---|---|
+| AWA-M1.1 | done | `screens/vision_planning_hub.py:58` — `test_awam11_and_m31_hub_nav_labels` asserts all six labels in order |
+| AWA-M1.2 | done | `screens/weekly_items.py:72` — `test_awam12_screen_header_matches_the_tab` |
+| AWA-M1.3 | done | `test_awam13_no_ape_weekly_label_remains` — zero `APE Weekly` string constants in either file, counted from the AST |
+| AWA-M1.4 | done | `test_awam14_and_m32_every_nav_key_opens_its_own_screen` — every key opened, class named |
+| AWA-M2.1 | done | `vps_manager.get_action_items_for_weekly_tactic` — `test_awam21_both_link_shapes_are_returned` |
+| AWA-M2.2 | done | `AND item_type != 'week'` — `test_awam22_week_rows_are_never_children` |
+| AWA-M2.3 | done | `test_awam23_one_home_for_the_link_predicate`, as corrected in §3 |
+| AWA-M2.4 | done | the `is_tactic` guard — `test_awam24_ordinary_subtasks_are_not_tactic_children` |
+| AWA-M2.5 | done | `test_awam25_orphaned_child_is_not_returned`, as corrected in §3 |
+| AWA-M3.1 | done | `screens/vision_planning_hub.py:59` — `test_awam11_and_m31_hub_nav_labels` |
+| AWA-M3.2 | done | `screens/vision_planning_hub.py:96` — `test_awam14_and_m32_every_nav_key_opens_its_own_screen` |
+| AWA-M3.3 | done | `test_awam33_screen_constructs_withdrawn`; `tests/test_ci_contract.py`'s mapped-window count is still 22 |
+| AWA-M4.1 | done | `WeekActionsScreen.jump_to_current_week` — `test_awam41_week_defaults_to_current_week`, compared against `week_options`, not against arithmetic rewritten in the test |
+| AWA-M4.2 | done | `test_awam42_left_panel_lists_the_weeks_tactics` |
+| AWA-M4.3 | done | `test_awam43_no_tactic_is_silently_dropped` records the `ape_only` argument the screen actually passed, and asserts the count in both the panel heading and the status line |
+| AWA-M4.4 | done | `test_awam44_selecting_a_tactic_reloads_the_right_panel` — one call, recorded |
+| AWA-M4.5 | done | `WeekActionsScreen.load_selected_week` — `test_awam45_changing_week_clears_the_selection` |
+| AWA-M5.1 | done | `test_awam51_right_panel_subclasses_today` |
+| AWA-M5.2 | done | `test_awam52_right_panel_queries_by_tactic_not_date` records the helper call and compares the panel's answer against it |
+| AWA-M5.3 | done | `test_awam53_row_behaviours_are_inherited_not_copied` — nine behaviours, identity-compared against `TodayScreen`, exact list |
+| AWA-M5.4 | done | `WeekTacticActionsPanel.add_action_item` — `test_awam54_add_action_item_links_by_weekly_tactic_id`, `test_awam54b_empty_title_creates_nothing` |
+| AWA-M5.5 | done | `COLUMN_PREFIX = "week_actions"` plus `AppSettings.week_actions_col_widths` — `test_awam55_column_prefix_is_its_own` |
+| AWA-M5.6 | done | `set_tactic` — `test_awam56_empty_state_names_the_tactic` |
+| AWA-M5.7 | done | `test_awam57_no_selection_is_not_an_error` |
+| AWA-M5.8 | done | `test_awam58_completed_children_are_not_date_filtered` — the 90-day-old child shows, another tactic's child completed today does not |
+| AWA-M6.1 | done | `screens/today.py:55-57` — `test_awam61_today_exposes_the_seam` |
+| AWA-M6.2 | done | `test_awam62_today_column_prefix_and_empty_text_are_unchanged`, `test_awam62_today_toolbar_unchanged` — seven widgets, exact columns and order |
+| AWA-M6.3 | done | the five Today files run unchanged: 26 passed, 1 skipped (the skip is the mapped-window geometry test, skipped by `GETMOREDONE_NO_MAPPED_WINDOWS`) |
+| "works like the Today tab" on screen | **not done** | needs a human at the screen; checklist below |
+
+### Mutation table
+
+Every new test was mutated with the **verbatim** original line, run alone,
+confirmed red, and the file restored and compared by sha256. 28 mutations, 28
+red, 28 byte-identical restores.
+
+Two mutations did not come back red on the first pass, and both were real:
+
+1. `test_awam25_orphaned_child_is_not_returned` stayed **green** with the
+   helper's guard removed. Both link columns carry `ON DELETE SET NULL` and
+   the connection runs with foreign keys on, so the ordinary `DELETE` the test
+   used cleared the link by itself: the test asserted an outcome the schema
+   guaranteed and verified nothing about the helper. Rewritten to seed the
+   dangling link with foreign keys off, and it now asserts the dirty state is
+   dirty before asserting the helper's answer, so it cannot go vacuous again.
+   Which of the three applied: **(c) the test was vacuous.**
+2. `test_awam56_empty_state_names_the_tactic`'s mutation did not apply — the
+   escaping in the mutation script, not the test. Re-run against the real
+   characters, it is red.
+
+### The on-screen check — for the user, not for a test
+
+§3 flagged one criterion as not code-testable: whether the panel *reads* like
+Today inside a half-width pane. It needs the running app. In order:
+
+1. **VSP Plan** in the sidebar. The nav row should show six buttons, the fifth
+   reading **APE Week Assignment** and the sixth **APE Week Actions**.
+2. Open **APE Week Assignment**. Its own header should read "APE Week
+   Assignment" too — it used to read "APE Weekly Assignment" under a tab that
+   read "APE Weekly".
+3. Open **APE Week Actions**. The Week Start picker should already show this
+   week. The left panel heading should read "Weekly Tactics (N)" with N
+   matching the rows under it, and the status line should say the same count.
+4. Click a tactic. The right panel should fill with its Action Items, with the
+   same columns, row height, badges and tints as the Today screen. The heading
+   above them should name the tactic.
+5. Click a tactic with no items. The empty line should name that tactic, not
+   say "No items for today".
+6. Drag the right panel's **Title** column divider. Then open the Today screen
+   and check its Title column has **not** moved. Come back and check this
+   panel kept its own width.
+7. **Add Action Item**, type a title, press OK. The editor should open on the
+   new item. Close it; the item should be in the list.
+8. Press **Add Action Item** again and cancel with an empty title. Nothing
+   should be created.
+9. Change the week in the picker. The right panel should go back to the
+   "Select a Weekly Tactic" prompt rather than keeping the previous week's
+   tactic on screen.
+
+What to watch for, since these are the things no test here settles: columns
+crowding or wrapping at half width, the toolbar overflowing the pane, and row
+heights differing from Today's.
 
 ---
 
@@ -348,6 +433,23 @@ They are **not** fixed by this spec, and none is a prerequisite.
   grep for "APE Weekly" still hits. **Recommendation:** leave the label, and
   decide separately whether `vision_planning.py` should exist at all — it is a
   whole screen of placeholders behind an unreachable entry point.
+- **AWA-A4 — the panel inherits Today's drag-to-top pin, and the pin is
+  shared.** `create_item_row` binds the grip to `_start_pin_drag` /
+  `_finish_pin_drag` (`today.py:541-542`), which write `action_items`.`today_pin_rank`
+  — the same column the Today screen orders by. Inherited unchanged, as
+  AWA-M5.3 requires, that means dragging a row to the top of the APE Week
+  Actions panel also floats it to the top of Today. Found after
+  implementation, by reading the inherited row builder rather than by a test.
+  **Recommendation:** decide between suppressing the grip on this panel and
+  giving it its own rank column; either is a behaviour change beyond what was
+  asked, so neither was made here. Not a defect in anything this batch wrote.
+- **AWA-A5 — `tests/test_ci_contract.py` counted session worktrees as
+  uncollected test files.** Fixed in this batch rather than recorded, because
+  it made the meta suite red and blocked verification: the desktop app's
+  per-session worktrees live under `.claude/worktrees/<name>/`, each a full
+  checkout with its own `tests/`, and the uncollected-files assertion globbed
+  them. `.claude` is now excluded, with the exclusion predicate under test.
+  Not caused by this feature; it fires for any worktree session.
 - **AWA-A3 — `weekly_tactic_maintenance._child_count` already reads both
   columns** (line 278) while `tactic_id_of` reads one. The two disagree about
   what a child is. AWA-M2 adds a third reader that matches `_child_count`.

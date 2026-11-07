@@ -138,13 +138,18 @@ Spec and implementation plan for APE quarter/month consistency (APC-M1 - APC-M6)
 ### docs/spec_2026-11-07_ape_week_actions.md
 
 Spec and implementation plan for the APE Week Assignment rename and a new
-APE Week Actions tab (AWA-M1 - AWA-M6). Approved 2026-11-07; not yet built:
+APE Week Actions tab (AWA-M1 - AWA-M6). Approved and built 2026-11-07; §6 is
+the per-criterion status report, and the one criterion that needs a human at
+the screen is still open there:
 
 - Why "linked to the week tactic" means two different columns in live data
 - The one predicate that reads both, and the counts behind that decision
 - The seam cut into `today.py` so the right panel can subclass it
 - The six decisions taken where the request admitted more than one reading
-- Three adjacent issues found and deliberately not fixed
+- Five adjacent issues found; one fixed because it blocked verification, four
+  recorded in `BACKLOG.md`
+- §6: the status table, the 28-mutation table, and the nine-step on-screen
+  checklist that criterion is waiting on
 
 ## Feature-Specific Documentation
 

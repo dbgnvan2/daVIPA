@@ -7,6 +7,51 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — APE Week Assignment, and the week's Action Items (2026-11-07)
+
+- **The "APE Weekly" tab is now "APE Week Assignment".** The old name said
+  nothing about what the screen does, and it had to say it before a second
+  weekly tab arrived beside it. The name is changed everywhere the live screen
+  is referred to, including the comments that named it.
+- **A new sixth tab, "APE Week Actions".** The selected week's Weekly Tactics
+  on the left; click one and its Action Items fill the right-hand panel. Where
+  APE Week Assignment answers "which APEs get a tactic this week", this answers
+  "what am I actually doing for this week's tactics" — a list that no screen
+  carried before. The Action Items under a tactic were reachable only one at a
+  time, from the tactic that created them.
+- **The right panel is the Today tab, filtered by tactic instead of by date.**
+  Not a screen that resembles it: the same code, with four names overridden.
+  Every row behaviour comes with it unchanged — the checkbox, the inline Title,
+  Who and Date editing, the timer, the push buttons, the drag grip, the
+  draggable column widths. Its column widths are its own and persist
+  separately, because this panel is half a window wide and Today is a whole
+  one, and a completed item is not filtered by date, because "completed today"
+  means nothing once the list is filtered by tactic.
+- **Every tactic in the week is listed**, including one whose Annual Plan
+  Element has since been detached, with the count in the panel heading and the
+  status line. Hiding such a tactic would leave its Action Items unreachable
+  from this tab with nothing on screen to say they exist.
+- **Add Action Item** asks for a title, creates the item against the selected
+  tactic and the week's start date, and opens it in the editor. An empty title
+  creates nothing.
+
+### Changed — internal, same batch (2026-11-07)
+
+- **One predicate now answers "what is linked to this Weekly Tactic".** Live
+  data links a child to its tactic through either of two columns: the re-filing
+  cascade writes `weekly_tactic_id`, while APE Week Assignment's own Add button
+  writes `parent_id`. Counted on 2026-11-07, the main database holds 49 of the
+  first kind and none of the second, the demo database 1 of the second and none
+  of the first — so a panel reading either column alone is right on one machine
+  and shows an empty list on the other.
+  `VPSManager.get_action_items_for_weekly_tactic` reads both, and is the only
+  place that predicate is written.
+- **Week identity has one home**, `week_options.py`: which day a week starts
+  on, which week a date falls in, and which week starts the picker offers. The
+  three helpers were private to the APE Week Assignment screen and now have a
+  second caller; two owners of one rule is how the APE quarter/month defect
+  started.
+
 ### Fixed — reported from the running screen (2026-11-07, second pass)
 
 - **The day pane is rebuilt where it is, so it stops going blank.** Moving a

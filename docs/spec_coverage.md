@@ -605,3 +605,35 @@ mutation — twenty-five mutations in all, twelve for the original criteria
 for the re-sweep of those fixes (§5.11). The criteria grew with the sweeps:
 APC-M2.4, M4.4, M5.4 and M6.2 came from the sweep, and APC-M2.5, M2.6, M5.5,
 M6.3 and M6.4 from the re-sweep over its own fix commits.
+
+---
+
+## AWA — APE Week Assignment, and the week's Action Items (2026-11-07)
+
+Spec and full per-criterion status report:
+[`docs/spec_2026-11-07_ape_week_actions.md`](spec_2026-11-07_ape_week_actions.md)
+§6. Kept there for the same reason APC's is: the PD-* batch was again open in
+this tree while AWA landed, and a status table that two batches both edit
+describes neither of them.
+
+AWA-M1 through AWA-M6: **done**, except the one criterion §3 flagged as not
+code-testable — "works like the Today tab", on screen, which carries no ID
+because it is a window rather than a function. That one is `not done` and stays
+that way until the nine-step checklist at the end of that §6 has been walked at
+the keyboard. 27 tests in
+`tests/test_ape_week_actions.py`, every behavioural claim proved by mutation:
+28 mutations, each the verbatim original line, each run alone, each file
+restored and sha256-compared.
+
+Two of those mutations did not come back red first time, and both are recorded
+in §6's mutation table:
+
+- `test_awam56` was a harness error on my side (the source holds real curly
+  quotes, the mutation script held escapes) — the test was fine.
+- `test_awam25` was genuinely vacuous. It deleted the tactic with an ordinary
+  `DELETE`, but both link columns are `ON DELETE SET NULL` and the connection
+  runs with `PRAGMA foreign_keys = ON`, so the delete cleared the link itself
+  and the test asserted an outcome the schema already guaranteed. Reason given
+  before rewriting: (c) the test was over-specified or vacuous. It now seeds
+  the dangling link with foreign keys off and asserts the dirty state really is
+  dirty before asserting the helper's answer.
