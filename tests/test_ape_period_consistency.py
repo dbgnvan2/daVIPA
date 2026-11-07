@@ -12,6 +12,7 @@ to quarter 4.
 """
 
 import ast
+import logging
 import pathlib
 import sqlite3
 import sys
@@ -222,19 +223,35 @@ def test_apcm22_matching_quarter_and_month_still_assigns(tmp_path):
 
 
 def test_apcm23_save_reports_refused_assignments():
-    """APC-M2.3 — a refusal is named, not left as a silently smaller count."""
+    """APC-M2.3 / APC-M2.5 — the wording, from the rows rather than a count.
+
+    Four states, each named: assigned, partly assigned (the call failed but the
+    month holds the row anyway), could not be assigned, and reported assigned
+    but not in the month. Dropping any of them is P2.
+    """
     from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen
 
     describe = APEPeriodViewScreen._describe_month_assignment
 
-    quiet = describe(2, 0, 11)
-    assert "Assigned 2" in quiet
-    assert "could not" not in quiet, "nothing refused, nothing to warn about"
-
-    loud = describe(1, 2, 11)
-    assert "2 could not be assigned" in loud, (
-        "a refused assignment must be reported, not hidden in the success count"
+    assert describe(["a", "b", "c"], {"a", "b", "c"}, {"a", "b", "c"}, 11) == (
+        "Assigned 3 APE(s) to M11."
     )
+
+    said = describe(["a", "b", "c"], {"a"}, {"a"}, 11)
+    assert said.startswith("Assigned 1 APE(s) to M11."), said
+    assert "2 could not be assigned" in said, said
+    assert "partly assigned" not in said, said
+
+    # The half-written case: the call said no, the month holds it anyway.
+    said = describe(["a", "b"], {"a"}, {"a", "b"}, 11)
+    assert said.startswith("Assigned 1 APE(s) to M11."), said
+    assert "1 partly assigned — in M11 with no month tactic behind it" in said, said
+    assert "could not be assigned" not in said, said
+
+    # And the other direction of P6: the call said yes, the row is not there.
+    said = describe(["a"], {"a"}, set(), 11)
+    assert said.startswith("Assigned 0 APE(s) to M11."), said
+    assert "1 reported assigned but are not in M11" in said, said
 
 
 def test_apcm23_save_button_reaches_the_reporting():
@@ -256,9 +273,10 @@ def test_apcm23_save_button_reaches_the_reporting():
         ),
         refresh_lists=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        right_items=[{"id": "ape-ok"}],
         _describe_month_assignment=APEPeriodViewScreen._describe_month_assignment,
     )
-    _bind(stub, APEPeriodViewScreen, "_assign_one")
+    _bind(stub, APEPeriodViewScreen, "_assign_one", "_ids_in_month")
 
     APEPeriodViewScreen.add_selected(stub)
 
@@ -267,10 +285,18 @@ def test_apcm23_save_button_reaches_the_reporting():
 
 
 def test_apcm23_drag_path_reaches_the_same_reporting():
-    """APC-M2.3 — the drop target reports too (P5: fix the siblings)."""
+    """APC-M2.3 — the drop target reports too (P5: fix the siblings).
+
+    The stub records the call as well as refusing it. ``_assign_one`` carries a
+    broad ``except Exception``, so a stub that raised — including on a wrong
+    argument count — would be swallowed and reported as an ordinary refusal,
+    and an assertion on the message alone would pass. Asserting the recorded
+    call is what keeps "the manager said no" apart from "the call blew up".
+    """
     from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen
 
     said = []
+    calls = []
     stub = SimpleNamespace(
         dragged_row={"id": "ape-bad"},
         winfo_toplevel=lambda: SimpleNamespace(unbind=lambda _e: None),
@@ -279,15 +305,21 @@ def test_apcm23_drag_path_reaches_the_same_reporting():
         winfo_containing=lambda *_: "target",
         _is_descendant=lambda *_: True,
         _parse_period=lambda: (2026, 4, 11),
-        vps_manager=SimpleNamespace(assign_ape_to_month=lambda *_a: False),
+        vps_manager=SimpleNamespace(
+            assign_ape_to_month=lambda *a: calls.append(a) or False
+        ),
         refresh_lists=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        right_items=[],
         _describe_month_assignment=APEPeriodViewScreen._describe_month_assignment,
     )
-    _bind(stub, APEPeriodViewScreen, "_assign_one")
+    _bind(stub, APEPeriodViewScreen, "_assign_one", "_ids_in_month")
 
     APEPeriodViewScreen._finish_row_drag(stub, SimpleNamespace(x_root=0, y_root=0))
 
+    assert calls == [("ape-bad", 4, 11)], (
+        f"the drop must reach the manager with the parsed period, got {calls}"
+    )
     assert any("could not be assigned" in s for s in said if isinstance(s, str)), said
 
 
@@ -710,9 +742,12 @@ def test_apcm24_a_raising_assignment_is_counted_not_escaped():
         vps_manager=SimpleNamespace(assign_ape_to_month=assign),
         refresh_lists=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        # The raising APE wrote nothing, so the month holds only the two that
+        # succeeded -- "refused", not "partly assigned".
+        right_items=[{"id": "ape-one"}, {"id": "ape-two"}],
         _describe_month_assignment=APEPeriodViewScreen._describe_month_assignment,
     )
-    _bind(stub, APEPeriodViewScreen, "_assign_one")
+    _bind(stub, APEPeriodViewScreen, "_assign_one", "_ids_in_month")
 
     APEPeriodViewScreen.add_selected(stub)
 
@@ -726,13 +761,20 @@ def test_apcm24_a_raising_assignment_is_counted_not_escaped():
     assert "1 could not be assigned" in message[-1], message
 
 
-def test_apcm44_month_lookup_guard_is_type_safe(tmp_path):
-    """APC-M4.4 — a non-integer month returns nothing instead of raising.
+def test_apcm44_month_lookup_guard_refuses_junk_and_normalises_a_float(tmp_path):
+    """APC-M4.4 — the junk a caller can reach this with is refused, not raised on.
 
     ``month < 1 or month > 12`` raised ``TypeError`` on a string and *passed*
     a float, and ``m_col`` is interpolated as a column name, so ``11.0`` built
     ``m11.0`` and raised ``sqlite3.OperationalError`` from inside a Tk
     callback where nothing is on screen to show it.
+
+    Named for what it asserts rather than "is type safe", which was this test's
+    first name and overstated it: an unhashable month (``[]``, ``{}``) still
+    raises ``TypeError`` from the membership test, and ``True`` passes it and
+    becomes column ``m1``. Neither is reachable from a caller — both screens
+    parse the month with ``int()`` — so both are in ``BACKLOG.md`` rather than
+    guarded here, and the name no longer claims otherwise.
     """
     vps = make_vps(tmp_path)
     try:
@@ -812,13 +854,21 @@ def test_apcm54_the_repair_reports_every_row_it_changed(tmp_path):
 
 
 def test_apcm62_quarter_save_reports_refused_assignments():
-    """APC-M6.2 — the quarter screen's wording, matching the month screen's."""
+    """APC-M6.2 / APC-M6.3 — the quarter screen's wording, from the rows."""
     from src.getmoredone.screens.ape_assignment import APEAssignmentScreen
 
     describe = APEAssignmentScreen._describe_quarter_assignment
-    assert describe(3, 0, 4) == "Assigned 3 APE(s) to Q4."
-    assert "2 could not be assigned" in describe(1, 2, 4)
-    assert describe(0, 1, 1).startswith("Assigned 0 APE(s) to Q1."), (
+
+    assert describe(["a", "b", "c"], {"a", "b", "c"}, {"a", "b", "c"}, 4) == (
+        "Assigned 3 APE(s) to Q4."
+    )
+
+    said = describe(["a", "b", "c"], {"a"}, {"a"}, 4)
+    assert said.startswith("Assigned 1 APE(s) to Q4."), said
+    assert "2 could not be assigned" in said, said
+
+    said = describe(["a"], set(), set(), 1)
+    assert said.startswith("Assigned 0 APE(s) to Q1."), (
         "a save that assigned nothing must not read as a success"
     )
 
@@ -836,9 +886,10 @@ def test_apcm62_quarter_save_with_nothing_checked_says_so():
         ),
         refresh_lists=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        right_items=[],
         _describe_quarter_assignment=APEAssignmentScreen._describe_quarter_assignment,
     )
-    _bind(stub, APEAssignmentScreen, "_assign_one")
+    _bind(stub, APEAssignmentScreen, "_assign_one", "_ids_in_quarter")
 
     APEAssignmentScreen.add_selected(stub)
 
@@ -876,9 +927,10 @@ def test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped():
         vps_manager=SimpleNamespace(assign_ape_to_quarter=assign),
         refresh_lists=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        right_items=[{"id": "ape-one"}],
         _describe_quarter_assignment=APEAssignmentScreen._describe_quarter_assignment,
     )
-    _bind(stub, APEAssignmentScreen, "_assign_one")
+    _bind(stub, APEAssignmentScreen, "_assign_one", "_ids_in_quarter")
 
     APEAssignmentScreen.add_selected(stub)
 
@@ -891,10 +943,17 @@ def test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped():
 
 
 def test_apcm62_quarter_drag_path_reaches_the_same_reporting():
-    """APC-M6.2 — the drop target reports too, as the month screen's does."""
+    """APC-M6.2 — the drop target reports too, as the month screen's does.
+
+    The stub records the call as well as refusing it, for the reason the month
+    screen's drag test gives: ``_assign_one``'s broad ``except Exception``
+    would swallow a stub that raised, so a message-only assertion would pass
+    on a call that never legitimately happened.
+    """
     from src.getmoredone.screens.ape_assignment import APEAssignmentScreen
 
     said = []
+    calls = []
     stub = SimpleNamespace(
         dragged_row={"id": "ape-bad"},
         winfo_toplevel=lambda: SimpleNamespace(unbind=lambda _e: None),
@@ -903,13 +962,328 @@ def test_apcm62_quarter_drag_path_reaches_the_same_reporting():
         winfo_containing=lambda *_: "target",
         _is_descendant=lambda *_: True,
         _parse_period=lambda: (2026, 4),
-        vps_manager=SimpleNamespace(assign_ape_to_quarter=lambda *_a: False),
+        vps_manager=SimpleNamespace(
+            assign_ape_to_quarter=lambda *a: calls.append(a) or False
+        ),
         refresh_lists=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        right_items=[],
         _describe_quarter_assignment=APEAssignmentScreen._describe_quarter_assignment,
     )
-    _bind(stub, APEAssignmentScreen, "_assign_one")
+    _bind(stub, APEAssignmentScreen, "_assign_one", "_ids_in_quarter")
 
     APEAssignmentScreen._finish_row_drag(stub, SimpleNamespace(x_root=0, y_root=0))
 
+    assert calls == [("ape-bad", 4)], (
+        f"the drop must reach the manager with the parsed quarter, got {calls}"
+    )
     assert any("could not be assigned" in s for s in said if isinstance(s, str)), said
+
+
+def _break_segment_link(vps, ape_id):
+    """Make the APE's segment unresolvable, the way a rename once did.
+
+    ``_segment_id_for_ape`` returns the stored id when there is one and only
+    falls back to the name, so both have to go: no id, and a name that matches
+    no segment. That is the state ``tests/test_rename_safe_links.py`` exists
+    for, and it is the one condition under which ``assign_ape_to_quarter`` and
+    ``assign_ape_to_month`` raise *after* committing a flag.
+    """
+    vps.db.conn.execute(
+        "UPDATE annual_plan_elements "
+        "SET segment_description_id = NULL, segment_name = 'Gone' WHERE id = ?",
+        (ape_id,),
+    )
+    vps.db.conn.commit()
+
+
+def test_apcm25_a_half_written_assignment_is_reported_as_partial(tmp_path):
+    """APC-M2.5 — the call raised, the row is in the month, and the line says so.
+
+    This is the test the APC-M2.4 pair could not be. Their stubs raise
+    *instead of* writing, so a status line counted off ``_assign_one``'s
+    booleans passes them both — and that line said "Assigned 0 APE(s) to M11"
+    beside a panel that was showing the row.
+
+    So the fixture here is the real manager on a real database, in the one
+    state that makes it half-write: the APE is already in Q4, its segment is
+    unresolvable, and ``assign_ape_to_month`` commits the month flag before it
+    reaches the segment lookup that raises. Both halves are asserted — the row
+    really is in M11, and the call really did fail — because a fixture that
+    only fails is the one that cannot catch this.
+    """
+    from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen
+
+    vps = make_vps(tmp_path)
+    ape_id = seed_ape(vps, year=2026)
+    assert vps.assign_ape_to_quarter(ape_id, 4) is True
+    _break_segment_link(vps, ape_id)
+
+    with pytest.raises(ValueError):
+        vps.assign_ape_to_month(ape_id, 4, 11)
+    assert vps.db.conn.execute(
+        "SELECT m11 FROM annual_plan_elements WHERE id = ?", (ape_id,)
+    ).fetchone()[0] == 1, (
+        "the fixture is not hostile in the way that reaches the line unless "
+        "the failed call left the month flag written"
+    )
+    vps.set_annual_plan_element_month(ape_id, 11, False)
+
+    said = []
+    stub = SimpleNamespace(
+        _parse_period=lambda: (2026, 4, 11),
+        left_checks={ape_id: SimpleNamespace(get=lambda: True)},
+        vps_manager=vps,
+        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        right_items=[],
+        _describe_month_assignment=APEPeriodViewScreen._describe_month_assignment,
+    )
+    # The same read the real refresh_lists does, so the sentence and the panel
+    # cannot disagree: one query feeds both.
+    stub.refresh_lists = lambda: setattr(
+        stub, "right_items", vps.get_annual_plan_elements_for_month(2026, 11)
+    )
+    _bind(stub, APEPeriodViewScreen, "_assign_one", "_ids_in_month")
+
+    APEPeriodViewScreen.add_selected(stub)
+
+    assert said, "the press must leave a status line"
+    assert ape_id in {row["id"] for row in stub.right_items}, (
+        "the half-written row must be in the panel for this test to mean anything"
+    )
+    assert said[-1].startswith("Assigned 0 APE(s) to M11."), said[-1]
+    assert "1 partly assigned — in M11 with no month tactic behind it" in said[-1], said[-1]
+    assert "could not be assigned" not in said[-1], said[-1]
+
+
+def test_apcm26_a_failed_remove_is_reported():
+    """APC-M2.6 — Remove reports against the row, in all three outcomes.
+
+    The remove path was left silent when the two assign paths were fixed: it
+    popped a confirmation, called the manager, discarded the answer, and
+    redrew. A remove that failed looked exactly like one that worked, with the
+    row still in the panel to contradict it.
+
+    Three outcomes, each from a real shape: the call succeeds and the row
+    leaves; the call raises before clearing the flag (a locked database) and
+    the row stays; the call raises after clearing it (the month tactic delete
+    fails) so the row has left but the call still failed.
+    """
+    from src.getmoredone.screens import ape_period_view
+    from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen
+
+    said = []
+    state = {"in_month": [{"id": "ape-1"}], "mode": "ok"}
+
+    def unassign(ape_id, _quarter, _month):
+        if state["mode"] == "ok":
+            state["in_month"] = []
+            return True
+        if state["mode"] == "raises_before_write":
+            raise sqlite3.OperationalError("database is locked")
+        state["in_month"] = []
+        raise ValueError("Segment 'Gone' not found.")
+
+    stub = SimpleNamespace(
+        _parse_period=lambda: (2026, 4, 11),
+        vps_manager=SimpleNamespace(unassign_ape_from_month=unassign),
+        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        right_items=[],
+    )
+    stub.refresh_lists = lambda: setattr(stub, "right_items", list(state["in_month"]))
+    _bind(stub, APEPeriodViewScreen, "_remove_one", "_ids_in_month")
+
+    original = ape_period_view.messagebox
+    ape_period_view.messagebox = SimpleNamespace(
+        askyesno=lambda *_a, **_k: True,
+        showerror=lambda *_a, **_k: None,
+    )
+    try:
+        APEPeriodViewScreen.delete_month_item(stub, {"id": "ape-1", "key_field": "Blog"})
+        assert said[-1] == "Removed Blog from M11.", said[-1]
+
+        state.update(in_month=[{"id": "ape-1"}], mode="raises_before_write")
+        APEPeriodViewScreen.delete_month_item(stub, {"id": "ape-1", "key_field": "Blog"})
+        assert said[-1] == "Blog is still in M11 — see the log.", said[-1]
+
+        state.update(in_month=[{"id": "ape-1"}], mode="raises_after_write")
+        APEPeriodViewScreen.delete_month_item(stub, {"id": "ape-1", "key_field": "Blog"})
+        assert said[-1] == (
+            "Blog is out of M11, but the remove reported a problem — see the log."
+        ), said[-1]
+    finally:
+        ape_period_view.messagebox = original
+
+
+def test_apcm63_a_half_written_quarter_assignment_is_reported_as_partial(tmp_path):
+    """APC-M6.3 — the same half-write on the quarter screen, same evidence.
+
+    ``assign_ape_to_quarter`` commits the quarter flag and only then raises on
+    a segment it cannot resolve, so this screen had the fault in its plainest
+    form: one write, one raise, and the row in the panel either way.
+    """
+    from src.getmoredone.screens.ape_assignment import APEAssignmentScreen
+
+    vps = make_vps(tmp_path)
+    ape_id = seed_ape(vps, year=2026)
+    _break_segment_link(vps, ape_id)
+
+    with pytest.raises(ValueError):
+        vps.assign_ape_to_quarter(ape_id, 4)
+    assert vps.db.conn.execute(
+        "SELECT q4 FROM annual_plan_elements WHERE id = ?", (ape_id,)
+    ).fetchone()[0] == 1, (
+        "the fixture must leave the quarter flag written, or it cannot reach "
+        "the line under test"
+    )
+    vps.set_annual_plan_element_quarter(ape_id, 4, False)
+
+    said = []
+    stub = SimpleNamespace(
+        _parse_period=lambda: (2026, 4),
+        left_checks={ape_id: SimpleNamespace(get=lambda: True)},
+        vps_manager=vps,
+        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        right_items=[],
+        _describe_quarter_assignment=APEAssignmentScreen._describe_quarter_assignment,
+    )
+    stub.refresh_lists = lambda: setattr(
+        stub, "right_items", vps.get_annual_plan_elements_for_quarter(2026, 4)
+    )
+    _bind(stub, APEAssignmentScreen, "_assign_one", "_ids_in_quarter")
+
+    APEAssignmentScreen.add_selected(stub)
+
+    assert said, "the press must leave a status line"
+    assert ape_id in {row["id"] for row in stub.right_items}, (
+        "the half-written row must be in the panel for this test to mean anything"
+    )
+    assert said[-1].startswith("Assigned 0 APE(s) to Q4."), said[-1]
+    assert "1 partly assigned — in Q4 with no quarter initiative behind it" in said[-1], said[-1]
+    assert "could not be assigned" not in said[-1], said[-1]
+
+
+def test_apcm64_a_failed_quarter_remove_is_reported():
+    """APC-M6.4 — the quarter screen's Remove reports too, in all three outcomes.
+
+    The sibling of APC-M2.6. Fixing one screen's remove and leaving the
+    other's is the same P5 shape that left this whole screen silent in the
+    first round.
+    """
+    from src.getmoredone.screens import ape_assignment
+    from src.getmoredone.screens.ape_assignment import APEAssignmentScreen
+
+    said = []
+    state = {"in_quarter": [{"id": "ape-1"}], "mode": "ok"}
+
+    def unassign(ape_id, _quarter):
+        if state["mode"] == "ok":
+            state["in_quarter"] = []
+            return True
+        if state["mode"] == "raises_before_write":
+            raise sqlite3.OperationalError("database is locked")
+        state["in_quarter"] = []
+        raise ValueError("Segment 'Gone' not found.")
+
+    stub = SimpleNamespace(
+        _parse_period=lambda: (2026, 4),
+        vps_manager=SimpleNamespace(unassign_ape_from_quarter=unassign),
+        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        right_items=[],
+    )
+    stub.refresh_lists = lambda: setattr(stub, "right_items", list(state["in_quarter"]))
+    _bind(stub, APEAssignmentScreen, "_remove_one", "_ids_in_quarter")
+
+    original = ape_assignment.messagebox
+    ape_assignment.messagebox = SimpleNamespace(
+        askyesno=lambda *_a, **_k: True,
+        showerror=lambda *_a, **_k: None,
+    )
+    try:
+        APEAssignmentScreen.delete_quarter_item(stub, {"id": "ape-1", "key_field": "Blog"})
+        assert said[-1] == "Removed Blog from Q4.", said[-1]
+
+        state.update(in_quarter=[{"id": "ape-1"}], mode="raises_before_write")
+        APEAssignmentScreen.delete_quarter_item(stub, {"id": "ape-1", "key_field": "Blog"})
+        assert said[-1] == "Blog is still in Q4 — see the log.", said[-1]
+
+        state.update(in_quarter=[{"id": "ape-1"}], mode="raises_after_write")
+        APEAssignmentScreen.delete_quarter_item(stub, {"id": "ape-1", "key_field": "Blog"})
+        assert said[-1] == (
+            "Blog is out of Q4, but the remove reported a problem — see the log."
+        ), said[-1]
+    finally:
+        ape_assignment.messagebox = original
+
+
+def test_apcm55_the_repair_log_reaches_a_handler(tmp_path):
+    """APC-M5.5 — the repair's log line lands, and names the rows it changed.
+
+    The return value is the only other record, and
+    ``_extend_annual_plan_elements`` discards it — so in the running app the
+    log line is the *entire* trace of a migration that rewrote the user's
+    rows. It was added with no test: deleting it left every other APC test
+    green, which is exactly the shape P2 is about.
+
+    §5.10 claimed a behavioural check was not practical here because the line
+    goes to the user's log. That was wrong, and
+    ``test_wt_m7a5_dedupe_log_reaches_a_handler`` was already the counter-
+    example: ``caplog`` cannot be used because this logger sets
+    ``propagate = False``, but a handler attached to the logger itself can,
+    which is what the app's own file handler is.
+    """
+    from src.getmoredone.vps_schema import VPSSchema
+    from src.getmoredone.weekly_tactic_logging import get_weekly_tactic_logger
+
+    live = get_weekly_tactic_logger()
+    assert live.isEnabledFor(logging.INFO), (
+        "the repair line is INFO; a logger below that level discards it"
+    )
+
+    vps = make_vps(tmp_path)
+    try:
+        ape_id = seed_ape(vps)
+        conn = vps.db.conn
+        conn.execute(
+            "UPDATE annual_plan_elements SET q4 = 0, m11 = 1 WHERE id = ?",
+            (ape_id,),
+        )
+        conn.commit()
+
+        records = []
+
+        class _Capture(logging.Handler):
+            def emit(self, record):
+                records.append(record.getMessage())
+
+        probe = _Capture(level=logging.INFO)
+        live.addHandler(probe)
+        try:
+            VPSSchema._repair_orphan_month_flags(conn)
+            conn.commit()
+        finally:
+            live.removeHandler(probe)
+
+        text = "\n".join(records)
+        assert "APC-M5" in text, f"the repair summary never reached the log: {text!r}"
+        assert ape_id in text, (
+            f"the repaired row's id must appear in the log, got {text!r}"
+        )
+
+        # And a run with nothing to repair says nothing, so the line stays a
+        # signal rather than one more every-launch message.
+        quiet = []
+
+        class _Quiet(logging.Handler):
+            def emit(self, record):
+                quiet.append(record.getMessage())
+
+        probe2 = _Quiet(level=logging.INFO)
+        live.addHandler(probe2)
+        try:
+            VPSSchema._repair_orphan_month_flags(conn)
+        finally:
+            live.removeHandler(probe2)
+        assert quiet == [], f"a no-op repair must log nothing, got {quiet}"
+    finally:
+        vps.close()
