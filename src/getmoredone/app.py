@@ -462,7 +462,7 @@ class GetMoreDoneApp(ctk.CTk):
         self.current_screen.grid(row=0, column=0, sticky="nsew")
 
     def show_weekly_items(self):
-        """Show APE Weekly screen."""
+        """Show APE Week Assignment screen."""
         from .screens.weekly_items import WeeklyItemsScreen
         self.clear_content()
         self.current_screen = WeeklyItemsScreen(self.content_frame, self.vps_manager, self)

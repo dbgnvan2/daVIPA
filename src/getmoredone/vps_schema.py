@@ -816,7 +816,7 @@ class VPSSchema:
 
         Until APC-M2 guarded it, ``assign_ape_to_month`` wrote whatever quarter
         the picker happened to show, so an APE could end up with ``m11 = 1``
-        and ``q4 = 0``. APE Weekly asks for both and showed nothing for it.
+        and ``q4 = 0``. APE Week Assignment asks for both and showed nothing for it.
 
         Additive only: it sets the implied quarter and never clears one. A
         quarter flag with no month flags in it is a legitimate state — an APE

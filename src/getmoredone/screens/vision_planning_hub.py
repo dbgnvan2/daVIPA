@@ -43,7 +43,7 @@ class VisionPlanningHubScreen(ctk.CTkFrame):
 
         ctk.CTkLabel(
             header,
-            text="Unified workspace for vision elements, annual plan elements, quarter/month APE planning, and APE weekly execution",
+            text="Unified workspace for vision elements, annual plan elements, quarter/month APE planning, week assignment, and the week's Action Items",
             text_color=palette["muted_text"],
         ).grid(row=1, column=0, sticky="w", padx=10, pady=(0, 10))
 
@@ -55,7 +55,8 @@ class VisionPlanningHubScreen(ctk.CTkFrame):
             ("Annual Plan Elements", "annual_vision_segments"),
             ("APE Quarter Assignment", "ape_assignment"),
             ("APE Month Assignment", "ape_period_view"),
-            ("APE Weekly", "ape_weekly"),
+            ("APE Week Assignment", "ape_weekly"),
+            ("APE Week Actions", "ape_week_actions"),
         ]
 
         for i, (label, key) in enumerate(buttons):
@@ -85,6 +86,7 @@ class VisionPlanningHubScreen(ctk.CTkFrame):
         from .ape_assignment import APEAssignmentScreen
         from .ape_period_view import APEPeriodViewScreen
         from .weekly_items import WeeklyItemsScreen
+        from .week_actions import WeekActionsScreen
 
         mapping = {
             "vision_segments": VisionSegmentsScreen,
@@ -92,6 +94,7 @@ class VisionPlanningHubScreen(ctk.CTkFrame):
             "ape_assignment": APEAssignmentScreen,
             "ape_period_view": APEPeriodViewScreen,
             "ape_weekly": WeeklyItemsScreen,
+            "ape_week_actions": WeekActionsScreen,
         }
         screen_cls = mapping.get(key, VisionSegmentsScreen)
         self.current_screen = screen_cls(self.content, self.vps_manager, self.app)

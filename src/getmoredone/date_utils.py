@@ -137,9 +137,9 @@ def future_date_targets(
 # Calendar quarters. Before this lived here it was written three times: a dict
 # in ``weekly_tactic``, a second dict inside
 # ``VPSManager._clear_quarter_month_flags``, and ``((month - 1) // 3) + 1`` in
-# the APE Weekly screen. Three copies that happened to agree, and nothing that
+# the APE Week Assignment screen. Three copies that happened to agree, and nothing that
 # owned the rule — which is how an APE came to be filed under Q3 and M11 at
-# once, invisible to APE Weekly ever after.
+# once, invisible to APE Week Assignment ever after.
 
 QUARTER_OF_MONTH: dict[int, int] = {month: ((month - 1) // 3) + 1 for month in range(1, 13)}
 

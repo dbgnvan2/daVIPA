@@ -411,7 +411,7 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
         whose callers both derived the quarter from the month and then required
         the matching quarter flag as well. That bought nothing when the flags
         agreed and hid the row when they did not: an APE with ``m11 = 1`` and
-        ``q4 = 0`` was invisible in APE Weekly for every November week.
+        ``q4 = 0`` was invisible in APE Week Assignment for every November week.
 
         APC-M4.4 — the guard is a membership test against the canonical map,
         and the column name is built from an ``int`` rather than from the
