@@ -72,7 +72,9 @@
   Verified against copies of both real databases: the demo row is repaired and
   appears in APE Weekly; the installed app's 17 APE rows were already
   consistent and the migration changed none of them. Verified on screen against
-  the **real** demo database on 2026-11-07 (spec §5.6). Swept by `learning-qa`,
+  the **real** demo database on 2026-11-07 (spec §5.6), and the second round's
+  status lines read on screen against a throwaway copy, with the migration and
+  its log line observed in the running app (§5.13). Swept by `learning-qa`,
   `/code-review` and `/security-review` (§5.8) — four findings fixed here, one
   medium-high, two medium and one low-medium, with two lows and two adjacent
   issues in `BACKLOG.md` and no security finding — and then re-swept over the

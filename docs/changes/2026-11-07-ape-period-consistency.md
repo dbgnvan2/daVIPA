@@ -232,6 +232,27 @@ Two further lows went to `BACKLOG.md`: the guard still raises on an unhashable
 month and accepts `True`, and a transient `sqlite3.OperationalError` reads as a
 permanent refusal.
 
+## The program run on the second round (2026-11-07 13:05-13:08)
+
+The real app, pointed by `GETMOREDONE_DB` at a throwaway copy of the demo
+database with that copy's `q4` flag cleared first. Full table in the spec,
+§5.13.
+
+- The migration repaired the copy's row on open and the log line landed:
+  `INFO [vps_schema] APC-M5 backfilled 1 implied quarter flag(s):
+  [('ape-1e44cdd5', 4)]` at 13:05:20,435.
+- APE Month opened on 2026 / Q4 / M11, APE Quarter on Q4.
+- The status lines were read on screen: "Check one or more APEs on the left
+  first.", "Assigned 1 APE(s) to M11." and, on the sibling screen,
+  "Assigned 1 APE(s) to Q4." That closes the "not seen on screen" gap for both
+  screens on the Save path.
+- Not covered: the Remove wording (the Delete button is past the right panel's
+  visible width at this window size) and the "partly assigned" wording (it
+  needs a corrupt lineage the copy does not have). Both are covered by tests.
+- Neither real database was written: afterwards their newest `updated_at`
+  values were `2026-11-07T09:00:49` (demo) and `2026-10-18T15:39:43`
+  (installed app), both older than this run.
+
 ## Next agent actions
 
 - Start the APE Week Assignment work (`docs/spec_2026-11-07_ape_week_actions.md`,

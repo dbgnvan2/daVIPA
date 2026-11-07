@@ -390,10 +390,13 @@ Eight mutations, eight reds, each restored byte-identical:
 
 ### 5.10 Still not covered after the sweep
 
-- **APE Quarter's new status label was not seen on screen.** Same reason as
-  the Month screen's in §5.7: showing it means writing an assignment to the
-  user's live demo data. Both are covered by stub-driven wiring tests
-  (`test_apcm62_*`), which is coverage of the call, not of the pixels.
+- ~~**APE Quarter's new status label was not seen on screen.**~~ Both screens'
+  status lines were read on screen in the §5.13 run, against a throwaway copy
+  of the demo database rather than the live data — which is what made the
+  original reason ("showing it means writing an assignment to the user's live
+  demo data") avoidable: `GETMOREDONE_DB` points the real app at a copy. What
+  is still unseen is the Remove wording and the "partly assigned" wording; see
+  §5.13.
 - ~~**`_repair_orphan_month_flags`' new log line was not read from the real
   log file.**~~ Covered as APC-M5.5 in the second fix round — see §5.11. The
   reason given here was wrong: the line going to the user's log does not make
@@ -471,3 +474,42 @@ Below the medium bar, so `BACKLOG.md` per the budget:
   produces the same status sentence as a permanent refusal. The log line
   carries the exception; the sentence does not distinguish retryable from
   terminal.
+
+### 5.13 The program run, 2026-11-07 13:05–13:08
+
+Reviews read code; none of them execute it. This batch's own §5.6 run covered
+the pickers and APE Weekly against the **real** demo database, read-only in
+effect. The second fix round changed what the two screens *say*, which cannot
+be seen without writing — so this run used `GETMOREDONE_DB` to point the real
+app at a throwaway copy of the demo database, with that copy's `q4` flag
+cleared first so the migration had work to do.
+
+Observed, in the running app:
+
+| What | Result |
+|---|---|
+| APC-M5.4 / M5.5 — the migration on open | The copy's row went `q4 = 0` → `q4 = 1` with `q1` and `q3` intact, `updated_at` stamped `2026-11-07T13:05:20.435172`, and the log line landed: `INFO [vps_schema] APC-M5 backfilled 1 implied quarter flag(s): [('ape-1e44cdd5', 4)]` at 13:05:20,435 |
+| APC-M3 / M6.1 — the pickers | APE Month opened on Year 2026, Quarter 4, Month 11; APE Quarter opened on Q4 |
+| APC-M2.3 — nothing checked | APE Month's status line read **"Check one or more APEs on the left first."** |
+| APC-M2.5 — a real save | APE Month's status line read **"Assigned 1 APE(s) to M11."** |
+| APC-M6.2 / M6.3 — the sibling screen | APE Quarter's status line read **"Assigned 1 APE(s) to Q4."** |
+
+That closes §5.7's and §5.10's "the status label was not seen on screen" for
+both screens, on the Save path.
+
+**Not covered by this run**, stated rather than left to be assumed:
+
+- The **Remove** wording (APC-M2.6 / M6.4). The Delete button sits in the right
+  panel's Actions column, past the visible width at this window size, and the
+  divider drag did not take. Covered by `test_apcm26_*` and `test_apcm64_*`,
+  whose stubs fail in the three real shapes.
+- The **partly assigned** wording. Producing it on screen means an APE whose
+  segment cannot be resolved, which is a corrupt lineage this copy does not
+  have. Covered by `test_apcm25_*` and `test_apcm63_*` against the real
+  manager.
+- The log line went to the app's own log directory,
+  `~/Library/Application Support/GetMoreDone/weekly_tactic_debug.log`, because
+  `GETMOREDONE_DB` overrides the database and not the log path. Nothing was
+  written to either real database: afterwards their newest `updated_at` values
+  were `2026-11-07T09:00:49` (demo, from this morning's run) and
+  `2026-10-18T15:39:43` (installed app), both older than this run.
