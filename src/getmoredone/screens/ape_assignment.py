@@ -6,11 +6,13 @@ from typing import TYPE_CHECKING, Optional
 
 import customtkinter as ctk
 
+from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
 from ..date_utils import current_quarter
 from ..theme import button_style, semantic_colors, status_text_color
 from ..weekly_tactic_logging import get_weekly_tactic_logger
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
+from .split_panel import SPLITTER_WIDTH, SplitPanel
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
@@ -22,8 +24,10 @@ logger = get_weekly_tactic_logger()
 
 class APEAssignmentScreen(ctk.CTkFrame):
     """Assign Annual Plan Elements to a selected quarter."""
-    SPLITTER_WIDTH = 8
-    MIN_PANEL_WIDTH = 420
+
+    # UPD-D3/D4 — this screen's own corner of AppSettings. The divider's
+    # ratio is stored under ``<SETTINGS_PREFIX>_split_ratio``.
+    SETTINGS_PREFIX = "ape_quarter"
 
     def __init__(self, parent, vps_manager: "VPSManager", app: "GetMoreDoneApp"):
         super().__init__(parent)
@@ -45,9 +49,10 @@ class APEAssignmentScreen(ctk.CTkFrame):
         self.subsegment_colors = {}
         self.category_colors = {}
         self.left_checks: dict[str, ctk.BooleanVar] = {}
-        self._split_ratio = 0.5
-        self._drag_start_x: Optional[int] = None
-        self._drag_start_left: Optional[int] = None
+        # The app's own instance where there is one, so a saved divider does
+        # not overwrite a setting changed elsewhere since this screen was
+        # built; its own load when constructed without an app (tests).
+        self.settings = getattr(app, "settings", None) or AppSettings.load()
         self.dragged_row: Optional[dict] = None
 
         self.grid_columnconfigure(0, weight=1)
@@ -110,7 +115,7 @@ class APEAssignmentScreen(ctk.CTkFrame):
         body = ctk.CTkFrame(self)
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
         body.grid_columnconfigure(0, weight=0, minsize=520)
-        body.grid_columnconfigure(1, weight=0, minsize=self.SPLITTER_WIDTH)
+        body.grid_columnconfigure(1, weight=0, minsize=SPLITTER_WIDTH)
         body.grid_columnconfigure(2, weight=0, minsize=520)
         body.grid_rowconfigure(1, weight=1)
         self.body = body
@@ -128,15 +133,12 @@ class APEAssignmentScreen(ctk.CTkFrame):
 
         divider = ctk.CTkFrame(
             body,
-            width=self.SPLITTER_WIDTH,
+            width=SPLITTER_WIDTH,
             fg_color=semantic_colors()["border"],
             corner_radius=2,
             cursor="sb_h_double_arrow",
         )
         divider.grid(row=1, column=1, sticky="ns", padx=0, pady=(0, 8))
-        divider.bind("<ButtonPress-1>", self._on_divider_press)
-        divider.bind("<B1-Motion>", self._on_divider_drag)
-        divider.bind("<ButtonRelease-1>", self._on_divider_release)
         self.divider = divider
 
         right_frame = ctk.CTkFrame(body)
@@ -152,7 +154,16 @@ class APEAssignmentScreen(ctk.CTkFrame):
         self.right_list = ctk.CTkScrollableFrame(right_frame)
         self.right_list.grid(row=0, column=0, sticky="nsew")
         self.right_list.grid_columnconfigure(0, weight=1)
-        body.bind("<Configure>", self._on_body_resize)
+
+        # UPD-M1 — the ratio, the clamp, the three divider handlers and the
+        # body's resize handler all live in screens/split_panel.py.
+        self.split = SplitPanel(
+            body,
+            left_frame,
+            divider,
+            settings=self.settings,
+            prefix=self.SETTINGS_PREFIX,
+        )
 
     def _parse_period(self) -> Optional[tuple[int, int]]:
         try:
@@ -549,41 +560,6 @@ class APEAssignmentScreen(ctk.CTkFrame):
                         quarter,
                     )
                 )
-
-    def _on_body_resize(self, _event):
-        if self._drag_start_x is None:
-            self._apply_split_ratio()
-
-    def _on_divider_press(self, event):
-        self._drag_start_x = event.x_root
-        self._drag_start_left = self.left_frame.winfo_width()
-
-    def _on_divider_drag(self, event):
-        if self._drag_start_x is None or self._drag_start_left is None:
-            return
-        total = self.body.winfo_width() - self.SPLITTER_WIDTH
-        if total <= 0:
-            return
-        left = self._drag_start_left + (event.x_root - self._drag_start_x)
-        max_left = max(self.MIN_PANEL_WIDTH, total - self.MIN_PANEL_WIDTH)
-        left = max(self.MIN_PANEL_WIDTH, min(max_left, left))
-        self._split_ratio = left / total
-        self._apply_split_ratio()
-
-    def _on_divider_release(self, _event):
-        self._drag_start_x = None
-        self._drag_start_left = None
-
-    def _apply_split_ratio(self):
-        total = self.body.winfo_width() - self.SPLITTER_WIDTH
-        if total <= 0:
-            return
-        max_left = max(self.MIN_PANEL_WIDTH, total - self.MIN_PANEL_WIDTH)
-        left = int(total * self._split_ratio)
-        left = max(self.MIN_PANEL_WIDTH, min(max_left, left))
-        right = total - left
-        self.body.grid_columnconfigure(0, minsize=left)
-        self.body.grid_columnconfigure(2, minsize=right)
 
     def _is_descendant(self, widget, ancestor) -> bool:
         current = widget

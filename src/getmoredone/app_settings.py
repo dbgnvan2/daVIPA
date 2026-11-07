@@ -108,6 +108,12 @@ class AppSettings:
     # own key, resizing either panel would move the other.
     week_actions_col_widths: dict = field(default_factory=dict)
 
+    # UPD-D4 — where a two-panel VSP tab's vertical divider was left. The same
+    # class of state as a column width, and stored the same way: one field per
+    # screen, named <screen prefix>_split_ratio. One per adopting screen, added
+    # as each adopts; screens/split_panel.py logs a prefix with no field here.
+    ape_quarter_split_ratio: float = 0.5
+
     # Future date options (Drag Schedule)
     mid_term_offset_days: int = 90
     long_term_offset_days: int = 180
