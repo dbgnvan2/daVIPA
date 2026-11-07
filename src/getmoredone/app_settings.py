@@ -103,6 +103,10 @@ class AppSettings:
     # Managed by screens/column_resize.py; the scalars above are legacy fallbacks.
     today_col_widths: dict = field(default_factory=dict)
     drag_schedule_col_widths: dict = field(default_factory=dict)
+    # AWA-M5.5 — the APE Week Actions panel stores its Title width here, not
+    # under ``today_col_widths``. It inherits the Today list, so without its
+    # own key, resizing either panel would move the other.
+    week_actions_col_widths: dict = field(default_factory=dict)
 
     # Future date options (Drag Schedule)
     mid_term_offset_days: int = 90
