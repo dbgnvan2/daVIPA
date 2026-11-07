@@ -313,8 +313,19 @@ Header:
   there were only 4". A day with no items on the left says *nothing to block*,
   which is not the same as no room. The whole run is one write: if the day
   refuses a block part-way, nothing at all is written and the message says how
-  far it had got. On a day the week's Day Settings exclude, the button refuses
-  with the same reason a drop onto that day gives.
+  far it had got. On a day the week's Day Settings exclude, the button asks
+  the same question a drop onto that day asks, and plans the day on a Yes.
+- **Clear Day** — What: Takes every scheduled item back off the day — the
+  reverse of AutoLoad. Why: A plan you want to redo takes one click to undo
+  rather than one right-click per block. It asks first, with the count in the
+  question (*"Remove 5 scheduled items from 2026-11-07?"*), because the app has
+  no undo. **Breaks and buffers stay**: AutoLoad never wrote one, each was put
+  there by hand, and the question says how many are staying. Lunch is not a
+  block at all — it comes from *Day Settings* — so it is untouched either way.
+  A day with no items scheduled says *nothing to remove* and asks nothing. It
+  does not ask about the weekday list: taking work off a day is not planning
+  work onto it, so a Saturday you filled can be cleared without being asked
+  about the week again.
 - **Earlier** / **Later** — What: A box at each end of the day column, above
   the first half hour and below the last. Drop an item on one and the day
   lengthens to hold it: *Day Start* moves back, or *Day End* moves forward, by
@@ -361,12 +372,15 @@ Items pane (left):
 - **Items starting \<date\>** — What: Open items whose start date is that date,
   highest priority score first. Why: These are the only items the day is built
   from. Each row is one line, laid out exactly like a task inside a day box:
-  colour stripe, title, a `>` marker when the day already holds a block for
-  this item, the depth bars, and the block length it would get (`30m`) at the
-  right-hand end. The marker is there rather than the words it replaced because
-  the words needed a second line, and a second line set a floor that made every
-  row the same height — see *How tall a row is* below. It is marked rather than
-  hidden, because an item can genuinely need two blocks in a day. The priority
+  colour stripe, title, a mark saying whether the item is scheduled, the depth
+  bars, and the block length it would get (`30m`) at the right-hand end. The
+  mark is a **green ✓** when the day already holds a block for this item and a
+  **red ?** when it holds none, so the column says something about every row
+  rather than only about the scheduled ones. It is a mark rather than the words
+  it replaced because the words needed a second line, and a second line set a
+  floor that made every row the same height — see *How tall a row is* below. A
+  scheduled item is marked rather than hidden, because an item can genuinely
+  need two blocks in a day. The priority
   score is not printed: the row is drawn in its priority band and striped in
   it, so the number said a third time what the colour already says twice.
 - **How tall a row is** — What: The space the item's work block will take in an

@@ -7,6 +7,25 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — reported from the running screen (2026-11-07)
+
+- **A "Clear Day" button**, the reverse of AutoLoad: it takes every scheduled
+  item back off the day in one click, where undoing a plan meant one
+  right-click per block. It asks first and the count is in the question, since
+  the app has no undo. Breaks and buffers stay where they are — AutoLoad never
+  wrote one, each was put there by hand — and the question says how many are
+  staying. A day with no items scheduled says so and asks nothing, and
+  clearing asks nothing about the weekday list: taking work off a day is not
+  planning work onto it.
+- **An item in the Plan list says whether it is scheduled.** A green check when
+  the day already holds a block for it, a red question mark when it holds none.
+  The column used to say something about a scheduled item and nothing at all
+  about the rest, so an unscheduled item and an unmarked row looked the same.
+  Both marks are theme tokens held to the 4.5:1 text contrast bar against every
+  priority fill in both themes: the fills are pale tints in the light theme and
+  deep in the dark one, where the ordinary dark-green success colour measures
+  1.63:1 against the green fill and would have been a mark nobody could see.
+
 ### Fixed — reported from the running screen (2026-11-07)
 
 - **A weekend no longer looks like a broken screen.** The Plan screen opens on
@@ -27,11 +46,12 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the whole window, though the grip and the window's two edge pads are 35px of
   it and none of that is pane — so the day pane could be left under its own
   minimum, which is the clipping the minimums exist to prevent.
-- **The depth bars sit on the text's line.** The three-bar stack is shorter
-  than a line of text and was aligned to the top of the row, so it floated
-  above the title on every row in the items pane. It is bottom-aligned now, and
-  the stack's own trailing gap is gone so the lowest bar ends level with the
-  title.
+- **The depth bars are justified like the text beside them.** The three-bar
+  stack is shorter than a line of text and was aligned to the top of the row,
+  so it floated above the title on every row in the items pane. It now takes
+  the title's own vertical justification — centred on the line — and the
+  stack's trailing gap is gone, so the bars fill the stack with no slack at
+  either end to put them a pixel out.
 - **A test fixture was reporting other tests' dialogs.** `messageboxes` yielded
   the session-wide record and trimmed only the tail on teardown, so a test that
   did not ask for the fixture left its dialogs in it for every later test. One

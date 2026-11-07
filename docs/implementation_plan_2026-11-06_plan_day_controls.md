@@ -1,7 +1,7 @@
-# Implementation plan — Plan screen day controls (PD-M1 … PD-M7)
+# Implementation plan — Plan screen day controls (PD-M1 … PD-M9)
 
 Date: 2026-11-06
-Status: **PD-M1 … PD-M6 shipped 2026-11-06. PD-M7, and the unplanned PD-M1.6, PD-M2.8 and PD-M2.9, shipped 2026-11-07**
+Status: **PD-M1 … PD-M6 shipped 2026-11-06. PD-M7, PD-M8, PD-M9 and the unplanned PD-M1.6, PD-M2.8 and PD-M2.9 shipped 2026-11-07**
 Screen: `src/getmoredone/screens/plan.py`, `src/getmoredone/screens/plan_blocks.py`
 Follows: `docs/implementation_plan_2026-11-06_plan_box_appearance.md` (PB-M1 … PB-M7, shipped)
 
@@ -44,7 +44,7 @@ removed the priority number for.
 | PD-M1.3 | The row is still `item_row_height(span, box_height)` tall — PB-M6.1 regression | `::test_pbm61_an_item_row_is_the_height_the_day_would_give_it` (existing, must stay green) |
 | PD-M1.4 | Every child is still drawn inside the frame at the floor and above it | `::test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it` (on-screen, `mapped_windows`) |
 | PD-M1.5 | The depth word is gone from the second line; `already blocked` is not | `::test_pdm14_the_second_line_is_the_blocked_marker_alone` |
-| PD-M1.6 | The bar stack's lowest bar ends level with the bottom of the title, not above it | `::test_pdm16_the_depth_bars_line_up_with_the_bottom_of_the_title` — unplanned; reported from the screen |
+| PD-M1.6 | The bar stack takes the title's own vertical justification: centred on the line, not pinned to the top or the bottom of the row, and the bars fill the stack with no slack at either end | `::test_pdm16_the_depth_bars_are_justified_like_the_text_on_the_line` — unplanned; reported from the screen three times, as "justified TOP", then "should be BOTTOM", then "justify vertically like TEXT on the line" |
 
 **Note on the mapped-window count:** PD-M1.4 and PD-M6.1 add on-screen tests.
 `tests/test_ci_contract.py::test_the_documented_mapped_window_count_is_the_real_one`
@@ -308,6 +308,61 @@ the guard asks instead of refusing.
 scope. It could have been per drop (noisy), or written to the weekday list
 (which would silently change the user's working week from a drag). Held on the
 screen, it lasts as long as the screen does.
+
+---
+
+## PD-M8 — A "Clear Day" button
+
+The reverse of AutoLoad: one click that takes the day's tasks back off it. The
+day was undoable only one block at a time, through the right-click menu, which
+is a dozen gestures to throw away a plan that took one.
+
+Item blocks only, because that is what AutoLoad writes. A break or a buffer was
+put there by hand, one gesture each, and taking them out would be a deletion
+nobody asked for -- so the question says how many are staying. Lunch is not a
+block at all; it comes from Day Settings.
+
+| ID | Criterion | Verified by |
+|---|---|---|
+| PD-M8.1 | A header button labelled Clear Day calls it, styled as destructive rather than primary | `tests/test_plan_screen.py::test_pdm8_the_header_has_a_clear_day_button` |
+| PD-M8.2 | Every item block on the selected date is removed, and the status says how many of how many | `::test_pdm8_clear_day_removes_every_item_block` |
+| PD-M8.3 | Break and buffer blocks are left in place, and both the question and the status account for them | `::test_pdm8_clear_day_leaves_breaks_and_buffers` |
+| PD-M8.4 | It asks first, with the count and the date in the question, and No removes nothing | `::test_pdm8_answering_no_removes_nothing` |
+| PD-M8.5 | A day with no items scheduled says so and asks nothing | `::test_pdm8_a_day_with_no_items_says_so_and_asks_nothing` |
+| PD-M8.6 | It asks nothing about the weekday list: a non-working day can be cleared | `::test_pdm8_clear_day_asks_nothing_about_the_weekday_list` |
+| PD-M8.7 | One transaction, so a failure part-way leaves the day as it was | *(not separately tested — `delete_time_block` has no failure mode to inject without patching the connection; the transaction is asserted by inspection, and `tests/test_weekly_tactic_cascade.py::test_wt_m4d1_cascade_runs_in_one_transaction` covers the helper itself)* |
+
+**Not code-testable, human review:** that "clear" means items and not blocks.
+A user who put three buffers on the day and presses Clear Day may expect an
+empty grid. The question names the number staying, which is the whole of the
+mitigation.
+
+---
+
+## PD-M9 — A scheduled item is checked, an unscheduled one questioned
+
+"A schedule item gets a GREEN Check Mark. An unscheduled item gets a RED ?"
+
+The marker column said something about a blocked item and nothing at all about
+the rest, so an unscheduled item and an unmarked row looked the same. It now
+says one of two things on every row.
+
+The check is the same glyph a day box uses for "this task is finished"
+(PD-M6). The two readings are kept apart by the pane, not by the glyph, which
+is the cost of the colours and is recorded where the constant is.
+
+| ID | Criterion | Verified by |
+|---|---|---|
+| PD-M9.1 | A scheduled row draws the check in the scheduled colour, an unscheduled row the question mark in the unscheduled colour, both in the marker column | `tests/test_plan_screen.py::test_pdm9_a_scheduled_item_is_checked_and_an_unscheduled_one_questioned` |
+| PD-M9.2 | Exactly one mark per row, either way | same test |
+| PD-M9.3 | Both marks clear 4.5:1 against every priority fill, in both themes | `tests/test_time_block_colors.py::test_pdm9_the_two_marks_are_legible_on_every_fill` |
+| PD-M9.4 | The colours are theme tokens, not literals in a screen file | `src/getmoredone/theme.py` (`scheduled_mark`, `unscheduled_mark`); the screen reads them by name |
+
+**On the colours.** `success_strong` and `danger` could not be used as they
+are. The marks sit on a priority *fill*: pale tints in the light theme, deep
+ones in the dark theme, where `success_strong`'s dark green measures 1.63:1
+against the green fill. So the light theme takes the dark pair and the dark
+theme the light one, and the test above is what holds them to the text bar.
 
 ---
 
