@@ -112,6 +112,20 @@ PLAN_PANE_EDGE_PAD_PX = 10
 #: plus this.
 PLAN_PANE_CHROME_PX = PLAN_DIVIDER_WIDTH_PX + 2 * PLAN_PANE_EDGE_PAD_PX
 
+#: How close (px) to the top or bottom edge of the day's scrolling viewport
+#: the pointer has to come, during a drag, for the day to scroll itself
+#: (PD-M11.5). Deep enough to reach with a dragged pointer, and shallow enough
+#: that the top and bottom boxes of the view can still be dropped on.
+PLAN_AUTOSCROLL_EDGE_PX = 32
+
+#: How far (px) one autoscroll tick moves the day.
+PLAN_AUTOSCROLL_STEP_PX = 24
+
+#: Milliseconds between autoscroll ticks while the pointer is held in the edge
+#: zone. A pointer held still delivers no motion events, so the scroll cannot
+#: be driven by motion alone -- it has to be its own clock.
+PLAN_AUTOSCROLL_MS = 60
+
 #: Height (px) of the "Outside the day" group. Fixed and scrollable rather
 #: than as tall as its contents: the group shares the items column with the
 #: item list, and a dozen blocks growing it would push the list it sits under
@@ -237,6 +251,10 @@ class PlanScreen(ctk.CTkFrame):
         #: back instead of flattening it to 0.
         self._drag_hover_border: int = 1
         self._block_menu: Optional[tk.Menu] = None
+        #: The pending autoscroll tick (PD-M11.5), or ``None`` when the day is
+        #: not scrolling itself. One at a time: the tick reschedules itself, so
+        #: a second one would double the speed for the rest of the drag.
+        self._autoscroll_job: Optional[str] = None
 
         #: Rendered boxes, as (frame, slot_index), in day order. A drop is
         #: turned into a slot by pointer-y against these frames rather than by
@@ -724,7 +742,9 @@ class PlanScreen(ctk.CTkFrame):
             padx=(0, PLAN_PANE_EDGE_PAD_PX), pady=10,
         )
         frame.grid_columnconfigure(0, weight=1)
-        frame.grid_rowconfigure(2, weight=1)
+        # Row 3 is the scrolling grid. The two ends of the day (PD-M11.2) sit
+        # in rows 2 and 4 and keep their own height, so the grid gets the rest.
+        frame.grid_rowconfigure(3, weight=1)
 
         self.day_heading = ctk.CTkLabel(
             frame, text="Day Plan", font=ctk.CTkFont(size=16, weight="bold")
@@ -740,11 +760,26 @@ class PlanScreen(ctk.CTkFrame):
         )
         self.day_summary.grid(row=1, column=0, padx=10, pady=(0, 6), sticky="w")
 
+        # PD-M11.2 -- the two ends of the day are drawn outside the scrolling
+        # grid, one above it and one below it, so neither can be scrolled off
+        # the screen. Inside the grid they were part of its content: on a day
+        # of eighteen boxes the Later box sat several hundred pixels below the
+        # bottom of the pane, and with no way to scroll while dragging there
+        # was no gesture that reached it at all.
+        self.earlier_holder = ctk.CTkFrame(frame, fg_color="transparent")
+        self.earlier_holder.grid(row=2, column=0, sticky="ew", padx=5)
+        self.earlier_holder.grid_columnconfigure(0, weight=1)
+
         # The drop target for an item drag, and the container a block drag is
         # reordered within.
         self.blocks_scroll = ctk.CTkScrollableFrame(frame)
-        self.blocks_scroll.grid(row=2, column=0, sticky="nsew", padx=5, pady=(0, 5))
+        self.blocks_scroll.grid(row=3, column=0, sticky="nsew", padx=5, pady=4)
         self.blocks_scroll.grid_columnconfigure(0, weight=1)
+
+        self.later_holder = ctk.CTkFrame(frame, fg_color="transparent")
+        self.later_holder.grid(row=4, column=0, sticky="ew", padx=5, pady=(0, 5))
+        self.later_holder.grid_columnconfigure(0, weight=1)
+
         self.day_drop_frame = frame
 
     # ================= loading ==============================================
@@ -756,24 +791,30 @@ class PlanScreen(ctk.CTkFrame):
     def _flush_redraw(self):
         """Put a rebuilt pane on screen now, rather than at the next event.
 
-        Purpose: PD-M10 -- both panes are rebuilt by taking the scroll frame
-                 out of the grid, destroying its children and putting it back.
-                 Tk draws from an idle handler, and every one of these rebuilds
-                 runs inside an event callback or an ``after_idle`` of one, so
-                 the re-gridded frame could stay undrawn until some later event
-                 arrived. In the app that event was the next mouse movement
-                 over the window: moving a block, resizing one or deleting one
-                 wrote the day correctly and looked like a gesture that had
-                 done nothing.
+        Purpose: PD-M10 -- a rebuilt pane stayed off the screen until the
+                 pointer moved over the window. Moving a block, resizing one
+                 or deleting one wrote the day correctly and looked like a
+                 gesture that had done nothing.
         Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m10
         Tests:   tests/test_plan_screen.py::test_pdm101_rebuilding_the_day_pane_flushes_the_redraw
 
-        ``update_idletasks`` and not ``update``: idle tasks are geometry and
-        redisplay, which is all that is owed here. ``update`` also services the
-        event queue, and these rebuilds run from drag handlers -- dispatching a
-        queued click in the middle of one would re-enter a rebuild that is
-        destroying the widget the click is for, which is the hang the
-        ``after_idle`` in ``on_drag_release`` exists to avoid.
+        ``update_idletasks`` and not ``update``. Idle tasks are Tk's geometry
+        and its own redisplay bookkeeping, which is all this can afford to
+        ask for. ``update`` services the event queue and turns the platform's
+        run loop, and that was measured here: with it in this path, six tests
+        of this screen took four minutes and 120% of a CPU, because every
+        pane rebuild pumped the whole loop. It is also the hang the
+        ``after_idle`` in ``on_drag_release`` exists to avoid -- a queued
+        click dispatched inside a rebuild lands in the widget the rebuild is
+        destroying.
+
+        What PD-M10 had wrong was not this call. It was the rebuild around it
+        (PD-M11.1): the scroll frame left the grid for the duration, which
+        unmapped the canvas the rows are drawn in, and the width and
+        scrollregion it came back with are restored by ``<Configure>``
+        handlers that an idle flush does not run. The pane was put back blank
+        and filled itself in on the next event. Rebuilt in place there is
+        nothing to restore.
         """
         try:
             self.update_idletasks()
@@ -831,8 +872,11 @@ class PlanScreen(ctk.CTkFrame):
         self.set_status("Day settings saved", "success")
 
     def load_items(self):
-        grid_info = self.items_scroll.grid_info()
-        self.items_scroll.grid_remove()
+        """Draw the items that start on the selected date.
+
+        Rebuilt in place (PD-M11.1): see ``load_blocks`` for why the scroll
+        frame is no longer taken out of the grid first.
+        """
         try:
             for widget in self.items_scroll.winfo_children():
                 widget.destroy()
@@ -895,7 +939,6 @@ class PlanScreen(ctk.CTkFrame):
                     text="Drag an item onto the day to block it."
                 )
         finally:
-            self.items_scroll.grid(**grid_info)
             self._flush_redraw()
 
     def load_blocks(self):
@@ -904,9 +947,22 @@ class PlanScreen(ctk.CTkFrame):
         Purpose: TG-M7 -- every box from Day Start to Day End, filled or not.
         Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m7
         Tests:   tests/test_plan_screen.py::test_tgm71_every_slot_is_drawn
+                 tests/test_plan_screen.py::test_pdm111_a_rebuild_leaves_the_day_pane_in_the_grid
+
+        PD-M11.1 -- rebuilt in place. This used to take the scroll frame out
+        of the grid first and put it back in a ``finally``, to batch the
+        redraw while the rows were destroyed and rebuilt. A
+        ``CTkScrollableFrame`` is a frame inside a canvas inside a frame, and
+        it is the outer frame that leaves the grid: the canvas is unmapped
+        with it, and on the way back the width of the window the rows are
+        drawn in, and the scrollregion, are both restored by ``<Configure>``
+        handlers that only run when the event queue is next serviced. A flush
+        of idle tasks does not service it, so the pane came back blank and
+        filled in on the next mouse movement. Destroying and rebuilding the
+        rows where they are costs one more layout pass and nothing else: Tk
+        does its geometry at idle, so no intermediate state is drawn unless
+        something asks for it in the middle, and nothing here does.
         """
-        grid_info = self.blocks_scroll.grid_info()
-        self.blocks_scroll.grid_remove()
         try:
             for widget in self.blocks_scroll.winfo_children():
                 widget.destroy()
@@ -915,6 +971,11 @@ class PlanScreen(ctk.CTkFrame):
             # screen after the day that had one was left.
             for widget in self.outside_frame.winfo_children():
                 widget.destroy()
+            # PD-M11.2 -- the two ends of the day are not in the scroll frame
+            # any more, so clearing its children does not clear them.
+            for holder in (self.earlier_holder, self.later_holder):
+                for widget in holder.winfo_children():
+                    widget.destroy()
             self._slot_frames = []
             self._virtual_frames = []
             self._block_widgets = []
@@ -986,17 +1047,19 @@ class PlanScreen(ctk.CTkFrame):
             # whether or not the day has anything in it. A drop target that
             # appears only once there is something to drop past would not be
             # there for the first item of the day.
+            #
+            # PD-M11.2 — in its own holder outside the scrolling grid, which
+            # is why it is row 0 of that holder rather than a row of the grid.
             self._virtual_frames.append((
                 build_virtual_slot_row(
-                    self.blocks_scroll,
-                    row,
+                    self.earlier_holder,
+                    0,
                     label=PD_EARLIER_TEXT,
                     hint=PD_EARLIER_HINT,
                     chip_height=self.box_height(),
                 ),
                 DAY_EXTEND_EARLIER,
             ))
-            row += 1
 
             for entry in self._grid.slots:
                 rendered = build_slot_row(
@@ -1015,15 +1078,14 @@ class PlanScreen(ctk.CTkFrame):
 
             self._virtual_frames.append((
                 build_virtual_slot_row(
-                    self.blocks_scroll,
-                    row,
+                    self.later_holder,
+                    0,
                     label=PD_LATER_TEXT,
                     hint=PD_LATER_HINT,
                     chip_height=self.box_height(),
                 ),
                 DAY_EXTEND_LATER,
             ))
-            row += 1
 
             if not blocks:
                 build_empty_day_note(self.blocks_scroll, row)
@@ -1048,7 +1110,6 @@ class PlanScreen(ctk.CTkFrame):
             else:
                 self.outside_frame.grid_remove()
         finally:
-            self.blocks_scroll.grid(**grid_info)
             self._flush_redraw()
 
     def _items_by_id(self, blocks) -> Dict[str, ActionItem]:
@@ -1709,6 +1770,130 @@ class PlanScreen(ctk.CTkFrame):
         y = self.winfo_pointery() - self.winfo_rooty() + 12
         self._drag_label.place(x=x, y=y)
 
+    def _day_canvas(self):
+        """The canvas the day's grid scrolls inside, or ``None``.
+
+        Purpose: PD-M11.5 -- autoscrolling the day means scrolling that canvas.
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m11
+        Tests:   tests/test_plan_screen.py::test_pdm115_the_day_canvas_is_the_scroll_frames_master
+
+        A ``CTkScrollableFrame`` is the frame the rows are gridded into, and
+        that frame is a child of the canvas that scrolls it. There is no
+        accessor for the canvas, so this reads Tk's own ``master`` rather than
+        CustomTkinter's private ``_parent_canvas``. Checked rather than
+        assumed: if a later version of the library puts something else there,
+        the day stops scrolling itself and nothing raises.
+        """
+        canvas = getattr(self.blocks_scroll, "master", None)
+        return canvas if isinstance(canvas, tk.Canvas) else None
+
+    def _autoscroll_direction(self) -> int:
+        """-1 to scroll the day up, 1 down, 0 to leave it where it is.
+
+        Purpose: PD-M11.5 -- "the Day Plan window should scroll as I drag an
+                 item up or down to an area not shown".
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m11
+        Tests:   tests/test_plan_screen.py::test_pdm115_the_pointer_at_the_bottom_edge_scrolls_down
+
+        The viewport's own edges, not the pane's: the strip at each end of the
+        day sits outside the canvas (PD-M11.2), and a pointer on one of those
+        is choosing that end of the day rather than asking to scroll.
+        """
+        canvas = self._day_canvas()
+        if canvas is None:
+            return 0
+        try:
+            if not canvas.winfo_ismapped():
+                return 0
+            left = canvas.winfo_rootx()
+            top = canvas.winfo_rooty()
+            right = left + canvas.winfo_width()
+            bottom = top + canvas.winfo_height()
+        except tk.TclError:
+            return 0
+
+        x_root, y_root = self.winfo_pointerx(), self.winfo_pointery()
+        if not left <= x_root <= right:
+            return 0
+        if top <= y_root <= top + PLAN_AUTOSCROLL_EDGE_PX:
+            return -1
+        if bottom - PLAN_AUTOSCROLL_EDGE_PX <= y_root <= bottom:
+            return 1
+        return 0
+
+    def _autoscroll_steps(self, canvas) -> int:
+        """How many scroll units make up one tick's worth of pixels.
+
+        Purpose: PD-M11.5 -- a unit is whatever ``yscrollincrement`` says, and
+                 CustomTkinter sets that per platform: 8px on macOS, 1px on
+                 Windows. A fixed number of units would scroll a Windows day
+                 eight times slower than a macOS one.
+        Tests:   tests/test_plan_screen.py::test_pdm115_a_tick_is_the_same_distance_on_any_platform
+
+        With no increment set, Tk reads a unit as a tenth of the view, so one
+        is the only sane answer -- twenty-four of those would be two and a half
+        screens per tick.
+        """
+        try:
+            increment = int(canvas.cget("yscrollincrement"))
+        except (tk.TclError, TypeError, ValueError):
+            increment = 0
+        if increment <= 0:
+            return 1
+        return max(1, round(PLAN_AUTOSCROLL_STEP_PX / increment))
+
+    def _tick_autoscroll(self):
+        """Scroll the day one step and come back, while the drag stays at the edge.
+
+        Purpose: PD-M11.5 -- its own clock. A pointer held still at the bottom
+                 of the pane delivers no motion events, so a scroll driven by
+                 motion alone would stop exactly when it is wanted most.
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m11
+        Tests:   tests/test_plan_screen.py::test_pdm116_a_tick_outside_the_edge_zone_stops_the_scroll
+
+        Rescheduling is the last thing it does, so the loop ends by not
+        starting another tick -- there is no job left to cancel when the drag
+        ends inside a tick.
+        """
+        self._autoscroll_job = None
+        if not self._drag_kind:
+            return
+        direction = self._autoscroll_direction()
+        if direction == 0:
+            return
+        canvas = self._day_canvas()
+        if canvas is None:
+            return
+        try:
+            canvas.yview_scroll(direction * self._autoscroll_steps(canvas), "units")
+        except tk.TclError:
+            return
+        # The boxes moved under a pointer that did not: without this the
+        # outline stays on the box that used to be there.
+        self.update_hover_target()
+        self._autoscroll_job = self.after(PLAN_AUTOSCROLL_MS, self._tick_autoscroll)
+
+    def _pump_autoscroll(self):
+        """Start the scroll if the pointer is at an edge and it is not running."""
+        if self._autoscroll_job is not None:
+            return
+        if self._autoscroll_direction() != 0:
+            self._tick_autoscroll()
+
+    def _stop_autoscroll(self):
+        """Cancel the pending tick, if there is one.
+
+        Purpose: PD-M11.7 -- a tick that fires after the drag has ended would
+                 scroll the day for a pointer that is not holding anything.
+        Tests:   tests/test_plan_screen.py::test_pdm117_ending_a_drag_cancels_the_scroll
+        """
+        if self._autoscroll_job is not None:
+            try:
+                self.after_cancel(self._autoscroll_job)
+            except (tk.TclError, ValueError):
+                pass
+            self._autoscroll_job = None
+
     def on_drag_motion(self, _event):
         if not self._drag_kind:
             return
@@ -1722,6 +1907,7 @@ class PlanScreen(ctk.CTkFrame):
         else:
             self._position_drag_label()
         self.update_hover_target()
+        self._pump_autoscroll()
 
     def on_drag_release(self, _event):
         kind, item, block = self._drag_kind, self._drag_item, self._drag_block
@@ -1787,6 +1973,7 @@ class PlanScreen(ctk.CTkFrame):
         ``after_idle``, so there is no queued rebuild for the flush to dispatch
         into the widget that is dispatching this event.
         """
+        self._stop_autoscroll()
         self._drag_label_text = None
         if self._drag_label is not None:
             self._drag_label.place_forget()
@@ -1862,15 +2049,19 @@ class PlanScreen(ctk.CTkFrame):
         Purpose: PD-M5 -- the two boxes that are not slots.
         Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
         Tests:   tests/test_plan_screen.py::test_pdm52_a_drop_above_moves_day_start_back
+                 tests/test_plan_screen.py::test_pdm114_a_drop_on_an_end_needs_no_pointer_in_the_scrolling_grid
 
         Read the same way as ``slot_under_pointer`` and only after it has
-        answered ``None``: a real box always wins, so the two boxes can sit
-        flush against the grid without stealing a drop meant for 08:00.
+        answered ``None``: a real box always wins.
+
+        No ``blocks_scroll`` guard, unlike ``slot_under_pointer``. Since
+        PD-M11.2 these two boxes are outside the scrolling grid -- that is the
+        whole point of them being there -- so a pointer on one of them is not
+        in the scroll frame at all, and the guard refused every drop on them.
+        Nothing is lost by dropping it: the rectangles tested here are the two
+        boxes themselves, not the pane they are in.
         """
         x_root, y_root = self.winfo_pointerx(), self.winfo_pointery()
-        if not widget_contains_pointer(self.blocks_scroll, x_root, y_root):
-            return None
-
         for frame, edge in self._virtual_frames:
             if widget_contains_pointer(frame, x_root, y_root):
                 return edge
