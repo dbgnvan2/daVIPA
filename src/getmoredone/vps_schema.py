@@ -812,6 +812,7 @@ class VPSSchema:
                  tests/test_ape_period_consistency.py::test_apcm52_dirty_state_orphan_quarter_flag_is_repaired_on_reopen
                  tests/test_ape_period_consistency.py::test_apcm53_migration_is_idempotent
                  tests/test_ape_period_consistency.py::test_apcm54_the_repair_reports_every_row_it_changed
+                 tests/test_ape_period_consistency.py::test_apcm55_the_repair_log_reaches_a_handler
 
         Until APC-M2 guarded it, ``assign_ape_to_month`` wrote whatever quarter
         the picker happened to show, so an APE could end up with ``m11 = 1``
@@ -835,6 +836,18 @@ class VPSSchema:
 
         Idempotent, and now provably so rather than by inference: a second run
         selects no rows, so it returns ``[]`` and writes nothing at all.
+
+        APC-M5.5 — the log line is tested, not just written. The return value
+        is discarded by the only caller (``_extend_annual_plan_elements``), so
+        in the running app this ``logger.info`` is the whole trace of a
+        migration that rewrote the user's rows — and it shipped with no test,
+        which means deleting it would have left every other APC test green.
+        The spec's first account of this claimed a behavioural check was not
+        practical because the line goes to the user's log;
+        ``test_wt_m7a5_dedupe_log_reaches_a_handler`` had already disproved
+        that. ``caplog`` cannot be used — this logger sets
+        ``propagate = False`` — but a handler attached to the logger itself
+        can, which is what the app's own file handler is.
         """
         repaired: List[Tuple[str, int]] = []
         now = datetime.now().isoformat()

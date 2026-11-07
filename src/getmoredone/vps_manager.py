@@ -404,7 +404,7 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
         Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m4
         Tests:   tests/test_ape_period_consistency.py::test_apcm41_month_lookup_matches_on_month_flag_alone
                  tests/test_ape_period_consistency.py::test_apcm42_orphan_month_flag_still_appears_in_november
-                 tests/test_ape_period_consistency.py::test_apcm44_month_lookup_guard_is_type_safe
+                 tests/test_ape_period_consistency.py::test_apcm44_month_lookup_guard_refuses_junk_and_normalises_a_float
 
         APC-M4.1 — the month alone, not the month and its quarter. This
         replaced ``get_annual_plan_elements_for_period(year, quarter, month)``,

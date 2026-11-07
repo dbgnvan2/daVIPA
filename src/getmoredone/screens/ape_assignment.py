@@ -261,20 +261,37 @@ class APEAssignmentScreen(ctk.CTkFrame):
         if not selected_ids:
             self.status_label.configure(text="Check one or more APEs on the left first.")
             return
-        assigned = 0
-        refused = 0
-        for ape_id in selected_ids:
-            if self._assign_one(ape_id, quarter):
-                assigned += 1
-            else:
-                refused += 1
+        claimed = {
+            ape_id for ape_id in selected_ids if self._assign_one(ape_id, quarter)
+        }
         self.refresh_lists()
         self.status_label.configure(
-            text=self._describe_quarter_assignment(assigned, refused, quarter)
+            text=self._describe_quarter_assignment(
+                selected_ids, claimed, self._ids_in_quarter(), quarter
+            )
         )
 
+    def _ids_in_quarter(self) -> set:
+        """Which APEs the quarter really holds, as the right-hand panel has it.
+
+        Purpose: APC-M6.3 — give the status line the artifact to reconcile
+                 against, and make it the same read the panel is drawn from.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m6
+        Tests:   tests/test_ape_period_consistency.py::test_apcm63_a_half_written_quarter_assignment_is_reported_as_partial
+
+        ``refresh_lists`` has just set ``self.right_items`` from
+        ``get_annual_plan_elements_for_quarter``, unfiltered.
+        """
+        return {row["id"] for row in getattr(self, "right_items", [])}
+
     def _assign_one(self, ape_id: str, quarter: int) -> bool:
-        """One APE's quarter assignment: ``True`` only if the row was written.
+        """One APE's quarter assignment: ``True`` only if the call said so.
+
+        Not "only if the row was written" — that was this docstring's first
+        claim and it is wrong in the direction that reaches the user. The
+        manager writes before it can fail, so ``False`` here does **not** mean
+        nothing was written. The caller reconciles against the row; this only
+        reports what the call claimed.
 
         Purpose: APC-M6.2 — turn a refusal and a raise into the same answer, so
                  both write paths on this screen count them the same way.
@@ -295,20 +312,42 @@ class APEAssignmentScreen(ctk.CTkFrame):
         return False
 
     @staticmethod
-    def _describe_quarter_assignment(assigned: int, refused: int, quarter: int) -> str:
-        """APC-M6.2 — one wording for every path that assigns a quarter.
+    def _describe_quarter_assignment(selected, claimed, in_quarter, quarter: int) -> str:
+        """APC-M6.3 — the sentence is computed from the rows, not from a return code.
 
-        Purpose: never let a refused assignment look like a successful one.
+        Purpose: never let a refused assignment look like a successful one, and
+                 never let a half-written one look like either.
         Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m6
         Tests:   tests/test_ape_period_consistency.py::test_apcm62_quarter_save_reports_refused_assignments
+                 tests/test_ape_period_consistency.py::test_apcm63_a_half_written_quarter_assignment_is_reported_as_partial
 
-        The month screen's ``_describe_month_assignment`` with Q for M: the two
-        screens are the same gesture against a different column, and a user who
-        has read one message should not have to read the other differently.
+        ``assign_ape_to_quarter`` commits the quarter flag through
+        ``set_annual_plan_element_quarter`` and only then raises on a segment
+        it cannot resolve, so a ``False`` from it does not mean nothing was
+        written. Counting the booleans put "Assigned 0 APE(s) to Q4." beside a
+        panel that was showing the row.
+
+        The month screen's ``_describe_month_assignment`` with Q for M, and the
+        same four states, for the same reason — see its docstring.
         """
-        text = f"Assigned {assigned} APE(s) to Q{quarter}."
+        assigned = [a for a in selected if a in claimed and a in in_quarter]
+        partial = [a for a in selected if a not in claimed and a in in_quarter]
+        refused = [a for a in selected if a not in claimed and a not in in_quarter]
+        missing = [a for a in selected if a in claimed and a not in in_quarter]
+
+        text = f"Assigned {len(assigned)} APE(s) to Q{quarter}."
+        if partial:
+            text += (
+                f" {len(partial)} partly assigned — in Q{quarter} with no "
+                f"quarter initiative behind it; see the log."
+            )
         if refused:
-            text += f" {refused} could not be assigned — see the log."
+            text += f" {len(refused)} could not be assigned — see the log."
+        if missing:
+            text += (
+                f" {len(missing)} reported assigned but are not in Q{quarter} — "
+                f"see the log."
+            )
         return text
 
     def _render_rows(self, container: ctk.CTkScrollableFrame, rows: list[dict], selectable: bool):
@@ -439,8 +478,46 @@ class APEAssignmentScreen(ctk.CTkFrame):
         label = row.get("key_field") or "this APE"
         if not messagebox.askyesno("Remove APE", f"Remove {label} from Quarter Q{quarter}?", icon="warning"):
             return
-        self.vps_manager.unassign_ape_from_quarter(row["id"], quarter)
+        ok = self._remove_one(row["id"], quarter)
         self.refresh_lists()
+        still_there = row["id"] in self._ids_in_quarter()
+        if ok and not still_there:
+            self.status_label.configure(text=f"Removed {label} from Q{quarter}.")
+        elif still_there:
+            self.status_label.configure(
+                text=f"{label} is still in Q{quarter} — see the log."
+            )
+        else:
+            self.status_label.configure(
+                text=f"{label} is out of Q{quarter}, but the remove reported a "
+                     f"problem — see the log."
+            )
+
+    def _remove_one(self, ape_id: str, quarter: int) -> bool:
+        """One APE's quarter removal: ``True`` only if the call reported success.
+
+        Purpose: APC-M6.4 — the remove path reports too. It is the same class as
+                 the two assign paths, on the same screen.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m6
+        Tests:   tests/test_ape_period_consistency.py::test_apcm64_a_failed_quarter_remove_is_reported
+
+        ``unassign_ape_from_quarter`` returns ``False`` for an APE row that no
+        longer exists, and this ran straight after a ``messagebox.askyesno``
+        that promised removal: a dialog that said it would remove the row, and
+        a panel that still shows it, with nothing in between.
+        """
+        try:
+            if self.vps_manager.unassign_ape_from_quarter(ape_id, quarter):
+                return True
+            logger.warning(
+                "[ape_assignment] APE %s was not removed from Q%d.", ape_id, quarter
+            )
+        except Exception:
+            logger.exception(
+                "[ape_assignment] APE %s raised while being removed from Q%d.",
+                ape_id, quarter,
+            )
+        return False
 
     def _bind_drag_widgets(self, widgets: tuple, row: dict):
         for widget in widgets:
@@ -466,7 +543,10 @@ class APEAssignmentScreen(ctk.CTkFrame):
                 self.refresh_lists()
                 self.status_label.configure(
                     text=self._describe_quarter_assignment(
-                        1 if ok else 0, 0 if ok else 1, quarter
+                        [row["id"]],
+                        {row["id"]} if ok else set(),
+                        self._ids_in_quarter(),
+                        quarter,
                     )
                 )
 
