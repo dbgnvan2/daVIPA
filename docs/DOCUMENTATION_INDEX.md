@@ -151,6 +151,20 @@ the screen is still open there:
 - §6: the status table, the 28-mutation table, and the nine-step on-screen
   checklist that criterion is waiting on
 
+### docs/spec_2026-11-07_unified_panel_design.md
+
+Spec and implementation plan for one panel design across the VSP tabs
+(UPD-M1 - UPD-M7). **Drafted 2026-11-07, not approved, no code written:**
+
+- The feature matrix: which of the six tabs has panels, a divider, drag and
+  resizable columns today, counted rather than assumed
+- Why the splitter, the row drag and the chip table are each written out four
+  or five times, and the three modules that replace them
+- Why draggable column widths are the only genuinely new part of the request
+- The two places "the same design" cannot be taken literally, and what is done
+  instead
+- How it sequences against the unpushed APE Week Actions batch
+
 ## Feature-Specific Documentation
 
 ### Requirements (Consolidated)
