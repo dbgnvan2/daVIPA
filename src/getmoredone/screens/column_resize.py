@@ -63,7 +63,7 @@ class ColumnResizer:
         # title label sits inside a sub-frame).
         self.set_cell_width = set_cell_width
         self._widths = self._load_widths()
-        self._rows = []          # list[(frame, cells)] ; cells: [(key, label, full, reserve)]
+        self._rows = []          # list[(frame, cells)] ; cells: [(key, label, full, reserve, width_delta)]
         self._header = None      # (header_frame, {key: label})
         self._drag = None        # (key, x_root_start, width_start)
 
@@ -139,7 +139,13 @@ class ColumnResizer:
         """Register a row for live resize.
 
         cells: iterable of (key, label) or (key, label, full_text) or
-        (key, label, full_text, reserve). full_text/reserve enable re-clamping.
+        (key, label, full_text, reserve) or
+        (key, label, full_text, reserve, width_delta).
+        full_text/reserve enable re-clamping. width_delta is subtracted from
+        the column width when the cell's own width is set, for a cell that
+        sits inside its column rather than filling it -- a chip pill, which
+        would otherwise touch the next column (UPD-M3.5). It defaults to 0, so
+        every caller that predates it is unaffected.
         """
         self.apply_grid(frame)
         norm = []
@@ -147,7 +153,8 @@ class ColumnResizer:
             key, label = cell[0], cell[1]
             full = cell[2] if len(cell) > 2 else None
             reserve = cell[3] if len(cell) > 3 else 0
-            norm.append((key, label, full, reserve))
+            width_delta = cell[4] if len(cell) > 4 else 0
+            norm.append((key, label, full, reserve, width_delta))
         self._rows.append((frame, norm))
 
     def clear_rows(self) -> None:
@@ -187,10 +194,10 @@ class ColumnResizer:
             if not frame.winfo_exists():
                 continue
             frame.grid_columnconfigure(spec.grid_col, minsize=width)
-            for ckey, label, full, reserve in cells:
+            for ckey, label, full, reserve, width_delta in cells:
                 if ckey != key or not label.winfo_exists():
                     continue
                 if self.set_cell_width:
-                    label.configure(width=width)
+                    label.configure(width=max(1, width - width_delta))
                 if full is not None:
                     label.configure(text=self.cell_text(key, full, reserve))
