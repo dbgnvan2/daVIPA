@@ -1106,6 +1106,59 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
         )
         return rows
 
+    def get_action_items_for_weekly_tactic(self, tactic_id: str) -> List[ActionItem]:
+        """Return the Action Items linked to one Weekly Tactic.
+
+        Purpose: one home for "linked to this weekly tactic", because the
+                 codebase writes that link two ways. The re-filing cascade
+                 sets ``weekly_tactic_id``; the APE Week Assignment screen's
+                 Add Action Item button sets ``parent_id``. Counted on
+                 2026-11-07, the main database held 49 children linked the
+                 first way and none the second, the demo database 1 the second
+                 way and none the first — so a reader of either column alone
+                 renders an empty panel on one of the two machines.
+        Spec:    docs/spec_2026-11-07_ape_week_actions.md#awa-m2
+        Tests:   tests/test_ape_week_actions.py::test_awam21_both_link_shapes_are_returned
+
+        ``parent_id`` is overloaded: it also means ordinary subtask nesting.
+        The link only counts when the id names a Weekly Tactic, so an id that
+        is not one (including a tactic since deleted) returns nothing rather
+        than somebody's subtasks — AWA-M2.4, AWA-M2.5.
+        """
+        if not tactic_id:
+            return []
+
+        is_tactic = self.db.conn.execute(
+            "SELECT 1 FROM action_items WHERE id = ? AND item_type = 'week'",
+            (tactic_id,),
+        ).fetchone()
+        if not is_tactic:
+            self.logger.info(
+                "[vps:get_action_items_for_weekly_tactic] db=%s tactic=%s "
+                "not a weekly tactic — returning none",
+                self.db.db_path,
+                tactic_id,
+            )
+            return []
+
+        query = """
+            SELECT * FROM action_items
+            WHERE (weekly_tactic_id = ? OR parent_id = ?)
+              AND item_type != 'week'
+            ORDER BY status ASC,
+                     COALESCE(start_date, due_date) ASC,
+                     priority_score DESC
+        """
+        rows = self.db.conn.execute(query, (tactic_id, tactic_id)).fetchall()
+        items = [self.db_manager._row_to_action_item(row) for row in rows]
+        self.logger.info(
+            "[vps:get_action_items_for_weekly_tactic] db=%s tactic=%s count=%d",
+            self.db.db_path,
+            tactic_id,
+            len(items),
+        )
+        return items
+
     def get_weekly_action_items_in_range(self, start_date: str, end_date: str,
                                          segment_ids: Optional[List[str]] = None,
                                          ape_only: bool = True) -> List[Dict[str, Any]]:
