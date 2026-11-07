@@ -3858,9 +3858,12 @@ def test_pdm22_a_resize_alone_rebalances_the_panes(
     ``winfo_manager`` is empty, and Tk delivers no ``<Configure>`` to a window
     that was never laid out, so ``event_generate`` on the frame's canvas --
     immediate or queued -- reached the binding not once. The first version of
-    this test generated one and asserted against ``apply_items_width``: it
-    could only have passed by patching the class, which the binding does not
-    go through because it holds the bound method captured in ``__init__``.
+    this test generated one and asserted against a recorder patched over
+    ``apply_items_width``; the recorder was reachable (``on_resize`` resolves
+    that name on ``self`` when it runs), so the event never arriving is the
+    whole reason it saw nothing. Its own first assertion passed on
+    CustomTkinter's internal ``<Configure>`` binding rather than on ours, so
+    it read as a test of the bind while asserting nothing about it.
     """
     panel = PlanScreen(root, manager, _App(settings))
     floor = panel.items_width_floor()
