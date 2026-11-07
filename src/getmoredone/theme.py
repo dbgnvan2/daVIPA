@@ -134,6 +134,20 @@ def semantic_colors() -> Dict[str, str]:
         "selected_tint": "#E6EEF8" if mode == "light" else "#223247",
         "success_strong": "#166534" if mode == "light" else "#14532D",
         "on_strong": "#ECFDF5" if mode == "light" else "#DCFCE7",
+        # PD-M9 -- the two marks in the Plan items pane: a green check for an
+        # item the day already holds a block for, a red question mark for one
+        # it does not.
+        #
+        # Their own tokens rather than `success_strong`/`danger`, because they
+        # are drawn on a priority *fill* and not on a surface. In the light
+        # theme the fills are pale tints, so the marks are the same dark green
+        # and red those two tokens carry there. In the dark theme the fills are
+        # deep -- the `low` fill is #052E16 -- and `success_strong`'s dark
+        # green measures 1.63:1 against it, a mark nobody can see, so the dark
+        # theme takes the light pair instead. Measured by
+        # ``tests/test_time_block_colors.py::test_pdm9_the_two_marks_are_legible_on_every_fill``.
+        "scheduled_mark": "#166534" if mode == "light" else "#4ADE80",
+        "unscheduled_mark": "#B91C1C" if mode == "light" else "#FCA5A5",
     }
 
 

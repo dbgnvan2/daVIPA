@@ -449,6 +449,19 @@ class PlanScreen(ctk.CTkFrame):
         )
         self.btn_autoload.pack(side="right", padx=4)
 
+        # The reverse of the button beside it, styled as what it is. Danger
+        # rather than primary: AutoLoad is this screen's one primary action,
+        # and a destructive button that looks like the main one is a misclick
+        # waiting to happen.
+        self.btn_clear_day = ctk.CTkButton(
+            header,
+            text="Clear Day",
+            width=100,
+            command=self.clear_day,
+            **button_style("danger"),
+        )
+        self.btn_clear_day.pack(side="right", padx=4)
+
         self.status_label = ctk.CTkLabel(header, text="", anchor="e")
         self.status_label.pack(side="right", padx=10)
 
@@ -1273,6 +1286,99 @@ class PlanScreen(ctk.CTkFrame):
         if unseen:
             said += f", {unseen} past the {MAX_ITEM_ROWS}-row list"
         self.set_status(said, "success" if placed else "warning")
+
+    def clear_day(self):
+        """PD-M8 — take every scheduled item back off the day.
+
+        Purpose: the reverse of AutoLoad. One click that empties the day of
+                 tasks, so a plan can be thrown away and redone.
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m8
+        Tests:   tests/test_plan_screen.py::test_pdm8_clear_day_removes_every_item_block
+                 tests/test_plan_screen.py::test_pdm8_clear_day_leaves_breaks_and_buffers
+                 tests/test_plan_screen.py::test_pdm8_answering_no_removes_nothing
+                 tests/test_plan_screen.py::test_pdm8_a_day_with_no_items_says_so
+
+        Item blocks only, because that is what AutoLoad writes. A break or a
+        buffer was put there by hand, one gesture each, and taking them out
+        would be a deletion nobody asked for -- so the question says how many
+        are staying, since a button called Clear Day that leaves two blocks
+        behind has to account for them where the user is looking.
+
+        Asked first. This is the only button on the screen that destroys work,
+        the app has no undo, and the count is in the question so the answer is
+        given against the real day rather than against the word "all".
+
+        No ``_require_block_day``: the weekday list is about planning work
+        onto a day, and taking work off one is not planning. A Saturday that
+        was filled -- by a Yes to PD-M7, or before the week was narrowed --
+        has to be clearable without being asked about the week again.
+
+        One transaction, so a failure part-way leaves the day as it was rather
+        than half-cleared. ``delete_time_block`` commits on its own, which the
+        transaction's commit gate suppresses -- that gate is what makes the
+        rollback real here.
+        """
+        blocks = self.db_manager.get_time_blocks(self.selected_date)
+        mine = [
+            block for block in blocks
+            if BlockType.normalize(block.block_type) == BlockType.ITEM
+        ]
+        kept = len(blocks) - len(mine)
+        if not mine:
+            self.set_status(
+                f"Clear Day: nothing to remove — no items are scheduled on "
+                f"{self.selected_date}",
+                "warning",
+            )
+            return
+
+        question = (
+            f"Remove {len(mine)} scheduled "
+            f"{'item' if len(mine) == 1 else 'items'} from "
+            f"{self.selected_date}?"
+        )
+        if kept == 1:
+            question += "\n\nThe one break or buffer block stays where it is."
+        elif kept:
+            question += (
+                f"\n\nThe {kept} break and buffer blocks stay where they are."
+            )
+        question += "\n\nThis cannot be undone."
+        if not messagebox.askyesno(
+            "Clear Day", question, icon="warning", parent=self
+        ):
+            self.set_status("Clear Day: nothing removed", "muted")
+            return
+
+        try:
+            with self.db_manager.transaction():
+                for block in mine:
+                    self.db_manager.delete_time_block(block.id)
+        except Exception as problem:
+            # The same arm AutoLoad has, for the same reason: without it a
+            # failure leaves a Tk callback with nothing redrawn and nothing
+            # said, and a press that failed looks like a press that found
+            # nothing to do. Logged as well as said, because the status line
+            # is overwritten by the next one.
+            logger.exception("Clear Day failed")
+            self.refresh()
+            self.set_status(
+                f"Clear Day removed nothing — "
+                f"{str(problem) or type(problem).__name__}",
+                "error",
+            )
+            return
+
+        self.refresh()
+        # Both numbers, every time (P2): "removed 4" cannot be told apart
+        # from "removed 4 and quietly left 2 it should have taken", and the
+        # blocks left behind are the ones the question promised to keep.
+        said = f"Clear Day: removed {len(mine)} of {len(blocks)} blocks"
+        if kept == 1:
+            said += " — 1 break or buffer left in place"
+        elif kept:
+            said += f" — {kept} break and buffer blocks left in place"
+        self.set_status(said, "success")
 
     def first_clear_slot(self, minutes: int) -> Optional[int]:
         """The earliest box in today's grid with nothing in it at all.

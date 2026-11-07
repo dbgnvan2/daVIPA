@@ -89,11 +89,22 @@ SLOT_MARKER_WIDTH_PX = 16
 #: widths and PD-M2's clamp both account for it.
 CHIP_RIGHT_INSET_PX = 8
 
-#: The marker itself: a plain ASCII greater-than, not the green check. The
-#: check already means "this task is finished" on a day box (PD-M6), and one
-#: glyph cannot carry both "done" and "has a block today" without saying the
-#: wrong one half the time.
-PD_BLOCKED_TEXT = ">"
+#: PD-M9 -- what the marker column says about an item in the left pane: a
+#: green check when the day already holds a block for it, a red question mark
+#: when it holds none. Asked for as "a schedule item gets a GREEN Check Mark,
+#: an unscheduled item gets a RED ?".
+#:
+#: The check is the same glyph ``PD_CHECK_TEXT`` uses on a day box, where it
+#: means "this task is finished" (PD-M6). The two readings are kept apart by
+#: the pane rather than by the glyph: a check in the items pane means
+#: scheduled, a check in a day box means complete. That was the reason the
+#: first version of this marker was a plain ``>`` instead, and it is the cost
+#: of the colours -- recorded here rather than argued, because a green tick
+#: and a red question mark are what the screen was asked for.
+PD_BLOCKED_TEXT = "\u2713"
+
+#: The other half of the pair: nothing is scheduled for this item today.
+PD_UNSCHEDULED_TEXT = "?"
 
 #: The chip's columns by name, so a renderer and a test can refer to the same
 #: index without counting.
@@ -388,27 +399,36 @@ def build_item_row(
     )
     title.grid(row=0, column=CHIP_TITLE_COLUMN, sticky="ew", pady=(5, 0))
 
-    if already_blocked:
-        # Marked, not hidden: an item can genuinely need two blocks in a day,
-        # and removing it from the list would look like it had vanished. A
-        # glyph rather than the words it replaced, which cost the row a second
-        # line and so cost every row in the pane the height that made it the
-        # size of the space it will take.
-        ctk.CTkLabel(
-            frame,
-            text=PD_BLOCKED_TEXT,
-            width=SLOT_MARKER_WIDTH_PX,
-            anchor="w",
-            text_color=on_fill,
-        ).grid(row=0, column=CHIP_MARKER_COLUMN, sticky="nw", pady=(5, 0))
+    # PD-M9: drawn either way, so the column says something about every item
+    # rather than only about the blocked ones. Marked, not hidden: an item can
+    # genuinely need two blocks in a day, and removing it from the list would
+    # look like it had vanished. A glyph rather than the words it replaced,
+    # which cost the row a second line and so cost every row in the pane the
+    # height that made it the size of the space it will take.
+    ctk.CTkLabel(
+        frame,
+        text=PD_BLOCKED_TEXT if already_blocked else PD_UNSCHEDULED_TEXT,
+        width=SLOT_MARKER_WIDTH_PX,
+        anchor="w",
+        # The theme's own pair for a mark on a priority fill, not
+        # `status_text_color`: that one's green is dark in both themes, and
+        # the dark theme's fills are deep enough to swallow it (1.63:1 on the
+        # green fill). See `semantic_colors`.
+        text_color=semantic_colors()[
+            "scheduled_mark" if already_blocked else "unscheduled_mark"
+        ],
+        font=ctk.CTkFont(size=12, weight="bold"),
+    ).grid(row=0, column=CHIP_MARKER_COLUMN, sticky="w", pady=(5, 0))
 
     bars = DepthBarStack(frame, item.depth)
-    # Bottom of the stack level with the bottom of the title, not the top. The
-    # stack is shorter than a line of text, so "n" left it floating above the
-    # text on every row in the pane.
-    bars.grid(
-        row=0, column=CHIP_BARS_COLUMN, padx=(4, 6), pady=(5, 0), sticky="s"
-    )
+    # The title's own vertical alignment, not the top of the row and not the
+    # bottom of it: "justify vertically like TEXT on the line". The stack is
+    # shorter than a line of text, so the sticky is the whole of where it
+    # sits -- "n" left it floating above the title, "s" sat it under the
+    # title's baseline, and no sticky centres it on the line exactly as the
+    # label beside it is centred. The day-pane chip grids its stack the same
+    # way, which is why the bars already lined up there.
+    bars.grid(row=0, column=CHIP_BARS_COLUMN, padx=(4, 6), pady=(5, 0))
 
     # The length, where a box writes it: the right-hand end of the task's own
     # line. This is the same task before it has been dragged there.
