@@ -93,6 +93,26 @@ seventh. The fix is mechanical and identical in each: delete the
 `finally`, keep the destroy-and-rebuild. What it needs is a walk of each
 screen afterwards, which is the actual cost.
 
+### 2026-11-07 - Type: Documentation
+
+**Title:** The documentation index lists two spec docs and none of the plans
+**Description:** `docs/DOCUMENTATION_INDEX.md` names
+`docs/spec_2026-11-07_ape_period_consistency.md` and
+`docs/spec_2026-11-07_ape_week_actions.md` individually, and covers handoff
+notes with one generic `docs/changes/` entry. The seventeen
+`implementation_plan_*.md` files, the other seven `spec_*.md` files and the five
+`spec_coverage*.md` files are not listed anywhere in it, including
+`implementation_plan_2026-11-06_plan_day_controls.md`, which is the plan of
+record for PD-M1 - PD-M11.
+**Priority:** Low
+**Effort:** Small - one pass over `ls docs/`, plus the meta test
+**Notes:** Found while updating docs for PD-M11; the gap predates that batch and
+no test enforces the index, so nothing failed. The global rule is that where a
+repo keeps a documentation index every document is listed in it and a test
+enforces that - this repo has the index and not the test. Worth doing as one
+docs pass with a meta test that compares `docs/*.md` against the index, rather
+than one entry at a time.
+
 ## Deferred from the APE period-consistency sweep (2026-11-07)
 
 Found by the three passes over `7aa601d...HEAD` — learning-qa, a correctness
