@@ -58,6 +58,7 @@ from ..time_block_layout import (
     weekday_names,
 )
 from ..widgets.date_picker import DatePickerButton
+from ..widgets import confirm_dialog
 from .drag_schedule_support import widget_contains_pointer
 from .plan_blocks import (
     PD_EARLIER_HINT,
@@ -237,6 +238,10 @@ class PlanScreen(ctk.CTkFrame):
         #: so it is asked once per date rather than once per drop -- five
         #: items onto a Saturday is one decision, not five.
         self._work_anyway: set = set()
+        # PD-M12.2 -- set when the non-work-day question could not be put
+        # on the screen, and read by the next status line this screen
+        # writes, so the fact is not overwritten by the success it caused.
+        self._could_not_ask = False
 
         # Drag state. One drag at a time, and its kind decides what a release
         # means: an item drop creates a block, a block drop reorders the day.
@@ -1245,6 +1250,7 @@ class PlanScreen(ctk.CTkFrame):
         boxes = slots_for_minutes(minutes)
         spare = boxes * SLOT_MINUTES - minutes
         text = f"Blocked {minutes}m for {item.title} at {block.start_time}"
+        text += self._take_unasked_note()
         if spare:
             # Said out loud, because the box the task does not fill is still
             # spent: the next task starts at the following box, not at the
@@ -1535,6 +1541,28 @@ class PlanScreen(ctk.CTkFrame):
         Tests:   tests/test_plan_screen.py::test_pdm7_a_non_work_day_asks_before_scheduling
                  tests/test_plan_screen.py::test_pdm7_answering_no_writes_nothing
                  tests/test_plan_screen.py::test_pdm7_a_work_day_asks_nothing
+                 tests/test_plan_screen.py::test_pdm121_the_question_is_asked_by_the_app
+                 tests/test_plan_screen.py::test_pdm122_a_question_that_cannot_be_asked_still_schedules
+
+        PD-M12: asked with the app's own dialog, not ``messagebox.askyesno``.
+        The platform's dialog cannot be used from here. Every item drop lands
+        in an idle callback scheduled by ``on_drag_release``, and on macOS
+        ``tk_messageBox`` called from there raises ``_tkinter.TclError`` with
+        no message -- which took out the first statement of both
+        ``block_item`` and ``extend_day_for``, so a drop on a non-work day and
+        a drop on either end of the day both did nothing at all, silently.
+        Reported from the running screen on 2026-11-07; the whole suite passed
+        throughout, because conftest replaces every ``messagebox`` function
+        with a recorder that returns a value and cannot raise (P25: a check
+        that only exists on a surface nobody uses).
+
+        And a question that still cannot be put on the screen no longer eats
+        the gesture. There are two ways to be wrong here: write without asking,
+        or lose the user's drag. Losing it is what happened today, and it is
+        the worse of the two -- nothing on screen said anything, four times
+        over -- so a dialog that fails is reported in the status line and the
+        work is scheduled, which is also what PD-M7's "a warning, not a wall"
+        says to do when the warning cannot be given.
 
         Asked rather than refused. The weekday list describes a normal week;
         it is not a lock on the calendar, and a Saturday someone has decided
@@ -1563,14 +1591,31 @@ class PlanScreen(ctk.CTkFrame):
             name for name, on in zip(weekday_names(), self.bounds.block_weekdays) if on
         ]
         week = ", ".join(allowed) if allowed else "no days"
-        if messagebox.askyesno(
-            "Not a work day",
+        question = (
             f"{self.selected_date} is not a regular work day.\n\n"
             f"Day Settings allows {week}.\n\n"
-            "Schedule anyway?",
-            icon="warning",
-            parent=self,
-        ):
+            "Schedule anyway?"
+        )
+        try:
+            said_yes = confirm_dialog.ask_yes_no(
+                self,
+                "Not a work day",
+                question,
+                yes_text="Schedule anyway",
+                no_text="Cancel",
+            )
+        except (confirm_dialog.ConfirmNotShown, tk.TclError) as problem:
+            logger.warning("the non-work-day question could not be asked: %s", problem)
+            self._work_anyway.add(self.selected_date)
+            self._could_not_ask = True
+            self.set_status(
+                f"{self.selected_date} is not a work day (Day Settings allows "
+                f"{week}) — scheduled anyway; the question could not be shown",
+                "warning",
+            )
+            return True
+
+        if said_yes:
             self._work_anyway.add(self.selected_date)
             return True
 
@@ -1580,6 +1625,28 @@ class PlanScreen(ctk.CTkFrame):
             "warning",
         )
         return False
+
+    def _take_unasked_note(self) -> str:
+        """What a status line owes when the question could not be asked.
+
+        Purpose: PD-M12.2 -- the fallback writes a warning and then the write
+                 it allowed writes its own success over the top, so the user
+                 was told the block was made and not that the app had failed
+                 to ask about the day. Surfaced, not dropped (P2).
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m12
+        Tests:   tests/test_plan_screen.py::test_pdm122_a_question_that_cannot_be_asked_still_schedules
+
+        One-shot: the note belongs to the gesture that could not be asked
+        about, not to every later gesture on the same day. The day itself is
+        remembered in ``_work_anyway``, which is what stops it asking again.
+        """
+        if not self._could_not_ask:
+            return ""
+        self._could_not_ask = False
+        return (
+            f" — {self.selected_date} is not a regular work day and the"
+            " question could not be shown"
+        )
 
     # ================= the block context menu ===============================
 
@@ -2191,7 +2258,8 @@ class PlanScreen(ctk.CTkFrame):
         self.refresh()
         self.set_status(
             f"The day now runs {new_bounds.day_start}–{new_bounds.day_end}; "
-            f"blocked {minutes}m for {item.title} at {block.start_time}",
+            f"blocked {minutes}m for {item.title} at {block.start_time}"
+            + self._take_unasked_note(),
             "success",
         )
 
