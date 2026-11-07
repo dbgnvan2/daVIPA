@@ -131,6 +131,54 @@ item cannot be dragged to a time that is not already visible.
 **Effort:** Unknown
 
 
+## Adjacent issues from the PD-M12 batch (2026-11-07)
+
+### 2026-11-07 - Type: Bug
+
+**Title:** The Scheduler asks through the platform's dialog inside a drag release
+**Description:** `drag_schedule.py::on_drag_release` calls `_drop_onto_project`
+directly, which calls `messagebox.showinfo` for a dragged Weekly Tactic and
+`confirm_exclusive_relink` (→ `messagebox.askyesno` in
+`project_link_notice.py`) before filing items under a project. That is the same
+call from the same kind of place as the fault PD-M12 fixed on the Plan screen:
+on macOS `tk_messageBox` raised `_tkinter.TclError` with no message when it was
+opened from the idle callback following a drag release, and here it is opened
+from inside the release handler itself. If it fails the same way, the
+exception leaves the Tk callback and the drop files nothing and says nothing.
+**Priority:** High if it reproduces - a silent no-op on a write gesture
+**Effort:** Small - swap both calls for `widgets/confirm_dialog.ask_yes_no` and
+an in-app notice; the tests in `test_project_multi_link.py` patch the
+confirmation, so they move to the new seam the way `test_pdm7_*` did.
+**Notes:** Not fixed with PD-M12. It has not been reported, it is a second
+screen's confirmation UI, and PD-M12's own dialog has had no walk yet - putting
+it on a second surface before anyone has seen it work on the first is how one
+unverified fix becomes two. **Worth a walk before anything else:** drag an item
+onto a project on the Scheduler screen and see whether it files. The other
+twenty `messagebox` call sites in the app, Clear Day on the Plan screen
+included, are reached from a button or a menu and are not in this class.
+
+### 2026-11-07 - Type: Test quality
+
+**Title:** The messagebox stub cannot fail, so no test can see a dialog that does
+**Description:** `conftest.py::_messageboxes_never_block` replaces every
+function in `tkinter.messagebox`, session-wide, with a recorder that returns a
+canned answer and cannot raise. It exists for a good reason - a real modal
+blocks a test run until someone clicks it - but it means the only call that
+fails in the running app is a call no test makes. PD-M12 is what that costs: a
+`TclError` out of `askyesno` killed two write paths on every weekend day, while
+`test_pdm7_a_non_work_day_asks_before_scheduling` passed throughout, asserting
+the block was written by code that could not ask the question at all.
+**Priority:** Medium
+**Effort:** Medium - a decision, then a sweep
+**Notes:** Two ways out, and they are not exclusive. (a) Where a dialog gates a
+write, call it through an app-owned seam like `widgets/confirm_dialog`, which a
+test can make raise - PD-M12 does this for one guard. (b) Give the recorder a
+way to be told to raise, and use it in at least one test per gated write path,
+so the failure mode is exercised somewhere. The general lesson belongs in
+`~/.claude/standards/learnings.md`: a stub installed for safety that cannot
+reproduce the failure it stands in for turns the untested path into an
+*invisible* one, which is P25 one layer down.
+
 ## Adjacent issue from the PD-M11 batch (2026-11-07)
 
 ### 2026-11-07 - Type: Bug

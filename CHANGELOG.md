@@ -61,10 +61,9 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   area taken out of the layout loses the size of the window its rows are drawn
   in, and gets it back from a handler that only runs when the next event
   arrives. The rows are now destroyed and rebuilt where they are. The same
-  cause was behind a drop on **Earlier** or **Later** looking like it had done
-  nothing, and behind *Schedule anyway* on a non-work day writing a block that
-  did not appear: both wrote correctly and redrew a pane that had not come
-  back.
+  cause was thought to be behind a drop on **Earlier** or **Later** looking
+  like it had done nothing, and behind *Schedule anyway* on a non-work day
+  writing a block that did not appear. It was not; see the third pass below.
 - **Earlier and Later are now fixed strips above and below the day, not rows
   inside it.** A day of eighteen half hours is taller than the pane, so the
   **Later** box sat below the bottom of it and no drag could reach it — there
@@ -74,6 +73,21 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   move off the edge or let go, so a half hour that is out of sight can be
   dropped on. It keeps scrolling while the pointer is held still, and the
   outline follows whichever box has moved under it.
+
+### Fixed — reported from the running screen (2026-11-07, third pass)
+
+- **A drop on a day outside your working week works again, and so does a drop
+  on Earlier or Later.** On macOS the system's own question dialog cannot be
+  opened from the moment a drag is released, and it failed with no message when
+  the Plan screen tried. Both of those gestures begin by asking whether the day
+  is a work day, so both ended there: nothing written, nothing said. On a
+  Saturday — which is every weekend, and the day this was found on — that was
+  every item drop on the screen. The question is now asked by the app's own
+  dialog, whose yes button says **Schedule anyway**.
+- **A question that cannot be shown no longer swallows the drag.** If the dialog
+  fails for any reason, the work is scheduled, the reason is logged, and the
+  status line says the question could not be shown. Losing the gesture silently
+  is worse than either answer to it.
 
 ### Added — the APE quarter/month consistency batch (2026-11-07)
 

@@ -1,7 +1,7 @@
-# Implementation plan — Plan screen day controls (PD-M1 … PD-M11)
+# Implementation plan — Plan screen day controls (PD-M1 … PD-M12)
 
 Date: 2026-11-06
-Status: **PD-M1 … PD-M6 shipped 2026-11-06. PD-M7, PD-M8, PD-M9, PD-M10, PD-M11 and the unplanned PD-M1.6, PD-M2.8 and PD-M2.9 shipped 2026-11-07. PD-M11 corrects PD-M10, which treated the symptom and not the cause**
+Status: **PD-M1 … PD-M6 shipped 2026-11-06. PD-M7, PD-M8, PD-M9, PD-M10, PD-M11, PD-M12 and the unplanned PD-M1.6, PD-M2.8 and PD-M2.9 shipped 2026-11-07. PD-M11 corrects PD-M10, which treated the symptom and not the cause; PD-M12 corrects PD-M11's reading of reports 2 and 3, which were a different fault entirely**
 Screen: `src/getmoredone/screens/plan.py`, `src/getmoredone/screens/plan_blocks.py`
 Follows: `docs/implementation_plan_2026-11-06_plan_box_appearance.md` (PB-M1 … PB-M7, shipped)
 
@@ -457,6 +457,18 @@ the write), and *Schedule anyway* writes the block
 redraw a pane that did not come back. Report 2 had a second cause of its own,
 below.
 
+> **Corrected 2026-11-07 by PD-M12.** The paragraph above is wrong, and it was
+> wrong in the way that matters: it reasoned from two passing tests to the
+> conclusion that the writes were happening and only the repaint was missing.
+> They were not happening. Both write paths begin by asking whether the day is
+> a work day, that question was `messagebox.askyesno`, and on macOS it raises
+> from the idle callback a drag release schedules. The user's own traceback is
+> in PD-M12. The tests passed because conftest replaces every `messagebox`
+> function with a recorder that cannot raise, so the one call that fails in the
+> running app is the one call no test makes. PD-M11's repaint and reach fixes
+> are still right and still needed — reports 2 and 3 simply were not about
+> them, which is why the user saw no change.
+
 **`update` was tried and rejected, with a measurement.** The macOS display
 path draws on a pass of the platform run loop, which `update` turns and
 `update_idletasks` does not, so `update` is the call that paints. It costs too
@@ -554,6 +566,95 @@ commit-separation rule.
    than what is there now.
 
 ---
+
+## PD-M12 — The question is asked by the app, not by the platform
+
+Reported on the running app after PD-M11 shipped: "Neither ends allow
+scheduling" and "Non-workday schedule on YES does NOT work" — two of PD-M11's
+four, unchanged. Reports 1 and 4 were fixed and confirmed on screen.
+
+The user sent the traceback, which named the fault outright:
+
+```
+  File ".../screens/plan.py", line 1235, in block_item
+    if not self._require_block_day():
+  File ".../screens/plan.py", line 1595, in _require_block_day
+    if messagebox.askyesno(
+  File ".../tkinter/messagebox.py", line 76, in _show
+    res = Message(**options).show()
+_tkinter.TclError
+```
+
+A `TclError` with no message, from the platform's own dialog, raised inside the
+`after_idle` callback `on_drag_release` schedules. macOS will not run
+`tk_messageBox` from there. The exception propagated out of the Tk callback, so
+neither write path got past its first statement:
+
+- `block_item` asks the question, so an item dropped on a half hour of a
+  non-work day wrote nothing — report 3.
+- `extend_day_for` asks the same question, so an item dropped on **Earlier** or
+  **Later** of a non-work day wrote nothing — report 2.
+
+And 2026-11-07 is a Saturday, which is why every gesture the user tried was on
+a non-work day and why both reports looked like two faults rather than one.
+
+**Why no test caught it, and why none could.** `conftest.py` replaces every
+function in `tkinter.messagebox` with a recorder that returns a canned answer
+and cannot raise — installed session-wide, for a good reason of its own: a real
+modal in a test run blocks until someone clicks it. The consequence is that the
+only call that fails in the running app is a call no test makes. P25, exactly:
+a check that exists on one surface and not the one anyone uses. A test asserting
+"the block is written when the user says yes" passed against code that could
+not ask the question at all.
+
+**What this module does.**
+
+- **PD-M12.1** The question is asked with the app's own dialog
+  (`widgets/confirm_dialog.py`): an ordinary Tk toplevel with a grab and
+  `wait_window`, which is Tcl's modality and does not go near AppKit's. It also
+  takes the words for its buttons, so the yes button says *Schedule anyway*
+  rather than *Yes*.
+- **PD-M12.2** A question that still cannot be put on the screen does not eat
+  the gesture. There are two ways to be wrong here — write without asking, or
+  lose the drag — and losing it is what happened: four gestures, nothing
+  written, nothing said. So a dialog that fails is logged, the work is
+  scheduled, and the status line says the question could not be shown. That is
+  also what PD-M7's "a warning, not a wall" means when the warning cannot be
+  given. The note is one-shot and belongs to the gesture, not to the day.
+- **PD-M12.3** The same guard is the first statement of `extend_day_for`, so
+  report 2 is the same fix. Its own test, because its own status line composes
+  the note separately — the mutation gate found that line deletable with every
+  other test green.
+- **PD-M12.4** The suite grows the guard the messagebox one already had:
+  `ask_yes_no` is stubbed session-wide, recorded, and answers no. Without it
+  every question in the suite would wait out the dialog's own visibility
+  timeout, because conftest withdraws every window.
+
+**Not changed, deliberately.** `messagebox` is still used by Clear Day on this
+screen and by twenty other call sites across the app. All of them are reached
+from a button or a menu, not from a drag release, and none has been reported.
+Swapping them is a UI change on surfaces nobody has walked, which is not a
+change to make inside a fix to a drop path. One of them is not merely adjacent
+but likely live, and it is in `BACKLOG.md`: the Scheduler's drag onto a project
+asks through `messagebox` from inside its own `ButtonRelease` handler.
+
+### Acceptance criteria
+
+| ID | Criterion | Test |
+|---|---|---|
+| PD-M12.1 | The non-work-day question is asked by the app's dialog; the platform's is not on the drop path | `::test_pdm121_the_question_is_asked_by_the_app` |
+| PD-M12.1 | The yes button names the gesture | `::test_pdm121_the_question_names_the_answer_it_wants` |
+| PD-M12.2 | A dialog that cannot be shown schedules the work and says so | `::test_pdm122_a_question_that_cannot_be_asked_still_schedules` |
+| PD-M12.2 | The note is said once, for the gesture, not for every later one on that day | `::test_pdm122_the_note_belongs_to_the_gesture_not_to_the_day` |
+| PD-M12.2 | The day-lengthening status line says it too | `::test_pdm122_the_end_of_the_day_says_it_too` |
+| PD-M12.3 | A drop on an end of a non-work day lengthens the day and blocks the item | `::test_pdm123_a_drop_on_an_end_of_a_non_work_day_extends_the_day` |
+| PD-M12.4 | No test can open a real confirm dialog | `::test_pdm124_a_test_cannot_open_a_real_dialog` |
+| PD-M12.5 | On the running app: the dialog appears on a Saturday drop, *Schedule anyway* writes the block, and a drop on either end lengthens the day | *(not code-testable — no test in this suite can build a visible window, and this failure was invisible to every test that did not)* |
+
+`widgets/confirm_dialog.py` itself has no direct test: it builds a toplevel and
+waits on it, and every window in this suite is withdrawn. What is tested is the
+Plan screen's use of it, the fallback when it raises, and the suite's guard over
+it. PD-M12.5 is the rest, and it is a walk.
 
 ## Documents to update when this is built
 
