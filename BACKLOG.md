@@ -1,6 +1,61 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-07 (four Plan / Day Plan faults reported from the running screen added at the top, recorded and not investigated; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Reported from the running screen — Plan / Day Plan (2026-11-07)
+
+Four faults reported by the user after the PD-* batch shipped. **Recorded, not
+investigated**: the descriptions below are the report, not a diagnosis. Nothing
+here has been reproduced, read in the code, or confirmed against a running app
+by this session.
+
+### 2026-11-07 - Type: Bug
+
+**Title:** Moving a Day Block leaves a blank panel until the mouse leaves it
+**Description:** Moving a block on the Day Plan produces a blank panel. It
+fills in as soon as the mouse moves outside the panel area.
+**Priority:** High
+**Effort:** Unknown
+**Notes:** Reads like the repaint class the PD-* batch set out to fix — a pane
+re-gridded inside an event callback that Tk does not draw until the next
+mouse motion over the window. That batch added `_flush_redraw` for exactly
+that shape, so either a path was missed or the fix does not cover the move
+path. First thing to check: whether the move path calls the flush at all.
+
+### 2026-11-07 - Type: Bug
+
+**Title:** An item cannot be moved into the early or late extended sections
+**Description:** Dragging an item into the early or late extended section of
+the day does not drop it there.
+**Priority:** High
+**Effort:** Unknown
+
+### 2026-11-07 - Type: Bug
+
+**Title:** "Schedule anyway" on a non-work day does nothing
+**Description:** Scheduling on a non-work day raises the confirmation message,
+but answering "schedule anyway" does not schedule the item — or the item does
+not appear afterwards. Which of those two it is has not been established.
+**Priority:** High
+**Effort:** Unknown
+**Notes:** Possibly the same thing as the sweep's PLAUSIBLE low finding
+recorded below ("`plan._require_block_day` opens a modal from inside a drop's
+`after_idle`"): the permission is recorded against one read of
+`self.selected_date` and the caller reads it again after the modal returns.
+That finding was left unfixed because neither review pass could drive a date
+change through Tk's modal grab and there was no demonstrated misbehaviour to
+test against. **This report may be that demonstration.** Unverified — do not
+treat the two as the same bug until one reproduction shows it.
+
+### 2026-11-07 - Type: Enhancement
+
+**Title:** The Day Plan does not scroll while dragging an item past its edge
+**Description:** Dragging an item up or down towards an area that is off
+screen should scroll the Day Plan window to follow it. It does not, so an
+item cannot be dragged to a time that is not already visible.
+**Priority:** Medium
+**Effort:** Unknown
+
 
 ## Deferred from the APE period-consistency sweep (2026-11-07)
 
