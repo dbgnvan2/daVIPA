@@ -694,3 +694,56 @@ in §6's mutation table:
   before rewriting: (c) the test was over-specified or vacuous. It now seeds
   the dangling link with foreign keys off and asserts the dirty state really is
   dirty before asserting the helper's answer.
+
+
+---
+
+# Spec Coverage — one panel design across the VSP tabs (2026-11-07)
+
+Spec: [`docs/spec_2026-11-07_unified_panel_design.md`](spec_2026-11-07_unified_panel_design.md)
+
+Tests all live in `tests/test_unified_panel_design.py`.
+
+## UPD-M1 — one splitter, not four
+
+| Spec ID | Description | Implementation | Test | Status |
+|---|---|---|---|---|
+| M1.1 | `screens/split_panel.py` owns the ratio, the clamp and the handlers | `src/getmoredone/screens/split_panel.py::SplitPanel` | `::test_updm11_split_panel_module_owns_the_divider` | done |
+| M1.2 | A drag right widens the left and narrows the right by the same pixels | `SplitPanel.on_press`, `SplitPanel.on_drag` | `::test_updm12_drag_moves_both_panels_by_the_same_amount` | done |
+| M1.3 | Neither panel goes below its minimum, at any body width | `SplitPanel.clamp_left`, `SplitPanel.apply` | `::test_updm13_neither_panel_can_be_crushed` | done |
+| M1.4 | A body width of 0 or less is a no-op | `SplitPanel._usable_width` | `::test_updm14_zero_width_body_is_a_noop` | done |
+| M1.5 | No screen keeps its own splitter — exact count from the AST | `src/getmoredone/screens/ape_assignment.py` (adopted) | `::test_updm15_no_screen_keeps_its_own_splitter` | **partial** — the guard is exact, the count is not yet 0: UPD-M1 adopts `ape_assignment.py` only, per the spec's §4 step 2. `annual_vision_segments.py`, `ape_period_view.py` and `weekly_items.py` adopt at UPD-M4; `project_boards.py` is out of scope (UPD-A5). |
+| M1.6 | The ratio persists across a rebuild | `SplitPanel._load_ratio`, `SplitPanel._persist`, `AppSettings.ape_quarter_split_ratio` | `::test_updm16_split_ratio_survives_a_relaunch`, `::test_updm16_the_ratio_has_a_settings_field_to_land_in`, `::test_updm16_a_prefix_with_no_settings_field_says_so` | done |
+
+One deliberate behaviour change against D1, and the measurement behind it, are
+in the spec's §10: the four copies held only the left panel at the minimum, so
+a narrow body gave the right panel a negative grid minsize, which Tk accepts
+without complaint. `apply()` holds both sides now.
+
+## UPD-M3 — one chip table
+
+| Spec ID | Description | Implementation | Test | Status |
+|---|---|---|---|---|
+| M3.1 | Header and N rows from a column spec list | `src/getmoredone/screens/chip_table.py::ChipTable.build_header`, `::add_row` | `::test_updm31_table_renders_header_and_rows` | done |
+| M3.2 | Every resizable column has a header handle | `ChipTable.build_header` via `ColumnResizer.build_dividers` | `::test_updm32_every_resizable_column_has_a_handle` | done |
+| M3.3 | Resizing one column leaves the others | `ColumnResizer` | `::test_updm33_resizing_one_column_leaves_the_others` | done |
+| M3.4 | A width is clamped to the column's min and max | `ColumnResizer._clamp` | `::test_updm34_column_width_is_clamped` | done |
+| M3.5 | Chip text follows the column width | `ChipTable._apply_live` | `::test_updm35_chip_text_follows_the_column_width` | done |
+| M3.6 | Widths persist per panel prefix | `ColumnResizer._setting_attr` | `::test_updm36_panels_keep_their_own_widths` | done |
+| M3.7 | Missing lineage renders without raising | `ChipTable` fallback palette | `::test_updm37_missing_lineage_falls_back_instead_of_raising`, `::test_updm37_the_fallback_chip_does_not_measure_a_named_colour` | done |
+
+**Adopted by nothing yet** — the module's own docstring says so, and UPD-M4 is
+the step that changes it. AWA-S5 and AWA-S6 in `BACKLOG.md` are its review
+findings, both to be settled before the first screen adopts.
+
+## UPD-M2, UPD-M4 … UPD-M7
+
+`not done` — not started. UPD-M4.1's characterisation tests for APE Quarter
+Assignment exist and are green (`::test_updm41_*`), written before UPD-M1
+removed a line from that screen, which is what the spec's §5 required.
+
+## Not verified on screen
+
+UPD-M7.2 and UPD-M7.3 are on-screen criteria and are `not done`. Nothing in
+UPD-M1 or UPD-M3 has been seen running; every test above builds its screen on
+a withdrawn root.

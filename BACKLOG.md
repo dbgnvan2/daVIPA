@@ -1,6 +1,49 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (a third cold pass over the AWA re-sweep's fixes added AWA-S9 to AWA-S11, found no high, and showed that half of one low fixed in the previous round was not a defect; the cold re-sweep of the AWA fix commits added its four remaining lows as AWA-S5 to AWA-S8, with its one high, three mediums and one raised low fixed in-loop and one low fixed against the budget with its reason stated there; the AWA sweep's four below-medium findings added as AWA-S1 to AWA-S4, with its one high and five mediums fixed in-loop and AWA-A3 mostly closed by that fix; four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-07 (UPD-M1 added two adjacent issues as UPD-A5 and UPD-A6 - a fifth copy of the splitter in Project Boards, whose clamp was already right where the four consolidated copies were wrong, and the holdout list UPD-M1.5 needs until UPD-M4 empties it; a third cold pass over the AWA re-sweep's fixes added AWA-S9 to AWA-S11, found no high, and showed that half of one low fixed in the previous round was not a defect; the cold re-sweep of the AWA fix commits added its four remaining lows as AWA-S5 to AWA-S8, with its one high, three mediums and one raised low fixed in-loop and one low fixed against the budget with its reason stated there; the AWA sweep's four below-medium findings added as AWA-S1 to AWA-S4, with its one high and five mediums fixed in-loop and AWA-A3 mostly closed by that fix; four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Adjacent issues — one panel design across the VSP tabs (UPD, 2026-11-07)
+
+Found while building UPD-M1, recorded under the standing rule rather than
+fixed in a sweeping diff.
+
+### 2026-11-07 - Type: Technical Debt
+
+**Title:** UPD-A5 - project_boards.py holds a fifth copy of the splitter, with a better clamp than the four
+**Description:** `src/getmoredone/screens/project_boards.py:772-1126` has its
+own splitter: `SPLITTER_WIDTH = 8`, `MIN_PANEL_WIDTH = 300`,
+`_split_ratio = 0.6`, `_on_divider_press/_drag/_release`, and the apply inlined
+into `_on_body_resize` rather than a separate `_apply_split_ratio`. The spec's
+§1.1 said the splitter was written out four times; it is five, and the fifth
+was found by the AST scan behind `test_updm15_no_screen_keeps_its_own_splitter`
+rather than by reading. Two things follow. First, `split_panel.py` is not yet
+the single owner it claims to be, and this screen is the one file that keeps
+its own numbers for reasons of its own (a 300px minimum and a 0.6 default both
+suit a board/detail layout, not two equal panels). Second, its clamp was
+already **right** where the four were wrong: `right = max(MIN_PANEL_WIDTH,
+total - left)` at `:1124`, which is the line UPD-M1.3 had to add to the shared
+module. Not fixed because Project Boards is not a VSP tab and nothing in the
+request named it, so adopting it here would be a change to an unrelated screen
+on the back of this work. The scan asserts exactly what this file still
+defines, so the day it is consolidated the test says so.
+**Priority:** Low
+**Effort:** Medium
+
+### 2026-11-07 - Type: Technical Debt
+
+**Title:** UPD-A6 - UPD-M1.5 cannot read 0 until UPD-M4, and the holdout list is a second place to keep in step
+**Description:** `test_updm15_no_screen_keeps_its_own_splitter` asserts an
+exact set, not a floor, so it is a real guard: it goes red if a seventh screen
+grows its own splitter, and red again when `annual_vision_segments.py`,
+`ape_period_view.py` or `weekly_items.py` adopts and is not struck off
+`SPLITTER_HOLDOUTS`. That second failure is deliberate - an adoption that
+leaves the list stale should not pass - but it does mean the list is a second
+place that has to be kept in step with the code until UPD-M4 empties it. It is
+recorded so that nobody reading the criterion as `done` is misled: the
+criterion is `partial` in the spec's §10 and in `docs/spec_coverage.md`, and it
+closes when the last holdout adopts. Not an action in itself; UPD-M4 closes it.
+**Priority:** Low
+**Effort:** Low
 
 ## Adjacent issues — APE Week Assignment / APE Week Actions (AWA, 2026-11-07)
 

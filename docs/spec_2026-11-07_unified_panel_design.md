@@ -1,6 +1,7 @@
 # Spec + implementation plan — one panel design across the VSP tabs
 
-Status: **drafted 2026-11-07, not approved, no code written.**
+Status: **approved 2026-11-07. UPD-M3 and UPD-M1 built; UPD-M2 and
+UPD-M4 … UPD-M7 outstanding.** Per-criterion status is in §10.
 IDs: `UPD-M1` … `UPD-M7`. Use them verbatim in commits, docstrings and test
 names.
 
@@ -49,15 +50,31 @@ The VSP hub has six tabs (`screens/vision_planning_hub.py:90-97`). Measured
 | APE Week Assignment | `weekly_items.py` | 610 | yes | partly — see below | yes | no |
 | APE Week Actions | `week_actions.py` | 351 | **no** | **no** — buttons | **no** | right panel only, inherited |
 
-### 1.1 The splitter is written out four times
+### 1.1 The splitter is written out five times, not four
 
 `_on_divider_press` / `_on_divider_drag` / `_on_divider_release` /
 `_apply_split_ratio` / `_on_body_resize`, plus `SPLITTER_WIDTH`,
 `MIN_PANEL_WIDTH` and `_split_ratio = 0.5`, appear in
 `annual_vision_segments.py`, `ape_assignment.py`, `ape_period_view.py` and
-`weekly_items.py`. The bodies are the same arithmetic. `MIN_PANEL_WIDTH` is
-420 in one and not declared as a class constant in the others. The ratio is
-**not persisted** anywhere — every tab opens at 0.5 every launch.
+`weekly_items.py`. The five method bodies are not merely the same arithmetic:
+`diff` of all four is **byte-identical**, measured before the extraction. All
+four declare `MIN_PANEL_WIDTH = 420`; the ratio is **not persisted** anywhere,
+so every tab opens at 0.5 every launch.
+
+**Two corrections to what this section claimed when it was drafted**, both
+established while building UPD-M1 and both corrected here rather than left to
+stand:
+
+- It is **five** copies. `project_boards.py:772-1126` holds a fifth, which the
+  AST scan behind UPD-M1.5 found. It is not a VSP tab, so it stays out of
+  scope, and it differs in four ways: `MIN_PANEL_WIDTH = 300`, a default ratio
+  of 0.6, no `_apply_split_ratio` (the arithmetic is inlined in
+  `_on_body_resize`), and a clamp that holds **both** panels at the minimum
+  where the other four hold only the left. Recorded as UPD-A5.
+- `MIN_PANEL_WIDTH` is not "420 in one and not declared in the others". All
+  four declare it as a class constant with the same value. The 520 that reading
+  came from is the initial `minsize` on the body's two panel columns, which is
+  a starting layout, not a minimum: it is overwritten by the first resize.
 
 ### 1.2 The drag is written out four times
 
@@ -315,12 +332,24 @@ Steps 1-3 are the ones worth pausing after; from step 4 on it is repetition.
 - **UPD-A1 — `vision_segments.py` is the odd one out.** Three fixed-width
   column blocks, no panels, no divider. Bringing it in is a redesign of that
   tab rather than an alignment, and nothing in the request named it.
-- **UPD-A2 — `MIN_PANEL_WIDTH` is 420 in `annual_vision_segments.py` and a
-  bare 520 `minsize` in the other three.** Consolidating forces one number;
-  this spec takes the lower, because the Week Actions body is the narrowest.
+- **UPD-A2 — withdrawn, it was a misreading.** All four screens declare
+  `MIN_PANEL_WIDTH = 420`; the 520 is the initial `minsize` on each panel
+  column, which the first resize overwrites. There was no number to reconcile,
+  and `split_panel.py` carries the 420 the four agreed on. See §1.1.
 - **UPD-A3 — the split ratio has never persisted on any tab.** Fixed by D4
   rather than recorded, because it is one field per screen and the request
   says "resizing", which nobody means once-per-launch.
+- **UPD-A5 — `project_boards.py` holds a fifth copy of the splitter, with a
+  better clamp than the four this spec consolidates.** `:772-1126`:
+  `MIN_PANEL_WIDTH = 300`, a 0.6 default, the apply inlined into
+  `_on_body_resize`, and `right = max(MIN_PANEL_WIDTH, total - left)` — which
+  is the line the four were missing (see UPD-M1.3 in §10). Not fixed, because
+  Project Boards is not a VSP tab and bringing it in is a change to a screen
+  nothing in the request named; sweeping it in on the back of this work is the
+  silent-wide-diff the standing rule forbids. Recorded in `BACKLOG.md`, and
+  pinned by `test_updm15_no_screen_keeps_its_own_splitter`, which asserts
+  exactly what that file still defines, so it cannot be forgotten and cannot
+  quietly grow a sixth variant.
 - **UPD-A4 — `drag_schedule.py` and `today.py` have the only two
   `ColumnResizer` callers today**, and both predate this. If the chip-table
   work changes `column_resize.py` at all, those two screens are in the blast
@@ -385,3 +414,54 @@ screen to **lose** 80-120. `codex.md`'s maintainability policy is read before
 - It does not change what any tab *does* — what is assigned, saved, deleted or
   filtered is the same before and after, except for UPD-M5's new per-row
   Delete.
+
+---
+
+## 10. Status, criterion by criterion
+
+### UPD-M1 — one splitter, not four — **done**, with one criterion partial
+
+| ID | Status | Evidence |
+|---|---|---|
+| M1.1 | done | `src/getmoredone/screens/split_panel.py`; `tests/test_unified_panel_design.py::test_updm11_split_panel_module_owns_the_divider` |
+| M1.2 | done | `::test_updm12_drag_moves_both_panels_by_the_same_amount` — 60px right is +60 left and -60 right, and the press is asserted to have captured the panel's applied width |
+| M1.3 | done | `::test_updm13_neither_panel_can_be_crushed` — three roomy widths × six ratios, both drag edges, and three bodies too narrow to seat two minimums |
+| M1.4 | done | `::test_updm14_zero_width_body_is_a_noop` |
+| M1.5 | **partial** | `::test_updm15_no_screen_keeps_its_own_splitter`. The guard exists and is exact, but the count is not yet 0: UPD-M1 adopts `ape_assignment.py` alone, per §4 step 2. The three VSP holdouts are named in the test and adopt at UPD-M4; `project_boards.py` is UPD-A5 and stays. The criterion closes when the last holdout adopts. |
+| M1.6 | done | `::test_updm16_split_ratio_survives_a_relaunch`, `::test_updm16_the_ratio_has_a_settings_field_to_land_in`, `::test_updm16_a_prefix_with_no_settings_field_says_so` |
+
+**One deliberate behaviour change, against D1's "no behaviour change".** M1.3
+says "at any body width", and the four copies did not hold that: they clamped
+the left panel only and gave the right whatever was left, so on a body under
+`2 * MIN_PANEL_WIDTH` the right panel went below the minimum, and under
+`MIN_PANEL_WIDTH` it took a **negative** grid minsize. Tk accepts a negative
+minsize silently — measured, not assumed — which is why it survived four
+copies and a fifth already holding it (UPD-A5). `apply()` now holds both sides
+and lets the body overflow instead, which is what a minimum means. A mutation
+removing the `max` turns `test_updm13` red.
+
+**One claim not made.** The extraction was checked for identity before it was
+written: `diff` across the four `_on_body_resize … _apply_split_ratio` blocks
+is byte-identical, so "no behaviour change" is measured for the arithmetic
+rather than asserted. The two differences above are the two exceptions, both
+named.
+
+**Mutation gate:** 8, each the verbatim original, each run alone, every file
+restored and sha256-compared. 8 red.
+
+**Not verified on screen.** Nothing in UPD-M1 has been seen running; M7.2 and
+M7.3 are the on-screen criteria and are still open. The divider's persistence
+in particular has only been proved against the real screen on a withdrawn
+root.
+
+### UPD-M3 — one chip table — **built, adopted by nothing**
+
+`chip_table.py` exists with all seven criteria tested
+(`::test_updm31` … `::test_updm37`), and its own docstring opens by saying
+nothing uses it yet. It is adopted at UPD-M4. Two findings from its review are
+filed under the batch it shipped in, as `BACKLOG.md`'s **AWA-S5** (a chip's
+text is clamped to the column width, not to the pill) and **AWA-S6** (five
+lifecycle assumptions its API does not enforce). Both are named there as things
+to settle before UPD-M4 moves the first screen onto the table.
+
+### UPD-M2, UPD-M4 … UPD-M7 — **not started**

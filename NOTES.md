@@ -1,5 +1,35 @@
 ## Recent Changes (2026-11-07)
 
+### One panel design across the VSP tabs - UPD-M1, the splitter
+
+- ✅ **The vertical divider has one owner:
+  `src/getmoredone/screens/split_panel.py`.** The same 30 lines were written
+  out in `annual_vision_segments.py`, `ape_assignment.py`,
+  `ape_period_view.py` and `weekly_items.py` - `diff` of all four is
+  byte-identical, measured before anything was removed. APE Quarter
+  Assignment has adopted it; the other three adopt at UPD-M4, and
+  `test_updm15_no_screen_keeps_its_own_splitter` names them so the list cannot
+  go stale.
+- ✅ **A divider stays where you left it.** It never did: every tab opened at
+  the middle every launch, however the divider had been dragged. Stored per
+  screen as `<prefix>_split_ratio`, the same way column widths are
+  (`ape_quarter_split_ratio` is the first). `split_panel.py` logs a warning if
+  a screen is given a prefix with no `AppSettings` field, because that would
+  otherwise look like working drag and a forgetful relaunch.
+- ⚠️ **The spec said the splitter was written out four times. It is five.**
+  `project_boards.py` holds a fifth copy with its own minimum (300), its own
+  default (0.6) and - as it turns out - a *better* clamp than the four: it
+  holds both panels at the minimum where they held only the left. Project
+  Boards is not a VSP tab, so it is recorded as UPD-A5 rather than swept into
+  this change. The spec's §1.1 and its UPD-A2 are corrected where they stood.
+- ✅ **The missing half of that clamp is fixed in the shared module.** On a
+  body too narrow to seat two minimums the four copies gave the right panel
+  whatever was left over, which below 420px is a negative grid minsize. Tk
+  accepts that silently - measured - so nothing ever failed and it survived
+  four copies. Both panels are held now, and the body overflows instead.
+- ⚠️ **Not seen on screen.** Every test builds its screen on a withdrawn root.
+  UPD-M7.2 and UPD-M7.3 are the on-screen criteria and are still open.
+
 ### APE Week Assignment, and the week's Action Items (AWA-M1 - AWA-M6)
 
 - ✅ **"APE Weekly" is now "APE Week Assignment", and there is a sixth tab,

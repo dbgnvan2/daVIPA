@@ -7,6 +7,27 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — one panel design across the VSP tabs (2026-11-07)
+
+- **A two-panel tab's vertical divider stays where you left it.** It never did:
+  every tab reopened with the divider in the middle, whatever you had dragged
+  it to. The position is now remembered per tab, the way column widths already
+  were. APE Quarter Assignment is the first tab to get this; the other
+  two-panel tabs follow.
+- **A panel can no longer be squeezed out of existence.** On a window narrow
+  enough that both panels cannot have their minimum width, the right-hand panel
+  used to be given whatever was left - which, past a point, was nothing or less
+  than nothing. Both panels keep their minimum now and the window scrolls or
+  clips instead.
+
+### Internal
+
+- The divider's behaviour - the ratio, the clamp, the drag - was written out
+  identically in four screen files and is now one module,
+  `screens/split_panel.py`, which is the only place the numbers live. A fifth,
+  older copy in Project Boards is recorded as an adjacent issue rather than
+  changed, since that screen is not part of this alignment.
+
 ### Added — APE Week Assignment, and the week's Action Items (2026-11-07)
 
 - **The "APE Weekly" tab is now "APE Week Assignment".** The old name said
