@@ -10,9 +10,14 @@ Based on simplified architecture where:
 """
 
 import sqlite3
+from datetime import datetime
 from typing import List, Optional, Tuple
 
 from .date_utils import MONTHS_OF_QUARTER
+from .weekly_tactic_logging import get_weekly_tactic_logger
+
+
+logger = get_weekly_tactic_logger()
 
 
 class VPSSchema:
@@ -795,7 +800,9 @@ class VPSSchema:
         VPSSchema._repair_orphan_month_flags(conn)
 
     @staticmethod
-    def _repair_orphan_month_flags(conn: sqlite3.Connection):
+    def _repair_orphan_month_flags(
+        conn: sqlite3.Connection,
+    ) -> List[Tuple[str, int]]:
         """APC-M5 — set the quarter flag every stored month flag implies.
 
         Purpose: make a month assignment visible to every screen that reads it,
@@ -804,6 +811,7 @@ class VPSSchema:
         Tests:   tests/test_ape_period_consistency.py::test_apcm51_migration_backfills_the_implied_quarter_flag
                  tests/test_ape_period_consistency.py::test_apcm52_dirty_state_orphan_quarter_flag_is_repaired_on_reopen
                  tests/test_ape_period_consistency.py::test_apcm53_migration_is_idempotent
+                 tests/test_ape_period_consistency.py::test_apcm54_the_repair_reports_every_row_it_changed
 
         Until APC-M2 guarded it, ``assign_ape_to_month`` wrote whatever quarter
         the picker happened to show, so an APE could end up with ``m11 = 1``
@@ -812,18 +820,49 @@ class VPSSchema:
         Additive only: it sets the implied quarter and never clears one. A
         quarter flag with no month flags in it is a legitimate state — an APE
         assigned to the quarter but not yet to a month — so clearing anything
-        here would destroy real assignments. Idempotent: the ``WHERE`` clause
-        matches nothing on a second run, so ``updated_at`` is left alone on
-        rows that were already consistent.
+        here would destroy real assignments.
+
+        APC-M5.4 — it says what it did. This runs against the user's real
+        database every time the app opens, and the first version returned
+        nothing, logged nothing and left ``updated_at`` alone, so the only
+        trace of a repair was the changed data: an APE appearing in a quarter
+        nobody remembers assigning, with no record of whether the migration
+        did it. ``weekly_tactic_migrations._log_report`` already holds this
+        repo's rule for it — "an automatic data change that says nothing is
+        indistinguishable from one that did nothing" (P2). The rows are read
+        before the write so each one can be named, and ``updated_at`` is
+        stamped because the row really did change.
+
+        Idempotent, and now provably so rather than by inference: a second run
+        selects no rows, so it returns ``[]`` and writes nothing at all.
         """
-        for quarter, months in MONTHS_OF_QUARTER.items():
+        repaired: List[Tuple[str, int]] = []
+        now = datetime.now().isoformat()
+        for quarter, months in sorted(MONTHS_OF_QUARTER.items()):
             month_test = " OR ".join(f"m{month} = 1" for month in months)
-            conn.execute(f"""
-                UPDATE annual_plan_elements
-                SET q{quarter} = 1
+            rows = conn.execute(f"""
+                SELECT id FROM annual_plan_elements
                 WHERE COALESCE(q{quarter}, 0) = 0
                   AND ({month_test})
-            """)
+                ORDER BY id
+            """).fetchall()
+            if not rows:
+                continue
+            ids = [row[0] for row in rows]
+            conn.executemany(
+                f"UPDATE annual_plan_elements "
+                f"SET q{quarter} = 1, updated_at = ? WHERE id = ?",
+                [(now, ape_id) for ape_id in ids],
+            )
+            repaired.extend((ape_id, quarter) for ape_id in ids)
+
+        if repaired:
+            logger.info(
+                "[vps_schema] APC-M5 backfilled %d implied quarter flag(s): %s",
+                len(repaired),
+                repaired,
+            )
+        return repaired
 
     @staticmethod
     def _extend_vision_subsegments(conn: sqlite3.Connection):

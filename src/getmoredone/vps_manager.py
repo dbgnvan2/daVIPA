@@ -19,7 +19,7 @@ from .link_integrity import (
     resolve_segment_id_exact,
 )
 from . import week_calendar
-from .date_utils import months_of_quarter, quarter_of_month
+from .date_utils import QUARTER_OF_MONTH, months_of_quarter, quarter_of_month
 from .weekly_tactic_logging import get_weekly_tactic_logger
 from . import weekly_tactic_titles
 from .models import ActionItem
@@ -404,6 +404,7 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
         Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m4
         Tests:   tests/test_ape_period_consistency.py::test_apcm41_month_lookup_matches_on_month_flag_alone
                  tests/test_ape_period_consistency.py::test_apcm42_orphan_month_flag_still_appears_in_november
+                 tests/test_ape_period_consistency.py::test_apcm44_month_lookup_guard_is_type_safe
 
         APC-M4.1 — the month alone, not the month and its quarter. This
         replaced ``get_annual_plan_elements_for_period(year, quarter, month)``,
@@ -411,10 +412,24 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
         the matching quarter flag as well. That bought nothing when the flags
         agreed and hid the row when they did not: an APE with ``m11 = 1`` and
         ``q4 = 0`` was invisible in APE Weekly for every November week.
+
+        APC-M4.4 — the guard is a membership test against the canonical map,
+        and the column name is built from an ``int`` rather than from the
+        argument as it arrived. ``month < 1 or month > 12`` was neither: it
+        raises ``TypeError`` on a string and *passes* a float, and ``m_col`` is
+        interpolated into the SQL as a column name — so ``11.0`` reached SQLite
+        as ``m11.0`` and raised ``OperationalError`` from inside a Tk callback,
+        where nothing is on screen to show it.
+
+        Both halves are needed, and the membership test alone is the half that
+        looks sufficient and is not: ``11.0 in {11: ...}`` is ``True``, because
+        a dict is keyed by hash and equality, so a float passes the test. The
+        ``int()`` is what makes the interpolated name one of the twelve columns
+        that exist. A string reaches neither — it is not in the map at all.
         """
-        if month < 1 or month > 12:
+        if month not in QUARTER_OF_MONTH:
             return []
-        m_col = f"m{month}"
+        m_col = f"m{int(month)}"
         cursor = self.db.conn.execute(f"""
             SELECT * FROM annual_plan_elements
             WHERE year = ?

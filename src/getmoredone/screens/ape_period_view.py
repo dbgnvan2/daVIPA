@@ -310,6 +310,29 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         self._render_rows(self.right_list, self._filtered_rows(self.right_items), selectable=False)
 
     def add_selected(self):
+        """Assign every checked APE to the selected month.
+
+        Purpose: APC-M2.3 — Save says what it did, including what it failed to
+                 do, for every APE in the press rather than for the press.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m2
+        Tests:   tests/test_ape_period_consistency.py::test_apcm23_save_reports_refused_assignments
+                 tests/test_ape_period_consistency.py::test_apcm24_a_raising_assignment_is_counted_not_escaped
+
+        APC-M2.4 — each APE is assigned inside its own ``try``.
+        ``assign_ape_to_month`` does not only return ``False``: it raises
+        ``ValueError`` when an APE's ``segment_name`` resolves to no segment
+        (``vps_manager`` — the renamed-segment hazard
+        ``tests/test_rename_safe_links.py`` exists for). Without the ``try``
+        the raise left the earlier APEs written, skipped both the redraw and
+        the status line, and left the *previous* press's "Assigned 3 APE(s)"
+        on screen — a success message for a save that half happened, with the
+        traceback going to a stderr a double-clicked app does not have.
+
+        Counted as refused rather than re-raised, and the exception goes to the
+        log: the whole point of the status line is that a press reconciles
+        with what reached the database, and a press that wrote two of three
+        has to say two.
+        """
         parsed = self._parse_period()
         if not parsed:
             return
@@ -321,15 +344,38 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         assigned = 0
         refused = 0
         for ape_id in selected_ids:
-            if self.vps_manager.assign_ape_to_month(ape_id, quarter, month):
+            if self._assign_one(ape_id, quarter, month):
                 assigned += 1
             else:
                 refused += 1
-                logger.warning(
-                    "[ape_period_view] APE %s was not assigned to %d/%d.", ape_id, quarter, month
-                )
         self.refresh_lists()
         self.status_label.configure(text=self._describe_month_assignment(assigned, refused, month))
+
+    def _assign_one(self, ape_id: str, quarter: int, month: int) -> bool:
+        """One APE's month assignment: ``True`` only if the row was written.
+
+        Purpose: APC-M2.4 — the one place a refusal and a raise are turned into
+                 the same answer, so both callers on this screen count them the
+                 same way.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m2
+        Tests:   tests/test_ape_period_consistency.py::test_apcm24_a_raising_assignment_is_counted_not_escaped
+
+        Both the Save button and the drop target go through here. Hardening one
+        and leaving the other to raise is the sibling problem P5 describes, and
+        it is the mistake the first version of this screen made.
+        """
+        try:
+            if self.vps_manager.assign_ape_to_month(ape_id, quarter, month):
+                return True
+            logger.warning(
+                "[ape_period_view] APE %s was not assigned to %d/%d.", ape_id, quarter, month
+            )
+        except Exception:
+            logger.exception(
+                "[ape_period_view] APE %s raised while being assigned to %d/%d.",
+                ape_id, quarter, month,
+            )
+        return False
 
     @staticmethod
     def _describe_month_assignment(assigned: int, refused: int, month: int) -> str:
@@ -341,9 +387,14 @@ class APEPeriodViewScreen(ctk.CTkFrame):
 
         ``assign_ape_to_month`` returns a bare boolean and refuses for more
         than one reason, so this counts what did not happen rather than
-        guessing why. Both the Save button and the drop target report through
-        here: hardening one and leaving the other silent is the sibling problem
-        P5 describes.
+        guessing why.
+
+        The class is four write paths, not two. Both of this screen's report
+        through here, and the first version of this docstring said so and
+        stopped there — while APE Quarter's Save and drop target, edited in the
+        same change, stayed silent. That is the "fixed as a class" shape P5
+        describes: the denominator was counted on one screen. APE Quarter now
+        has ``_describe_quarter_assignment``, the same wording with Q for M.
         """
         text = f"Assigned {assigned} APE(s) to M{month}."
         if refused:
@@ -501,12 +552,7 @@ class APEPeriodViewScreen(ctk.CTkFrame):
             parsed = self._parse_period()
             if parsed:
                 _year, quarter, month = parsed
-                ok = self.vps_manager.assign_ape_to_month(row["id"], quarter, month)
-                if not ok:
-                    logger.warning(
-                        "[ape_period_view] dragged APE %s was not assigned to %d/%d.",
-                        row["id"], quarter, month,
-                    )
+                ok = self._assign_one(row["id"], quarter, month)
                 self.refresh_lists()
                 self.status_label.configure(
                     text=self._describe_month_assignment(1 if ok else 0, 0 if ok else 1, month)

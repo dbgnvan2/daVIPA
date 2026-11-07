@@ -8,12 +8,16 @@ import customtkinter as ctk
 
 from ..color_contrast import pick_text_color
 from ..date_utils import current_quarter
-from ..theme import button_style, semantic_colors
+from ..theme import button_style, semantic_colors, status_text_color
+from ..weekly_tactic_logging import get_weekly_tactic_logger
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
     from ..vps_manager import VPSManager
+
+
+logger = get_weekly_tactic_logger()
 
 
 class APEAssignmentScreen(ctk.CTkFrame):
@@ -96,6 +100,12 @@ class APEAssignmentScreen(ctk.CTkFrame):
             header, width=160, values=["All"], variable=self.category_filter_var, command=lambda _v: self.on_filters_changed()
         )
         self.category_filter_combo.grid(row=1, column=12, padx=4, pady=(0, 8), sticky="w")
+
+        # APC-M6.2 — somewhere for Save to say what it did, as APE Month has.
+        # Before this the quarter screen reported neither a success nor a
+        # refusal on either of its two write paths.
+        self.status_label = ctk.CTkLabel(header, text="", text_color=status_text_color("muted"))
+        self.status_label.grid(row=2, column=0, columnspan=13, sticky="w", padx=8, pady=(0, 8))
 
         body = ctk.CTkFrame(self)
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
@@ -226,16 +236,80 @@ class APEAssignmentScreen(ctk.CTkFrame):
         self._render_rows(self.right_list, self._filtered_rows(self.right_items), selectable=False)
 
     def add_selected(self):
+        """Assign every checked APE to the selected quarter.
+
+        Purpose: APC-M6.2 — the quarter screen says what Save did, as the month
+                 screen does, on both of its write paths.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m6
+        Tests:   tests/test_ape_period_consistency.py::test_apcm62_quarter_save_reports_refused_assignments
+                 tests/test_ape_period_consistency.py::test_apcm62_quarter_save_with_nothing_checked_says_so
+
+        APC-M6.2. ``assign_ape_to_quarter`` returns a bare boolean and can
+        raise ``ValueError`` when an APE's segment resolves to nothing, and
+        this screen discarded both: a rejected APE simply did not appear in the
+        right-hand panel, which is what a click on the wrong row looks like.
+        The month screen was hardened on exactly this axis in the same change
+        and this one was left silent — the "fixed as a class" shape P5
+        describes, where the denominator was two paths on one screen and is
+        really four across two.
+        """
         parsed = self._parse_period()
         if not parsed:
             return
         _year, quarter = parsed
         selected_ids = [row_id for row_id, var in self.left_checks.items() if var.get()]
         if not selected_ids:
+            self.status_label.configure(text="Check one or more APEs on the left first.")
             return
+        assigned = 0
+        refused = 0
         for ape_id in selected_ids:
-            self.vps_manager.assign_ape_to_quarter(ape_id, quarter)
+            if self._assign_one(ape_id, quarter):
+                assigned += 1
+            else:
+                refused += 1
         self.refresh_lists()
+        self.status_label.configure(
+            text=self._describe_quarter_assignment(assigned, refused, quarter)
+        )
+
+    def _assign_one(self, ape_id: str, quarter: int) -> bool:
+        """One APE's quarter assignment: ``True`` only if the row was written.
+
+        Purpose: APC-M6.2 — turn a refusal and a raise into the same answer, so
+                 both write paths on this screen count them the same way.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m6
+        Tests:   tests/test_ape_period_consistency.py::test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped
+        """
+        try:
+            if self.vps_manager.assign_ape_to_quarter(ape_id, quarter):
+                return True
+            logger.warning(
+                "[ape_assignment] APE %s was not assigned to Q%d.", ape_id, quarter
+            )
+        except Exception:
+            logger.exception(
+                "[ape_assignment] APE %s raised while being assigned to Q%d.",
+                ape_id, quarter,
+            )
+        return False
+
+    @staticmethod
+    def _describe_quarter_assignment(assigned: int, refused: int, quarter: int) -> str:
+        """APC-M6.2 — one wording for every path that assigns a quarter.
+
+        Purpose: never let a refused assignment look like a successful one.
+        Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m6
+        Tests:   tests/test_ape_period_consistency.py::test_apcm62_quarter_save_reports_refused_assignments
+
+        The month screen's ``_describe_month_assignment`` with Q for M: the two
+        screens are the same gesture against a different column, and a user who
+        has read one message should not have to read the other differently.
+        """
+        text = f"Assigned {assigned} APE(s) to Q{quarter}."
+        if refused:
+            text += f" {refused} could not be assigned — see the log."
+        return text
 
     def _render_rows(self, container: ctk.CTkScrollableFrame, rows: list[dict], selectable: bool):
         for w in container.winfo_children():
@@ -388,8 +462,13 @@ class APEAssignmentScreen(ctk.CTkFrame):
             parsed = self._parse_period()
             if parsed:
                 _year, quarter = parsed
-                self.vps_manager.assign_ape_to_quarter(row["id"], quarter)
+                ok = self._assign_one(row["id"], quarter)
                 self.refresh_lists()
+                self.status_label.configure(
+                    text=self._describe_quarter_assignment(
+                        1 if ok else 0, 0 if ok else 1, quarter
+                    )
+                )
 
     def _on_body_resize(self, _event):
         if self._drag_start_x is None:
