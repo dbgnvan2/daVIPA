@@ -132,10 +132,13 @@ NOTE_MIN_WRAP_PX = 120
 MAX_ITEM_ROWS = 60
 
 #: PD-M12 — how close (px) a drag gets to the Day Plan's top or bottom edge
-#: before the day starts scrolling under it. A box is 32px at the default chip
-#: height, so this is about three-quarters of one: wide enough that the user
-#: does not have to find the pane's border, narrow enough that it does not
-#: fire while they are aiming at the last box that is actually visible.
+#: before the day starts scrolling under it. An empty box is 34px --
+#: ``max(SLOT_MIN_HEIGHT_PX, chips * chip_height + 4)`` -- and is gridded
+#: ``pady=1``, so the pitch is 36px and this is about two-thirds of one: wide
+#: enough that the user does not have to find the pane's border. Most of the
+#: last visible box is therefore inside the band, which is the trade -- a
+#: pointer aimed at that box scrolls instead, and the box it wanted comes back
+#: under the pointer as the day moves.
 PD_AUTOSCROLL_MARGIN_PX = 24
 
 #: PD-M12 — how often (ms) the day keeps scrolling while the pointer is held
@@ -257,9 +260,12 @@ class PlanScreen(ctk.CTkFrame):
         # What the label will say once the pointer actually moves (PD-M10.3).
         self._drag_label_text: Optional[str] = None
         self._drag_hover_frame = None
-        #: The hovered box's own border width, so clearing the hover puts it
-        #: back instead of flattening it to 0.
+        #: The hovered box's own border width and colour, so clearing the
+        #: hover puts both back instead of flattening the width to 0 and
+        #: leaving the accent on. Set together with ``_drag_hover_frame``,
+        #: and only read while it is not None.
         self._drag_hover_border: int = 1
+        self._drag_hover_color: Optional[str] = None
         self._block_menu: Optional[tk.Menu] = None
         #: PD-M12 — the pending autoscroll tick, or ``None`` when the day is
         #: not scrolling. One timer at a time: ``_start_autoscroll`` is called
@@ -2391,22 +2397,36 @@ class PlanScreen(ctk.CTkFrame):
         self.clear_hover_target()
         if hovered is not None:
             self._drag_hover_border = hovered.cget("border_width")
+            self._drag_hover_color = hovered.cget("border_color")
             hovered.configure(
                 border_width=2, border_color=semantic_colors()["primary_hover"]
             )
             self._drag_hover_frame = hovered
 
     def clear_hover_target(self):
-        """Put the outlined box's own border back.
+        """Put the outlined box's own border back — width *and* colour.
+
+        Tests:   tests/test_plan_screen.py::test_pdm1210_clearing_the_hover_puts_the_colour_back
 
         Restored to what it was rather than to 0: every box is drawn with a
         1px border, so clearing to 0 would leave the last-hovered box subtly
         different from its neighbours for the rest of the session.
+
+        The colour is restored for the same reason, and it is restored because
+        of PD-M12: putting back only the width left the accent on at 1px, and
+        a drag abandoned away from the boxes gets no rebuild to hide it. That
+        was one or two boxes' worth of trail while the hover only moved with
+        the pointer. Since the autoscroll re-reads the hover every 60ms, a
+        pointer held still at an edge walks it down every box the day scrolls
+        past, so the trail is now the whole day — and a persistent primary
+        accent on boxes with no action pending is what the theme rules call a
+        misuse of the one emphasis colour.
         """
         if self._drag_hover_frame is not None:
             try:
                 self._drag_hover_frame.configure(
-                    border_width=self._drag_hover_border
+                    border_width=self._drag_hover_border,
+                    border_color=self._drag_hover_color,
                 )
             except tk.TclError:
                 pass
