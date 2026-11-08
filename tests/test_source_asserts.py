@@ -22,6 +22,7 @@ import pytest
 from tests.source_asserts import (
     assigns_attribute_of,
     assigns_self_attribute,
+    call_string_args,
     calls_any_attribute,
     calls_attribute,
     count_calls,
@@ -218,3 +219,33 @@ def test_assigns_attribute_of_rejects_a_different_owner_or_attribute():
     value = local_assignments(_Subject.assigns_once_from_an_attribute, "bg_color")[0]
     assert not assigns_attribute_of(value, "other", "fill")
     assert not assigns_attribute_of(value, "fill", "text_color")
+
+
+class _Tabbed:
+    """A stand-in for a screen that builds a tab strip."""
+
+    def create_tabs(self):
+        # Tab 1: Alpha. A comment naming Alpha and Omega on purpose, so a
+        # substring check over the source cannot pass for the real calls.
+        self.tabview.add("Alpha")
+        self.tabview.add("Beta")
+        self.other.add("Gamma")
+        self.tabview.insert("Delta")
+        self.tabview.add(SOME_NAME)
+
+
+SOME_NAME = "Epsilon"
+
+
+def test_call_string_args_collects_only_that_owners_calls():
+    names = call_string_args(_Tabbed.create_tabs, "self.tabview", "add")
+    assert names == ["Alpha", "Beta"]
+
+
+def test_call_string_args_ignores_comments_other_owners_and_non_literals():
+    names = call_string_args(_Tabbed.create_tabs, "self.tabview", "add")
+    # "Omega" appears only in a comment, "Gamma" is another owner, "Delta" is
+    # another method, "Epsilon" is behind a name rather than a literal.
+    for absent in ("Omega", "Gamma", "Delta", "Epsilon"):
+        assert absent not in names
+    assert call_string_args(_Tabbed.create_tabs, "self.missing", "add") == []

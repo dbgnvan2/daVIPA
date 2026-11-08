@@ -19,15 +19,24 @@ therefore untouched.
 
 from __future__ import annotations
 
+import ast
+import inspect
 import logging
+import textwrap
 from dataclasses import fields
+from tkinter import colorchooser
 from types import SimpleNamespace
+from unittest import mock
 
 import customtkinter as ctk
 import pytest
 
 from src.getmoredone.app_settings import AppSettings
-from src.getmoredone.color_contrast import contrast_ratio, normalize_hex_color
+from src.getmoredone.color_contrast import (
+    contrast_ratio,
+    normalize_hex_color,
+    pick_text_color,
+)
 from src.getmoredone.models import ActionItem, PriorityFactors, Status
 from src.getmoredone.priority_levels import (
     LEVEL_ANY_CRITICAL,
@@ -41,14 +50,23 @@ from src.getmoredone.priority_levels import (
     SOURCE_LEVEL,
     SOURCE_NONE,
     SOURCE_SEGMENT,
+    RowFill,
     level_color,
     priority_color_rows,
     priority_level,
     priority_level_for_item,
+    row_control_kwargs,
     row_fill,
     settings_field_name,
 )
-from src.getmoredone.screens import all_items, completed, hierarchical, today, upcoming
+from src.getmoredone.screens import (
+    all_items,
+    completed,
+    hierarchical,
+    today,
+    upcoming,
+    week_actions,
+)
 from src.getmoredone.screens.settings import SettingsScreen
 from src.getmoredone.screens.settings_priority_colors import (
     SettingsPriorityColorsMixin,
@@ -56,6 +74,8 @@ from src.getmoredone.screens.settings_priority_colors import (
 from src.getmoredone.theme import priority_level_fill_colors
 from tests.source_asserts import (
     assigns_attribute_of,
+    assigns_self_attribute,
+    call_string_args,
     calls_attribute,
     count_calls,
     local_assignments,
@@ -304,7 +324,29 @@ def test_plcm24_level_colours_round_trip(settings_file):
 
 
 @pytest.mark.parametrize(
-    "stored", ["red", "#GGGGGG", "#12345", "rgb(1,2,3)", None, 17, ["#FFFFFF"]]
+    "stored",
+    [
+        "red",
+        "#GGGGGG",
+        "#12345",
+        "rgb(1,2,3)",
+        None,
+        17,
+        ["#FFFFFF"],
+        # Shapes the first version of this guard admitted, because it validated
+        # with ``int(text[1:], 16)``: Python accepts a 0x prefix, a sign,
+        # PEP-515 underscores, inner whitespace and non-ASCII decimal digits,
+        # and every one of these reached Tk as a seven-character "#......"
+        # string that Tk then raised on, inside a row build.
+        "0x1234",
+        "#0X1234",
+        "+12345",
+        "#+12345",
+        "# 12345",
+        "#-12345",
+        "#1_2345",
+        "#\uff11\uff12\uff13\uff14\uff15\uff16",
+    ],
 )
 def test_plcm25_a_malformed_stored_colour_falls_back_to_the_default(stored, caplog):
     """PLC-M2.5 (P8) — a settings file from an earlier run cannot crash a row.
@@ -433,8 +475,17 @@ def test_plcm31_one_row_per_level_in_order():
 
 
 def test_plcm32_saved_colours_reach_the_running_app():
-    """PLC-M3.2 — the three fields are written and published to the app."""
+    """PLC-M3.2 — the three fields are written and published to the app.
+
+    The third level starts from a *non-empty* stored colour, so clearing it is
+    a real write. Its dataclass default is already ``""``, so asserting
+    ``== NO_FILL`` against a fresh ``AppSettings`` held whether or not the
+    handler wrote anything, and the one action that removes a colour was
+    unproven.
+    """
     settings = AppSettings()
+    settings.priority_level_color_no_high_or_critical = "#654321"
+    settings.priority_level_color_any_critical = "#111111"
     stub = _StubSettingsScreen(
         settings,
         {
@@ -534,15 +585,29 @@ def test_plcm36_create_tabs_adds_the_priority_colours_tab():
 
     A source check because proving it behaviourally needs a built
     CustomTkinter screen; parsed rather than greped, so a comment naming the
-    method does not satisfy it.
+    method or the tab does not satisfy it. (It used to end in a bare
+    ``"Priority Colours" in inspect.getsource(...)``, which the comment above
+    the ``add`` call satisfied on its own -- exactly the shape
+    ``source_asserts`` exists to replace.)
     """
     assert calls_attribute(SettingsScreen.create_tabs, "self",
                            "create_priority_colors_section")
     assert count_calls(SettingsScreen.create_priority_colors_section,
                        "priority_color_rows") == 1
-    import inspect
-
-    assert "Priority Colours" in inspect.getsource(SettingsScreen.create_tabs)
+    # The tab names as the tabview is actually given them. A substring check
+    # over the source passed on the comment above the call ("# Tab 3: Priority
+    # Colours..."), so renaming the tab -- or dropping the ``add`` entirely --
+    # left it green. The whole set is asserted, in order, so this also pins
+    # which tabs the Settings screen offers.
+    assert call_string_args(SettingsScreen.create_tabs, "self.tabview", "add") == [
+        "Database Management",
+        "Appearance",
+        "Priority Colours",
+        "Future Dates",
+        "Timer & Audio",
+        "Organizational Factors",
+        "Email Import",
+    ]
 
 
 # =========================================================================
@@ -717,6 +782,27 @@ def test_plcm48_every_list_screen_row_builder_calls_the_helper():
     assert len(ROW_BUILDERS) == 5
 
 
+def _self_settings_statement_index(func) -> int:
+    """Which top-level statement of ``func`` assigns ``self.settings``.
+
+    Raises if none does, so it cannot quietly report a passing position for a
+    function that never reloads.
+    """
+    tree = ast.parse(textwrap.dedent(inspect.getsource(func))).body[0]
+    for index, statement in enumerate(tree.body):
+        if not isinstance(statement, ast.Assign):
+            continue
+        for target in statement.targets:
+            if (
+                isinstance(target, ast.Attribute)
+                and target.attr == "settings"
+                and isinstance(target.value, ast.Name)
+                and target.value.id == "self"
+            ):
+                return index
+    raise AssertionError(f"{func.__qualname__} never assigns self.settings")
+
+
 def test_plcm48_the_five_screens_reload_settings_before_building_rows():
     """PLC-M4 — a colour saved in Settings shows without a relaunch.
 
@@ -730,9 +816,24 @@ def test_plcm48_the_five_screens_reload_settings_before_building_rows():
         all_items.AllItemsScreen.refresh,
         hierarchical.HierarchicalScreen.refresh,
         completed.CompletedScreen.refresh,
+        # WeekTacticActionsPanel is deliberately NOT here: it inherits
+        # TodayScreen.refresh rather than defining one, so this entry would be
+        # the same function object as Today's and would read as a sixth check
+        # while testing Today twice. Its inheritance is asserted instead, in
+        # test_plc_cold_the_week_panel_inherits_todays_rows_and_reload.
     )
     for refresher in refreshers:
-        assert calls_attribute(refresher, "AppSettings", "load"), refresher.__qualname__
+        name = refresher.__qualname__
+        assert calls_attribute(refresher, "AppSettings", "load"), name
+        # Into ``self.settings``, not a local: ``today.py`` and ``upcoming.py``
+        # both already contain ``settings = AppSettings.load()`` into a local
+        # elsewhere, so a screen written that way would have kept this test
+        # green while the saved colour stayed invisible until relaunch.
+        assert assigns_self_attribute(refresher, "settings"), name
+        # And near the top, before the rows are built. Three because a screen
+        # may clear its frame or take a guard first; all five sit at index 1 or
+        # 2 today.
+        assert _self_settings_statement_index(refresher) <= 2, name
 
 
 def test_plcm4_a_completed_row_in_all_items_still_uses_the_status_check():
@@ -747,6 +848,17 @@ def test_plcm4_a_completed_row_in_all_items_still_uses_the_status_check():
     )
     assert fill.source == SOURCE_COMPLETED
     assert fill.fill == PALETTE["success_tint"]
+
+
+#: Stderr fragments that mean "there is no display here", as opposed to "the
+#: section is broken". Deliberately narrow: the reason is in the comment inside
+#: ``test_plcm3_the_section_builds_on_real_widgets``.
+_NO_DISPLAY_MARKERS = (
+    "no display name and no $DISPLAY",
+    "couldn't connect to display",
+    "can't find a usable init.tcl",
+    "Can't find a usable tk.tcl",
+)
 
 
 def test_plcm3_the_section_builds_on_real_widgets():
@@ -776,8 +888,14 @@ def test_plcm3_the_section_builds_on_real_widgets():
         timeout=120,
         cwd=str(root),
     )
-    if result.returncode != 0 and "TclError" in result.stderr:
-        pytest.skip("Tk display unavailable")
+    # Only a *display* failure is a skip. A bare ``TclError`` is what a bad
+    # grid call, a rejected widget option, or an fg_color Tk will not take all
+    # raise -- which is this test's whole target class, so skipping on it would
+    # leave the test unable to fail for the thing it exists to catch.
+    if result.returncode != 0 and any(
+        marker in result.stderr for marker in _NO_DISPLAY_MARKERS
+    ):
+        pytest.skip(f"Tk display unavailable: {result.stderr.strip()[-200:]}")
     assert result.returncode == 0, (
         f"the section failed to build:\n{result.stdout}\n{result.stderr}"
     )
@@ -802,3 +920,161 @@ def test_plcm3_the_section_builds_on_real_widgets():
     assert printed["RESTORED"] == defaults[LEVEL_KEYS[0]]
     assert "chartreuse" in printed["REFUSAL"]
     assert LEVEL_LABELS[LEVEL_KEYS[0]] in printed["REFUSAL"]
+
+
+# =========================================================================
+# Fixes for the findings of the two cold review passes (2026-11-08)
+# =========================================================================
+
+def test_plc_cold_a_bad_colour_cannot_be_saved_from_the_entry():
+    """H1 — the shapes the validator used to admit are refused at the entry.
+
+    The save path, not just ``level_color``: these reached ``settings.json``,
+    and from then on every row build in five screens and the Settings tab's own
+    swatch raised ``TclError``, so the tab the user would fix it from could not
+    open. The only way back was hand-editing the file.
+    """
+    for raw in ("0x1234", "+12345", "# 12345", "#1_2345", "#-12345"):
+        settings = AppSettings()
+        before = settings.priority_level_color_any_critical
+        stub = _StubSettingsScreen(settings, {LEVEL_ANY_CRITICAL: raw})
+        SettingsPriorityColorsMixin.save_priority_level_colors(stub)
+
+        assert stub.status[1] == "error", raw
+        assert raw in stub.status[0], raw
+        assert settings.priority_level_color_any_critical == before, raw
+        assert stub.handed_to_app == 0, raw
+
+
+def test_plcm49_controls_follow_a_level_fill():
+    """PLC-M4.9 — a row's controls stay legible on a level fill.
+
+    ``priority_level_fill_colors`` has no dark variant, by design: a colour the
+    user picked cannot have one. So in dark mode a Critical row is light while
+    the theme's checkbox and grip colours are light too — the checkbox border
+    measures about 2.6:1 against the shipped green, under the 3:1 bar for a
+    non-text control. PLC-M4.4 fixed the row text and left these behind.
+    """
+    settings = AppSettings()
+    for level in (LEVEL_ANY_CRITICAL, LEVEL_ANY_HIGH):
+        colour = priority_level_fill_colors()[level]
+        fill = RowFill(colour, pick_text_color(colour), SOURCE_LEVEL)
+        kwargs = row_control_kwargs(fill)
+        assert set(kwargs) == {"border_color", "fg_color", "checkmark_color"}
+        assert kwargs["border_color"] == fill.text_color
+        assert kwargs["checkmark_color"] == colour
+        # 3:1 is the WCAG bar for a non-text control; this clears it because
+        # text_color already clears 4.5:1 against the same fill.
+        assert contrast_ratio(kwargs["border_color"], colour) >= 3.0
+
+    # Every other kind of fill leaves the theme's controls alone, so a
+    # segment-coloured or completed row looks exactly as it did before.
+    assert row_control_kwargs(RowFill("#123456", None, SOURCE_SEGMENT)) == {}
+    assert row_control_kwargs(RowFill(PALETTE["success_tint"], None,
+                                      SOURCE_COMPLETED)) == {}
+    assert row_control_kwargs(RowFill(None, None, SOURCE_NONE)) == {}
+
+
+def test_plc_cold_the_three_screens_with_row_controls_pass_the_kwargs():
+    """PLC-M4.9 — the three row builders that build controls use the helper.
+
+    Today has a grip and a checkbox; Upcoming and All Items have a checkbox.
+    Hierarchical and Completed build neither in their row, so they are not in
+    this list and the count below says so.
+    """
+    with_controls = (
+        ("today", today.TodayScreen.create_item_row),
+        ("upcoming", upcoming.UpcomingScreen.create_item_row),
+        ("all_items", all_items.AllItemsScreen.refresh),
+    )
+    for name, builder in with_controls:
+        assert count_calls(builder, "row_control_kwargs") == 1, name
+    assert sum(
+        count_calls(b, "row_control_kwargs")
+        for _, b in with_controls
+    ) == 3
+    for name, builder in (
+        ("hierarchical", hierarchical.HierarchicalScreen.create_item_row),
+        ("completed", completed.CompletedScreen.refresh),
+    ):
+        assert count_calls(builder, "row_control_kwargs") == 0, name
+
+
+def test_plc_cold_a_refused_write_puts_the_settings_object_back():
+    """M4 — a refused save leaves no colour behind on the shared object.
+
+    ``self.settings`` is shared by every Save handler on the Settings screen.
+    Mutating it before the ``_write_settings`` guard and not restoring it meant
+    the colours the user was told were *not* saved would be written to disk by
+    the next successful save from any other section — Appearance, Timer,
+    Future Dates.
+    """
+    settings = AppSettings()
+    before = {
+        level: getattr(settings, settings_field_name(level))
+        for level in LEVEL_KEYS
+    }
+    stub = _StubSettingsScreen(
+        settings,
+        {
+            LEVEL_ANY_CRITICAL: "#0A0B0C",
+            LEVEL_ANY_HIGH: "#0D0E0F",
+            LEVEL_NO_HIGH_OR_CRITICAL: "#101112",
+        },
+        write_succeeds=False,
+    )
+    SettingsPriorityColorsMixin.save_priority_level_colors(stub)
+
+    assert stub.status[1] == "error"
+    for level, value in before.items():
+        assert getattr(settings, settings_field_name(level)) == value, level
+
+
+def test_plc_cold_the_colour_chooser_is_given_a_colour_tk_can_parse():
+    """M5 — Pick Colour opens on a usable colour, not on raw entry text.
+
+    ``colorchooser.askcolor(color=...)`` hands its argument to Tk, which raises
+    on anything it cannot parse. The exception escaped the button command, so
+    a user who typo'd and then reached for the picker got a dead button and no
+    message at all.
+    """
+    seen = {}
+
+    def fake_askcolor(color=None, title=None):
+        seen["color"] = color
+        return (None, None)
+
+    stub = _StubSettingsScreen(AppSettings(), {LEVEL_ANY_CRITICAL: "qqq"})
+    with mock.patch.object(colorchooser, "askcolor", fake_askcolor):
+        SettingsPriorityColorsMixin.pick_priority_level_color(
+            stub, LEVEL_ANY_CRITICAL
+        )
+        # Unparseable text falls back to the level's own default.
+        assert seen["color"] == priority_level_fill_colors()[LEVEL_ANY_CRITICAL]
+
+        stub.priority_level_color_vars[LEVEL_ANY_CRITICAL].set("#abcdef")
+        SettingsPriorityColorsMixin.pick_priority_level_color(
+            stub, LEVEL_ANY_CRITICAL
+        )
+        assert seen["color"] == "#ABCDEF"
+
+
+def test_plc_cold_the_week_panel_inherits_todays_rows_and_reload():
+    """PLC-M4.10 — the sixth surface that draws the fill, and why it is covered.
+
+    ``WeekTacticActionsPanel`` subclasses ``TodayScreen`` and overrides neither
+    ``create_item_row`` nor ``refresh``, so it inherits the level fill *and*
+    Today's settings reload — which is why it is not in the ``refreshers``
+    tuple above: its ``refresh`` is the same function object, and listing it
+    would have looked like a sixth check while testing Today twice.
+
+    Asserted rather than assumed, because the inheritance is the only reason
+    the panel is covered at all. If it ever defines its own ``refresh``, this
+    fails and PLC-M4.10 has to be given a real check.
+    """
+    panel = week_actions.WeekTacticActionsPanel
+    assert issubclass(panel, today.TodayScreen)
+    assert "refresh" not in panel.__dict__
+    assert "create_item_row" not in panel.__dict__
+    assert panel.refresh is today.TodayScreen.refresh
+    assert panel.create_item_row is today.TodayScreen.create_item_row
