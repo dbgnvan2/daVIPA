@@ -131,6 +131,22 @@ NOTE_MIN_WRAP_PX = 120
 # be hiding the work it exists to surface.
 MAX_ITEM_ROWS = 60
 
+#: PD-M12 — how close (px) a drag gets to the Day Plan's top or bottom edge
+#: before the day starts scrolling under it. A box is 32px at the default chip
+#: height, so this is about three-quarters of one: wide enough that the user
+#: does not have to find the pane's border, narrow enough that it does not
+#: fire while they are aiming at the last box that is actually visible.
+PD_AUTOSCROLL_MARGIN_PX = 24
+
+#: PD-M12 — how often (ms) the day keeps scrolling while the pointer is held
+#: in that margin. A drag that scrolled only on motion would stop the moment
+#: the user held still at the edge, which is exactly where they hold still.
+PD_AUTOSCROLL_INTERVAL_MS = 60
+
+#: PD-M12 — canvas scroll units per tick. One unit per 60ms is roughly a box
+#: every two ticks, which is slow enough to stop on the box you meant.
+PD_AUTOSCROLL_UNITS = 1
+
 # What each refusal reason is called on screen. Keyed by SlotRefusal, so a
 # rule added to the grid arithmetic has exactly one place to be worded here,
 # and a reason with no wording is caught by the test rather than shown to the
@@ -237,6 +253,10 @@ class PlanScreen(ctk.CTkFrame):
         #: back instead of flattening it to 0.
         self._drag_hover_border: int = 1
         self._block_menu: Optional[tk.Menu] = None
+        #: PD-M12 — the pending autoscroll tick, or ``None`` when the day is
+        #: not scrolling. One timer at a time: ``_start_autoscroll`` is called
+        #: on every motion event, and each tick re-arms the next.
+        self._autoscroll_after: Optional[str] = None
 
         #: Rendered boxes, as (frame, slot_index), in day order. A drop is
         #: turned into a slot by pointer-y against these frames rather than by
@@ -774,6 +794,20 @@ class PlanScreen(ctk.CTkFrame):
         queued click in the middle of one would re-enter a rebuild that is
         destroying the widget the click is for, which is the hang the
         ``after_idle`` in ``on_drag_release`` exists to avoid.
+
+        **Not sufficient for the blank pane reported on 2026-11-07** ("moving
+        a Day Block leaves a blank panel until the mouse moves outside the
+        panel area"). Measured after a real ``move_block_to_slot``, with no
+        event-loop turn in between: the pane is mapped at its full size, all
+        20 children are mapped at correct sizes and positions, and the scroll
+        canvas's window width, ``bbox("all")``, scrollregion and yview are
+        already byte-identical to what a following ``update()`` leaves them.
+        So nothing in the widget tree or the canvas is stale, and settling it
+        again -- which an earlier version of this method did -- changed
+        nothing at all. ``update()`` was also tried here and is not an option:
+        it drains the event queue, and the thirteenth ``PlanScreen`` built in
+        one process did not come back from it. What remains unexplained is why
+        the pixels wait for a pointer event; that is open, in BACKLOG.md.
         """
         try:
             self.update_idletasks()
@@ -1502,14 +1536,19 @@ class PlanScreen(ctk.CTkFrame):
             name for name, on in zip(weekday_names(), self.bounds.block_weekdays) if on
         ]
         week = ", ".join(allowed) if allowed else "no days"
-        if messagebox.askyesno(
-            "Not a work day",
-            f"{self.selected_date} is not a regular work day.\n\n"
-            f"Day Settings allows {week}.\n\n"
-            "Schedule anyway?",
-            icon="warning",
-            parent=self,
-        ):
+        answer = self._ask_work_anyway(week)
+        if answer is None:
+            # PD-M11 -- the question could not be put. Reported, and recorded
+            # as nothing rather than as a "no" (P1): the user has not declined
+            # anything, and writing their silence down as a refusal is how a
+            # transient failure becomes a permanent negative.
+            self.set_status(
+                f"{self.selected_date} is not a regular work day, and the "
+                "question could not be shown — nothing was scheduled",
+                "error",
+            )
+            return False
+        if answer:
             self._work_anyway.add(self.selected_date)
             return True
 
@@ -1519,6 +1558,36 @@ class PlanScreen(ctk.CTkFrame):
             "warning",
         )
         return False
+
+    def _ask_work_anyway(self, week: str) -> Optional[bool]:
+        """Put the non-work-day question on screen. ``None`` if it could not be.
+
+        Purpose: PD-M11 -- a dialog that raises must not present as a gesture
+                 that did nothing. Measured on 2026-11-07 against the running
+                 app: a Saturday drop raised the dialog, and the call raised
+                 ``_tkinter.TclError`` with an empty message instead of
+                 returning the answer. The traceback went to stderr, which the
+                 user never sees, and the drop wrote nothing and said nothing.
+        Spec:    docs/changes/2026-11-07-plan-day-faults.md
+        Tests:   tests/test_plan_screen.py::test_pdm11_a_dialog_that_raises_writes_nothing_says_so_and_asks_again
+
+        ``TclError`` only, and not ``Exception``: a failure inside the dialog
+        machinery is the one this arm is for, and swallowing anything wider
+        would hide a bug in the caller's own arguments.
+        """
+        try:
+            return bool(
+                messagebox.askyesno(
+                    "Not a work day",
+                    f"{self.selected_date} is not a regular work day.\n\n"
+                    f"Day Settings allows {week}.\n\n"
+                    "Schedule anyway?",
+                    icon="warning",
+                    parent=self,
+                )
+            )
+        except tk.TclError:
+            return None
 
     # ================= the block context menu ===============================
 
@@ -1721,7 +1790,12 @@ class PlanScreen(ctk.CTkFrame):
             self._show_drag_label(armed)
         else:
             self._position_drag_label()
-        self.update_hover_target()
+        # PD-M12 -- scroll first, then read the hover off where the boxes have
+        # ended up. ``autoscroll_day`` updates the hover itself when it moves
+        # the day, so the second call is only for the motion that did not.
+        self._start_autoscroll()
+        if not self.autoscroll_day():
+            self.update_hover_target()
 
     def on_drag_release(self, _event):
         kind, item, block = self._drag_kind, self._drag_item, self._drag_block
@@ -1735,7 +1809,7 @@ class PlanScreen(ctk.CTkFrame):
         # there. The write and the redraw must NOT happen now: both end in
         # refresh(), which destroys the very row whose ButtonRelease handler is
         # running, and tearing down the widget that is dispatching the event
-        # hangs Tk. after_idle lets this handler return first.
+        # hangs Tk. _after_release lets this handler return first.
         target = self.slot_under_pointer()
         # Both read, and the order of the branches below is what decides
         # between them: a half hour that exists always wins. Computing the
@@ -1745,9 +1819,9 @@ class PlanScreen(ctk.CTkFrame):
         edge = self.virtual_under_pointer()
         if kind == "item" and item is not None:
             if target is not None:
-                self.after_idle(lambda: self.block_item(item, target))
+                self._after_release(lambda: self.block_item(item, target))
             elif edge is not None:
-                self.after_idle(lambda: self.extend_day_for(item, edge))
+                self._after_release(lambda: self.extend_day_for(item, edge))
             elif self.pointer_over_day():
                 # In the day column but not on a box -- the heading, the
                 # summary, or the "outside the day" group below the grid.
@@ -1756,7 +1830,7 @@ class PlanScreen(ctk.CTkFrame):
                 self.set_status("Drop an item on a half-hour box", "muted")
         elif kind == "block" and block is not None:
             if target is not None:
-                self.after_idle(lambda: self.move_block_to_slot(block.id, target))
+                self._after_release(lambda: self.move_block_to_slot(block.id, target))
             elif edge is not None:
                 # PD-M5.7 — the day grows to make room for work that is not
                 # planned yet, not to rehouse work that already has a box. A
@@ -1773,6 +1847,31 @@ class PlanScreen(ctk.CTkFrame):
                 # nothing is indistinguishable from a drag that missed.
                 self.set_status("Drop a block on a half-hour box", "muted")
 
+    def _after_release(self, work):
+        """Run a drop's work once this ButtonRelease handler has returned.
+
+        Purpose: PD-M11 -- the drop's work is a database write, a full pane
+                 rebuild and, on a day outside the working week, a modal
+                 question. ``after_idle`` was the wrong queue for all three:
+                 it means "before the next redraw", and this is work that
+                 *causes* a redraw and can block on the user answering.
+        Spec:    docs/changes/2026-11-07-plan-day-faults.md
+        Tests:   tests/test_plan_screen.py::test_pdm11_a_drop_is_deferred_to_a_timer_not_the_idle_queue
+
+        A zero-delay timer meets the only requirement the idle call was there
+        for -- let this handler return before anything destroys the row it is
+        dispatching to -- and runs the work from the ordinary event loop,
+        where every other write path on this screen already runs.
+
+        **Not proved to be the cure for the dialog fault.** A Saturday drop
+        was measured raising ``_tkinter.TclError`` out of ``askyesno`` on
+        2026-11-07, from inside the ``after_idle`` this replaces; the same
+        call works from a button's own handler elsewhere on this screen
+        (``clear_day``). Which of the two contexts Tk/Aqua objects to was not
+        established, so ``_ask_work_anyway`` carries the failure arm as well.
+        """
+        self.after(0, work)
+
     def _end_drag(self):
         """Take the label off the screen and forget what was being dragged.
 
@@ -1784,9 +1883,10 @@ class PlanScreen(ctk.CTkFrame):
 
         Flushing from inside the ButtonRelease handler is safe here and only
         here: ``on_drag_release`` calls this before it schedules the drop's own
-        ``after_idle``, so there is no queued rebuild for the flush to dispatch
-        into the widget that is dispatching this event.
+        timer, so there is no queued rebuild for the flush to dispatch into
+        the widget that is dispatching this event.
         """
+        self._stop_autoscroll()
         self._drag_label_text = None
         if self._drag_label is not None:
             self._drag_label.place_forget()
@@ -1794,6 +1894,135 @@ class PlanScreen(ctk.CTkFrame):
         self._drag_kind = None
         self._drag_item = None
         self._drag_block = None
+
+    # ------------------------------------------------------------------
+    # PD-M12 — the day scrolls while a drag sits at its edge
+    # ------------------------------------------------------------------
+
+    def day_autoscroll_direction(self) -> int:
+        """Which way the day wants to scroll for where the pointer is now.
+
+        Purpose: PD-M12 -- "the Day Plan does not scroll while an item is
+                 dragged past its edge", so a day taller than its pane could
+                 only be dropped into where it already happened to be.
+        Spec:    docs/changes/2026-11-07-plan-day-faults.md
+        Tests:   tests/test_plan_screen.py::test_pdm121_a_drag_at_an_edge_asks_to_scroll_that_way
+                 tests/test_plan_screen.py::test_pdm121_a_drag_past_the_edge_still_asks_to_scroll
+                 tests/test_plan_screen.py::test_pdm122_a_drag_clear_of_the_edges_asks_for_no_scroll
+                 tests/test_plan_screen.py::test_pdm122_a_drag_beside_the_day_pane_asks_for_no_scroll
+                 tests/test_plan_screen.py::test_pdm123_an_end_already_reached_asks_for_no_scroll
+
+        ``-1`` up, ``1`` down, ``0`` nowhere. Past the edge counts as at it:
+        the reported gesture is dragging *beyond* the pane, and a band that
+        stopped at the border would ask the user to hold the pointer inside a
+        24px strip. The x range is still the pane's own, so a drag over the
+        unscheduled list on the left asks for nothing.
+
+        An end that is already reached asks for nothing, so that holding at
+        the bottom of a fully scrolled day does not repaint it 16 times a
+        second for no movement.
+        """
+        canvas = getattr(self.blocks_scroll, "_parent_canvas", None)
+        if canvas is None:
+            return 0
+        try:
+            if not canvas.winfo_ismapped():
+                return 0
+            left = canvas.winfo_rootx()
+            top = canvas.winfo_rooty()
+            width = canvas.winfo_width()
+            height = canvas.winfo_height()
+            x_root, y_root = self.winfo_pointerx(), self.winfo_pointery()
+            first, last = canvas.yview()
+        except tk.TclError:
+            # The screen went away mid-drag. Nothing to scroll.
+            return 0
+
+        if not left <= x_root < left + width:
+            return 0
+        if y_root < top + PD_AUTOSCROLL_MARGIN_PX:
+            return 0 if first <= 0.0 else -1
+        if y_root >= top + height - PD_AUTOSCROLL_MARGIN_PX:
+            return 0 if last >= 1.0 else 1
+        return 0
+
+    def autoscroll_day(self) -> bool:
+        """Scroll the day one step if the drag is at an edge. ``True`` if it moved.
+
+        Purpose: PD-M12 -- see ``day_autoscroll_direction``.
+        Spec:    docs/changes/2026-11-07-plan-day-faults.md
+        Tests:   tests/test_plan_screen.py::test_pdm124_scrolling_the_day_moves_the_canvas_and_rereads_the_hover
+                 tests/test_plan_screen.py::test_pdm124_a_drag_clear_of_the_edges_scrolls_nothing
+
+        The hover highlight is re-read here and not left to the caller: the
+        boxes have moved under a pointer that has not, so whichever box was
+        lit is no longer the one being dropped on, and the timer path has no
+        caller to re-read it.
+        """
+        direction = self.day_autoscroll_direction()
+        if not direction:
+            return False
+        try:
+            self.blocks_scroll._parent_canvas.yview_scroll(
+                direction * PD_AUTOSCROLL_UNITS, "units"
+            )
+        except tk.TclError:
+            return False
+        self.update_hover_target()
+        return True
+
+    def _start_autoscroll(self):
+        """Arm the next autoscroll tick, if one is not already armed.
+
+        Purpose: PD-M12 -- a drag held still at the edge must keep scrolling.
+                 Scrolling only on motion would stop the moment the user held
+                 the pointer at the border, which is exactly where a drag that
+                 wants more of the day to appear comes to rest.
+        Spec:    docs/changes/2026-11-07-plan-day-faults.md
+        Tests:   tests/test_plan_screen.py::test_pdm126_motion_does_not_stack_autoscroll_timers
+                 tests/test_plan_screen.py::test_pdm128_motion_arms_the_autoscroll_and_the_release_cancels_it
+        """
+        if self._autoscroll_after is not None:
+            return
+        self._autoscroll_after = self.after(
+            PD_AUTOSCROLL_INTERVAL_MS, self._autoscroll_tick
+        )
+
+    def _autoscroll_tick(self):
+        """One autoscroll step, then re-arm -- while a drag is still in hand.
+
+        Purpose: PD-M12 -- the ticks must end with the drag. ``_drag_kind`` is
+                 read rather than trusted from when the timer was armed: the
+                 release that ends the drag also cancels the timer, and this
+                 guard is what makes a tick already in flight harmless.
+        Spec:    docs/changes/2026-11-07-plan-day-faults.md
+        Tests:   tests/test_plan_screen.py::test_pdm125_a_held_drag_keeps_scrolling
+                 tests/test_plan_screen.py::test_pdm127_a_tick_after_the_drag_ended_does_nothing
+        """
+        self._autoscroll_after = None
+        if not self._drag_kind:
+            return
+        self.autoscroll_day()
+        self._start_autoscroll()
+
+    def _stop_autoscroll(self):
+        """Cancel the pending tick, if any.
+
+        Purpose: PD-M12 -- called from ``_end_drag``, so the day stops
+                 scrolling when the button comes up rather than at whatever
+                 the next tick decides.
+        Spec:    docs/changes/2026-11-07-plan-day-faults.md
+        Tests:   tests/test_plan_screen.py::test_pdm128_motion_arms_the_autoscroll_and_the_release_cancels_it
+        """
+        if self._autoscroll_after is None:
+            return
+        try:
+            self.after_cancel(self._autoscroll_after)
+        except (tk.TclError, ValueError):
+            # Already fired or the screen has gone. Either way there is
+            # nothing left to cancel, and the id is cleared below.
+            pass
+        self._autoscroll_after = None
 
     def _day_shape_is_the_users(self) -> bool:
         """Whether ``self.bounds`` came from settings we could actually read.

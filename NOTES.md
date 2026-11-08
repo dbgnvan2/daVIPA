@@ -1,5 +1,45 @@
 ## Recent Changes (2026-11-07)
 
+### The four Plan / Day Plan faults reported from the running screen (PD-M11, PD-M12)
+
+- ✅ **"Schedule anyway" on a non-work day wrote nothing.** The open half of the
+  report is settled: it does not schedule. `messagebox.askyesno` raised
+  `_tkinter.TclError` with an empty message instead of returning the answer,
+  from inside the drop's `after_idle`; the traceback went to stderr, which the
+  user never sees, so the gesture wrote nothing and said nothing. The question
+  is now asked through `_ask_work_anyway`, whose `TclError` arm returns `None`
+  — neither yes nor no — so the screen says the question could not be shown,
+  writes nothing, and caches nothing, leaving the next drop free to ask again
+  (P1). The drop's work also moved off the idle queue onto a zero-delay timer
+  (`_after_release`), which is the context the raise was measured in. The
+  *mechanism* of the raise is unproven: the byte-identical call works from
+  `clear_day`'s button command, and the Yes click that produced the traceback
+  was synthetic input.
+- ✅ **The Day Plan now scrolls while a drag sits at or past its edge** (PD-M12).
+  A pointer within `PD_AUTOSCROLL_MARGIN_PX` (24) of the pane's top or bottom —
+  or beyond it, which is the gesture reported — scrolls one unit every 60ms, and
+  the hover highlight is re-read after each step because the boxes have moved
+  under a pointer that has not. The x range is the pane's own, an end already
+  reached asks for nothing, and `_end_drag` cancels the timer.
+- ⚠️ **"An item cannot be dropped into the early or late sections" did not
+  reproduce.** Driven as real Tk events on a work day the day extends and the
+  item is blocked, at both ends, with `plan_day_shape_unconfirmed` either way.
+  `extend_day_for` also calls `_require_block_day`, so on the Saturday the
+  report was made on it funnelled through the failing dialog above. Closed by
+  inference only; stays in `BACKLOG.md` until it has been tried on a weekday.
+- ❌ **"Moving a Day Block leaves a blank panel" is NOT fixed.** Measured
+  immediately after a real `move_block_to_slot`, with no event-loop turn in
+  between: the pane is mapped at full size, every child is mapped at the right
+  size and position, and the scroll canvas's window width, `bbox("all")`,
+  scrollregion and yview already match what a following `update()` leaves them.
+  Nothing in the tree or the canvas is stale. A "settle the scroll panes" fix
+  was built and withdrawn because it was measured to change nothing at all, and
+  `self.update()` in `_flush_redraw` was withdrawn because it does not reliably
+  return — the thirteenth `PlanScreen` in one process hung in it. Open in
+  `BACKLOG.md` with the two observations that would split it.
+- Full record, including the adjacent `bind_item_drag` subtree gap found and not
+  fixed: `docs/changes/2026-11-07-plan-day-faults.md`.
+
 ### APE quarter/month consistency (APC-M1 - APC-M6)
 
 - ✅ **An APE could be filed under a quarter that does not contain its month.** The APE Month

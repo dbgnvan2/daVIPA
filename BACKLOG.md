@@ -1,60 +1,126 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (four Plan / Day Plan faults reported from the running screen added at the top, recorded and not investigated; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-07 (the four Plan / Day Plan faults reported from the running screen investigated: two fixed, one implemented, one still open with its measurements, plus one adjacent issue and a correction to the `_require_block_day` low finding below; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
 
 ## Reported from the running screen — Plan / Day Plan (2026-11-07)
 
-Four faults reported by the user after the PD-* batch shipped. **Recorded, not
-investigated**: the descriptions below are the report, not a diagnosis. Nothing
-here has been reproduced, read in the code, or confirmed against a running app
-by this session.
+Four faults reported by the user after the PD-* batch shipped. **Investigated
+2026-11-07** — see `docs/changes/2026-11-07-plan-day-faults.md`. Two are fixed,
+one is implemented, one is open and stays here. None of the four has been
+confirmed on screen: the fixes are proved by pytest driving real widgets, and
+the on-screen pass is with the user.
 
-### 2026-11-07 - Type: Bug
+### 2026-11-07 - Type: Bug - OPEN
 
 **Title:** Moving a Day Block leaves a blank panel until the mouse leaves it
 **Description:** Moving a block on the Day Plan produces a blank panel. It
 fills in as soon as the mouse moves outside the panel area.
 **Priority:** High
 **Effort:** Unknown
-**Notes:** Reads like the repaint class the PD-* batch set out to fix — a pane
-re-gridded inside an event callback that Tk does not draw until the next
-mouse motion over the window. That batch added `_flush_redraw` for exactly
-that shape, so either a path was missed or the fix does not cover the move
-path. First thing to check: whether the move path calls the flush at all.
+**Notes:** Narrowed, not solved, and **not fixed**. Measured immediately after
+a real `move_block_to_slot`, with no event-loop turn in between: the pane is
+mapped at full size, all 20 children are mapped at correct sizes and positions,
+and the scroll canvas's window width, `bbox("all")`, scrollregion and yview are
+already byte-identical to what a following `update()` leaves them. So nothing
+in the widget tree or the canvas is stale, and the repaint class the PD-*
+batch's `_flush_redraw` was written for is not what this is — the move path
+does call the flush.
 
-### 2026-11-07 - Type: Bug
+Two candidate fixes were built and both withdrawn rather than shipped. An
+explicit "settle the scroll panes" step, doing by hand what
+`CTkScrollableFrame` defers to its two `<Configure>` bindings, was measured to
+change *nothing at all* — the comparison above is that measurement. And
+`self.update()` inside `_flush_redraw`, which would drive the Aqua
+window-server draw pass that `update_idletasks` does not reach, drains the
+event queue until it is empty and does not always come back: the thirteenth
+`PlanScreen` built in one process hung in it inside `load_items`, reproduced
+from the suite itself. It also dispatches input, so a queued press could land
+in a row being torn down.
+
+What remains unexplained is why the pixels wait for a pointer event when the
+app's event loop turns continuously anyway. The two observations that would
+split it: whether the pane fills in on *any* pointer motion or only on the
+pointer leaving the pane, and whether it is the day pane or the unscheduled
+list that goes blank. If any motion does it, the draw-pass theory holds and the
+next thing to try is a *bounded* event pump (`tk.dooneevent(DONT_WAIT)` under a
+budget) rather than `update()`. If only leaving does it, the trigger is
+something bound to `<Leave>` and the theory is wrong.
+
+### 2026-11-07 - Type: Bug - FIXED (unconfirmed on screen)
+
+**Title:** "Schedule anyway" on a non-work day does nothing
+**Description:** Scheduling on a non-work day raises the confirmation message,
+but answering "schedule anyway" does not schedule the item.
+**Priority:** High
+**Effort:** Unknown
+**Notes:** The open half of the original report is settled: **it does not
+schedule.** Answering Yes on a Saturday drop left the day's `time_blocks` table
+empty, and the app's stderr carried a `_tkinter.TclError` with an empty message
+raised out of `messagebox.askyesno`, from inside the drop's `after_idle`. The
+traceback goes to stderr, which the user never sees, so the gesture wrote
+nothing and said nothing.
+
+Fixed two ways: `_ask_work_anyway` now carries a `tk.TclError` arm that returns
+`None` — neither yes nor no — so the caller reports that the question could not
+be shown, writes nothing, and caches nothing, leaving the next drop free to ask
+again (P1: a transient failure is not a permanent negative). And the drop's
+work is deferred through `_after_release`, a zero-delay timer, instead of
+`after_idle`, which is the context the raise was measured in.
+
+**The mechanism of the raise is unproven.** The byte-identical call works from
+`clear_day`'s button command on the same screen, so the distinguishing factor
+looks like the calling context, but that was not established — and the Yes click
+that produced the traceback was synthetic input, which is a confound. The
+failure arm is correct either way; the `after(0)` move is the candidate cure.
+
+### 2026-11-07 - Type: Bug - NOT REPRODUCED (closed by inference)
 
 **Title:** An item cannot be moved into the early or late extended sections
 **Description:** Dragging an item into the early or late extended section of
 the day does not drop it there.
 **Priority:** High
 **Effort:** Unknown
+**Notes:** Driven as real Tk events on a work day — press, motion, release onto
+the "Earlier" row — the day extends to 07:30 and the item is blocked; onto
+"Later", to 17:30. Verified with `plan_day_shape_unconfirmed = True` as well,
+which is the state in the user's own settings file. `virtual_under_pointer()`
+returns the right end and `slot_under_pointer()` correctly returns `None`
+there.
 
-### 2026-11-07 - Type: Bug
+`extend_day_for` also calls `_require_block_day`, so on the Saturday the report
+was made on this gesture funnelled through the failing dialog above. That is
+the explanation on offer and it is not proven: the fault stays recorded until
+it has been tried on a weekday. If it still fails there, the handler path is
+innocent — it was driven end to end — and the next place to look is which widget
+receives the press, which leads to the `bind_item_drag` gap below.
 
-**Title:** "Schedule anyway" on a non-work day does nothing
-**Description:** Scheduling on a non-work day raises the confirmation message,
-but answering "schedule anyway" does not schedule the item — or the item does
-not appear afterwards. Which of those two it is has not been established.
-**Priority:** High
-**Effort:** Unknown
-**Notes:** Possibly the same thing as the sweep's PLAUSIBLE low finding
-recorded below ("`plan._require_block_day` opens a modal from inside a drop's
-`after_idle`"): the permission is recorded against one read of
-`self.selected_date` and the caller reads it again after the modal returns.
-That finding was left unfixed because neither review pass could drive a date
-change through Tk's modal grab and there was no demonstrated misbehaviour to
-test against. **This report may be that demonstration.** Unverified — do not
-treat the two as the same bug until one reproduction shows it.
-
-### 2026-11-07 - Type: Enhancement
+### 2026-11-07 - Type: Enhancement - IMPLEMENTED (unconfirmed on screen)
 
 **Title:** The Day Plan does not scroll while dragging an item past its edge
 **Description:** Dragging an item up or down towards an area that is off
-screen should scroll the Day Plan window to follow it. It does not, so an
-item cannot be dragged to a time that is not already visible.
+screen should scroll the Day Plan window to follow it.
 **Priority:** Medium
 **Effort:** Unknown
+**Notes:** Implemented as PD-M12: `PD_AUTOSCROLL_MARGIN_PX` (24),
+`PD_AUTOSCROLL_INTERVAL_MS` (60), `PD_AUTOSCROLL_UNITS` (1) and the
+`day_autoscroll_direction` / `autoscroll_day` / `_start_autoscroll` /
+`_autoscroll_tick` / `_stop_autoscroll` group. The speed is a judgement set
+from the box height and has not been felt by a human.
+
+### 2026-11-07 - Adjacent issue found, not fixed
+
+**Title:** `bind_item_drag` binds direct children only, not the row's subtree
+**Description:** `bind_item_drag` binds `[frame] + list(frame.winfo_children())`,
+while `bind_block_handlers` deliberately walks `_subtree(frame)` because "a
+press on the text reached nothing at all". Probed: the `DepthBarStack` bars
+inside an item row carry no bindings, so a press that starts on a depth bar
+starts no drag at all.
+**Priority:** Low-medium
+**Effort:** Small — the same `_subtree` walk, plus a test that a press on a
+depth bar starts a drag.
+**Notes:** Found while looking for fault 2 and left alone rather than swept
+into that change. It is also the first place to look if fault 2 survives a
+weekday retry.
 
 
 ## Deferred from the APE period-consistency sweep (2026-11-07)
@@ -84,7 +150,14 @@ because the repo's budget stops in-loop fixes below medium.
   fixed here** because neither pass could drive a date change through Tk's
   modal grab, so there is no demonstrated misbehaviour to write a test against
   — only a latent coupling between a permission keyed on one read of the date
-  and a write that takes another.
+  and a write that takes another. **Investigated 2026-11-07 and it is not the
+  reported "Schedule anyway does nothing" fault**, despite the earlier note
+  here saying that report might be its demonstration: the traceback shows
+  `askyesno` raising rather than returning, so the dialog never completed and
+  no second read of the date happened. The date race is a separate, still
+  undemonstrated coupling and stays low. A cheap probe would settle it —
+  monkeypatch `askyesno` to change `panel.selected_date` and return True, then
+  assert which day the block lands on — and was not run.
 
 ### Adjacent issues found, not fixed
 
