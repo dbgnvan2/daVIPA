@@ -110,6 +110,84 @@ Give a fifth a VSP segment colour. Then, in light **and** dark mode:
    fill; Restore Defaults refills the fields and does not save until Apply.
 5. Save a colour, go to Today, confirm it took effect with no relaunch.
 6. The red `P:` chip still marks critical items, beside a green row.
+7. **Dark mode, Today:** on a green or amber row, the complete checkbox and the
+   drag grip are visible against the fill, not washed out. This is the one the
+   second cold pass found by measurement (about 2.6:1 before the fix) and it is
+   the change most worth a human eye.
+8. **Type into a colour field.** The swatch should repaint as you type, and a
+   half-typed `#12` should leave it blank rather than showing the old colour.
+9. **Pick Colour with junk in the field.** Type `qqq`, then press Pick Colour:
+   the chooser should open on the level's default. Before the fix the button
+   did nothing at all and said nothing.
+10. **APE Week Assignment → Action Items panel.** It is a `TodayScreen`
+    subclass, so it takes the tints too. Save a colour and confirm it appears
+    there without a relaunch.
+
+## Review passes (2026-11-08)
+
+Two **cold** passes over a diff built from this change's five commits only, so
+neither saw the narrative of how the code was written. Severities were assigned
+before any fix was written. Both passes independently found the same blocker.
+
+**High, fixed:**
+
+1. `color_contrast.normalize_hex_color` validated with `int(text[1:], 16)`,
+   which Python accepts far more loosely than Tk: `0x1234` → `#0X1234`,
+   `+12345`, `# 12345`, `#-12345`, `#1_2345` and full-width Unicode digits all
+   passed as "valid" at seven characters. Saved from the new Settings field,
+   such a value was written to `settings.json` and then raised `TclError` on
+   every row build in five screens *and* on the Settings tab's own swatch — so
+   the tab the user would fix it from could not open, and the only way back was
+   hand-editing the file. Now a `#[0-9A-F]{6}` match, in both that function and
+   the pre-existing `_normalize_hex` beside it (P5: the whole class, not the one
+   instance).
+2. `test_plcm3_the_section_builds_on_real_widgets` turned any `TclError` into
+   `pytest.skip` — and `TclError` is exactly what a bad `grid` call, a rejected
+   option or a colour Tk refuses raise, which is the test's whole reason to
+   exist. It skipped on its own target class. Now only four display-specific
+   stderr fragments skip; everything else fails with the captured stderr.
+
+**Medium, fixed:** the vacuous clear-a-field assertion in `test_plcm32` (the
+third level's default is already `""`, so it held whether or not the handler
+wrote anything); PLC-M3.6's unanchored `"Priority Colours" in
+inspect.getsource(...)`, which the comment above the `add` call satisfied on its
+own — now an AST check over the strings `self.tabview.add` is given, pinning the
+whole seven-tab set in order; dark-mode row controls, which kept theme colours
+on a light level fill; `self.settings` left mutated after a refused write, where
+the next successful save from any other Settings section would have persisted
+colours the user was told were not saved; Pick Colour raising on unparseable
+entry text; the swatch not following the field although the user guide said it
+did; and a sixth surface the docs did not mention — APE Week Assignment's
+Action Items panel, a `TodayScreen` subclass that overrides neither the row
+builder nor `refresh` and so inherits the tint.
+
+One of those fixes was wrong and was reverted in the same session: the panel
+was read as *overriding* `refresh` and therefore never reloading, on a grep
+that found `def refresh` at line 553 of `week_actions.py` — which belongs to
+`WeekActionsScreen`, the container, not to the panel. The panel inherits
+`TodayScreen.refresh` and was never stale. The reload added to the container
+(which has no `settings` and builds no rows) is gone, and the test that
+"covered" it passed only because `WeekTacticActionsPanel.refresh` *is*
+`TodayScreen.refresh`. What replaced it asserts the inheritance itself, which
+is the real reason the panel is covered. Only the documentation half of that
+finding was ever real.
+
+The reload guard also became a real guard: it now asserts the reload is
+assigned to `self.settings` (both `today.py` and `upcoming.py` already contain a
+`settings = AppSettings.load()` into a *local* elsewhere, which the old
+call-only check would have accepted) and that it sits in the first three
+statements of `refresh`, across the five screens that define one.
+
+**Below medium:** seven findings in `BACKLOG.md` as PLC-A6 to PLC-A12 — the chip
+and the fill now disagreeing about "critical", the save stub publishing by the
+opposite mechanism from the real helper, the per-row warning on a bad stored
+colour, the six Save handlers that still have no rollback,
+`segment_color_utils._normalize_color` doing no validation at all,
+`local_assignments` returning `None` for a bare annotation, and the seven-tab
+strip that cannot scroll.
+
+A third pass is owed under the repo's sweep budget, since this round produced
+high-severity findings: cold, and in a different failure family.
 
 ## Next agent actions
 

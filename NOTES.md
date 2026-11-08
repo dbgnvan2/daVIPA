@@ -78,6 +78,54 @@
 - ⚠️ **The red `P:` chip is unchanged**, by the user's choice, so a green
   critical row sits beside a red chip. Logged as PLC-A3.
 
+### Two cold review passes over PLC, and what they found
+
+- ⚠️ **The validator written to keep a bad colour out of Tk admitted six
+  shapes Tk rejects.** `normalize_hex_color` checked `len == 7` and
+  `int(text[1:], 16)`, and Python's `int` takes a sign, a `0x` prefix,
+  PEP-515 underscores, inner whitespace and non-ASCII digits: `0x1234` came
+  back as `#0X1234`. Saved from the new field it reached `settings.json`, and
+  from then on every row build in five screens *and* the Settings tab's own
+  swatch raised `TclError` — so the tab the user would fix it from could not
+  open. Now `#[0-9A-F]{6}`, in `_normalize_hex` too (P5).
+- ⚠️ **The one test that built the section for real skipped on its own target
+  class.** Any `TclError` became `pytest.skip`, and `TclError` is what a bad
+  `grid` call or a colour Tk refuses raises. Four display-specific stderr
+  fragments skip now; everything else fails.
+- ✅ **Dark-mode row controls follow the fill.** The level table has no dark
+  variant by design, so in dark mode a Critical row is light while the theme's
+  checkbox border and drag grip stay light — about 2.6:1, under the 3:1
+  non-text bar. `row_control_kwargs` gives the three screens that build row
+  controls the fill's own text colour, and nothing at all for a segment,
+  completed or unfilled row.
+- ✅ **A refused write no longer leaves colours on the shared settings
+  object**, where the next successful save from any other Settings section
+  would have persisted what the user was told was not saved.
+- ✅ **A sixth surface draws the fill, and the docs named five.** APE Week
+  Assignment's Action Items panel is a `TodayScreen` subclass that overrides
+  neither the row builder nor `refresh`, so it inherits the tint and the
+  reload. The user guide and the in-app help now say so, and a test asserts the
+  inheritance, since that is the only reason the panel is covered.
+  (A first attempt at this put a reload into `WeekActionsScreen.refresh` — the
+  *container*, which has no `settings` and builds no rows — and a test that
+  passed only because `WeekTacticActionsPanel.refresh` *is*
+  `TodayScreen.refresh`. Both were reverted.)
+- ✅ **The reload guard now asserts the result is assigned to
+  `self.settings`** — both `today.py` and `upcoming.py` already load into a
+  *local* elsewhere, which the old call-only check accepted — and that it
+  happens in the first three statements of `refresh`.
+- ⚠️ **A source guard was passing on a comment.** PLC-M3.6 ended in
+  `"Priority Colours" in inspect.getsource(create_tabs)`, satisfied by the
+  comment above the `add` call, while its own docstring claimed it was parsed
+  rather than greped. It is now an AST check over the strings
+  `self.tabview.add` is given, pinning all seven tabs in order.
+- ⚠️ **One test could not fail:** `test_plcm32` asserted the cleared level
+  equalled `""` against a fresh `AppSettings`, whose default for that field is
+  already `""`. It now starts from a stored colour, so clearing is a real
+  write.
+- 📋 **Seven below-medium findings** went to `BACKLOG.md` as PLC-A6 to PLC-A12
+  rather than being fixed in-loop.
+
 ## Recent Changes (2026-11-07)
 
 ### APE Week Assignment joins the one panel design - UPD-M5

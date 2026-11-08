@@ -692,7 +692,8 @@ Date Increment Settings:
 Priority Colours (added 2026-11-08):
 - What: The row tint for each of the three **priority levels**. A priority level
   is a rule on an item's own Importance and Urgency, and it tints the whole row
-  in Today, Upcoming, All Items, Hierarchical and Completed.
+  in Today, Upcoming, All Items, Hierarchical and Completed, and in the Action
+  Items panel of APE Week Assignment, which draws Today's rows.
 - Why: The old behaviour had one tint, a pale red, for Critical items only, with
   no way to change it and no tier between Critical and nothing.
 - The three levels, checked in this order:
@@ -706,7 +707,8 @@ Priority Colours (added 2026-11-08):
 - A missing factor does not disqualify an item: Urgency Critical with
   Importance unset is still **Any Critical**.
 - Controls per level: a `#RRGGBB` field, a **Pick Colour** button, and a swatch
-  showing what is in the field.
+  that repaints as you type, showing what is in the field. A field holding
+  something that is not a colour shows no fill in its swatch until it is.
   - **Apply / Save** — Writes all three. Nothing is written if any of the three
     is not a colour; the status line names the level and the value it refused,
     rather than silently substituting one.
@@ -715,9 +717,10 @@ Priority Colours (added 2026-11-08):
 - **Clear a field** to give that level no fill.
 - One colour per level, used in both light and dark mode. The row's *text*
   colour is chosen automatically for contrast against whatever you pick, so a
-  pale colour gets dark text in either mode.
-- A saved colour shows the next time you open one of the five list screens; no
-  relaunch is needed.
+  pale colour gets dark text in either mode, and the row's own controls — the
+  complete checkbox, and Today's drag grip — follow it for the same reason.
+- A saved colour shows the next time you open one of those screens; no relaunch
+  is needed.
 - These are **not** the Plan screen's priority bands. A band comes from the
   priority *score* — the product of all four factors — and has its own five
   colours. An item can sit in the top band while being in no critical level:

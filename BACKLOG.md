@@ -146,6 +146,79 @@ listed in it — which global rule 13 asks for. The index also mixes per-documen
 sections with category descriptions, so "every document is listed" is not
 currently a well-defined property of it.
 
+## Below-medium findings from the PLC cold review passes (2026-11-08)
+
+Two cold passes ran over the PLC diff. Their high and medium findings were
+fixed in that batch; these are the below-medium ones, held here rather than
+fixed in-loop because a cosmetic fix buys none of the safety it costs.
+
+### PLC-A6 — the `P:` chip and the row fill now disagree about "critical" (low)
+
+Extends PLC-A3. `row_fill` derives the level from `priority_levels._at_least`,
+which reads `PriorityFactors` and compares with `>=` after `int()` coercion;
+five lines below it in the same five row builders, the chip still uses the
+literal `item.importance == 20 or item.urgency == 20`. They disagree for an
+importance of `25` (the fill appears, the chip does not) and for one stored as
+the string `"20"` (likewise — and `completed.py:306` compares
+`str(value).strip() == "20"`, so string-typed factors do occur). Fixing PLC-A3
+should replace the literal with a call to the module, not just recolour the
+chip.
+
+### PLC-A7 — the save test's stub publishes by the opposite mechanism (low)
+
+`_StubSettingsScreen._hand_settings_to_app` assigns `self.settings` to
+`self.app.settings`; the real `SettingsScreen._hand_settings_to_app` re-reads
+the file with `AppSettings.load()`, precisely so a refused write cannot leak.
+So PLC-M3.2's "reaches the running app" is proven against a stub that models
+the opposite of the real guard. The disk round trip is covered separately by
+`test_plcm24`, so nothing is unguarded; one test through the real helper with
+the `settings_file` fixture would close the gap.
+
+### PLC-A8 — an unusable stored colour is logged once per row, per refresh (low)
+
+`priority_levels.level_color` warns every time it falls back, and it is called
+once per row in five screens, so one bad field writes thousands of identical
+lines into `app.log` on each refresh. The Settings entry also shows the
+*effective* colour rather than the stored one, so the tab displays a value the
+file does not contain with no indication the stored one was rejected. A
+once-per-value log plus a status line on the tab would surface the drop where
+it can be fixed.
+
+### PLC-A9 — the other six Save handlers still have no rollback (low)
+
+`settings_priority_colors.save_priority_level_colors` now restores
+`self.settings` when `_write_settings` declines. The other six handlers on the
+Settings screen do not, and `SettingsScreen._hand_settings_to_app`'s docstring
+already documents the class. One shared helper that snapshots the fields a
+handler is about to write and restores them on refusal would retire it; doing
+it per handler in a sweeping diff would not.
+
+### PLC-A10 — `segment_color_utils._normalize_color` does no hex validation (low)
+
+`screens/segment_color_utils.py:164` passes its result straight to `fg_color`
+as a row fill in Today, Upcoming and All Items, with no check at all, from the
+`segment_descriptions.color_hex` column. Same `TclError`-inside-a-row-build
+class that `color_contrast._HEX_COLOR_RE` now closes for settings colours, from
+a database column instead. Pre-existing and untouched by that batch, but it is
+the sibling call path (P5).
+
+### PLC-A11 — `source_asserts.local_assignments` can return `None` (low)
+
+For an `ast.AnnAssign` with no value, `node.value` is `None` and is appended to
+the result list; a caller then passes `None` to `assigns_attribute_of`, which
+returns `False`. Harmless today because no row builder annotates `bg_color`
+without assigning it, misleading the first time one does.
+
+### PLC-A12 — the Settings tab strip has seven tabs and does not scroll (low)
+
+`CTkTabview`'s segmented button neither wraps nor scrolls, and the seven labels
+now run to about 110 characters. The window opens at 1200x700 with no
+`minsize`, so a narrow window or a small display can clip "Email Import" with
+no way to reach it. The tab *set* is now pinned in order by
+`test_plcm36_create_tabs_adds_the_priority_colours_tab`, so a fix can shorten
+labels without silently dropping a tab. The missing `minsize` is the older half
+of this and is not specific to the new tab.
+
 ## Adjacent issues — one panel design across the VSP tabs (UPD, 2026-11-07)
 
 Found while building UPD-M1, recorded under the standing rule rather than
