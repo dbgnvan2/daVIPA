@@ -7130,3 +7130,130 @@ def test_pdm128_motion_arms_the_autoscroll_and_the_release_cancels_it(
 
     assert cancelled == [armed], cancelled
     assert screen._autoscroll_after is None, screen._autoscroll_after
+
+
+def test_pdm13_autoload_does_not_spill_into_the_drawn_extension(
+    root, manager, settings
+):
+    """PD-M13.18 — a span that starts inside the configured day ends inside it.
+
+    Purpose: ``can_place``'s limit is the day as *drawn*, which is wider than
+             the configured day wherever a block already sits outside it. Both
+             free-box scans walk the configured range, so the *start* of a span
+             is bounded -- but its length is checked by ``can_place``, so a
+             block could start on the last configured box and run past Day End
+             into the extension.
+    Spec:    docs/implementation_plan_2026-11-07_plan_day_range.md#pd-m13
+    Tests:   this test
+
+    Found by a cold pass. AutoLoad fills the day the user configured; only a
+    deliberate drag on Earlier or Later may put work outside it.
+    """
+    panel = _short_day(root, manager, settings, end="16:30")  # boxes 0-16
+    # A Later drop has already put a block at 17:00, so the day is *drawn* out
+    # to box 18 while the user's configured day still ends at 16:30.
+    _add_block(manager, 30, "Later", slot_index=18, outside_range=True)
+    # Everything taken but the last configured box, 16:00-16:30. Boxes 8 and 9
+    # are lunch and hold nothing.
+    for index in list(range(8)) + list(range(10, 16)):
+        _add_block(manager, 30, f"Taken {index}", slot_index=index)
+    _priced_item(manager, "Long", 20, 20, 16, 8)
+    long_item = manager.get_items_for_start_date(THURSDAY)[0]
+    long_item.work_block = 60
+    manager.update_action_item(long_item)
+    panel.refresh()
+    existing = {block.id for block in manager.get_time_blocks(THURSDAY)}
+    before = len(existing)
+
+    panel.autoload_day()
+
+    # The whole span, not just where it starts: a 60m block written at 16:00
+    # starts on the last configured box and ends on one past it. Only the
+    # blocks AutoLoad wrote are in scope -- the Later block at box 18 is
+    # outside the configured day because the user put it there.
+    spilled = [
+        (block.label, block.slot_index, slots_for_minutes(block.planned_minutes))
+        for block in manager.get_time_blocks(THURSDAY)
+        if block.id not in existing
+        and block.slot_index is not None
+        and block.slot_index + slots_for_minutes(block.planned_minutes) - 1 > 16
+    ]
+    assert spilled == [], (
+        f"AutoLoad wrote these past the configured Day End of 16:30: {spilled}"
+    )
+    assert len(manager.get_time_blocks(THURSDAY)) == before, (
+        "a 60m task needs two boxes and only the last configured box is free"
+    )
+    assert "1 did not fit" in panel.status_label.cget("text")
+
+
+def test_pdm13_the_free_box_scan_bounds_the_span_too(root, manager, settings):
+    """PD-M13.19 — the same bound on the other scan, for the add paths.
+
+    Purpose: ``first_clear_slot`` serves AutoLoad and ``first_free_slot``
+             serves "block this item" and "add a break" when there is no
+             pointer to read. Both walk the configured day, so both need the
+             span bounded by it; a bound on only one leaves the other able to
+             finish a block inside the drawn extension.
+    Spec:    docs/implementation_plan_2026-11-07_plan_day_range.md#pd-m13
+    Tests:   this test
+
+    ``first_free_slot`` offers the earliest box that is not *full*, so the
+    boxes before the last one are filled to ``MAX_BLOCKS_PER_SLOT`` to get the
+    scan as far as the end of the configured day.
+    """
+    panel = _short_day(root, manager, settings, end="09:00")  # boxes 0 and 1
+    # A Later drop has drawn the day out to box 2 (09:00-09:30).
+    _add_block(manager, 30, "Later", slot_index=2, outside_range=True)
+    for seat in range(MAX_BLOCKS_PER_SLOT):
+        _add_block(manager, 30, f"Full {seat}", slot_index=0)
+    panel.refresh()
+
+    assert panel.first_free_slot(30) == 1, (
+        "precondition: box 0 is full and box 1 is the last configured box"
+    )
+    assert panel.first_free_slot(60) is None, (
+        "a 60m block offered box 1 would finish in box 2, which is past the "
+        "configured Day End and only drawn because the user put work there"
+    )
+
+
+def test_pdm13_a_failed_extension_redraws_before_it_reports(
+    screen, manager, settings, monkeypatch
+):
+    """PD-M13.20 — the broad failure arm redraws the day before reporting.
+
+    Purpose: the arm used to call ``refresh`` as part of putting a settings
+             file back. PD-M13 deleted the rollback and the redraw went with
+             it. Every refusal this path can currently reach is checked before
+             the write, so the screen is already right -- but a failure landing
+             *after* the commit would leave the drawn day disagreeing with the
+             database, with the error sentence as the only sign of it.
+    Spec:    docs/implementation_plan_2026-11-07_plan_day_range.md#pd-m13
+    Tests:   this test
+
+    Found by two cold passes independently. Asserted on the call rather than
+    on the pixels: what the redraw puts on screen is covered by the grid tests,
+    and a failure that is *not* pre-checked cannot be staged from outside.
+    """
+    item = _item(manager, "Early start")
+    redraws = []
+    real_refresh = screen.refresh
+
+    def counted_refresh(*args, **kwargs):
+        redraws.append(1)
+        return real_refresh(*args, **kwargs)
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("the disk went away")
+
+    monkeypatch.setattr(screen, "refresh", counted_refresh)
+    monkeypatch.setattr(manager, "add_block_at", boom)
+
+    screen.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+    assert redraws, (
+        "the day was not redrawn after the extension failed, so a failure "
+        "after the write would leave the screen showing a day that is gone"
+    )
+    assert "the disk went away" in screen.status_label.cget("text")

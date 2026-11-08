@@ -787,10 +787,15 @@ def test_pdm54_extending_the_day_is_not_confirming_it(settings_file, tmp_path):
     ``plan_day_shape_unconfirmed`` says the four day times were invented rather
     than chosen, and it is what stops the Plan screen's one irreversible write
     running against a day nobody picked. Only the Day Settings dialog clears
-    it. A drop that lengthens the day writes one of those four values -- which
-    is exactly the shape of change that *looks* like confirmation and is not:
-    the user said where one item goes, not that 08:00, 12:00, 60 and 17:00 are
-    their day.
+    it.
+
+    **Retargeted 2026-11-08 under reason (b) — the behaviour changed
+    intentionally.** This used to assert the flag survived a drop that *wrote*
+    ``plan_day_start``, because writing one of the four day values is exactly
+    the shape of change that looks like confirmation and is not. Under PD-M13
+    the drop writes no setting at all, so the criterion is now met by a
+    stronger fact, and that is what is asserted: the extension happened, and
+    the day's four values are untouched.
     """
     import customtkinter as ctk
 
@@ -811,16 +816,30 @@ def test_pdm54_extending_the_day_is_not_confirming_it(settings_file, tmp_path):
 
         panel.extend_day_for(item, DAY_EXTEND_EARLIER)
 
-        assert settings.plan_day_start == "07:30", (
+        # The precondition the old assertion carried -- that the extension
+        # really happened -- now has to be read off the block, because that is
+        # the only thing the gesture writes.
+        placed = manager.get_time_blocks("2026-11-05")
+        assert [block.slot_index for block in placed] == [-1], (
             "precondition for the real assertion: the extension has to have "
-            f"happened, and the day start is {settings.plan_day_start}"
+            f"happened, and the day holds {[b.slot_index for b in placed]}"
+        )
+        assert settings.plan_day_start == "08:00", (
+            "PD-M13 — the drop drew the day wider; it must not have moved the "
+            f"configured Day Start, which is now {settings.plan_day_start}"
         )
         assert settings.plan_day_shape_unconfirmed is True, (
-            "lengthening the day was taken as the user confirming its shape"
+            "extending the day was taken as the user confirming its shape"
         )
-        assert json.loads(settings_file.read_text())[
-            "plan_day_shape_unconfirmed"
-        ] is True, "the file now says a guessed day shape is the user's"
+        # This used to read the flag back out of the file, which only worked
+        # because the extension called ``settings.save()`` and so rewrote the
+        # unreadable file as a side effect. PD-M13 removed that save, and not
+        # writing the file is the stronger guarantee: a guessed day shape
+        # cannot be committed to disk by a gesture that never touches it.
+        assert settings_file.read_text() == "{ not json", (
+            "the extension wrote the settings file, which is how a guessed "
+            "day shape used to become the user's without them saying so"
+        )
     finally:
         root.destroy()
         manager.close()
@@ -832,6 +851,10 @@ def test_pdm54_an_already_confirmed_day_stays_confirmed(settings_file, tmp_path)
     Without this, the test above would pass for an implementation that wrote
     ``True`` unconditionally -- which would put every user who has opened Day
     Settings back behind the warning and stop their old blocks being placed.
+
+    **Retargeted 2026-11-08 under reason (b)**, the same way as the test
+    above: the Day End assertion was a precondition that the extension had
+    happened, and PD-M13 moved that evidence onto the block.
     """
     import customtkinter as ctk
 
@@ -857,7 +880,15 @@ def test_pdm54_an_already_confirmed_day_stays_confirmed(settings_file, tmp_path)
 
         panel.extend_day_for(item, DAY_EXTEND_LATER)
 
-        assert settings.plan_day_end == "17:30", settings.plan_day_end
+        placed = manager.get_time_blocks("2026-11-05")
+        assert [block.slot_index for block in placed] == [18], (
+            "precondition: the extension has to have happened, and the day "
+            f"holds {[b.slot_index for b in placed]}"
+        )
+        assert settings.plan_day_end == "17:00", (
+            "PD-M13 — the drop drew the day wider; it must not have moved the "
+            f"configured Day End, which is now {settings.plan_day_end}"
+        )
         assert settings.plan_day_shape_unconfirmed is False, (
             "extending the day put a confirmed day back behind the warning"
         )

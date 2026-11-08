@@ -665,3 +665,85 @@ def test_pdm1311_a_box_before_midnight_is_refused():
     # A span is counted from its own end, not its start.
     assert slot_is_on_the_date(BOUNDS, 30, 2) is True
     assert slot_is_on_the_date(BOUNDS, 31, 2) is False
+
+
+def test_pdm13_the_grid_never_draws_a_box_the_date_cannot_hold():
+    """PD-M13.15 — what is drawn is what ``can_place`` will accept.
+
+    Purpose: close the gap between the two limits. ``slot_is_on_the_date`` is
+             the absolute limit on writing, and ``drawn_day_slots`` decides
+             what is drawn; if the second is wider than the first, the grid
+             offers a box every write path then refuses.
+    Spec:    docs/implementation_plan_2026-11-07_plan_day_range.md#pd-m13
+    Tests:   this test
+
+    A stored index counts from Day Start, so reducing Day Start in ⚙ Day
+    Settings reinterprets every stored index -- and an index placed *before*
+    the old start can land before midnight under the new one.
+    """
+    # Both directions, because Day Start moves either way and the two fail
+    # differently: before midnight format_hhmm floors to "00:00" and two boxes
+    # share one label, past midnight it counts on past 24 and draws "40:00".
+    cases = [
+        # A block stored at 07:30 under an 08:00 start, read back from 00:00.
+        (DayBounds(day_start="00:00"), _block(30, slot_index=-1, label="07:30")),
+        # A block stored at 20:00 under an 08:00 start, read back from 20:00.
+        (
+            DayBounds(day_start="20:00", day_end="23:30"),
+            _block(30, slot_index=40, label="20:00"),
+        ),
+    ]
+    for bounds, stored in cases:
+        drawn = drawn_day_slots(bounds, [stored])
+        assert drawn, "the configured day is still the floor"
+        for slot in drawn:
+            assert slot_is_on_the_date(bounds, slot.index), (
+                f"box {slot.index} is drawn but no write path will accept it"
+            )
+            assert 0 <= slot.start_minutes < 24 * 60, (
+                f"box {slot.index} starts at {slot.start_minutes} minutes past "
+                "midnight, which is not a time of day on this date"
+            )
+
+
+def test_pdm13_an_index_the_new_day_start_puts_off_the_date_goes_outside():
+    """PD-M13.16 — such a block is surfaced, not drawn in the wrong box (P2).
+
+    Purpose: the remedy, not just the refusal. The block has to stay reachable
+             or the user cannot fix it: drawn in a box it cannot be moved out
+             of, deleting it is the only way out.
+    Spec:    docs/implementation_plan_2026-11-07_plan_day_range.md#pd-m13
+    Tests:   this test
+    """
+    orphan = _block(30, slot_index=-1, label="07:30 under an 08:00 start")
+    grid = build_day_grid([orphan], DayBounds(day_start="00:00"))
+
+    assert [b.label for b in grid.outside] == ["07:30 under an 08:00 start"]
+    assert all(not entry.starting for entry in grid.slots), (
+        "the block was drawn in a box that can_place refuses, so the user "
+        "can neither read its time nor move it"
+    )
+    # The box it would have claimed is not conjured into the day either.
+    assert [entry.slot.index for entry in grid.slots] == [
+        slot.index for slot in day_grid(DayBounds(day_start="00:00"))
+    ]
+
+
+def test_pdm13_one_unreadable_index_cannot_ask_for_an_unbounded_grid():
+    """PD-M13.17 — the drawn day is bounded by the date, not by stored data.
+
+    Purpose: the extent used to be ``len(day_grid(bounds))``; it is now taken
+             from the blocks, which is data. One row with an absurd index must
+             not turn into one widget row per box on every open of that date.
+    Spec:    docs/implementation_plan_2026-11-07_plan_day_range.md#pd-m13
+    Tests:   this test
+
+    Not reachable through ``add_block_at`` -- ``can_place`` refuses it -- so
+    this is about a row that arrived another way: a hand-edited database, a
+    failed migration, or a future caller that bypasses the gate.
+    """
+    grid = build_day_grid([_block(30, slot_index=100_000, label="corrupt")], BOUNDS)
+
+    # 48 half hours is the most any date can hold.
+    assert len(grid.slots) <= 48
+    assert [b.label for b in grid.outside] == ["corrupt"]
