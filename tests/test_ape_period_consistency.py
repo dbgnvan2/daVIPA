@@ -298,12 +298,6 @@ def test_apcm23_drag_path_reaches_the_same_reporting():
     said = []
     calls = []
     stub = SimpleNamespace(
-        dragged_row={"id": "ape-bad"},
-        winfo_toplevel=lambda: SimpleNamespace(unbind=lambda _e: None),
-        winfo_pointerxy=lambda: (0, 0),
-        right_list=object(),
-        winfo_containing=lambda *_: "target",
-        _is_descendant=lambda *_: True,
         _parse_period=lambda: (2026, 4, 11),
         vps_manager=SimpleNamespace(
             assign_ape_to_month=lambda *a: calls.append(a) or False
@@ -315,12 +309,17 @@ def test_apcm23_drag_path_reaches_the_same_reporting():
     )
     _bind(stub, APEPeriodViewScreen, "_assign_one", "_ids_in_month")
 
-    APEPeriodViewScreen._finish_row_drag(stub, SimpleNamespace(x_root=0, y_root=0))
+    # UPD-M4 moved the drag itself into screens/row_drag.py, so the stub no
+    # longer fakes a pointer, a toplevel or a descendant walk: none of that is
+    # this screen's any more, and it is covered by UPD-M2.2 to M2.4. What is
+    # still this screen's is what a dropped row means, which is this method.
+    APEPeriodViewScreen._assign_dragged_row(stub, {"id": "ape-bad"})
 
     assert calls == [("ape-bad", 4, 11)], (
         f"the drop must reach the manager with the parsed period, got {calls}"
     )
     assert any("could not be assigned" in s for s in said if isinstance(s, str)), said
+    assert "refresh" in said, "a refused drop must not skip the redraw"
 
 
 # --------------------------------------------------------------------------

@@ -39,7 +39,11 @@ import customtkinter as ctk  # noqa: E402
 from src.getmoredone.app_settings import AppSettings  # noqa: E402
 from src.getmoredone.color_contrast import pick_text_color  # noqa: E402
 from src.getmoredone.screens import chip_table, row_drag, split_panel  # noqa: E402
+from src.getmoredone.screens.annual_vision_segments import (  # noqa: E402
+    AnnualVisionSegmentsScreen,
+)
 from src.getmoredone.screens.ape_assignment import APEAssignmentScreen  # noqa: E402
+from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen  # noqa: E402
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "getmoredone"
 
@@ -74,7 +78,9 @@ def _fake_vps(left_rows, right_rows):
     call `.strip()` and `.get()` on what comes back, so a MagicMock would
     sail past the assertions this file makes about rendered text.
     """
+    calls = []
     return SimpleNamespace(
+        calls=calls,
         get_annual_plan_elements=lambda year: list(left_rows),
         get_annual_plan_elements_for_quarter=lambda year, quarter: list(right_rows),
         get_vision_categories=lambda: [],
@@ -82,6 +88,7 @@ def _fake_vps(left_rows, right_rows):
         get_segment_color_map=lambda: {},
         get_segment_colors_by_id=lambda: {},
         resolve_segment_color=lambda name, colors: "",
+        assign_ape_to_quarter=lambda *a: calls.append(a) or True,
     )
 
 
@@ -116,12 +123,30 @@ def _row_frames(scroll_frame):
     return children[1:]
 
 
+def _is_resize_handle(widget) -> bool:
+    """A ColumnResizer drag handle, which is not a cell.
+
+    The shared table grids a handle into the same grid column as the header
+    label it belongs to, so a reader of the header's children sees two
+    widgets per resizable column. `test_updm32` identifies a handle the same
+    way, by its cursor.
+    """
+    try:
+        return widget.cget("cursor") == "sb_h_double_arrow"
+    except Exception:
+        return False
+
+
 def _cells(frame):
-    """[(grid column, class name, text)] for a header or row frame."""
+    """[(grid column, class name, text)] for a header or row frame.
+
+    Resize handles are skipped: they sit in a column without being a cell of
+    it, and before the shared table there was nothing in a header but cells.
+    """
     out = []
     for child in frame.winfo_children():
         info = child.grid_info()
-        if not info:
+        if not info or _is_resize_handle(child):
             continue
         try:
             text = child.cget("text")
@@ -268,6 +293,208 @@ def test_updm41_ape_quarter_right_row_ends_with_a_delete_button():
         root.destroy()
 
 
+# ------------------------- UPD-M4.1: APE Month and Annual, as they stand
+
+def _fake_month_vps(left_rows, right_rows):
+    """A VPS double for APE Month Assignment, same shape as `_fake_vps`."""
+    calls = []
+    return SimpleNamespace(
+        calls=calls,
+        get_annual_plan_elements_for_quarter=lambda year, quarter: list(left_rows),
+        get_annual_plan_elements_for_month=lambda year, month: list(right_rows),
+        get_vision_categories=lambda: [],
+        get_vision_subsegments=lambda: [],
+        get_segment_color_map=lambda: {},
+        get_segment_colors_by_id=lambda: {},
+        resolve_segment_color=lambda name, colors: "",
+        assign_ape_to_month=lambda *a: calls.append(a) or True,
+    )
+
+
+def _fake_annual_vps(left_rows, right_rows):
+    """A VPS double for Annual Vision Segments."""
+    calls = []
+    return SimpleNamespace(
+        calls=calls,
+        get_vision_elements=lambda: list(left_rows),
+        get_annual_vision_elements=lambda year: list(right_rows),
+        get_vision_categories=lambda: [],
+        get_vision_subsegments=lambda: [],
+        get_segment_color_map=lambda: {},
+        get_segment_colors_by_id=lambda: {},
+        resolve_segment_color=lambda name, colors: "",
+        create_annual_records_from_vision_element=lambda *a: calls.append(a) or True,
+    )
+
+
+def _month_screen(left_rows=(), right_rows=(), settings=None):
+    """APE Month Assignment on a withdrawn root, already rendered."""
+    root = _root()
+    vps = _fake_month_vps(left_rows, right_rows)
+    app = SimpleNamespace(vps_manager=vps)
+    if settings is not None:
+        app.settings = settings
+    screen = APEPeriodViewScreen(root, vps, app)
+    screen.update_idletasks()
+    return root, screen
+
+
+def _annual_screen(left_rows=(), right_rows=(), settings=None):
+    """Annual Vision Segments on a withdrawn root, already rendered."""
+    root = _root()
+    vps = _fake_annual_vps(left_rows, right_rows)
+    app = SimpleNamespace(vps_manager=vps)
+    if settings is not None:
+        app.settings = settings
+    screen = AnnualVisionSegmentsScreen(root, vps, app)
+    screen.update_idletasks()
+    return root, screen
+
+
+def test_updm41_ape_month_layout_is_unchanged():
+    """UPD-M4.1 — APE Month's body is left | divider | right, and it drags.
+
+    The same three-column body and the same three divider bindings as APE
+    Quarter, pinned before this screen's own copies of the handlers are
+    removed. `<ButtonPress-1>` and `<Button-1>` are one event in Tk and
+    `bind()` reports the canonical name, so this assertion holds both before
+    the move, where the screen binds the long form, and after, where
+    split_panel binds the short one.
+    """
+    root, screen = _month_screen()
+    try:
+        body = screen.body
+        assert int(screen.left_frame.grid_info()["column"]) == 0
+        assert int(screen.divider.grid_info()["column"]) == 1
+        assert int(screen.right_frame.grid_info()["column"]) == 2
+        assert body.grid_columnconfigure(1).get("minsize") == split_panel.SPLITTER_WIDTH
+
+        bound = set(_bound_sequences(screen.divider))
+        assert {"<Button-1>", "<B1-Motion>", "<ButtonRelease-1>"} <= bound
+    finally:
+        root.destroy()
+
+
+def test_updm41_ape_month_headers_and_widths_are_unchanged():
+    """UPD-M4.1 — APE Month's two headers, and the left panel's pixel widths.
+
+    Byte for byte the same `_render_rows` as APE Quarter's, so the same
+    numbers: a blank checkbox cell then the four names on the left, the four
+    names then Actions on the right.
+    """
+    root, screen = _month_screen(left_rows=[_ape_row(1)], right_rows=[_ape_row(2)])
+    try:
+        left = _header_frame(screen.left_list)
+        assert [text for _col, _cls, text in _cells(left)] == [
+            "", "#", "Segment", "SubSegment", "Category"]
+        assert _minsizes(left, (0, 1, 2, 3, 4)) == [34, 34, 135, 155, 125]
+
+        right = _header_frame(screen.right_list)
+        assert [text for _col, _cls, text in _cells(right)] == [
+            "#", "Segment", "SubSegment", "Category", "Actions"]
+        assert _minsizes(right, (0, 1, 2, 3, 4)) == [34, 135, 155, 125, 84]
+    finally:
+        root.destroy()
+
+
+def test_updm41_ape_month_rows_drag_left_and_delete_right():
+    """UPD-M4.1 — a left row is a drag source, a right row has its Delete.
+
+    Five draggable widgets on the left (the frame and its four cells, not the
+    checkbox) and a Delete button in the right row's Actions column. Dragging
+    is one-way, so the right row is bound to nothing.
+    """
+    root, screen = _month_screen(left_rows=[_ape_row(1)], right_rows=[_ape_row(2)])
+    try:
+        left_row = _row_frames(screen.left_list)[0]
+        assert [cls for _col, cls, _text in _cells(left_row)][0] == "CTkCheckBox"
+        draggable = [left_row] + [c for c in left_row.winfo_children()
+                                  if not isinstance(c, ctk.CTkCheckBox)]
+        assert len(draggable) == 5
+        for widget in draggable:
+            assert "<Button-1>" in set(_bound_sequences(widget))
+
+        right_row = _row_frames(screen.right_list)[0]
+        last = _cells(right_row)[-1]
+        assert last[1] == "CTkButton"
+        assert last[2] == "Delete"
+        assert "<Button-1>" not in set(_bound_sequences(right_row))
+    finally:
+        root.destroy()
+
+
+def test_updm41_annual_layout_is_unchanged():
+    """UPD-M4.1 — Annual Vision Segments' body and divider, pinned.
+
+    This screen declares its own `SPLITTER_WIDTH = 8`, which is the number
+    split_panel carries, so the middle column's width is the same before and
+    after the move.
+    """
+    root, screen = _annual_screen()
+    try:
+        body = screen.body
+        assert int(screen.left_frame.grid_info()["column"]) == 0
+        assert int(screen.divider.grid_info()["column"]) == 1
+        assert int(screen.right_frame.grid_info()["column"]) == 2
+        assert body.grid_columnconfigure(1).get("minsize") == split_panel.SPLITTER_WIDTH
+
+        bound = set(_bound_sequences(screen.divider))
+        assert {"<Button-1>", "<B1-Motion>", "<ButtonRelease-1>"} <= bound
+    finally:
+        root.destroy()
+
+
+def test_updm41_annual_headers_and_widths_are_unchanged():
+    """UPD-M4.1 — Annual's headers, and the Actions column that is 140 not 84.
+
+    This is the one column width that differs across the three screens: the
+    Annual right panel's Actions column holds Edit *and* Delete, so it is 140
+    where the APE tabs' is 84. The shared table has to let a screen say so,
+    and this pins the number it has to reproduce.
+    """
+    root, screen = _annual_screen(left_rows=[_ape_row(1)], right_rows=[_ape_row(2)])
+    try:
+        left = _header_frame(screen.left_list)
+        assert [text for _col, _cls, text in _cells(left)] == [
+            "", "#", "Segment", "SubSegment", "Category"]
+        assert _minsizes(left, (0, 1, 2, 3, 4)) == [34, 34, 135, 155, 125]
+
+        right = _header_frame(screen.right_list)
+        assert [text for _col, _cls, text in _cells(right)] == [
+            "#", "Segment", "SubSegment", "Category", "Actions"]
+        assert _minsizes(right, (0, 1, 2, 3, 4)) == [34, 135, 155, 125, 140]
+    finally:
+        root.destroy()
+
+
+def test_updm41_annual_right_row_keeps_edit_beside_delete():
+    """UPD-M4.1 — Annual's right row ends in a frame holding Edit and Delete.
+
+    Not a bare button like the APE tabs': the two buttons are packed into a
+    transparent sub-frame gridded in the Actions column. The screen keeps
+    owning that cell after the move, so what is in it must not change.
+    """
+    root, screen = _annual_screen(left_rows=[_ape_row(1)], right_rows=[_ape_row(2)])
+    try:
+        right_row = _row_frames(screen.right_list)[0]
+        last = _cells(right_row)[-1]
+        assert last[1] == "CTkFrame"
+
+        actions = [c for c in right_row.winfo_children()
+                   if isinstance(c, ctk.CTkFrame) and c.grid_info()
+                   and int(c.grid_info()["column"]) == last[0]][0]
+        assert [b.cget("text") for b in actions.winfo_children()] == ["Edit", "Delete"]
+
+        left_row = _row_frames(screen.left_list)[0]
+        draggable = [left_row] + [c for c in left_row.winfo_children()
+                                  if not isinstance(c, ctk.CTkCheckBox)]
+        assert len(draggable) == 5
+        for widget in draggable:
+            assert "<Button-1>" in set(_bound_sequences(widget))
+    finally:
+        root.destroy()
+
+
 # ------------------------------------------- UPD-M3: the shared chip table
 
 def _table(prefix="ape_quarter_left", columns=None, settings=None):
@@ -275,7 +502,7 @@ def _table(prefix="ape_quarter_left", columns=None, settings=None):
     root = _root()
     frame = ctk.CTkScrollableFrame(root)
     frame.grid(row=0, column=0, sticky="nsew")
-    cols = columns if columns is not None else list(chip_table.APE_COLUMNS)
+    cols = columns if columns is not None else list(chip_table.APE_LEFT_COLUMNS)
     table = chip_table.ChipTable(
         frame, settings if settings is not None else FakeSettings(), prefix, cols
     )
@@ -310,12 +537,42 @@ def test_updm31_table_renders_header_and_rows():
                 {"segment": "#3366cc", "subsegment": "#44aa88", "category": "#cc7744"},
             )
         assert [c.heading for c in table.columns] == [
-            "", "#", "Segment", "SubSegment", "Category", "Actions"]
+            "", "#", "Segment", "SubSegment", "Category"]
         assert len(table.rows) == 3
         texts = [lbl.cget("text").strip() for lbl in table.rows[0][1].values()]
         assert "Purposeful Work" in texts
     finally:
         root.destroy()
+
+    # The right panel's set is the same four names with Actions after them and
+    # no checkbox before them, so a column's grid index differs between the
+    # two panels of one tab. That is why there is a set per panel.
+    assert [c.heading for c in chip_table.APE_RIGHT_COLUMNS] == [
+        "#", "Segment", "SubSegment", "Category", "Actions"]
+    assert [c.default_width for c in chip_table.APE_RIGHT_COLUMNS][-1] == 84
+    assert [c.default_width for c in chip_table.ANNUAL_RIGHT_COLUMNS][-1] == 140
+
+
+def test_updm31_every_shipped_column_declares_a_width_it_can_have():
+    """UPD-M3.1 — every shipped column's default sits inside its own bounds.
+
+    `ColumnResizer` clamps a stored width into [min, max], so a column
+    declared 34 wide with ChipColumn's default minimum of 40 renders at 40 and
+    nothing reports it. That is exactly what happened to the checkbox and #
+    columns, and UPD-M4.1's pixel assertion is what caught it. This holds
+    every set, so the next one cannot repeat it.
+    """
+    sets = {
+        "APE_LEFT_COLUMNS": chip_table.APE_LEFT_COLUMNS,
+        "APE_RIGHT_COLUMNS": chip_table.APE_RIGHT_COLUMNS,
+        "ANNUAL_RIGHT_COLUMNS": chip_table.ANNUAL_RIGHT_COLUMNS,
+    }
+    for name, columns in sets.items():
+        assert columns, f"{name} is empty"
+        for column in columns:
+            assert column.min_width <= column.default_width <= column.max_width, (
+                f"{name}.{column.key} declares {column.default_width} but is "
+                f"bounded [{column.min_width}, {column.max_width}]")
 
 
 def test_updm32_every_resizable_column_has_a_handle():
@@ -331,8 +588,9 @@ def test_updm32_every_resizable_column_has_a_handle():
         handles = [c for c in header.winfo_children()
                    if c.cget("cursor") == "sb_h_double_arrow"]
         resizable = [c for c in table.columns if c.resizable]
-        # Segment, SubSegment, Category. The checkbox, # and Actions columns
-        # are fixed: a 34px number has nothing to widen into.
+        # Segment, SubSegment, Category. The checkbox and # columns are fixed,
+        # as is Actions on the panels that have one: a 34px number has nothing
+        # to widen into.
         assert len(handles) == len(resizable) == 3
     finally:
         root.destroy()
@@ -404,6 +662,133 @@ def test_updm35_chip_text_follows_the_column_width():
         root.destroy()
 
 
+def test_updm35_chip_text_fits_the_pill_not_the_column():
+    """UPD-M3.5 / AWA-S5 — the character budget comes from the pill's width.
+
+    A chip pill is CHIP_INSET narrower than its column, so a budget measured
+    from the column width overruns the pill by one character at most widths
+    and by two where the column width is a multiple of CHAR_PX. The last
+    character was clipped on the 135px Segment column on every row of every
+    panel that adopts this table.
+
+    Asserted at three widths because the off-by-how-much depends on the
+    width modulo CHAR_PX: one number would pass with the bug still in.
+    """
+    from src.getmoredone.screens.column_resize import chars_for_width
+
+    root, _frame, table = _table()
+    try:
+        table.build_header()
+        long_name = "Purposeful Work and then some more words indeed"
+        for width in (135, 136, 160):
+            table.resizer._widths["segment"] = width
+            _row, cells = table.add_row({"segment": long_name},
+                                        {"segment": "#3366cc"})
+            text = cells["segment"].cget("text")
+            budget = chars_for_width(table._chip_width("segment"))
+            assert len(text.strip()) <= budget, (
+                f"at {width}px the pill holds {budget} characters and the chip "
+                f"was given {len(text.strip())}")
+    finally:
+        root.destroy()
+
+
+def test_updm35_a_drag_re_clamps_to_the_pill_too():
+    """UPD-M3.5 / AWA-S5 — the live re-clamp uses the same budget as the render.
+
+    `_apply_live` recomputed the text from the column width while setting the
+    label's width to the column less the inset, so a drag reproduced the
+    clipping the render had just been fixed for. Both paths now take the
+    cell's own width_delta.
+    """
+    from src.getmoredone.screens.column_resize import chars_for_width
+
+    root, _frame, table = _table()
+    try:
+        table.build_header()
+        _row, cells = table.add_row(
+            {"segment": "Purposeful Work and then some more words"},
+            {"segment": "#3366cc"})
+
+        table.resizer._on_start(SimpleNamespace(x_root=500), "segment")
+        table.resizer._on_drag(SimpleNamespace(x_root=460), "segment")
+
+        text = cells["segment"].cget("text")
+        assert len(text.strip()) <= chars_for_width(table._chip_width("segment"))
+    finally:
+        root.destroy()
+
+
+def test_updm31_a_row_before_a_header_is_refused():
+    """UPD-M3.1 / AWA-S6 d — add_row without build_header raises.
+
+    It used to grid the first row at row 1 and leave row 0 empty, which reads
+    as a panel with a missing header rather than as a mistake.
+    """
+    root, _frame, table = _table()
+    try:
+        with pytest.raises(ValueError, match="before build_header"):
+            table.add_row({"segment": "Purposeful Work"})
+    finally:
+        root.destroy()
+
+
+def test_updm31_a_row_with_no_known_column_is_refused():
+    """UPD-M3.1 / AWA-S6 e — values naming no column of this table raises.
+
+    `values={}`, or a typo in a key, appended a zero-cell, zero-height frame
+    with no error and no signal: a row the panel counts and the user cannot
+    see.
+    """
+    root, _frame, table = _table()
+    try:
+        table.build_header()
+        with pytest.raises(ValueError, match="no known column key"):
+            table.add_row({})
+        with pytest.raises(ValueError, match="no known column key"):
+            table.add_row({"segmant": "typo"})
+        assert table.rows == []
+    finally:
+        root.destroy()
+
+
+def test_updm31_clearing_forgets_the_destroyed_header():
+    """UPD-M3.1 / AWA-S6 b — clear() drops the resizer's header registration.
+
+    The header frame is destroyed with the rows, but the resizer went on
+    holding it and relied on `winfo_exists()` to make a later drag a no-op.
+    """
+    root, _frame, table = _table()
+    try:
+        table.build_header()
+        assert table.resizer._header is not None
+        table.clear()
+        assert table.resizer._header is None
+    finally:
+        root.destroy()
+
+
+def test_updm31_the_table_makes_its_container_stretch():
+    """UPD-M3.1 / AWA-S6 c — build_header weights the container's column 0.
+
+    The header and every row are gridded sticky="ew" in column 0, which does
+    nothing at all unless that column can stretch. Every adopting screen sets
+    it, so the table setting it changes nothing for them -- it stops the next
+    adopter getting a ragged panel and no clue why.
+    """
+    root = _root()
+    try:
+        frame = ctk.CTkScrollableFrame(root)
+        frame.grid(row=0, column=0, sticky="nsew")
+        table = chip_table.ChipTable(frame, FakeSettings(), "ape_quarter_left",
+                                     list(chip_table.APE_LEFT_COLUMNS))
+        assert frame.grid_columnconfigure(0).get("weight") == 0
+        table.build_header()
+        assert frame.grid_columnconfigure(0).get("weight") == 1
+    finally:
+        root.destroy()
+
+
 def test_updm36_panels_keep_their_own_widths():
     """UPD-M3.6 — two tables with different prefixes do not share a width.
 
@@ -416,9 +801,9 @@ def test_updm36_panels_keep_their_own_widths():
         left_frame = ctk.CTkScrollableFrame(root)
         right_frame = ctk.CTkScrollableFrame(root)
         left = chip_table.ChipTable(left_frame, settings, "ape_quarter_left",
-                                    list(chip_table.APE_COLUMNS))
+                                    list(chip_table.APE_LEFT_COLUMNS))
         right = chip_table.ChipTable(right_frame, settings, "ape_quarter_right",
-                                     list(chip_table.APE_COLUMNS))
+                                     list(chip_table.APE_RIGHT_COLUMNS))
         start = right.resizer.width("segment")
 
         left.resizer._on_start(SimpleNamespace(x_root=500), "segment")
@@ -506,8 +891,6 @@ SPLITTER_METHODS = ("_apply_split_ratio", "_on_divider_drag")
 # as an exact set rather than a ceiling, so it cannot quietly grow a fourth
 # entry and it cannot stay stale after an adoption.
 SPLITTER_HOLDOUTS = {
-    "annual_vision_segments.py",
-    "ape_period_view.py",
     "weekly_items.py",
 }
 
@@ -712,16 +1095,19 @@ def _screens_with_their_own_splitter():
 def test_updm15_no_screen_keeps_its_own_splitter():
     """UPD-M1.5 — counted from the AST, as an exact set.
 
-    UPD-M1 adopts ape_assignment only, so the count is not yet zero and saying
-    it is would be a false claim. What is asserted instead is exact: the files
-    that still define a splitter are the three the spec's order leaves for
-    UPD-M4, and each defines the whole copy rather than part of one. The set
-    goes red when a fourth screen grows one, and again when a holdout adopts
-    and is not struck off here.
+    Still not zero after UPD-M4, and saying it is would be a false claim. The
+    spec's §4 said UPD-M4 would empty this set; it was wrong, because UPD-M4
+    is the three APE/Annual tabs and the fourth copy is in weekly_items.py,
+    which is rewritten at UPD-M5. What is asserted instead is exact: the one
+    file that still defines a splitter defines the whole copy rather than part
+    of one. The set goes red when another screen grows one, and again when the
+    last holdout adopts and is not struck off here.
     """
     found = _screens_with_their_own_splitter()
     assert set(found) == SPLITTER_HOLDOUTS | SPLITTER_OUT_OF_SCOPE
-    assert "ape_assignment.py" not in found
+    for adopted in ("ape_assignment.py", "ape_period_view.py",
+                    "annual_vision_segments.py"):
+        assert adopted not in found, f"{adopted} grew a splitter back"
     whole_copy = {"_apply_split_ratio", "_on_divider_drag", "SPLITTER_WIDTH"}
     for name in SPLITTER_HOLDOUTS:
         assert found[name] == whole_copy, (name, sorted(found[name]))
@@ -805,8 +1191,6 @@ DRAG_METHODS = ("_start_row_drag", "_is_descendant")
 # this set must shrink to empty as they do. Exact, like SPLITTER_HOLDOUTS, and
 # for the same reason.
 DRAG_HOLDOUTS = {
-    "annual_vision_segments.py",
-    "ape_period_view.py",
     "weekly_items.py",
 }
 
@@ -1006,14 +1390,16 @@ def _screens_with_their_own_drag():
 def test_updm25_no_screen_keeps_its_own_drag():
     """UPD-M2.5 — counted from the AST, as an exact set.
 
-    Partial for the same reason UPD-M1.5 is: UPD-M2 adopts ape_assignment
-    only, so the count is not 0 yet and claiming it would be false. The set is
-    exact in both directions — red if another screen grows its own copy, red
-    again when a holdout adopts and is not struck off here.
+    Partial for the same reason UPD-M1.5 is, and still partial after UPD-M4:
+    the last copy is in weekly_items.py, which is rewritten at UPD-M5. The set
+    is exact in both directions — red if another screen grows its own copy,
+    red again when that holdout adopts and is not struck off here.
     """
     found = _screens_with_their_own_drag()
     assert set(found) == DRAG_HOLDOUTS
-    assert "ape_assignment.py" not in found
+    for adopted in ("ape_assignment.py", "ape_period_view.py",
+                    "annual_vision_segments.py"):
+        assert adopted not in found, f"{adopted} grew a drag back"
     for name in DRAG_HOLDOUTS:
         assert found[name] == set(DRAG_METHODS), (name, sorted(found[name]))
 
@@ -1040,3 +1426,193 @@ def test_updm22_the_quarter_screen_routes_its_drop_through_the_module():
         assert "<Button-1>" in bound
     finally:
         root.destroy()
+
+
+# ------------------------------- UPD-M4.3 / UPD-M4.4: the three tabs, adopted
+
+def _drop_on(screen, row):
+    """Drive one real drop through the shared RowDragSource.
+
+    The pointer is the one thing that cannot be real: `winfo_pointerxy` reads
+    the mouse, so under a suite run it reports wherever the mouse happens to
+    be. Everything else is the screen's own: its RowDragSource, its drop
+    target, and `is_descendant` walking the real widget tree from the panel's
+    scroll frame up to whatever that screen gave as its target.
+    """
+    screen.winfo_pointerxy = lambda: (0, 0)
+    screen.winfo_containing = lambda *_: screen.right_list
+    screen.row_drag.start(row)
+    screen.row_drag.finish()
+
+
+def test_updm43_a_drop_assigns_on_each_tab():
+    """UPD-M4.3 — a dropped row still reaches the manager, on all three tabs.
+
+    One drop per tab, each through that screen's own RowDragSource, each
+    asserted against the call the manager actually got. The three screens
+    write through three different methods with three different argument
+    shapes, so a drop wired to the wrong one cannot pass by accident.
+
+    The Annual tab's drop target is the right *frame*, not the list inside it;
+    dropping on the list still counts, because `is_descendant` walks up. That
+    asymmetry predates this work and is kept.
+    """
+    row = _ape_row(1)
+
+    root, screen = _quarter_screen(left_rows=[row])
+    try:
+        _drop_on(screen, row)
+        assert screen.vps_manager.calls == [("ape-1", int(screen.quarter_var.get()))]
+    finally:
+        root.destroy()
+
+    root, screen = _month_screen(left_rows=[row])
+    try:
+        _drop_on(screen, row)
+        assert screen.vps_manager.calls == [
+            ("ape-1", int(screen.quarter_var.get()), int(screen.month_var.get()))]
+    finally:
+        root.destroy()
+
+    root, screen = _annual_screen(left_rows=[row])
+    try:
+        _drop_on(screen, row)
+        assert screen.vps_manager.calls == [(int(screen.year_var.get()), "ape-1")]
+    finally:
+        root.destroy()
+
+
+def test_updm43_a_drop_outside_the_target_assigns_nothing_on_each_tab():
+    """UPD-M4.3 — and the refusal path, which is where a wrong target shows.
+
+    P7: a release that looks exactly like a drop except for where the pointer
+    is. `winfo_containing` returns the *left* panel, which is a descendant of
+    the screen but not of any drop target, so every tab must write nothing.
+    """
+    row = _ape_row(1)
+    for builder in (_quarter_screen, _month_screen, _annual_screen):
+        root, screen = builder(left_rows=[row])
+        try:
+            screen.winfo_pointerxy = lambda: (0, 0)
+            screen.winfo_containing = lambda *_: screen.left_list
+            screen.row_drag.start(row)
+            screen.row_drag.finish()
+            assert screen.vps_manager.calls == [], builder.__name__
+        finally:
+            root.destroy()
+
+
+def _resize(table, key="segment", delta=70):
+    """Drag one column handle by `delta` pixels and let go."""
+    table.resizer._on_start(SimpleNamespace(x_root=500), key)
+    table.resizer._on_drag(SimpleNamespace(x_root=500 + delta), key)
+    table.resizer._on_stop(SimpleNamespace(x_root=500 + delta), key)
+
+
+def test_updm44_ape_quarter_columns_resize_and_persist():
+    """UPD-M4.4 — the quarter tab's columns drag, save, and come back.
+
+    None of the three tabs had resizable columns before this step. The second
+    build is the relaunch: the width has to come back from settings, not from
+    the column's default.
+    """
+    settings = FakeSettings(ape_quarter_split_ratio=0.5)
+    root, screen = _quarter_screen(left_rows=[_ape_row(1)], settings=settings)
+    try:
+        start = screen.left_table.resizer.width("segment")
+        _resize(screen.left_table)
+        assert screen.left_table.resizer.width("segment") == start + 70
+        assert settings.ape_quarter_left_col_widths["segment"] == start + 70
+        # The other panel of the same tab is a separate store (UPD-M3.6).
+        assert not getattr(settings, "ape_quarter_right_col_widths", {})
+    finally:
+        root.destroy()
+
+    root, screen = _quarter_screen(left_rows=[_ape_row(1)], settings=settings)
+    try:
+        assert screen.left_table.resizer.width("segment") == start + 70
+        header = _header_frame(screen.left_list)
+        assert header.grid_columnconfigure(2).get("minsize") == start + 70
+    finally:
+        root.destroy()
+
+
+def test_updm44_ape_month_columns_resize_and_persist():
+    """UPD-M4.4 — the same for APE Month, under its own prefix."""
+    settings = FakeSettings(ape_month_split_ratio=0.5)
+    root, screen = _month_screen(left_rows=[_ape_row(1)], settings=settings)
+    try:
+        start = screen.right_table.resizer.width("category")
+        _resize(screen.right_table, "category", 50)
+        assert settings.ape_month_right_col_widths["category"] == start + 50
+        assert not getattr(settings, "ape_month_left_col_widths", {})
+    finally:
+        root.destroy()
+
+    root, screen = _month_screen(right_rows=[_ape_row(1)], settings=settings)
+    try:
+        assert screen.right_table.resizer.width("category") == start + 50
+    finally:
+        root.destroy()
+
+
+def test_updm44_annual_columns_resize_and_persist():
+    """UPD-M4.4 — the same for Annual Vision Segments."""
+    settings = FakeSettings(annual_vision_split_ratio=0.5)
+    root, screen = _annual_screen(left_rows=[_ape_row(1)], settings=settings)
+    try:
+        start = screen.left_table.resizer.width("subsegment")
+        _resize(screen.left_table, "subsegment", 40)
+        assert settings.annual_vision_left_col_widths["subsegment"] == start + 40
+    finally:
+        root.destroy()
+
+    root, screen = _annual_screen(left_rows=[_ape_row(1)], settings=settings)
+    try:
+        assert screen.left_table.resizer.width("subsegment") == start + 40
+    finally:
+        root.destroy()
+
+
+def test_updm44_every_panel_prefix_has_a_settings_field():
+    """UPD-M4.4 — every panel's width store is a declared AppSettings field.
+
+    `ColumnResizer._persist` setattrs the store and calls `save()`, which
+    writes declared dataclass fields only. An undeclared one is therefore
+    *worse* than a missing split ratio: the width works all session and is
+    gone at the next launch, and nothing warns. Asserted as an exact set, so a
+    sixth panel cannot be added without its field.
+    """
+    names = {f.name for f in dataclasses.fields(AppSettings)}
+    prefixes = []
+    for cls in (APEAssignmentScreen, APEPeriodViewScreen, AnnualVisionSegmentsScreen):
+        for side in ("left", "right"):
+            prefixes.append(f"{cls.SETTINGS_PREFIX}_{side}")
+
+    assert prefixes == [
+        "ape_quarter_left", "ape_quarter_right",
+        "ape_month_left", "ape_month_right",
+        "annual_vision_left", "annual_vision_right",
+    ]
+    for prefix in prefixes:
+        assert f"{prefix}_col_widths" in names, prefix
+        assert getattr(AppSettings(), f"{prefix}_col_widths") == {}
+
+
+def test_updm44_the_panels_a_screen_builds_use_those_prefixes():
+    """UPD-M4.4 — and the screens really pass them, not just declare them.
+
+    The field names above are only worth something if the tables use them. A
+    screen that built its table with a typo'd prefix would store widths under
+    an attribute nothing declares, and the test above would still pass.
+    """
+    for builder, prefix in ((_quarter_screen, "ape_quarter"),
+                            (_month_screen, "ape_month"),
+                            (_annual_screen, "annual_vision")):
+        root, screen = builder()
+        try:
+            assert screen.left_table.prefix == f"{prefix}_left"
+            assert screen.right_table.prefix == f"{prefix}_right"
+            assert screen.left_table.resizer._setting_attr() == f"{prefix}_left_col_widths"
+        finally:
+            root.destroy()
