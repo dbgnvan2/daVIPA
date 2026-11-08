@@ -74,8 +74,8 @@ Record which of these three you get:
 
 - **The block appears** — fixed.
 - **Nothing appears and the status line says "the question could not be
-  completed — nothing was scheduled. Try the drop again, or allow the day in
-  Day Settings"** — the dialog is still raising, but it now tells you so
+  completed — nothing was scheduled. Try again, or allow the day in Day
+  Settings"** — the dialog is still raising, but it now tells you so
   instead of failing silently. Say so; that is a different next step.
 - **Nothing appears and the status line says something else, or nothing** —
   still broken in a third way. Please copy the status line text.
@@ -92,8 +92,9 @@ question now goes through the same failure arm, so it is worth the one press.
 Make the window short enough that the Day Plan has a scrollbar.
 
 1. Pick up an unscheduled item and drag it over the Day Plan.
-2. Hold the pointer near the **bottom edge** of the Day Plan pane — within about
-   a box height of it — and **hold still**.
+2. Hold the pointer near the **bottom edge** of the Day Plan pane — within
+   about 20 pixels of it, which is a bit less than a box — and **hold still**.
+   Further in than that is meant to do nothing.
 3. Expected: the day scrolls down steadily under the pointer, and the box
    highlighted under the pointer keeps up as the boxes move.
 4. Hold near the **top edge**. Expected: it scrolls up.
@@ -115,12 +116,14 @@ A small thing that changed in the same area, worth one look while you are here.
 
 1. Press on an unscheduled item and move the mouse, so the floating label with
    the item's name appears beside the pointer.
-2. Release over something that is **not** a box — the pane heading, or the
-   sidebar.
-3. Expected: the label disappears at once, and the status line says to drop it
-   on a half-hour box.
+2. Release over the **pane heading** (the "Day Plan" title or the summary line
+   under it). Expected: the label disappears at once and the status line says
+   *Drop an item on a half-hour box*.
+3. Now do it again and release over the **sidebar**. Expected: the label
+   disappears at once and nothing is said — that is correct, because a release
+   outside the day pane is not a missed drop.
 
-Record whether the label lingers.
+Record whether the label lingers in either case.
 
 ## 6. Does the Custom block length dialog still work?
 

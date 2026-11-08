@@ -267,6 +267,30 @@ multiple of 8 so the macOS `yscrollincrement` cannot round it away.
 unqualified (`NOTES.md`, the on-screen checklist) now say "at the default box
 height", which is the honest half of this; deriving the step is the other half.
 
+### 2026-11-07 - Type: Bug - Not fixed, below the fix threshold
+
+**Title:** The autoscroll band excludes the Day Plan's scrollbar strip
+**Description:** `day_autoscroll_direction` takes its x range from
+`blocks_scroll._parent_canvas`, while `slot_under_pointer` and
+`virtual_under_pointer` use `widget_contains_pointer(self.blocks_scroll, …)`.
+`CTkScrollableFrame` grids the canvas in column 0 and the scrollbar in column
+1, so the autoscroll's rectangle is the pane minus its scrollbar: a drag held
+in the bottom-left corner scrolls, the same drag held in the bottom-right
+corner, over the scrollbar, does nothing, with no message either way. The
+scrollbar edge is where a user reaching for "scroll" would instinctively drag.
+**Priority:** Low
+**Effort:** Small, but the right widget needs establishing first — the
+candidates are `_parent_frame` (canvas plus scrollbar, which is the pane the
+user sees) and `blocks_scroll` itself (the inner frame, whose height is the
+*content* height, not the viewport, so `top`/`height`/`yview` must stay on the
+canvas either way).
+**Notes:** Found by the cold UI-contract pass. Recorded rather than fixed
+under the repo's budget, and because the fix is a widget choice that wants
+checking against a mapped window rather than a one-line substitution. Checklist
+item 4 does not distinguish the two corners, so an on-screen pass that happens
+to hold the pointer on the right would report the feature as not working — if
+that is what comes back, this entry is the explanation.
+
 ### 2026-11-07 - Refuted by measurement, no change made
 
 **Title:** A pending `after` callback does *not* survive its widget's destroy
@@ -844,14 +868,15 @@ change, and a cosmetic fix buys none of the safety it costs.
   *16 of 18 boxes* and can never reach 18. It is a capacity claim that
   overstates capacity by the lunch length. Fix: divide by the placeable boxes,
   or say "16 of 16 workable boxes (2 lunch)".
-- **`clear_hover_target` restores the border width but not its colour**
-  (`plan.py:881`, `/code-review`, low). `update_hover_target` sets
-  `border_width` and `border_color`; the clear path puts only the width back.
-  Release a drag over the sidebar or the items pane and no redraw follows, so
-  the last-hovered box keeps the hover colour at 1px for the rest of the
-  session — the "subtly different from its neighbours" outcome the docstring
-  says the method exists to prevent. Low: a successful drop hides it, because
-  `load_blocks` rebuilds the frames.
+- ~~**`clear_hover_target` restores the border width but not its colour**~~
+  (`plan.py:881`, `/code-review`, low) — **FIXED 2026-11-07** by the Plan
+  day-faults batch's cold UI-contract pass, and re-rated on the way: the "low"
+  rested on "a successful drop hides it", which stopped bounding it once PD-M12
+  made the autoscroll re-read the hover every 60ms. A pointer held still at an
+  edge now walks the hover down every box the day scrolls past, so an abandoned
+  drag left the accent on the whole day rather than on one box.
+  `_drag_hover_color` is cached beside `_drag_hover_border` and both are
+  restored; `test_pdm1210_clearing_the_hover_puts_the_colour_back`.
 - **`block_item`'s no-box branch has no UI caller** (`plan.py:518`,
   `/code-review`, low). Every drop names the box under the pointer, so
   `slot_index=None` is reached only by tests and by the API shape it shares

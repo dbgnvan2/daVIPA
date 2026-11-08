@@ -271,9 +271,83 @@ hashed after each. The re-sweep's own verdict is that one further pass is owed
 in a different failure family, since no pass over this branch has covered the
 repo's UI contract — that pass ran next, and its result is below.
 
+### Cold UI-contract pass
+
+The re-sweep's own verdict was that a further pass was owed in a different
+failure family, since no pass over this branch had covered the repo's UI
+contract (`~/.claude/standards/ui-regression.md`, the theme rules, the screen's
+controls as a contract). Run cold over the whole range: seven findings, four
+major. All four are fixed, and two of the three minors with them, because they
+are errors in the checklist the user will act on.
+
+- **The hover outline was asserted as a call, not as an outline.** Both
+  PD-M12.4 tests stub `update_hover_target` and assert `hovered == [1]`, and
+  `update_hover_target` had no behavioural coverage anywhere in the suite — so
+  the outlined box could be the wrong box with the suite green. That is the
+  same shape as the unit-versus-distance finding this batch fixed one step
+  earlier, one call deeper. `test_pdm129_scrolling_rereads_the_hover_onto_the_box_now_under_the_pointer`
+  runs the real thing and asserts which frame carries the 2px border before
+  and after a scroll step.
+- **`clear_hover_target` put back the border width but not its colour.** It
+  was already in `BACKLOG.md` at low from an earlier pass, on the stated
+  grounds that "a successful drop hides it" — and PD-M12 stopped that bounding
+  it. The hover is now re-read every 60ms, so a pointer held still at an edge
+  walks it down every box the day scrolls past, and a drag abandoned away from
+  the boxes gets no rebuild: the trail went from one box to the whole day, in a
+  colour the theme rules reserve for one action's emphasis. Fixed, and the
+  BACKLOG entry re-rated rather than left with its stale rationale. This is
+  "every in-loop fix is itself in scope for the next pass" doing its job.
+- **The checklist quoted a sentence the code no longer says.** Item 3's second
+  outcome still read "Try **the drop** again" — the wording the re-sweep had
+  just removed, one commit earlier, in this same batch. Fault 3's disposition
+  turns on which of three outcomes comes back, so the decision tree had the
+  right answer spelled wrong. Corrected, and nothing in `docs/` quotes the old
+  sentence now.
+- **`docs/USER_GUIDE.md` had not been updated.** A new drag affordance and
+  three new status sentences, in a section that already documents the
+  neighbouring affordances and quotes their status lines verbatim, with a docs
+  sync gate in CI. Two entries added: holding a drag at either edge, and what
+  a question that cannot be completed says on each of the three paths.
+- **Two more checklist errors, both of which would have produced a false
+  failure report.** It told the tester to hold "within about a box height" of
+  the edge, which is outside a 24px band — an empty box is 34px on a 36px
+  pitch — so a correct build would have read as "it does not scroll"; and it
+  offered the sidebar and the pane heading as interchangeable release targets
+  for item 5 when only the heading sets a status line. Item 4 now says 20
+  pixels, item 5 is split in two, and `PD_AUTOSCROLL_MARGIN_PX`'s comment no
+  longer claims the band is three-quarters of a box or that it stays clear of
+  the last visible one.
+
+One minor was recorded rather than fixed, in `BACKLOG.md`: the autoscroll band
+is the scroll canvas, while the pane the user sees is the canvas plus its
+scrollbar, so the rightmost strip is a dead zone. Recorded because the fix is a
+choice between two widgets that wants checking against a mapped window, not a
+substitution.
+
+The pass also reported clean on what it was pointed at and found nothing wrong
+with, which is worth as much: no hard-coded colour is introduced, the
+`set_status` severity words match the file's own use at all 30 call sites, every
+new sentence names what was not done and keeps the file's em-dash convention, no
+control is removed, renamed or relocated, the drag label cannot be left stale by
+a scroll, and `yview_moveto` drives `yscrollcommand` so the scrollbar stays in
+step. It could not assess anything needing pixels, which is still items 1, 1a
+and 3 of the checklist.
+
+2 new tests, 4 more mutants, all killed. **It also could not read the diff** —
+no Bash tool reached that worker, so it reconstructed the change set from the
+brief and read the present state of each hunk. Its findings were verified
+against the code here before being acted on; the box-pitch arithmetic in
+particular was checked against `plan_blocks.py` rather than taken on trust.
+
 ## Risks / Known gaps
 
 - **Fault 1 is open.** See above.
+- **Nothing in this batch has been seen on screen**, which is why
+  `docs/changes/2026-11-07-plan-day-faults-screen-checklist.md` exists. Three
+  of the four passes said so independently. The checklist is now six items, and
+  three of its own instructions had to be corrected by the last pass — so if an
+  item still reads as not working, check the BACKLOG entry for the autoscroll
+  band's dead zone before concluding the feature is broken.
 - **The `TclError`'s cause is unproven**, and the `after(0)` move is a candidate
   cure with a real argument behind it, not a demonstrated one. If item 3 of the
   checklist still fails, the next step is to find what Tk/Aqua objects to
