@@ -220,6 +220,57 @@ status assertions, which moved with the reworded sentence, same reason. 11 more
 mutants, one per fix, each applied alone against the test that names it, all 11
 killed, source restored and its hash verified after each.
 
+### Re-sweep of the fix pass
+
+The fix commits were swept again — they are the least-reviewed code in the
+batch, written last. Six findings, one medium plus one low-medium raised
+outside the numbered list. Both of those are fixed:
+
+- **The class is every modal, not every confirmation.** `_ask_yes_no`'s own
+  docstring had defined it as "every confirmation on this screen", and the
+  measured fault is a modal *failing to return an answer*.
+  `ask_custom_minutes` is the third modal in this file, 90 lines below the new
+  helper, reached from the context menu's "Custom…", and
+  `CTkInputDialog.get_input` is `wait_window` plus a read of the entry — the
+  same machinery. It now carries its own arm (it has no yes/no answer to pass
+  through `_ask_yes_no`). By the criterion this batch used to defer the rest —
+  same file, same screen — it should never have been left out.
+- **The arm had cost the evidence.** `clear_day` previously let a `TclError`
+  reach `report_callback_exception` and therefore stderr, which is the only
+  reason this fault is understood as far as it is. The new arm converted it to
+  a status line and logged nothing, and a status line is overwritten by the
+  next one. Every other failure arm on this screen logs as well as says;
+  these now do too. For a fault whose mechanism is still unproven, trading the
+  symptom for the evidence was the wrong direction.
+
+Three claims were wrong and are corrected, two of them mine from the fix pass
+itself:
+
+- `day_autoscroll_fraction`'s docstring said it returns `None` for "a day that
+  fits its pane". It returns 0.0 for that case (`visible` is 1.0, so the clamp
+  is 0.0); the `None` is for an absent scrollregion only.
+- The reworded status said "Try **the drop** again", but `_require_block_day`
+  is reached from the AutoLoad button and the padding button as well as from a
+  drop and a day extension — so two of four callers told the user to retry a
+  gesture they never made. It is gesture-neutral now, and a test asserts the
+  sentence names no gesture.
+- `NOTES.md` and the checklist repeated "half a box per tick" unqualified,
+  while the box height is a user setting. Both now say "at the default box
+  height".
+
+Three findings were recorded rather than fixed, all below medium, all in
+`BACKLOG.md` with their reasons: the denominator in `day_autoscroll_fraction`
+is `bbox("all")` while the fractions either side of it are scrollregion
+fractions (a latent coupling the reviewer could not construct a reachable path
+for, correct today by an event ordering nothing asserts); `_ask_yes_no`
+collapses every non-answer other than a raise into the user's refusal; and the
+16px step is fixed against a configurable box height.
+
+3 new tests from this pass, 6 more mutants, all killed, source restored and
+hashed after each. The re-sweep's own verdict is that one further pass is owed
+in a different failure family, since no pass over this branch has covered the
+repo's UI contract — that pass ran next, and its result is below.
+
 ## Risks / Known gaps
 
 - **Fault 1 is open.** See above.

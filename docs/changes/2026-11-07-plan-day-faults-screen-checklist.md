@@ -105,7 +105,8 @@ Make the window short enough that the Day Plan has a scrollbar.
    stops immediately.
 
 Record whether the **speed** is usable — it is set to 16 pixels every 60ms,
-which is half a box per tick, or about 270 pixels a second. Too fast to aim,
+about 270 pixels a second, which is half a box at the default box height (if
+you have raised the box height in Plan Settings it is less than half). Too fast to aim,
 too slow to be worth it, or about right?
 
 ## 5. Does the drag label still disappear on release?
@@ -120,6 +121,20 @@ A small thing that changed in the same area, worth one look while you are here.
    on a half-hour box.
 
 Record whether the label lingers.
+
+## 6. Does the Custom block length dialog still work?
+
+One press, because the re-sweep found it was the third modal on this screen
+with no failure arm and it now has one.
+
+1. Right-click a block in the Day Plan and choose **Custom…**
+2. Type `45` and press OK.
+3. Expected: the block becomes 45 minutes long.
+4. Repeat and press **Cancel**. Expected: nothing changes and nothing is said.
+
+Record anything else — in particular a status line reading "The block length
+question could not be completed", which would mean that dialog raises the way
+the non-work-day one did.
 
 ## Afterwards
 

@@ -158,12 +158,16 @@ left. See `docs/changes/2026-11-07-plan-day-faults.md`.
 
 ### 2026-11-07 - Type: Debt - Not fixed, scope
 
-**Title:** 20 modal confirmations outside the Plan screen have no failure arm
-**Description:** The PD-M11 fault is a modal confirmation raising
-`_tkinter.TclError` instead of returning an answer, which leaves the gesture
-with nothing written and nothing said. Both of the Plan screen's confirmations
-now ask through `PlanScreen._ask_yes_no`, which carries the arm. The other 20
-`askyesno` / `askokcancel` sites, across 14 files (`weekly_items`,
+**Title:** 20 modals outside the Plan screen have no failure arm
+**Description:** The PD-M11 fault is a modal raising `_tkinter.TclError`
+instead of returning an answer, which leaves the gesture with nothing written
+and nothing said. The class is every modal that can fail to return an answer,
+not confirmations only — `CTkInputDialog.get_input` is the same
+`wait_window` machinery, which is why `ask_custom_minutes` on the Plan screen
+was fixed in the re-sweep rather than deferred. All three of the Plan screen's
+modals now carry the arm; the two confirmations share
+`PlanScreen._ask_yes_no`. The other 20 `askyesno` / `askokcancel` sites,
+across 14 files (`weekly_items`,
 `vision_segments` ×3, `vision_elements`, `project_boards`, `ape_assignment`,
 `ape_period_view`, `settings`, `edit_contact` ×2, `vps_planning` ×2,
 `item_editor`, …), still call `messagebox` directly and would fail the same
@@ -175,7 +179,9 @@ status sentence at each one for the `None` answer. The sentences are the work,
 not the helper: each screen has its own wording and its own idea of what was
 not done.
 **Notes:** P5 says harden the class, not the instance, and this entry is the
-part of that class not covered. Deferred on scope rather than on judgement: 20
+part of that class not covered. The count is of `askyesno` / `askokcancel`
+only; `CTkInputDialog` call sites elsewhere in the app have not been counted
+and belong to the same class. Deferred on scope rather than on judgement: 20
 call sites in 14 files, each needing a user-visible sentence, is its own batch
 with its own review pass, and appending it to a fix pass at the end of this one
 would ship the largest and least-reviewed diff of the batch. The one sibling
@@ -199,6 +205,67 @@ findings do not get fixed in-loop. The surviving mutant was already recorded in
 the handoff note's verification section; this is the same gap, raised again by
 the sweep. `PD_AUTOSCROLL_STEP_PX` is pinned, by
 `test_pdm129_a_tick_moves_the_day_by_the_step_in_pixels`.
+
+### 2026-11-07 - Type: Bug - Not fixed, below the fix threshold
+
+**Title:** `day_autoscroll_fraction` divides by `bbox("all")` but reads
+scrollregion fractions
+**Description:** `canvas.yview()` returns fractions of the canvas's
+`-scrollregion`, and `yview_moveto` consumes the same. `day_autoscroll_fraction`
+takes its denominator from `bbox("all")` instead. `CTkScrollableFrame` keeps the
+two in step from the inner frame's own `<Configure>` binding, which is one
+queued event behind the geometry pass — and this screen's `_flush_redraw` uses
+`update_idletasks` and deliberately does not service the event queue, so after
+a rebuild there is a window where `bbox("all")` is the new content and the
+scrollregion is still the old one. In that window a tick does not move 16px: a
+stale 1000px region against a new 50px bbox gives a step of 0.32, about 320px,
+capped only by the end-of-day clamp.
+**Priority:** Low
+**Effort:** Small — read `canvas.cget("scrollregion")`, parse its four numbers,
+and fall back to `bbox("all")` only when it is empty, which is Tk's own rule.
+**Notes:** Found by the re-sweep of the fix commits, and recorded rather than
+fixed on two grounds: the repo's budget does not fix below-medium findings
+in-loop, and the reviewer could construct no reachable path — the inner frame
+is resized only by a rebuild, rebuilds happen in button callbacks and in
+`_after_release`, and `_end_drag` stops the autoscroll before the rebuild that
+follows a drop. So it is correct today by an event ordering that no test
+asserts. An *absent* scrollregion is safe: Tk falls back to the item bbox,
+which is what the code already measures.
+
+### 2026-11-07 - Type: Debt - Not fixed, below the fix threshold
+
+**Title:** `_ask_yes_no` records every non-answer as the user's refusal
+**Description:** The `None` sentinel means only "`askyesno` raised".
+Everything else collapses to `False`, which both callers report as a decision
+("Clear Day: nothing removed", "is not a block day"). `tk_messageBox` returns
+the empty string when its dialog is destroyed without an answer — a parent torn
+down while the modal is up — and `tkinter.messagebox.askyesno` turns that into
+`False` by `s == "yes"`. That is the same P1 shape the `None` arm exists to
+avoid, one layer down.
+**Priority:** Low
+**Effort:** Small — three branches in `_ask_yes_no` (`is True` → True,
+`is False` → False, anything else → None), and
+`test_pdm1110_a_truthy_non_answer_is_not_permission` flips from `False` to
+`None`, since it currently locks in the collapse.
+**Notes:** Pre-existing in `_ask_work_anyway`; surfaced by the re-sweep because
+the fix pass moved the comparison and wrote a docstring about it. Strictly
+safer than the collapse, because both callers' `None` arms already fail safe.
+
+### 2026-11-07 - Type: Debt - Not fixed, below the fix threshold
+
+**Title:** The autoscroll step is a fixed 16px against a configurable box height
+**Description:** `PD_AUTOSCROLL_STEP_PX`'s comment says "half a box at the
+default chip height", which is true (`SLOT_CHIP_HEIGHT_PX` is 30) and
+qualified. But the box height is a user setting — `drag_schedule_box_height_px`,
+floor 30, read at `plan.py:371` — so for a user who raises it the "half a box
+per tick" calibration stops holding, and the step is also in the canvas's
+scaled pixels, so CustomTkinter widget scaling shifts it against the box again.
+**Priority:** Low
+**Effort:** Small — derive the step from the box-height setting, rounded to a
+multiple of 8 so the macOS `yscrollincrement` cannot round it away.
+**Notes:** Found by the re-sweep. The two documents that repeated the claim
+unqualified (`NOTES.md`, the on-screen checklist) now say "at the default box
+height", which is the honest half of this; deriving the step is the other half.
 
 ### 2026-11-07 - Refuted by measurement, no change made
 

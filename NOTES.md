@@ -16,6 +16,11 @@
   claims no cause on purpose: the raise came out of the single Tcl call that
   both shows the dialog and returns the answer, so "never shown" is a guess,
   and it is wrong in the case where the user said yes.
+  `ask_custom_minutes` carries its own arm, because the class is every modal
+  that can fail to return an answer rather than confirmations only, and
+  `CTkInputDialog.get_input` is the same `wait_window` machinery. Each arm logs
+  as well as says: before the arms existed the raise reached stderr, and that
+  traceback is the only reason the fault is understood as far as it is.
   The drop's work also moved off the idle queue onto a zero-delay timer
   (`_after_release`), which is the context the raise was measured in. The
   *mechanism* of the raise is unproven: the byte-identical call works from
@@ -25,7 +30,7 @@
   implemented, and **not yet seen on screen**. A pointer within
   `PD_AUTOSCROLL_MARGIN_PX` (24) of the pane's top or bottom — or beyond it,
   which is the gesture reported — scrolls it `PD_AUTOSCROLL_STEP_PX` (16) every
-  60ms, and the hover highlight is re-read after each step because the boxes
+  60ms, half a box at the default box height, and the hover highlight is re-read after each step because the boxes
   have moved under a pointer that has not. The x range is the pane's own, an
   end already reached asks for nothing, and `_end_drag` cancels the timer.
   Pixels and not canvas "units": the first version scrolled one unit per tick,
