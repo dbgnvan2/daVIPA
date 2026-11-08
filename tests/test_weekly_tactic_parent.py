@@ -1027,5 +1027,239 @@ def test_wtpm66_count_follows_the_wt_m5a_refile(tmp_path):
         vps.close()
 
 
+# ------------------------------------------- WTP-M5.2, M6.4, M6.5: the screens
+# The two panels that carry a Weekly Tactic row, and the one confirmation that
+# destroys a week. These three criteria were left out of the first build
+# because both files were held by a concurrent session; they are built here.
+
+
+def _screen_settings():
+    """A settings double carrying every field the two screens persist into.
+
+    ``split_panel`` logs when its prefix has no field to land in and
+    ``ColumnResizer._persist`` calls ``save()``, so a bare namespace would warn
+    on construction and raise on a drag.
+    """
+    return SimpleNamespace(
+        first_day_of_week=0,
+        week_assignment_split_ratio=0.5,
+        week_assignment_left_col_widths={},
+        week_assignment_right_col_widths={},
+        week_actions_split_ratio=0.5,
+        week_actions_left_col_widths={},
+        save=lambda: None,
+    )
+
+
+def _app_for(vps):
+    """An app double whose vps_manager is the real one under test.
+
+    The colour maps are the only thing the list screens ask the app for, and
+    returning empty ones keeps a chip's colour out of these assertions.
+    """
+    return SimpleNamespace(
+        vps_manager=vps,
+        db_manager=vps.db_manager,
+        settings=_screen_settings(),
+    )
+
+
+def _week_assignment_screen(root, vps):
+    from src.getmoredone.screens.weekly_items import WeeklyItemsScreen
+    screen = WeeklyItemsScreen(root, vps, _app_for(vps))
+    screen.update_idletasks()
+    return screen
+
+
+def _seed_tactic_with_progress(vps, title="W1"):
+    """One tactic, three items under it, one of them completed."""
+    ape = seed_ape(vps)
+    tactic = make_week_item(vps, ape, title=title)
+    finished = make_daily_item(vps, title="Finished", weekly_tactic_id=tactic.id)
+    make_daily_item(vps, title="Open one", weekly_tactic_id=tactic.id)
+    make_daily_item(vps, title="Open two", weekly_tactic_id=tactic.id)
+    vps.db.conn.execute(
+        "UPDATE action_items SET status = ? WHERE id = ?",
+        (Status.COMPLETED, finished.id))
+    vps.db.conn.commit()
+    return tactic
+
+
+def test_wtpm52_confirmation_names_the_child_count(tmp_path, monkeypatch):
+    """WTP-M5.2 — the delete confirmation says how many items go with it.
+
+    WTP-M5.3 widened what this one confirmed click destroys: the cascade takes
+    the ``weekly_tactic_id`` items as well as the ``parent_id`` children. The
+    old wording, "and related action items", does not say how much. The number
+    is read from ``children_to_delete_with_weekly_tactic`` — the same list the
+    cascade deletes, not a second count of the same thing (P6).
+
+    A refused confirmation still deletes nothing, which is UPD-M5.3's promise
+    and is asserted here against the database rather than against a call log.
+    """
+    vps = make_vps(tmp_path)
+    root = _root()
+    try:
+        tactic = _seed_tactic_with_progress(vps)
+        screen = _week_assignment_screen(root, vps)
+
+        import src.getmoredone.screens.weekly_items as wi
+        asked = []
+        monkeypatch.setattr(
+            wi.messagebox, "askyesno",
+            lambda title, msg, **_kw: asked.append(msg) or False)
+
+        screen.delete_weekly_row({"id": tactic.id, "title": "W1"})
+
+        assert len(asked) == 1, asked
+        message = asked[0]
+        assert "W1" in message
+        # Three items are filed under it, and the plural is the plural.
+        assert "3 Action Items" in message, message
+        assert "cannot be undone" in message, message
+
+        # Refused: the tactic and all three are still there.
+        assert vps.db_manager.get_action_item(tactic.id) is not None
+        assert len(vps.db_manager.get_children(tactic.id)) == 3
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_wtpm52_confirmation_says_so_when_nothing_is_filed(tmp_path, monkeypatch):
+    """WTP-M5.2 — and it does not warn about items that do not exist.
+
+    The adversarial half (P7): a message that always names a number would read
+    "0 Action Items" for a tactic with nothing under it, which overstates a
+    delete that destroys one row. The branch is asserted, not just the count.
+    """
+    vps = make_vps(tmp_path)
+    root = _root()
+    try:
+        ape = seed_ape(vps)
+        tactic = make_week_item(vps, ape, title="Empty week")
+        screen = _week_assignment_screen(root, vps)
+
+        import src.getmoredone.screens.weekly_items as wi
+        asked = []
+        monkeypatch.setattr(
+            wi.messagebox, "askyesno",
+            lambda title, msg, **_kw: asked.append(msg) or False)
+
+        screen.delete_weekly_row({"id": tactic.id, "title": "Empty week"})
+
+        assert len(asked) == 1, asked
+        message = asked[0]
+        assert "No Action Items are filed under it" in message, message
+        assert "Action Items filed under it" not in message, message
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_wtpm52_one_item_is_singular(tmp_path, monkeypatch):
+    """WTP-M5.2 — "1 Action Item", not "1 Action Items"."""
+    vps = make_vps(tmp_path)
+    root = _root()
+    try:
+        ape = seed_ape(vps)
+        tactic = make_week_item(vps, ape, title="One under it")
+        make_daily_item(vps, title="The one", weekly_tactic_id=tactic.id)
+        screen = _week_assignment_screen(root, vps)
+
+        import src.getmoredone.screens.weekly_items as wi
+        asked = []
+        monkeypatch.setattr(
+            wi.messagebox, "askyesno",
+            lambda title, msg, **_kw: asked.append(msg) or False)
+
+        screen.delete_weekly_row({"id": tactic.id, "title": "One under it"})
+
+        assert "1 Action Item." in asked[0] or "1 Action Item " in asked[0], asked[0]
+        assert "1 Action Items" not in asked[0], asked[0]
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_wtpm64_week_assignment_row_shows_progress(tmp_path):
+    """WTP-M6.4 — the APE Week Assignment tactic row reads ``1/3``.
+
+    The panel's rows are Weekly Tactics, so each one now says how much of the
+    week under it is finished. ``right_items`` is set from the manager rather
+    than through the week picker: the criterion is what the row renders, and
+    making the fixture agree with a date combo would test the picker instead.
+    """
+    vps = make_vps(tmp_path)
+    root = _root()
+    try:
+        _seed_tactic_with_progress(vps)
+        screen = _week_assignment_screen(root, vps)
+        screen.right_items = vps.get_weekly_action_items(ape_only=False)
+        assert len(screen.right_items) == 1, screen.right_items
+        screen._render_right_rows()
+        screen.update_idletasks()
+
+        cells = screen.right_table.rows[0][1]
+        assert "progress" in cells, sorted(cells)
+        # The table pads a cell's text, so the comparison is on the value.
+        assert cells["progress"].cget("text").strip() == "1/3"
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_wtpm64_a_tactic_with_nothing_under_it_shows_a_dash(tmp_path):
+    """WTP-M6.4 — ``—``, not ``0/0``.
+
+    ``0/0`` reads as a count that failed rather than a week with nothing filed
+    under it yet, and the dash is the difference between the two.
+    """
+    vps = make_vps(tmp_path)
+    root = _root()
+    try:
+        ape = seed_ape(vps)
+        make_week_item(vps, ape, title="Empty week")
+        screen = _week_assignment_screen(root, vps)
+        screen.right_items = vps.get_weekly_action_items(ape_only=False)
+        screen._render_right_rows()
+        screen.update_idletasks()
+
+        assert screen.right_table.rows[0][1]["progress"].cget("text").strip() == "\u2014"
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_wtpm65_week_actions_list_shows_progress(tmp_path):
+    """WTP-M6.5 — the Week Actions tactic list reads the same ``1/3``.
+
+    From the same helper, which is the point: two panels counting one week two
+    ways is how they come to disagree. The number is asserted on the rendered
+    cell *and* against the helper, so a rendering that hard-coded a string
+    would fail the first and a helper that drifted would fail the second.
+    """
+    from src.getmoredone.screens.week_actions import WeekActionsScreen
+
+    vps = make_vps(tmp_path)
+    root = _root()
+    try:
+        tactic = _seed_tactic_with_progress(vps)
+        screen = WeekActionsScreen(root, vps, _app_for(vps))
+        screen.update_idletasks()
+        screen.tactic_rows = vps.get_weekly_action_items(ape_only=False)
+        screen.visible_rows = list(screen.tactic_rows)
+        screen._render_tactics()
+        screen.update_idletasks()
+
+        cells = screen.left_table.rows[0][1]
+        assert "progress" in cells, sorted(cells)
+        assert cells["progress"].cget("text").strip() == "1/3"
+        assert vps.count_open_children_for_weekly_tactic(tactic.id) == (1, 3)
+    finally:
+        root.destroy()
+        vps.close()
+
+
 if __name__ == "__main__":  # pragma: no cover - parity with the other suites
     pytest.main([__file__])

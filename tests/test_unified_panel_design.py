@@ -599,6 +599,8 @@ def test_updm31_every_shipped_column_declares_a_width_it_can_have():
         "APE_LEFT_COLUMNS": chip_table.APE_LEFT_COLUMNS,
         "APE_RIGHT_COLUMNS": chip_table.APE_RIGHT_COLUMNS,
         "ANNUAL_RIGHT_COLUMNS": chip_table.ANNUAL_RIGHT_COLUMNS,
+        "WEEK_ASSIGNMENT_RIGHT_COLUMNS": chip_table.WEEK_ASSIGNMENT_RIGHT_COLUMNS,
+        "WEEK_ACTIONS_LEFT_COLUMNS": chip_table.WEEK_ACTIONS_LEFT_COLUMNS,
     }
     for name, columns in sets.items():
         assert columns, f"{name} is empty"
@@ -1680,6 +1682,13 @@ def _fake_week_vps(left_rows, right_rows):
         create_week_action_items_for_ape=lambda *a: calls.append(("create",) + a) or {
             "created_count": 1, "skipped_count": 0, "collided_count": 0},
         delete_weekly_action_item=lambda item_id: calls.append(("delete", item_id)) or True,
+        # WTP-M5.2 and WTP-M6.4 — the screen reads these two now: the count in
+        # the delete confirmation, and the Done column on each row. Returning
+        # fixed values keeps this file's subject the panel's layout; the
+        # numbers themselves are asserted against a real database in
+        # tests/test_weekly_tactic_parent.py.
+        children_to_delete_with_weekly_tactic=lambda item_id: [],
+        count_open_children_for_weekly_tactic=lambda item_id: (0, 0),
     )
 
 
@@ -1818,7 +1827,8 @@ def test_updm57_clicking_a_right_row_selects_it_and_double_click_opens_it():
         # not a selection handle (UPD-M5.2).
         clickable = [rows[0]] + [c for c in rows[0].winfo_children()
                                  if not isinstance(c, ctk.CTkButton)]
-        assert len(clickable) == 5
+        # Five cells since WTP-M6.4 added Done, plus the row frame itself.
+        assert len(clickable) == 6
         for widget in clickable:
             bound = set(_bound_sequences(widget))
             assert "<Button-1>" in bound
@@ -1857,7 +1867,7 @@ def test_updm57_selecting_a_row_repaints_the_panel_instead_of_stacking_it():
 
 
 def test_updm51_right_panel_has_the_actions_column():
-    """UPD-M5.1 — `#` / Segment / SubSegment / Category / Actions.
+    """UPD-M5.1 — `#` / Segment / SubSegment / Category / Done / Actions.
 
     The right panel had four columns and three buttons in a bar below the
     list; the image has a fifth column with the row's own Delete in it. The
@@ -1869,9 +1879,13 @@ def test_updm51_right_panel_has_the_actions_column():
                                right_rows=[_weekly_row(1)])
     try:
         right = _header_frame(screen.right_list)
+        # WTP-M6.4 put a Done column before Actions, and gave this panel a
+        # column set of its own: its rows are Weekly Tactics, so they have
+        # children to count, which the other two APE right panels' rows do
+        # not. The set is still pinned exactly, including the new width.
         assert [text for _col, _cls, text in _cells(right)] == [
-            "#", "Segment", "SubSegment", "Category", "Actions"]
-        assert _minsizes(right, (0, 1, 2, 3, 4)) == [34, 135, 155, 125, 84]
+            "#", "Segment", "SubSegment", "Category", "Done", "Actions"]
+        assert _minsizes(right, (0, 1, 2, 3, 4, 5)) == [34, 135, 155, 125, 70, 84]
     finally:
         root.destroy()
 
@@ -2350,9 +2364,10 @@ def test_updm62_left_panel_is_the_shared_table(tmp_path):
             chip_table.WEEK_ACTIONS_LEFT_COLUMNS)
 
         header = _header_frame(screen.left_list)
+        # WTP-M6.5 added the Done column; the set is still pinned exactly.
         assert [cell[2] for cell in _cells(header)] == [
-            "#", "Weekly Tactic", "Segment", "SubSegment", "Category"]
-        assert _minsizes(header, (0, 1, 2, 3, 4)) == [34, 220, 135, 155, 125]
+            "#", "Weekly Tactic", "Segment", "SubSegment", "Category", "Done"]
+        assert _minsizes(header, (0, 1, 2, 3, 4, 5)) == [34, 220, 135, 155, 125, 70]
 
         rows = _row_frames(screen.left_list)
         assert len(rows) == 2
@@ -2406,7 +2421,8 @@ def test_updm63_clicking_a_row_still_selects(tmp_path):
             child for child in rows[1].winfo_children()
             if not _is_resize_handle(child)
         ]
-        assert len(clickable) == 6
+        # Six cells since WTP-M6.5 added Done, plus the row frame itself.
+        assert len(clickable) == 7
         for widget in clickable:
             assert "<Button-1>" in _bound_sequences(widget), widget
 
