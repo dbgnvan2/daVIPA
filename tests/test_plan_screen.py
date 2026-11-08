@@ -39,7 +39,7 @@ from src.getmoredone.screens.plan import (
     OUTSIDE_GROUP_HEIGHT_PX,
     PD_AUTOSCROLL_INTERVAL_MS,
     PD_AUTOSCROLL_MARGIN_PX,
-    PD_AUTOSCROLL_UNITS,
+    PD_AUTOSCROLL_STEP_PX,
     PLAN_DIVIDER_WIDTH_PX,
     PLAN_ITEMS_COL_WIDTH_PX,
     PLAN_PANE_CHROME_PX,
@@ -5658,8 +5658,9 @@ def test_pdm11_a_dialog_that_raises_writes_nothing_says_so_and_asks_again(
 
     Three claims in one test because each kills a different mutation of the
     same two lines. Nothing is written, so the arm is not a silent yes. The
-    status says the question could not be shown, so it is not reported as the
-    user's refusal. And the failure is not cached either way, so the next drop
+    status says the question could not be completed, so it is not reported as
+    the user's refusal -- and it claims no cause, because the raise came out of
+    the one Tcl call that both shows the dialog and returns the answer. And the failure is not cached either way, so the next drop
     asks again and can still be agreed to -- a transient failure is not a
     permanent negative (P1).
     """
@@ -5685,8 +5686,12 @@ def test_pdm11_a_dialog_that_raises_writes_nothing_says_so_and_asks_again(
         "a question that could not be asked scheduled the item anyway"
     )
     status = panel.status_label.cget("text")
-    assert "could not be shown" in status, status
+    assert "could not be completed" in status, status
     assert "nothing was scheduled" in status, status
+    # And it claims no cause: the ``TclError`` came out of the one Tcl call
+    # that both shows the dialog and returns the answer, so "never shown" is
+    # a guess, and the guess is wrong in the case where the user said yes.
+    assert "could not be shown" not in status, status
     assert SATURDAY not in panel._work_anyway, (
         "a question that failed was cached as permission"
     )
@@ -5697,6 +5702,102 @@ def test_pdm11_a_dialog_that_raises_writes_nothing_says_so_and_asks_again(
     assert SATURDAY in panel._work_anyway, "the Yes was not remembered"
     assert [b.label for b in manager.get_time_blocks(SATURDAY)] == ["second"], (
         manager.get_time_blocks(SATURDAY)
+    )
+
+
+def test_pdm1110_a_clear_day_question_that_raises_removes_nothing(
+    root, manager, settings, monkeypatch
+):
+    """PD-M11 — the arm belongs to the confirmation, not to the one question.
+
+    The measured fault is a modal confirmation on this screen raising instead
+    of returning an answer. ``clear_day``'s question is the nearest sibling of
+    the one that was measured, in the same file and on the same screen, and it
+    gates a transactional delete -- so a raise there removed nothing and said
+    nothing, reproducing the reported symptom on the one button that destroys
+    work. Both now ask through ``_ask_yes_no`` (P5: hardening the class, not
+    the instance).
+
+    Asserted as a delete that did not happen plus a sentence that was said,
+    because "nothing was removed" on its own is also what answering No does.
+    """
+    def raising(*args, **kwargs):
+        raise tk.TclError("")
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", raising)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    _add_block(manager, 30, "Draft the proposal", 0, block_type=BlockType.ITEM)
+
+    panel.clear_day()
+
+    assert len(manager.get_time_blocks(THURSDAY)) == 1, (
+        "a question that could not be answered deleted the block anyway"
+    )
+    said = panel.status_label.cget("text")
+    assert "could not be completed" in said, said
+    assert "nothing was removed" in said, said
+
+
+def test_pdm1110_a_truthy_non_answer_is_not_permission(
+    root, manager, settings, monkeypatch
+):
+    """PD-M11 — only the answer yes is a yes.
+
+    ``bool(askyesno(...))`` turns anything unexpectedly truthy into permission
+    to write, which is the unsafe direction for a confirmation. Real tkinter
+    returns a bool, so this is defence rather than a live bug -- but it is one
+    comparison, and the comparison that fails safe.
+    """
+    monkeypatch.setattr("tkinter.messagebox.askyesno", lambda *a, **k: "no")
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+
+    assert panel._ask_yes_no("t", "q") is False, (
+        "a non-bool truthy answer read as yes"
+    )
+
+
+def test_pdm1111_the_gesture_itself_survives_a_question_that_raises(
+    root, manager, settings, monkeypatch
+):
+    """PD-M11 — the whole drop, not just the method the drop calls.
+
+    Every other test of the failing dialog calls ``block_item`` directly, so
+    the gesture the user actually makes -- press, move, release onto a box on a
+    non-work day -- was not covered end to end, and the deferral the release
+    now goes through was not in the path being asserted. Driven as the real
+    handlers here: the release defers to a timer, the timer runs the drop, the
+    drop asks, the question raises, and the screen has to come out of that
+    saying so with nothing written.
+    """
+    def raising(*args, **kwargs):
+        raise tk.TclError("")
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", raising)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    item = _item(manager, "weekend work", SATURDAY)
+    panel.refresh()
+    frames = dict((index, frame) for frame, index in _slot_frames(panel))
+    assert frames, "the day pane built no half-hour boxes on a non-work day"
+    _pointer_on(panel, monkeypatch, frames[0])
+
+    panel.start_item_drag(None, item)
+    panel.on_drag_release(None)
+    _run_due_timers(panel)
+
+    assert manager.get_time_blocks(SATURDAY) == [], (
+        "the drop scheduled the item though the question never returned"
+    )
+    said = panel.status_label.cget("text")
+    assert "could not be completed" in said, said
+    assert "nothing was scheduled" in said, said
+    assert SATURDAY not in panel._work_anyway, (
+        "a question that failed was cached as permission"
     )
 
 
@@ -5712,6 +5813,14 @@ def test_pdm11_a_drop_is_deferred_to_a_timer_not_the_idle_queue(
     measured in. A zero-delay timer meets the only requirement the idle call
     was there for: let the ButtonRelease handler return before anything
     destroys the row it is dispatching to.
+
+    **The queue is provisional, and the first two assertions with it.** The
+    move off idle is the candidate cure for the raising dialog, not a proven
+    one -- the cause of the ``TclError`` was never established. If it turns
+    out to lie elsewhere, the queue is free to change and these two
+    assertions should change with it rather than being defended. What is not
+    provisional is the rest: the work does not run inside the ButtonRelease
+    handler, and it does run once that handler has returned.
     """
     item = _item(manager, "weekend work")
     screen.refresh()
@@ -5747,7 +5856,7 @@ def test_pdm11_a_drop_is_deferred_to_a_timer_not_the_idle_queue(
 
 def _fake_day_viewport(
     screen, monkeypatch, *, top=100, height=300, left=400, width=200,
-    yview=(0.3, 0.6),
+    yview=(0.3, 0.6), region=(0, 0, 200, 1000),
 ):
     """Give the day pane a viewport, without needing a mapped window.
 
@@ -5764,6 +5873,7 @@ def _fake_day_viewport(
     monkeypatch.setattr(canvas, "winfo_width", lambda: width)
     monkeypatch.setattr(canvas, "winfo_height", lambda: height)
     monkeypatch.setattr(canvas, "yview", lambda *a: yview)
+    monkeypatch.setattr(canvas, "bbox", lambda *a: region)
     return canvas
 
 
@@ -5862,15 +5972,16 @@ def test_pdm124_scrolling_the_day_moves_the_canvas_and_rereads_the_hover(
     """
     canvas = _fake_day_viewport(screen, monkeypatch)
     scrolled, hovered = [], []
-    monkeypatch.setattr(
-        canvas, "yview_scroll", lambda n, what: scrolled.append((n, what))
-    )
+    monkeypatch.setattr(canvas, "yview_moveto", lambda f: scrolled.append(f))
     monkeypatch.setattr(screen, "update_hover_target", lambda: hovered.append(1))
     _fake_pointer(screen, monkeypatch, 500, 399)
 
     assert screen.autoscroll_day() is True
 
-    assert scrolled == [(PD_AUTOSCROLL_UNITS, "units")], scrolled
+    # 0.3 of a 1000px day, plus 16px of it. Asserted as a fraction and not as
+    # an argument to ``yview_scroll``: see the PD-M12.9 tests below for why a
+    # "unit" was not a distance.
+    assert scrolled == [0.3 + 16 / 1000], scrolled
     assert hovered == [1], hovered
 
 
@@ -5878,9 +5989,7 @@ def test_pdm124_a_drag_clear_of_the_edges_scrolls_nothing(screen, monkeypatch):
     """PD-M12.4 — and the middle of the pane touches neither the canvas nor the hover."""
     canvas = _fake_day_viewport(screen, monkeypatch)
     scrolled, hovered = [], []
-    monkeypatch.setattr(
-        canvas, "yview_scroll", lambda n, what: scrolled.append((n, what))
-    )
+    monkeypatch.setattr(canvas, "yview_moveto", lambda f: scrolled.append(f))
     monkeypatch.setattr(screen, "update_hover_target", lambda: hovered.append(1))
     _fake_pointer(screen, monkeypatch, 500, 250)
 
@@ -5888,6 +5997,76 @@ def test_pdm124_a_drag_clear_of_the_edges_scrolls_nothing(screen, monkeypatch):
 
     assert scrolled == [], scrolled
     assert hovered == [], hovered
+
+
+def test_pdm129_a_tick_moves_the_day_by_the_step_in_pixels(screen, monkeypatch):
+    """PD-M12.9 — one tick is a distance, and the distance is 16px.
+
+    The first version of this scrolled ``yview_scroll(1, "units")``, which is
+    not a distance at all: ``CTkScrollableFrame.__init__`` configures the
+    canvas's ``yscrollincrement`` itself, and differently per platform -- 8 on
+    macOS, 1 on Windows, and unset on Linux, where Tk falls back to a tenth of
+    the pane. The same line therefore scrolled at three speeds an order of
+    magnitude apart, and no test noticed because every test asserted the
+    *arguments* to ``yview_scroll`` rather than any movement.
+
+    Asserted as a fraction of the scrollregion, which is the one quantity that
+    means the same thing on all three, with the numbers written out: a 1000px
+    day scrolled 16px is 0.016 of itself.
+    """
+    _fake_day_viewport(screen, monkeypatch, yview=(0.3, 0.6),
+                       region=(0, 0, 200, 1000))
+
+    assert screen.day_autoscroll_fraction(1) == 0.3 + 0.016, (
+        screen.day_autoscroll_fraction(1)
+    )
+    assert screen.day_autoscroll_fraction(-1) == 0.3 - 0.016, (
+        screen.day_autoscroll_fraction(-1)
+    )
+    assert PD_AUTOSCROLL_STEP_PX == 16, (
+        f"the step is {PD_AUTOSCROLL_STEP_PX}px, so the fractions above are "
+        "no longer the arithmetic being asserted"
+    )
+
+
+def test_pdm129_a_step_cannot_scroll_past_the_end(screen, monkeypatch):
+    """PD-M12.9 — the last step stops at the end rather than overshooting it.
+
+    ``yview_moveto`` is a destination, not an increment, so unlike the units
+    version an arithmetic overshoot is not clamped for us by the scroll
+    command. A day showing its last 30% cannot start later than 0.70.
+    """
+    _fake_day_viewport(screen, monkeypatch, yview=(0.69, 0.99),
+                       region=(0, 0, 200, 1000))
+
+    assert screen.day_autoscroll_fraction(1) == 0.70, (
+        screen.day_autoscroll_fraction(1)
+    )
+
+    _fake_day_viewport(screen, monkeypatch, yview=(0.0, 0.3),
+                       region=(0, 0, 200, 1000))
+
+    assert screen.day_autoscroll_fraction(-1) == 0.0, (
+        screen.day_autoscroll_fraction(-1)
+    )
+
+
+def test_pdm129_a_day_with_no_scrollregion_asks_for_nothing(screen, monkeypatch):
+    """PD-M12.9 — no scrollregion is "do not call it", not "scroll to zero".
+
+    A pane rebuilt and not yet configured has no ``bbox("all")``. Zero is a
+    real destination and would jump a part-scrolled day to its top, so the
+    answer has to be ``None`` and the canvas has to be left alone.
+    """
+    canvas = _fake_day_viewport(screen, monkeypatch)
+    monkeypatch.setattr(canvas, "bbox", lambda *a: None)
+    moved = []
+    monkeypatch.setattr(canvas, "yview_moveto", lambda f: moved.append(f))
+    _fake_pointer(screen, monkeypatch, 500, 399)
+
+    assert screen.day_autoscroll_fraction(1) is None
+    assert screen.autoscroll_day() is False
+    assert moved == [], moved
 
 
 def test_pdm125_a_held_drag_keeps_scrolling(screen, monkeypatch):
