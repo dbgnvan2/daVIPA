@@ -5836,6 +5836,88 @@ def test_pdm1112_a_length_dialog_that_raises_says_so(
     assert "block length dialog" in caplog.text, caplog.text
 
 
+def test_pdm1115_the_failed_length_dialog_is_torn_down_before_anything_is_said(
+    root, manager, settings, monkeypatch
+):
+    """PD-M11.15 — the arm that reports the failure must not leave the modal up.
+
+    Found by the fourth pass, in the fix for PD-M11.12 itself. The P5 reasoning
+    carried the failure arm across the whole class of modals but not the
+    cleanup obligation, which is not the same on both: ``askyesno`` goes
+    through ``tkinter.commondialog`` and a native dialog Tk disposes of itself,
+    while ``CTkInputDialog`` is a Toplevel that takes ``grab_set`` and
+    ``-topmost`` in its own ``__init__`` and is destroyed only by its Ok,
+    Cancel and close handlers. So returning from a raise left an
+    application-modal, always-on-top window on screen still holding the grab,
+    and wrote the error status to a screen the user could no longer click --
+    worse than the silent failure the arm was added to cure. Order matters as
+    much as the calls: the status line has to be readable when it is written.
+    """
+    order = []
+
+    class _Stuck:
+        def get_input(self):
+            raise tk.TclError("")
+
+        def grab_release(self):
+            order.append("grab_release")
+
+        def destroy(self):
+            order.append("destroy")
+
+    monkeypatch.setattr("customtkinter.CTkInputDialog", lambda **kw: _Stuck())
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    block = _add_block(manager, 30, "Draft the proposal", 0,
+                       block_type=BlockType.ITEM)
+    monkeypatch.setattr(
+        panel, "set_status", lambda *a, **k: order.append("set_status")
+    )
+
+    panel.ask_custom_minutes(block)
+
+    assert order == ["grab_release", "destroy", "set_status"], order
+
+
+def test_pdm1116_a_grab_release_that_raises_does_not_strand_the_window(
+    root, manager, settings, monkeypatch
+):
+    """PD-M11.16 — the teardown's own two steps fail independently.
+
+    ``grab_release`` goes to the same interpreter that just raised, so it is as
+    able to raise as the call it is cleaning up after. One ``try`` around both
+    steps would mean the first failure skipped the ``destroy``, which is the
+    step that actually gets the window off the screen, and the stranded modal
+    would be exactly the symptom this teardown exists to prevent.
+    """
+    order = []
+
+    class _Stuck:
+        def get_input(self):
+            raise tk.TclError("")
+
+        def grab_release(self):
+            order.append("grab_release")
+            raise tk.TclError("and again")
+
+        def destroy(self):
+            order.append("destroy")
+
+    monkeypatch.setattr("customtkinter.CTkInputDialog", lambda **kw: _Stuck())
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    block = _add_block(manager, 30, "Draft the proposal", 0,
+                       block_type=BlockType.ITEM)
+
+    panel.ask_custom_minutes(block)
+
+    assert order == ["grab_release", "destroy"], order
+    said = panel.status_label.cget("text")
+    assert "could not be completed" in said, said
+
+
 def test_pdm1113_a_confirmation_that_raises_is_logged_as_well_as_said(
     root, manager, settings, monkeypatch, caplog
 ):
@@ -6235,6 +6317,34 @@ def test_pdm1210_clearing_the_hover_puts_the_colour_back(
     assert box.cget("border_color") == before, (
         f"the box kept the hover colour: {box.cget('border_color')} != {before}"
     )
+    assert box.cget("border_width") == 1, box.cget("border_width")
+
+
+def test_pdm1211_the_width_goes_back_even_with_no_colour_to_restore(
+    screen, manager
+):
+    """PD-M12.11 — the colour restore must not be able to cost the width one.
+
+    Found by the fourth pass, in the PD-M12.10 fix. ``CTkFrame.configure``
+    pops ``border_color`` and runs it through ``_check_color_type``, which
+    raises ``ValueError`` -- not ``TclError``, so the existing guard did not
+    cover it -- when the colour is None, and it pops it *before* applying
+    ``border_width``. So adding the colour to the restore put the width
+    restore, which was already working, behind a call that could raise. The
+    cached colour is None until the first hover, which is the state this
+    asserts; the box keeps its own 1px border either way.
+    """
+    _item(manager, "Draft the proposal")
+    screen.refresh()
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    box = frames[0]
+    box.configure(border_width=2)
+    screen._drag_hover_frame = box
+    screen._drag_hover_border = 1
+    screen._drag_hover_color = None
+
+    screen.clear_hover_target()
+
     assert box.cget("border_width") == 1, box.cget("border_width")
 
 
