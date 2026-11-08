@@ -155,8 +155,11 @@ the screen is still open there:
 
 Spec and implementation plan for one panel design across the VSP tabs
 (UPD-M1 - UPD-M7). **Approved 2026-11-07. UPD-M3, UPD-M1, UPD-M2, UPD-M4,
-UPD-M5 and UPD-M6 built; UPD-M7 outstanding** (per-criterion status in the
-spec's §10):
+UPD-M5 and UPD-M6 built; UPD-M7.1 done, UPD-M7.2 and UPD-M7.3 open** -- the
+two on-screen criteria need a person at the running app, and nothing in
+UPD-M1 through UPD-M6 has been seen running (per-criterion status in the
+spec's §10, and the batch's handoff note is
+`docs/changes/2026-11-08-unified-panel-m7.md`):
 
 - The feature matrix: which of the six tabs has panels, a divider, drag and
   resizable columns today, counted rather than assumed
@@ -166,6 +169,8 @@ spec's §10):
 - The two places "the same design" cannot be taken literally, and what is done
   instead
 - How it sequences against the unpushed APE Week Actions batch
+- §11: the ten-step on-screen checklist UPD-M7.2 and UPD-M7.3 are waiting on,
+  written for the user to walk in the running app rather than for a test
 
 ### docs/implementation_plan_2026-11-08_priority_level_colours.md
 

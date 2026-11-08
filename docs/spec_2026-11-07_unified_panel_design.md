@@ -1,7 +1,9 @@
 # Spec + implementation plan — one panel design across the VSP tabs
 
 Status: **approved 2026-11-07. UPD-M3, UPD-M1, UPD-M2, UPD-M4, UPD-M5 and
-UPD-M6 built; UPD-M7 outstanding.** Per-criterion status is in §10.
+UPD-M6 built. UPD-M7.1 done; UPD-M7.2 and UPD-M7.3 are on-screen criteria
+and are open — nothing in UPD-M1 through UPD-M6 has been seen running.**
+Per-criterion status is in §10; the on-screen checklist is §11.
 IDs: `UPD-M1` … `UPD-M7`. Use them verbatim in commits, docstrings and test
 names.
 
@@ -804,4 +806,85 @@ green again, verified here after that commit landed.
 **Not verified on screen.** Every test here builds the screen on a withdrawn
 root. UPD-M7.2 and UPD-M7.3 are the on-screen criteria and are open.
 
-### UPD-M7 — **not started**
+### UPD-M7 — it holds together on screen — **M7.1 done, M7.2 and M7.3 open**
+
+| ID | Status | Where |
+|---|---|---|
+| M7.1 | `done` | `::test_updm71_screens_construct_withdrawn` builds all five rewritten screens and asserts that **no `Toplevel` was opened anywhere beneath the root** — a dialog at construction would be a modal thrown over whoever is using the machine, once per test that builds the screen. That count is the failable claim, and it is an exact zero walked to the bottom of each widget tree. The two assertions beside it — the root is withdrawn, the screen is unmapped — are stated in the test as what they are: `conftest.py` withdraws every window at construction and re-withdraws after any `deiconify`, so no change to a screen can turn them red, and `tests/test_tk_offscreen.py` is the guard on that patching rather than this test (P24). `::test_updm71_no_test_here_needs_a_mapped_window` counts the tests in this file that take the `mapped_windows` fixture from the AST: exact 0, so the number `test_ci_contract.py::test_the_documented_mapped_window_count_is_the_real_one` checks is the 22 it was before this plan. |
+| M7.2 | `not done` | needs a person at the running app — §11's checklist, steps 1 to 6 |
+| M7.3 | `not done` | needs a person at the running app — §11's checklist, steps 7 to 10 |
+
+**M7.2 and M7.3 are not written as tests, deliberately.** Both are about how
+six tabs *read* beside each other, and the thing that would make them
+code-testable — comparing rendered geometry across screens — is what the
+characterisation tests already do per screen. What is left is the part a
+measurement cannot settle: whether the six look like one design at a real
+window size, with real data, and whether a width a user set is still there the
+next morning. §11 is the checklist for it.
+
+**Nothing in UPD-M1 through UPD-M6 has been seen running.** Every test in
+`tests/test_unified_panel_design.py` builds its screen on a withdrawn root,
+which is what keeps a full run off the user's screen and is also the reason
+none of them can answer M7.2 or M7.3.
+
+---
+
+## 11. The on-screen check — for the user, not for a test
+
+M7.2 and M7.3. Ten steps, in order. Before starting: **quit the packaged app**
+if `/Applications/daVIPA.app` is running — a source launch exits silently
+while it holds the database lock — then `./start.sh`, and check `app.log` for
+a traceback at the end.
+
+**One design (M7.2)**
+
+1. **VSP Plan** in the sidebar. The nav row should show six buttons: Vision
+   Elements, Annual Plan Elements, APE Quarter Assignment, APE Month
+   Assignment, APE Week Assignment, APE Week Actions.
+2. Open each of the last five in turn. Each should show the same shape: a
+   header card with its own controls, then two panels side by side with a thin
+   rounded divider between them. **Vision Elements is the exception** and
+   should still look different — it is out of scope by UPD-D8 (recorded as
+   UPD-A1) and was not touched.
+3. On those five, compare the row heights and the chips. Segment, SubSegment
+   and Category should be coloured pills of the same height and corner radius
+   on every tab, and a row should be the same height on all five. A name too
+   long for its column should end in `...` rather than spilling into the next
+   column or wrapping to a second line.
+4. **APE Week Assignment**: the right panel should have five columns ending in
+   **Actions**, with a Delete button on each row, and the left panel's first
+   column should be a checkbox under a blank header — not the word "Pick".
+5. **APE Week Actions**: the left panel should be a table — `#`, Weekly
+   Tactic, Segment, SubSegment, Category — not a stack of buttons. Clicking
+   anywhere in a row, including on a coloured chip, should select that tactic
+   and fill the right panel.
+6. **APE Week Actions**, the filters: set **Sub** to a value one tactic has.
+   The list should narrow, the heading should read "Weekly Tactics (1 of N)",
+   and the status line should say how many were hidden and by which filter.
+   Set it to a value **no** tactic in that week has: the list should be
+   replaced by a line naming the filter and the hidden count, not an empty
+   panel. Reset to All and the heading should go back to "Weekly Tactics (N)".
+
+**Widths and dividers (M7.3)**
+
+7. On each of the five tabs, drag the divider between the panels left and
+   right. Both panels should move together, neither should be crushed below
+   about a third of the window, and the divider should not jump when the
+   window is resized.
+8. On each of the five tabs, drag the **SubSegment** column's right-hand edge
+   in the **left** panel. Only that column should change width; the columns
+   either side should stay put, and the text in the dragged column should be
+   re-clipped as it narrows rather than overflowing its pill.
+9. Do the same in the **right** panel of the same tab. The left panel's
+   columns should not move — each panel keeps its own widths.
+10. Quit the app and start it again. Every divider position and every column
+    width from steps 7 to 9 should be where you left it. Then open the
+    **Today** screen and check its Title column has not moved: APE Week
+    Actions' right panel shares Today's `week_actions` prefix for its own
+    columns and must not have taken Today's.
+
+What to watch for, since these are the things no test here settles: columns
+crowding or wrapping at the window size you actually use, a header card
+overflowing its pane, row heights differing between tabs, a chip colour that
+makes its text unreadable, and a divider that snaps back on the first resize
+after a relaunch.

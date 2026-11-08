@@ -7,6 +7,21 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — the one panel design is finished and is waiting to be looked at (2026-11-08)
+
+- **UPD-M7 closes the plan**, and what it adds is a guard rather than a
+  feature: the five rewritten VSP tabs are each built in a test that asserts
+  none of them opens a window of its own, and the count of tests needing a
+  real on-screen window is read from the file's syntax tree and asserted at
+  exactly zero, so the 22 in `CLAUDE.md` could not have drifted. No screen
+  behaviour changed.
+- **The two remaining criteria are not tests and are not claimed as done.**
+  Whether the six tabs read as one design, and whether a column width a user
+  dragged is still there the next morning, are questions a withdrawn-root test
+  cannot answer. They are a ten-step checklist in §11 of
+  `docs/spec_2026-11-07_unified_panel_design.md`, to be walked in the running
+  app. Nothing in UPD-M1 through UPD-M6 has been seen running.
+
 ### Added — APE Week Actions joins the one panel design (2026-11-08)
 
 - **APE Week Actions has Segment, SubSegment and Category filters**, the three

@@ -851,9 +851,21 @@ handle.
 Gate: 20 mutations, each the verbatim original, each run alone, every file
 restored and sha256-compared. 20 red, no finding.
 
-## UPD-M7
+## UPD-M7 — it holds together on screen
 
-`not done` — not started.
+| ID | Status | Evidence |
+|---|---|---|
+| M7.1 | `done` | `tests/test_unified_panel_design.py::test_updm71_screens_construct_withdrawn` builds all five rewritten screens and asserts no `Toplevel` was opened anywhere beneath the root — an exact zero, walked to the bottom of each widget tree. The withdrawn/unmapped assertions beside it are held by `conftest.py`, not by this test, and are stated as such in its docstring; `tests/test_tk_offscreen.py` is the guard on that patching (P24). `::test_updm71_no_test_here_needs_a_mapped_window` reads this file's AST and asserts exactly zero tests take the `mapped_windows` fixture, so the 22 in `CLAUDE.md` that `tests/test_ci_contract.py::test_the_documented_mapped_window_count_is_the_real_one` checks did not move. |
+| M7.2 | `not done` | needs a person at the running app — the spec's §11 checklist, steps 1 to 6 |
+| M7.3 | `not done` | needs a person at the running app — the spec's §11 checklist, steps 7 to 10 |
+
+M7.2 and M7.3 are deliberately not tests: both are about how six tabs read
+beside each other at a real window size with real data, and about whether a
+width a user set is still there the next morning. The spec's §11 says why and
+holds the ten steps.
+
+Mutation gate: 4 mutations, each the verbatim original, one at a time, every
+file restored and sha256-compared. 4 red, no finding.
 
 ## Not verified on screen
 
