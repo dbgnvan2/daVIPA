@@ -1,6 +1,10 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-08 (PLC-M1 to PLC-M5 made the three priority level colours settable and added five adjacent issues as PLC-A1 to PLC-A5 - the segment-fill text contrast the new priority fill fixes only for itself, two screens that ignore their own segment colour for the row fill, the `P:` chip's hard-coded red, `settings.py`'s length, and this index's own staleness; UPD-M5 moved APE Week Assignment's two panels onto
+Last Updated: 2026-11-08 (UPD-M6 put APE Week Actions on the shared divider
+and chip table, gave it the three lineage filters it never had, and moved the
+filter rule and the category chip colour into one owner each rather than a
+sixth copy: one adjacent issue is filed as UPD-A9, the five copies left under
+`screens/`; PLC-M1 to PLC-M5 made the three priority level colours settable and added five adjacent issues as PLC-A1 to PLC-A5 - the segment-fill text contrast the new priority fill fixes only for itself, two screens that ignore their own segment colour for the row fill, the `P:` chip's hard-coded red, `settings.py`'s length, and this index's own staleness; UPD-M5 moved APE Week Assignment's two panels onto
 the shared chip table, splitter and row drag, the last screen in scope: UPD-A6
 is resolved in place below, both holdout lists are empty and UPD-M1.5 and
 UPD-M2.5 are `done`, and one adjacent issue is filed as UPD-A8, an unused
@@ -143,6 +147,35 @@ code. A one-line deletion with no test to change; the only reason to keep it is
 that a later edit in this file may want it, which is not a reason.
 **Priority:** Low
 **Effort:** Low
+
+### 2026-11-08 - Type: Technical Debt
+
+**Title:** UPD-A9 - the filter triple and the category chip colour are still written out five times each
+**Description:** UPD-M6 needed both rules on APE Week Actions and moved them
+into `screens/lineage_filters.py` (new) and
+`segment_color_utils.load_category_color_map` / `resolve_chip_colors` rather
+than writing a sixth copy, and moved `weekly_items.py` onto them in the same
+change because that screen is the other one UPD-M5/UPD-M6 own. Five files
+still hold their own copy of one or both:
+
+- the three combos with the `All` sentinel and the match predicate -
+  `ape_assignment.py:43`, `ape_period_view.py:43`,
+  `drag_schedule.py` and `item_editor_weekly_tactic_dialog.py`, plus
+  `weekly_items.py`'s combos themselves (its *predicate* and row readers are
+  shared now, the widgets are not).
+- the lower-cased three-part category colour key with its fall-back -
+  `ape_assignment.py:406`, `ape_period_view.py:512`,
+  `annual_vision_segments.py:214`, `drag_schedule.py:914`,
+  `item_editor_weekly_tactic_dialog.py:274`.
+
+Two of those five fall back differently: `annual_vision_segments` prefers the
+row's own `category_color_hex` and then the segment's colour, and the tactic
+dialog adds a `gray20` floor. That is why this is recorded rather than swept -
+reconciling the fall-backs is a behaviour change on four screens, in a
+different batch, with its own tests. This is the P5 shape: one rule, six
+places, easy to get subtly wrong in one and not another.
+**Priority:** Medium
+**Effort:** Medium
 
 ## Adjacent issues — APE Week Assignment / APE Week Actions (AWA, 2026-11-07)
 

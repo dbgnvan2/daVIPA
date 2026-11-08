@@ -1,5 +1,45 @@
 ## Recent Changes (2026-11-08)
 
+### APE Week Actions joins the one panel design - UPD-M6
+
+- ✅ **A draggable divider**, from `screens/split_panel.py`, where the body was
+  a fixed 380px minimum on the left and `weight=1` on the right. The ratio
+  lands in `AppSettings.week_actions_split_ratio` and is there on the next
+  launch.
+- ✅ **The tactic list is the shared chip table**: `#` / Weekly Tactic /
+  Segment / SubSegment / Category at 34 / 220 / 135 / 155 / 125, every column
+  draggable, under its own `week_actions_left` store. It was one `CTkButton`
+  per tactic with the title and the segment name stacked inside it. Clicking
+  any cell in a row still selects that tactic — every cell is bound, not just
+  the row frame.
+- ✅ **Segment / SubSegment / Category filters**, which this tab was the only
+  one in the hub without. An empty result names the filter and says how many
+  it hid, and an empty week says that instead (P2). A selection the new week
+  cannot match falls back to All rather than leaving the panel empty for a
+  reason nothing on screen gives.
+- ✅ **The Actions panel on the right is untouched** and keeps the
+  `week_actions` prefix, so widths a user has already set there are still read
+  with the same keys (D3). There is no drop target and no drag source on this
+  tab (D6) — asserted from the AST at exact count 0, with both pins written
+  and run green *before* the rewrite.
+- ✅ **Three rules now have one owner each** rather than a sixth copy:
+  `screens/lineage_filters.py` (new) for the filter triple and the two lineage
+  row readers, `segment_color_utils.load_category_color_map` /
+  `resolve_chip_colors` for the category chip colour, and
+  `chip_table.show_list_or_message` for the list-or-message rule. `weekly_items.py`
+  moved onto all three in the same change. The five copies left under
+  `screens/` are UPD-A9 in `BACKLOG.md`, not swept in here.
+- ✅ **One defect in the shared table, fixed.** `add_row` clipped a chip to its
+  column but gave a plain cell its raw text, so a Title column opened with one
+  row pushing the others out of line and corrected itself the moment the
+  handle was touched. A resizable plain column is clamped at the first render
+  now; a fixed-width one keeps its raw text deliberately.
+- ⚠️ **Not seen running.** Every test builds the screen on a withdrawn root.
+  UPD-M7.2 and UPD-M7.3 are the on-screen criteria and are still open.
+- Gate: 20 mutations, each the verbatim original, each run alone, every file
+  restored and sha256-compared — 20 red, no finding. 112 tests across
+  `test_unified_panel_design.py` and `test_ape_week_actions.py`.
+
 ### Priority level colours are settable - PLC-M1 to PLC-M5
 
 - ✅ **Three priority levels, named and decided in one place.** Any Critical;

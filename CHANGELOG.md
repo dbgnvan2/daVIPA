@@ -7,6 +7,35 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — APE Week Actions joins the one panel design (2026-11-08)
+
+- **APE Week Actions has Segment, SubSegment and Category filters**, the three
+  every other tab in the hub already had. The combos offer only the values the
+  week actually contains, a selection the next week cannot match falls back to
+  All rather than leaving the list silently empty, and the heading and the
+  status line say how many of the week's tactics are shown and how many the
+  filter hid.
+- **The divider between the tactic list and the Actions panel can be dragged**,
+  and stays where you left it between launches. The split used to be fixed: a
+  380px minimum on the left and whatever was left on the right.
+- **The tactic list's columns can be dragged wider or narrower** and each
+  keeps its width. It is the same table as the other tabs' now — a header of
+  `#`, Weekly Tactic, Segment, SubSegment and Category, with the three name
+  columns at the same widths as everywhere else — where it was one button per
+  tactic with the title and the segment name stacked inside it. Clicking
+  anywhere in a row still selects that tactic. The Actions panel on the right
+  is untouched, and the widths you have already set there are read with the
+  same keys as before.
+
+### Fixed — the shared table's plain columns (2026-11-08)
+
+- **A long title no longer pushes a row's columns out of line until the
+  divider is touched.** The shared table clipped a coloured chip to its column
+  but gave a plain text cell its full text, so the first paint was the one
+  state in which text could overrun its column, and dragging the handle was
+  what corrected it. Only a column with no drag handle keeps its raw text now,
+  which is the `#` and Actions columns, neither of which can overrun.
+
 ### Changed — APE Week Assignment joins the one panel design (2026-11-07)
 
 - **Every row in the right panel of APE Week Assignment has its own Delete

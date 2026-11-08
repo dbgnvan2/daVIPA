@@ -821,13 +821,43 @@ Gate: 17 mutations, each the verbatim original, each run alone. 15 red first
 pass; the 2 green were weaknesses in the tests and both were strengthened
 until red — details in the spec's §10.
 
-## UPD-M6 … UPD-M7
+## UPD-M6 — APE Week Actions gets the design it can take
+
+| Spec ID | Description | Implementation | Test | Status |
+|---|---|---|---|---|
+| M6.1 | A draggable divider between the tactic list and the Actions panel | `week_actions.py::create_ui` over `SplitPanel`, prefix `week_actions`; `AppSettings.week_actions_split_ratio` | `::test_updm61_week_actions_has_a_divider`, `::test_updm61_the_divider_position_survives_a_relaunch` | done — the body was `minsize=380` / `weight=1` before |
+| M6.2 | The left panel is the shared chip table, not a stack of buttons | `week_actions.py::_render_tactics` over `chip_table.WEEK_ACTIONS_LEFT_COLUMNS` | `::test_updm62_left_panel_is_the_shared_table`, `::test_updm62_a_long_title_is_clipped_to_its_column`, `::test_updm62_a_row_with_no_category_colour_takes_the_subsegments` | done — and no `CTkButton` is left in the panel |
+| M6.3 | Clicking a left row still selects that tactic and reloads the right panel | `_render_tactics`'s per-cell `<Button-1>` → `select_tactic` | `::test_updm63_clicking_a_row_still_selects`, `::test_updm63_selecting_a_row_repaints_the_panel_instead_of_stacking_it` | done — a real event on the widget's canvas, every cell bound |
+| M6.4 | Segment / SubSegment / Category filters that filter the left list | `screens/lineage_filters.py::LineageFilters`, `week_actions.py::on_filters_changed` | `::test_updm64_filters_narrow_the_tactic_list`, `::test_updm64_the_combos_offer_only_the_values_the_week_has`, `::test_updm64_a_filter_that_hides_the_selected_row_clears_the_panel` | done |
+| M6.5 | A filter that matches nothing says so and says how many it hid (P2) | `week_actions.py::_empty_text`, `_report_counts`, `chip_table.show_list_or_message` | `::test_updm65_an_empty_filter_result_says_what_it_hid`, `::test_updm65_an_empty_week_says_that_instead` | done — asserts which widget is gridded, not the label's text |
+| M6.6 | The right panel is still a `TodayScreen` subclass on the `week_actions` prefix | `WeekTacticActionsPanel` untouched; the left table takes `week_actions_left` | `::test_updm66_right_panel_is_untouched`, `::test_updm66_the_left_panel_columns_resize_and_persist` | done — pin written and run green before the rewrite |
+| M6.7 | No drop target and no drag source on this tab — exact count 0 | nothing in `week_actions.py` | `::test_updm67_no_dead_drop_target` | done — from the AST; pin written before the rewrite |
+
+Three rules moved out rather than being copied a sixth time:
+`screens/lineage_filters.py` (new) for the filter triple and the two lineage
+row readers, `segment_color_utils.load_category_color_map` /
+`resolve_chip_colors` for the category chip colour, and
+`chip_table.show_list_or_message` for the list-or-message rule UPD-M5 wrote
+inline. `weekly_items.py` moved onto all three in the same change. The five
+remaining copies are UPD-A9 in `BACKLOG.md`.
+
+A defect in the shared table, found while writing M6.2's test: `add_row` gave
+a non-chip cell its raw text, so a Title column opened with one row pushing
+every column out of line and corrected itself the moment the handle was
+touched. A resizable plain column is clamped in `add_row` now; a fixed-width
+one keeps its raw text, because the resizer never re-clamps a column with no
+handle.
+
+Gate: 20 mutations, each the verbatim original, each run alone, every file
+restored and sha256-compared. 20 red, no finding.
+
+## UPD-M7
 
 `not done` — not started.
 
 ## Not verified on screen
 
 UPD-M7.2 and UPD-M7.3 are on-screen criteria and are `not done`. Nothing in
-UPD-M1, UPD-M2, UPD-M3 or UPD-M4 has been seen running; every test above builds
-its screen on a withdrawn root. UPD-M4 changed the renderer, the splitter and
+UPD-M1 through UPD-M6 has been seen running; every test above builds its
+screen on a withdrawn root. UPD-M4 changed the renderer, the splitter and
 the drag of three tabs in one step and none has been looked at.

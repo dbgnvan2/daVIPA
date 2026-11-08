@@ -1,7 +1,7 @@
 # Spec + implementation plan — one panel design across the VSP tabs
 
-Status: **approved 2026-11-07. UPD-M3, UPD-M1, UPD-M2, UPD-M4 and UPD-M5
-built; UPD-M6 and UPD-M7 outstanding.** Per-criterion status is in §10.
+Status: **approved 2026-11-07. UPD-M3, UPD-M1, UPD-M2, UPD-M4, UPD-M5 and
+UPD-M6 built; UPD-M7 outstanding.** Per-criterion status is in §10.
 IDs: `UPD-M1` … `UPD-M7`. Use them verbatim in commits, docstrings and test
 names.
 
@@ -122,6 +122,9 @@ differences:
   be given different widths, and the numbers differ from the other tabs'.
 
 ### 1.5 Where APE Week Actions differs
+
+**All five differences below are closed at UPD-M6** — this section is the
+before state, kept for the record. §10's UPD-M6 block has what each became.
 
 It was built to a different brief three commits ago and does not follow this
 design at all:
@@ -322,6 +325,15 @@ Each step is a commit, tests first, and each leaves the app working.
    This is the step that empties both holdout sets and closes UPD-M1.5 and
    UPD-M2.5.
 6. **UPD-M6** — APE Week Actions: divider, chip table, filters.
+
+   This step was not repetition either. The tab needed two rules it did not
+   have — the filter triple and the category chip colour — and both were
+   already written out five times under `screens/`. They moved into
+   `screens/lineage_filters.py` and two new functions in
+   `screens/segment_color_utils.py` as they were adopted, rather than becoming
+   a sixth copy each (UPD-D1). `weekly_items.py` was moved onto all three
+   seams in the same change, because it is the other screen this batch owns.
+   The five remaining copies are UPD-A9, not swept here.
 7. **UPD-M7** — the meta test, the docs, the on-screen checklist.
 
 Steps 1-3 are the ones worth pausing after; from step 4 on it is repetition.
@@ -421,6 +433,8 @@ the screen it checks.
 | `src/getmoredone/screens/annual_vision_segments.py` | same |
 | `src/getmoredone/screens/weekly_items.py` | same, plus the right-panel rewrite (UPD-M5) |
 | `src/getmoredone/screens/week_actions.py` | divider, chip table, filters (UPD-M6) |
+| `src/getmoredone/screens/lineage_filters.py` | **new at UPD-M6** — the Segment / SubSegment / Category filter triple |
+| `src/getmoredone/screens/segment_color_utils.py` | at UPD-M6, `load_category_color_map` and `resolve_chip_colors` |
 | `src/getmoredone/app_settings.py` | 9 new `<prefix>_col_widths` fields, 5 `<prefix>_split_ratio` fields |
 | `tests/test_unified_panel_design.py` | **new** — UPD-M1 … UPD-M7 |
 | `tests/test_ci_contract.py` | only if the mapped-window count moves |
@@ -691,4 +705,103 @@ step either — recorded as UPD-A8 rather than swept in with a feature change.
 **Not verified on screen.** Every test here builds the screen on a withdrawn
 root. UPD-M7.2 and UPD-M7.3 are the on-screen criteria and are open.
 
-### UPD-M6 … UPD-M7 — **not started**
+### UPD-M6 — APE Week Actions gets the design it can take — **done**
+
+| ID | Status | Where |
+|---|---|---|
+| M6.1 | `done` | `::test_updm61_week_actions_has_a_divider` and `::test_updm61_the_divider_position_survives_a_relaunch`. The body was `minsize=380` on the left and `weight=1` on the right, so the proportion was the layout's; it is `split_panel.SplitPanel` under the `week_actions` prefix now, with the ratio in a declared field. |
+| M6.2 | `done` | `::test_updm62_left_panel_is_the_shared_table`, `::test_updm62_a_long_title_is_clipped_to_its_column`, `::test_updm62_a_row_with_no_category_colour_takes_the_subsegments`. The header is `#` / Weekly Tactic / Segment / SubSegment / Category at 34 / 220 / 135 / 155 / 125, and no `CTkButton` is left in the panel. |
+| M6.3 | `done` | `::test_updm63_clicking_a_row_still_selects` and `::test_updm63_selecting_a_row_repaints_the_panel_instead_of_stacking_it`. Every cell carries the binding, not just the row frame, and the click is generated on the widget's internal canvas so it is a real event rather than a call to the handler. |
+| M6.4 | `done` | `::test_updm64_filters_narrow_the_tactic_list`, `::test_updm64_the_combos_offer_only_the_values_the_week_has`, `::test_updm64_a_filter_that_hides_the_selected_row_clears_the_panel`. |
+| M6.5 | `done` | `::test_updm65_an_empty_filter_result_says_what_it_hid` and `::test_updm65_an_empty_week_says_that_instead`. The two cases say different things, and the test asserts which of the two widgets in that grid cell is gridded rather than reading the label's text — that is UPD-M5's finding applied here. |
+| M6.6 | `done` | `::test_updm66_right_panel_is_untouched` and `::test_updm66_the_left_panel_columns_resize_and_persist`. The right panel is still a `TodayScreen` subclass on the `week_actions` prefix; the left table has its own `week_actions_left`, so a drag in one panel cannot move the other's columns or read a user's existing widths with the wrong keys (D3). |
+| M6.7 | `done` | `::test_updm67_no_dead_drop_target`. Exact count 0, from the AST: no `RowDropTarget`, no `RowDragSource`, no `bind_row` anywhere in the file (D6). |
+
+**The two pins were written first.** §5's first risk says the characterisation
+test comes before the first line is removed.
+`::test_updm66_right_panel_is_untouched` and `::test_updm67_no_dead_drop_target`
+were written against the untouched screen and run green there (2 passed), and
+`tests/test_ape_week_actions.py` was baselined at 33 passed, before any edit.
+Both still pass.
+
+**Three rules moved out rather than being copied a sixth time.** The tab needed
+the Segment / SubSegment / Category filter triple and the category chip colour,
+and each was already written out five times under `screens/`:
+
+- `screens/lineage_filters.py` (**new**) owns the three combos, the `All`
+  sentinel, the option lists, the predicate and the wording of what is
+  filtering. It also owns the two row readers — a Weekly Tactic carries its
+  lineage under `ape_*` keys, an Annual Plan Element under `*_name`.
+- `screens/segment_color_utils.py` gains `load_category_color_map` (the
+  lower-cased three-part key) and `resolve_chip_colors` (the three chip
+  colours, with the category falling back to the subsegment's).
+- `screens/chip_table.py` gains `show_list_or_message`, the two-widgets-in-one
+  -cell rule UPD-M5 wrote inline.
+
+`weekly_items.py` was moved onto all three in the same change: it is the other
+screen this batch owns, and leaving it with its own copies would have been the
+inconsistent half of the choice. The five remaining copies — `ape_assignment`,
+`ape_period_view`, `annual_vision_segments`, `drag_schedule` and
+`item_editor_weekly_tactic_dialog` — are **not** changed here and are recorded
+as UPD-A9 in `BACKLOG.md`. Two of them fall back differently for a missing
+category colour, so reconciling them is a behaviour change on four screens and
+not UPD-M6's to make.
+
+**One defect in the shared table, found while writing UPD-M6.2's test.**
+`add_row` gave a non-chip cell its raw text while a chip cell was clamped to
+its column. On the four tabs that had no plain text column wider than its
+content that was invisible; on a Title column it is a panel that opens with
+one row pushing every column out of line and corrects itself the moment the
+handle is touched. A resizable plain column is clamped in `add_row` now, the
+same way the resizer clamps it on a drag. A fixed-width column keeps its raw
+text deliberately: `#` and `Actions` cannot overrun, and `_apply_live` never
+re-clamps a column with no handle, so clamping them here would be the only
+place the pad appeared.
+
+**Four deliberate behaviour changes, stated because they are visible.**
+
+- The left panel's minimum goes 380 to `split_panel.MIN_PANEL_WIDTH` (420),
+  which is what the other five tabs use.
+- The left list is a table with a Weekly Tactic column where it was one
+  two-line button per tactic. Its rows are picked by name on this tab, which
+  is why it has a Title column and the other panels do not.
+- The three filters are new. This tab was the only one in the hub without
+  them.
+- The left heading and the status line say "shown of total" **only while a
+  filter is narrowing the list**. The unfiltered strings are byte-identical to
+  the ones `tests/test_ape_week_actions.py::test_awam43` already asserted, so
+  that test still holds the old wording unchanged.
+
+**One test changed, case (b) — the behaviour changed intentionally.**
+`test_awam42` asserted `set(screen.tactic_buttons) == {mine.id}`. There are no
+buttons any more; it reads `tactic_row_frames`, which is the same claim about
+the same rows.
+
+**Gate.** 20 mutations, each the verbatim original, each run alone, every file
+restored and sha256-compared: **20 red**, no finding. They cover the clamp and
+each column width, the empty-state branch, the filter predicate's `!=` and its
+`All` guard, the stale-selection fall-back, `describe`, all three filtered
+message branches, the selection-survives-a-filter guard, the per-cell click
+binding, the selection tint, the repaint on select, the category colour
+fall-back, the splitter's panel, the left table's prefix, the settings field
+and the Actions panel's grid column.
+
+**Tests run.** `tests/test_unified_panel_design.py` (79) and
+`tests/test_ape_week_actions.py` (33): 112 passed. With
+`test_weekly_tactic_schema`, `test_column_resize`, `test_ape_period_consistency`,
+`test_settings_isolation`, `test_weekly_item_filters`, `test_weekly_items_title`,
+`test_weekly_items_week_options`, `test_no_vacuous_tests`, `test_traceability_refs`
+and `test_ci_contract`: 301 passed, 1 skipped, and one failure that was not
+this batch's — `test_traceability_refs.py::test_every_referenced_test_name_exists`
+was red over nine `Tests:` references in `item_editor.py`,
+`item_editor_dialogs.py` and `vps_manager.py` naming WTP tests
+(`test_wtpm41_*` … `test_wtpm64_*`) that did not exist yet. Those three files
+are untouched by UPD-M6; the WTP batch wrote the tests in `a0fb2d3` and it is
+green again, verified here after that commit landed.
+`test_release_docs`, `test_vision_planning_regressions` and
+`test_weekly_tactic_surfaces`: 75 passed.
+
+**Not verified on screen.** Every test here builds the screen on a withdrawn
+root. UPD-M7.2 and UPD-M7.3 are the on-screen criteria and are open.
+
+### UPD-M7 — **not started**
