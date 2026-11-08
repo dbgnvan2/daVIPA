@@ -5660,7 +5660,8 @@ def test_pdm11_a_dialog_that_raises_writes_nothing_says_so_and_asks_again(
     same two lines. Nothing is written, so the arm is not a silent yes. The
     status says the question could not be completed, so it is not reported as
     the user's refusal -- and it claims no cause, because the raise came out of
-    the one Tcl call that both shows the dialog and returns the answer. And the failure is not cached either way, so the next drop
+    the one Tcl call that both shows the dialog and returns the answer. And the
+    failure is not cached either way, so the next drop
     asks again and can still be agreed to -- a transient failure is not a
     permanent negative (P1).
     """
@@ -5798,6 +5799,97 @@ def test_pdm1111_the_gesture_itself_survives_a_question_that_raises(
     assert "nothing was scheduled" in said, said
     assert SATURDAY not in panel._work_anyway, (
         "a question that failed was cached as permission"
+    )
+
+
+def test_pdm1112_a_length_dialog_that_raises_says_so(
+    root, manager, settings, monkeypatch, caplog
+):
+    """PD-M11 — the third modal on this screen, found by the re-sweep.
+
+    The measured fault is a modal failing to return an answer, not a
+    *confirmation* failing to -- so the class is every modal on the screen,
+    and ``ask_custom_minutes`` was the one left out. ``CTkInputDialog.get_input``
+    is ``wait_window`` plus a read of the entry, the same machinery
+    ``askyesno`` goes through, and the context menu's "Custom..." reaches it.
+    Before this it wrote nothing and said nothing, which is the reported
+    symptom on a third path.
+    """
+    def raising(*args, **kwargs):
+        raise tk.TclError("")
+
+    monkeypatch.setattr("customtkinter.CTkInputDialog", raising)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    block = _add_block(manager, 30, "Draft the proposal", 0,
+                       block_type=BlockType.ITEM)
+
+    with caplog.at_level(logging.ERROR, logger="getmoredone.screens.plan"):
+        panel.ask_custom_minutes(block)
+
+    said = panel.status_label.cget("text")
+    assert "could not be completed" in said, said
+    assert manager.get_time_blocks(THURSDAY)[0].planned_minutes == 30, (
+        "the block length changed though the question never returned"
+    )
+    assert "block length dialog" in caplog.text, caplog.text
+
+
+def test_pdm1113_a_confirmation_that_raises_is_logged_as_well_as_said(
+    root, manager, settings, monkeypatch, caplog
+):
+    """PD-M11 — catching the raise must not cost the evidence of it.
+
+    Before the arm existed, a raising dialog reached stderr, and that traceback
+    is the entire reason this fault is understood as far as it is -- the
+    mechanism is still unproven. An arm that converted it into a status line
+    and nothing else would have traded the symptom for the evidence, and a
+    status line is overwritten by the next one. The sibling failure arms on
+    this screen (``clear_day``, AutoLoad) log as well as say, for the same
+    reason.
+    """
+    def raising(*args, **kwargs):
+        raise tk.TclError("boom")
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", raising)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+
+    with caplog.at_level(logging.ERROR, logger="getmoredone.screens.plan"):
+        assert panel._ask_yes_no("Not a work day", "q") is None
+
+    assert "could not be put" in caplog.text, caplog.text
+    assert "TclError" in caplog.text, (
+        f"the traceback was not logged, only the message: {caplog.text}"
+    )
+
+
+def test_pdm1114_the_non_work_day_sentence_names_no_gesture(
+    root, manager, settings, monkeypatch
+):
+    """PD-M11 — four callers, one sentence, so it cannot name one gesture.
+
+    ``_require_block_day`` is reached from the AutoLoad button, the padding
+    button, a drop and a day extension. "Try the drop again" told a user who
+    pressed AutoLoad to retry a drop they never made.
+    """
+    def raising(*args, **kwargs):
+        raise tk.TclError("")
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", raising)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+
+    panel.autoload_day()
+
+    said = panel.status_label.cget("text")
+    assert "could not be completed" in said, said
+    assert "Try again" in said, said
+    assert "drop" not in said, (
+        f"the sentence names a gesture AutoLoad does not have: {said}"
     )
 
 
