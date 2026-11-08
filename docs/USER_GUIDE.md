@@ -921,8 +921,10 @@ Buttons (paired below):
   leaving the editor. **Clear Project** unfiles it. Not available on a Weekly Tactic record.
 - **Complete** — What: Marks the item completed. On a Weekly Tactic with items
   still open it asks first, naming how many; completing the tactic does not
-  complete them. Why: Track progress without silently closing a week that is
-  not finished.
+  complete them. The same question is asked wherever a Weekly Tactic is
+  completed — the Today checkbox, All Items, Upcoming, the Hierarchical tree,
+  a Project Board, and the timer's **Done** button — not only here. Why: Track
+  progress without silently closing a week that is not finished.
 - **Delete** — What: Deletes the item. Refused if the item has child items,
   naming how many — including, for a Weekly Tactic, the items filed under it.
   Why: Remove obsolete tasks without losing the work underneath them.

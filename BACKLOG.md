@@ -95,6 +95,57 @@ rewrite that wants its own pass rather than riding along with a feature.
 **Priority:** Low
 **Effort:** Small
 
+## Below-medium findings — WTP completion surfaces (2026-11-08)
+
+From the Hermes `learning-qa-sweep` gate over `3f705b4..56c1dc0`
+(`docs/cycles/2026-11-08_wtp-plc-upd-pd-qa-gate.md`) and from fixing its one
+medium finding. The gate's F1 was fixed in-loop; everything here is below
+medium, so it is filed rather than fixed.
+
+### WTP-A2 — a `feat(wtp)` commit carries Calendar Export hunks (low)
+
+The gate's F2. `8c65080` ("feat(wtp): a Weekly Tactic is the parent … M1–M3")
+also contains unrelated CE work in `db_manager.py`: `calendar_event_id` added
+to the time_blocks INSERT/UPDATE/read paths, and `set_block_calendar_event_id`.
+Those hunks were read by the gate only as WTP commit content, never as CE work,
+so the CE batch's own sweep should cover them. The read path falls back to
+`None` on a missing column, so a pre-migration database does not crash. This is
+the contamination class *One build batch at a time* in `CLAUDE.md` documents.
+
+**Priority:** Low (process; no code defect found)
+**Effort:** None — it is a note for the CE sweep, not a change
+
+### WTP-A3 — `upcoming.py` reports a week collision twice (low)
+
+`UpcomingScreen.complete_item` calls `notify_weekly_tactic_changes` on two
+consecutive lines, so a completion that hits a week collision shows the same
+warning dialog twice. Introduced by `a1468c8` ("fix(weekly-tactic): resolve the
+nine third-sweep findings"), which is already pushed and outside the swept
+range — a fix pass adding the line a previous fix pass had already added (P26).
+Deleting one line is the whole fix.
+
+**Priority:** Low (duplicate dialog; no data effect)
+**Effort:** Small
+
+### WTP-A4 — the rollover's effect on the Done column is not in the guide (low)
+
+`complete_action_item` re-files a completed item onto the Weekly Tactic for the
+week it was *finished* in, not the week it was planned for. This is specified —
+WTP-M6.6, tested by `test_wtpm66_count_follows_the_wt_m5a_refile` — and it is
+the year-rollover behaviour working as intended ("finishing in January
+something planned for last December"). It is not a defect.
+
+What is missing is the user-facing half. Measured 2026-11-08: completing items
+inside their own week reads `0/3 → 1/3 → 2/3 → 3/3`, as expected; completing a
+February item in November moves it off the February tactic, so that tactic's
+Done column goes `0/3 → 0/2 → 0/1` — the denominator shrinks instead of the
+numerator growing. `docs/USER_GUIDE.md` does not say a tactic's Done count can
+fall when its work is finished late, and the column is surprising to read
+without it.
+
+**Priority:** Low (documentation)
+**Effort:** Small
+
 ## Adjacent issues — priority level colours (PLC, 2026-11-08)
 
 Found while building PLC-M1 to PLC-M5. Flagged, not fixed (global rule 10):

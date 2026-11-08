@@ -255,6 +255,7 @@ Every `DatabaseManager` in it takes an explicit `tmp_path` database.
 | WTP-M6.4 | The Weekly Tactic row in the APE Week Assignment right panel shows `n/m done` from its children. | `test_wtpm64_week_assignment_row_shows_progress`, plus `test_wtpm64_progress_counts_come_from_one_helper` for the helper and `test_wtpm64_a_tactic_with_nothing_under_it_shows_a_dash` for the empty case |
 | WTP-M6.5 | The Week Actions tab's left tactic list shows the same count, from the same helper — one home, not two renderings. | `test_wtpm65_week_actions_list_shows_progress` |
 | WTP-M6.6 | Completing a child changes that count, and `complete_action_item`'s WT-M5.A re-file still moves the item to the week it was completed in — so the count is read after the re-file, not before. | `test_wtpm66_count_follows_the_wt_m5a_refile` |
+| WTP-M6.7 | *Added after the batch, from the gate's F1.* The WTP-M6.1 question is asked on **every** surface that completes an item, not only the editor: the Today checkbox, All Items, Upcoming, the Hierarchical tree, a Project Board and the timer's Done button. | `test_wtpm67_every_completion_surface_asks_first`, `test_wtpm67_a_declined_prompt_completes_nothing_on_any_surface`, `test_wtpm67_yes_completes_it_on_any_surface`, `test_wtpm67_an_ordinary_item_is_never_questioned`, and two AST guards — all in `tests/test_weekly_tactic_completion_surfaces.py` |
 
 ### Not code-testable
 
@@ -331,8 +332,19 @@ Recorded 2026-11-08, after implementation. Commits: `e465f79` (this spec),
 then the screen work and its tests. Nothing is pushed. Every test named below
 is in `tests/test_weekly_tactic_parent.py` unless another file is given.
 
-**Summary: all 38 criteria `done`** — the 35 in §3, plus WTP-M1.7 and the two
-extra cases WTP-M5.2 needed. Nothing is `partial` and nothing is outstanding.
+**Summary: all 39 criteria `done`** — the 35 in §3, plus WTP-M1.7, the two
+extra cases WTP-M5.2 needed, and WTP-M6.7. Nothing is `partial` and nothing is
+outstanding.
+
+WTP-M6.7 was added *after* the batch was pushed. The independent Hermes
+`learning-qa-sweep` gate over `3f705b4..56c1dc0`
+(`docs/cycles/2026-11-08_wtp-plc-upd-pd-qa-gate.md`) rejected the range on one
+medium finding: WTP-M6.1's question existed only in `ItemEditorDialog`, so six
+other screens — the Today checkbox among them — completed a tactic with open
+children and asked nothing. That is the P25 shape, and WTP-M6.1 to WTP-M6.3
+were reported `done` on the strength of the one surface that had it. They are
+now true of all seven. The gate's second finding (F2, low) is filed as
+WTP-A2.
 
 Three of them — WTP-M5.2, WTP-M6.4's rendering and WTP-M6.5 — were held back
 mid-batch because `screens/weekly_items.py` and `screens/week_actions.py`
@@ -403,12 +415,13 @@ WTP there now is an adjacent issue found while building WTP-M6.4.
 
 | ID | Status | Proof |
 |---|---|---|
-| WTP-M6.1 | done | `item_editor.py` `_confirm_tactic_completion`, called from `complete_item` · `test_wtpm61_completing_a_tactic_with_open_children_asks` (mutation-gated) |
+| WTP-M6.1 | done | `week_collision_notice.confirm_weekly_tactic_completion`, reached from all seven completion paths · `test_wtpm61_completing_a_tactic_with_open_children_asks` (mutation-gated). **Corrected:** this was first built in `item_editor.py` alone and reported `done` on that basis; see WTP-M6.7. |
 | WTP-M6.2 | done | the prompt returns a bool and nothing else changes status · `test_wtpm62_completion_does_not_cascade` |
 | WTP-M6.3 | done | the same method's early return · `test_wtpm63_no_prompt_when_nothing_is_open` |
 | WTP-M6.4 | done | `vps_manager.count_open_children_for_weekly_tactic` · `test_wtpm64_progress_counts_come_from_one_helper` asserts its `(done, total)` and that the number agrees with the `(N sub)` count the tree renders. The rendering is a Done column on the row · `test_wtpm64_week_assignment_row_shows_progress` (reads `1/3` off the cell) and `test_wtpm64_a_tactic_with_nothing_under_it_shows_a_dash` (`—`, not `0/0`, which reads as a count that failed). Both mutation-gated. The panel took a column set of its own, `WEEK_ASSIGNMENT_RIGHT_COLUMNS`, rather than a column added to `APE_RIGHT_COLUMNS`: the other two APE right panels list Annual Plan Elements, which have no children, so a Done column there could only ever read `—`. |
 | WTP-M6.5 | done | `screens/week_actions.py` `_render_tactics`, reading the same helper · `test_wtpm65_week_actions_list_shows_progress`, which asserts the rendered cell **and** the helper's own answer — a rendering that hard-coded the string fails the first, a helper that drifted fails the second. Mutation-gated. |
 | WTP-M6.6 | done | `count_open_children_for_weekly_tactic` reads through `get_children`, so it is read after the re-file · `test_wtpm66_count_follows_the_wt_m5a_refile` |
+| WTP-M6.7 | done | `week_collision_notice.confirm_weekly_tactic_completion` — one implementation, called from all seven completion paths; `ItemEditorDialog._confirm_tactic_completion` is now a one-line delegation to it, so there is one reader of the rule. Six behavioural tests, parametrised over the surfaces, plus `test_wtpm67_the_set_of_completion_call_sites_is_pinned` (an AST walk asserting the call-site set **exactly**, since a floor would have passed the one-of-seven state this fixes) and `test_wtpm67_every_completion_call_site_is_guarded`. Fourteen mutations, all killed. |
 
 ### The two "not code-testable" items
 
@@ -479,7 +492,9 @@ None is a prerequisite.
 | `src/getmoredone/weekly_tactic.py` | **WTP-M1** — `parent_of`, beside `tactic_of` |
 | `src/getmoredone/db_manager.py` | **WTP-M2, M3** — `get_children`, `get_root_items` |
 | `src/getmoredone/screens/hierarchical.py` | **WTP-M3.5/M3.6** — expected: no change |
-| `src/getmoredone/screens/item_editor.py` | **WTP-M4.1–M4.3** — parent line + View Parent; **WTP-M6.1–M6.3** — the complete prompt |
+| `src/getmoredone/screens/item_editor.py` | **WTP-M4.1–M4.3** — parent line + View Parent; **WTP-M6.1–M6.3** — the complete prompt, now delegated (**WTP-M6.7**) |
+| `src/getmoredone/screens/week_collision_notice.py` | **WTP-M6.7** — the one implementation of the question. It already owned the shared week notices and the always-on-top wrapper every one of these modals needs, so the question went beside them rather than into a module of its own |
+| `src/getmoredone/screens/today.py`, `all_items.py`, `upcoming.py`, `hierarchical.py`, `project_boards.py`, `timer_window.py` | **WTP-M6.7** — each asks before completing. The timer asks once, before its note dialog and before it destroys the Next Action window, so declining costs the user neither a typed note nor a window |
 | `src/getmoredone/screens/item_editor_dialogs.py` | **WTP-M4.5/M4.6** — `PARENT ITEM` / `CHILD ITEMS` |
 | `src/getmoredone/vps_manager.py` | **WTP-M5.3/M5.4** — the cascade; **WTP-M6.4/M6.5** — one progress helper |
 | `src/getmoredone/screens/weekly_items.py` | **WTP-M5.2** — the confirmation; **WTP-M6.4** — the count on the row |
