@@ -909,15 +909,25 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
 
         Weekly Tactics themselves are still roots (WTP-M1.7).
 
-        **The existence test is load-bearing** (WTP-D6/P2). The exclusion fires
+        **The existence test is defensive** (WTP-D6/P2). The exclusion fires
         only when the ``weekly_tactic_id`` names a row that is still there, so
-        an item whose tactic was deleted keeps appearing here instead of
-        vanishing from the only tree view. That state is not hypothetical: a
-        tactic delete orphaned its ``weekly_tactic_id`` items until WTP-M5, and
-        both live databases hold the result. Such an item is a child of nothing
-        — ``get_children`` on a missing id returns nothing — so it shows once,
-        at the top level, which is where an item with a broken link should be
-        found.
+        an item whose link does not resolve keeps appearing here instead of
+        vanishing from the only tree view. Such an item is a child of nothing —
+        ``get_children`` on an id that is not a week row returns nothing — so
+        it shows once, at the top level, which is where a row with a broken
+        link should be found.
+
+        How reachable that is: ``weekly_tactic_id`` is
+        ``REFERENCES action_items(id) ON DELETE SET NULL`` and ``database.py``
+        sets ``PRAGMA foreign_keys = ON``, so deleting a tactic through the app
+        nulls this column rather than leaving a value pointing at nothing. The
+        pragma is per connection, so the state is reachable from a client that
+        does not set it, and not otherwise. Counted on 2026-11-08, the main
+        database holds 49 items linked by ``weekly_tactic_id`` and none whose
+        link fails to resolve. The guard is kept because the cost is one
+        ``NOT EXISTS`` and the alternative hides a row;
+        ``test_wtpm32_dangling_link_stays_a_root`` seeds the state with the
+        pragma off, because with it on there is nothing to test.
 
         ``COALESCE(parent_id, '') = ''`` rather than ``IS NULL``, so a blank
         string counts as no parent — the same test ``parent_of`` applies.

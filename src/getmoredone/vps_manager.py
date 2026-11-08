@@ -23,7 +23,7 @@ from .date_utils import QUARTER_OF_MONTH, months_of_quarter, quarter_of_month
 from .weekly_tactic_logging import get_weekly_tactic_logger
 from . import weekly_tactic_titles
 from .weekly_tactic import LINK_PREDICATE_SQL
-from .models import ActionItem
+from .models import ActionItem, Status
 from .paths import app_data_dir_path
 from .vps_manager_planning import VPSPlanningMixin
 from .vps_manager_taxonomy import VPSTaxonomyMixin, VisionElementHasDependentsError
@@ -1264,8 +1264,80 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
         )
         return [dict(row) for row in cursor.fetchall()]
 
+    def count_open_children_for_weekly_tactic(self, tactic_id: str) -> tuple:
+        """WTP-M6 — ``(done, total)`` for one Weekly Tactic's children.
+
+        Purpose: one home for the progress a tactic row shows, so two panels
+                 cannot render two different numbers for the same week.
+        Spec:    docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m6
+        Tests:   tests/test_weekly_tactic_parent.py::test_wtpm64_progress_counts_come_from_one_helper
+
+        Counts what ``get_children`` calls a child — the tree reader, not the
+        wider panel reader (WTP-D4) — so the count beside a tactic agrees with
+        the ``(N sub)`` count on the Hierarchical screen.
+        """
+        children = self.db_manager.get_children(tactic_id)
+        done = sum(1 for child in children if child.status == Status.COMPLETED)
+        return done, len(children)
+
+    def children_to_delete_with_weekly_tactic(self, weekly_item_id: str) -> List[str]:
+        """WTP-M5.3/M5.4 — every row ``delete_weekly_action_item`` will remove.
+
+        Purpose: the confirmation and the delete have to agree about what goes,
+                 so the count the user is shown is read from the same walk that
+                 does the deleting (P6 — a claim checked against the thing it
+                 describes).
+        Spec:    docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m5
+        Tests:   tests/test_weekly_tactic_parent.py::test_wtpm53_cascade_covers_both_link_columns
+                 tests/test_weekly_tactic_parent.py::test_wtpm54_cascade_reaches_grandchildren
+
+        Excludes the tactic itself. Returns the ids in breadth-first order,
+        from ``get_subtree``, so a week-filed item's own subtasks are included
+        — the cascade used to delete one level by ``parent_id`` and leave
+        anything below it behind.
+        """
+        if not self.db_manager.is_weekly_tactic(weekly_item_id):
+            return []
+        return [item.id for item in self.db_manager.get_subtree(weekly_item_id)]
+
     def delete_weekly_action_item(self, weekly_item_id: str) -> bool:
-        """Delete an APE weekly Action Item and its child actions."""
+        """Delete an APE weekly Action Item and its child actions.
+
+        WTP-M5.3 — "its child actions" now means what ``get_children`` means:
+        the items linked by ``weekly_tactic_id`` as well as the ``parent_id``
+        ones. Before this it deleted only the ``parent_id`` children, so a
+        week-filed item was left in place with its ``weekly_tactic_id`` nulled
+        by the column's ``ON DELETE SET NULL`` — surviving the delete as an
+        unparented root item rather than going with the week it belonged to.
+        Nothing pointed at a deleted row; the link was simply gone, and with it
+        any record of which week the item had been filed under.
+
+        Spec:  docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m5
+        Tests: tests/test_weekly_tactic_parent.py::test_wtpm53_cascade_covers_both_link_columns
+
+        Widening a delete is the one destructive change in this batch, which
+        is why the caller's confirmation names the count
+        (``children_to_delete_with_weekly_tactic``) instead of saying "and
+        related action items".
+        """
+        # WTP-M5.5 — nothing happens for an id that is not a Weekly Tactic.
+        # The statement below used to run first, so passing an ordinary item's
+        # id deleted that item's subtasks and then returned False, reporting
+        # that nothing had been deleted. Latent, because the only caller passes
+        # a row from the weekly list; guarded because this method's delete is
+        # wider than it was.
+        if not self.db_manager.is_weekly_tactic(weekly_item_id):
+            return False
+
+        doomed = self.children_to_delete_with_weekly_tactic(weekly_item_id)
+        for item_id in doomed:
+            self.db.conn.execute(
+                "DELETE FROM action_items WHERE id = ?",
+                (item_id,),
+            )
+        # Kept for the rows no walk above reaches: a `parent_id` child of an id
+        # that is not a week row deletes nothing here, and this statement is
+        # what made the old behaviour true for the AWA-A1 shape.
         self.db.conn.execute(
             "DELETE FROM action_items WHERE parent_id = ?",
             (weekly_item_id,),

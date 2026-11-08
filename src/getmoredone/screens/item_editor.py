@@ -13,6 +13,7 @@ from typing import Optional, TYPE_CHECKING, Dict, Any, Tuple, List
 from ..utils.after_tracker import TrackedAfterMixin
 from ..models import ActionItem, PriorityFactors, ItemLink, Status, SchedulingOptions
 from .week_collision_notice import notify_weekly_tactic_changes
+from ..weekly_tactic import parent_of
 from .. import week_calendar
 from .. import weekly_tactic_titles
 from ..validation import Validator
@@ -302,13 +303,50 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
         self.refresh_project_display()
 
         # Parent Info (if applicable)
-        if self.item and self.item.parent_id:
-            parent_item = self.db_manager.get_action_item(self.item.parent_id)
-            if parent_item:
-                p_info = ctk.CTkLabel(left_col, text=f"Parent: {parent_item.title}", 
-                                     font=ctk.CTkFont(size=11), text_color=semantic_colors()["muted_text"])
-                p_info.grid(row=row_l, column=0, columnspan=2, sticky="w", padx=10)
-                row_l += 1
+        #
+        # WTP-M4.1/M4.2 — the parent is whatever ``parent_of`` says it is, so a
+        # week-filed item names its Weekly Tactic here, and an item that is
+        # both a subtask and week-filed names the nearer of the two (WTP-D3).
+        # Reading ``parent_id`` directly is what left a week-filed item with no
+        # parent line at all.
+        # Spec:  docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m4
+        # Tests: tests/test_weekly_tactic_parent.py::test_wtpm41_editor_shows_tactic_as_parent
+        #        tests/test_weekly_tactic_parent.py::test_wtpm43_view_parent_button_opens_the_parent
+        #
+        # ``parent_of`` names the link as recorded; the row may be gone, which
+        # the existing ``if parent_item`` already covered and still does — a
+        # tactic deleted out from under an item leaves no parent line rather
+        # than a line naming nothing.
+        parent_id = parent_of(self.item) if self.item else None
+        parent_item = (
+            self.db_manager.get_action_item(parent_id) if parent_id else None
+        )
+        if parent_item:
+            parent_row = ctk.CTkFrame(left_col, fg_color="transparent")
+            parent_row.grid(row=row_l, column=0, columnspan=2, sticky="w",
+                            padx=10)
+            ctk.CTkLabel(
+                parent_row,
+                text=f"Parent: {parent_item.title}",
+                font=ctk.CTkFont(size=11),
+                text_color=semantic_colors()["muted_text"],
+            ).pack(side="left")
+            # WTP-M4.3 — ``view_parent_item`` has existed since the hierarchy
+            # work and was bound to nothing. Binding it gives the
+            # ``parent_id`` case a button it never had as well, which the spec
+            # records in §7 as deliberate: the alternative is a tactic parent
+            # line with a button and a subtask parent line without one.
+            self.view_parent_button = ctk.CTkButton(
+                parent_row,
+                text="View Parent",
+                width=90,
+                height=22,
+                font=ctk.CTkFont(size=11),
+                **button_style("secondary"),
+                command=lambda pid=parent_item.id: self.view_parent_item(pid),
+            )
+            self.view_parent_button.pack(side="left", padx=(8, 0))
+            row_l += 1
 
         # Description
         ctk.CTkLabel(left_col, text="Description:").grid(row=row_l, column=0, sticky="nw", padx=10, pady=(5, 0))
@@ -1476,9 +1514,51 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
         except (tk.TclError, AttributeError):
             pass  # widgets may be gone if the window is closing
 
+    def _confirm_tactic_completion(self) -> bool:
+        """WTP-M6.1 — ask before completing a Weekly Tactic with open children.
+
+        Purpose: a tactic now has children, so completing one is a claim about
+                 a week's work. It asks rather than refuses, because a week
+                 does end with items still open and the user is the one who
+                 decides what that means.
+        Spec:    docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m6
+        Tests:   tests/test_weekly_tactic_parent.py::test_wtpm61_completing_a_tactic_with_open_children_asks
+                 tests/test_weekly_tactic_parent.py::test_wtpm63_no_prompt_when_nothing_is_open
+
+        Returns True when there is nothing to ask about, so the ordinary path
+        is unchanged for every item that is not a tactic (WTP-D8). Completion
+        does not cascade either way.
+
+        ``messagebox.askyesno`` with ``parent=self``, the same shape the
+        Change Project confirmation uses, so the two read alike.
+        """
+        if not self._is_weekly_tactic_record():
+            return True
+        open_children = [
+            child for child in self.db_manager.get_children(self.item_id)
+            if child.status != Status.COMPLETED
+        ]
+        if not open_children:
+            return True
+
+        import tkinter.messagebox as messagebox
+        count = len(open_children)
+        noun = "Action Item" if count == 1 else "Action Items"
+        return messagebox.askyesno(
+            "Complete Weekly Tactic",
+            f"{count} {noun} under this Weekly Tactic "
+            f"{'is' if count == 1 else 'are'} still open.\n\n"
+            "Completing the tactic leaves them open. Complete it anyway?",
+            parent=self,
+        )
+
     def complete_item(self):
         """Mark item as complete."""
         if self.item_id:
+            # WTP-M6.1 — a declined confirmation completes nothing and says
+            # nothing.
+            if not self._confirm_tactic_completion():
+                return
             self.db_manager.complete_action_item(self.item_id)
             # Completion is what triggers a year rollover — finishing in
             # January something planned for last December.

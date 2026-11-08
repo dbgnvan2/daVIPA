@@ -19,6 +19,7 @@ from ..paths import app_data_dir_path
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .title_format import split_action_item_title
+from ..weekly_tactic import parent_of
 from .item_editor_confirm_dialogs import DeleteChildrenWarningDialog, DeleteConfirmDialog
 from .item_editor_note_dialogs import CreateNoteDialog, LinkNoteDialog
 from .item_editor_weekly_tactic_dialog import SetWeeklyTacticDialog
@@ -106,9 +107,15 @@ class ShowRelatedDialog(ctk.CTkToplevel):
         current_item = self.db_manager.get_action_item(self.current_item_id)
 
         # Show parent section if exists
-        if current_item and current_item.parent_id:
-            parent_item = self.db_manager.get_action_item(
-                current_item.parent_id)
+        #
+        # WTP-M4.5 — from ``parent_of``, so a week-filed item's PARENT ITEM is
+        # its Weekly Tactic. CHILD ITEMS below needs no change: it reads
+        # ``get_children``, which answers for a tactic as of WTP-M2.
+        # Spec:  docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m4
+        # Tests: tests/test_weekly_tactic_parent.py::test_wtpm45_hierarchy_dialog_shows_the_tactic_as_parent
+        parent_link = parent_of(current_item) if current_item else None
+        if parent_link:
+            parent_item = self.db_manager.get_action_item(parent_link)
             if parent_item:
                 # Parent section header
                 parent_header = ctk.CTkFrame(
@@ -163,8 +170,14 @@ class ShowRelatedDialog(ctk.CTkToplevel):
                 self.create_item_row(child, current_row)
                 current_row += 1
         else:
-            # Only show "no children" message if there's also no parent
-            if not (current_item and current_item.parent_id):
+            # Only show "no children" message if there's also no parent.
+            #
+            # WTP-M4.5 — ``parent_link``, not ``current_item.parent_id``. This
+            # is the second reader of parenthood in this method, and while it
+            # read the column a week-filed item with no children rendered
+            # "No related items found" immediately below the PARENT ITEM
+            # section that had just been drawn for it.
+            if not parent_link:
                 ctk.CTkLabel(
                     self.scroll_frame,
                     text="No related items found",
