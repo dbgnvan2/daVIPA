@@ -747,3 +747,58 @@ def test_plcm4_a_completed_row_in_all_items_still_uses_the_status_check():
     )
     assert fill.source == SOURCE_COMPLETED
     assert fill.fill == PALETTE["success_tint"]
+
+
+def test_plcm3_the_section_builds_on_real_widgets():
+    """PLC-M3 — the section constructs, and its handlers run on real widgets.
+
+    Every other test of this section calls the mixin against stand-ins, so none
+    of them would catch a bad ``grid`` call, an option CustomTkinter rejects, or
+    a ``fg_color`` Tk will not take — faults that only appear when the user
+    opens Settings. This builds it for real.
+
+    In a subprocess with a hard timeout, for the reason
+    ``tests/render_list_screen.py`` gives: CustomTkinter does not tolerate
+    several CTk roots in one interpreter, and a hanging test is worse than no
+    test. The helper withdraws its root, so no window is mapped and the
+    ``mapped_windows`` count is untouched.
+    """
+    import pathlib
+    import subprocess
+    import sys
+
+    root = pathlib.Path(__file__).resolve().parents[1]
+    helper = root / "tests" / "build_priority_colors_section.py"
+    result = subprocess.run(
+        [sys.executable, str(helper)],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        cwd=str(root),
+    )
+    if result.returncode != 0 and "TclError" in result.stderr:
+        pytest.skip("Tk display unavailable")
+    assert result.returncode == 0, (
+        f"the section failed to build:\n{result.stdout}\n{result.stderr}"
+    )
+
+    printed = dict(
+        line.split("=", 1) for line in result.stdout.splitlines() if "=" in line
+    )
+    assert printed.get("BUILT") == "ok", result.stdout
+    assert printed.get("ENTRIES") == str(len(LEVEL_KEYS)), result.stdout
+    assert printed.get("SWATCHES") == str(len(LEVEL_KEYS)), result.stdout
+
+    defaults = priority_level_fill_colors()
+    for level in LEVEL_KEYS:
+        assert printed[f"LABELLED:{level}"] == "True", (
+            f"{LEVEL_LABELS[level]} has no label in the built section"
+        )
+        assert printed[f"VALUE:{level}"] == defaults[level], result.stdout
+        # A level set to no fill cannot paint its swatch "" — Tk rejects it.
+        expected = defaults[level] or "transparent"
+        assert printed[f"SWATCH:{level}"] == expected, result.stdout
+
+    assert printed["RESTORED"] == defaults[LEVEL_KEYS[0]]
+    assert "chartreuse" in printed["REFUSAL"]
+    assert LEVEL_LABELS[LEVEL_KEYS[0]] in printed["REFUSAL"]

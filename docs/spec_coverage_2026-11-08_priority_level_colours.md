@@ -25,6 +25,7 @@ mapped-window count held by `tests/test_ci_contract.py` is unchanged.
 | PLC-M3.3 | A refused write is not reported as saved and is not published | `src/getmoredone/screens/settings_priority_colors.py::save_priority_level_colors` | `::test_plcm33_a_refused_write_is_not_reported_as_saved` | done |
 | PLC-M3.4 | Values normalised; a bad one refused by level name with nothing written | `src/getmoredone/screens/settings_priority_colors.py::save_priority_level_colors` | `::test_plcm34_entry_values_are_normalised_and_bad_ones_refused` | done |
 | PLC-M3.5 | Restore Defaults refills the fields and does not save | `src/getmoredone/screens/settings_priority_colors.py::restore_priority_level_colors` | `::test_plcm35_restore_defaults_writes_the_theme_table` | done |
+| PLC-M3.0 | The section constructs for real, and Restore/refusal run on real widgets | `src/getmoredone/screens/settings_priority_colors.py::create_priority_colors_section` | `::test_plcm3_the_section_builds_on_real_widgets` (subprocess, withdrawn root) — **mutation-proved** | done |
 | PLC-M3.6 | The tab is reachable, by that name | `src/getmoredone/screens/settings.py::create_tabs` | `::test_plcm36_create_tabs_adds_the_priority_colours_tab` (AST) | done |
 | PLC-M4.1 | A row takes its level's colour, from settings rather than a constant | `src/getmoredone/priority_levels.py::row_fill` | `::test_plcm41_a_row_takes_its_level_colour` — **mutation-proved** | done |
 | PLC-M4.2 | Segment and completed still win, in that order | `src/getmoredone/priority_levels.py::row_fill` | `::test_plcm42_segment_and_completed_still_win`, `::test_plcm4_a_completed_row_in_all_items_still_uses_the_status_check` | done |
@@ -50,6 +51,10 @@ both directions, so none of those guards can be a no-op:
 | `local_assignments` | `tests/test_source_asserts.py::test_local_assignments_counts_each_write_and_ignores_prose`, `::test_local_assignments_sees_every_branch`, `::test_local_assignments_says_no_to_a_name_never_assigned` |
 | `count_calls` | `tests/test_source_asserts.py::test_count_calls_counts_calls_not_mentions` |
 | `assigns_attribute_of` | `tests/test_source_asserts.py::test_assigns_attribute_of_rejects_a_different_owner_or_attribute` |
+
+The real-widget build runs through `tests/build_priority_colors_section.py`, a
+helper (not named `test_*`) whose root is withdrawn and never mapped, so it adds
+nothing to the mapped-window count.
 
 ## Not code-testable
 
