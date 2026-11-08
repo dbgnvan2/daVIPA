@@ -538,6 +538,8 @@ def drawn_day_slots(
     With no blocks outside the range this returns exactly ``day_grid(bounds)``,
     so the ordinary day is unchanged and the configured range is the floor:
     the day never draws *narrower* than what the user set, however empty it is.
+    The date is the ceiling: the widening stops at the boxes that lie on the
+    date, so what is drawn is always what ``can_place`` will accept.
     """
     configured = day_grid(bounds)
     first = 0
@@ -553,6 +555,21 @@ def drawn_day_slots(
         last = max(last, start + slot_span_of(block) - 1)
 
     day_start = bounds.day_start_minutes
+    # Every drawn box has to be one ``can_place`` would accept, or the grid
+    # offers the user a box they cannot then use. A stored index is counted
+    # from Day Start, so *reducing* Day Start in Settings reinterprets it: a
+    # block dropped at 07:30 under an 08:00 start is index -1, and a later
+    # start of 00:00 turns that same -1 into 30 minutes before midnight --
+    # no longer a time of day, and no longer on the date. Unclamped, the box
+    # is still drawn, ``format_hhmm`` floors it to "00:00", and the block sits
+    # there showing the wrong time and refusing every move, because
+    # ``slot_is_on_the_date`` rejects the very box it was drawn in. Clamped,
+    # the block misses the grid and ``build_day_grid`` routes it to
+    # ``outside`` (P2) -- on screen, with its stored time, and draggable back
+    # onto the day. The same bound caps the grid's extent, so one unreadable
+    # stored index cannot ask the screen for thousands of rows.
+    first = max(first, -(day_start // SLOT_MINUTES))
+    last = min(last, (MINUTES_PER_DAY - SLOT_MINUTES - day_start) // SLOT_MINUTES)
     slots: List[Slot] = []
     for index in range(first, last + 1):
         at = day_start + index * SLOT_MINUTES
@@ -656,11 +673,23 @@ def can_place(
     ``allow_outside_range`` is for the one gesture that means to make the day
     wider -- the Earlier/Later extension, which has to write a box that is not
     drawn yet. Every other caller leaves it alone, and the default refuses a
-    box outside the day as drawn. That default is load-bearing in two places
-    that have nothing to do with drag and drop: AutoLoad fills the day it was
-    given rather than growing it, and adoption of a pre-grid row whose clock
-    time falls outside the day leaves the row unplaced for the outside group
-    to report (P2) instead of inventing a box past Day End for it.
+    box outside the day as drawn.
+
+    The day *as drawn* is the limit, not the configured range, so this default
+    on its own does not keep a write inside the hours the user configured once
+    anything sits outside them. The two callers that need that stronger limit
+    apply it themselves rather than asking for it here:
+
+    * AutoLoad and the free-box scans walk ``day_grid(bounds)`` and bound the
+      span by it as well (``plan.first_clear_slot``), so a button never fills
+      an hour the user did not claim -- not even the tail of a span.
+    * Adoption gives a pre-grid row with a readable ``start_time`` exactly one
+      candidate, the box that time names, so it may land past Day End when the
+      day is drawn out that far. That keeps the user's own clock time rather
+      than inventing a different one, which is the point of honouring it. A
+      row with no readable time is offered configured boxes only
+      (``db_manager.adopt_legacy_day``), and a row that fits nowhere stays
+      unplaced for the outside group to report (P2).
     """
     span = max(1, int(span))
     slot_index = int(slot_index)
@@ -790,12 +819,16 @@ def build_day_grid(blocks: Iterable[TimeBlock], bounds: DayBounds) -> DayGrid:
     Purpose: the single function the screen draws from, so what is on screen
              and what the arithmetic says are the same object.
     Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m3
-    Tests:   tests/test_time_grid.py::test_tgm31_blocks_outside_the_grid_are_surfaced
+    Tests:   tests/test_time_grid.py::test_a_never_placed_block_is_surfaced_rather_than_assumed_to_be_at_eight
+             tests/test_time_grid.py::test_pdm13_an_index_the_new_day_start_puts_off_the_date_goes_outside
 
-    A block whose slot no longer exists -- because Day End moved earlier, or
-    because its length now spans past the last box -- is **returned in
-    ``outside``, never dropped** (P2). The day it stops being drawn is the day
-    the user loses work with nothing on screen to say so.
+    A block whose slot no longer exists is **returned in ``outside``, never
+    dropped** (P2). The day it stops being drawn is the day the user loses
+    work with nothing on screen to say so. Moving Day End earlier is no longer
+    one of the ways that happens -- ``drawn_day_slots`` widens the day to keep
+    drawing a block past the configured end (PD-M13). What is left are a
+    length that now spans past the last box, a stored index no date can hold
+    (Day Start reduced under a block placed before it), and lunch, below.
 
     A block whose boxes now include lunch goes to ``outside`` for the same
     reason. ``can_place`` refuses lunch, so this is only reachable after the

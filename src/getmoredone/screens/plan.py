@@ -275,7 +275,8 @@ class PlanScreen(ctk.CTkFrame):
         #: PD-M5 — the two always-drawn boxes at the ends of the day, each
         #: paired with which end it is. Kept apart from ``_slot_frames``
         #: because they are not slots: nothing may be placed in them, and a
-        #: drop on one lengthens the day before anything is placed at all.
+        #: drop on one adds a box to the day *as drawn* (PD-M13) rather than
+        #: putting work in a box that already exists.
         self._virtual_frames: List[tuple] = []
         #: The task chips this screen bound handlers to, as
         #: (widget, block_id). Only blocks that *start* in a box are in here:
@@ -1252,8 +1253,9 @@ class PlanScreen(ctk.CTkFrame):
 
         Purely additive. It never moves, resizes or deletes a block that is
         already there, which is what makes it undoable by hand in an app with
-        no undo, and it does not extend the day: lengthening the working day is
-        PD-M5's deliberate gesture, not something a button does quietly.
+        no undo, and it does not put work outside the configured day -- not
+        even by half an hour at the end of a span. Drawing the day wider is
+        PD-M5/PD-M13's deliberate drag, not something a button does quietly.
 
         One transaction, so a refusal part-way leaves none of it rather than
         half a planned day. ``first_free_slot`` re-reads the day inside that
@@ -1504,8 +1506,19 @@ class PlanScreen(ctk.CTkFrame):
         # is wider wherever a block sits outside the configured one, and a
         # button that fills the day must not fill the hours the user did not
         # say they work -- only an explicit drag may put work out there.
-        for slot in day_grid(self.bounds):
+        configured = day_grid(self.bounds)
+        # ``can_place`` bounds the span by the day as *drawn*, which is wider
+        # than the configured day wherever a block already sits outside it, so
+        # the length is bounded here as well. Without this a span could start
+        # on the last configured box and end inside the extension -- the start
+        # is inside the hours the user gave, the finish is not.
+        # ``configured[-1]`` is safe inside the loop: an empty configured day
+        # means the loop body never runs.
+        last = configured[-1].index if configured else 0
+        for slot in configured:
             index = slot.index
+            if index + span - 1 > last:
+                break
             if can_place(blocks, self.bounds, index, span) is not None:
                 continue
             if any(occupancy.get(index + step) for step in range(span)):
@@ -1524,8 +1537,13 @@ class PlanScreen(ctk.CTkFrame):
 
         blocks = self.db_manager.get_time_blocks(self.selected_date)
         span = slots_for_minutes(minutes)
-        # The configured range, for the reason given in ``_first_free_slot_for``.
-        for slot in day_grid(self.bounds):
+        # The configured range, and the span bounded by it too, both for the
+        # reasons given in ``first_clear_slot``.
+        configured = day_grid(self.bounds)
+        last = configured[-1].index if configured else 0
+        for slot in configured:
+            if slot.index + span - 1 > last:
+                break
             if not can_place(blocks, self.bounds, slot.index, span):
                 return slot.index
         return None
@@ -1935,13 +1953,13 @@ class PlanScreen(ctk.CTkFrame):
             if target is not None:
                 self._after_release(lambda: self.move_block_to_slot(block.id, target))
             elif edge is not None:
-                # PD-M5.7 — the day grows to make room for work that is not
-                # planned yet, not to rehouse work that already has a box. A
-                # block dropped here would be asking the day to lengthen for
-                # something it is already long enough to hold.
+                # PD-M5.7 — the day is drawn wider to make room for work
+                # that is not planned yet, not to rehouse work that already
+                # has a box. A block dropped here would be asking for a new
+                # half hour to hold something the day already holds.
                 self.set_status(
                     "A block cannot make a new half hour — move it onto a box, "
-                    "or drag an item here to lengthen the day",
+                    "or drag an item here to add one",
                     "warning",
                 )
             elif self.pointer_over_day():
@@ -2234,7 +2252,7 @@ class PlanScreen(ctk.CTkFrame):
 
         Purpose: PD-M5 -- the two boxes that are not slots.
         Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
-        Tests:   tests/test_plan_screen.py::test_pdm52_a_drop_above_moves_day_start_back
+        Tests:   tests/test_plan_screen.py::test_pdm131_an_earlier_drop_leaves_day_start_alone
 
         Read the same way as ``slot_under_pointer`` and only after it has
         answered ``None``: a real box always wins, so the two boxes can sit
@@ -2340,6 +2358,12 @@ class PlanScreen(ctk.CTkFrame):
             # nothing to put back, so the day cannot be left disagreeing with
             # the file about where it starts.
             logger.exception("Day extension failed")
+            # Redraw before reporting. Every refusal this path can currently
+            # reach is checked before the write, so the screen is already
+            # right -- but a future failure *after* the commit would otherwise
+            # leave the day on screen disagreeing with the database, and the
+            # error message would be the only sign of it.
+            self.refresh()
             said = str(problem) or type(problem).__name__
             self.set_status(f"The day was not extended — {said}", "error")
             return
