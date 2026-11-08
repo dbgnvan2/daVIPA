@@ -2392,3 +2392,21 @@ two docstrings and a live-timer leak. These three were recorded because the
 budget does not fix below-medium findings in-loop: a cosmetic fix buys none of
 the safety it costs, and this batch has already had one high-severity defect
 introduced by a fix pass.
+
+### Grid tests compare against `day_grid` rather than a literal box list
+
+**Description:** `test_pdm13_the_grid_never_draws_a_box_the_date_cannot_hold`
+and `test_pdm13_one_unreadable_index_cannot_ask_for_an_unbounded_grid` assert
+that the drawn day equals `day_grid(bounds)`. Both the code under test and the
+expectation therefore run through `day_grid`, so a defect inside `day_grid`
+itself would be invisible to them. Raised by a cold pass whose only lens was
+test quality.
+**Priority:** Low — recorded rather than changed.
+**Effort:** Small, and probably not worth it.
+**Notes:** Accepted as-is for two reasons. `day_grid` is pinned independently by
+`test_tgm11_grid_covers_the_day_in_half_hours`, so it is not an unchecked
+dependency. And a literal box list would have to be rewritten by hand each time
+the fixture day changes, which is how an exact-count assertion decays into the
+`> N` floor the repo rules forbid. The property under test is "the drawn day is
+the configured day", and `day_grid` *is* the configured day — restating it as
+numbers would weaken the statement, not strengthen it.

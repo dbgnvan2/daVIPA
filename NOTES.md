@@ -8,6 +8,12 @@
   two of its tests still expected the settings write PD-M13 removed. A cold
   pass found them. The file set to run is the one that *references* the changed
   names (`grep -rln` over `tests/`), not the one the diff touches.
+- ✅ **A clamp on the result is not the same as a filter on the input.** The
+  first fix for the box-off-the-date defect clamped `drawn_day_slots`'s final
+  extent, which kept every box on the date and still drew one empty box past
+  the configured Day End — the widening had already been computed from the
+  block being clamped out. Skipping the block before it widens anything is the
+  fix; a fourth cold pass, on test quality, is what surfaced it.
 - ✅ **The grid can no longer draw a box that `can_place` will refuse.**
   `drawn_day_slots` clamps its widening to the boxes on the date, so a stored
   index that a later Day Start change puts off the date goes to the outside

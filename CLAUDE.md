@@ -14,8 +14,8 @@ python run.py
 
 # Tests
 pytest                                          # All tests
-pytest -m "not meta"                            # App behaviour only (1997 tests)
-pytest -m meta                                  # Repo/infra assertions only (212 tests)
+pytest -m "not meta"                            # App behaviour only (2000 tests)
+pytest -m meta                                  # Repo/infra assertions only (213 tests)
 pytest -v                                       # Verbose
 pytest tests/test_vps_integration.py -v        # Single file
 pytest --cov=src/getmoredone                   # With coverage

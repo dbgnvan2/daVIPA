@@ -109,10 +109,14 @@ Docs:
   changed names rather than by which files the diff edited, which is how the
   two red tests in `test_plan_settings.py` were found.
 - Result: **PASS** — see the line below for the count.
-- Command: 16 single-mutation runs before the cold passes, 6 after (each
-  applied to one named production line, one test run, file restored and
-  verified byte-identical by sha256)
-- Result: **PASS** — 22 of 22 mutants killed, 0 survived.
+- Command: 16 single-mutation runs before the cold passes, 6 after them, and
+  6 again after the fourth pass with the two grid mutants repointed — one now
+  deletes the per-block filter, the other *downgrades* it back to the two
+  blanket clamps, so the suite has to distinguish "on the date" from "no box
+  that holds nothing". Each run applies one mutation to one named production
+  line, runs the test that names it, then restores the file and verifies it
+  byte-identical by sha256.
+- Result: **PASS** — 28 of 28 mutants killed, 0 survived.
 - **Not run:** the full suite. Throttled on this machine by the user's
   standing instruction; CI runs it.
 - **Not run:** the app itself. The user's standing instruction is that I do not
@@ -186,14 +190,72 @@ named "Day End moved earlier" as a way into `outside`, which this change
 inverted. The status line "drag an item here to lengthen the day" and
 `USER_GUIDE.md`'s "Lengthening the day does not count as confirming the day's
 hours" both describe a gesture that no longer lengthens anything. `CLAUDE.md`'s
-test count said 1691 where collection reports 1997 — drift that predates this
-batch.
+test count said 1691, where collection reports **2000** behaviour tests and 213
+meta ones — drift that predates this batch. The figure was first corrected to
+1997/212, which did not match a re-collection at the final commit: 2000 and 213.
+The only count change this batch's last round made is one new parametrize id, so
+1997 was a mis-measurement rather than a change. Both numbers are prose; no test
+parses them, which is how they drifted by three hundred in the first place.
 
 **Withdrawn.** A `BACKLOG.md` entry about `shift_all_slots` accepting a negative
 `by` outlived the function; and the "adjacent issue" this note first recorded
 (that Day Settings accepts a Day End which does not divide into half hours) is
 not a gap: `day_grid`'s loop is `while at + SLOT_MINUTES <= end` and its
 docstring states that a partial last box is deliberately not produced.
+
+## The fourth cold pass (test quality), and what it changed
+
+A fourth cold pass ran over the fix commits with test quality as its only lens
+— a different failure family, as the budget requires of a further pass. It
+reported one medium and six low findings, plus one item it correctly refused to
+rule on as outside its lens.
+
+**Fixed — production, from the item the pass handed on.** It observed that the
+new grid test drew a box one past the configured Day End for a block the clamps
+had removed, and said that whether that empty box is intended is a
+production-correctness question another pass owns. It is not intended, and it
+was reproduced directly: Day Start 20:00, Day End 23:30, a block at stored
+index 40 — the clamps held the extent on the date but still widened the day to
+box 7, which holds nothing, because the widening was computed from the
+unclamped block and only the *result* was clamped. The two blanket clamps are
+replaced by a per-block filter: a block the date cannot hold is skipped before
+it widens anything, so it widens nothing, `build_day_grid` routes it to
+`outside` exactly as before, and the drawn day equals the configured day box
+for box. The grid test now asserts that equality, which is strictly stronger
+than the "every drawn box is on the date" property it asserted before.
+
+**Fixed — medium. `assert len(grid.slots) <= 48` was a ceiling where an exact
+value exists.** The repo rule is to assert exact counts and never a `> N`
+floor; this was the same defect with the inequality flipped, and it would have
+passed for any wrong-but-small extent. With the filter in place the right
+answer is the configured day itself, so the test now compares the grid's boxes
+to `day_grid(BOUNDS)` index for index.
+
+**Fixed — three findings that were about a test not testing its own claim**,
+which the repo's test rules treat as more than cosmetic:
+`test_pdm13_a_failed_extension_redraws_before_it_reports` recorded only *that*
+the redraw happened, never that it came first, so the order in its name was
+unasserted — it now traces both calls into one list and asserts the index.
+`test_pdm13_the_free_box_scan_bounds_the_span_too` passed `outside_range=True`
+on a write the helper checked against its own 08:00–17:00 default, where the
+box was well inside the day and the flag did nothing — it now passes the short
+day the screen is actually on. And the reworded PD-M5.7 refusal had no
+coverage for its second clause, which this batch changed; that assertion is
+part of this batch's own change, so it was completed rather than deferred.
+
+**Two low findings came along inside a rewrite that was required anyway.** The
+grid test had to be rewritten for the production change above, so while it was
+being rewritten the assertion that was strictly implied by the one three lines
+above it was dropped (replaced by a check on the clock labels, which pins the
+symptom the user saw and exercises `format_hhmm` rather than the widening), and
+the two cases were parametrized so that each end of the range is reported
+independently instead of the first failure hiding the second.
+
+**Recorded, not fixed.** One finding was a judgement call about comparing
+`drawn_day_slots` output against `day_grid` output rather than against a
+literal: see `BACKLOG.md`. It is accepted as-is, because `day_grid` is pinned
+independently by `test_tgm11_grid_covers_the_day_in_half_hours`, and a literal
+box list would have to be rewritten by hand every time the fixture day changes.
 
 ## Risks / Known gaps
 

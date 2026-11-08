@@ -14,7 +14,8 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   in one of the half hours before the old start, that block could be drawn at
   00:00 and then refuse to be moved or resized, with deleting it the only way
   out. Such a block is now listed under "outside the day" with the time its own
-  row holds, and you can drag it back onto the day.
+  row holds, and you can drag it back onto the day, and the day column is not
+  drawn any wider for it.
 - **AutoLoad no longer finishes a task past *Day End*.** On a day drawn wider
   than its settings, a task needing two half hours could start on the last box
   of your configured day and run half an hour past it. It now takes only boxes
