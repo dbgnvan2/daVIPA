@@ -22,6 +22,10 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Internal
 
+- Dragging a row from a two-panel tab's left list onto its right list was
+  written out identically in four screen files and is now one module,
+  `screens/row_drag.py`. What a dropped row means stays with the screen that
+  means it. No change to what a drag does.
 - The divider's behaviour - the ratio, the clamp, the drag - was written out
   identically in four screen files and is now one module,
   `screens/split_panel.py`, which is the only place the numbers live. A fifth,

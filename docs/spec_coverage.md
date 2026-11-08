@@ -727,6 +727,26 @@ in the spec's §10: the four copies held only the left panel at the minimum, so
 a narrow body gave the right panel a negative grid minsize, which Tk accepts
 without complaint. `apply()` holds both sides now.
 
+## UPD-M2 — one row-drag, not four
+
+| Spec ID | Description | Implementation | Test | Status |
+|---|---|---|---|---|
+| M2.1 | The press is bound on every widget the row is given; the release on the toplevel | `src/getmoredone/screens/row_drag.py::RowDragSource.bind_row`, `::start` | `::test_updm21_every_widget_in_the_row_is_a_drag_handle` | done — the criterion's original wording ("press/motion/release on every widget") is corrected in the spec's §1.2 and §3: there is no motion handler on any of the four copies and no drag ghost to need one |
+| M2.2 | A release inside the target calls the screen's handler once, with the row | `RowDragSource.finish`, `ape_assignment.py::_assign_dragged_row` | `::test_updm22_drop_inside_the_target_assigns_once`, `::test_updm22_the_quarter_screen_routes_its_drop_through_the_module` | done |
+| M2.3 | A release outside the target calls nothing | `RowDragSource.finish`, `row_drag.is_descendant` | `::test_updm23_drop_outside_the_target_does_nothing` | done |
+| M2.4 | A release with no drag in progress does nothing (P7) | `RowDragSource.finish` guard | `::test_updm24_release_without_a_press_does_nothing`, `::test_updm24_is_descendant_walks_up_and_stops` | done |
+| M2.5 | No screen keeps its own `_start_row_drag` or `_is_descendant` — exact count from the AST | `src/getmoredone/screens/ape_assignment.py` (adopted) | `::test_updm25_no_screen_keeps_its_own_drag` | **partial** — the guard is exact, the count is not yet 0: UPD-M2 adopts `ape_assignment.py` only, per the spec's §4 step 3. The three holdouts adopt at UPD-M4. |
+
+No behaviour change in this extraction, unlike UPD-M1's. Two mutations came
+back green and both were findings about the tests, not the code — a false
+docstring claim about the lambda's default argument, and a missing
+`refresh_lists()` assertion in APC-M6.2 that predates this step (P5). The
+spec's §10 has both.
+
+One test moved rather than deleted, case (b):
+`tests/test_ape_period_consistency.py::test_apcm62_quarter_drag_path_reaches_the_same_reporting`
+drove `_finish_row_drag`; it drives `_assign_dragged_row` now.
+
 ## UPD-M3 — one chip table
 
 | Spec ID | Description | Implementation | Test | Status |
@@ -743,7 +763,7 @@ without complaint. `apply()` holds both sides now.
 the step that changes it. AWA-S5 and AWA-S6 in `BACKLOG.md` are its review
 findings, both to be settled before the first screen adopts.
 
-## UPD-M2, UPD-M4 … UPD-M7
+## UPD-M4 … UPD-M7
 
 `not done` — not started. UPD-M4.1's characterisation tests for APE Quarter
 Assignment exist and are green (`::test_updm41_*`), written before UPD-M1

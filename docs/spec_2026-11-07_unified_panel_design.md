@@ -1,6 +1,6 @@
 # Spec + implementation plan — one panel design across the VSP tabs
 
-Status: **approved 2026-11-07. UPD-M3 and UPD-M1 built; UPD-M2 and
+Status: **approved 2026-11-07. UPD-M3, UPD-M1 and UPD-M2 built;
 UPD-M4 … UPD-M7 outstanding.** Per-criterion status is in §10.
 IDs: `UPD-M1` … `UPD-M7`. Use them verbatim in commits, docstrings and test
 names.
@@ -79,9 +79,20 @@ stand:
 ### 1.2 The drag is written out four times
 
 `_bind_drag_widgets` / `_start_row_drag` / `_finish_row_drag` /
-`_is_descendant`, same four files, same shape: bind press/motion/release on
-the row and its chips, on release ask whether the pointer is inside the right
-panel, and if so call that screen's own assign method.
+`_is_descendant`, same four files, same shape: bind the press on the row and
+its chips, bind the release on the **toplevel**, and on release ask whether
+the pointer is inside the right panel — calling that screen's own assign
+method if it is. `_bind_drag_widgets`, `_start_row_drag` and `_is_descendant`
+are byte-identical across all four, measured; `_finish_row_drag` differs only
+in the body of its final `if`.
+
+**One correction to what this section claimed when it was drafted.** It said
+"press/motion/release on the row and its chips". Only the press is on the row.
+The release is on the toplevel, because the pointer has left the row by the
+time it is let go and the drop target is a different widget entirely. And
+there is **no motion handler anywhere** — nothing is drawn while the row is
+being dragged, on any of the four. UPD-M2.1's wording inherited the error and
+is corrected with it in §3.
 
 ### 1.3 The chip table is written out five times
 
@@ -218,7 +229,7 @@ Every criterion below is checkable by an automated test except the two marked
 
 | ID | Criterion | Test |
 |---|---|---|
-| M2.1 | `screens/row_drag.py` binds press/motion/release on every widget it is given | `test_updm21_every_widget_in_the_row_is_a_drag_handle` |
+| M2.1 | `screens/row_drag.py` binds the press on every widget it is given, and the release on the toplevel. **Corrected from "press/motion/release on every widget"**, which none of the four copies did and nothing needs: there is no motion handler and no drag ghost — see §1.2 | `test_updm21_every_widget_in_the_row_is_a_drag_handle` |
 | M2.2 | A release inside the target calls the screen's handler once, with the row | `test_updm22_drop_inside_the_target_assigns_once` |
 | M2.3 | A release outside the target calls nothing | `test_updm23_drop_outside_the_target_does_nothing` |
 | M2.4 | A release with no drag in progress does nothing (P7: the "looks right but is wrong" input) | `test_updm24_release_without_a_press_does_nothing` |
@@ -454,6 +465,52 @@ M7.3 are the on-screen criteria and are still open. The divider's persistence
 in particular has only been proved against the real screen on a withdrawn
 root.
 
+### UPD-M2 — one row-drag, not four — **done**, with one criterion partial
+
+| ID | Status | Evidence |
+|---|---|---|
+| M2.1 | done | `src/getmoredone/screens/row_drag.py::RowDragSource.bind_row`; `::test_updm21_every_widget_in_the_row_is_a_drag_handle`. The criterion's wording is corrected in §3 and §1.2: the press is per widget, the release is the toplevel's, and there is no motion handler. |
+| M2.2 | done | `RowDragSource.finish`; `::test_updm22_drop_inside_the_target_assigns_once` (one call, one row, and a second release with no press adding nothing), plus `::test_updm22_the_quarter_screen_routes_its_drop_through_the_module` for the real screen's wiring |
+| M2.3 | done | `::test_updm23_drop_outside_the_target_does_nothing` — over another widget, and over nothing at all, which is the `None` `winfo_containing` returns past the window edge |
+| M2.4 | done | `::test_updm24_release_without_a_press_does_nothing`, asserted with the pointer *inside* the target so the drop test cannot be what saves it, plus `::test_updm24_is_descendant_walks_up_and_stops` |
+| M2.5 | **partial** | `::test_updm25_no_screen_keeps_its_own_drag`. Same shape as M1.5: the guard is exact, the count is not 0, because UPD-M2 adopts `ape_assignment.py` alone per §4 step 3. The three holdouts adopt at UPD-M4. |
+
+**No behaviour change.** Unlike UPD-M1 this extraction carries none: the three
+identical methods moved as they were, and `finish` keeps the original order —
+guard, read the pointer, clear the row, test the drop.
+
+**One test moved rather than deleted**, case (b): the behaviour did not
+change, the method it lives in did.
+`tests/test_ape_period_consistency.py::test_apcm62_quarter_drag_path_reaches_the_same_reporting`
+drove `_finish_row_drag` through a stub carrying six members that existed only
+to fake the drag machinery. It drives `_assign_dragged_row` now, and UPD-M2.2
+owns the claim that a release inside the panel reaches that method once.
+
+**Two mutations came back green, and both were findings about the tests.**
+
+- `test_updm21`'s docstring claimed the lambda's `r=row` default guards
+  against the late-binding trap. It does not: `bind_row` loops over the
+  *widgets*, and `row` is the call's own parameter, so each call already
+  closes over its own row. Removing the default left the test green. The
+  docstring now says so and names the two mutations that do turn it red, and
+  the module says the default is kept for intent rather than effect.
+- Dropping `refresh_lists()` from `_assign_dragged_row` left every assertion
+  in APC-M6.2 green. A refused assignment must still redraw — the weekly
+  screen's test says exactly that in words ("used to refresh only when
+  something was created") and this screen's sibling had no assertion for it
+  (P5). The gap predates UPD-M2; it is closed now.
+
+**Mutation gate:** 9, each the verbatim original, each run alone, every file
+restored and sha256-compared. 9 red, after the two greens above were resolved
+— one by correcting a false docstring claim, one by adding the missing
+assertion.
+
+**Not verified on screen.** The drop test cannot be driven with real widgets
+at all: `winfo_pointerxy` reads the real mouse, so where the pointer happens
+to be when the suite runs is not an input a test may depend on. M2.1 - M2.4
+are proved against doubles, M2.2 has one real-screen wiring test, and whether
+a drag actually assigns on screen is still UPD-M7.2/M7.3.
+
 ### UPD-M3 — one chip table — **built, adopted by nothing**
 
 `chip_table.py` exists with all seven criteria tested
@@ -464,4 +521,4 @@ text is clamped to the column width, not to the pill) and **AWA-S6** (five
 lifecycle assumptions its API does not enforce). Both are named there as things
 to settle before UPD-M4 moves the first screen onto the table.
 
-### UPD-M2, UPD-M4 … UPD-M7 — **not started**
+### UPD-M4 … UPD-M7 — **not started**

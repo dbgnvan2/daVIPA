@@ -154,7 +154,7 @@ the screen is still open there:
 ### docs/spec_2026-11-07_unified_panel_design.md
 
 Spec and implementation plan for one panel design across the VSP tabs
-(UPD-M1 - UPD-M7). **Approved 2026-11-07. UPD-M3 and UPD-M1 built; UPD-M2 and
+(UPD-M1 - UPD-M7). **Approved 2026-11-07. UPD-M3, UPD-M1 and UPD-M2 built;
 UPD-M4 - UPD-M7 outstanding** (per-criterion status in the spec's §10):
 
 - The feature matrix: which of the six tabs has panels, a divider, drag and

@@ -1,5 +1,28 @@
 ## Recent Changes (2026-11-07)
 
+### One panel design across the VSP tabs - UPD-M2, the row drag
+
+- ✅ **Dragging a row from the left panel to the right has one owner:
+  `src/getmoredone/screens/row_drag.py`.** `_bind_drag_widgets`,
+  `_start_row_drag` and `_is_descendant` were byte-identical in the same four
+  screens; `_finish_row_drag` differed only in the body of its final `if`,
+  which is what a dropped row *means* and stays on the screen. APE Quarter
+  Assignment has adopted it; the other three adopt at UPD-M4.
+- ⚠️ **The spec said the drag bound "press/motion/release on the row". It
+  binds the press on the row and the release on the toplevel, and there is no
+  motion handler anywhere** - nothing is drawn while a row is dragged, on any
+  of the four. UPD-M2.1's wording inherited that and both are corrected.
+- ✅ **A refused drop still redraws the list - now asserted.** The mutation
+  gate found that removing `refresh_lists()` from the quarter screen's drop
+  left every assertion green. The weekly screen's test says that behaviour out
+  loud; its sibling here had nothing holding it (P5). The gap predates this
+  step.
+- ⚠️ **One docstring claim withdrawn.** A test said the drag lambda's `r=row`
+  default argument guards against the late-binding trap. It does not - the
+  loop is over the widgets and `row` is the call's own parameter - and
+  removing the default left the test green. Said plainly in the test and in
+  the module; the default is kept for intent, not effect.
+
 ### One panel design across the VSP tabs - UPD-M1, the splitter
 
 - ✅ **The vertical divider has one owner:
