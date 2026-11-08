@@ -87,7 +87,12 @@
   back as `#0X1234`. Saved from the new field it reached `settings.json`, and
   from then on every row build in five screens *and* the Settings tab's own
   swatch raised `TclError` — so the tab the user would fix it from could not
-  open. Now `#[0-9A-F]{6}`, in `_normalize_hex` too (P5).
+  open. Now `#[0-9A-F]{6}`, in `_normalize_hex` too. **Five more of these
+  validators remain** elsewhere in the app, one of them reachable to the same
+  end through a VSP segment colour; they are PLC-A10, not fixed here.
+  That Tk really does raise `TclError` on all six shapes is now asserted
+  against a real Tk, in `tests/build_priority_colors_section.py`, rather than
+  taken from its colour grammar.
 - ⚠️ **The one test that built the section for real skipped on its own target
   class.** Any `TclError` became `pytest.skip`, and `TclError` is what a bad
   `grid` call or a colour Tk refuses raises. Four display-specific stderr
@@ -107,7 +112,8 @@
   reload. The user guide and the in-app help now say so, and a test asserts the
   inheritance, since that is the only reason the panel is covered.
   (A first attempt at this put a reload into `WeekActionsScreen.refresh` — the
-  *container*, which has no `settings` and builds no rows — and a test that
+  *container*, which builds no rows of its own and already sets `self.settings`
+  in `__init__`, so the line was redundant rather than useful — and a test that
   passed only because `WeekTacticActionsPanel.refresh` *is*
   `TodayScreen.refresh`. Both were reverted.)
 - ✅ **The reload guard now asserts the result is assigned to

@@ -193,14 +193,57 @@ already documents the class. One shared helper that snapshots the fields a
 handler is about to write and restores them on refusal would retire it; doing
 it per handler in a sweeping diff would not.
 
-### PLC-A10 — `segment_color_utils._normalize_color` does no hex validation (low)
+### PLC-A10 — five more colour validators use `int(x, 16)`, and one is reachable (medium)
 
-`screens/segment_color_utils.py:164` passes its result straight to `fg_color`
-as a row fill in Today, Upcoming and All Items, with no check at all, from the
-`segment_descriptions.color_hex` column. Same `TclError`-inside-a-row-build
-class that `color_contrast._HEX_COLOR_RE` now closes for settings colours, from
-a database column instead. Pre-existing and untouched by that batch, but it is
-the sibling call path (P5).
+The whole of the H1 class, which the PLC batch closed for *settings* colours
+only. `int(x, 16)` accepts a leading sign, a `0x` prefix, PEP-515 underscores,
+surrounding whitespace and non-ASCII decimal digits, so a seven-character
+`#......` string that Tk raises on passes every one of these:
+
+| Where | Function |
+|---|---|
+| `screens/vps_segment_editor.py:177` | `validate_color`, which gates `save_segment` |
+| `vps_manager.py:158` | `_is_valid_hex_color` |
+| `screens/settings.py:716` | the `drag_schedule_date_text_color` check (`len != 7` only) |
+| `screens/drag_schedule_support.py:61` | same `len != 7` |
+| `screens/item_editor_weekly_tactic_dialog.py:387` | same pattern |
+
+And the read path has no check at all: `screens/segment_color_utils.py:164`
+`_normalize_color` passes its result straight to `fg_color` as a row fill in
+Today, Upcoming and All Items, from `segment_descriptions.color_hex`.
+
+Reachable end to end, the same shape as the bug the batch fixed: VSP → segment
+editor → type `# 12345` → `validate_color` returns True → written to
+`segment_descriptions.color_hex` → read back unvalidated → `TclError` inside
+the row build of three list screens.
+
+Not fixed in the PLC batch because closing it properly means changing a save
+gate *and* a read path in the VSP segment subsystem, with its own tests and its
+own already-stored data — a change of its own, not a line in a colour batch
+(standing rule 10). `color_contrast.normalize_hex_color` is the validator to
+route all six call sites through; it returns `None` rather than raising, which
+is what a save gate and a row build both want.
+
+### PLC-A13 — `hover_color` was not taken with the other three checkbox colours (low)
+
+`priority_levels.row_control_kwargs` sets `border_color`, `fg_color` and
+`checkmark_color` from the fill but leaves `hover_color` at the theme's.
+CustomTkinter repaints both the inner square and the border in `hover_color` on
+pointer-enter for a checked box (`ctk_checkbox.py:371-379`) while the checkmark
+keeps `checkmark_color`, so apple_grey's dark hover `#B3B3BC` against a
+`#DCFCE7` checkmark is about 1.3:1 — the tick disappears while the pointer is
+on it. The theme's own pairing was no better before the fill existed, so this
+is not a new class; it is the moment the four stopped being chosen together.
+
+### PLC-A14 — the completion ✓ is drawn in `success_strong`, whatever the fill (low)
+
+`screens/completed.py:223` and `screens/today.py:522` draw the tick in
+`palette["success_strong"]` rather than from the row fill. Completed passes
+`use_completed_tint=False`, so its rows do take a level fill. On the two
+shipped defaults this measures 6.4-8.3:1 and is fine; a user who picks a dark
+green such as `#14532D` for Any Critical gets about 1:1 and the tick vanishes.
+`row_control_kwargs` covers the checkbox and the grip, not this glyph, and
+PLC-M4.4 covers labels, not it either.
 
 ### PLC-A11 — `source_asserts.local_assignments` can return `None` (low)
 

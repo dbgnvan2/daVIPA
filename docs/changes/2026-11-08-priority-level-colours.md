@@ -139,8 +139,21 @@ before any fix was written. Both passes independently found the same blocker.
    every row build in five screens *and* on the Settings tab's own swatch — so
    the tab the user would fix it from could not open, and the only way back was
    hand-editing the file. Now a `#[0-9A-F]{6}` match, in both that function and
-   the pre-existing `_normalize_hex` beside it (P5: the whole class, not the one
-   instance).
+   the pre-existing `_normalize_hex` beside it.
+
+   Not the whole class, and the first version of this note said it was. Five
+   more `int(x, 16)` / `len != 7` colour validators remain, in
+   `screens/vps_segment_editor.py`, `vps_manager.py`, `screens/settings.py`,
+   `screens/drag_schedule_support.py` and
+   `screens/item_editor_weekly_tactic_dialog.py`. One of them is reachable to
+   the same end: a segment colour typed as `# 12345` passes
+   `validate_color`, is written to `segment_descriptions.color_hex`, is read
+   back by `segment_color_utils._normalize_color` (which validates nothing at
+   all) and raises `TclError` in the row build of three list screens. Fixing
+   them means changing a save gate and a read path in the VSP segment
+   subsystem, with its own tests, which is not what this change is — so they
+   are recorded in full as PLC-A10 under the standing rule rather than swept
+   in here.
 2. `test_plcm3_the_section_builds_on_real_widgets` turned any `TclError` into
    `pytest.skip` — and `TclError` is exactly what a bad `grid` call, a rejected
    option or a colour Tk refuses raise, which is the test's whole reason to
@@ -166,7 +179,9 @@ was read as *overriding* `refresh` and therefore never reloading, on a grep
 that found `def refresh` at line 553 of `week_actions.py` — which belongs to
 `WeekActionsScreen`, the container, not to the panel. The panel inherits
 `TodayScreen.refresh` and was never stale. The reload added to the container
-(which has no `settings` and builds no rows) is gone, and the test that
+(which builds no rows of its own, and already sets `self.settings` in
+`__init__` at `week_actions.py:220`, so the line was redundant) is gone, and
+the test that
 "covered" it passed only because `WeekTacticActionsPanel.refresh` *is*
 `TodayScreen.refresh`. What replaced it asserts the inheritance itself, which
 is the real reason the panel is covered. Only the documentation half of that
