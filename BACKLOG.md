@@ -314,6 +314,49 @@ since every other list in the app can tick an item off.
 **Priority:** Low (dead code, no user-visible defect)
 **Effort:** Small either way
 
+### WTP-A9 — `done_action` sits between Done and `finished_action`, untested (low)
+
+Found by the second gate pass on the widget tests. The timer's Done control
+does not call `finished_action` directly: it calls
+`timer_window_reward.done_action`, which runs the reward sequence
+(`run_reward_sequence` -> savor dialog, canvas, audio) inside a `try` and then
+calls `finished_action`. Both of this batch's timer tests call
+`finished_action` themselves, so the WTP-M6.1 question is tested on the method
+Done reaches but not through the thing Done actually presses.
+
+What the gap can hide is narrow but real: `done_action` is where a reward-stage
+exception is swallowed so the session is still recorded — the comment there
+records a TclError that once cost a user the work log, the completion and the
+count. A regression that made that `except` stop reaching `finished_action`
+would leave every one of this batch's tests green.
+
+Covering it means building a TimerWindow with a project-linked item and
+pressing the real Done control, which pulls the deliverable dialog and the
+reward sequence into the test. That is a timer-batch job, not a WTP one.
+
+**Priority:** Low (the guard itself is tested; only the route to it is not)
+**Effort:** Medium (the reward sequence has to be stubbed or driven)
+
+### WTP-A10 — the decline test pins the outcome, not the ordering (low)
+
+Also from the second gate pass, and a correction to what the handoff note
+first claimed. `test_wtpw_the_timer_asks_and_a_no_costs_the_user_nothing`
+asserts that declining writes no work log and completes nothing. That is the
+outcome, and it holds wherever the guard sits: moved to *after* the note
+dialog, a decline would still write no log, so the test would still pass.
+
+The thing the guard's placement is for — the user not typing a note that is
+then thrown away — is therefore unasserted. The note dialog is a custom
+`Toplevel` rather than a `messagebox`, so it leaves no trace in the
+`messageboxes` fixture and the "asks exactly once" count cannot see it either.
+
+A test that pins it would record whether the note dialog was constructed at
+all on the declining path and assert it was not. Step 7 of the handoff note's
+on-screen checklist is the manual stand-in until then.
+
+**Priority:** Low (the placement is correct today and reviewed twice)
+**Effort:** Small
+
 ## Adjacent issues — priority level colours (PLC, 2026-11-08)
 
 Found while building PLC-M1 to PLC-M5. Flagged, not fixed (global rule 10):

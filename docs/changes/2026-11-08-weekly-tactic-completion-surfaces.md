@@ -183,10 +183,13 @@ Steps 1-3, 5, 6 and 8-9 now have a widget test behind them, which is not the
 same as having been seen: the test presses the control and reads the row back,
 and says nothing about what the screen looks like.
 
-Step 7 is **half** tested, and the gate caught the overclaim here. The question
-coming up before the note dialog is genuinely tested: declining asserts no work
-log was written, which it would have been had the flow reached the dialog. The
-*Next Action window staying intact* is not. Both timer tests drive
+Step 7 is **barely** tested, and two gate passes caught two overclaims here.
+What the decline test really pins is narrow: declining writes no work log and
+completes nothing. That is not the *ordering*. A guard moved to after the note
+dialog would still write no log on a decline, so it would still pass -- what
+that reordering costs the user is a note typed for nothing, and no test sees
+it. The question coming up before the note dialog is checklist-only. The
+*Next Action window staying intact* is untested too. Both timer tests drive
 `finished_action()` with `next_action_window` already `None`, so the branch that
 destroys it is never entered; what they assert is that the TimerWindow itself
 survives. Covering the real thing needs a Next Action window open first, which

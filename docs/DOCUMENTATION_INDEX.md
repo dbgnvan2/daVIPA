@@ -244,9 +244,14 @@ handoff note is `docs/changes/2026-11-08-plan-calendar-export.md`:
 
 Spec and implementation plan for a Weekly Tactic acting as the parent of the
 Action Items filed under it (WTP-M1 - WTP-M6). **Approved 2026-11-08 and built
-the same day: 32 of 35 criteria `done`, 3 not built** - per-criterion status in
-the spec's §6, and the batch's handoff note is
-`docs/changes/2026-11-08-weekly-tactic-as-parent.md`:
+the same day, then extended through WTP-M6.8: 40 of 40 criteria `done`** -
+per-criterion status in the spec's §6. Three handoff notes:
+`docs/changes/2026-11-08-weekly-tactic-as-parent.md` for the original batch,
+`docs/changes/2026-11-08-weekly-tactic-completion-surfaces.md` for the
+completion question on all seven surfaces (WTP-M6.7) and its widget tests
+(WTP-M6.8), and the independent gate's reports in
+`docs/cycles/2026-11-08_wtp-plc-upd-pd-qa-gate.md` and
+`docs/cycles/2026-11-08_wtp-widget-tests-qa-gate.md`:
 
 - Why the tactic is made a parent in the readers rather than in storage: the
   launch migration nulls `parent_id` for week parents, so writing it would be
@@ -263,8 +268,15 @@ the spec's §6, and the batch's handoff note is
   not have, and a vacuous test whose own justification in this spec was wrong
 - The corrected account of what a tactic delete used to do, with the counts it
   was verified against
-- The three criteria not built, and the concurrent session that holds their
-  files - filed as WTP-A1 to WTP-A3 in `BACKLOG.md`
+- The three criteria deferred on the day for a concurrent session's files,
+  since built; the adjacent findings left unfixed are WTP-A1 to WTP-A8 in
+  `BACKLOG.md`
+- WTP-M6.7: the question was first built in `ItemEditorDialog` alone and
+  reported done on that basis, while six other surfaces completed a tactic
+  silently (P25). `confirm_weekly_tactic_completion` now holds it once
+- WTP-M6.8: 21 real-widget tests that build each screen, find the control by
+  reading the item id out of its own callback, and press it with the widget's
+  own `toggle()`/`invoke()`
 
 ## Feature-Specific Documentation
 
