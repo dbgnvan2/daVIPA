@@ -213,12 +213,29 @@ def _scored_item(manager, title, band="critical", **kwargs):
     return item
 
 
-def _add_block(manager, minutes, label, slot_index, block_date=THURSDAY, **kwargs):
+def _add_block(
+    manager,
+    minutes,
+    label,
+    slot_index,
+    block_date=THURSDAY,
+    bounds=None,
+    outside_range=False,
+    **kwargs,
+):
     """Put a block on a box, the way every screen path now does.
 
     ``slot_index`` is required rather than defaulted: a day's shape is the
     thing under test in most of this file, and a test that did not say where
     its blocks were would be asserting against whatever box the helper chose.
+
+    ``outside_range`` is spelled out at the call site on purpose. A box outside
+    the day as drawn is refused for every write but the Earlier/Later extension
+    (PD-M13), so a helper that passed it quietly would let a test build a day
+    the app itself would not have allowed, and that day is where the
+    assertions would then come from. ``bounds`` is for the same kind of
+    honesty: a day written under a different Day Start, which is what a
+    database from before this change holds.
     """
     block = TimeBlock(
         block_date=block_date,
@@ -228,7 +245,37 @@ def _add_block(manager, minutes, label, slot_index, block_date=THURSDAY, **kwarg
         label=label,
         **kwargs,
     )
-    return manager.add_block_at(block, slot_index, DayBounds())
+    return manager.add_block_at(
+        block,
+        slot_index,
+        bounds if bounds is not None else DayBounds(),
+        allow_outside_range=outside_range,
+    )
+
+
+def _unplaced(manager, *labels, first_hour=17, block_date=THURSDAY):
+    """Rows the grid has no box for, which is what "outside the day" now means.
+
+    PD-M13 left exactly one way for a block to be outside the drawn day: a
+    pre-grid row whose stored clock time falls outside the configured range,
+    which ``adopt_unplaced_blocks`` refuses to invent a box for and leaves
+    ``NULL`` (P2 -- surfaced, never dropped). Narrowing Day End no longer does
+    it, because the drawn day widens past the configured range to cover
+    whatever is still planned out there, so every test that used to orphan a
+    block by shrinking the day builds one of these instead.
+    """
+    for offset, label in enumerate(labels):
+        hour, half = divmod(first_hour * 2 + offset, 2)
+        start = f"{hour:02d}:{30 if half else 0:02d}"
+        manager.create_time_block(
+            TimeBlock(
+                block_date=block_date,
+                start_time=start,
+                end_time=start,
+                planned_minutes=30,
+                label=label,
+            )
+        )
 
 
 def _stored(manager, block_date=THURSDAY):
@@ -844,6 +891,425 @@ def test_pdm8_clear_day_asks_nothing_about_the_weekday_list(
     )
 
 
+def test_pdm13_a_settings_save_does_not_blame_itself_for_an_old_unplaced_row(
+    screen, manager
+):
+    """The "no longer fit the day" line has to be about what the save did.
+
+    Found while retargeting the outside-group tests. That sentence was written
+    when narrowing the day was the one way a block came off the grid, and it
+    fired on any non-empty outside group after a save. Under PD-M13 a save
+    cannot orphan anything -- the drawn day widens past the configured range --
+    so on any day holding a pre-grid row the user saved Day Settings and was
+    told their save had just displaced a block it had nothing to do with.
+
+    The warning is kept for the case it was written for, which is why the
+    assertion is on the *wording* and not on the absence of a warning: if
+    anything ever does orphan a block again, the user is still told.
+    """
+    _unplaced(manager, "never placed")
+    screen.load_blocks()
+    assert len(screen._grid.outside) == 1, "precondition: the row has no box"
+
+    screen.on_settings_saved(DayBounds(day_end="16:00"))
+
+    text = screen.status_label.cget("text")
+    assert "no longer fit" not in text, text
+    assert text == "Day settings saved", text
+    assert [b.label for b in screen._grid.outside] == ["never placed"], (
+        "the row stopped being reported at all, which is the P2 failure"
+    )
+
+
+# ================= PD-M14 — either end takes a drop, whatever is near =====
+#
+# The user's second fault: "User should be able to drag to the Early or Late
+# Block regardless if anything is after the Morning block or before the Evening
+# block." There is no adjacency guard in the source to remove -- the two rows
+# are built on every redraw and the only refusals on the path are the weekday
+# gate and midnight -- so these tests exist to establish that and to fail if
+# anybody adds one. The gesture itself, with a pointer, is checklist item 2
+# (PD-M14.4): nothing here drives a real pane.
+
+
+def test_pdm141_an_earlier_drop_onto_an_empty_day_schedules(screen, manager):
+    """PD-M14.1 — nothing is scheduled, so nothing can be "adjacent" to it.
+
+    The first box of the day is also the last one, and a guard keyed on either
+    would refuse the one day where the gesture is most obviously wanted.
+    """
+    item = _item(manager, "Early start")
+
+    screen.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+    assert [(row[0], row[1]) for row in _stored(manager)] == [("Early start", -1)], (
+        _stored(manager)
+    )
+
+
+def test_pdm142_an_earlier_drop_ignores_what_is_at_the_other_end(screen, manager):
+    """PD-M14.2 — a block at the last box is not next to the Earlier row.
+
+    The fault as reported, in the direction it was reported in: work sitting
+    late in the day must not have any bearing on a drop at the early end.
+    """
+    last = len(day_grid(screen.bounds)) - 1
+    _add_block(manager, 30, "end of day", last)
+    item = _item(manager, "Early start")
+
+    screen.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+    placed = {row[0]: row[1] for row in _stored(manager)}
+    assert placed == {"end of day": last, "Early start": -1}, placed
+
+
+def test_pdm143_a_later_drop_ignores_what_is_at_the_other_end(screen, manager):
+    """PD-M14.3 — and the mirror of it: box 0 is not next to the Later row."""
+    _add_block(manager, 30, "start of day", 0)
+    item = _item(manager, "Late finish")
+    boxes = len(day_grid(screen.bounds))
+
+    screen.extend_day_for(item, DAY_EXTEND_LATER)
+
+    placed = {row[0]: row[1] for row in _stored(manager)}
+    assert placed == {"start of day": 0, "Late finish": boxes}, placed
+
+
+# ================= PD-M15 — the work-day warning, once per date ===========
+#
+# The user's third fault: "You are simply ignoring the Work day settings and
+# letting me schedule on a NON checked Day. Warning happens once on the first
+# block." Asked whether an unchecked day should be warned about once a day or
+# refused outright, they chose warned once per day -- which is the behaviour
+# that is already there, so PD-M15 is these tests over it rather than new code.
+# The question reaching a real dialog is checklist item 3 (PD-M15.6).
+
+
+def test_pdm151_every_write_path_asks_on_an_unchecked_day(
+    root, manager, settings, monkeypatch
+):
+    """PD-M15.1 — all four, named one at a time.
+
+    Named individually and counted, so a fifth writer added later -- or one of
+    these four having its gate removed -- fails here rather than being found by
+    the user on a Saturday. Each path gets its own screen, because the answer
+    is cached per date for the life of the screen and a shared one would let
+    three of the four coast on the first one's yes.
+    """
+    item = _item(manager, "weekend work", SATURDAY)
+
+    def gesture_padding(panel):
+        panel.add_padding_block(BlockType.BREAK)
+
+    def gesture_item(panel):
+        panel.block_item(item)
+
+    def gesture_autoload(panel):
+        panel.autoload_day()
+
+    def gesture_extension(panel):
+        panel.extend_day_for(item, DAY_EXTEND_LATER)
+
+    paths = {
+        "add_padding_block": gesture_padding,
+        "block_item": gesture_item,
+        "autoload_day": gesture_autoload,
+        "extend_day_for": gesture_extension,
+    }
+    asked = {}
+    for name, gesture in paths.items():
+        count = []
+        monkeypatch.setattr(
+            "tkinter.messagebox.askyesno",
+            lambda *a, **k: count.append(1) or False,
+        )
+        panel = PlanScreen(root, manager, _App(settings))
+        panel.selected_date = SATURDAY
+        panel.refresh()
+        gesture(panel)
+        asked[name] = len(count)
+
+    assert asked == {name: 1 for name in paths}, asked
+    assert manager.get_time_blocks(SATURDAY) == [], (
+        "a path wrote to the Saturday after the question was declined"
+    )
+
+
+def test_pdm152_the_day_off_question_is_asked_once_per_date(
+    root, manager, settings, monkeypatch
+):
+    """PD-M15.2 — "once per day" across paths, not once per path.
+
+    ``test_pdm7_the_question_is_asked_once_per_date`` already covers two drops
+    through the same path. This is the user's wording -- one warning on the
+    first block, and nothing after it -- which only holds if the four paths
+    share the one answer rather than each asking its own first question.
+    """
+    asked = []
+    monkeypatch.setattr(
+        "tkinter.messagebox.askyesno", lambda *a, **k: asked.append(1) or True
+    )
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    item = _item(manager, "weekend work", SATURDAY)
+
+    panel.block_item(item)
+    panel.add_padding_block(BlockType.BREAK)
+    panel.extend_day_for(_item(manager, "late one", SATURDAY), DAY_EXTEND_LATER)
+    panel.autoload_day()
+
+    assert len(asked) == 1, f"four gestures on one Saturday asked {len(asked)} times"
+    assert len(manager.get_time_blocks(SATURDAY)) >= 3, (
+        f"a gesture after the first was refused: {_stored(manager, SATURDAY)}"
+    )
+
+
+def test_pdm153_breaks_on_the_day_do_not_re_arm_the_question(
+    root, manager, settings, monkeypatch
+):
+    """PD-M15.3 — the user's parenthetical, answered "No, once per day".
+
+    They wondered whether a day holding only breaks and buffers should be
+    asked about again. It is not: the question is keyed on the date and reads
+    nothing about what is on the day, so filling the Saturday with padding
+    cannot bring it back. Pinned because a later change that keyed it on the
+    day's contents would be a warning per block, which is the fault this item
+    was reported as.
+    """
+    asked = []
+    monkeypatch.setattr(
+        "tkinter.messagebox.askyesno", lambda *a, **k: asked.append(1) or True
+    )
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+
+    panel.add_padding_block(BlockType.BREAK)
+    panel.add_padding_block(BlockType.BUFFER)
+    panel.add_padding_block(BlockType.BREAK)
+
+    assert len(asked) == 1, (
+        f"three padding blocks on one Saturday asked {len(asked)} times"
+    )
+    assert len(manager.get_time_blocks(SATURDAY)) == 3, _stored(manager, SATURDAY)
+
+
+def test_pdm154_a_break_on_the_day_does_not_refuse_an_item(
+    root, manager, settings, monkeypatch
+):
+    """PD-M15.4 — the other half: padding is not a lock on the rest of the day.
+
+    "(if a non break /buffer/ lunch block - a non -action item block - is on
+    the Day, allow more)". A box already holding something is skipped, which is
+    how AutoLoad keeps off lunch, but the day itself goes on accepting work --
+    and this pins that so it cannot quietly become a refusal.
+    """
+    monkeypatch.setattr("tkinter.messagebox.askyesno", lambda *a, **k: True)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    _add_block(
+        manager, 30, "coffee", 0, block_date=SATURDAY, block_type=BlockType.BREAK
+    )
+    item = _item(manager, "weekend work", SATURDAY)
+
+    panel.block_item(item, 4)
+
+    placed = {row[0]: row[1] for row in _stored(manager, SATURDAY)}
+    assert placed == {"coffee": 0, "weekend work": 4}, placed
+
+
+def test_pdm155_an_unparseable_date_is_not_a_work_day(
+    root, manager, settings, monkeypatch
+):
+    """PD-M15.5 — **adversarial (P7)**: a date that looks like one and is not.
+
+    ``is_block_day`` answers False for anything it cannot parse, so the gate
+    asks rather than letting the write through -- the input that "looks right
+    but is wrong" must not score as a work day. Declined here, so the
+    assertion is that nothing was written to a date the planner cannot name.
+    """
+    asked = []
+    monkeypatch.setattr(
+        "tkinter.messagebox.askyesno", lambda *a, **k: asked.append(1) or False
+    )
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = "2026-13-45"
+    panel.refresh()
+    item = _item(manager, "nowhere work", THURSDAY)
+
+    panel.block_item(item, 0)
+
+    assert len(asked) == 1, "the planner read an impossible date as a work day"
+    assert manager.get_time_blocks("2026-13-45") == [], (
+        "a block was written onto a date that is not one"
+    )
+
+
+# ================= PD-M13.7-13.10 — Clear Day and the drawn range =========
+#
+# The user's first fault: "Clear day doesn't reset the time blocks to range in
+# settings." Under PD-M13 it resets by itself and has no reset code of its own:
+# the drawn day is derived from the configured range plus whatever blocks are
+# outside it, so removing the blocks that were outside narrows it back. These
+# tests are what hold that claim up, and they are the ones that would fail if
+# anybody put a bound write back into the extension.
+
+
+def _clear_day_saying_yes(panel, monkeypatch):
+    monkeypatch.setattr("tkinter.messagebox.askyesno", lambda *a, **k: True)
+    panel.clear_day()
+
+
+def test_pdm137_clear_day_returns_the_day_to_its_settings_range(
+    root, manager, settings, monkeypatch
+):
+    """PD-M13.7 — the drawn grid after Clear Day is exactly the configured range.
+
+    The fault as reported. A day extended by four drops was drawn from 06:00
+    to 19:00; Clear Day took the work off it and left the thirteen hours of
+    empty boxes behind, because the range had been written into Settings and
+    nothing put it back.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    configured = [slot.start_time for slot in day_grid(panel.bounds)]
+    _add_block(
+        manager, 30, "early bird", -2,
+        block_type=BlockType.ITEM, outside_range=True,
+    )
+    _add_block(
+        manager, 30, "night owl", 20,
+        block_type=BlockType.ITEM, outside_range=True,
+    )
+    panel.refresh()
+    assert [entry.slot.start_time for entry in panel._grid.slots] != configured, (
+        "precondition: the day is drawn wider than the configured range"
+    )
+
+    _clear_day_saying_yes(panel, monkeypatch)
+
+    assert [entry.slot.start_time for entry in panel._grid.slots] == configured, (
+        "the day kept the boxes the cleared blocks had widened it to"
+    )
+
+
+def test_pdm138_clear_day_writes_no_settings(root, manager, settings, monkeypatch):
+    """PD-M13.8 — the configured range is the user's, and Clear Day is not about it.
+
+    The other half of PD-M13.7, and the half a reset-the-range fix would have
+    got wrong: narrowing the day by writing Day Start and Day End back to some
+    remembered value would overwrite whatever the user had typed since.
+    """
+    saves = []
+    monkeypatch.setattr(type(settings), "save", lambda self: saves.append(True) or True)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    _add_block(
+        manager, 30, "night owl", 20,
+        block_type=BlockType.ITEM, outside_range=True,
+    )
+    panel.refresh()
+
+    _clear_day_saying_yes(panel, monkeypatch)
+
+    assert saves == [], f"Clear Day saved settings {len(saves)} time(s)"
+    assert (settings.plan_day_start, settings.plan_day_end) == ("08:00", "17:00"), (
+        f"{settings.plan_day_start}-{settings.plan_day_end}"
+    )
+
+
+def test_pdm139_clear_day_keeps_a_break_outside_the_range_on_the_grid(
+    root, manager, settings, monkeypatch
+):
+    """PD-M13.9 — the day shrinks to the configured range *or* to what is still
+    outside it, whichever is wider.
+
+    The decision taken when this was planned: a break put before Day Start by
+    hand is one deliberate gesture, Clear Day promises in its own question to
+    leave breaks where they are, and a block drawn nowhere is the P2 failure
+    the outside group exists to prevent. So the day stays wide enough to show
+    it, even though every item block has gone.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    _add_block(
+        manager, 30, "school run", -1,
+        block_type=BlockType.BREAK, outside_range=True,
+    )
+    _add_block(
+        manager, 30, "night owl", 20,
+        block_type=BlockType.ITEM, outside_range=True,
+    )
+    panel.refresh()
+
+    _clear_day_saying_yes(panel, monkeypatch)
+
+    drawn = {
+        block.label: entry.slot.start_time
+        for entry in panel._grid.slots
+        for block in entry.starting
+    }
+    assert drawn == {"school run": "07:30"}, drawn
+    assert panel._grid.outside == [], (
+        "the break it promised to keep was moved into the outside group"
+    )
+    # The item block's boxes are gone; the break's is not.
+    assert [entry.slot.start_time for entry in panel._grid.slots][0] == "07:30"
+    assert [entry.slot.start_time for entry in panel._grid.slots][-1] == "16:30", (
+        "the day is still drawn out to the box the cleared item had"
+    )
+
+
+def test_pdm1310_a_day_extended_under_the_old_behaviour_still_draws(
+    root, manager, settings, monkeypatch
+):
+    """PD-M13.10 — **dirty state (P8)**: indexes a previous version renumbered.
+
+    The state this change cannot undo, and the reason the status report carries
+    a human-review line about it. Until PD-M13 an Earlier drop moved
+    ``plan_day_start`` and renumbered **every** date's blocks to match, so a
+    database written by the shipped version holds indexes counted from a Day
+    Start that the user never typed and that is still in their settings file.
+    There is no way to tell such a 07:30 from one the user chose, so nothing
+    tries to: the day is drawn from the settings as they stand, and what this
+    test holds up is that it is drawn *coherently* -- every block at the time
+    its own row says, none of them in the outside group.
+    """
+    settings.plan_day_start = "07:30"
+    # The renumbered day as the old code left it: the 08:00 meeting at box 1
+    # because box 0 became 07:30, and the dropped item at box 0.
+    _add_block(
+        manager, 30, "standing meeting", 1,
+        block_type=BlockType.ITEM, bounds=DayBounds(day_start="07:30"),
+    )
+    _add_block(
+        manager, 30, "early start", 0,
+        block_type=BlockType.ITEM, bounds=DayBounds(day_start="07:30"),
+    )
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+
+    drawn = {
+        block.label: entry.slot.start_time
+        for entry in panel._grid.slots
+        for block in entry.starting
+    }
+    assert drawn == {"early start": "07:30", "standing meeting": "08:00"}, drawn
+    assert panel._grid.outside == [], (
+        f"a renumbered day lost a block: {[b.label for b in panel._grid.outside]}"
+    )
+    stored = {row[0]: row[3] for row in _stored(manager)}
+    assert stored == drawn, (
+        f"the row and the box disagree about the time: {stored} vs {drawn}"
+    )
+
+
 def test_the_day_summary_flags_a_day_that_takes_no_blocks(root, manager, settings):
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = SATURDAY
@@ -1314,21 +1780,22 @@ def test_a_longer_task_marks_the_boxes_it_runs_through(screen, manager):
 def test_tgm31_an_outside_block_is_drawn(screen, manager, settings):
     """TG-M3.1 — a block no box can hold is shown, not dropped (P2).
 
-    Day End moving earlier is the ordinary way this happens. The block still
-    exists and is still the user's planned work; the day it stops being drawn
-    is the day that work is lost with nothing on screen to say so.
+    The mechanism changed under PD-M13, reason (b): the behaviour changed
+    intentionally. Day End moving earlier used to be the ordinary way a block
+    ended up here, and the day it stopped being drawn was the day that work
+    was lost with nothing on screen to say so. The drawn day now widens past
+    the configured range instead, so what is left outside is a pre-grid row
+    whose clock time no box answers to. The guarantee under test is the same
+    one: that block is on screen, in the group, and not silently absent.
     """
-    _add_block(manager, 30, "late afternoon", 16)
-    screen.load_blocks()
-    assert screen._grid.outside == []
+    _unplaced(manager, "late afternoon")
 
-    screen.on_settings_saved(DayBounds(day_end="12:00"))
+    screen.load_blocks()
 
     assert [b.label for b in screen._grid.outside] == ["late afternoon"]
     drawn = _label_texts(screen.outside_frame)
     assert "late afternoon" in drawn
     assert any("Outside the day (1)" in text for text in drawn)
-    assert "no longer fit the day" in screen.status_label.cget("text")
     # In the items column, not under the grid: the group is dragged from,
     # so it belongs beside the other things that are dragged from.
     assert "late afternoon" not in _label_texts(screen.blocks_scroll)
@@ -2181,9 +2648,8 @@ def test_every_part_of_an_outside_row_starts_a_drag(screen, manager):
     direct children left a press on the text doing nothing at all, in the one
     group the screen tells the user to drag blocks out of.
     """
-    _add_block(manager, 30, "late afternoon", 16)
+    _unplaced(manager, "late afternoon")
     screen.load_blocks()
-    screen.on_settings_saved(DayBounds(day_end="12:00"))
 
     label = _find_label(screen.outside_frame, "late afternoon")
     assert label is not None, (
@@ -2514,9 +2980,8 @@ def test_the_outside_group_does_not_outlive_the_day_that_had_one(screen, manager
     otherwise touch: emptied inside the "there are blocks outside the day"
     branch, yesterday's group would still be on screen under today's items.
     """
-    _add_block(manager, 30, "late afternoon", 16)
+    _unplaced(manager, "late afternoon")
     screen.load_blocks()
-    screen.on_settings_saved(DayBounds(day_end="12:00"))
     assert "late afternoon" in _label_texts(screen.outside_frame)
 
     screen.selected_date = FRIDAY
@@ -3023,11 +3488,10 @@ def test_pbm55_the_settings_reach_the_outside_group_on_screen(
     tells it. A keyword argument with no caller is the failure being fixed.
     """
     settings.drag_schedule_box_height_px = 64
-    _add_block(manager, 30, "late afternoon", 16)
+    _unplaced(manager, "late afternoon")
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = THURSDAY
     panel.refresh()
-    panel.on_settings_saved(DayBounds(day_end="12:00"))
 
     # Read off what the screen recorded as draggable rather than off the
     # container's children: a scrollable frame has children of its own.
@@ -3088,12 +3552,10 @@ def test_the_outside_group_scrolls_instead_of_growing_past_the_pane(
     telling the user that work it had made undraggable was still there, which
     is worse than the silent drop P2 is about.
     """
-    for slot in range(10, 18):
-        _add_block(manager, 30, f"late {slot}", slot)
+    _unplaced(manager, *(f"late {n}" for n in range(8)))
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = THURSDAY
     panel.refresh()
-    panel.on_settings_saved(DayBounds(day_end="10:00"))
 
     assert len(panel._grid.outside) == 8, (
         f"{len(panel._grid.outside)} blocks outside the day, expected 8"
@@ -3127,9 +3589,8 @@ def test_the_outside_group_takes_no_room_on_a_day_without_one(
         "the empty group is still taking its height out of the item list"
     )
 
-    _add_block(manager, 30, "late afternoon", 16)
+    _unplaced(manager, "late afternoon")
     panel.load_blocks()
-    panel.on_settings_saved(DayBounds(day_end="12:00"))
 
     assert panel.outside_frame.grid_info() != {}, (
         "the group is not gridded on a day that has blocks outside the day"
@@ -5182,43 +5643,82 @@ def test_pdm51_a_virtual_box_is_not_a_slot(screen):
         assert id(frame) not in virtual, f"a virtual box is being offered as slot {index}"
 
 
-def test_pdm52_a_drop_above_moves_day_start_back(screen, manager, settings):
-    """PD-M5.2 — Day Start moves back by the item's span and the item lands there."""
+def test_pdm131_an_earlier_drop_leaves_day_start_alone(screen, manager, settings):
+    """PD-M13.1 — the item is blocked at 07:30 and Day Start is still 08:00.
+
+    This asserted ``plan_day_start == "07:30"`` until PD-M13, under reason (b):
+    the behaviour changed intentionally. The user's words were "when add to
+    start and End of day do NOT change the length of Day in Settings". The box
+    is now a negative index -- one span before the first drawn box -- and the
+    day is drawn wide enough to show it, so the gesture is a decision about
+    this item on this date instead of a redefinition of the working day for
+    every date in the file.
+
+    Both the settings object and the file are asserted, because the old
+    version wrote to the object and then saved it: a fix that stopped only the
+    save would leave the screen's own day changed for the rest of the session.
+    """
     item = _item(manager, "Early start")
     assert settings.plan_day_start == "08:00", "precondition: the shipped day start"
 
     screen.extend_day_for(item, DAY_EXTEND_EARLIER)
 
-    assert settings.plan_day_start == "07:30", settings.plan_day_start
-    assert AppSettings.load().plan_day_start == "07:30", "the file did not get it"
     assert [(row[0], row[1], row[3]) for row in _stored(manager)] == [
-        ("Early start", 0, "07:30")
+        ("Early start", -1, "07:30")
     ], _stored(manager)
-    assert screen.bounds.day_start == "07:30", "the screen kept the old day"
+    assert settings.plan_day_start == "08:00", settings.plan_day_start
+    assert AppSettings.load().plan_day_start == "08:00", "the file was written anyway"
+    assert screen.bounds.day_start == "08:00", "the screen redefined its own day"
 
 
-def test_pdm52_a_long_item_dropped_above_takes_the_day_back_far_enough(
+def test_pdm131_a_long_item_dropped_above_goes_as_far_back_as_its_span(
     screen, manager, settings
 ):
-    """PD-M5.2 — the span, not one box: a 90m item needs three half hours."""
+    """PD-M13.1 — the span, not one box: a 90m item needs three half hours.
+
+    Retargeted with the test above, same reason (b). What moves is the box the
+    item lands on (-3, 06:30), not Day Start.
+    """
     item = _item(manager, "Deep work", work_block=90)
 
     screen.extend_day_for(item, DAY_EXTEND_EARLIER)
 
-    assert settings.plan_day_start == "06:30", settings.plan_day_start
     assert [(row[0], row[1], row[3]) for row in _stored(manager)] == [
-        ("Deep work", 0, "06:30")
+        ("Deep work", -3, "06:30")
     ], _stored(manager)
+    assert settings.plan_day_start == "08:00", settings.plan_day_start
 
 
-def test_pdm52_existing_blocks_keep_their_clock_times(screen, manager, settings):
-    """PD-M5.5 — on screen: the 08:00 task is still at 08:00 after the day grows.
+def test_pdm132_a_day_extension_saves_no_settings(screen, manager, settings, monkeypatch):
+    """PD-M13.2 — ``save`` is not called at all, on either end of the day.
 
-    A slot index counts boxes from Day Start. Moving Day Start back one box
-    without renumbering leaves the 08:00 task at box 0 of a day that now starts
-    at 07:30, so it is drawn at 07:30 while its stored start_time still says
-    08:00 -- the day on screen and the row disagreeing with nothing marked
-    wrong.
+    Asserted on the call and not only on the values: a version that set the
+    attribute, saved, and then set it back would leave the stored values right
+    and the user's settings file rewritten under them -- including
+    ``plan_day_shape_unconfirmed``, which PD-M5.4 says this gesture must leave
+    exactly as it found it.
+    """
+    saves = []
+    monkeypatch.setattr(
+        type(settings), "save", lambda self: saves.append(True) or True
+    )
+
+    screen.extend_day_for(_item(manager, "Early start"), DAY_EXTEND_EARLIER)
+    screen.extend_day_for(_item(manager, "Late finish"), DAY_EXTEND_LATER)
+
+    assert saves == [], f"the extension saved settings {len(saves)} time(s)"
+    assert len(_stored(manager)) == 2, f"both ends wrote a block: {_stored(manager)}"
+
+
+def test_pdm136_an_extension_renumbers_nothing(screen, manager, settings):
+    """PD-M13.6 — the 08:00 task keeps box 0 as well as 08:00.
+
+    This asserted ``(1, "08:00")`` until PD-M13, under reason (b): the
+    behaviour changed intentionally. A slot index counts boxes from Day Start,
+    so while the bound moved every existing block had to be renumbered to keep
+    the clock time it was drawn at -- the whole purpose of ``shift_all_slots``.
+    With the bound fixed there is nothing to compensate for, and the right
+    answer is that the row is not touched: same index, same time.
     """
     _add_block(manager, 30, "Standing meeting", slot_index=0)
     item = _item(manager, "Early start")
@@ -5226,23 +5726,23 @@ def test_pdm52_existing_blocks_keep_their_clock_times(screen, manager, settings)
     screen.extend_day_for(item, DAY_EXTEND_EARLIER)
 
     placed = {row[0]: (row[1], row[3]) for row in _stored(manager)}
-    assert placed["Standing meeting"] == (1, "08:00"), (
-        f"the meeting moved: {placed['Standing meeting']}"
+    assert placed["Standing meeting"] == (0, "08:00"), (
+        f"the meeting was renumbered: {placed['Standing meeting']}"
     )
-    assert placed["Early start"] == (0, "07:30"), placed["Early start"]
+    assert placed["Early start"] == (-1, "07:30"), placed["Early start"]
 
 
-def test_pdm55_a_block_on_another_date_keeps_its_clock_time(
-    screen, manager, settings
-):
-    """PD-M5.5 — "every existing block" is every date's, because Day Start is one.
+def test_pdm136_another_date_is_not_touched_at_all(screen, manager, settings):
+    """PD-M13.6 — Friday keeps its index as well as its time.
 
-    The renumber was scoped to the date being looked at. Extending Thursday
-    earlier then moved the single ``plan_day_start`` that Friday is drawn from
-    too, while Friday's blocks kept their old indexes: a 10:00 task drawn at
-    09:30 with "10:00" still in its own row, on a screen the user was not even
-    on when they dropped the item. Asserted as the time it is drawn at, not as
-    the index, because the index moving is the fix and not the promise.
+    This asserted the index had *moved* (the renumber) until PD-M13, under
+    reason (b): the behaviour changed intentionally. ``plan_day_start`` is a
+    single setting that every date is drawn from, so while a drop moved it
+    every other date had to be renumbered to stay where it was -- one drop on
+    one date rewriting every day in the file, on screens the user was not even
+    on. Nothing changes the bound now, so the correct outcome is that Friday's
+    row is byte-for-byte what it was: the index too, which is the assertion
+    that would have failed under the old behaviour.
     """
     friday = _add_block(manager, 30, "Friday standup", slot_index=4, block_date=FRIDAY)
     assert friday.start_time == "10:00", (
@@ -5253,7 +5753,7 @@ def test_pdm55_a_block_on_another_date_keeps_its_clock_time(
     screen.extend_day_for(item, DAY_EXTEND_EARLIER)
 
     later = DayBounds.from_settings(settings)
-    assert later.day_start == "07:30", f"precondition: the day moved ({later.day_start})"
+    assert later.day_start == "08:00", f"the day moved ({later.day_start})"
     grid = build_day_grid(manager.get_time_blocks(FRIDAY), later)
     drawn = {
         entry.starting[0].label: entry.slot.start_time
@@ -5261,24 +5761,30 @@ def test_pdm55_a_block_on_another_date_keeps_its_clock_time(
         if entry.starting
     }
     assert drawn == {"Friday standup": "10:00"}, drawn
-    stored = {row[0]: row[3] for row in _stored(manager, FRIDAY)}
-    assert stored == {"Friday standup": "10:00"}, (
-        f"the stored time was rewritten rather than kept: {stored}"
+    stored = {row[0]: (row[1], row[3]) for row in _stored(manager, FRIDAY)}
+    assert stored == {"Friday standup": (4, "10:00")}, (
+        f"Friday's row was rewritten: {stored}"
     )
 
 
-def test_pdm53_a_drop_below_moves_day_end_forward(screen, manager, settings):
-    """PD-M5.3 — Day End moves forward by the span and the item lands there."""
+def test_pdm131_a_later_drop_leaves_day_end_alone(screen, manager, settings):
+    """PD-M13.1 — the item is blocked at 17:00 and Day End is still 17:00.
+
+    The Later half of the test above, retargeted for the same reason (b): the
+    box the item lands on is the one after the last drawn box, and the
+    configured Day End it is past does not move.
+    """
     item = _item(manager, "Late finish")
     assert settings.plan_day_end == "17:00", "precondition: the shipped day end"
     boxes_before = len(day_grid(screen.bounds))
 
     screen.extend_day_for(item, DAY_EXTEND_LATER)
 
-    assert settings.plan_day_end == "17:30", settings.plan_day_end
     assert [(row[0], row[1], row[3]) for row in _stored(manager)] == [
         ("Late finish", boxes_before, "17:00")
     ], _stored(manager)
+    assert settings.plan_day_end == "17:00", settings.plan_day_end
+    assert AppSettings.load().plan_day_end == "17:00", "the file was written anyway"
 
 
 def test_pdm53_a_drop_below_does_not_renumber_the_day(screen, manager, settings):
@@ -5292,28 +5798,38 @@ def test_pdm53_a_drop_below_does_not_renumber_the_day(screen, manager, settings)
     assert placed["Standing meeting"] == (0, "08:00"), placed["Standing meeting"]
 
 
-def test_pdm56_a_refused_write_leaves_the_day_unchanged(
-    screen, manager, settings, monkeypatch
+def test_pdm1311_an_extension_that_would_cross_midnight_writes_nothing(
+    screen, manager, settings
 ):
-    """PD-M5.6/P41 — a refused settings write rolls back all of it, and says so."""
+    """PD-M13.11/P41 — the one refusal this gesture has left, and it is clean.
+
+    This was ``test_pdm56_a_refused_write_leaves_the_day_unchanged``, which
+    monkeypatched ``AppSettings.save`` to fail and asserted the rollback put
+    the day back. Retargeted under reason (b): the behaviour changed
+    intentionally -- there is no settings write here to refuse any more, so
+    that path cannot be reached by any input and a test holding it up with a
+    monkeypatch would be asserting against code that no longer exists.
+
+    The guarantee that survives is the one worth keeping: the refusal the
+    gesture does still have leaves the database exactly as it was. A day
+    starting at 00:00 has nothing before box 0 that is still the same date,
+    which ``slot_is_on_the_date`` is what refuses -- no patching, a real day a
+    user can configure in ⚙ Day Settings.
+    """
+    settings.plan_day_start = "00:00"
+    screen.on_settings_saved(DayBounds(day_start="00:00"))
     _add_block(manager, 30, "Standing meeting", slot_index=0)
-    item = _item(manager, "Early start")
     before = _stored(manager)
-    monkeypatch.setattr(type(settings), "save", lambda self: False)
+    item = _item(manager, "Early start")
 
     screen.extend_day_for(item, DAY_EXTEND_EARLIER)
 
-    assert settings.plan_day_start == "08:00", (
-        f"the refused width stayed on the app's own settings object: "
-        f"{settings.plan_day_start}"
-    )
-    assert screen.bounds.day_start == "08:00", "the screen took the day anyway"
     assert _stored(manager) == before, (
-        f"the database kept work the settings file never agreed to: "
-        f"{_stored(manager)}"
+        f"a block was written before the date began: {_stored(manager)}"
     )
+    assert settings.plan_day_start == "00:00", settings.plan_day_start
     text = screen.status_label.cget("text")
-    assert "was not extended" in text, text
+    assert "a day is one date" in text, text
 
 
 def test_pdm56_a_failure_with_no_message_still_names_itself(
@@ -5341,16 +5857,28 @@ def test_pdm56_a_failure_with_no_message_still_names_itself(
     assert not text.rstrip().endswith("—"), text
 
 
-def test_pdm56_a_refused_write_is_not_reported_as_a_longer_day(
+def test_pdm56_a_failed_extension_is_not_drawn_as_a_success(
     screen, manager, settings, monkeypatch
 ):
-    """The status must not read like a success. Nothing happened."""
+    """The status must not read like a success. Nothing happened.
+
+    Retargeted with the test above, same reason (b): the refused settings save
+    it used to stage is gone, so the failure is staged on the write instead.
+    The colour is the assertion -- the sentence is covered by the test above
+    this one -- because a success-coloured line is what the user reads before
+    they read any of the words.
+    """
     item = _item(manager, "Early start")
-    monkeypatch.setattr(type(settings), "save", lambda self: False)
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("the disk went away")
+
+    monkeypatch.setattr(manager, "add_block_at", boom)
 
     screen.extend_day_for(item, DAY_EXTEND_EARLIER)
 
     assert screen.status_label.cget("text_color") == status_text_color("error")
+    assert _stored(manager) == [], f"something was written anyway: {_stored(manager)}"
 
 
 def test_pdm57_a_block_drag_onto_a_virtual_box_is_refused(

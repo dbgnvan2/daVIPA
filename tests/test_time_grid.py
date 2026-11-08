@@ -24,7 +24,9 @@ from src.getmoredone.time_block_layout import (
     build_day_grid,
     can_place,
     day_grid,
+    drawn_day_slots,
     slot_index_for_time,
+    slot_is_on_the_date,
     slot_occupancy,
     slot_span_of,
     slots_for_minutes,
@@ -224,6 +226,56 @@ def test_a_block_running_past_the_last_box_is_outside_the_grid():
     assert can_place([], BOUNDS, last, 2) == SlotRefusal.OUTSIDE_GRID
 
 
+def test_pdm13_the_extension_gesture_is_the_only_caller_that_may_go_outside():
+    """PD-M13 — the drawn day is the limit, and one flag lifts it.
+
+    The box after the last one is refused for every ordinary write, which is
+    what keeps AutoLoad and pre-grid adoption inside the day the user
+    configured. ``allow_outside_range`` is the Earlier/Later extension saying
+    it means to make the day wider, and nothing else passes it.
+    """
+    last_box = len(day_grid(BOUNDS)) - 1
+    past_the_end = last_box + 1
+
+    assert can_place([], BOUNDS, past_the_end, 1) == SlotRefusal.OUTSIDE_GRID
+    assert can_place([], BOUNDS, past_the_end, 1, allow_outside_range=True) is None
+    # Before the day as well as after it, so the Earlier half is covered too.
+    assert can_place([], BOUNDS, -1, 1) == SlotRefusal.OUTSIDE_GRID
+    assert can_place([], BOUNDS, -1, 1, allow_outside_range=True) is None
+
+
+def test_pdm13_a_box_the_day_is_already_drawn_on_needs_no_flag():
+    """PD-M13 — once work sits past Day End, that box is droppable.
+
+    The distinction the flag rests on: the limit is the day *as drawn*, not the
+    configured range. A box past Day End that something is already drawn on is
+    a box the user can point at, so an ordinary drop there must be allowed --
+    otherwise a block could be put outside the day by the extension and then
+    never moved within the hours it had just created.
+    """
+    out_there = [_block(30, slot_index=20)]
+
+    # Nothing is drawn at 21 or beyond, so it stays a refusal...
+    assert can_place(out_there, BOUNDS, 21, 1) == SlotRefusal.OUTSIDE_GRID
+    # ...but 20 is drawn now, and sharing it is an ordinary write.
+    assert can_place(out_there, BOUNDS, 20, 1) is None
+    # The same box on a day with nothing out there is refused, which is what
+    # makes the block above the reason and not a coincidence.
+    assert can_place([], BOUNDS, 20, 1) == SlotRefusal.OUTSIDE_GRID
+
+
+def test_pdm13_the_date_is_the_limit_even_for_the_extension():
+    """PD-M13 — the flag lifts the day's range, never the date's.
+
+    A block has no way to say it belongs to another date, so a box off the
+    date is refused however the write asks. 08:00 plus 32 boxes is midnight.
+    """
+    assert can_place([], BOUNDS, 32, 1, allow_outside_range=True) == SlotRefusal.OUTSIDE_GRID
+    assert can_place([], BOUNDS, 31, 2, allow_outside_range=True) == SlotRefusal.OUTSIDE_GRID
+    assert can_place([], BOUNDS, -16, 1, allow_outside_range=True) is None
+    assert can_place([], BOUNDS, -17, 1, allow_outside_range=True) == SlotRefusal.OUTSIDE_GRID
+
+
 def test_a_second_task_may_share_a_box():
     """The user's decision: a box holds more than one task.
 
@@ -284,6 +336,22 @@ def test_occupancy_counts_every_box_a_span_covers():
 # =====================================================================
 
 
+def test_pdm13_a_box_before_day_start_carries_the_earlier_time():
+    """PD-M13 — box -1 is 07:30, not Day Start clamped back to itself.
+
+    ``times_for_slot`` clamped the index at zero, from when a box before Day
+    Start could not exist. Under PD-M13 it can, and the clamp wrote 08:00 into
+    a row the grid drew at 07:30 -- the stored time and the drawn time
+    disagreeing, with nothing marked wrong, which is the exact failure the
+    renumber this change deletes was built to prevent (P6: the row is checked
+    against what it claims, not trusted).
+    """
+    assert times_for_slot(-1, 30, BOUNDS) == ("07:30", "08:00")
+    assert times_for_slot(-3, 90, BOUNDS) == ("06:30", "08:00")
+    # The box after the last one keeps working the same way.
+    assert times_for_slot(18, 30, BOUNDS) == ("17:00", "17:30")
+
+
 def test_times_for_slot_reads_off_the_grid():
     """Box 4 of an 08:00 day is 10:00."""
     assert times_for_slot(4, 30, BOUNDS) == ("10:00", "10:30")
@@ -340,26 +408,45 @@ def test_an_empty_box_is_still_a_row():
     assert not grid.slots[4].is_empty
 
 
-def test_tgm31_blocks_outside_the_grid_are_surfaced():
-    """TG-M3.1 — **P2**: a block with no box is returned, never dropped.
+def test_pdm13_a_block_past_the_configured_day_is_drawn_rather_than_listed():
+    """PD-M13 — **P2 discharged better**: drawn at its own hour, not exiled.
 
-    Day End moving earlier is the ordinary way this happens. The day it stops
-    being drawn is the day the user loses planned work with nothing on screen
-    to say so.
+    This asserted ``grid.outside == ["late"]`` until PD-M13, under reason (b):
+    the behaviour changed intentionally. P2 is the same guarantee -- a block is
+    never dropped -- and the drawn day now satisfies it by *showing* the block
+    at its real time instead of listing it in a footnote under the day. Day End
+    moving earlier in Settings no longer takes the box away; it only narrows
+    the day the user configured, and the drawn day widens past it to whatever
+    is still planned there.
+
+    The two assertions that matter are that the block has a box and that
+    nothing is in ``outside``: a block in neither place would be the loss P2
+    names, and this test would then fail on the first one.
     """
     blocks = [_block(30, slot_index=2, label="inside"), _block(30, slot_index=30, label="late")]
 
     grid = build_day_grid(blocks, BOUNDS)
 
-    assert [b.label for b in grid.outside] == ["late"]
-    assert [b.label for b in grid.slots[2].starting] == ["inside"]
+    drawn = {
+        block.label: entry.slot.index
+        for entry in grid.slots
+        for block in entry.starting
+    }
+    assert drawn == {"inside": 2, "late": 30}
+    assert [b.label for b in grid.outside] == []
 
 
-def test_a_block_whose_span_now_runs_past_the_day_is_surfaced_too():
-    """The subtler half: the box exists, the block no longer fits in what's left."""
+def test_pdm13_a_block_whose_span_runs_past_the_day_is_drawn_too():
+    """The subtler half, inverted with it: the span extends the day as well."""
     grid = build_day_grid([_block(120, slot_index=17, label="too long")], BOUNDS)
 
-    assert [b.label for b in grid.outside] == ["too long"]
+    drawn = [
+        entry.slot.index for entry in grid.slots if entry.starting
+    ]
+    assert drawn == [17], drawn
+    assert [b.label for b in grid.outside] == []
+    # Four boxes of a 120, the last of them 20 -- 17 + 4 - 1.
+    assert grid.slots[-1].slot.index == 20, grid.slots[-1].slot.index
 
 
 def test_a_never_placed_block_is_surfaced_rather_than_assumed_to_be_at_eight():
@@ -484,3 +571,97 @@ def test_a_time_that_cannot_be_placed_returns_none(start_time):
     "the first box" and use the row's position instead of inventing a slot.
     """
     assert slot_index_for_time(start_time, BOUNDS) is None
+
+
+# ---------------------------------------------------------------------------
+# PD-M13 — the configured day and the day as drawn are two different things
+# ---------------------------------------------------------------------------
+
+
+def test_pdm133_a_block_before_day_start_gets_a_box():
+    """PD-M13.3 — a block at a negative index is drawn, not listed as outside.
+
+    The mechanism the whole change rests on. Before this, the only way to get
+    a box before the configured Day Start was to move ``plan_day_start`` and
+    renumber every date's blocks to match, so one drop on one date redefined
+    the working day everywhere. A negative ``slot_index`` means the same thing
+    -- one box earlier than the day the user configured -- and costs no other
+    date anything.
+    """
+    grid = build_day_grid([_block(30, slot_index=-2, label="early")], BOUNDS)
+
+    first = grid.slots[0]
+    assert first.slot.index == -2, first.slot.index
+    assert [b.label for b in first.starting] == ["early"]
+    assert grid.outside == []
+    # 08:00 less two boxes. The box knows its clock time, so the row and the
+    # screen cannot disagree about when the block is.
+    assert first.slot.start_minutes == 7 * 60
+
+
+def test_pdm134_a_block_past_day_end_gets_a_box():
+    """PD-M13.4 — and the same at the other end."""
+    grid = build_day_grid([_block(30, slot_index=19, label="late")], BOUNDS)
+
+    last = grid.slots[-1]
+    assert last.slot.index == 19, last.slot.index
+    assert [b.label for b in last.starting] == ["late"]
+    assert grid.outside == []
+    assert last.slot.start_minutes == 17 * 60 + 30
+
+
+def test_pdm135_a_block_in_lunch_is_still_surfaced():
+    """PD-M13.5 — **P2**: widening the day must not empty ``outside``.
+
+    The drawn day grows to cover a block past either end, so the two cases
+    that used to fill ``outside`` no longer do. If that had been allowed to
+    make ``outside`` dead, the one case it still has to carry -- a block the
+    user's lunch hour has moved on top of, which a lunch box draws nothing of
+    -- would have gone quietly missing. ``can_place`` refuses lunch, so this
+    is only reachable after the lunch hour moves over planned work.
+    """
+    grid = build_day_grid([_block(30, slot_index=8, label="eaten")], BOUNDS)
+
+    assert [b.label for b in grid.outside] == ["eaten"]
+    assert all(not entry.starting for entry in grid.slots), (
+        "the block was drawn in a lunch box, which draws Lunch and nothing else"
+    )
+
+
+def test_pdm133_an_ordinary_day_draws_exactly_the_configured_range():
+    """PD-M13.3 — the configured range is the floor, not just a starting point.
+
+    With nothing outside it the drawn day is the configured day, box for box.
+    A version of ``drawn_day_slots`` that took its extent from the blocks alone
+    would shrink an empty day to nothing, so the day the user set is the
+    narrowest it can ever draw.
+    """
+    assert [slot.index for slot in drawn_day_slots(BOUNDS)] == [
+        slot.index for slot in day_grid(BOUNDS)
+    ]
+    assert [slot.index for slot in drawn_day_slots(BOUNDS, [])] == [
+        slot.index for slot in day_grid(BOUNDS)
+    ]
+    # A block well inside the day does not narrow it either.
+    inside = drawn_day_slots(BOUNDS, [_block(30, slot_index=4)])
+    assert [slot.index for slot in inside] == [slot.index for slot in day_grid(BOUNDS)]
+
+
+def test_pdm1311_a_box_before_midnight_is_refused():
+    """PD-M13.11 — PD-M5.8's guarantee, moved off the bound and onto the box.
+
+    "A day is one date" used to be enforced by refusing a new Day Start that
+    would cross midnight. Nothing moves Day Start any more, so that guard would
+    never fire again -- it is enforced on the box a block would occupy instead.
+    Asserted at the boundary from both sides, because an off-by-one here is a
+    block silently belonging to yesterday.
+    """
+    # 08:00 less sixteen boxes is exactly 00:00: the earliest box there is.
+    assert slot_is_on_the_date(BOUNDS, -16) is True
+    assert slot_is_on_the_date(BOUNDS, -17) is False
+    # 08:00 plus 31 boxes ends at 24:00: the latest box there is.
+    assert slot_is_on_the_date(BOUNDS, 31) is True
+    assert slot_is_on_the_date(BOUNDS, 32) is False
+    # A span is counted from its own end, not its start.
+    assert slot_is_on_the_date(BOUNDS, 30, 2) is True
+    assert slot_is_on_the_date(BOUNDS, 31, 2) is False
