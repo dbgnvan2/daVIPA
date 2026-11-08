@@ -102,8 +102,19 @@ Record:
 - Is the break still drawn, at the time it was at?
 - Does the column still start early enough to show it, with the rest of the day
   back to your configured range?
-- Is anything listed under **Outside the day** in the left column? Nothing
-  should be.
+- Is anything listed under **Outside the day** in the left column? Nothing you
+  put there in this pass should be — but see the note below before you call it
+  a fault.
+
+**If something you did not just create is listed under "Outside the day",**
+that is this batch surfacing an old row rather than breaking a new one. A
+block's stored position counts half hours from Day Start, not a clock time, so
+if you ever moved **Day Start** in ⚙ Day Settings, a block saved under the old
+start can now land before midnight or past it. Before this change such a block
+was drawn in the day at a wrong time — usually 00:00 — and refused every move
+and resize, with deleting it the only way out. It is now listed under "Outside
+the day" with its own stored time, and you can drag it back onto the day. If
+you see one, that is the fix working; note the label and the time it shows.
 
 ## Still open from the previous batch
 
