@@ -11,6 +11,7 @@ from ..color_contrast import pick_text_color
 from ..date_utils import current_quarter
 from ..theme import button_style, semantic_colors, status_text_color
 from ..weekly_tactic_logging import get_weekly_tactic_logger
+from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .split_panel import SPLITTER_WIDTH, SplitPanel
 
@@ -53,7 +54,6 @@ class APEAssignmentScreen(ctk.CTkFrame):
         # not overwrite a setting changed elsewhere since this screen was
         # built; its own load when constructed without an app (tests).
         self.settings = getattr(app, "settings", None) or AppSettings.load()
-        self.dragged_row: Optional[dict] = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -163,6 +163,13 @@ class APEAssignmentScreen(ctk.CTkFrame):
             divider,
             settings=self.settings,
             prefix=self.SETTINGS_PREFIX,
+        )
+
+        # UPD-M2 — the row drag, the drop test and the descendant walk live in
+        # screens/row_drag.py. What a dropped row means is this screen's, and
+        # stays here as _assign_dragged_row.
+        self.row_drag = RowDragSource(
+            self, self.right_list, self._assign_dragged_row
         )
 
     def _parse_period(self) -> Optional[tuple[int, int]]:
@@ -479,7 +486,9 @@ class APEAssignmentScreen(ctk.CTkFrame):
                     **button_style("danger"),
                 ).grid(row=0, column=offset + 4, padx=5, pady=5, sticky="e")
             else:
-                self._bind_drag_widgets((item, index_label, seg_chip, sub_chip, cat_chip), row)
+                self.row_drag.bind_row(
+                    (item, index_label, seg_chip, sub_chip, cat_chip), row
+                )
 
     def delete_quarter_item(self, row: dict):
         parsed = self._parse_period()
@@ -530,44 +539,31 @@ class APEAssignmentScreen(ctk.CTkFrame):
             )
         return False
 
-    def _bind_drag_widgets(self, widgets: tuple, row: dict):
-        for widget in widgets:
-            widget.bind("<ButtonPress-1>", lambda _event, r=row: self._start_row_drag(r))
+    def _assign_dragged_row(self, row: dict):
+        """Assign one APE to the selected quarter, dropped rather than checked.
 
-    def _start_row_drag(self, row: dict):
-        self.dragged_row = row
-        self.winfo_toplevel().bind("<ButtonRelease-1>", self._finish_row_drag)
+        Purpose: what a drop onto the right panel means on this screen.
+        Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m2--one-row-drag-not-four
+        Tests:   tests/test_unified_panel_design.py::test_updm22_drop_inside_the_target_assigns_once
 
-    def _finish_row_drag(self, _event):
-        self.winfo_toplevel().unbind("<ButtonRelease-1>")
-        if not self.dragged_row:
-            return
-        pointer_x, pointer_y = self.winfo_pointerxy()
-        target = self.winfo_containing(pointer_x, pointer_y)
-        row = self.dragged_row
-        self.dragged_row = None
-        if self._is_descendant(target, self.right_list):
-            parsed = self._parse_period()
-            if parsed:
-                _year, quarter = parsed
-                ok = self._assign_one(row["id"], quarter)
-                self.refresh_lists()
-                self.status_label.configure(
-                    text=self._describe_quarter_assignment(
-                        [row["id"]],
-                        {row["id"]} if ok else set(),
-                        self._ids_in_quarter(),
-                        quarter,
-                    )
+        APC-M6.2 — the drop reports through the same status line as the Save
+        button, so a refused assignment says so however it was made. Called by
+        screens/row_drag.py only on a release inside the drop target; the
+        screen no longer decides that for itself.
+        """
+        parsed = self._parse_period()
+        if parsed:
+            _year, quarter = parsed
+            ok = self._assign_one(row["id"], quarter)
+            self.refresh_lists()
+            self.status_label.configure(
+                text=self._describe_quarter_assignment(
+                    [row["id"]],
+                    {row["id"]} if ok else set(),
+                    self._ids_in_quarter(),
+                    quarter,
                 )
-
-    def _is_descendant(self, widget, ancestor) -> bool:
-        current = widget
-        while current is not None:
-            if current == ancestor:
-                return True
-            current = getattr(current, "master", None)
-        return False
+            )
 
     @staticmethod
     def _clip_label(value: str, limit: int) -> str:
