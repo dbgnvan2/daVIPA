@@ -181,10 +181,19 @@ silently while `/Applications/daVIPA.app` holds the database.
 
 Steps 1-3, 5, 6 and 8-9 now have a widget test behind them, which is not the
 same as having been seen: the test presses the control and reads the row back,
-and says nothing about what the screen looks like. Step 7's ordering (the
-question before the note dialog, the Next Action window intact) is tested.
+and says nothing about what the screen looks like.
+
+Step 7 is **half** tested, and the gate caught the overclaim here. The question
+coming up before the note dialog is genuinely tested: declining asserts no work
+log was written, which it would have been had the flow reached the dialog. The
+*Next Action window staying intact* is not. Both timer tests drive
+`finished_action()` with `next_action_window` already `None`, so the branch that
+destroys it is never entered; what they assert is that the TimerWindow itself
+survives. Covering the real thing needs a Next Action window open first, which
+is on the checklist and not in a test.
+
 Step 10 is tested for the `-topmost` restore specifically, against a real
-Toplevel parent.
+Toplevel parent — not for whether the modal is legible in front of it.
 
 ## Next agent actions
 
@@ -192,3 +201,6 @@ Toplevel parent.
 - Decide WTP-A8: give the Hierarchical row a Complete control, or delete the
   method. If the control is added, it must also go into the widget tests'
   `BUILDERS` and `SCREENS_WITH_A_CONTROL`, which fail until it does.
+- Cover the Next Action window on the timer's decline path: open one, decline,
+  assert it is still there. The guard is placed before its destroy precisely
+  for that, and nothing checks it.
