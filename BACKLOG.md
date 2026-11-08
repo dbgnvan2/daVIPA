@@ -1,6 +1,6 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (the four Plan / Day Plan faults reported from the running screen investigated: two fixed, one implemented, one still open with its measurements, plus one adjacent issue and a correction to the `_require_block_day` low finding below; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-07 (the four Plan / Day Plan faults reported from the running screen investigated: two fixed, one implemented, one still open with its measurements, plus one adjacent issue and a correction to the `_require_block_day` low finding below; then that batch's fix pass — six of the sweep's ten findings fixed including the high one, two refuted by measurement and recorded as such, two deferred here; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
 
 ## Reported from the running screen — Plan / Day Plan (2026-11-07)
 
@@ -103,10 +103,12 @@ screen should scroll the Day Plan window to follow it.
 **Priority:** Medium
 **Effort:** Unknown
 **Notes:** Implemented as PD-M12: `PD_AUTOSCROLL_MARGIN_PX` (24),
-`PD_AUTOSCROLL_INTERVAL_MS` (60), `PD_AUTOSCROLL_UNITS` (1) and the
-`day_autoscroll_direction` / `autoscroll_day` / `_start_autoscroll` /
-`_autoscroll_tick` / `_stop_autoscroll` group. The speed is a judgement set
-from the box height and has not been felt by a human.
+`PD_AUTOSCROLL_INTERVAL_MS` (60), `PD_AUTOSCROLL_STEP_PX` (16) and the
+`day_autoscroll_direction` / `day_autoscroll_fraction` / `autoscroll_day` /
+`_start_autoscroll` / `_autoscroll_tick` / `_stop_autoscroll` group. The speed
+is a judgement — 16px per 60ms, half a box per tick — and has not been felt by
+a human. The first version of it scrolled one canvas *unit* per tick, which the
+sweep showed was not a distance at all; see the fix-pass section below.
 
 ### 2026-11-07 - Adjacent issue found, not fixed
 
@@ -136,13 +138,91 @@ the Day Plan scrolls continuously with nothing short of quitting to stop it.
 **Notes:** New exposure from PD-M12, and recorded rather than fixed because of
 how narrow the path is: the Plan screen has no periodic refresh (`autoload_day`
 is a button), and leaving the screen through the sidebar destroys the whole
-`PlanScreen`, which deletes the timer's Tcl command so the tick never runs. The
+`PlanScreen`, which deletes the timer's Tcl command so the tick never runs.
+That last clause was challenged by the sweep and has since been **measured**
+rather than argued — see the fix-pass section below. The
 pre-existing version of the same lost release already left a stale `_drag_kind`
 and a stranded drag label; the autoscroll makes that state louder rather than
 creating it. A guard needs something the Tk API does not offer directly —
 whether the button is still down — so the likely shape is a cap on consecutive
 ticks with no intervening motion, which is a design decision rather than a
 one-line fix.
+
+
+## Deferred from the Plan day-faults fix pass (2026-11-07)
+
+Ten findings from `learning-qa` over `6d86791...HEAD`, one high. Six were
+fixed (the high plus four mediums and one low that sat on a line being
+rewritten anyway), two were refuted by measurement, and these are what is
+left. See `docs/changes/2026-11-07-plan-day-faults.md`.
+
+### 2026-11-07 - Type: Debt - Not fixed, scope
+
+**Title:** 20 modal confirmations outside the Plan screen have no failure arm
+**Description:** The PD-M11 fault is a modal confirmation raising
+`_tkinter.TclError` instead of returning an answer, which leaves the gesture
+with nothing written and nothing said. Both of the Plan screen's confirmations
+now ask through `PlanScreen._ask_yes_no`, which carries the arm. The other 20
+`askyesno` / `askokcancel` sites, across 14 files (`weekly_items`,
+`vision_segments` ×3, `vision_elements`, `project_boards`, `ape_assignment`,
+`ape_period_view`, `settings`, `edit_contact` ×2, `vps_planning` ×2,
+`item_editor`, …), still call `messagebox` directly and would fail the same
+silent way.
+**Priority:** Medium
+**Effort:** Medium — one shared `ask_yes_no(parent, title, question) ->
+Optional[bool]` helper in `utils/`, every call site routed through it, and a
+status sentence at each one for the `None` answer. The sentences are the work,
+not the helper: each screen has its own wording and its own idea of what was
+not done.
+**Notes:** P5 says harden the class, not the instance, and this entry is the
+part of that class not covered. Deferred on scope rather than on judgement: 20
+call sites in 14 files, each needing a user-visible sentence, is its own batch
+with its own review pass, and appending it to a fix pass at the end of this one
+would ship the largest and least-reviewed diff of the batch. The one sibling
+that is in the same file and on the same screen — `clear_day`, which gates a
+transactional delete — was fixed here rather than deferred.
+
+### 2026-11-07 - Type: Debt - Not fixed, below the fix threshold
+
+**Title:** `PD_AUTOSCROLL_MARGIN_PX`'s value is not pinned by any test
+**Description:** `test_pdm121` / `test_pdm122` derive their pointer
+coordinates *from* `PD_AUTOSCROLL_MARGIN_PX`, so a mutation of the constant
+moves the tests with it. The band could be widened to cover the whole pane —
+taking over every drop near an edge — with a green suite. The comparison
+either side of the band *is* pinned (mutating `<` to `<=` is killed); only the
+width is not.
+**Priority:** Low
+**Effort:** Small — one test with a literal viewport and a literal expected
+band.
+**Notes:** Recorded, not fixed, under the repo's review budget: below-medium
+findings do not get fixed in-loop. The surviving mutant was already recorded in
+the handoff note's verification section; this is the same gap, raised again by
+the sweep. `PD_AUTOSCROLL_STEP_PX` is pinned, by
+`test_pdm129_a_tick_moves_the_day_by_the_step_in_pixels`.
+
+### 2026-11-07 - Refuted by measurement, no change made
+
+**Title:** A pending `after` callback does *not* survive its widget's destroy
+**Description:** The sweep raised two medium findings resting on the claim that
+"Tk's `after` is registered on the interpreter, not the widget, so destroying
+`PlanScreen` cancels nothing": that `_autoscroll_tick` would loop at 16Hz for
+the life of the interpreter after the screen was destroyed, and that
+`_after_release`'s deferred write would land on a dead widget and raise out of
+the redraw. Both were measured instead of argued, with pytest on a withdrawn
+root: `Misc.after` registers its callback through `_register(..., needcleanup=1)`,
+which appends the Tcl command name to **that widget's** `_tclCommands`, and
+`Misc.destroy` deletes every name in that list. Probed directly — schedule,
+destroy, pump due timers — the Tcl command is gone (`info commands` returns
+empty), the callback never runs, and no stderr appears. `app.py:299`
+`clear_content` does call `destroy()` on the screen, so navigation takes this
+path.
+**Priority:** n/a — no defect
+**Effort:** n/a
+**Notes:** Recorded so the next reader does not re-derive it, and so the
+guards it would have justified (a `winfo_exists` check in `_autoscroll_tick`
+and in `_after_release`'s deferred work) are not added as unreachable code.
+What remains real from that family is the lost-`ButtonRelease` entry above,
+which is about a drag that never ends rather than a screen that goes away.
 
 
 ## Deferred from the APE period-consistency sweep (2026-11-07)

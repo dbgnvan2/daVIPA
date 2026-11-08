@@ -73,14 +73,19 @@ This needs a **non-work day**, so set the date picker to a Saturday or Sunday.
 Record which of these three you get:
 
 - **The block appears** — fixed.
-- **Nothing appears and the status line says "the question could not be shown —
-  nothing was scheduled"** — the dialog is still raising, but it now tells you
-  so instead of failing silently. Say so; that is a different next step.
+- **Nothing appears and the status line says "the question could not be
+  completed — nothing was scheduled. Try the drop again, or allow the day in
+  Day Settings"** — the dialog is still raising, but it now tells you so
+  instead of failing silently. Say so; that is a different next step.
 - **Nothing appears and the status line says something else, or nothing** —
   still broken in a third way. Please copy the status line text.
 
 Then, without changing the date, drag a **second** item onto another box. It
 should go straight in without asking again.
+
+Then press **Clear Day** on that same date and answer No. Expected: the day is
+untouched and the status line says "Clear Day: nothing removed". That button's
+question now goes through the same failure arm, so it is worth the one press.
 
 ## 4. Does the day scroll while an item is dragged past its edge?
 
@@ -99,9 +104,9 @@ Make the window short enough that the Day Plan has a scrollbar.
 7. Release on a box. Expected: the item lands in that box, and the scrolling
    stops immediately.
 
-Record whether the **speed** is usable — it is set to one scroll unit every
-60ms, which is roughly a box every two ticks. Too fast to aim, too slow to be
-worth it, or about right?
+Record whether the **speed** is usable — it is set to 16 pixels every 60ms,
+which is half a box per tick, or about 270 pixels a second. Too fast to aim,
+too slow to be worth it, or about right?
 
 ## 5. Does the drag label still disappear on release?
 

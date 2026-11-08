@@ -8,19 +8,31 @@
   from inside the drop's `after_idle`; the traceback went to stderr, which the
   user never sees, so the gesture wrote nothing and said nothing. The question
   is now asked through `_ask_work_anyway`, whose `TclError` arm returns `None`
-  — neither yes nor no — so the screen says the question could not be shown,
-  writes nothing, and caches nothing, leaving the next drop free to ask again
-  (P1). The drop's work also moved off the idle queue onto a zero-delay timer
+  — neither yes nor no — so the screen says the question could not be
+  completed, writes nothing, and caches nothing, leaving the next drop free to
+  ask again (P1). The arm sits in `_ask_yes_no`, which `clear_day`'s
+  confirmation asks through as well, because it is a property of putting a
+  modal question on this screen rather than of one question (P5). The sentence
+  claims no cause on purpose: the raise came out of the single Tcl call that
+  both shows the dialog and returns the answer, so "never shown" is a guess,
+  and it is wrong in the case where the user said yes.
+  The drop's work also moved off the idle queue onto a zero-delay timer
   (`_after_release`), which is the context the raise was measured in. The
   *mechanism* of the raise is unproven: the byte-identical call works from
   `clear_day`'s button command, and the Yes click that produced the traceback
   was synthetic input.
-- ✅ **The Day Plan now scrolls while a drag sits at or past its edge** (PD-M12).
-  A pointer within `PD_AUTOSCROLL_MARGIN_PX` (24) of the pane's top or bottom —
-  or beyond it, which is the gesture reported — scrolls one unit every 60ms, and
-  the hover highlight is re-read after each step because the boxes have moved
-  under a pointer that has not. The x range is the pane's own, an end already
-  reached asks for nothing, and `_end_drag` cancels the timer.
+- ⚠️ **The Day Plan scrolls while a drag sits at or past its edge** (PD-M12) —
+  implemented, and **not yet seen on screen**. A pointer within
+  `PD_AUTOSCROLL_MARGIN_PX` (24) of the pane's top or bottom — or beyond it,
+  which is the gesture reported — scrolls it `PD_AUTOSCROLL_STEP_PX` (16) every
+  60ms, and the hover highlight is re-read after each step because the boxes
+  have moved under a pointer that has not. The x range is the pane's own, an
+  end already reached asks for nothing, and `_end_drag` cancels the timer.
+  Pixels and not canvas "units": the first version scrolled one unit per tick,
+  which the sweep showed is 8px on macOS, 1px on Windows and a tenth of the
+  pane on Linux, because `CTkScrollableFrame` sets `yscrollincrement` itself.
+  The tests assert the fraction asked of the canvas, so the pixels that move on
+  a real screen are item 4 of the checklist.
 - ⚠️ **"An item cannot be dropped into the early or late sections" did not
   reproduce.** Driven as real Tk events on a work day the day extends and the
   item is blocked, at both ends, with `plan_day_shape_unconfirmed` either way.

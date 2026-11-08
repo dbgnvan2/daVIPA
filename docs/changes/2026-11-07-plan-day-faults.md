@@ -33,7 +33,7 @@ said. Two changes:
 
 - `_ask_work_anyway` is split out of `_require_block_day` and carries a
   `tk.TclError` arm returning `None`. `None` is neither yes nor no: the caller
-  reports "the question could not be shown — nothing was scheduled", writes
+  reports "the question could not be completed — nothing was scheduled", writes
   nothing, and caches nothing, so the next drop asks again and can still be
   agreed to. Recording the failure as a refusal would turn a transient failure
   into a permanent negative (P1).
@@ -73,11 +73,11 @@ it on a weekday** — item 2 of the checklist.
 ### Fault 4 — the Day Plan does not scroll past its edge. **Implemented.**
 
 New in `plan.py`: `PD_AUTOSCROLL_MARGIN_PX` (24), `PD_AUTOSCROLL_INTERVAL_MS`
-(60) and `PD_AUTOSCROLL_UNITS` (1) as module constants, and
-`day_autoscroll_direction` / `autoscroll_day` / `_start_autoscroll` /
-`_autoscroll_tick` / `_stop_autoscroll`. While a drag is in hand, a pointer
+(60) and `PD_AUTOSCROLL_STEP_PX` (16) as module constants, and
+`day_autoscroll_direction` / `day_autoscroll_fraction` / `autoscroll_day` /
+`_start_autoscroll` / `_autoscroll_tick` / `_stop_autoscroll`. While a drag is in hand, a pointer
 within 24px of the day pane's top or bottom edge — **or past it**, which is the
-gesture the report describes — scrolls the pane one unit every 60ms, and the
+gesture the report describes — scrolls the pane 16px every 60ms, and the
 hover highlight is re-read after each step because the boxes have moved under a
 pointer that has not. The x range is the pane's own, so dragging up the
 unscheduled list does not scroll the day beside it. An end already reached asks
@@ -120,17 +120,28 @@ reader does not re-derive it.
 - `src/getmoredone/screens/plan.py`
 - `tests/test_plan_screen.py`
 - `BACKLOG.md`
+- `NOTES.md`
 - `docs/changes/2026-11-07-plan-day-faults.md` (this note)
+- `docs/changes/2026-11-07-plan-day-faults-screen-checklist.md` (the on-screen
+  pass this batch cannot do itself)
 
 ## Verification
 
 - Command: `GETMOREDONE_NO_MAPPED_WINDOWS= taskpolicy -b venv/bin/python -m pytest tests/test_plan_screen.py tests/test_ci_contract.py -q`
-- Result: PASS — 284 passed, 1 pre-existing failure, 1 skipped.
+- Result: **red, with a known cause outside this change** — 284 passed, 1
+  failed, 1 skipped. Reported as red rather than as a pass: the exit status is
+  non-zero, and a batch that calls that PASS teaches the next reader to read
+  past a failure line.
   The failure is `test_pbm61_a_tall_row_keeps_its_two_lines_together`, a
   mapped-window layout assertion over `plan_blocks.build_item_row`. It fails on
   `HEAD` too, this change touches neither `plan_blocks.py` nor that test, and it
   matches the layout test already known red on `main`.
-- 13 new tests, 2 existing tests adjusted. Every new test proved by mutation:
+- 13 new tests, 2 existing tests adjusted, before the fix pass below added 6
+  more tests and adjusted 3. **Commit `1ae0397`'s subject line says "fourteen
+  tests" and is wrong** — there are 13. It is left as it is because the commit
+  is not the branch tip and rewording it means rewriting two commits of
+  history for a subject line; the error is recorded here instead.
+  Every new test proved by mutation:
   17 mutants applied one at a time to the line each test names, each run
   against that test alone, all 17 killed, source restored verbatim after each.
   Two mutants had to be rewritten after surviving, and both survivals were
@@ -151,6 +162,63 @@ reader does not re-derive it.
   from pytest driving real widgets on a withdrawn root, plus the app's own
   stderr from the earlier investigation. Items 1–5 of the checklist are what
   pytest cannot answer.
+
+## Fix pass — the sweep's findings
+
+`learning-qa` over `6d86791...HEAD` returned 10 findings, one high, after
+`/code-review` had returned 3. Disposition:
+
+- **Fixed (1 high).** `PD_AUTOSCROLL_UNITS = 1` was not a distance.
+  `CTkScrollableFrame.__init__` configures the canvas's `yscrollincrement`
+  itself and differently per platform — 8 on macOS, 1 on Windows, unset on
+  Linux, where Tk falls back to a tenth of the pane — so one unit per 60ms was
+  ~133px/s, ~17px/s and ~500px/s for the same line of code. The constant's own
+  comment ("roughly a box every two ticks") was true on no platform, and no
+  test noticed because every test asserted the arguments to `yview_scroll`
+  rather than any movement. Now `PD_AUTOSCROLL_STEP_PX = 16` and a new
+  `day_autoscroll_fraction`, which converts pixels to a fraction of
+  `bbox("all")` and scrolls with `yview_moveto`. 16 is a multiple of 8 so the
+  macOS increment cannot round the step away. The tests assert the resulting
+  fraction with the arithmetic written out, not the call.
+- **Fixed (4 medium).** The confirmation arm is now `_ask_yes_no`, and
+  `clear_day` — the nearest sibling, in the same file, gating a transactional
+  delete — asks through it too (P5). The `None` status no longer claims a
+  cause: the `TclError` came out of the single Tcl call that both shows the
+  dialog and returns the answer, so "it was never shown" is a guess, and it is
+  the wrong guess in the case where the user answered yes; the sentence now
+  says "could not be completed" and names a remedy. The deferral test's queue
+  assertions are labelled provisional in its docstring, since the queue is the
+  candidate cure for an unproven cause. And the gesture is covered end to end
+  by `test_pdm1111_the_gesture_itself_survives_a_question_that_raises` —
+  before it, every test of the failing dialog called `block_item` directly.
+- **Fixed (1 low, in a line already being rewritten).** `bool(askyesno(...))`
+  → `answer is True`: for a confirmation the truthy direction is the unsafe
+  one. Also the two stale `after_idle` references in `_flush_redraw`'s
+  docstring, which this batch had removed from the code.
+- **Refuted by measurement (2 medium).** Both rested on "Tk's `after` is
+  registered on the interpreter, not the widget". It is registered on the
+  widget: `Misc.after` → `_register(..., needcleanup=1)` appends the Tcl
+  command to that widget's `_tclCommands`, and `Misc.destroy` deletes them.
+  Probed with pytest — schedule, destroy, pump due timers — the command is
+  gone, the callback never runs, no stderr. So neither the autoscroll tick nor
+  the deferred drop can run after the screen is destroyed, and the two
+  `winfo_exists` guards the findings asked for would have been unreachable
+  code. Recorded in `BACKLOG.md` with the probe.
+- **Deferred (1 medium, 1 low).** The other 20 `askyesno` / `askokcancel`
+  sites across 14 files, on scope — each needs its own user-visible sentence,
+  which is its own batch. And `PD_AUTOSCROLL_MARGIN_PX`'s value is still not
+  pinned by a test, which is below the repo's fix threshold. Both in
+  `BACKLOG.md` with the reasons.
+- **Fixed (1 low, docs).** This note's own overstatements: `NOTES.md` missing
+  from "Files changed", a non-zero exit reported as PASS, and the commit
+  subject's "fourteen tests". All three corrected above.
+
+6 new tests from this pass, 3 existing tests adjusted. The adjusted ones are
+the two `test_pdm124` autoscroll tests, which asserted the opaque unit —
+reason **(b), the behaviour changed intentionally** — and the dialog test's
+status assertions, which moved with the reworded sentence, same reason. 11 more
+mutants, one per fix, each applied alone against the test that names it, all 11
+killed, source restored and its hash verified after each.
 
 ## Risks / Known gaps
 
@@ -176,9 +244,11 @@ reader does not re-derive it.
   in `BACKLOG.md`, but the reported fault is the raise, not the race: the
   traceback shows the dialog never returned at all. The BACKLOG note that said
   "this report may be that demonstration" has been corrected.
-- The autoscroll speed (one unit per 60ms) is a judgement, set from the box
-  height, and has not been felt by a human. Item 4 of the checklist asks
-  whether it is usable.
+- The autoscroll speed (16px per 60ms, half a box per tick) is a judgement and
+  has not been felt by a human. Item 4 of the checklist asks whether it is
+  usable. It is now the same speed on all three platforms, which it was not
+  before the fix pass, but it has been measured on none of them — the tests
+  assert the fraction asked of the canvas, not pixels that moved on a screen.
 
 ## Next agent actions
 
