@@ -15,7 +15,7 @@ from ..weekly_tactic_logging import get_weekly_tactic_logger
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
 from .chip_table import (
     APE_LEFT_COLUMNS,
-    APE_RIGHT_COLUMNS,
+    WEEK_ASSIGNMENT_RIGHT_COLUMNS,
     ChipTable,
     show_list_or_message,
 )
@@ -217,7 +217,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         )
         self.right_table = ChipTable(
             self.right_list, self.settings,
-            f"{self.SETTINGS_PREFIX}_right", APE_RIGHT_COLUMNS,
+            f"{self.SETTINGS_PREFIX}_right", WEEK_ASSIGNMENT_RIGHT_COLUMNS,
         )
 
         # UPD-M1 — the ratio, the clamp and the four handlers live in
@@ -462,8 +462,17 @@ class WeeklyItemsScreen(ctk.CTkFrame):
                  image has in an Actions column. Selection and
                  double-click-to-open are re-bound here; the table knows
                  nothing about either.
+
+                 WTP-M6.4 — each row also shows ``n/m`` in a Done column, from
+                 ``count_open_children_for_weekly_tactic``: a tactic is a
+                 parent now, so its row says how much of the week under it is
+                 finished. The number comes from the helper, not from a count
+                 taken here, so this panel and the Week Actions tactic list
+                 cannot disagree about one week (WTP-M6.5 reads the same one).
         Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m5
+                 docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m6
         Tests:   tests/test_unified_panel_design.py::test_updm51_right_panel_has_the_actions_column
+                 tests/test_weekly_tactic_parent.py::test_wtpm64_week_assignment_row_shows_progress
         """
         empty = not self.right_items
         self._show_list_or_message(self.right_list, self.right_empty, empty)
@@ -479,12 +488,15 @@ class WeeklyItemsScreen(ctk.CTkFrame):
                 segment_name, subsegment_name, category_name)
             bg = palette["selected_tint"] if idx - 1 == self.selected_weekly_idx else None
 
+            done, total = self.vps_manager.count_open_children_for_weekly_tactic(
+                row["id"])
             item, cells = self.right_table.add_row(
                 {
                     "index": str(idx),
                     "segment": segment_name,
                     "subsegment": subsegment_name,
                     "category": category_name,
+                    "progress": f"{done}/{total}" if total else "—",
                 },
                 {
                     "segment": segment_color,
@@ -506,7 +518,8 @@ class WeeklyItemsScreen(ctk.CTkFrame):
                    padx=5, pady=5, sticky="e")
 
             for widget in (item, cells["index"], cells["segment"],
-                           cells["subsegment"], cells["category"]):
+                           cells["subsegment"], cells["category"],
+                           cells["progress"]):
                 widget.bind("<Button-1>", lambda _e, i=idx - 1: self.on_select_weekly_item(i))
                 widget.bind("<Double-Button-1>", lambda _e, i=idx - 1: self._open_weekly_from_index(i))
 
@@ -585,18 +598,42 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         self.delete_weekly_row(self.selected_weekly_item)
 
     def delete_weekly_row(self, row: Dict[str, object]):
-        """Delete one weekly tactic, after asking.
+        """Delete one weekly tactic, after asking — naming what will go with it.
 
         Purpose: UPD-M5.2, UPD-M5.3 — the row's own Delete button and the
                  Delete Weekly button below the list are two ways to delete
                  the same thing, so they are one method with two callers
                  rather than two copies of the confirmation (P5). A refused
                  confirmation deletes nothing and says nothing.
+
+                 WTP-M5.2 — the confirmation names the count. WTP-M5.3 widened
+                 what this delete destroys: a tactic is a parent now, so the
+                 cascade takes the items linked by ``weekly_tactic_id`` as well
+                 as the ``parent_id`` children, and their own subtasks. "and
+                 related action items" was already vague; against the wider
+                 delete it understates it. The number comes from
+                 ``children_to_delete_with_weekly_tactic``, which returns the
+                 ids the cascade will actually delete — the same list, not a
+                 second count of the same thing (P6: the figure shown is read
+                 off the work that will be done).
         Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m5
+                 docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m5
         Tests:   tests/test_unified_panel_design.py::test_updm53_delete_is_confirmed_before_it_happens
+                 tests/test_weekly_tactic_parent.py::test_wtpm52_confirmation_names_the_child_count
         """
         title = (row.get("title") or "this weekly tactic").strip()
-        if not messagebox.askyesno("Delete Weekly Tactic", f"Delete {title} and related action items?", icon="warning"):
+        doomed = self.vps_manager.children_to_delete_with_weekly_tactic(row["id"])
+        if doomed:
+            count = len(doomed)
+            noun = "Action Item" if count == 1 else "Action Items"
+            prompt = (
+                f"Delete {title}?\n\n"
+                f"This will also delete {count} {noun} filed under it. "
+                f"This cannot be undone."
+            )
+        else:
+            prompt = f"Delete {title}?\n\nNo Action Items are filed under it."
+        if not messagebox.askyesno("Delete Weekly Tactic", prompt, icon="warning"):
             return
         if self.vps_manager.delete_weekly_action_item(row["id"]):
             self.refresh()

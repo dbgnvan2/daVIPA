@@ -111,6 +111,17 @@ APE_RIGHT_COLUMNS: Tuple[ChipColumn, ...] = _INDEX_AND_CHIPS + (
     ChipColumn("actions", "Actions", 84, chip=False, resizable=False),
 )
 
+# Right panel on APE Week Assignment (WTP-M6.4). The same set as the other two
+# APE right panels plus a Done column, because this is the only right panel
+# whose rows are Weekly Tactics — the other two list Annual Plan Elements,
+# which have no children to count. Kept as its own constant rather than added
+# to APE_RIGHT_COLUMNS for that reason: a Done column on APE Quarter and APE
+# Month would be a column that can only ever read 0/0.
+WEEK_ASSIGNMENT_RIGHT_COLUMNS: Tuple[ChipColumn, ...] = _INDEX_AND_CHIPS + (
+    ChipColumn("progress", "Done", 70, min_width=52, chip=False),
+    ChipColumn("actions", "Actions", 84, chip=False, resizable=False),
+)
+
 # Right panel on Annual Vision Segments: Edit *and* Delete, so 140px. This is
 # the only column width that differs across the three screens.
 ANNUAL_RIGHT_COLUMNS: Tuple[ChipColumn, ...] = _INDEX_AND_CHIPS + (
@@ -128,6 +139,9 @@ WEEK_ACTIONS_LEFT_COLUMNS: Tuple[ChipColumn, ...] = (
     ChipColumn("segment", "Segment", 135, min_width=60),
     ChipColumn("subsegment", "SubSegment", 155, min_width=60),
     ChipColumn("category", "Category", 125, min_width=60),
+    # WTP-M6.5 — the same count as the APE Week Assignment right panel, read
+    # from the same helper, so the two panels cannot disagree about one week.
+    ChipColumn("progress", "Done", 70, min_width=52, chip=False),
 )
 
 

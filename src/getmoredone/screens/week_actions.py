@@ -439,8 +439,18 @@ class WeekActionsScreen(ctk.CTkFrame):
                  no column a user could size. It is the same table the other
                  five panels draw now, with a Title column this tab needs
                  because its rows are picked by name.
+
+                 WTP-M6.5 — each row also shows ``n/m`` in a Done column, so
+                 the list says how much of the work under each tactic is
+                 finished. It reads
+                 ``vps_manager.count_open_children_for_weekly_tactic``, the
+                 same helper the APE Week Assignment right panel reads
+                 (WTP-M6.4), rather than counting here: two panels counting the
+                 same week two ways is how they come to disagree.
         Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m6
+                 docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m6
         Tests:   tests/test_unified_panel_design.py::test_updm62_left_panel_is_the_shared_table
+                 tests/test_weekly_tactic_parent.py::test_wtpm65_week_actions_list_shows_progress
         """
         self.tactic_row_frames = {}
         self.left_title_label.configure(text=self._left_title())
@@ -463,6 +473,8 @@ class WeekActionsScreen(ctk.CTkFrame):
             tactic_id = row["id"]
             selected = tactic_id == self.selected_tactic_id
 
+            done, total = self.vps_manager.count_open_children_for_weekly_tactic(
+                tactic_id)
             frame, cells = self.left_table.add_row(
                 {
                     "index": str(idx),
@@ -470,6 +482,7 @@ class WeekActionsScreen(ctk.CTkFrame):
                     "segment": segment_name,
                     "subsegment": subsegment_name,
                     "category": category_name,
+                    "progress": f"{done}/{total}" if total else "—",
                 },
                 {
                     "segment": segment_color,
