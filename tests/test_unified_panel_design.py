@@ -2662,7 +2662,7 @@ def test_updm62_a_row_with_no_category_colour_takes_the_subsegments(tmp_path):
 
     The category chip falls back to the subsegment's colour rather than
     rendering as a hole, which is `resolve_chip_colors`' contract and the
-    reason `week_actions` calls it instead of writing a seventh copy of the
+    reason `week_actions` calls it instead of writing a sixth copy of the
     three-part lookup.
     """
     from src.getmoredone.screens.segment_color_utils import resolve_chip_colors
@@ -2685,3 +2685,98 @@ def test_updm62_a_row_with_no_category_colour_takes_the_subsegments(tmp_path):
         {("purposeful work", "living systems", "blog"): "#cc7744"},
     )
     assert cat == "#cc7744"
+
+
+# ------------------------------------- UPD-M7: it holds together on screen
+#
+# M7.2 and M7.3 cannot be met by a test and are not written as one: they are
+# the on-screen checklist in the spec's §11, walked by a person in the running
+# app. The two below are M7.1, the part of "it holds together" that code can
+# hold: that none of the rewritten panels needs a window on screen to be
+# built, and that this batch did not add a test that takes one.
+
+THIS_FILE = Path(__file__).resolve()
+
+
+def _toplevels_under(widget) -> list:
+    """Every Toplevel anywhere beneath a widget, depth first.
+
+    `winfo_class()` rather than `isinstance`: `ctk.CTkToplevel` and
+    `tk.Toplevel` both report "Toplevel", and a dialog a screen opens may be
+    either. Recursive rather than a pass over the root's own children,
+    because a screen builds three or four frames deep before it opens
+    anything — the mutation for this walks a dialog in at `left_frame`, which
+    is `root` → screen → `body` → `left_frame`.
+    """
+    found = []
+    for child in widget.winfo_children():
+        if child.winfo_class() == "Toplevel":
+            found.append(str(child))
+        found.extend(_toplevels_under(child))
+    return found
+
+
+def test_updm71_screens_construct_withdrawn(tmp_path):
+    """UPD-M7.1 — the five rewritten tabs build without a window of their own.
+
+    A full run builds real Tk windows on purpose, and on macOS a mapped one
+    raises itself and takes the keyboard — `tests/test_tk_offscreen.py`'s
+    docstring has the shape of it. UPD-M1 through UPD-M6 rewrote the
+    construction path of all five of these screens, and a dialog opened while
+    one is being built is a modal thrown over whoever is using the machine,
+    once per test that builds that screen. The Toplevel count is this test's
+    failable claim: exact 0, walked to the bottom of each widget tree, so a
+    dialog opened three frames down still counts.
+
+    The two assertions above it are weaker on purpose and are stated as what
+    they are: `conftest.py` withdraws every window at construction and
+    re-withdraws after any `deiconify`, so these hold whatever a screen does.
+    `tests/test_tk_offscreen.py` is the guard on that guard (P24); what is
+    asserted here is that the five rewritten construction paths are inside it.
+
+    `vision_segments.py` is not here: it is out of scope by UPD-D8 and was not
+    touched.
+    """
+    vps = make_vps(tmp_path)
+    builders = (
+        ("ape_assignment", lambda: _quarter_screen()),
+        ("ape_period_view", lambda: _month_screen()),
+        ("annual_vision_segments", lambda: _annual_screen()),
+        ("weekly_items", lambda: _week_screen()),
+        ("week_actions", lambda: _week_actions_screen(tmp_path, vps)),
+    )
+    try:
+        for name, build in builders:
+            root, screen = build()
+            try:
+                assert root.wm_state() == "withdrawn", name
+                assert screen.winfo_ismapped() == 0, name
+                opened = _toplevels_under(root)
+                assert opened == [], f"{name} opened {opened}"
+            finally:
+                root.destroy()
+    finally:
+        vps.close()
+
+
+def test_updm71_no_test_here_needs_a_mapped_window():
+    """UPD-M7.1 — the mapped-window count did not move, counted from the AST.
+
+    The suite-wide total is held by
+    `tests/test_ci_contract.py::test_the_documented_mapped_window_count_is_the_real_one`,
+    which checks the number CLAUDE.md states against the number of tests that
+    actually take the `mapped_windows` fixture. This is the part that belongs
+    to this batch: six panels across five screens were rewritten and not one
+    of the tests written for them needs a real window, so the number that
+    test checks is the one it was before. An exact count of zero, not a
+    ceiling — a test added here that quietly took the fixture would put a
+    window on the user's screen on every local run.
+    """
+    tree = ast.parse(THIS_FILE.read_text(encoding="utf-8"))
+    needs_window = sorted(
+        node.name for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name.startswith("test_")
+        and "mapped_windows" in [arg.arg for arg in node.args.args]
+    )
+    assert needs_window == []
