@@ -949,18 +949,22 @@ def test_apcm62_quarter_drag_path_reaches_the_same_reporting():
     screen's drag test gives: ``_assign_one``'s broad ``except Exception``
     would swallow a stub that raised, so a message-only assertion would pass
     on a call that never legitimately happened.
+
+    UPD-M2 moved the drop *test* — the pointer, the descendant walk, the
+    release binding — into ``screens/row_drag.py``, and what a dropped row
+    means stayed on the screen as ``_assign_dragged_row``. This test is
+    rewritten against that method, case (b): the behaviour did not change, the
+    method the behaviour lives in did. The six stub members that only ever
+    existed to carry the drag machinery are gone with it, which is the point —
+    ``test_updm22_drop_inside_the_target_assigns_once`` now owns the claim
+    that a release inside the panel reaches this method exactly once, and this
+    test owns the claim that reaching it reports.
     """
     from src.getmoredone.screens.ape_assignment import APEAssignmentScreen
 
     said = []
     calls = []
     stub = SimpleNamespace(
-        dragged_row={"id": "ape-bad"},
-        winfo_toplevel=lambda: SimpleNamespace(unbind=lambda _e: None),
-        winfo_pointerxy=lambda: (0, 0),
-        right_list=object(),
-        winfo_containing=lambda *_: "target",
-        _is_descendant=lambda *_: True,
         _parse_period=lambda: (2026, 4),
         vps_manager=SimpleNamespace(
             assign_ape_to_quarter=lambda *a: calls.append(a) or False
@@ -972,12 +976,20 @@ def test_apcm62_quarter_drag_path_reaches_the_same_reporting():
     )
     _bind(stub, APEAssignmentScreen, "_assign_one", "_ids_in_quarter")
 
-    APEAssignmentScreen._finish_row_drag(stub, SimpleNamespace(x_root=0, y_root=0))
+    APEAssignmentScreen._assign_dragged_row(stub, {"id": "ape-bad"})
 
     assert calls == [("ape-bad", 4)], (
         f"the drop must reach the manager with the parsed quarter, got {calls}"
     )
     assert any("could not be assigned" in s for s in said if isinstance(s, str)), said
+    # A refused assignment still redraws. Added at UPD-M2, because the
+    # mutation gate found that neither this test nor any other asserted it on
+    # this screen: dropping `refresh_lists()` from the method left every
+    # assertion above green. The same fault was found and fixed on the weekly
+    # screen, where `tests/test_weekly_tactic_schema.py` pins it in so many
+    # words ("used to refresh only when something was created"); this is its
+    # untested sibling (P5), and the gap predates UPD-M2.
+    assert "refresh" in said, "a refused drop must not skip the redraw"
 
 
 def _break_segment_link(vps, ape_id):

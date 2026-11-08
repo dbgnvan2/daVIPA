@@ -38,7 +38,7 @@ import customtkinter as ctk  # noqa: E402
 
 from src.getmoredone.app_settings import AppSettings  # noqa: E402
 from src.getmoredone.color_contrast import pick_text_color  # noqa: E402
-from src.getmoredone.screens import chip_table, split_panel  # noqa: E402
+from src.getmoredone.screens import chip_table, row_drag, split_panel  # noqa: E402
 from src.getmoredone.screens.ape_assignment import APEAssignmentScreen  # noqa: E402
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "getmoredone"
@@ -792,5 +792,251 @@ def test_updm16_a_prefix_with_no_settings_field_says_so(caplog):
         panel.on_release(_event(0))
         assert settings.saved == 0
         assert not hasattr(settings, "nowhere_split_ratio")
+    finally:
+        root.destroy()
+
+
+# --------------------------------------------- UPD-M2: one row-drag, not four
+
+DRAG_METHODS = ("_start_row_drag", "_is_descendant")
+
+# The screens that still carry their own copy of the row drag. UPD-M2 adopts
+# ape_assignment only (the spec's §4 step 3); these three adopt at UPD-M4 and
+# this set must shrink to empty as they do. Exact, like SPLITTER_HOLDOUTS, and
+# for the same reason.
+DRAG_HOLDOUTS = {
+    "annual_vision_segments.py",
+    "ape_period_view.py",
+    "weekly_items.py",
+}
+
+
+class _FakeWidget:
+    """A widget that records what was bound on it.
+
+    `winfo_pointerxy` reads the real mouse, so the drop test cannot be driven
+    with real widgets: where the pointer happens to be when the suite runs is
+    not an input a test may depend on. These doubles are the only way to say
+    "the release landed here" and mean it, and they are what the drag tests in
+    tests/test_ape_period_consistency.py already use.
+    """
+
+    def __init__(self, name="widget", master=None):
+        self.name = name
+        self.master = master
+        self.bound = {}
+        self.unbound = []
+
+    def bind(self, sequence, handler):
+        # Tk replaces rather than appends without add="+", and so does this.
+        self.bound[sequence] = handler
+
+    def unbind(self, sequence):
+        self.unbound.append(sequence)
+        self.bound.pop(sequence, None)
+
+
+class _FakeScreen:
+    """The three things RowDragSource reads from the screen it is given."""
+
+    def __init__(self, containing=None):
+        self.toplevel = _FakeWidget("toplevel")
+        self.containing = containing
+        self.asked = None
+
+    def winfo_toplevel(self):
+        return self.toplevel
+
+    def winfo_pointerxy(self):
+        return (7, 11)
+
+    def winfo_containing(self, x, y):
+        self.asked = (x, y)
+        return self.containing
+
+
+def _drag_source(containing=None, target=None):
+    """A RowDragSource over doubles, plus the list its on_drop appends to."""
+    dropped = []
+    target = target if target is not None else _FakeWidget("right_list")
+    screen = _FakeScreen(containing=containing)
+    source = row_drag.RowDragSource(screen, target, dropped.append)
+    return screen, target, source, dropped
+
+
+def test_updm21_every_widget_in_the_row_is_a_drag_handle():
+    """UPD-M2.1 — the frame and every cell start the drag, with their own row.
+
+    Two rows are bound, and each row's five handles are asserted to start
+    *that* row: a drag handle that assigns the wrong record is worse than one
+    that does nothing, because it looks like it worked.
+
+    What this test does **not** establish, though its first draft said it did:
+    that the `r=row` default argument in `bind_row`'s lambda is load-bearing.
+    It is not. `bind_row`'s loop is over the widgets, and `row` is a parameter
+    of the call, so each call already closes over its own `row` and the
+    late-binding trap that default argument guards against cannot be reached
+    here. Replacing `lambda _event, r=row: self.start(r)` with
+    `lambda _event: self.start(row)` leaves this test **green** — measured.
+    The assertions that carry a verdict are the two mutations that do turn it
+    red: binding only `widgets[:1]`, and starting with a row other than the
+    one bound.
+    """
+    screen, target, source, dropped = _drag_source()
+    first = [_FakeWidget(f"a{i}") for i in range(5)]
+    second = [_FakeWidget(f"b{i}") for i in range(5)]
+    row_a = {"id": "ape-a"}
+    row_b = {"id": "ape-b"}
+    source.bind_row(first, row_a)
+    source.bind_row(second, row_b)
+
+    for widget in first + second:
+        assert set(widget.bound) == {"<ButtonPress-1>"}, widget.name
+
+    for widget in first:
+        source.dragged_row = None
+        widget.bound["<ButtonPress-1>"](SimpleNamespace())
+        assert source.dragged_row is row_a, widget.name
+    for widget in second:
+        source.dragged_row = None
+        widget.bound["<ButtonPress-1>"](SimpleNamespace())
+        assert source.dragged_row is row_b, widget.name
+
+    # The release is the toplevel's, not the row's: the pointer leaves the row.
+    assert set(screen.toplevel.bound) == {"<ButtonRelease-1>"}
+
+
+def test_updm22_drop_inside_the_target_assigns_once():
+    """UPD-M2.2 — one release inside the target is one call, with that row.
+
+    A nested widget, not the target itself, because that is what
+    `winfo_containing` returns for a drop onto a row of the right-hand list.
+    """
+    target = _FakeWidget("right_list")
+    inner = _FakeWidget("right_row", master=_FakeWidget("mid", master=target))
+    screen, target, source, dropped = _drag_source(containing=inner, target=target)
+    row = {"id": "ape-1"}
+
+    source.start(row)
+    source.finish(SimpleNamespace())
+
+    assert dropped == [row]
+    assert screen.asked == (7, 11), "the pointer decides the target, not the event"
+    assert source.dragged_row is None
+    assert screen.toplevel.unbound == ["<ButtonRelease-1>"]
+
+    # A second release, with no second press, adds nothing.
+    source.finish(SimpleNamespace())
+    assert dropped == [row]
+
+
+def test_updm23_drop_outside_the_target_does_nothing():
+    """UPD-M2.3 — released over another widget, or over nothing at all.
+
+    `winfo_containing` returns None when the pointer is outside every widget
+    in the application, which is a release past the edge of the window.
+    """
+    for containing in (_FakeWidget("left_list"), None):
+        target = _FakeWidget("right_list")
+        screen, target, source, dropped = _drag_source(
+            containing=containing, target=target
+        )
+        source.start({"id": "ape-1"})
+        source.finish(SimpleNamespace())
+
+        assert dropped == []
+        assert source.dragged_row is None
+        assert screen.toplevel.unbound == ["<ButtonRelease-1>"]
+
+
+def test_updm24_release_without_a_press_does_nothing():
+    """UPD-M2.4 (P7) — the input that looks like a drop and is not.
+
+    Reached by any click on the window that is not a row: the release fires,
+    there is no row, and nothing may be assigned. Asserted over a pointer that
+    *is* inside the drop target, so the drop test cannot be what saves it.
+    """
+    target = _FakeWidget("right_list")
+    inner = _FakeWidget("right_row", master=target)
+    screen, target, source, dropped = _drag_source(containing=inner, target=target)
+
+    assert source.dragged_row is None
+    source.finish(SimpleNamespace())
+
+    assert dropped == []
+    assert screen.asked is None, "a release with no drag must not even look"
+
+
+def test_updm24_is_descendant_walks_up_and_stops():
+    """UPD-M2.4 — the descendant walk: itself, its masters, and nothing else.
+
+    `None` is the answer `winfo_containing` gives for a pointer outside the
+    application, so it has to be an ordinary input rather than a crash.
+    """
+    root_w = _FakeWidget("root")
+    mid = _FakeWidget("mid", master=root_w)
+    leaf = _FakeWidget("leaf", master=mid)
+    other = _FakeWidget("other")
+
+    assert row_drag.is_descendant(leaf, leaf)
+    assert row_drag.is_descendant(leaf, mid)
+    assert row_drag.is_descendant(leaf, root_w)
+    assert not row_drag.is_descendant(leaf, other)
+    assert not row_drag.is_descendant(root_w, leaf)
+    assert not row_drag.is_descendant(None, root_w)
+
+
+def _screens_with_their_own_drag():
+    """{filename: the drag names it defines} across screens/, by AST."""
+    found = {}
+    for path in sorted((SRC / "screens").glob("*.py")):
+        if path.name == "row_drag.py":
+            continue
+        names = {
+            node.name
+            for node in ast.walk(ast.parse(path.read_text()))
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name in DRAG_METHODS
+        }
+        if names:
+            found[path.name] = names
+    return found
+
+
+def test_updm25_no_screen_keeps_its_own_drag():
+    """UPD-M2.5 — counted from the AST, as an exact set.
+
+    Partial for the same reason UPD-M1.5 is: UPD-M2 adopts ape_assignment
+    only, so the count is not 0 yet and claiming it would be false. The set is
+    exact in both directions — red if another screen grows its own copy, red
+    again when a holdout adopts and is not struck off here.
+    """
+    found = _screens_with_their_own_drag()
+    assert set(found) == DRAG_HOLDOUTS
+    assert "ape_assignment.py" not in found
+    for name in DRAG_HOLDOUTS:
+        assert found[name] == set(DRAG_METHODS), (name, sorted(found[name]))
+
+
+def test_updm22_the_quarter_screen_routes_its_drop_through_the_module():
+    """UPD-M2.1/M2.2 — the real screen is wired to the shared module.
+
+    The doubles above prove the module; this proves the screen uses it, which
+    is the half a double cannot. Asserted on the real screen: the drag source
+    exists, it points at the right panel, and its callback is the screen's own
+    assignment rather than something the module invented.
+    """
+    root, screen = _quarter_screen(left_rows=[_ape_row(1)])
+    try:
+        assert isinstance(screen.row_drag, row_drag.RowDragSource)
+        assert screen.row_drag.drop_target is screen.right_list
+        assert screen.row_drag.on_drop == screen._assign_dragged_row
+        assert screen.row_drag.dragged_row is None
+        assert not hasattr(screen, "dragged_row")
+
+        row_frames = _row_frames(screen.left_list)
+        assert row_frames, "a left row is needed to have a handle at all"
+        bound = set(_bound_sequences(row_frames[0]))
+        assert "<Button-1>" in bound
     finally:
         root.destroy()
