@@ -41,6 +41,25 @@ corrected to say it was first built on one surface only.
 The gate's second finding (F2, low — Calendar Export hunks inside a
 `feat(wtp)` commit) is filed, not fixed.
 
+**WTP-M6.8 — the same question, through the real widgets.** Everything above is
+verified by driving each screen's `complete_item` unbound against a
+`SimpleNamespace`, which proves the guard is *in* the method and nothing about
+the control that reaches it. `tests/test_weekly_tactic_completion_widgets.py`
+builds the real screens instead: it finds the widget the screen itself created
+— by reading the item id out of that widget's own callback rather than by
+matching the row's rendered text — and presses it with the widget's own
+`toggle()` / `invoke()`. 21 tests, 13 mutations, all killed.
+
+**WTP-A8, found by doing that.** Looking for the widget behind each guarded
+method turned up one that has none: `HierarchicalScreen.complete_item` has no
+caller anywhere in `src/` — no `command=`, no string reference, no `getattr`.
+Its rows are labels only. The guard on it is therefore harmless but
+unreachable, and three documents were claiming otherwise (this note's checklist
+step 4 among them). The spec, the user guide and this note are corrected, and
+the dead method is filed as WTP-A8 rather than fixed: whether that screen should
+grow a Complete control or lose the method is a product decision, not a
+cleanup.
+
 ## Files changed
 
 Source:
@@ -56,13 +75,15 @@ Source:
 
 Tests:
 - `tests/test_weekly_tactic_completion_surfaces.py` — new, 31 tests
+- `tests/test_weekly_tactic_completion_widgets.py` — new, 21 tests (WTP-M6.8)
 
 Docs:
 - `docs/spec_2026-11-08_weekly_tactic_as_parent.md` — WTP-M6.7, summary, status
 - `docs/cycles/2026-11-08_wtp-plc-upd-pd-qa-gate.md` — the gate's own report
 - `docs/USER_GUIDE.md` — the Complete bullet now says the question is asked
   wherever a tactic is completed
-- `BACKLOG.md` — WTP-A2, WTP-A3, WTP-A4
+- `BACKLOG.md` — WTP-A2, WTP-A3, WTP-A4; then WTP-A5, A6, A7 from the re-gate;
+  then WTP-A8
 - this note
 
 ## Verification
@@ -91,15 +112,42 @@ returned nothing and the filter was never reached. The test now seeds the
 completed status straight onto the rows (P8) and asserts the seed left them
 under the tactic, which is the state the line is actually for.
 
+### WTP-M6.8, the widget layer
+
+- Command: `pytest tests/test_weekly_tactic_completion_widgets.py -q`
+- Result: PASS — 21 passed
+
+- Command: mutation gate, 13 mutations (scratchpad `mutate_widgets.py`)
+- Result: PASS — all 13 killed, every file restored verbatim
+
+The mutation gate was worth running twice here. Its first run left a survivor:
+the mutation that counts *completed* children as open, because the test it was
+aimed at used a tactic with no children at all, so the status filter was never
+reached. The test now seeds two completed children by SQL and asserts the seed
+left them under the tactic — the same trap, and the same fix, as in the stub
+file. And one test *hung* rather than failing under the "timer: no guard"
+mutation: with the guard gone, `finished_action` walked into the note dialog
+and blocked in `wait_window` with nobody to dismiss it. Both timer tests now
+arm the dismisser, including the one that expects no dialog, so a removed guard
+goes red instead of hanging. A test that hangs is not a test that can fail.
+
+A third thing the gate taught, about itself: the first run was killed with
+SIGTERM between a mutation and its restore and left the timer's guard deleted
+in the working tree. `try/finally` does not cover a signal. The script now
+installs a SIGTERM/SIGINT/SIGHUP handler and an `atexit` hook that restore
+every mutated file, and asserts the restore at the end.
+
 ## Risks / Known gaps
 
-- **Nobody has opened the app.** Every assertion here is a unit test driving an
-  unbound method against a stub; no test builds a window. The on-screen
-  checklist below is not done.
-- **The timer's accepting path is not tested.** Saying Yes there runs a
-  work-log save and a window teardown a stub this size cannot stand in for, so
-  `ACCEPT_SURFACES` leaves the timer out. Its decline path — the one this fix
-  changed — is tested.
+- **Nobody has opened the app.** No test maps a window: every screen here is
+  built withdrawn, as conftest requires. What the widget tests add is that the
+  real widget tree is built and the real control is pressed, so an unwired
+  control or a screen that cannot construct now fails a test rather than
+  waiting for someone to look. What they still cannot see is anything only
+  visible on screen — layout, colour, whether the modal is legible. The
+  on-screen checklist below is not done.
+- **`HierarchicalScreen.complete_item` is unreachable** (WTP-A8). Filed, not
+  fixed. Its guard is correct and dead.
 - **`docs/DOCUMENTATION_INDEX.md` has no entry** for this note or the gate
   file. That file carries another session's uncommitted work, and `CLAUDE.md`
   says to add shared-doc entries after the merge. Nothing enforces the index in
@@ -119,7 +167,8 @@ silently while `/Applications/daVIPA.app` holds the database.
    open items under it. Expect the question, naming the count.
 2. Say No. The row must still be open, and nothing else should change.
 3. Say Yes. The tactic completes; its items stay open.
-4. Hierarchical: complete a tactic from the tree. Same question.
+4. ~~Hierarchical: complete a tactic from the tree.~~ **Not possible** — that
+   screen's rows have no Complete control (WTP-A8). Nothing to check.
 5. All Items and Upcoming: same, once each.
 6. A Project Board holding a tactic: same.
 7. Timer: open a tactic in the timer and press Done. The question must come up
@@ -130,7 +179,16 @@ silently while `/Applications/daVIPA.app` holds the database.
 10. Check `app.log` for a `bad window path name` or a Tk traceback after each
     modal — the always-on-top wrapper is exercised on the timer path only.
 
+Steps 1-3, 5, 6 and 8-9 now have a widget test behind them, which is not the
+same as having been seen: the test presses the control and reads the row back,
+and says nothing about what the screen looks like. Step 7's ordering (the
+question before the note dialog, the Next Action window intact) is tested.
+Step 10 is tested for the `-topmost` restore specifically, against a real
+Toplevel parent.
+
 ## Next agent actions
 
-- Walk the ten steps above and record the result in this note.
-- Re-gate before pushing: the fix is code the gate has not read.
+- Walk the nine remaining steps above and record the result in this note.
+- Decide WTP-A8: give the Hierarchical row a Complete control, or delete the
+  method. If the control is added, it must also go into the widget tests'
+  `BUILDERS` and `SCREENS_WITH_A_CONTROL`, which fail until it does.

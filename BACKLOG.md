@@ -190,6 +190,34 @@ that session has landed.
 **Priority:** Low (style; no behavioural effect)
 **Effort:** Small
 
+### WTP-A8 — `HierarchicalScreen.complete_item` has no caller (low)
+
+Found while writing `tests/test_weekly_tactic_completion_widgets.py`: looking
+for the widget that reaches each guarded method turned up a screen that has
+none. `hierarchical.py:357` defines `complete_item`, and nothing in `src/`
+calls it — no `command=`, no string reference, no `getattr`. The rows it builds
+are labels only; where the other screens put a checkbox or a Complete button,
+the Hierarchical row puts `CTkLabel(frame, text="", width=70)` "to maintain
+alignment".
+
+This predates WTP: the method was already unreachable before the WTP-M6.7 guard
+was added to it, so the guard is harmless rather than wrong. What it did cost
+is a false claim — the spec, the user guide and the handoff note's on-screen
+checklist all said the question is asked on "the Hierarchical tree", and
+checklist step 4 told a reader to complete a tactic from that tree, which
+cannot be done. Those three documents are corrected in the same change as this
+entry.
+
+Two ways to settle it, and the choice is a product one rather than a cleanup:
+give the Hierarchical row a completion control like its siblings (then it also
+has to be added to the widget tests' `BUILDERS` and
+`SCREENS_WITH_A_CONTROL`), or delete the method and its guard. Deleting is
+smaller; adding the control is probably what a reader of that screen expects,
+since every other list in the app can tick an item off.
+
+**Priority:** Low (dead code, no user-visible defect)
+**Effort:** Small either way
+
 ## Adjacent issues — priority level colours (PLC, 2026-11-08)
 
 Found while building PLC-M1 to PLC-M5. Flagged, not fixed (global rule 10):

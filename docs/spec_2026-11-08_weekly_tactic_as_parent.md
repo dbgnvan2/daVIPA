@@ -255,7 +255,8 @@ Every `DatabaseManager` in it takes an explicit `tmp_path` database.
 | WTP-M6.4 | The Weekly Tactic row in the APE Week Assignment right panel shows `n/m done` from its children. | `test_wtpm64_week_assignment_row_shows_progress`, plus `test_wtpm64_progress_counts_come_from_one_helper` for the helper and `test_wtpm64_a_tactic_with_nothing_under_it_shows_a_dash` for the empty case |
 | WTP-M6.5 | The Week Actions tab's left tactic list shows the same count, from the same helper — one home, not two renderings. | `test_wtpm65_week_actions_list_shows_progress` |
 | WTP-M6.6 | Completing a child changes that count, and `complete_action_item`'s WT-M5.A re-file still moves the item to the week it was completed in — so the count is read after the re-file, not before. | `test_wtpm66_count_follows_the_wt_m5a_refile` |
-| WTP-M6.7 | *Added after the batch, from the gate's F1.* The WTP-M6.1 question is asked on **every** surface that completes an item, not only the editor: the Today checkbox, All Items, Upcoming, the Hierarchical tree, a Project Board and the timer's Done button. | `test_wtpm67_every_completion_surface_asks_first`, `test_wtpm67_a_declined_prompt_completes_nothing_on_any_surface`, `test_wtpm67_yes_completes_it_on_any_surface`, `test_wtpm67_an_ordinary_item_is_never_questioned`, and two AST guards — all in `tests/test_weekly_tactic_completion_surfaces.py` |
+| WTP-M6.7 | *Added after the batch, from the gate's F1.* The WTP-M6.1 question is asked at **every** `complete_action_item` call site, not only the editor: the Today checkbox, All Items, Upcoming, the Hierarchical screen's `complete_item`, a Project Board and the timer's Done button. Six of the seven are reachable from a control a user can press; `HierarchicalScreen.complete_item` is guarded but has no caller (WTP-A8). | `test_wtpm67_every_completion_surface_asks_first`, `test_wtpm67_a_declined_prompt_completes_nothing_on_any_surface`, `test_wtpm67_yes_completes_it_on_any_surface`, `test_wtpm67_an_ordinary_item_is_never_questioned`, and two AST guards — all in `tests/test_weekly_tactic_completion_surfaces.py` |
+| WTP-M6.8 | *Added after WTP-M6.7.* Every completion control a user can actually press is pressed in a test: the real screen is built, the widget the screen itself created is found by reading the item id out of that widget's own callback, and it is pressed with the widget's own `toggle()`/`invoke()`. The set of screens offering such a control is pinned exactly, so a sixth cannot ship unpressed. | the 21 tests in `tests/test_weekly_tactic_completion_widgets.py`, including `test_wtpw_the_real_control_asks_before_completing_a_tactic`, `test_wtpw_a_declined_prompt_leaves_the_row_open`, `test_wtpw_the_timer_completes_the_tactic_on_yes` and `test_wtpw_the_screens_with_a_completion_control_are_pinned` |
 
 ### Not code-testable
 
@@ -332,9 +333,9 @@ Recorded 2026-11-08, after implementation. Commits: `e465f79` (this spec),
 then the screen work and its tests. Nothing is pushed. Every test named below
 is in `tests/test_weekly_tactic_parent.py` unless another file is given.
 
-**Summary: all 39 criteria `done`** — the 35 in §3, plus WTP-M1.7, the two
-extra cases WTP-M5.2 needed, and WTP-M6.7. Nothing is `partial` and nothing is
-outstanding.
+**Summary: all 40 criteria `done`** — the 35 in §3, plus WTP-M1.7, the two
+extra cases WTP-M5.2 needed, WTP-M6.7 and WTP-M6.8. Nothing is `partial` and
+nothing is outstanding.
 
 WTP-M6.7 was added *after* the batch was pushed. The independent Hermes
 `learning-qa-sweep` gate over `3f705b4..56c1dc0`
@@ -422,6 +423,7 @@ WTP there now is an adjacent issue found while building WTP-M6.4.
 | WTP-M6.5 | done | `screens/week_actions.py` `_render_tactics`, reading the same helper · `test_wtpm65_week_actions_list_shows_progress`, which asserts the rendered cell **and** the helper's own answer — a rendering that hard-coded the string fails the first, a helper that drifted fails the second. Mutation-gated. |
 | WTP-M6.6 | done | `count_open_children_for_weekly_tactic` reads through `get_children`, so it is read after the re-file · `test_wtpm66_count_follows_the_wt_m5a_refile` |
 | WTP-M6.7 | done | `week_collision_notice.confirm_weekly_tactic_completion` — one implementation, called from all seven completion paths; `ItemEditorDialog._confirm_tactic_completion` is now a one-line delegation to it, so there is one reader of the rule. Six behavioural tests, parametrised over the surfaces, plus `test_wtpm67_the_set_of_completion_call_sites_is_pinned` (an AST walk asserting the call-site set **exactly**, since a floor would have passed the one-of-seven state this fixes) and `test_wtpm67_every_completion_call_site_is_guarded`. Fourteen mutations, all killed. |
+| WTP-M6.8 | done | `tests/test_weekly_tactic_completion_widgets.py` — 21 tests building the real screens on a `tmp_path` database. Each finds the control the screen itself created (by the item id in that widget's own callback, not by the row's rendered text) and presses it with the widget's own `toggle()`/`invoke()`. Covers the two gaps the stub file recorded: the timer's **accepting** path, which runs a real work-log save and window teardown, and the modal against a real always-on-top Toplevel parent — checklist step 10, which was the only check on `_parent_not_on_top` that a `SimpleNamespace` could not make. 13 mutations, all killed. Found WTP-A8 while locating the controls. |
 
 ### The two "not code-testable" items
 
@@ -494,7 +496,7 @@ None is a prerequisite.
 | `src/getmoredone/screens/hierarchical.py` | **WTP-M3.5/M3.6** — expected: no change |
 | `src/getmoredone/screens/item_editor.py` | **WTP-M4.1–M4.3** — parent line + View Parent; **WTP-M6.1–M6.3** — the complete prompt, now delegated (**WTP-M6.7**) |
 | `src/getmoredone/screens/week_collision_notice.py` | **WTP-M6.7** — the one implementation of the question. It already owned the shared week notices and the always-on-top wrapper every one of these modals needs, so the question went beside them rather than into a module of its own |
-| `src/getmoredone/screens/today.py`, `all_items.py`, `upcoming.py`, `hierarchical.py`, `project_boards.py`, `timer_window.py` | **WTP-M6.7** — each asks before completing. The timer asks once, before its note dialog and before it destroys the Next Action window, so declining costs the user neither a typed note nor a window |
+| `src/getmoredone/screens/today.py`, `all_items.py`, `upcoming.py`, `hierarchical.py`, `project_boards.py`, `timer_window.py` | **WTP-M6.7** — each asks before completing. The timer asks once, before its note dialog and before it destroys the Next Action window, so declining costs the user neither a typed note nor a window. `hierarchical.py`'s guard is unreachable today: that method has no caller (WTP-A8) |
 | `src/getmoredone/screens/item_editor_dialogs.py` | **WTP-M4.5/M4.6** — `PARENT ITEM` / `CHILD ITEMS` |
 | `src/getmoredone/vps_manager.py` | **WTP-M5.3/M5.4** — the cascade; **WTP-M6.4/M6.5** — one progress helper |
 | `src/getmoredone/screens/weekly_items.py` | **WTP-M5.2** — the confirmation; **WTP-M6.4** — the count on the row |

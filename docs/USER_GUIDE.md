@@ -922,9 +922,11 @@ Buttons (paired below):
 - **Complete** — What: Marks the item completed. On a Weekly Tactic with items
   still open it asks first, naming how many; completing the tactic does not
   complete them. The same question is asked wherever a Weekly Tactic is
-  completed — the Today checkbox, All Items, Upcoming, the Hierarchical tree,
-  a Project Board, and the timer's **Done** button — not only here. Why: Track
-  progress without silently closing a week that is not finished.
+  completed — the Today checkbox, All Items, Upcoming, a Project Board, and
+  the timer's **Done** button — not only here. (The Hierarchical screen is
+  read-only in this respect: its rows have no Complete control, so there is
+  nothing to ask about there.) Why: Track progress without silently closing a
+  week that is not finished.
 - **Delete** — What: Deletes the item. Refused if the item has child items,
   naming how many — including, for a Weekly Tactic, the items filed under it.
   Why: Remove obsolete tasks without losing the work underneath them.
