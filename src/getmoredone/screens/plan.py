@@ -1569,7 +1569,7 @@ class PlanScreen(ctk.CTkFrame):
             self.set_status(
                 f"{self.selected_date} is not a regular work day, and the "
                 "question could not be completed — nothing was scheduled. "
-                "Try the drop again, or allow the day in Day Settings",
+                "Try again, or allow the day in Day Settings",
                 "error",
             )
             return False
@@ -1629,6 +1629,13 @@ class PlanScreen(ctk.CTkFrame):
                 title, question, icon="warning", parent=self
             )
         except tk.TclError:
+            # Logged as well as said, which is the rule the other failure arms
+            # on this screen follow (``clear_day``, AutoLoad) because a status
+            # line is overwritten by the next one. It matters more here: before
+            # this arm existed the raise reached stderr, and that traceback is
+            # the entire reason the fault is understood as far as it is. Catching
+            # it without logging would have traded the symptom for the evidence.
+            logger.exception("a confirmation on the Plan screen could not be put")
             return None
         return answer is True
 
@@ -1724,10 +1731,34 @@ class PlanScreen(ctk.CTkFrame):
         self.set_status(text, "success")
 
     def ask_custom_minutes(self, block: TimeBlock):
-        dialog = ctk.CTkInputDialog(
-            text="Block length in minutes:", title="Block Length"
-        )
-        raw = dialog.get_input()
+        """Ask for a block length in minutes.
+
+        Purpose: PD-M11 -- the third modal on this screen, and the measured
+                 fault is a modal failing to return an answer rather than a
+                 *confirmation* failing to. ``CTkInputDialog.get_input`` is
+                 ``wait_window`` plus a read of the entry, the same machinery
+                 ``askyesno`` goes through, and the context menu's "Custom..."
+                 is a live user path -- so a raise here wrote nothing and said
+                 nothing, which is the reported symptom.
+        Spec:    docs/changes/2026-11-07-plan-day-faults.md
+        Tests:   tests/test_plan_screen.py::test_pdm1112_a_length_dialog_that_raises_says_so
+
+        Its own arm rather than ``_ask_yes_no``: this one is not a yes/no
+        question and has no answer to pass through.
+        """
+        try:
+            dialog = ctk.CTkInputDialog(
+                text="Block length in minutes:", title="Block Length"
+            )
+            raw = dialog.get_input()
+        except tk.TclError:
+            logger.exception("the block length dialog could not be completed")
+            self.set_status(
+                "The block length question could not be completed — the "
+                "block was not changed",
+                "error",
+            )
+            return
         if raw is None:
             return
         try:
@@ -2030,10 +2061,11 @@ class PlanScreen(ctk.CTkFrame):
                  tests/test_plan_screen.py::test_pdm129_a_step_cannot_scroll_past_the_end
                  tests/test_plan_screen.py::test_pdm129_a_day_with_no_scrollregion_asks_for_nothing
 
-        ``None`` -- not zero -- when there is nothing to scroll: no
-        scrollregion yet, or a day that fits its pane. Zero is a real
-        destination and would be handed to ``yview_moveto``; this is "do not
-        call it at all".
+        ``None`` -- not zero -- when there is no scrollregion to measure
+        against. Zero is a real destination and would be handed to
+        ``yview_moveto``; this is "do not call it at all". A day that *fits*
+        its pane is not this case and returns 0.0, which is correct and never
+        reached: ``day_autoscroll_direction`` answers 0 for it first.
         """
         canvas = getattr(self.blocks_scroll, "_parent_canvas", None)
         if canvas is None:
