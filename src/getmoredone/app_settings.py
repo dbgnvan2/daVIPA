@@ -115,6 +115,7 @@ class AppSettings:
     ape_quarter_split_ratio: float = 0.5
     ape_month_split_ratio: float = 0.5
     annual_vision_split_ratio: float = 0.5
+    week_assignment_split_ratio: float = 0.5
 
     # UPD-M4 — a two-panel VSP tab's column widths, one field per *panel*: the
     # two panels of one tab are different shapes, and one store for both would
@@ -130,6 +131,8 @@ class AppSettings:
     ape_month_right_col_widths: dict = field(default_factory=dict)
     annual_vision_left_col_widths: dict = field(default_factory=dict)
     annual_vision_right_col_widths: dict = field(default_factory=dict)
+    week_assignment_left_col_widths: dict = field(default_factory=dict)
+    week_assignment_right_col_widths: dict = field(default_factory=dict)
 
     # Future date options (Drag Schedule)
     mid_term_offset_days: int = 90

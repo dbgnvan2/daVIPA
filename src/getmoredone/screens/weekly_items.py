@@ -10,10 +10,13 @@ import customtkinter as ctk
 import tkinter as tk
 
 from .. import week_options
+from ..app_settings import AppSettings
 from ..weekly_tactic_logging import get_weekly_tactic_logger
-from ..color_contrast import pick_text_color
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
+from .chip_table import APE_LEFT_COLUMNS, APE_RIGHT_COLUMNS, ChipTable
+from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
+from .split_panel import SPLITTER_WIDTH, SplitPanel
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
@@ -25,17 +28,19 @@ logger = get_weekly_tactic_logger()
 class WeeklyItemsScreen(ctk.CTkFrame):
     """Assign month-selected Annual Plan Elements into weekly tactics."""
 
-    SPLITTER_WIDTH = 8
-    MIN_PANEL_WIDTH = 420
-    INDEX_COL_WIDTH = 34
-    SEGMENT_COL_WIDTH = 180
-    SUBSEGMENT_COL_WIDTH = 180
-    CATEGORY_COL_WIDTH = 180
+    # UPD-M5 — the divider position and each panel's column widths are this
+    # screen's own: ``week_assignment_split_ratio``,
+    # ``week_assignment_left_col_widths`` and ``..._right_col_widths``. The
+    # column widths used to be the four class constants that stood here, which
+    # is why the two panels could not be sized separately and why the numbers
+    # drifted from the other tabs' (spec section 1.4).
+    SETTINGS_PREFIX = "week_assignment"
 
     def __init__(self, parent, vps_manager: "VPSManager", app: "GetMoreDoneApp"):
         super().__init__(parent)
         self.vps_manager = vps_manager
         self.app = app
+        self.settings = getattr(app, "settings", None) or AppSettings.load()
 
         self.week_options: List[str] = []
         self.week_var = ctk.StringVar(value="")
@@ -52,10 +57,6 @@ class WeeklyItemsScreen(ctk.CTkFrame):
 
         self.selected_weekly_idx: Optional[int] = None
         self.selected_weekly_item: Optional[Dict[str, object]] = None
-        self._split_ratio = 0.5
-        self._drag_start_x: Optional[int] = None
-        self._drag_start_left: Optional[int] = None
-        self.dragged_row: Optional[Dict[str, object]] = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -130,7 +131,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         body = ctk.CTkFrame(self)
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
         body.grid_columnconfigure(0, weight=0, minsize=520)
-        body.grid_columnconfigure(1, weight=0, minsize=self.SPLITTER_WIDTH)
+        body.grid_columnconfigure(1, weight=0, minsize=SPLITTER_WIDTH)
         body.grid_columnconfigure(2, weight=0, minsize=520)
         body.grid_rowconfigure(1, weight=1)
         self.body = body
@@ -140,15 +141,35 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         self.right_title_label = ctk.CTkLabel(body, text="Weekly Tactics", font=ctk.CTkFont(weight="bold"))
         self.right_title_label.grid(row=0, column=2, sticky="w", padx=8, pady=(8, 4))
 
-        self.left_frame = ctk.CTkScrollableFrame(body, label_text="")
+        # UPD-M5 — each panel is a plain frame holding the scroll frame the
+        # shared table owns and, in the same cell, the empty-state label. The
+        # table destroys every child of its container (chip_table's class
+        # docstring says so), so the label cannot live inside it.
+        self.left_frame = ctk.CTkFrame(body)
         self.left_frame.grid(row=1, column=0, sticky="nsew")
         self.left_frame.grid_columnconfigure(0, weight=1)
+        self.left_frame.grid_rowconfigure(0, weight=1)
 
-        divider = ctk.CTkFrame(body, width=self.SPLITTER_WIDTH, corner_radius=999, fg_color=semantic_colors()["border"])
+        self.left_list = ctk.CTkScrollableFrame(self.left_frame, label_text="")
+        self.left_list.grid(row=0, column=0, sticky="nsew")
+        self.left_list.grid_columnconfigure(0, weight=1)
+
+        self.left_empty = ctk.CTkLabel(
+            self.left_frame,
+            text="No month-assigned Annual Plan Elements match the current week/filter.",
+            text_color=status_text_color("muted"),
+        )
+        self.left_empty.grid(row=0, column=0, pady=20, padx=10, sticky="nw")
+
+        divider = ctk.CTkFrame(
+            body,
+            width=SPLITTER_WIDTH,
+            corner_radius=999,
+            fg_color=semantic_colors()["border"],
+            cursor="sb_h_double_arrow",
+        )
         divider.grid(row=1, column=1, sticky="ns", padx=4, pady=4)
-        divider.bind("<ButtonPress-1>", self._on_divider_press)
-        divider.bind("<B1-Motion>", self._on_divider_drag)
-        divider.bind("<ButtonRelease-1>", self._on_divider_release)
+        self.divider = divider
 
         self.right_frame = ctk.CTkFrame(body)
         self.right_frame.grid(row=1, column=2, sticky="nsew")
@@ -158,6 +179,13 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         self.right_list = ctk.CTkScrollableFrame(self.right_frame, label_text="")
         self.right_list.grid(row=0, column=0, sticky="nsew")
         self.right_list.grid_columnconfigure(0, weight=1)
+
+        self.right_empty = ctk.CTkLabel(
+            self.right_frame,
+            text="No weekly tactics exist for the selected week yet.",
+            text_color=status_text_color("muted"),
+        )
+        self.right_empty.grid(row=0, column=0, pady=20, padx=10, sticky="nw")
 
         right_actions = ctk.CTkFrame(self.right_frame)
         right_actions.grid(row=1, column=0, sticky="w", padx=4, pady=(6, 4))
@@ -171,8 +199,34 @@ class WeeklyItemsScreen(ctk.CTkFrame):
             side="left", padx=6, pady=6
         )
 
-        self.body.bind("<Configure>", self._on_body_resize)
-        self.after(100, self._apply_split_ratio)
+        # UPD-M5 — one table per panel, from screens/chip_table.py. The two
+        # panels take the same column sets as the other APE tabs, so the three
+        # tabs now show the same widths and all of them are draggable.
+        self.left_table = ChipTable(
+            self.left_list, self.settings,
+            f"{self.SETTINGS_PREFIX}_left", APE_LEFT_COLUMNS,
+        )
+        self.right_table = ChipTable(
+            self.right_list, self.settings,
+            f"{self.SETTINGS_PREFIX}_right", APE_RIGHT_COLUMNS,
+        )
+
+        # UPD-M1 — the ratio, the clamp and the four handlers live in
+        # screens/split_panel.py, which also persists the position this screen
+        # used to forget on every rebuild.
+        self.split = SplitPanel(
+            body,
+            self.left_frame,
+            divider,
+            settings=self.settings,
+            prefix=self.SETTINGS_PREFIX,
+        )
+
+        # UPD-M2 — the press, the release and the descendant walk live in
+        # screens/row_drag.py. What a dropped row means is this screen's.
+        self.row_drag = RowDragSource(
+            self, self.right_list, self._assign_dragged_row
+        )
 
     def refresh(self):
         self.segment_colors, self.subsegment_colors = load_latest_lineage_color_maps(self.vps_manager)
@@ -322,88 +376,151 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         return status
 
     def _render_lists(self):
-        self._clear_scroll(self.left_frame)
-        self._clear_scroll(self.right_list)
         self.left_checks = {}
         self._render_left_rows()
         self._render_right_rows()
 
+    @staticmethod
+    def _show_list_or_message(list_frame, message, empty: bool) -> None:
+        """Show the panel's list or its empty-state label, never both.
+
+        Purpose: UPD-M5.6 — the shared table owns its scroll frame outright,
+                 so the "nothing here" label sits in the same grid cell beside
+                 it rather than inside it, and exactly one of the two is
+                 gridded at a time.
+        Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m5
+        Tests:   tests/test_unified_panel_design.py::test_updm56_both_panels_still_say_when_they_are_empty
+        """
+        if empty:
+            list_frame.grid_remove()
+            message.grid()
+        else:
+            message.grid_remove()
+            list_frame.grid()
+
     def _render_left_rows(self):
-        if not self.left_items:
-            ctk.CTkLabel(self.left_frame, text="No month-assigned Annual Plan Elements match the current week/filter.", text_color=status_text_color("muted")).grid(
-                row=0, column=0, pady=20, padx=10, sticky="w"
-            )
+        """Render the month-assigned APEs into the shared chip table.
+
+        Purpose: UPD-M5.6 — the header, the row frames, the chips and the
+                 column widths come from screens/chip_table.py. The checkbox
+                 cell and the drag binding stay here, because what they do is
+                 this screen's.
+        Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m5
+        Tests:   tests/test_unified_panel_design.py::test_updm55_left_header_matches_the_other_tabs
+        """
+        empty = not self.left_items
+        self._show_list_or_message(self.left_list, self.left_empty, empty)
+        if empty:
+            self.left_table.clear()
             return
 
-        palette = semantic_colors()
-        header = ctk.CTkFrame(self.left_frame, fg_color=palette["surface_subtle"])
-        header.grid(row=0, column=0, sticky="ew", padx=4, pady=(0, 4))
-        header.grid_columnconfigure(4, weight=1)
-        ctk.CTkLabel(header, text="Pick", width=52, font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=5, pady=5)
-        ctk.CTkLabel(header, text="#", width=self.INDEX_COL_WIDTH, font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=1, padx=5, pady=5, sticky="w")
-        ctk.CTkLabel(header, text="Segment", width=self.SEGMENT_COL_WIDTH, font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=2, padx=5, pady=5, sticky="w")
-        ctk.CTkLabel(header, text="SubSegment", width=self.SUBSEGMENT_COL_WIDTH, font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=3, padx=5, pady=5, sticky="w")
-        ctk.CTkLabel(header, text="Category", width=self.CATEGORY_COL_WIDTH, font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=4, padx=5, pady=5, sticky="w")
-
+        self.left_table.build_header()
         for idx, row in enumerate(self.left_items, start=1):
             segment_name, subsegment_name, category_name = self._ape_parts(row)
-            segment_color, subsegment_color = resolve_lineage_colors(segment_name, subsegment_name, self.vps_manager, self.segment_colors, self.subsegment_colors)
-            category_color = self.category_colors.get((segment_name.strip().lower(), subsegment_name.strip().lower(), category_name.strip().lower()), "") or subsegment_color
+            segment_color, subsegment_color, category_color = self._row_colors(
+                segment_name, subsegment_name, category_name)
 
-            item = ctk.CTkFrame(self.left_frame)
-            item.grid(row=idx, column=0, sticky="ew", padx=4, pady=2)
-            item.grid_columnconfigure(4, weight=1)
+            item, cells = self.left_table.add_row(
+                {
+                    "index": str(idx),
+                    "segment": segment_name,
+                    "subsegment": subsegment_name,
+                    "category": category_name,
+                },
+                {
+                    "segment": segment_color,
+                    "subsegment": subsegment_color,
+                    "category": category_color,
+                },
+            )
 
             checked = ctk.BooleanVar(value=False)
             self.left_checks[row["id"]] = checked
-            ctk.CTkCheckBox(item, text="", variable=checked, width=30).grid(row=0, column=0, padx=5, pady=5)
-            index_label = ctk.CTkLabel(item, text=str(idx), width=self.INDEX_COL_WIDTH, anchor="w")
-            index_label.grid(row=0, column=1, padx=5, pady=5, sticky="w")
-            seg_chip = ctk.CTkLabel(item, text=f" {self._clip_label(segment_name, 18)} ", width=self.SEGMENT_COL_WIDTH, fg_color=segment_color, text_color=pick_text_color(segment_color), corner_radius=6, anchor="w")
-            seg_chip.grid(row=0, column=2, padx=5, pady=5, sticky="w")
-            sub_chip = ctk.CTkLabel(item, text=f" {self._clip_label(subsegment_name, 18)} ", width=self.SUBSEGMENT_COL_WIDTH, fg_color=subsegment_color, text_color=pick_text_color(subsegment_color), corner_radius=6, anchor="w")
-            sub_chip.grid(row=0, column=3, padx=5, pady=5, sticky="w")
-            cat_chip = ctk.CTkLabel(item, text=f" {self._clip_label(category_name, 18)} ", width=self.CATEGORY_COL_WIDTH, fg_color=category_color, text_color=pick_text_color(category_color), corner_radius=6, anchor="w")
-            cat_chip.grid(row=0, column=4, padx=5, pady=5, sticky="w")
-            self._bind_drag_widgets((item, index_label, seg_chip, sub_chip, cat_chip), row)
+            ctk.CTkCheckBox(item, text="", variable=checked, width=20).grid(
+                row=0, column=self.left_table.grid_col("checkbox"),
+                padx=2, pady=5, sticky="w",
+            )
+            self.row_drag.bind_row(
+                (item, cells["index"], cells["segment"],
+                 cells["subsegment"], cells["category"]),
+                row,
+            )
 
     def _render_right_rows(self):
-        if not self.right_items:
-            ctk.CTkLabel(self.right_list, text="No weekly tactics exist for the selected week yet.", text_color=status_text_color("muted")).grid(
-                row=0, column=0, pady=20, padx=10, sticky="w"
-            )
+        """Render the week's tactics, each with its own Delete.
+
+        Purpose: UPD-M5.1, UPD-M5.2 — the right panel is a table in the same
+                 shape as the other tabs' and each row carries the Delete the
+                 image has in an Actions column. Selection and
+                 double-click-to-open are re-bound here; the table knows
+                 nothing about either.
+        Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m5
+        Tests:   tests/test_unified_panel_design.py::test_updm51_right_panel_has_the_actions_column
+        """
+        empty = not self.right_items
+        self._show_list_or_message(self.right_list, self.right_empty, empty)
+        if empty:
+            self.right_table.clear()
             return
 
         palette = semantic_colors()
-        row_text = palette["row_text"]
-        header = ctk.CTkFrame(self.right_list, fg_color=palette["surface_subtle"])
-        header.grid(row=0, column=0, sticky="ew", padx=4, pady=(0, 4))
-        header.grid_columnconfigure(3, weight=1)
-        ctk.CTkLabel(header, text="#", width=self.INDEX_COL_WIDTH, font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        ctk.CTkLabel(header, text="Segment", width=self.SEGMENT_COL_WIDTH, font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=1, padx=5, pady=5, sticky="w")
-        ctk.CTkLabel(header, text="SubSegment", width=self.SUBSEGMENT_COL_WIDTH, font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=2, padx=5, pady=5, sticky="w")
-        ctk.CTkLabel(header, text="Category", width=self.CATEGORY_COL_WIDTH, font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=3, padx=5, pady=5, sticky="w")
-
+        self.right_table.build_header()
         for idx, row in enumerate(self.right_items, start=1):
             segment_name, subsegment_name, category_name = self._weekly_parts(row)
-            segment_color, subsegment_color = resolve_lineage_colors(segment_name, subsegment_name, self.vps_manager, self.segment_colors, self.subsegment_colors)
-            category_color = self.category_colors.get((segment_name.strip().lower(), subsegment_name.strip().lower(), category_name.strip().lower()), "") or subsegment_color
+            segment_color, subsegment_color, category_color = self._row_colors(
+                segment_name, subsegment_name, category_name)
             bg = palette["selected_tint"] if idx - 1 == self.selected_weekly_idx else None
 
-            item = ctk.CTkFrame(self.right_list, fg_color=bg, border_width=2, border_color=segment_color)
-            item.grid(row=idx, column=0, sticky="ew", padx=4, pady=2)
-            item.grid_columnconfigure(3, weight=1)
-            index_label = ctk.CTkLabel(item, text=str(idx), width=self.INDEX_COL_WIDTH, anchor="w", text_color=row_text)
-            index_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
-            seg_chip = ctk.CTkLabel(item, text=f" {self._clip_label(segment_name, 18)} ", width=self.SEGMENT_COL_WIDTH, fg_color=segment_color, text_color=pick_text_color(segment_color), corner_radius=6, anchor="w")
-            seg_chip.grid(row=0, column=1, padx=5, pady=5, sticky="w")
-            sub_chip = ctk.CTkLabel(item, text=f" {self._clip_label(subsegment_name, 18)} ", width=self.SUBSEGMENT_COL_WIDTH, fg_color=subsegment_color, text_color=pick_text_color(subsegment_color), corner_radius=6, anchor="w")
-            sub_chip.grid(row=0, column=2, padx=5, pady=5, sticky="w")
-            cat_chip = ctk.CTkLabel(item, text=f" {self._clip_label(category_name, 18)} ", width=self.CATEGORY_COL_WIDTH, fg_color=category_color, text_color=pick_text_color(category_color), corner_radius=6, anchor="w")
-            cat_chip.grid(row=0, column=3, padx=5, pady=5, sticky="w")
-            for widget in (item, index_label, seg_chip, sub_chip, cat_chip):
+            item, cells = self.right_table.add_row(
+                {
+                    "index": str(idx),
+                    "segment": segment_name,
+                    "subsegment": subsegment_name,
+                    "category": category_name,
+                },
+                {
+                    "segment": segment_color,
+                    "subsegment": subsegment_color,
+                    "category": category_color,
+                },
+                fg_color=bg,
+                border_width=2,
+                border_color=segment_color,
+            )
+
+            ctk.CTkButton(
+                item,
+                text="Delete",
+                width=72,
+                command=lambda r=row: self.delete_weekly_row(r),
+                **button_style("danger"),
+            ).grid(row=0, column=self.right_table.grid_col("actions"),
+                   padx=5, pady=5, sticky="e")
+
+            for widget in (item, cells["index"], cells["segment"],
+                           cells["subsegment"], cells["category"]):
                 widget.bind("<Button-1>", lambda _e, i=idx - 1: self.on_select_weekly_item(i))
                 widget.bind("<Double-Button-1>", lambda _e, i=idx - 1: self._open_weekly_from_index(i))
+
+    def _row_colors(self, segment_name: str, subsegment_name: str,
+                    category_name: str) -> tuple[str, str, str]:
+        """The three chip colours for one row.
+
+        The same four lines were written out in both render methods; the
+        category lookup in particular is a three-part lower-cased key that is
+        easy to get subtly wrong in one copy and not the other (P5).
+        """
+        segment_color, subsegment_color = resolve_lineage_colors(
+            segment_name, subsegment_name, self.vps_manager,
+            self.segment_colors, self.subsegment_colors,
+        )
+        category_color = self.category_colors.get(
+            (segment_name.strip().lower(),
+             subsegment_name.strip().lower(),
+             category_name.strip().lower()),
+            "",
+        ) or subsegment_color
+        return segment_color, subsegment_color, category_color
 
     def on_select_weekly_item(self, idx: int):
         if idx < 0 or idx >= len(self.right_items):
@@ -458,13 +575,27 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         ItemEditorDialog(self, self.app.db_manager, item_id=self.selected_weekly_item["id"], vps_manager=self.vps_manager, on_close_callback=self.on_weekly_editor_closed)
 
     def delete_selected_weekly_item(self):
+        """The Delete Weekly button: delete whatever is selected."""
         if not self.selected_weekly_item:
             messagebox.showwarning("No Weekly Item Selected", "Select a weekly tactic on the right first.")
             return
-        title = (self.selected_weekly_item.get("title") or "this weekly tactic").strip()
+        self.delete_weekly_row(self.selected_weekly_item)
+
+    def delete_weekly_row(self, row: Dict[str, object]):
+        """Delete one weekly tactic, after asking.
+
+        Purpose: UPD-M5.2, UPD-M5.3 — the row's own Delete button and the
+                 Delete Weekly button below the list are two ways to delete
+                 the same thing, so they are one method with two callers
+                 rather than two copies of the confirmation (P5). A refused
+                 confirmation deletes nothing and says nothing.
+        Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m5
+        Tests:   tests/test_unified_panel_design.py::test_updm53_delete_is_confirmed_before_it_happens
+        """
+        title = (row.get("title") or "this weekly tactic").strip()
         if not messagebox.askyesno("Delete Weekly Tactic", f"Delete {title} and related action items?", icon="warning"):
             return
-        if self.vps_manager.delete_weekly_action_item(self.selected_weekly_item["id"]):
+        if self.vps_manager.delete_weekly_action_item(row["id"]):
             self.refresh()
         else:
             messagebox.showerror("Delete Failed", "Weekly tactic could not be deleted.")
@@ -472,108 +603,44 @@ class WeeklyItemsScreen(ctk.CTkFrame):
     def on_weekly_editor_closed(self):
         self.refresh()
 
-    def _start_row_drag(self, row: Dict[str, object]):
-        self.dragged_row = row
-        self.winfo_toplevel().bind("<ButtonRelease-1>", self._finish_row_drag)
+    def _assign_dragged_row(self, row: Dict[str, object]):
+        """Create a weekly tactic from an APE dropped on the right panel.
 
-    def _finish_row_drag(self, _event):
-        self.winfo_toplevel().unbind("<ButtonRelease-1>")
-        if not self.dragged_row:
-            return
-        pointer_x, pointer_y = self.winfo_pointerxy()
-        target = self.winfo_containing(pointer_x, pointer_y)
-        row = self.dragged_row
-        self.dragged_row = None
-        if self._is_descendant(target, self.right_list):
-            parsed = self._selected_week_context()
-            if not parsed:
-                # The button path warns when no week is chosen; the drag path
-                # used to do nothing at all for the same input.
-                self.status_label.configure(
-                    text="Select a Week Start before dragging an Annual Plan Element."
-                )
-                return
-            week_start, year, month = parsed
-            try:
-                result = self.vps_manager.create_week_action_items_for_ape(
-                    row["id"], year, month, [week_start])
-            except ValueError as exc:
-                # create_week_action_items_for_ape raises on a stale APE or a
-                # bad month. Unhandled inside a Tk binding that is a traceback
-                # on stderr and nothing on screen.
-                logger.exception("[weekly_items] drag create failed: %s", exc)
-                self.status_label.configure(text=f"Could not create the weekly tactic: {exc}")
-                return
-            # Always refresh and always say what happened: a drag that collided
-            # used to produce no refresh, no status and no sign of rejection.
-            self.refresh()
+        Purpose: UPD-M2.2 — the press, the release and the drop test live in
+                 screens/row_drag.py; this is the body of what was
+                 _finish_row_drag's final `if`, moved as it was.
+        Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m5
+        Tests:   tests/test_weekly_tactic_schema.py::test_wt_m1c3_both_creation_paths_report_collisions
+        """
+        parsed = self._selected_week_context()
+        if not parsed:
+            # The button path warns when no week is chosen; the drag path
+            # used to do nothing at all for the same input.
             self.status_label.configure(
-                text=self._describe_week_creation(
-                    int(result.get("created_count", 0)),
-                    int(result.get("skipped_count", 0)),
-                    int(result.get("collided_count", 0)),
-                )
+                text="Select a Week Start before dragging an Annual Plan Element."
             )
-
-    def _bind_drag_widgets(self, widgets: tuple, row: Dict[str, object]):
-        for widget in widgets:
-            widget.bind("<ButtonPress-1>", lambda _event, r=row: self._start_row_drag(r))
-
-    def _on_body_resize(self, _event):
-        if self._drag_start_x is None:
-            self._apply_split_ratio()
-
-    def _on_divider_press(self, event):
-        self._drag_start_x = event.x_root
-        self._drag_start_left = self.left_frame.winfo_width()
-
-    def _on_divider_drag(self, event):
-        if self._drag_start_x is None or self._drag_start_left is None:
             return
-        total = self.body.winfo_width() - self.SPLITTER_WIDTH
-        if total <= 0:
+        week_start, year, month = parsed
+        try:
+            result = self.vps_manager.create_week_action_items_for_ape(
+                row["id"], year, month, [week_start])
+        except ValueError as exc:
+            # create_week_action_items_for_ape raises on a stale APE or a
+            # bad month. Unhandled inside a Tk binding that is a traceback
+            # on stderr and nothing on screen.
+            logger.exception("[weekly_items] drag create failed: %s", exc)
+            self.status_label.configure(text=f"Could not create the weekly tactic: {exc}")
             return
-        left = self._drag_start_left + (event.x_root - self._drag_start_x)
-        max_left = max(self.MIN_PANEL_WIDTH, total - self.MIN_PANEL_WIDTH)
-        left = max(self.MIN_PANEL_WIDTH, min(max_left, left))
-        self._split_ratio = left / total
-        self._apply_split_ratio()
-
-    def _on_divider_release(self, _event):
-        self._drag_start_x = None
-        self._drag_start_left = None
-
-    def _apply_split_ratio(self):
-        total = self.body.winfo_width() - self.SPLITTER_WIDTH
-        if total <= 0:
-            return
-        max_left = max(self.MIN_PANEL_WIDTH, total - self.MIN_PANEL_WIDTH)
-        left = int(total * self._split_ratio)
-        left = max(self.MIN_PANEL_WIDTH, min(max_left, left))
-        right = total - left
-        self.body.grid_columnconfigure(0, minsize=left)
-        self.body.grid_columnconfigure(2, minsize=right)
-
-    @staticmethod
-    def _is_descendant(widget, ancestor) -> bool:
-        current = widget
-        while current is not None:
-            if current == ancestor:
-                return True
-            current = getattr(current, "master", None)
-        return False
-
-    @staticmethod
-    def _clear_scroll(frame: ctk.CTkScrollableFrame):
-        for child in frame.winfo_children():
-            child.destroy()
-
-    @staticmethod
-    def _clip_label(value: str, limit: int) -> str:
-        text = (value or "").strip()
-        if len(text) <= limit:
-            return text
-        return text[:limit - 1].rstrip() + "…"
+        # Always refresh and always say what happened: a drag that collided
+        # used to produce no refresh, no status and no sign of rejection.
+        self.refresh()
+        self.status_label.configure(
+            text=self._describe_week_creation(
+                int(result.get("created_count", 0)),
+                int(result.get("skipped_count", 0)),
+                int(result.get("collided_count", 0)),
+            )
+        )
 
     def _ape_matches_filters(self, row: Dict[str, object]) -> bool:
         seg, sub, cat = self._ape_parts(row)
