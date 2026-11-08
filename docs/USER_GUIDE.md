@@ -515,17 +515,27 @@ Day Settings modal:
 - **Day End** — What: The time of the last box. Why: The grid stops here, so
   there is nowhere past it to drop work.
 - **Days for Blocks** — What: Seven checkboxes, Monday to Sunday. Why: These are
-  the weekdays a normal week plans work on. A drop, an AutoLoad or a day
-  extension on a day that is not checked asks first — *"<date> is not a regular
-  work day. Day Settings allows Mon, Tue, Wed, Thu, Fri. Schedule anyway?"* —
-  so a weekend cannot be filled by accident, and a weekend you have decided to
-  work takes one **Schedule anyway**. The question is asked once for that date,
-  not once per item, and answering it plans that day only: it does not tick the
-  box, and the next time the screen is opened on that date it asks again.
-  **Cancel** writes nothing and says which days the week allows. At least one
-  day must be checked. If the question cannot be put on the screen at all, the
-  work is scheduled rather than lost, and the status line says so — a drop that
-  silently does nothing is the one outcome worse than either answer.
+  the weekdays a normal week plans work on. They describe a normal week; they
+  are not a lock on the calendar, and what happens on an unchecked day depends
+  on how you got there:
+  - **Dragging an item** onto a half hour, or onto **Earlier** or **Later**,
+    just works. The block is written and the status line says which day it was
+    on — *"Blocked 30m for … — 2026-11-07 is not a regular work day (Day
+    Settings allows Mon, Tue, Wed, Thu, Fri)"*. Nothing to dismiss: on macOS a
+    question cannot be put on the screen at the moment a drag is released, and
+    the two attempts to ask one there cost a silent dropped drag and then a
+    hung window.
+  - **AutoLoad** and the **break/buffer** button ask first — *"<date> is not a
+    regular work day. Day Settings allows Mon, Tue, Wed, Thu, Fri. Schedule
+    anyway?"* — because either one can fill a whole day at once. The question
+    is asked once for that date, not once per item, and answering it plans that
+    day only: it does not tick the box, and the next time the screen is opened
+    on that date it asks again. **Cancel** writes nothing and says which days
+    the week allows. If the question cannot be shown at all, the work is
+    scheduled rather than lost and the status line says which day it was on —
+    losing the gesture silently is the one outcome worse than either answer.
+
+  At least one day must be checked.
 - Times must be written as `HH:MM`, between `00:00` and `23:59`. A time the app
   cannot read — including an hour past 23, such as `24:00` — is rejected in the
   modal with the field named, never silently replaced. A settings file that

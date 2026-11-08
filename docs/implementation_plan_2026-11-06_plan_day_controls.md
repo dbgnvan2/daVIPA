@@ -1,7 +1,7 @@
-# Implementation plan — Plan screen day controls (PD-M1 … PD-M12)
+# Implementation plan — Plan screen day controls (PD-M1 … PD-M13)
 
 Date: 2026-11-06
-Status: **PD-M1 … PD-M6 shipped 2026-11-06. PD-M7, PD-M8, PD-M9, PD-M10, PD-M11, PD-M12 and the unplanned PD-M1.6, PD-M2.8 and PD-M2.9 shipped 2026-11-07. PD-M11 corrects PD-M10, which treated the symptom and not the cause; PD-M12 corrects PD-M11's reading of reports 2 and 3, which were a different fault entirely**
+Status: **PD-M1 … PD-M6 shipped 2026-11-06. PD-M7, PD-M8, PD-M9, PD-M10, PD-M11, PD-M13 and the unplanned PD-M1.6, PD-M2.8 and PD-M2.9 shipped 2026-11-07. PD-M11 corrects PD-M10, which treated the symptom and not the cause; PD-M12 corrects PD-M11's reading of reports 2 and 3, which were a different fault entirely; PD-M12 was built, reported broken on the running app — its dialog hung the application — and is superseded by PD-M13, which takes the modal off the drop path instead of replacing it**
 Screen: `src/getmoredone/screens/plan.py`, `src/getmoredone/screens/plan_blocks.py`
 Follows: `docs/implementation_plan_2026-11-06_plan_box_appearance.md` (PB-M1 … PB-M7, shipped)
 
@@ -245,7 +245,7 @@ half hour that drop created.
 | PD-M5.7 | The virtual boxes are not droppable for a *block* drag — a block cannot invent a half hour | `::test_pdm57_a_block_drag_onto_a_virtual_box_is_refused` |
 | PD-M5.9 | A real box always wins over a virtual one, so a box flush against the Earlier box still gets its own drops | `::test_pdm5_a_real_box_wins_over_a_virtual_one` — unplanned; the read order is a one-line change nothing else would notice |
 | PD-M5.10 | The drop gesture itself routes to the right end, not only the method | `::test_pdm5_an_item_drag_onto_a_virtual_box_extends_the_day` — unplanned; without it the extension is only reachable by calling `extend_day_for` |
-| PD-M5.11 | Extending is refused on a non-working day, like every other write on this screen | `::test_pdm5_the_day_cannot_be_extended_onto_a_non_block_day` — unplanned |
+| PD-M5.11 | Extending is refused on a non-working day, like every other write on this screen | *withdrawn by PD-M13.1 — the test is deleted; the replacement is* `::test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day` |
 | PD-M5.8 | Midnight is the floor and the ceiling: the day cannot be extended past either | `tests/test_time_block_layout.py::test_pdm58_the_day_cannot_cross_midnight`, `::test_pdm58_the_ceiling_is_the_last_bound_that_yields_a_whole_box` — the ceiling is a Day End of **23:30**, not 24:00: a box running 23:30–24:00 would need a Day End that is not a time of day, so 23:30 is the last bound that yields a whole box. Refused rather than clamped, because a clamped bound makes fewer boxes than the item needs |
 
 ---
@@ -298,11 +298,15 @@ the guard asks instead of refusing.
 
 | ID | Criterion | Verified by |
 |---|---|---|
-| PD-M7.1 | A write onto a day outside the weekday list asks before it writes, naming the date and the days the week allows | `tests/test_plan_screen.py::test_pdm7_a_non_work_day_asks_before_scheduling` |
-| PD-M7.2 | Yes writes the block | `::test_pdm7_a_non_work_day_asks_before_scheduling`, second half |
-| PD-M7.3 | No writes nothing and leaves the refusal's own sentence, weekday list included | `::test_pdm7_answering_no_writes_nothing` |
-| PD-M7.4 | The question is asked once per date, not once per drop, and the answer is held on the screen only | `::test_pdm7_the_question_is_asked_once_per_date` |
-| PD-M7.5 | A day inside the weekday list asks nothing | `::test_pdm7_a_work_day_asks_nothing` |
+| PD-M7.1 | A write onto a day outside the weekday list asks before it writes, naming the date and the days the week allows | `tests/test_plan_screen.py::test_pdm132_a_button_still_asks_on_a_non_work_day` — narrowed by PD-M13.1 to the gestures that come from a button |
+| PD-M7.2 | Yes writes the block | `::test_pdm132_a_button_still_asks_on_a_non_work_day`, second half |
+| PD-M7.3 | No writes nothing and leaves the refusal's own sentence, weekday list included | `::test_pdm132_answering_no_writes_nothing` |
+| PD-M7.4 | The question is asked once per date, not once per drop, and the answer is held on the screen only | `::test_pdm132_the_question_is_asked_once_per_date` |
+| PD-M7.5 | A day inside the weekday list asks nothing, and is told nothing | `::test_pdm7_a_work_day_says_nothing` |
+
+> **Renamed 2026-11-07.** Every test in this table was rewritten by PD-M13,
+> which moved the question off the two drop paths. The criteria stand for the
+> gestures that still ask; PD-M13.1 is what a drop does instead.
 
 **Not code-testable, human review:** that Yes-for-the-sitting is the right
 scope. It could have been per drop (noisy), or written to the weekday list
@@ -453,7 +457,9 @@ draws no intermediate state unless something asks it to mid-rebuild.
 Reports 2 and 3 are that pane, twice. A drop on **Earlier** writes the day's
 new hours and the block (`test_pdm52_a_drop_above_moves_day_start_back` covers
 the write), and *Schedule anyway* writes the block
-(`test_pdm7_a_non_work_day_asks_before_scheduling` covers that one); both then
+(`test_pdm132_a_button_still_asks_on_a_non_work_day`, named
+`test_pdm7_a_non_work_day_asks_before_scheduling` when this was written,
+covers that one); both then
 redraw a pane that did not come back. Report 2 had a second cause of its own,
 below.
 
@@ -567,7 +573,17 @@ commit-separation rule.
 
 ---
 
-## PD-M12 — The question is asked by the app, not by the platform
+## PD-M12 — The question is asked by the app, not by the platform *(superseded by PD-M13)*
+
+> **Superseded 2026-11-07.** Built, shipped to the user for a walk, and
+> reported back as *"broken - it just hangs..."*. The diagnosis in this
+> section is correct and PD-M13 keeps it; the remedy is not. An in-app
+> `CTkToplevel` with `grab_set` and `wait_window` cannot be raised from the
+> `after_idle` callback either: the window never becomes viewable from
+> there, so `wait_window` never returns and the grab is up with nothing
+> able to take it. The application stopped responding. `confirm_dialog.py`
+> is deleted and PD-M12.1 … PD-M12.4 are withdrawn. Read this section for
+> the fault; read PD-M13 for what shipped.
 
 Reported on the running app after PD-M11 shipped: "Neither ends allow
 scheduling" and "Non-workday schedule on YES does NOT work" — two of PD-M11's
@@ -640,6 +656,9 @@ asks through `messagebox` from inside its own `ButtonRelease` handler.
 
 ### Acceptance criteria
 
+> Every test named in this table was deleted with the module. The dialog they
+> covered hung the application; PD-M13's table is the one that holds.
+
 | ID | Criterion | Test |
 |---|---|---|
 | PD-M12.1 | The non-work-day question is asked by the app's dialog; the platform's is not on the drop path | `::test_pdm121_the_question_is_asked_by_the_app` |
@@ -655,6 +674,85 @@ asks through `messagebox` from inside its own `ButtonRelease` handler.
 waits on it, and every window in this suite is withdrawn. What is tested is the
 Plan screen's use of it, the fallback when it raises, and the suite's guard over
 it. PD-M12.5 is the rest, and it is a walk.
+
+## PD-M13 — No modal on the drop path at all
+
+Reported on the running app after PD-M12 shipped: **"broken - it just hangs..."**.
+
+PD-M12 read the fault correctly and then made it worse. The platform's dialog
+raises a bare `TclError` from the `after_idle` callback `on_drag_release`
+schedules; the app's own toplevel does not raise there, it never returns. A
+`CTkToplevel` with `grab_set` and `wait_window` cannot become viewable from that
+callback, so `wait_window` waits forever with the grab held and nothing able to
+take it. One gesture took the whole application down from responding.
+
+So the conclusion is not "ask with a different dialog" but **no modal of any
+kind survives that moment on this platform**. The drop paths stop asking.
+
+**What this module does.**
+
+- **PD-M13.1** `block_item` and `extend_day_for` call
+  `_require_block_day(ask=False)`: the write goes ahead on a day outside the
+  working week and the status line carries the warning. The status line is the
+  one place on this screen that cannot fail to appear, and PD-M7's rule for
+  this screen was "a warning, not a wall" — this is that rule with the warning
+  in the only place that works. The weekday list in Day Settings describes a
+  normal week; it was never a lock on the calendar.
+- **PD-M13.2** The two button gestures — AutoLoad, and the break/buffer
+  button — keep the question. A modal raised from a button press is the
+  ordinary case and the platform is content with it, and AutoLoad fills a whole
+  day from the item list, which is worth stopping for. The question is now
+  wrapped in `try/except tk.TclError` wherever it is asked: a dialog that
+  raises logs, allows the day, proceeds, and says which day it was on. Losing
+  the gesture is the failure that was reported, and it cannot happen again on
+  any path.
+- **PD-M13.3** The note is one-shot and belongs to the gesture, not the day:
+  it is read by the status line the gesture writes and cleared there. All four
+  status lines that can follow a non-work-day write append it — `block_item`,
+  `extend_day_for`, AutoLoad and the break/buffer button. Three of those four
+  were added because the mutation gate found the line deletable with every
+  other test green.
+
+**Withdrawn acceptance criteria.** Two approved criteria asserted the refusal
+this module removes, and both are withdrawn rather than re-pointed:
+
+- **TB-M8.2** "A drop on an unchecked weekday creates **no** block and reports
+  why" — the second half stands, the first does not. PD-M7 had already softened
+  it from a refusal to a question; PD-M13 removes the question from the drop
+  path. `::test_tbm82_drop_on_non_block_day_is_refused` is deleted; it had been
+  passing only because the suite's messagebox stub answers no.
+- **PD-M5.11** "Extending is refused on a non-working day" — the same, for the
+  **Earlier** / **Later** path.
+  `::test_pdm5_the_day_cannot_be_extended_onto_a_non_block_day` is deleted.
+
+The refusal they covered still exists on the paths that ask, and
+`::test_pdm132_answering_no_writes_nothing` covers it there.
+
+**Not changed, deliberately.** `messagebox` is still used by Clear Day on this
+screen and by twenty other call sites across the app, all reached from a button
+or a menu. The one that is not merely adjacent but likely live is in
+`BACKLOG.md`: the Scheduler's drag onto a project asks through `messagebox`
+from inside its own `ButtonRelease` handler, which is the same moment this
+module is about.
+
+### Acceptance criteria
+
+| ID | Criterion | Test |
+|---|---|---|
+| PD-M13.1 | A drop on a half hour of a non-work day asks nothing and writes the block | `::test_pdm131_a_drop_on_a_non_work_day_asks_nothing_and_writes` |
+| PD-M13.1 | A drop on an end of a non-work day lengthens the day and blocks the item | `::test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day` |
+| PD-M13.2 | A button gesture still asks on a non-work day | `::test_pdm132_a_button_still_asks_on_a_non_work_day` |
+| PD-M13.2 | The question is asked once per date, not once per press | `::test_pdm132_the_question_is_asked_once_per_date` |
+| PD-M13.2 | Answering no writes nothing and leaves the reason on screen | `::test_pdm132_answering_no_writes_nothing` |
+| PD-M13.2 | A question that raises does not take the gesture with it | `::test_pdm132_a_question_that_raises_does_not_take_the_gesture` |
+| PD-M13.2 | A break added after a failed question says which day it was on | `::test_pdm132_a_break_added_after_a_failed_question_says_the_day` |
+| PD-M13.3 | The note is said for the gesture it was raised for, and then cleared | `::test_pdm133_the_note_belongs_to_the_gesture` |
+| PD-M13.3 | A work day sees neither the question nor the note | `::test_pdm7_a_work_day_says_nothing` |
+| PD-M13.4 | On the running app: a Saturday drop on a half hour writes a block, a drop on **Earlier** and on **Later** lengthens the day, and the app keeps responding | *(not code-testable — no test in this suite can build a visible window, and both of the last two failures were invisible to every test that could not)* |
+
+PD-M13.4 is the walk, and it is the third one for these two reports. The first
+two remedies were both written against a correct diagnosis and both failed on
+screen, which is the reason this criterion is listed rather than assumed.
 
 ## Documents to update when this is built
 

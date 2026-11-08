@@ -138,10 +138,33 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   dropped on. It keeps scrolling while the pointer is held still, and the
   outline follows whichever box has moved under it.
 
+### Fixed — reported from the running screen (2026-11-07, fourth pass)
+
+- **Dropping an item on a weekend works, and the window no longer stops
+  responding.** The third pass replaced the system's question dialog with one
+  of the app's own, which did not fail — it never came back. A window cannot be
+  made visible at the moment a drag is released on macOS, so the app waited for
+  a dialog that could not appear, holding the input grab, and the application
+  hung. Reported as *"broken - it just hangs..."*.
+- **A drag no longer asks anything.** There is no dialog on the drop path at
+  all now. An item dropped on a half hour of a day outside your working week is
+  blocked, an item dropped on **Earlier** or **Later** lengthens the day and is
+  blocked, and the status line says which day it was on: *"Blocked 30m for … —
+  2026-11-07 is not a regular work day (Day Settings allows Mon, Tue, Wed, Thu,
+  Fri)"*. The weekday list in Day Settings describes a normal week; it was never
+  meant to be a lock on the calendar, and the warning now sits in the one place
+  on that screen that cannot fail to appear.
+- **AutoLoad and the break/buffer button still ask**, because either one can
+  fill a whole day at once, and a question raised from a button press is the
+  ordinary case the platform is content with. If one of those questions fails
+  to appear, the work goes ahead and the status line says which day it was on —
+  on every path now, not just the two that stopped asking.
+
 ### Fixed — reported from the running screen (2026-11-07, third pass)
 
 - **A drop on a day outside your working week works again, and so does a drop
-  on Earlier or Later.** On macOS the system's own question dialog cannot be
+  on Earlier or Later.** *(This pass was reported broken on the running app —
+  its dialog hung the window. The fourth pass above is what shipped.)* On macOS the system's own question dialog cannot be
   opened from the moment a drag is released, and it failed with no message when
   the Plan screen tried. Both of those gestures begin by asking whether the day
   is a work day, so both ended there: nothing written, nothing said. On a

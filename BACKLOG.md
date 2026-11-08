@@ -474,14 +474,18 @@ opened from the idle callback following a drag release, and here it is opened
 from inside the release handler itself. If it fails the same way, the
 exception leaves the Tk callback and the drop files nothing and says nothing.
 **Priority:** High if it reproduces - a silent no-op on a write gesture
-**Effort:** Small - swap both calls for `widgets/confirm_dialog.ask_yes_no` and
-an in-app notice; the tests in `test_project_multi_link.py` patch the
-confirmation, so they move to the new seam the way `test_pdm7_*` did.
-**Notes:** Not fixed with PD-M12. It has not been reported, it is a second
-screen's confirmation UI, and PD-M12's own dialog has had no walk yet - putting
-it on a second surface before anyone has seen it work on the first is how one
-unverified fix becomes two. **Worth a walk before anything else:** drag an item
-onto a project on the Scheduler screen and see whether it files. The other
+**Effort:** Small - take the modal off that release path the way PD-M13 did:
+file the link, say what happened where the screen already reports, and wrap any
+question that remains in `try/except tk.TclError` so a dialog that fails cannot
+take the gesture with it. **Not** by swapping in an in-app toplevel: PD-M12 tried
+that on the Plan screen and it hung the application, and `confirm_dialog.py` is
+deleted.
+**Notes:** Not fixed with PD-M12 or PD-M13. It has not been reported and it is a
+second screen's confirmation UI; fixing it there before anyone has walked the
+Plan screen's own remedy is how one unverified fix becomes two - and the first
+two remedies here were both wrong on screen. **Worth a walk before anything
+else:** drag an item onto a project on the Scheduler screen and see whether it
+files. The other
 twenty `messagebox` call sites in the app, Clear Day on the Plan screen
 included, are reached from a button or a menu and are not in this class.
 
@@ -494,8 +498,12 @@ canned answer and cannot raise. It exists for a good reason - a real modal
 blocks a test run until someone clicks it - but it means the only call that
 fails in the running app is a call no test makes. PD-M12 is what that costs: a
 `TclError` out of `askyesno` killed two write paths on every weekend day, while
-`test_pdm7_a_non_work_day_asks_before_scheduling` passed throughout, asserting
-the block was written by code that could not ask the question at all.
+the PD-M7 test (then named `test_pdm7_a_non_work_day_asks_before_scheduling`,
+now `::test_pdm132_a_button_still_asks_on_a_non_work_day`) passed throughout,
+asserting the block was written by code that could not ask the question at all.
+PD-M13 is what the second half costs: nothing in the suite could show that an
+in-app toplevel never returns from that callback either, because conftest
+withdraws every window, so the second remedy shipped as unseen as the first.
 **Priority:** Medium
 **Effort:** Medium - a decision, then a sweep
 **Notes:** Two ways out, and they are not exclusive. (a) Where a dialog gates a

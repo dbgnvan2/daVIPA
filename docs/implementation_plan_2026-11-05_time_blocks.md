@@ -191,7 +191,7 @@ Every `DatabaseManager` in these tests takes an explicit `tmp_path` database
 | TB-M6.1 | Changing the date picker reloads the item list and the block list for the new date | `::test_tbm61_date_change_reloads_both_panes` |
 | TB-M7.1 | The left pane shows exactly the items whose start date is the selected date | `::test_tbm71_item_list_matches_selected_date` |
 | TB-M8.1 | A drop on the day column creates one block in the database, with the item's work block as its length | `::test_tbm81_drop_creates_block_using_work_block` |
-| TB-M8.2 | A drop on an unchecked weekday creates **no** block and reports why | `::test_tbm82_drop_on_non_block_day_is_refused` |
+| TB-M8.2 | A drop on an unchecked weekday creates **no** block and reports why | *superseded 2026-11-07 — PD-M7 softened the refusal to a question and PD-M13.1 removed the question from the drop path; the test is deleted and the replacement is* `::test_pdm131_a_drop_on_a_non_work_day_asks_nothing_and_writes` |
 | TB-M9.1 | Both `<Button-3>` and `<Button-2>` are bound on a block widget | `::test_tbm91_both_right_click_buttons_are_bound` |
 | TB-M9.2 | Choosing 60 from the menu updates that block's row to 60 and re-times the blocks after it | `::test_tbm92_duration_change_repacks_the_day` |
 | TB-M10.1 | Add Buffer and Add Break each create a typed block of the right length | `::test_tbm101_buffer_and_break_blocks_are_typed` |
