@@ -18,6 +18,18 @@ from .title_format import format_column_text
 # column's pixel width into a character budget for `format_column_text`.
 CHAR_PX = 8
 
+# The narrowest a resizable column is ever made by a panel resize, in
+# characters. UPD-F4: the on-screen walk asked for "all columns to resize as I
+# move the vertical bar left or right, down to 5 character widths", so the
+# floor is stated in characters and converted at whatever `char_px` the screen
+# measures its text with.
+MIN_COLUMN_CHARS = 5
+
+
+def min_column_width(char_px: int = CHAR_PX) -> int:
+    """The five-character floor in pixels at the given character width."""
+    return MIN_COLUMN_CHARS * max(1, char_px)
+
 
 def chars_for_width(width_px: int, char_px: int = CHAR_PX) -> int:
     """How many characters fit in a column of the given pixel width (>= 1)."""
@@ -114,6 +126,113 @@ class ColumnResizer:
         stored.update(self._widths)
         setattr(self.settings, self._setting_attr(), stored)
         self.settings.save()
+
+    # --------------------------------------------------------------- fitting
+    def fit_to_width(self, available: int) -> int:
+        """Share `available` pixels across the resizable columns. Returns overflow.
+
+        Purpose: UPD-F4.1/F4.2/F4.3 — a panel that grew or shrank hands the
+                 difference to its resizable columns in proportion to the
+                 widths they already have, never below the five-character
+                 floor, with the fixed columns reserved out first.
+        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+        Tests:   tests/test_unified_panel_design.py::test_updf41_a_divider_move_rescales_every_resizable_column
+
+        A column's stored width is treated as a weight rather than a pixel
+        promise. That is what lets a drag and a resize coexist: the drag
+        writes a pixel width, which becomes the weight the next resize shares
+        the panel out by, so the *shape* the user set survives a window of a
+        different size (UPD-F4.6).
+
+        The return value is the pixels by which the columns overrun
+        `available` -- zero whenever they fit. It is a count, not a flag, so
+        the caller can say how badly a panel is too narrow instead of
+        discovering it from a clipped column (P2). A panel too narrow even for
+        the floors gets the floors and overflows; a floor that gives way under
+        pressure is not a floor.
+        """
+        order = [k for k in self.order if self.specs[k].resizable]
+        if not order:
+            return 0
+
+        reserved = sum(self._widths[k] for k in self.order
+                       if not self.specs[k].resizable)
+        # A panel of no width is the worst case, not a no-op: returning 0 here
+        # would report "they fit" for a panel with nothing in it, which is the
+        # silence this return value exists to prevent.
+        budget = max(0, int(available)) - reserved
+
+        floors = {k: max(self.specs[k].min_width, min_column_width(self.char_px))
+                  for k in order}
+        floor_total = sum(floors.values())
+        if budget < floor_total:
+            for key in order:
+                self._widths[key] = floors[key]
+            self._apply_all()
+            return floor_total - budget
+
+        assigned = self._share(order, budget, floors)
+        if assigned != {k: self._widths[k] for k in order}:
+            self._widths.update(assigned)
+            self._apply_all()
+        return 0
+
+    def _share(self, order, budget: int, floors: dict) -> dict:
+        """`budget` pixels over `order`, by weight, inside each column's bounds.
+
+        Columns that would land outside their own bounds are pinned there and
+        taken out of the share, and what they did not use is re-shared across
+        the rest. The loop runs at most once per column, because each pass
+        either pins one or settles.
+        """
+        assigned: dict = {}
+        free = list(order)
+        remaining = budget
+
+        while free:
+            weight = sum(self._widths[k] for k in free)
+            if weight <= 0:
+                # Nothing to go by; equal shares is the only honest answer.
+                weight = len(free)
+                shares = {k: remaining / len(free) for k in free}
+            else:
+                shares = {k: remaining * self._widths[k] / weight for k in free}
+
+            pinned = False
+            for key in list(free):
+                want = int(shares[key])
+                bound = None
+                if want < floors[key]:
+                    bound = floors[key]
+                elif want > self.specs[key].max_width:
+                    bound = self.specs[key].max_width
+                if bound is not None:
+                    assigned[key] = bound
+                    free.remove(key)
+                    remaining -= bound
+                    pinned = True
+            if pinned:
+                continue
+
+            for key in free:
+                assigned[key] = int(shares[key])
+            # Integer division leaves up to one pixel per column unspent. It
+            # goes to the widest free column, so the panel is filled exactly
+            # and the rounding is where it shows least.
+            spare = remaining - sum(assigned[k] for k in free)
+            if spare > 0:
+                widest = max(free, key=lambda k: assigned[k])
+                capped = min(self.specs[widest].max_width,
+                             assigned[widest] + spare)
+                assigned[widest] = capped
+            break
+
+        return assigned
+
+    def _apply_all(self) -> None:
+        """Push every column's current width to the header and every row."""
+        for key in self.order:
+            self._apply_live(key)
 
     # -------------------------------------------------------------------- grid
     def apply_grid(self, frame) -> None:

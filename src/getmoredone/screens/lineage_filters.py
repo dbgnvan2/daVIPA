@@ -32,6 +32,13 @@ from ..theme import combo_box_style
 # never compared against it.
 ALL = "All"
 
+# How deep the filter row is. One combo box high, which is what the row holds
+# on every tab that has filters. Annual Plan Elements has none and grids an
+# empty frame of this height instead, so the body of all six tabs starts at
+# the same y (UPD-F2.5) -- an empty CTkFrame asks for 200px, so it has to be
+# told.
+FILTER_ROW_HEIGHT = 28
+
 # What a row with no name in that part of its lineage renders and filters as.
 # A dash is never offered as a filter value: picking it would mean "the rows
 # that are missing a subsegment", which no screen offers and no user asked for.

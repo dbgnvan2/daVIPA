@@ -10,7 +10,7 @@ from ..app_settings import AppSettings
 from ..date_utils import current_quarter
 from ..theme import button_style, semantic_colors, status_text_color
 from ..weekly_tactic_logging import get_weekly_tactic_logger
-from .chip_table import APE_LEFT_COLUMNS, APE_RIGHT_COLUMNS, ChipTable
+from .chip_table import APE_LEFT_COLUMNS, APE_RIGHT_COLUMNS, ChipTable, panel_fitter
 from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .split_panel import SPLITTER_WIDTH, SplitPanel
@@ -88,29 +88,42 @@ class APEAssignmentScreen(ctk.CTkFrame):
             row=1, column=6, padx=(4, 12), pady=(0, 8), sticky="w"
         )
 
-        ctk.CTkLabel(header, text="Segment:").grid(row=1, column=7, padx=(0, 4), pady=(0, 8), sticky="e")
+        # UPD-F2 — the three filters sit on a row of their own, below the
+        # row holding this tab's own controls, so every tab in the hub is the
+        # same depth. They were on the controls row, which put eleven widgets
+        # on one line and made the filters hard to find. A frame rather than
+        # six more cells in the header's grid: the two rows then size their
+        # columns independently, so a 160px combo does not stretch the column
+        # the Year entry sits in.
+        # Spec:  docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+        # Tests: tests/test_unified_panel_design.py::test_updf21_the_filters_are_on_their_own_row
+        self.filter_row = ctk.CTkFrame(header, fg_color="transparent")
+        self.filter_row.grid(row=2, column=0, columnspan=13, sticky="w",
+                             padx=8, pady=(0, 8))
+
+        ctk.CTkLabel(self.filter_row, text="Segment:").grid(row=0, column=0, padx=(0, 4), sticky="e")
         self.segment_filter_combo = ctk.CTkComboBox(
-            header, width=160, values=["All"], variable=self.segment_filter_var, command=lambda _v: self.on_filters_changed()
+            self.filter_row, width=160, values=["All"], variable=self.segment_filter_var, command=lambda _v: self.on_filters_changed()
         )
-        self.segment_filter_combo.grid(row=1, column=8, padx=4, pady=(0, 8), sticky="w")
+        self.segment_filter_combo.grid(row=0, column=1, padx=4, sticky="w")
 
-        ctk.CTkLabel(header, text="SubSegment:").grid(row=1, column=9, padx=(10, 4), pady=(0, 8), sticky="e")
+        ctk.CTkLabel(self.filter_row, text="SubSegment:").grid(row=0, column=2, padx=(10, 4), sticky="e")
         self.subsegment_filter_combo = ctk.CTkComboBox(
-            header, width=160, values=["All"], variable=self.subsegment_filter_var, command=lambda _v: self.on_filters_changed()
+            self.filter_row, width=160, values=["All"], variable=self.subsegment_filter_var, command=lambda _v: self.on_filters_changed()
         )
-        self.subsegment_filter_combo.grid(row=1, column=10, padx=4, pady=(0, 8), sticky="w")
+        self.subsegment_filter_combo.grid(row=0, column=3, padx=4, sticky="w")
 
-        ctk.CTkLabel(header, text="Category:").grid(row=1, column=11, padx=(10, 4), pady=(0, 8), sticky="e")
+        ctk.CTkLabel(self.filter_row, text="Category:").grid(row=0, column=4, padx=(10, 4), sticky="e")
         self.category_filter_combo = ctk.CTkComboBox(
-            header, width=160, values=["All"], variable=self.category_filter_var, command=lambda _v: self.on_filters_changed()
+            self.filter_row, width=160, values=["All"], variable=self.category_filter_var, command=lambda _v: self.on_filters_changed()
         )
-        self.category_filter_combo.grid(row=1, column=12, padx=4, pady=(0, 8), sticky="w")
+        self.category_filter_combo.grid(row=0, column=5, padx=4, sticky="w")
 
         # APC-M6.2 — somewhere for Save to say what it did, as APE Month has.
         # Before this the quarter screen reported neither a success nor a
         # refusal on either of its two write paths.
         self.status_label = ctk.CTkLabel(header, text="", text_color=status_text_color("muted"))
-        self.status_label.grid(row=2, column=0, columnspan=13, sticky="w", padx=8, pady=(0, 8))
+        self.status_label.grid(row=3, column=0, columnspan=13, sticky="w", padx=8, pady=(0, 8))
 
         body = ctk.CTkFrame(self)
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
@@ -176,6 +189,10 @@ class APEAssignmentScreen(ctk.CTkFrame):
             divider,
             settings=self.settings,
             prefix=self.SETTINGS_PREFIX,
+            # UPD-F4 — the divider hands each panel's new width to that
+            # panel's columns, so moving it widens or narrows the columns
+            # instead of leaving empty space beside the last one.
+            on_apply=panel_fitter(self.left_table, self.right_table),
         )
 
         # UPD-M2 — the row drag, the drop test and the descendant walk live in

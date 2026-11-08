@@ -61,6 +61,7 @@ class SplitPanel:
         right_column=2,
         splitter_width=SPLITTER_WIDTH,
         min_panel_width=MIN_PANEL_WIDTH,
+        on_apply=None,
     ):
         self.body = body
         self.left_panel = left_panel
@@ -71,6 +72,11 @@ class SplitPanel:
         self.right_column = right_column
         self.splitter_width = splitter_width
         self.min_panel_width = min_panel_width
+        # UPD-F4 — called with (left_px, right_px) every time the panels are
+        # re-sized, so a screen can re-share each panel's width across that
+        # panel's columns. The divider is the only thing that changes a
+        # panel's width, so this is the only place that knows the new one.
+        self.on_apply = on_apply
         self.ratio = self._load_ratio()
         self._drag_start_x = None
         self._drag_start_left = None
@@ -151,10 +157,11 @@ class SplitPanel:
         if not total:
             return
         left = self.clamp_left(int(total * self.ratio), total)
+        right = max(self.min_panel_width, total - left)
         self.body.grid_columnconfigure(self.left_column, minsize=left)
-        self.body.grid_columnconfigure(
-            self.right_column, minsize=max(self.min_panel_width, total - left)
-        )
+        self.body.grid_columnconfigure(self.right_column, minsize=right)
+        if self.on_apply is not None:
+            self.on_apply(left, right)
 
     def on_body_resize(self, _event=None) -> None:
         """Re-apply on resize, but never while a drag is setting the ratio."""

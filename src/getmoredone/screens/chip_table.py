@@ -24,6 +24,7 @@ goes in the checkbox and Actions columns, and grids it at the index
 selectable and a right panel that is not.
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -31,11 +32,21 @@ import customtkinter as ctk
 
 from ..color_contrast import pick_text_color
 from ..theme import semantic_colors
-from .column_resize import ColumnResizer, ColumnSpec
+from .column_resize import ColumnResizer, ColumnSpec, min_column_width
+
+logger = logging.getLogger(__name__)
 
 # How far inside its column a chip sits. The pill is the column width less
 # this, so two chips in adjacent columns do not touch.
 CHIP_INSET = 12
+
+# The padding the table spends on itself, which the columns therefore do not
+# get. `HEADER_PADX` is the header's and each row's own `padx`; `CELL_PADX` is
+# every cell's. Named because `available_width` has to subtract exactly what
+# `build_header` and `add_row` spend, and two numbers that must agree are
+# better as one (UPD-F4).
+HEADER_PADX = 4
+CELL_PADX = 5
 
 # A chip whose colour is empty falls back to the panel's own surface, so a row
 # with no lineage colour still reads as a row rather than as a hole.
@@ -66,7 +77,9 @@ class ChipColumn:
     """One column of the table.
 
     key:          stable id; also the persistence sub-key and the cell tag.
-    heading:      header text. Empty for the checkbox column.
+    heading:      header text. "Pick" over the checkbox column (UPD-F3);
+                  it was blank until the on-screen walk asked for a word
+                  there, because a blank header gave the ticks no name.
     chip:         True draws a solid-colour pill, False a plain label.
     resizable:    False means a fixed width and no drag handle — the checkbox
                   and Actions columns, which have nothing to widen.
@@ -80,7 +93,15 @@ class ChipColumn:
     # 34 wide with the default minimum of 40 renders at 40 and nothing says
     # so. Pinned for every shipped set by
     # ::test_updm31_every_shipped_column_declares_a_width_it_can_have.
-    min_width: int = 40
+    #
+    # UPD-F4: the default is the five-character floor from `column_resize`,
+    # and every resizable column in the sets below takes it. They declared 52,
+    # 60 and 80 until the on-screen walk asked for "all columns to resize ...
+    # down to 5 character widths". The cost is on the record: "SubSegment"
+    # measures 84px in the header font, so a column dragged or fitted to the
+    # floor now clips its own heading. That was already true of the old 60px
+    # minimum and the walk asked for the narrower one anyway.
+    min_width: int = min_column_width()
     max_width: int = 600
     chip: bool = True
     resizable: bool = True
@@ -96,14 +117,17 @@ class ChipColumn:
 # every column of every panel one place to the right of where it is today.
 _INDEX_AND_CHIPS: Tuple[ChipColumn, ...] = (
     ChipColumn("index", "#", 34, min_width=34, chip=False, resizable=False),
-    ChipColumn("segment", "Segment", 135, min_width=60),
-    ChipColumn("subsegment", "SubSegment", 155, min_width=60),
-    ChipColumn("category", "Category", 125, min_width=60),
+    ChipColumn("segment", "Segment", 135),
+    ChipColumn("subsegment", "SubSegment", 155),
+    ChipColumn("category", "Category", 125),
 )
 
-# Left panel: a blank cell over the checkboxes, then the four names.
+# Left panel: "Pick" over the checkboxes, then the four names. The heading
+# fits the column it is declared in: "Pick" measures 28px in the header
+# font against a 34px column, so UPD-F3 moved no width. Held by
+# ::test_updf32_the_pick_column_fits_its_heading_and_has_no_handle.
 APE_LEFT_COLUMNS: Tuple[ChipColumn, ...] = (
-    ChipColumn("checkbox", "", 34, min_width=34, chip=False, resizable=False),
+    ChipColumn("checkbox", "Pick", 34, min_width=34, chip=False, resizable=False),
 ) + _INDEX_AND_CHIPS
 
 # Right panel on the two APE tabs: one Delete button, 84px.
@@ -118,7 +142,7 @@ APE_RIGHT_COLUMNS: Tuple[ChipColumn, ...] = _INDEX_AND_CHIPS + (
 # to APE_RIGHT_COLUMNS for that reason: a Done column on APE Quarter and APE
 # Month would be a column that can only ever read 0/0.
 WEEK_ASSIGNMENT_RIGHT_COLUMNS: Tuple[ChipColumn, ...] = _INDEX_AND_CHIPS + (
-    ChipColumn("progress", "Done", 70, min_width=52, chip=False),
+    ChipColumn("progress", "Done", 70, chip=False),
     ChipColumn("actions", "Actions", 84, chip=False, resizable=False),
 )
 
@@ -135,13 +159,13 @@ ANNUAL_RIGHT_COLUMNS: Tuple[ChipColumn, ...] = _INDEX_AND_CHIPS + (
 # ticked here) and no Actions (clicking the row is the interaction, D6).
 WEEK_ACTIONS_LEFT_COLUMNS: Tuple[ChipColumn, ...] = (
     ChipColumn("index", "#", 34, min_width=34, chip=False, resizable=False),
-    ChipColumn("title", "Weekly Tactic", 220, min_width=80, chip=False),
-    ChipColumn("segment", "Segment", 135, min_width=60),
-    ChipColumn("subsegment", "SubSegment", 155, min_width=60),
-    ChipColumn("category", "Category", 125, min_width=60),
+    ChipColumn("title", "Weekly Tactic", 220, chip=False),
+    ChipColumn("segment", "Segment", 135),
+    ChipColumn("subsegment", "SubSegment", 155),
+    ChipColumn("category", "Category", 125),
     # WTP-M6.5 — the same count as the APE Week Assignment right panel, read
     # from the same helper, so the two panels cannot disagree about one week.
-    ChipColumn("progress", "Done", 70, min_width=52, chip=False),
+    ChipColumn("progress", "Done", 70, chip=False),
 )
 
 
@@ -201,6 +225,32 @@ class ChipTable:
     def _chip_width(self, key: str) -> int:
         return max(1, self.resizer.width(key) - CHIP_INSET)
 
+    def fit_to_panel(self, panel_px: int) -> int:
+        """Re-share this panel's width across its resizable columns.
+
+        Purpose: UPD-F4.1 — the panel's width, less what the layout spends on
+                 padding, is what the columns have to share.
+        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+        Tests:   tests/test_unified_panel_design.py::test_updf41_a_divider_move_rescales_every_resizable_column
+
+        Returns the pixels by which the columns overrun the panel, zero
+        whenever they fit, so a caller can report a panel that is too narrow
+        rather than leave the user to notice a clipped column (P2).
+        """
+        return self.resizer.fit_to_width(self.available_width(panel_px))
+
+    def available_width(self, panel_px: int) -> int:
+        """Of a panel `panel_px` wide, what the column widths themselves get.
+
+        The header and every row are gridded with `padx=HEADER_PADX`, and each
+        cell inside them with `padx=CELL_PADX`, so a column of width W asks
+        the panel for W + 2 * CELL_PADX. Fitting to the raw panel width would
+        overrun it by twice the cell padding per column -- 70px on a
+        seven-column panel, which is most of a column.
+        """
+        spent = 2 * HEADER_PADX + 2 * CELL_PADX * len(self.columns)
+        return max(0, int(panel_px) - spent)
+
     # ------------------------------------------------------------------ header
 
     def clear(self) -> None:
@@ -228,7 +278,7 @@ class ChipTable:
         self.container.grid_columnconfigure(0, weight=1)
         header = ctk.CTkFrame(
             self.container, fg_color=semantic_colors()["surface_subtle"])
-        header.grid(row=0, column=0, sticky="ew", padx=4, pady=(0, 4))
+        header.grid(row=0, column=0, sticky="ew", padx=HEADER_PADX, pady=(0, 4))
         self.resizer.apply_grid(header)
 
         labels: Dict[str, ctk.CTkLabel] = {}
@@ -241,8 +291,8 @@ class ChipTable:
                 font=ctk.CTkFont(weight="bold"),
                 anchor=anchor,
             )
-            label.grid(row=0, column=self.grid_col(column.key), padx=5, pady=5,
-                       sticky=anchor)
+            label.grid(row=0, column=self.grid_col(column.key),
+                       padx=CELL_PADX, pady=5, sticky=anchor)
             labels[column.key] = label
 
         self.resizer.build_dividers(header, labels)
@@ -274,7 +324,8 @@ class ChipTable:
         colors = colors or {}
         palette = semantic_colors()
         frame = ctk.CTkFrame(self.container, **frame_kwargs)
-        frame.grid(row=len(self.rows) + 1, column=0, sticky="ew", padx=4, pady=2)
+        frame.grid(row=len(self.rows) + 1, column=0, sticky="ew",
+                   padx=HEADER_PADX, pady=2)
 
         cells: Dict[str, ctk.CTkLabel] = {}
         registered = []
@@ -332,10 +383,43 @@ class ChipTable:
                     anchor="w",
                 )
                 registered.append((column.key, label, full_text, 0, 0))
-            label.grid(row=0, column=self.grid_col(column.key), padx=5, pady=5,
-                       sticky="w")
+            label.grid(row=0, column=self.grid_col(column.key),
+                       padx=CELL_PADX, pady=5, sticky="w")
             cells[column.key] = label
 
         self.resizer.register_row(frame, registered)
         self.rows.append((frame, cells))
         return frame, cells
+
+
+def panel_fitter(left_table: Optional["ChipTable"] = None,
+                 right_table: Optional["ChipTable"] = None):
+    """A `SplitPanel` `on_apply` that re-shares each panel across its columns.
+
+    Purpose: UPD-F4.1 — one fitter for the five two-panel tabs, so moving the
+             divider widens or narrows the columns of whichever panel grew or
+             shrank rather than leaving empty space beside the last column.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Tests:   tests/test_unified_panel_design.py::test_updf41_the_divider_is_wired_to_both_panels
+
+    Either table may be None: APE Week Actions' right panel is a `TodayScreen`
+    subclass with a column store of its own and is not a `ChipTable`, so it is
+    left out rather than half-fitted.
+
+    A panel too narrow for its columns' floors is logged with the shortfall
+    rather than passed over, because the only other way to find out is to
+    notice a clipped column (P2).
+    """
+    def fit(left_px: int, right_px: int) -> None:
+        for table, panel_px, side in ((left_table, left_px, "left"),
+                                      (right_table, right_px, "right")):
+            if table is None:
+                continue
+            overflow = table.fit_to_panel(panel_px)
+            if overflow:
+                logger.warning(
+                    "[chip_table] %s %s panel is %dpx too narrow for its "
+                    "columns at their minimum; they are clipped",
+                    table.prefix, side, overflow)
+
+    return fit

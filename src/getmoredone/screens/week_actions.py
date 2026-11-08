@@ -29,6 +29,7 @@ from ..theme import button_style, combo_box_style, semantic_colors, status_text_
 from .chip_table import (
     WEEK_ACTIONS_LEFT_COLUMNS,
     ChipTable,
+    panel_fitter,
     show_list_or_message,
 )
 from .lineage_filters import LineageFilters, weekly_tactic_parts
@@ -277,14 +278,26 @@ class WeekActionsScreen(ctk.CTkFrame):
         # screens/lineage_filters.py. The module owns the "All" sentinel, the
         # option lists and the predicate; this screen owns where they sit and
         # what it says when they hide everything.
-        next_column = self.filters.build_combos(
-            header, start_column=4, on_change=self.on_filters_changed)
+        #
+        # UPD-F2 — they sit on a row of their own, below this tab's own
+        # controls, so every tab in the hub is the same depth. A frame rather
+        # than six more cells in the header's grid: the two rows then size
+        # their columns independently, so a 150px combo does not stretch the
+        # column the Week Start combo sits in.
+        # Spec:  docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+        # Tests: tests/test_unified_panel_design.py::test_updf21_the_filters_are_on_their_own_row
+        self.filter_row = ctk.CTkFrame(header, fg_color="transparent")
+        self.filter_row.grid(row=2, column=0, columnspan=6, sticky="w",
+                             padx=8, pady=(0, 8))
+        self.filters.build_combos(
+            self.filter_row, start_column=0, on_change=self.on_filters_changed,
+            row=0, pady=(0, 0))
 
         self.status_label = ctk.CTkLabel(
             header, text="", text_color=status_text_color("muted"))
-        self.status_label.grid(row=1, column=next_column, sticky="w", padx=10,
-                               pady=(0, 8))
-        header.grid_columnconfigure(next_column, weight=1)
+        self.status_label.grid(row=3, column=0, columnspan=6, sticky="w",
+                               padx=10, pady=(0, 8))
+        header.grid_columnconfigure(4, weight=1)
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
@@ -353,6 +366,10 @@ class WeekActionsScreen(ctk.CTkFrame):
             divider,
             settings=self.settings,
             prefix=self.SETTINGS_PREFIX,
+            # UPD-F4 — the divider hands each panel's new width to that
+            # panel's columns, so moving it widens or narrows the columns
+            # instead of leaving empty space beside the last one.
+            on_apply=panel_fitter(self.left_table),
         )
 
     # -------------------------------------------------------------------- weeks

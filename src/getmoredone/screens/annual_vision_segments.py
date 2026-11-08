@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING, Optional
 from ..app_settings import AppSettings
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
 from ..vps_manager import ActionItemsAttachedError, ProjectBoardsAttachedError
-from .chip_table import ANNUAL_RIGHT_COLUMNS, APE_LEFT_COLUMNS, ChipTable
+from .chip_table import ANNUAL_RIGHT_COLUMNS, APE_LEFT_COLUMNS, ChipTable, panel_fitter
+from .lineage_filters import FILTER_ROW_HEIGHT
 from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .split_panel import SPLITTER_WIDTH, SplitPanel
@@ -55,21 +56,37 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         header.grid(row=0, column=0, sticky="ew", padx=12, pady=12)
         header.grid_columnconfigure(6, weight=1)
 
+        # UPD-F2 — the title gets row 0 to itself and the controls drop to
+        # row 1, which is where every other tab in the hub puts them. They
+        # were on the title's row, so this tab was two lines shallower than
+        # its neighbours and the body jumped when you moved between them.
+        # Spec:  docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+        # Tests: tests/test_unified_panel_design.py::test_updf24_the_tab_with_no_filters_is_the_same_depth
         ctk.CTkLabel(header, text="Annual Plan Elements", font=ctk.CTkFont(size=22, weight="bold")).grid(
-            row=0, column=0, padx=8, pady=8, sticky="w"
+            row=0, column=0, columnspan=6, padx=8, pady=(8, 6), sticky="w"
         )
-        ctk.CTkLabel(header, text="Year:").grid(row=0, column=1, padx=(18, 4), pady=8)
+        ctk.CTkLabel(header, text="Year:").grid(row=1, column=0, padx=(8, 4), pady=(0, 8), sticky="e")
         self.year_entry = ctk.CTkEntry(header, width=90, textvariable=self.year_var)
-        self.year_entry.grid(row=0, column=2, padx=4, pady=8)
+        self.year_entry.grid(row=1, column=1, padx=4, pady=(0, 8), sticky="w")
         ctk.CTkButton(header, text="Load Year", width=100, command=self.refresh_lists, **button_style("secondary")).grid(
-            row=0, column=3, padx=6, pady=8
+            row=1, column=2, padx=6, pady=(0, 8), sticky="w"
         )
         ctk.CTkButton(header, text="Save", width=100, command=self.add_selected, **button_style("primary")).grid(
-            row=0, column=4, padx=6, pady=8
+            row=1, column=3, padx=6, pady=(0, 8), sticky="w"
         )
         ctk.CTkButton(header, text="Refresh", width=90, command=self.refresh_lists, **button_style("secondary")).grid(
-            row=0, column=5, padx=6, pady=8
+            row=1, column=4, padx=6, pady=(0, 8), sticky="w"
         )
+
+        # This tab filters nothing -- there is no lineage above an annual plan
+        # element to filter by -- so row 2 is an empty frame one combo deep.
+        # The user asked for the blank line by name: without it the body of
+        # this tab starts 36px above the body of the four that do filter.
+        self.filter_row = ctk.CTkFrame(
+            header, fg_color="transparent", height=FILTER_ROW_HEIGHT)
+        self.filter_row.grid(row=2, column=0, columnspan=6, sticky="w",
+                             padx=8, pady=(0, 8))
+        self.filter_row.grid_propagate(False)
 
         body = ctk.CTkFrame(self)
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
@@ -145,6 +162,10 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
             divider,
             settings=self.settings,
             prefix=self.SETTINGS_PREFIX,
+            # UPD-F4 — the divider hands each panel's new width to that
+            # panel's columns, so moving it widens or narrows the columns
+            # instead of leaving empty space beside the last one.
+            on_apply=panel_fitter(self.left_table, self.right_table),
         )
 
         # UPD-M2 — the row drag lives in screens/row_drag.py. This screen's
