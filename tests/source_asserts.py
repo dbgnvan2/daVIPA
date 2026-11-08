@@ -193,41 +193,6 @@ def call_string_args(func: Callable, owner: str, attr: str) -> "list[str]":
     return found
 
 
-def call_string_args(func: Callable, owner: str, attr: str) -> "list[str]":
-    """Every string literal passed as the first argument to ``owner.attr(...)``.
-
-    ``owner`` may be dotted, so ``call_string_args(f, "self.tabview", "add")``
-    collects the tab names in ``self.tabview.add("Appearance")`` and friends.
-    ``calls_attribute`` cannot be used for this: its ``obj`` must be a bare
-    name, and it answers whether the call happens, not what it was given.
-
-    Matches calls, so a comment or a docstring containing the same words
-    contributes nothing -- which is the point. A substring check over
-    ``inspect.getsource`` is satisfied by the comment above the call.
-    """
-    def dotted(node: ast.AST) -> str:
-        if isinstance(node, ast.Name):
-            return node.id
-        if isinstance(node, ast.Attribute):
-            base = dotted(node.value)
-            return f"{base}.{node.attr}" if base else ""
-        return ""
-
-    found: "list[str]" = []
-    for node in ast.walk(_tree(func)):
-        if not isinstance(node, ast.Call) or not node.args:
-            continue
-        target = node.func
-        if not isinstance(target, ast.Attribute) or target.attr != attr:
-            continue
-        if dotted(target.value) != owner:
-            continue
-        first = node.args[0]
-        if isinstance(first, ast.Constant) and isinstance(first.value, str):
-            found.append(first.value)
-    return found
-
-
 def iterates_mapping(func: Callable, name: str) -> bool:
     """Does ``func`` call ``<name>.items()`` or ``<name>.values()``?
 

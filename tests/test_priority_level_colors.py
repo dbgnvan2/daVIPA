@@ -782,25 +782,42 @@ def test_plcm48_every_list_screen_row_builder_calls_the_helper():
     assert len(ROW_BUILDERS) == 5
 
 
-def _self_settings_statement_index(func) -> int:
-    """Which top-level statement of ``func`` assigns ``self.settings``.
+def _settings_reload_statement_index(func) -> int:
+    """Which top-level statement of ``func`` is ``self.settings = AppSettings.load(...)``.
 
-    Raises if none does, so it cannot quietly report a passing position for a
-    function that never reloads.
+    Both halves, in one statement: ``assigns_self_attribute`` looks only at
+    assignment *targets* and ``calls_attribute`` only at calls, so asserting
+    them separately accepted a ``refresh`` that wrote ``self.settings`` from a
+    cache at the top and called ``AppSettings.load()`` into a local further
+    down — the very hole the pair was meant to close.
+
+    Raises if there is no such statement, so it cannot quietly report a
+    passing position for a function that never reloads.
     """
     tree = ast.parse(textwrap.dedent(inspect.getsource(func))).body[0]
     for index, statement in enumerate(tree.body):
         if not isinstance(statement, ast.Assign):
             continue
-        for target in statement.targets:
-            if (
-                isinstance(target, ast.Attribute)
-                and target.attr == "settings"
-                and isinstance(target.value, ast.Name)
-                and target.value.id == "self"
-            ):
-                return index
-    raise AssertionError(f"{func.__qualname__} never assigns self.settings")
+        targets_self_settings = any(
+            isinstance(target, ast.Attribute)
+            and target.attr == "settings"
+            and isinstance(target.value, ast.Name)
+            and target.value.id == "self"
+            for target in statement.targets
+        )
+        value = statement.value
+        loads_settings = (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Attribute)
+            and value.func.attr == "load"
+            and isinstance(value.func.value, ast.Name)
+            and value.func.value.id == "AppSettings"
+        )
+        if targets_self_settings and loads_settings:
+            return index
+    raise AssertionError(
+        f"{func.__qualname__} has no self.settings = AppSettings.load() statement"
+    )
 
 
 def test_plcm48_the_five_screens_reload_settings_before_building_rows():
@@ -824,16 +841,16 @@ def test_plcm48_the_five_screens_reload_settings_before_building_rows():
     )
     for refresher in refreshers:
         name = refresher.__qualname__
-        assert calls_attribute(refresher, "AppSettings", "load"), name
-        # Into ``self.settings``, not a local: ``today.py`` and ``upcoming.py``
-        # both already contain ``settings = AppSettings.load()`` into a local
-        # elsewhere, so a screen written that way would have kept this test
-        # green while the saved colour stayed invisible until relaunch.
-        assert assigns_self_attribute(refresher, "settings"), name
-        # And near the top, before the rows are built. Three because a screen
-        # may clear its frame or take a guard first; all five sit at index 1 or
-        # 2 today.
-        assert _self_settings_statement_index(refresher) <= 2, name
+        # One statement that both writes ``self.settings`` AND reads it from
+        # ``AppSettings.load``, near the top, before the rows are built.
+        # ``today.py`` and ``upcoming.py`` both already contain a
+        # ``settings = AppSettings.load()`` into a *local* elsewhere, and
+        # asserting the call and the assignment separately would accept a
+        # screen that did the two in different statements — green here, while
+        # the saved colour stayed invisible until relaunch. Three because a
+        # screen may clear its frame or take a guard first; all five sit at
+        # index 1 or 2 today.
+        assert _settings_reload_statement_index(refresher) <= 2, name
 
 
 def test_plcm4_a_completed_row_in_all_items_still_uses_the_status_check():
@@ -852,12 +869,14 @@ def test_plcm4_a_completed_row_in_all_items_still_uses_the_status_check():
 
 #: Stderr fragments that mean "there is no display here", as opposed to "the
 #: section is broken". Deliberately narrow: the reason is in the comment inside
-#: ``test_plcm3_the_section_builds_on_real_widgets``.
+#: ``test_plcm3_the_section_builds_on_real_widgets``. Compared lower-cased,
+#: because Tcl capitalises its own two ("Can't find a usable init.tcl") and a
+#: marker that can never match is a marker that is not there.
 _NO_DISPLAY_MARKERS = (
-    "no display name and no $DISPLAY",
+    "no display name and no $display",
     "couldn't connect to display",
     "can't find a usable init.tcl",
-    "Can't find a usable tk.tcl",
+    "can't find a usable tk.tcl",
 )
 
 
@@ -879,6 +898,8 @@ def test_plcm3_the_section_builds_on_real_widgets():
     import subprocess
     import sys
 
+    from tests import build_priority_colors_section
+
     root = pathlib.Path(__file__).resolve().parents[1]
     helper = root / "tests" / "build_priority_colors_section.py"
     result = subprocess.run(
@@ -893,7 +914,7 @@ def test_plcm3_the_section_builds_on_real_widgets():
     # raise -- which is this test's whole target class, so skipping on it would
     # leave the test unable to fail for the thing it exists to catch.
     if result.returncode != 0 and any(
-        marker in result.stderr for marker in _NO_DISPLAY_MARKERS
+        marker in result.stderr.lower() for marker in _NO_DISPLAY_MARKERS
     ):
         pytest.skip(f"Tk display unavailable: {result.stderr.strip()[-200:]}")
     assert result.returncode == 0, (
@@ -906,6 +927,24 @@ def test_plcm3_the_section_builds_on_real_widgets():
     assert printed.get("BUILT") == "ok", result.stdout
     assert printed.get("ENTRIES") == str(len(LEVEL_KEYS)), result.stdout
     assert printed.get("SWATCHES") == str(len(LEVEL_KEYS)), result.stdout
+
+    # The premise of PLC-M2.5, confirmed against the real Tk rather than read
+    # off its colour grammar: every shape the old validator admitted is one Tk
+    # refuses. If Tk ever accepted one, the guard could be loosened for it --
+    # and if this ever fails the other way, the guard is load-bearing for a
+    # reason the comments no longer state correctly.
+    for raw in build_priority_colors_section.TK_MUST_REJECT:
+        verdict = printed.get(f"TKREJECTS:{raw}")
+        assert verdict is not None, result.stdout
+        # TclError specifically, not merely "something went wrong": that is
+        # the exception a row build would have raised, and naming it here is
+        # what makes color_contrast.py's comment a checked statement.
+        assert verdict == "TclError", (
+            f"Tk gave {verdict} for {raw!r}, not TclError, so the comment in "
+            f"color_contrast.py explaining why int(x, 16) is too lax "
+            f"describes the wrong failure for this value"
+        )
+        assert normalize_hex_color(raw) is None, raw
 
     defaults = priority_level_fill_colors()
     for level in LEVEL_KEYS:

@@ -63,6 +63,19 @@ class _Host(SettingsPriorityColorsMixin, ctk.CTkFrame):
         raise AssertionError("the helper must not publish to a running app")
 
 
+#: Shapes ``int(text[1:], 16)`` called valid and Tk does not. Kept here, next
+#: to the only Tk root in the suite, so the claim can be checked rather than
+#: believed.
+TK_MUST_REJECT = (
+    "#0X1234",
+    "#+12345",
+    "# 12345",
+    "#-12345",
+    "#1_2345",
+    "#\uff11\uff12\uff13\uff14\uff15\uff16",
+)
+
+
 def main() -> int:
     root = ctk.CTk()
     root.withdraw()
@@ -96,6 +109,19 @@ def main() -> int:
     host.save_priority_level_colors()
     root.update_idletasks()
     print(f"REFUSAL={host.priority_colors_status_label.cget('text')}")
+
+    # The premise of the whole validator, asked of Tk itself rather than
+    # assumed from its colour grammar: these are the shapes the first version
+    # of normalize_hex_color admitted, and the reason it had to stop is that
+    # Tk raises on them. Nothing else in the suite puts one in front of Tk.
+    for raw in TK_MUST_REJECT:
+        try:
+            ctk.CTkFrame(root, fg_color=raw).grid()
+            root.update_idletasks()
+            verdict = "accepted"
+        except Exception as exc:                      # TclError, or whatever Tk raises
+            verdict = type(exc).__name__
+        print(f"TKREJECTS:{raw}={verdict}")
 
     root.destroy()
     print("BUILT=ok")
