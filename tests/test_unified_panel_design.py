@@ -20,6 +20,7 @@ import ast
 import dataclasses
 import logging
 import sys
+from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -45,6 +46,12 @@ from src.getmoredone.screens.annual_vision_segments import (  # noqa: E402
 from src.getmoredone.screens.ape_assignment import APEAssignmentScreen  # noqa: E402
 from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen  # noqa: E402
 from src.getmoredone.screens.weekly_items import WeeklyItemsScreen  # noqa: E402
+from tests.weekly_tactic_fixtures import (  # noqa: E402
+    make_vps,
+    make_week_item,
+    seed_ape,
+    seed_second_ape,
+)
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "getmoredone"
 
@@ -2113,3 +2120,552 @@ def test_updm56_a_row_with_no_category_colour_takes_the_subsegments():
         assert cat == "#cc7744"
     finally:
         root.destroy()
+
+
+# ---------------------------- UPD-M6: APE Week Actions gets the design it can take
+#
+# The two tests that open this section are **characterisation** tests in the
+# sense this file's docstring describes: both were written and run green
+# against `week_actions.py` as it stood, before a line of it was changed, and
+# both must still be green after. They hold the two things UPD-M6 must not
+# disturb -- the right panel's own column store (M6.6) and the absence of a
+# drag on this tab (M6.7, D6).
+
+def _week_actions_screen(tmp_path, vps, settings=None, first_day=0):
+    """APE Week Actions on a withdrawn root, already rendered.
+
+    Takes a real `VPSManager` on a temporary database rather than a double:
+    the right panel is a `TodayScreen` subclass and queries items for real.
+    """
+    from src.getmoredone.screens.week_actions import WeekActionsScreen
+    root = _root()
+    app = SimpleNamespace(
+        vps_manager=vps,
+        db_manager=vps.db_manager,
+        settings=settings if settings is not None else FakeSettings(
+            first_day_of_week=first_day,
+            week_actions_left_col_widths={},
+            week_actions_split_ratio=0.5,
+        ),
+    )
+    if settings is not None and not hasattr(settings, "first_day_of_week"):
+        settings.first_day_of_week = first_day
+    screen = WeekActionsScreen(root, vps, app)
+    screen.update_idletasks()
+    return root, screen
+
+
+def _this_monday() -> str:
+    from src.getmoredone import week_options
+    return week_options.week_start_for(date.today(), 0).isoformat()
+
+
+def test_updm66_right_panel_is_untouched(tmp_path):
+    """UPD-M6.6 — the Actions panel's widths are read from `week_actions`.
+
+    Characterisation, written before the change: the right panel is a
+    `TodayScreen` subclass and already has draggable, persisted widths under
+    its own prefix (AWA-M5.5). UPD-M6 adds a left-hand table with a prefix of
+    its own, and the failure to guard against is the new prefix replacing this
+    one -- a rename would discard every width a user has already set, with
+    nothing on screen to say so.
+
+    The width is seeded in the real settings file (conftest redirects it to a
+    temporary path) rather than in a double, because that is the object
+    `TodayScreen.__init__` loads.
+    """
+    from src.getmoredone.screens.week_actions import WeekTacticActionsPanel
+
+    assert WeekTacticActionsPanel.COLUMN_PREFIX == "week_actions"
+
+    stored = AppSettings.load()
+    stored.week_actions_col_widths = {"title": 362}
+    stored.save()
+
+    vps = make_vps(tmp_path)
+    try:
+        root, screen = _week_actions_screen(tmp_path, vps)
+        try:
+            panel = screen.actions_panel
+            assert panel.resizer.prefix == "week_actions"
+            assert panel.resizer._setting_attr() == "week_actions_col_widths"
+            assert panel.resizer.width("title") == 362
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_updm67_no_dead_drop_target():
+    """UPD-M6.7 — nothing on this tab binds a drag or builds a drop target.
+
+    D6: the right panel is the *contents* of the row selected on the left, not
+    a second collection, so a drop has nothing it could mean. The guard is an
+    exact count of 0 over the parsed module rather than a floor, and it names
+    every spelling the other five tabs use, so a drag added here by copying a
+    sibling screen fails this rather than silently doing nothing.
+    """
+    tree = ast.parse((SRC / "screens" / "week_actions.py").read_text())
+    names = {
+        node.id for node in ast.walk(tree) if isinstance(node, ast.Name)
+    } | {
+        node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)
+    } | {
+        node.name for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+    }
+    forbidden = {
+        "RowDragSource", "row_drag", "bind_row", "dragged_row",
+        "_start_row_drag", "_finish_row_drag", "_bind_drag_widgets",
+        "winfo_pointerxy", "winfo_containing", "_is_descendant",
+        "drop_target",
+    }
+    assert names & forbidden == set()
+
+
+def _week_actions_with(tmp_path, titles_and_lineage, settings=None):
+    """APE Week Actions holding one Weekly Tactic per entry, in this week.
+
+    Each entry is (title, subsegment, key_field); a distinct pair of those two
+    is a distinct lineage, which is what the filters sort rows by.
+    """
+    vps = make_vps(tmp_path)
+    week = _this_monday()
+    for title, subsegment, key_field in titles_and_lineage:
+        ape = seed_ape(vps, subsegment=subsegment, key_field=key_field)
+        make_week_item(vps, ape, start=week, due=week, title=title)
+    root, screen = _week_actions_screen(tmp_path, vps, settings=settings)
+    return vps, root, screen
+
+
+def _tactic_row(screen, index=0):
+    """The index-th rendered row frame of the left panel, in grid order."""
+    return _row_frames(screen.left_list)[index]
+
+
+def _click(widget):
+    """Generate a real `<Button-1>` where the binding actually lives.
+
+    A CustomTkinter widget forwards `bind` to an internal canvas, so an event
+    generated on the widget itself reaches no handler. Driving the canvas is
+    what makes this a click rather than a direct call to the handler the test
+    is supposed to be checking the row is wired to.
+    """
+    target = getattr(widget, "_canvas", widget)
+    target.event_generate("<Button-1>", x=2, y=2)
+
+
+def _row_id_for(screen, title):
+    """The id of the visible row with this title, whatever order they are in.
+
+    `get_weekly_action_items` does not promise an order, and a test that
+    indexes into the list is asserting one it was never given.
+    """
+    return next(row["id"] for row in screen.visible_rows
+                if (row.get("title") or "") == title)
+
+
+def test_updm61_week_actions_has_a_divider(tmp_path):
+    """UPD-M6.1 — a draggable divider, where the split was a fixed minimum.
+
+    The body was `minsize=380` on the left and `weight=1` on the right, so
+    the proportion was the layout's and not the user's. The three divider
+    bindings and the body's `<Configure>` are split_panel's, and the ratio
+    lands in a declared field, which is the difference between a divider that
+    is remembered and one that silently is not.
+    """
+    import dataclasses as _dc
+
+    declared = {f.name for f in _dc.fields(AppSettings)}
+    assert "week_actions_split_ratio" in declared
+    assert "week_actions_left_col_widths" in declared
+
+    vps, root, screen = _week_actions_with(tmp_path, [("one", "Living Systems", "Blog")])
+    try:
+        assert isinstance(screen.split, split_panel.SplitPanel)
+        assert screen.split.prefix == "week_actions"
+        assert screen.split.setting_attr() == "week_actions_split_ratio"
+        assert screen.split.left_panel is screen.left_frame
+        assert int(screen.left_frame.grid_info()["column"]) == 0
+        assert int(screen.divider.grid_info()["column"]) == 1
+        assert int(screen.actions_panel.grid_info()["column"]) == 2
+        assert screen.body.grid_columnconfigure(1).get("minsize") == (
+            split_panel.SPLITTER_WIDTH)
+
+        bound = _bound_sequences(screen.divider)
+        for sequence in ("<Button-1>", "<B1-Motion>", "<ButtonRelease-1>"):
+            assert sequence in bound, bound
+        assert "<Configure>" in _bound_sequences(screen.body)
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_updm61_the_divider_position_survives_a_relaunch(tmp_path):
+    """UPD-M6.1 / UPD-D4 — a dragged divider is still there on the next build."""
+    settings = FakeSettings(
+        first_day_of_week=0,
+        week_actions_split_ratio=0.5,
+        week_actions_left_col_widths={},
+    )
+    vps, root, screen = _week_actions_with(
+        tmp_path, [("one", "Living Systems", "Blog")], settings=settings)
+    try:
+        screen.body.update_idletasks()
+        screen.split.ratio = 0.62
+        screen.split._drag_start_x = 10
+        screen.split.on_release()
+        assert settings.week_actions_split_ratio == 0.62
+        assert settings.saved >= 1
+    finally:
+        root.destroy()
+
+    try:
+        root, screen = _week_actions_screen(tmp_path, vps, settings=settings)
+        try:
+            assert screen.split.ratio == 0.62
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_updm62_left_panel_is_the_shared_table(tmp_path):
+    """UPD-M6.2 — a header and chip rows, where it was a stack of buttons.
+
+    The left panel used to be one `CTkButton` per tactic with the title and
+    the segment name on two lines inside it. It is the shared table now, with
+    a Title column this tab needs -- its rows are picked by name -- and the
+    three chip columns at the same widths as the other panels', every one of
+    them draggable.
+    """
+    vps, root, screen = _week_actions_with(tmp_path, [
+        ("first", "Living Systems", "Blog"),
+        ("second", "Other Systems", "Podcast"),
+    ])
+    try:
+        assert isinstance(screen.left_table, chip_table.ChipTable)
+        assert screen.left_table.prefix == "week_actions_left"
+        assert screen.left_table.columns == list(
+            chip_table.WEEK_ACTIONS_LEFT_COLUMNS)
+
+        header = _header_frame(screen.left_list)
+        assert [cell[2] for cell in _cells(header)] == [
+            "#", "Weekly Tactic", "Segment", "SubSegment", "Category"]
+        assert _minsizes(header, (0, 1, 2, 3, 4)) == [34, 220, 135, 155, 125]
+
+        rows = _row_frames(screen.left_list)
+        assert len(rows) == 2
+        assert [_cells(row)[0][2] for row in rows] == ["1", "2"]
+        assert [_cells(row)[1][2].strip() for row in rows] == ["first", "second"]
+        # No CTkButton anywhere in the panel: the stack of them is gone.
+        assert _button_texts(screen.left_list) == []
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_updm62_a_long_title_is_clipped_to_its_column(tmp_path):
+    """UPD-M6.2 — a plain resizable cell is clamped at the first render.
+
+    `add_row` gave a non-chip cell its raw text, which only the resizer's
+    first drag then clamped. On a Title column that is a panel that opens
+    with one row pushing every column out of line and corrects itself when
+    the handle is touched. The `#` column is fixed-width and keeps its raw
+    text, because the resizer never re-clamps a column with no handle.
+    """
+    vps, root, screen = _week_actions_with(
+        tmp_path, [("x" * 400, "Living Systems", "Blog")])
+    try:
+        cells = _cells(_tactic_row(screen))
+        index_text, title_text = cells[0][2], cells[1][2]
+        budget = screen.left_table.resizer.chars("title")
+        assert len(title_text) < 400
+        assert len(title_text.strip()) <= budget
+        assert index_text == "1"
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_updm63_clicking_a_row_still_selects(tmp_path):
+    """UPD-M6.3 — a click anywhere in the row selects that tactic.
+
+    The button carried the click before; the row's cells carry it now. Every
+    cell is asserted, not just the frame: a click lands on the widget under
+    the pointer, and a row that only selects at its edges is a row that looks
+    broken at random.
+    """
+    vps, root, screen = _week_actions_with(tmp_path, [
+        ("first", "Living Systems", "Blog"),
+        ("second", "Other Systems", "Podcast"),
+    ])
+    try:
+        rows = _row_frames(screen.left_list)
+        clickable = [rows[1]] + [
+            child for child in rows[1].winfo_children()
+            if not _is_resize_handle(child)
+        ]
+        assert len(clickable) == 6
+        for widget in clickable:
+            assert "<Button-1>" in _bound_sequences(widget), widget
+
+        second_id = _row_id_for(screen, "second")
+        second_index = [row["id"] for row in screen.visible_rows].index(second_id)
+        _click(_row_frames(screen.left_list)[second_index])
+        assert screen.selected_tactic_id == second_id
+        assert screen.actions_panel.selected_tactic["id"] == second_id
+
+        tint = chip_table.semantic_colors()["selected_tint"]
+        repainted = _row_frames(screen.left_list)
+        assert repainted[second_index].cget("fg_color") == tint
+        assert repainted[1 - second_index].cget("fg_color") != tint
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_updm63_selecting_a_row_repaints_the_panel_instead_of_stacking_it(tmp_path):
+    """UPD-M6.3 — three clicks leave three rows, not nine.
+
+    The lesson from UPD-M5, applied to the screen that re-renders on every
+    click: `build_header` clears its container, so a repaint replaces the
+    panel rather than gridding a second copy into the same cells. Two widgets
+    in one Tk cell both stay mapped and the later one is drawn on top, so the
+    stacked case looks right on screen and is only visible as a child count.
+    """
+    vps, root, screen = _week_actions_with(tmp_path, [
+        ("first", "Living Systems", "Blog"),
+        ("second", "Other Systems", "Podcast"),
+    ])
+    try:
+        before = len(screen.left_list.winfo_children())
+        assert before == 3  # one header, two rows
+        for _ in range(3):
+            _click(_tactic_row(screen, 0))
+        assert len(screen.left_list.winfo_children()) == before
+        assert len(screen.tactic_row_frames) == 2
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_updm64_filters_narrow_the_tactic_list(tmp_path):
+    """UPD-M6.4 — the three filters this tab did not have, and the counts.
+
+    The other five tabs all filter by Segment / SubSegment / Category. The
+    left list, its heading and the status line all report what the filter
+    left: a narrowed list with an unchanged count is a screen that looks like
+    it lost rows.
+    """
+    vps, root, screen = _week_actions_with(tmp_path, [
+        # Two rows in one subsegment, so the subsegment filter has something
+        # to keep and something to hide. They need different key fields: one
+        # Annual Plan Element cannot carry two Weekly Tactics in the same week
+        # (a unique constraint).
+        ("blog one", "Living Systems", "Blog"),
+        ("blog two", "Living Systems", "Essay"),
+        ("a podcast", "Other Systems", "Podcast"),
+    ])
+    try:
+        assert len(screen.visible_rows) == 3
+        assert screen.left_title_label.cget("text") == "Weekly Tactics (3)"
+
+        screen.filters.subsegment_var.set("Other Systems")
+        screen.on_filters_changed()
+
+        assert [row["title"] for row in screen.visible_rows] == ["a podcast"]
+        assert len(_row_frames(screen.left_list)) == 1
+        assert screen.left_title_label.cget("text") == "Weekly Tactics (1 of 3)"
+        status = screen.status_label.cget("text")
+        assert status.startswith("1 of 3 Weekly Tactic(s) for week of ")
+        assert "2 hidden by Sub Other Systems." in status
+
+        screen.filters.reset()
+        screen.on_filters_changed()
+        assert len(screen.visible_rows) == 3
+        assert screen.left_title_label.cget("text") == "Weekly Tactics (3)"
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_updm64_the_combos_offer_only_the_values_the_week_has(tmp_path):
+    """UPD-M6.4 — and a selection the new week cannot match falls back to All.
+
+    A filter left pointing at a value the combo no longer lists is a panel
+    that is empty for a reason the screen does not show (P2).
+    """
+    vps, root, screen = _week_actions_with(tmp_path, [
+        ("blog one", "Living Systems", "Blog"),
+        ("a podcast", "Other Systems", "Podcast"),
+    ])
+    try:
+        assert screen.filters.subsegment_combo.cget("values") == [
+            "All", "Living Systems", "Other Systems"]
+        assert screen.filters.category_combo.cget("values") == [
+            "All", "Blog", "Podcast"]
+
+        screen.filters.subsegment_var.set("Other Systems")
+        screen.on_filters_changed()
+        assert len(screen.visible_rows) == 1
+
+        # A week with none of that subsegment in it.
+        other_week = (date.fromisoformat(_this_monday())
+                      + timedelta(days=70)).isoformat()
+        screen.week_var.set(other_week)
+        screen.load_selected_week()
+        assert screen.filters.subsegment_var.get() == "All"
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_updm64_a_filter_that_hides_the_selected_row_clears_the_panel(tmp_path):
+    """UPD-M6.4 — the selection survives a filter unless the filter hides it.
+
+    Filtering is not a week change, so a selected tactic that is still listed
+    stays selected and the right panel keeps its items. One that the filter
+    has hidden is cleared, because its Action Items beside a list that does
+    not contain it is the confusion AWA-M4.5 exists to prevent.
+    """
+    vps, root, screen = _week_actions_with(tmp_path, [
+        ("blog one", "Living Systems", "Blog"),
+        ("a podcast", "Other Systems", "Podcast"),
+    ])
+    try:
+        kept = _row_id_for(screen, "a podcast")
+        screen.select_tactic(kept)
+
+        screen.filters.subsegment_var.set("Other Systems")
+        screen.on_filters_changed()
+        assert screen.selected_tactic_id == kept
+        assert screen.actions_panel.selected_tactic["id"] == kept
+
+        screen.filters.subsegment_var.set("Living Systems")
+        screen.on_filters_changed()
+        assert screen.selected_tactic_id is None
+        assert screen.actions_panel.selected_tactic is None
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_updm65_an_empty_filter_result_says_what_it_hid(tmp_path):
+    """UPD-M6.5 — an empty week and a filter that hid everything differ (P2).
+
+    Asserts which of the two widgets in that grid cell is gridded, not only
+    what the label says: both are built once and only gridded and un-gridded,
+    so a test that read the text alone would stay green with the branch
+    inverted. That is the UPD-M5 finding, applied here.
+    """
+    vps, root, screen = _week_actions_with(tmp_path, [
+        ("blog one", "Living Systems", "Blog"),
+    ])
+    try:
+        assert screen.left_list.winfo_viewable() or screen.left_list.grid_info()
+        assert screen.left_empty.grid_info() == {}
+
+        screen.filters.subsegment_var.set("Other Systems")
+        screen.filters.subsegment_combo.configure(
+            values=["All", "Living Systems", "Other Systems"])
+        screen.on_filters_changed()
+
+        assert screen.visible_rows == []
+        assert screen.left_list.grid_info() == {}
+        assert screen.left_empty.grid_info() != {}
+        text = screen.left_empty.cget("text")
+        assert "No Weekly Tactics match the filter" in text
+        assert "Sub Other Systems" in text
+        assert "1 hidden." in text
+        assert screen.left_title_label.cget("text") == "Weekly Tactics (0 of 1)"
+    finally:
+        root.destroy()
+        vps.close()
+
+
+def test_updm65_an_empty_week_says_that_instead(tmp_path):
+    """UPD-M6.5 — with no tactics at all the message is about the week."""
+    vps = make_vps(tmp_path)
+    try:
+        root, screen = _week_actions_screen(tmp_path, vps)
+        try:
+            assert screen.tactic_rows == []
+            assert screen.left_empty.grid_info() != {}
+            assert screen.left_empty.cget("text") == (
+                "No Weekly Tactics for this week.")
+            assert screen.left_title_label.cget("text") == "Weekly Tactics (0)"
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_updm66_the_left_panel_columns_resize_and_persist(tmp_path):
+    """UPD-M6.6 — the left panel's own store, and the right panel's untouched.
+
+    The right panel has had draggable widths since AWA-M5.5 under the
+    `week_actions` prefix. The left panel's drag has to land somewhere else,
+    or sizing one would move the other and a user's existing widths would be
+    read with the wrong keys.
+    """
+    settings = FakeSettings(
+        first_day_of_week=0,
+        week_actions_split_ratio=0.5,
+        week_actions_left_col_widths={},
+        week_actions_col_widths={"title": 300},
+    )
+    vps, root, screen = _week_actions_with(
+        tmp_path, [("one", "Living Systems", "Blog")], settings=settings)
+    try:
+        assert screen.left_table.resizer._setting_attr() == (
+            "week_actions_left_col_widths")
+        _resize(screen.left_table, "segment", 40)
+        assert screen.left_table.width("segment") == 175
+        assert settings.week_actions_left_col_widths["segment"] == 175
+        # The Actions panel's store is loaded from the real settings file, not
+        # from this double, so the assertion that matters here is that the
+        # left panel wrote nowhere near it.
+        assert settings.week_actions_col_widths == {"title": 300}
+    finally:
+        root.destroy()
+
+    try:
+        root, screen = _week_actions_screen(tmp_path, vps, settings=settings)
+        try:
+            assert screen.left_table.width("segment") == 175
+            assert _minsizes(_header_frame(screen.left_list), (2,)) == [175]
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_updm62_a_row_with_no_category_colour_takes_the_subsegments(tmp_path):
+    """UPD-M6.2 — the shared chip-colour resolver, on this tab's rows.
+
+    The category chip falls back to the subsegment's colour rather than
+    rendering as a hole, which is `resolve_chip_colors`' contract and the
+    reason `week_actions` calls it instead of writing a seventh copy of the
+    three-part lookup.
+    """
+    from src.getmoredone.screens.segment_color_utils import resolve_chip_colors
+
+    vps_double = SimpleNamespace(
+        resolve_segment_color=lambda name, colors: "#112233",
+        get_vision_subsegments=lambda: [],
+        get_segment_color_map=lambda: {},
+        get_vision_categories=lambda: [],
+    )
+    seg, sub, cat = resolve_chip_colors(
+        "Purposeful Work", "Living Systems", "Blog", vps_double,
+        {}, {("purposeful work", "living systems"): "#445566"}, {},
+    )
+    assert (seg, sub, cat) == ("#112233", "#445566", "#445566")
+
+    seg, sub, cat = resolve_chip_colors(
+        "Purposeful Work", "Living Systems", "Blog", vps_double,
+        {}, {("purposeful work", "living systems"): "#445566"},
+        {("purposeful work", "living systems", "blog"): "#cc7744"},
+    )
+    assert cat == "#cc7744"
