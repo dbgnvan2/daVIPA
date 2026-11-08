@@ -5652,9 +5652,12 @@ def test_pdm11_a_dialog_that_raises_writes_nothing_says_so_and_asks_again(
     dialog, and ``askyesno`` raised ``_tkinter.TclError`` with an empty message
     instead of returning the answer. The traceback went to stderr, which the
     user never sees; the drop wrote nothing and said nothing, so the gesture
-    read as broken. Answered Yes, the day's ``time_blocks`` table was still
-    empty -- which settles the half of the report that was open: it does not
-    schedule, rather than scheduling something that fails to appear.
+    read as broken. **That measurement was taken before this fix**, and is
+    what settles the half of the report that was open: answered Yes, the day's
+    ``time_blocks`` table was still empty, so the fault is that it does not
+    schedule rather than that it schedules something which fails to appear.
+    The assertions below are on the behaviour *after* the fix, where a Yes that
+    the dialog actually returns does schedule.
 
     Three claims in one test because each kills a different mutation of the
     same two lines. Nothing is written, so the arm is not a silent yes. The
@@ -6267,6 +6270,7 @@ def test_pdm129_scrolling_rereads_the_hover_onto_the_box_now_under_the_pointer(
     # The pointer does not move; which box is under it does, because the day
     # scrolls beneath it. Faked as the box the second read lands on.
     under = [frames[0], frames[1]]
+    plain = frames[0].cget("border_color")
     monkeypatch.setattr(screen, "slot_under_pointer", lambda: 0)
     screen.update_hover_target()
 
@@ -6282,6 +6286,154 @@ def test_pdm129_scrolling_rereads_the_hover_onto_the_box_now_under_the_pointer(
     assert under[1].cget("border_width") == 2, under[1].cget("border_width")
     assert under[0].cget("border_width") == 1, (
         "the box the day scrolled past kept its outline"
+    )
+    # Width *and* colour, on this path above all others: PD-M12.10's trail is
+    # the whole day precisely because a 60ms timer walks the hover down every
+    # box the day scrolls past, so a colour restore asserted only by a direct
+    # unit call is asserted nowhere near where it matters.
+    assert under[0].cget("border_color") == plain, (
+        f"the scrolled-past box kept the accent: {under[0].cget('border_color')}"
+    )
+
+
+def test_pdm1213_a_drag_across_the_middle_of_the_pane_moves_the_outline(
+    screen, manager, monkeypatch
+):
+    """PD-M12.13 — the caller that compensates for the autoscroll's own skip.
+
+    ``on_drag_motion`` ends ``if not self.autoscroll_day(): update_hover_target()``.
+    ``autoscroll_day`` deliberately leaves the hover alone when it did not move
+    the day -- PD-M12.4 asserts exactly that -- so for every drag clear of the
+    two edge bands, which is most of the pane, the outline is moved by that one
+    line in the caller and by nothing else. **Measured: deleting it leaves the
+    whole suite green** (201 passed) while the drop-target outline stops
+    following the pointer across the middle of the pane, which is the only
+    feedback telling the user which half hour they are about to get.
+
+    The two tests on this path both stub ``update_hover_target`` and assert a
+    call count, so the real outline is what this one asserts -- the same
+    correction PD-M12.9 made for the scrolling path.
+    """
+    _item(manager, "Draft the proposal")
+    screen.refresh()
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    assert len(frames) >= 2, "the day pane built too few boxes to move between"
+    screen._drag_kind = "item"
+    screen._drag_label_text = None
+    monkeypatch.setattr(screen, "_position_drag_label", lambda: None)
+
+    _fake_day_viewport(screen, monkeypatch)
+    # Mid-pane: the viewport is 100..400, so this is clear of both bands and
+    # ``autoscroll_day`` must answer False.
+    _fake_pointer(screen, monkeypatch, 500, 250)
+    monkeypatch.setattr(screen, "slot_under_pointer", lambda: 1)
+
+    screen.on_drag_motion(None)
+
+    try:
+        assert screen.autoscroll_day() is False, (
+            "the pointer was meant to be clear of both bands"
+        )
+        assert screen._drag_hover_frame is frames[1], (
+            "the box under the pointer was not outlined by the motion"
+        )
+        assert frames[1].cget("border_width") == 2, frames[1].cget("border_width")
+    finally:
+        screen._stop_autoscroll()
+
+
+def test_pdm1214_an_abandoned_drag_leaves_no_outline_behind(
+    screen, manager, monkeypatch
+):
+    """PD-M12.14 — the release clears the hover, asserted through the release.
+
+    PD-M12.10 calls ``clear_hover_target`` directly, but the fault its
+    docstring describes -- "a drag abandoned away from the boxes gets no
+    rebuild to hide it" -- runs through ``on_drag_release``, which is the only
+    production caller for that case. **Measured: deleting that call leaves the
+    whole suite green** (202 passed) while the accent trail PD-M12.10 exists to
+    remove is back for exactly the gesture it was reported on.
+
+    Released off the boxes on purpose: a release *on* a box ends in a
+    ``refresh()`` that rebuilds every box, which would hide the fault rather
+    than test it.
+    """
+    _item(manager, "Draft the proposal")
+    screen.refresh()
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    box = frames[0]
+    plain_colour = box.cget("border_color")
+    plain_width = box.cget("border_width")
+    screen._drag_kind = "item"
+    monkeypatch.setattr(screen, "slot_under_pointer", lambda: 0)
+
+    screen.update_hover_target()
+    assert box.cget("border_width") == 2, "the hover never went on"
+
+    # Nothing under the pointer, so nothing is scheduled and nothing rebuilds.
+    monkeypatch.setattr(screen, "slot_under_pointer", lambda: None)
+    monkeypatch.setattr(screen, "virtual_under_pointer", lambda: None)
+    screen.on_drag_release(None)
+
+    assert box.cget("border_width") == plain_width, box.cget("border_width")
+    assert box.cget("border_color") == plain_colour, (
+        f"the abandoned drag left its accent behind: {box.cget('border_color')}"
+    )
+    assert screen._drag_hover_frame is None, (
+        "the cleared hover is still being tracked"
+    )
+
+
+def test_pdm1212_a_pointer_held_at_the_end_of_the_day_stops_scrolling(
+    screen, monkeypatch
+):
+    """PD-M12.12 — the clamp and the end-stop, against each other.
+
+    PD-M12.3 proves ``day_autoscroll_direction`` answers 0 once ``yview``
+    reports ``last >= 1.0``, and PD-M12.9 proves ``day_autoscroll_fraction``
+    clamps the destination to ``1.0 - visible``. Nothing joined them, and
+    ``_fake_day_viewport`` patches ``yview`` to a constant, so no test ran two
+    consecutive ticks against a viewport that moves. The guarantee the two
+    together are supposed to give is that a pointer held in the bottom band
+    comes to a stop: if the clamped destination made ``yview`` report
+    ``0.9999...`` instead of ``1.0``, the direction would stay 1, every tick
+    would return True, and the hover would be re-read 16 times a second for no
+    movement for as long as the button was held -- which is what PD-M12.3's
+    docstring claims is prevented, on the path that actually does the
+    scrolling.
+
+    So the fake writes ``yview_moveto`` back into what ``yview`` returns, and
+    the assertion is termination: a bounded number of ticks, then False.
+    """
+    canvas = _fake_day_viewport(screen, monkeypatch)
+    # 0.25, not 0.3, and the first version of this test had 0.3 and was
+    # vacuous because of it. The step is 16/1000 = 0.016 of the region, and
+    # from 0.3 the distance to a 0.7 end-stop is exactly 25 steps -- so the
+    # *unclamped* walk landed on the same 0.7 the clamp produces, and the test
+    # passed with the clamp deleted. With 0.25 the end-stop is 0.75, which is
+    # 28.125 steps away: the clamp stops exactly on it, and without the clamp
+    # the walk overshoots to ~0.764 before ``yview`` reports the end.
+    visible = 0.25
+    state = {"first": 0.3}
+    monkeypatch.setattr(canvas, "yview", lambda *a: (state["first"],
+                                                     state["first"] + visible))
+    monkeypatch.setattr(
+        canvas, "yview_moveto", lambda f: state.__setitem__("first", f)
+    )
+    _fake_pointer(screen, monkeypatch, 500, 400 - 1)
+
+    ticks = 0
+    while screen.autoscroll_day():
+        ticks += 1
+        assert ticks < 200, (
+            f"held at the end of the day and still scrolling after {ticks} "
+            f"ticks, at first={state['first']}"
+        )
+
+    assert ticks > 0, "the pointer was in the band and nothing scrolled at all"
+    assert state["first"] == pytest.approx(1.0 - visible), state["first"]
+    assert screen.day_autoscroll_direction() == 0, (
+        "the day is at its end but the direction still asks to scroll on"
     )
 
 
@@ -6330,9 +6482,19 @@ def test_pdm1211_the_width_goes_back_even_with_no_colour_to_restore(
     raises ``ValueError`` -- not ``TclError``, so the existing guard did not
     cover it -- when the colour is None, and it pops it *before* applying
     ``border_width``. So adding the colour to the restore put the width
-    restore, which was already working, behind a call that could raise. The
-    cached colour is None until the first hover, which is the state this
-    asserts; the box keeps its own 1px border either way.
+    restore, which was already working, behind a call that could raise.
+
+    **The None is not reachable in production today, and this test does not
+    claim it is.** ``_drag_hover_color`` is assigned in one place only, in the
+    same block that sets ``_drag_hover_frame``, so a frame to restore always
+    implies a colour to restore; before the first hover the frame is None too
+    and ``clear_hover_target`` returns at its first ``if``. Nor can the cached
+    value be None at source: ``build_slot_row`` passes an explicit
+    ``border_color``. The state is set by hand here because the guard is a
+    code-shape one -- it exists so that no future way of reaching
+    ``clear_hover_target`` with an unset colour can cost the width restore --
+    and a guard with no test is a guard the next reader deletes or, worse,
+    trusts for more than it does.
     """
     _item(manager, "Draft the proposal")
     screen.refresh()
@@ -6361,9 +6523,16 @@ def test_pdm125_a_held_drag_keeps_scrolling(screen, monkeypatch):
 
     screen._autoscroll_tick()
 
-    assert moves == [1], moves
-    assert screen._autoscroll_after is not None, "the tick did not re-arm"
-    screen._stop_autoscroll()
+    try:
+        assert moves == [1], moves
+        assert screen._autoscroll_after is not None, "the tick did not re-arm"
+    finally:
+        # In a ``finally`` because the timer is real. A failing assertion here
+        # would otherwise leave a 60ms callback queued against a screen about
+        # to be destroyed, and ``_run_due_timers`` in a later test dispatches
+        # timer events indiscriminately -- so one failure in this test would
+        # surface as a second, unrelated one somewhere else.
+        screen._stop_autoscroll()
 
 
 def test_pdm126_motion_does_not_stack_autoscroll_timers(screen, monkeypatch):
