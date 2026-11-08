@@ -301,6 +301,8 @@ class Database:
                 block_type   TEXT NOT NULL DEFAULT 'item',
                 slot_index   INTEGER,
                 position     INTEGER NOT NULL DEFAULT 0,
+                calendar_event_id TEXT,
+                calendar_event_calendar_id TEXT,
                 created_at   TEXT NOT NULL,
                 updated_at   TEXT NOT NULL
             )
@@ -796,6 +798,27 @@ class Database:
             # Spec:  docs/implementation_plan_2026-11-05_time_grid.md#tg-m4
             # Tests: tests/test_time_block_schema.py::test_tgm41_migration_adds_slot_index_idempotently
             ('slot_index', 'INTEGER'),
+            # CE-M1.1 -- the Google Calendar event this block owns. NULLable
+            # with no default on purpose: NULL means "never exported", which
+            # is a different fact from holding an id, and a back-filled empty
+            # string would read as an event that exists and can be updated.
+            # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
+            # Tests: tests/test_time_block_schema.py::test_cem11_migration_adds_calendar_event_id_idempotently
+            ('calendar_event_id', 'TEXT'),
+            # CE-M1.1 -- which calendar that event id is on. An id is only
+            # meaningful against the calendar it was created in, and the
+            # calendar is a setting the user can change: without this column a
+            # change left every exported event unreachable, since the next
+            # export looked for them on the new calendar, found none, and
+            # created duplicates while the originals stayed behind with nothing
+            # able to name them (found by a cold review pass).
+            #
+            # NULLable, and NULL is read as the default calendar: rows written
+            # before this column existed were all written by an export whose
+            # only possible target was ``primary``.
+            # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
+            # Tests: tests/test_time_block_schema.py::test_cem11b_migration_adds_the_event_calendar_idempotently
+            ('calendar_event_calendar_id', 'TEXT'),
         ):
             if column not in time_block_columns:
                 conn.execute(f"ALTER TABLE time_blocks ADD COLUMN {column} {definition}")

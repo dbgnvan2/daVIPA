@@ -272,6 +272,24 @@ class TimeBlock:
     id: str = field(default_factory=lambda: str(uuid4()))
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    # CE-M1.2 -- the Google Calendar event this block owns, or None for a
+    # block that has never been exported. Last field on purpose: a caller
+    # constructing a TimeBlock positionally must not have its id shifted.
+    #
+    # Written by ``create_time_block`` and by
+    # ``set_block_calendar_event_id``, and by nothing else:
+    # ``update_time_block`` leaves the column alone so an edit made from a
+    # block the screen loaded before an export cannot erase the id.
+    # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+    # Tests: tests/test_time_block_crud.py::test_cem12_calendar_event_id_round_trips
+    calendar_event_id: Optional[str] = None
+
+    # CE-M1.2 -- the calendar ``calendar_event_id`` lives on. None means the
+    # default calendar, which is the only one the first version of the export
+    # could write to. Same writers as the field above.
+    # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+    # Tests: tests/test_time_block_crud.py::test_cem12b_the_event_calendar_round_trips
+    calendar_event_calendar_id: Optional[str] = None
 
 
 @dataclass
