@@ -1,6 +1,10 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (UPD-M4 moved the three APE/Annual tabs onto the
+Last Updated: 2026-11-07 (UPD-M5 moved APE Week Assignment's two panels onto
+the shared chip table, splitter and row drag, the last screen in scope: UPD-A6
+is resolved in place below, both holdout lists are empty and UPD-M1.5 and
+UPD-M2.5 are `done`, and one adjacent issue is filed as UPD-A8, an unused
+`import tkinter as tk` in `weekly_items.py`; UPD-M4 moved the three APE/Annual tabs onto the
 shared chip table, splitter and row drag: AWA-S5 and AWA-S6 are resolved in
 place below, UPD-A6's claim that UPD-M4 would empty the holdout lists is
 corrected there - `weekly_items.py` is the last copy and UPD-M5 rewrites it -
@@ -52,6 +56,9 @@ UPD-M4 empties the list was wrong, and so was the spec's §4 and both guard
 docstrings. UPD-M4 covers the three APE/Annual tabs; the fourth copy of the
 splitter and of the drag is in `weekly_items.py`, which UPD-M5 rewrites. Both
 holdout sets are down to that one file, and both criteria close at UPD-M5.
+**Resolved 2026-11-07 at UPD-M5.** `weekly_items.py` adopted, both holdout sets
+are `set()`, and both guards now assert emptiness - so the second place to keep
+in step is gone, and neither criterion is `partial` any more.
 **Priority:** Low
 **Effort:** Low
 
@@ -69,6 +76,20 @@ under the standing rule: a feature change does not silently sweep adjacent
 code. They are harmless but they describe a drag the screen no longer has, and
 an index-based lookup is the kind of thing a later edit reaches for. Removing
 both is a two-line deletion with no test to change.
+**Priority:** Low
+**Effort:** Low
+
+### 2026-11-07 - Type: Technical Debt
+
+**Title:** UPD-A8 - weekly_items.py imports tkinter and never uses it
+**Description:** `import tkinter as tk`
+(`src/getmoredone/screens/weekly_items.py:10`) has no `tk.` reference left in
+the file - grep returns the import and nothing else. It was already unused
+before UPD-M5: the screen's own splitter and drag used `winfo_*` calls on
+CustomTkinter widgets, not the `tkinter` namespace. UPD-M5 did not remove it,
+under the standing rule that a feature change does not silently sweep adjacent
+code. A one-line deletion with no test to change; the only reason to keep it is
+that a later edit in this file may want it, which is not a reason.
 **Priority:** Low
 **Effort:** Low
 

@@ -1,7 +1,7 @@
 # Spec + implementation plan — one panel design across the VSP tabs
 
-Status: **approved 2026-11-07. UPD-M3, UPD-M1, UPD-M2 and UPD-M4 built;
-UPD-M5 … UPD-M7 outstanding.** Per-criterion status is in §10.
+Status: **approved 2026-11-07. UPD-M3, UPD-M1, UPD-M2, UPD-M4 and UPD-M5
+built; UPD-M6 and UPD-M7 outstanding.** Per-criterion status is in §10.
 IDs: `UPD-M1` … `UPD-M7`. Use them verbatim in commits, docstrings and test
 names.
 
@@ -104,6 +104,9 @@ and class constants (`INDEX_COL_WIDTH`, `SEGMENT_COL_WIDTH`, …) in
 `weekly_items.py`.
 
 ### 1.4 Where APE Week Assignment differs from the image
+
+*As the screen stood when this spec was written. All three are closed at
+UPD-M5 — see §10.*
 
 It has the divider, the drag and the chips, so at a glance it is close. Three
 differences:
@@ -316,6 +319,8 @@ Each step is a commit, tests first, and each leaves the app working.
    of each is in `weekly_items.py`, and that screen is rewritten at UPD-M5,
    not here. Both criteria stay `partial` until then.
 5. **UPD-M5** — APE Week Assignment, including the right-panel rewrite.
+   This is the step that empties both holdout sets and closes UPD-M1.5 and
+   UPD-M2.5.
 6. **UPD-M6** — APE Week Actions: divider, chip table, filters.
 7. **UPD-M7** — the meta test, the docs, the on-screen checklist.
 
@@ -450,7 +455,7 @@ screen to **lose** 80-120. `codex.md`'s maintainability policy is read before
 | M1.2 | done | `::test_updm12_drag_moves_both_panels_by_the_same_amount` — 60px right is +60 left and -60 right, and the press is asserted to have captured the panel's applied width |
 | M1.3 | done | `::test_updm13_neither_panel_can_be_crushed` — three roomy widths × six ratios, both drag edges, and three bodies too narrow to seat two minimums |
 | M1.4 | done | `::test_updm14_zero_width_body_is_a_noop` |
-| M1.5 | **partial** | `::test_updm15_no_screen_keeps_its_own_splitter`. The guard exists and is exact, but the count is not yet 0: UPD-M1 adopts `ape_assignment.py` alone, per §4 step 2. Two of the three VSP holdouts adopted at UPD-M4, which left `weekly_items.py`; `project_boards.py` is UPD-A5 and stays. **The claim that UPD-M4 would close this was wrong** — `weekly_items.py` is rewritten at UPD-M5, so the criterion closes there. |
+| M1.5 | **done at UPD-M5** | `::test_updm15_no_screen_keeps_its_own_splitter`. `ape_assignment.py` adopted at UPD-M1, `ape_period_view.py` and `annual_vision_segments.py` at UPD-M4, `weekly_items.py` at UPD-M5, so `SPLITTER_HOLDOUTS` is empty and the guard asserts it. The only file left with a splitter is `project_boards.py`, which is out of scope by UPD-A5 and is named in `SPLITTER_OUT_OF_SCOPE`. The §4 claim that UPD-M4 would close this was wrong, and is corrected there. |
 | M1.6 | done | `::test_updm16_split_ratio_survives_a_relaunch`, `::test_updm16_the_ratio_has_a_settings_field_to_land_in`, `::test_updm16_a_prefix_with_no_settings_field_says_so` |
 
 **One deliberate behaviour change, against D1's "no behaviour change".** M1.3
@@ -485,7 +490,7 @@ root.
 | M2.2 | done | `RowDragSource.finish`; `::test_updm22_drop_inside_the_target_assigns_once` (one call, one row, and a second release with no press adding nothing), plus `::test_updm22_the_quarter_screen_routes_its_drop_through_the_module` for the real screen's wiring |
 | M2.3 | done | `::test_updm23_drop_outside_the_target_does_nothing` — over another widget, and over nothing at all, which is the `None` `winfo_containing` returns past the window edge |
 | M2.4 | done | `::test_updm24_release_without_a_press_does_nothing`, asserted with the pointer *inside* the target so the drop test cannot be what saves it, plus `::test_updm24_is_descendant_walks_up_and_stops` |
-| M2.5 | **partial** | `::test_updm25_no_screen_keeps_its_own_drag`. Same shape as M1.5: the guard is exact and the count is not 0. Two of the three holdouts adopted at UPD-M4; the last, `weekly_items.py`, adopts at UPD-M5, which is where this closes. |
+| M2.5 | **done at UPD-M5** | `::test_updm25_no_screen_keeps_its_own_drag`. Nothing under `screens/` defines `_start_row_drag` or `_is_descendant` any more, so this is a plain emptiness assertion with no out-of-scope file beside it — `project_boards.py` has a splitter but never had a row drag. |
 
 **No behaviour change.** Unlike UPD-M1 this extraction carries none: the three
 identical methods moved as they were, and `finish` keeps the original order —
@@ -605,4 +610,85 @@ also now follows the column width rather than a fixed 15 characters, which is
 UPD-M3.5 working as specified: at the default widths SubSegment shows 17
 characters where it showed 15, and Category 14.
 
-### UPD-M5 … UPD-M7 — **not started**
+### UPD-M5 — APE Week Assignment matches the image — **done**
+
+| ID | Status | Where |
+|---|---|---|
+| M5.1 | `done` | `::test_updm51_right_panel_has_the_actions_column`. The right panel had four columns and three buttons in a bar below the list; it has five columns now, with the row's Delete in the Actions one. |
+| M5.2 | `done` | `::test_updm52_a_row_delete_removes_that_row_not_the_selection`. Driven with a *different* row selected, because a per-row button wired to `delete_selected_weekly_item` would look right and delete the wrong tactic. |
+| M5.3 | `done` | `::test_updm53_delete_is_confirmed_before_it_happens`, which refuses the confirmation from both entry points and asserts nothing was deleted. |
+| M5.4 | `done` | `::test_updm54_the_selection_buttons_act_on_the_selection` and `::test_updm54_delete_weekly_still_deletes_the_selection`. |
+| M5.5 | `done` | `::test_updm55_left_header_matches_the_other_tabs`, asserted as text *and* pixels: a cell that was merely blanked would leave every row's cells one place to the right of the other tabs'. |
+| M5.6 | `done` | `::test_updm56_week_assignment_uses_the_shared_table_and_module_wiring`, `::..._columns_resize_and_persist`, `::..._the_week_assignment_prefixes_have_settings_fields`, `::..._a_left_row_is_a_drag_source_on_this_tab_too`, `::..._both_panels_still_say_when_they_are_empty`, `::..._a_row_with_no_category_colour_takes_the_subsegments`. |
+| M5.7 | `done` | `::test_updm57_clicking_a_right_row_selects_it_and_double_click_opens_it` and `::test_updm57_selecting_a_row_repaints_the_panel_instead_of_stacking_it`. |
+| M1.5 | **closed here** | `SPLITTER_HOLDOUTS` is empty. |
+| M2.5 | **closed here** | `DRAG_HOLDOUTS` is empty, and so is the AST result. |
+
+**A defect in the screen as it stood, found while writing UPD-M5.7's test.**
+`on_select_weekly_item` re-rendered the right panel to move the selection
+tint, and did so **without destroying what was already there**:
+`_render_right_rows` gridded a fresh header and a fresh set of row frames into
+the same cells as the old ones, and only `_render_lists` ever cleared the
+panel. Two widgets gridded into one cell both stay mapped, so the newest set
+was drawn on top and the screen looked right while every click added another
+full set — three clicks on a two-row week took the panel from 3 children to
+12. The shared table clears its container in `build_header`, so adopting it is
+the fix; the test counts the children rather than trusting that, and it was
+written and proved red against the old screen first.
+
+**The two spec statements about `Delete Weekly` disagreed.** §2's D5 lists
+`Edit Weekly Tactic` and `Add Action Item` as the buttons that stay, "because
+they act on the selected tactic and have no per-row equivalent in the image",
+which reads as removing `Delete Weekly` now that the row has its own Delete.
+§5's risk list says the opposite in as many words: the button "stays beside
+it", and "M5.2 and M5.4 both have to pass". M5.4, the criterion, names only
+Edit and Add, so it settles nothing. **Resolved by keeping the button**, for
+two reasons: §5 is the explicit statement where D5 is an implication, and
+removing a working button from a screen the user uses is the one reading that
+cannot be undone by a later step. The risk §5 named — two ways to delete the
+same thing — is handled by making them one method, `delete_weekly_row`, with
+two callers: the row's button passes its own row, `delete_selected_weekly_item`
+passes the selection, and the confirmation exists once.
+`::test_updm53_delete_is_confirmed_before_it_happens` drives both callers for
+that reason.
+
+**The three differences §1.4 listed are all closed.** The right panel is a
+table in the image's shape; the left header's first cell is empty; and the
+widths are no longer class constants — each panel has its own store
+(`week_assignment_left_col_widths`, `week_assignment_right_col_widths`) and
+every column is draggable. The numbers are the other APE tabs' now: 34 / 34 /
+135 / 155 / 125 on the left and 34 / 135 / 155 / 125 / 84 on the right, where
+this screen used 52 for the "Pick" column and 180 for all three names. That
+is a visible change to column widths on this tab, and it is the alignment the
+request asked for rather than a side effect.
+
+**Gate.** 17 mutations, each the verbatim original, each run alone, every file
+restored and sha256-compared: 15 red on the first pass, 2 green. Both green
+ones were findings about the tests, not the code, and both tests were
+strengthened until the mutation was red:
+
+- The empty-state test read the label's *text*, and the labels are built in
+  `create_ui` and only gridded or un-gridded as the panel fills — so swapping
+  the two branches of `_show_list_or_message` left it green. It asserts which
+  of the two widgets in that grid cell is gridded now, in both the empty and
+  the filled case.
+- The two-panels-one-store test resized the left panel and read the right
+  panel's width in memory. A right table built on the left prefix loads that
+  store *before* the drag happens, so it holds the default for the rest of
+  the session and the assertion passed. The test rebuilds the screen from the
+  same settings now, which is where a shared store shows.
+
+**Two cosmetic changes, stated because nothing pins them.** The left row's
+checkbox is `width=20, padx=2` where this screen used `width=30, padx=5`,
+matching the other three tabs; and a clipped chip ends in `...` rather than
+`…`, and is clipped to the column width rather than to a fixed 18 characters,
+for the same reason UPD-M4 recorded.
+
+**Adjacent issues found, not fixed.** `import tkinter as tk` at
+`weekly_items.py:10` has no user anywhere in the file and did not before this
+step either — recorded as UPD-A8 rather than swept in with a feature change.
+
+**Not verified on screen.** Every test here builds the screen on a withdrawn
+root. UPD-M7.2 and UPD-M7.3 are the on-screen criteria and are open.
+
+### UPD-M6 … UPD-M7 — **not started**

@@ -7,6 +7,31 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — APE Week Assignment joins the one panel design (2026-11-07)
+
+- **Every row in the right panel of APE Week Assignment has its own Delete
+  button**, under an Actions column, so a tactic can be taken off the week
+  without selecting it first. It asks before it deletes, like the button below
+  the panel, which is still there and still acts on the selection.
+- **Both panels' columns can be dragged wider or narrower, and each panel
+  remembers its own widths.** This was the last of the eight panels with fixed
+  columns; a long segment name was cut off at 15 characters with no way to see
+  the rest. The three name columns are now the same widths as the other tabs'
+  (135 / 155 / 125 rather than 180 each), and the blank cell over the
+  checkboxes is 34px rather than 52px with the word "Pick" in it.
+- **The divider on APE Week Assignment stays where you left it** between
+  launches, as the other tabs' already did.
+
+### Fixed — APE Week Assignment (2026-11-07)
+
+- **Selecting a row in the right panel no longer draws a second copy of the
+  panel on top of the first.** Clicking a row re-rendered the panel without
+  destroying what was there, so a fresh header and a fresh set of rows were
+  gridded into the same cells as the old ones and every click added another
+  set. It looked right, because Tk draws the later widget on top, but the panel
+  held three times as many widgets after three clicks and the ones underneath
+  were still live.
+
 ### Changed — one panel design across the VSP tabs (2026-11-07)
 
 - **Every column on APE Quarter Assignment, APE Month Assignment and Annual

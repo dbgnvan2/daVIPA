@@ -1,5 +1,36 @@
 ## Recent Changes (2026-11-07)
 
+### APE Week Assignment joins the one panel design - UPD-M5
+
+- ✅ **The last two panels now draw with the shared chip table, splitter and row
+  drag.** `weekly_items.py` lost nine splitter-and-drag methods, `_clear_scroll`
+  and `_clip_label`, and gained the right panel's Actions column with a Delete
+  on every row. Both panels' columns are draggable and persisted, and the
+  divider is remembered, for the first time on this tab.
+- ✅ **UPD-M1.5 and UPD-M2.5 are `done`.** Both holdout sets are empty, and the
+  guards now assert emptiness rather than a shrinking list. `project_boards.py`
+  still has a splitter and is named in `SPLITTER_OUT_OF_SCOPE` by UPD-A5; it
+  never had a row drag, so the drag guard has no out-of-scope file at all.
+- ⚠️ **A defect in the screen as it stood, found while writing M5.7's test.**
+  `on_select_weekly_item` re-rendered the right panel without destroying what
+  was there, so every selection click gridded a fresh header and a fresh set of
+  rows into the same cells as the old ones - three clicks on a two-row week took
+  the panel from 3 children to 12. Only `_render_lists` ever cleared. Adopting
+  the shared table is the fix, because `build_header` clears its container. The
+  test was proved red against the old screen first.
+- ⚠️ **The spec contradicted itself about `Delete Weekly` and the contradiction
+  is recorded, not quietly resolved.** §2's D5 lists only the two other buttons
+  as staying; §5's risk list says `Delete Weekly` stays beside the row Deletes.
+  Kept, because §5 is explicit where D5 is an implication and removing a working
+  button is what a later step cannot undo. The row's Delete and the selection's
+  Delete are one method with two callers, so the confirmation exists once.
+- ⚠️ **The three name columns got narrower on this tab** - 180px each to
+  135/155/125 - because that is what the other tabs use and §1.4 named the
+  difference as a difference. Every column is draggable now, so a name that no
+  longer fits can be widened; before, nothing could be.
+- ⚠️ **Nothing in UPD-M1 to UPD-M5 has been seen running.** UPD-M7.2 and
+  UPD-M7.3 are the on-screen criteria and are open.
+
 ### One panel design across the VSP tabs - UPD-M4, the three tabs adopt
 
 - ✅ **APE Quarter Assignment, APE Month Assignment and Annual Vision Segments

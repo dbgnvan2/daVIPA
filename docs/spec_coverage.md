@@ -719,7 +719,7 @@ Tests all live in `tests/test_unified_panel_design.py`.
 | M1.2 | A drag right widens the left and narrows the right by the same pixels | `SplitPanel.on_press`, `SplitPanel.on_drag` | `::test_updm12_drag_moves_both_panels_by_the_same_amount` | done |
 | M1.3 | Neither panel goes below its minimum, at any body width | `SplitPanel.clamp_left`, `SplitPanel.apply` | `::test_updm13_neither_panel_can_be_crushed` | done |
 | M1.4 | A body width of 0 or less is a no-op | `SplitPanel._usable_width` | `::test_updm14_zero_width_body_is_a_noop` | done |
-| M1.5 | No screen keeps its own splitter — exact count from the AST | `ape_assignment.py`, `ape_period_view.py`, `annual_vision_segments.py` (all adopted) | `::test_updm15_no_screen_keeps_its_own_splitter` | **partial** — the guard is exact, the count is not yet 0. UPD-M4 adopted the two VSP holdouts above; `weekly_items.py` is the last copy and is rewritten at UPD-M5, which is where this closes. `project_boards.py` is out of scope (UPD-A5). The earlier claim here that UPD-M4 would close it was wrong. |
+| M1.5 | No screen keeps its own splitter — exact count from the AST | all four screens adopted: `ape_assignment.py` (M1), `ape_period_view.py` and `annual_vision_segments.py` (M4), `weekly_items.py` (M5) | `::test_updm15_no_screen_keeps_its_own_splitter` | **done at UPD-M5** — `SPLITTER_HOLDOUTS` is empty and the guard asserts it. `project_boards.py` is the only file left with a splitter and is out of scope by UPD-A5, named in `SPLITTER_OUT_OF_SCOPE`. |
 | M1.6 | The ratio persists across a rebuild | `SplitPanel._load_ratio`, `SplitPanel._persist`, `AppSettings.ape_quarter_split_ratio` | `::test_updm16_split_ratio_survives_a_relaunch`, `::test_updm16_the_ratio_has_a_settings_field_to_land_in`, `::test_updm16_a_prefix_with_no_settings_field_says_so` | done |
 
 One deliberate behaviour change against D1, and the measurement behind it, are
@@ -735,7 +735,7 @@ without complaint. `apply()` holds both sides now.
 | M2.2 | A release inside the target calls the screen's handler once, with the row | `RowDragSource.finish`, `ape_assignment.py::_assign_dragged_row` | `::test_updm22_drop_inside_the_target_assigns_once`, `::test_updm22_the_quarter_screen_routes_its_drop_through_the_module` | done |
 | M2.3 | A release outside the target calls nothing | `RowDragSource.finish`, `row_drag.is_descendant` | `::test_updm23_drop_outside_the_target_does_nothing` | done |
 | M2.4 | A release with no drag in progress does nothing (P7) | `RowDragSource.finish` guard | `::test_updm24_release_without_a_press_does_nothing`, `::test_updm24_is_descendant_walks_up_and_stops` | done |
-| M2.5 | No screen keeps its own `_start_row_drag` or `_is_descendant` — exact count from the AST | `ape_assignment.py`, `ape_period_view.py`, `annual_vision_segments.py` (all adopted) | `::test_updm25_no_screen_keeps_its_own_drag` | **partial** — the guard is exact, the count is not yet 0. Two of the three holdouts adopted at UPD-M4; `weekly_items.py` is the last and adopts at UPD-M5. |
+| M2.5 | No screen keeps its own `_start_row_drag` or `_is_descendant` — exact count from the AST | all four screens adopted, `weekly_items.py` last at UPD-M5 | `::test_updm25_no_screen_keeps_its_own_drag` | **done at UPD-M5** — a plain emptiness assertion, with no out-of-scope file beside it: `project_boards.py` has a splitter but never had a row drag. |
 
 No behaviour change in this extraction, unlike UPD-M1's. Two mutations came
 back green and both were findings about the tests, not the code — a false
@@ -792,7 +792,36 @@ widgets would leave a stale label behind for a screen that added one.
 Gate: 13 mutations, each the verbatim original, each run alone, all 13 red on
 the first pass.
 
-## UPD-M5 … UPD-M7
+## UPD-M5 — APE Week Assignment matches the image
+
+| Spec ID | Description | Implementation | Test | Status |
+|---|---|---|---|---|
+| M5.1 | The right panel renders `#` / Segment / SubSegment / Category / Actions | `weekly_items.py::_render_right_rows` over `APE_RIGHT_COLUMNS` | `::test_updm51_right_panel_has_the_actions_column` | done |
+| M5.2 | Each right row carries a Delete that deletes that row's tactic | `weekly_items.py::delete_weekly_row` | `::test_updm52_a_row_delete_removes_that_row_not_the_selection` | done — driven with a different row selected |
+| M5.3 | Delete asks first, and a refused confirmation deletes nothing | `weekly_items.py::delete_weekly_row` | `::test_updm53_delete_is_confirmed_before_it_happens` | done — both entry points refused in one test |
+| M5.4 | `Edit Weekly Tactic` and `Add Action Item` still act on the selection | `open_selected_weekly_item`, `create_action_item_for_selected_weekly`, `delete_selected_weekly_item` | `::test_updm54_the_selection_buttons_act_on_the_selection`, `::test_updm54_delete_weekly_still_deletes_the_selection` | done |
+| M5.5 | The left header's first cell is empty, not "Pick" | `APE_LEFT_COLUMNS` | `::test_updm55_left_header_matches_the_other_tabs` | done — text and pixels |
+| M5.6 | Both panels use the shared table, with their own prefixes | `ChipTable`, `SplitPanel`, `RowDragSource`, `AppSettings.week_assignment_*` | `::test_updm56_week_assignment_uses_the_shared_table_and_module_wiring`, `::test_updm56_week_assignment_columns_resize_and_persist`, `::test_updm56_the_week_assignment_prefixes_have_settings_fields`, `::test_updm56_a_left_row_is_a_drag_source_on_this_tab_too`, `::test_updm56_both_panels_still_say_when_they_are_empty`, `::test_updm56_a_row_with_no_category_colour_takes_the_subsegments` | done |
+| M5.7 | Selection tint and double-click-to-open survive the rewrite | `_render_right_rows`'s re-bind | `::test_updm57_clicking_a_right_row_selects_it_and_double_click_opens_it`, `::test_updm57_selecting_a_row_repaints_the_panel_instead_of_stacking_it` | done |
+
+A defect in the screen as it stood, found while writing M5.7's test:
+`on_select_weekly_item` re-rendered the right panel without destroying what
+was there, so a fresh header and a fresh set of rows were gridded into the
+same cells as the old ones and every selection click added another set — three
+clicks on a two-row week took the panel from 3 children to 12. Adopting the
+shared table fixes it, because `build_header` clears its container. The test
+was written and proved red against the old screen first.
+
+The spec's own two statements about `Delete Weekly` disagreed (D5 implies it
+goes, §5's risk list says it stays). Resolved by keeping it, and by making the
+row's Delete and the selection's Delete one method with two callers, so the
+confirmation exists once. The reasoning is in the spec's §10.
+
+Gate: 17 mutations, each the verbatim original, each run alone. 15 red first
+pass; the 2 green were weaknesses in the tests and both were strengthened
+until red — details in the spec's §10.
+
+## UPD-M6 … UPD-M7
 
 `not done` — not started.
 
