@@ -1,3 +1,82 @@
+## Recent Changes (2026-11-08)
+
+### The Plan day range — the configured day and the drawn day (PD-M13/14/15)
+
+- ⚠️ **The batch was verified against the files it edited, and that missed two
+  red tests.** `tests/test_plan_settings.py` was never run during
+  implementation: it edits none of the changed code, it only asserts on it, and
+  two of its tests still expected the settings write PD-M13 removed. A cold
+  pass found them. The file set to run is the one that *references* the changed
+  names (`grep -rln` over `tests/`), not the one the diff touches.
+- ✅ **The grid can no longer draw a box that `can_place` will refuse.**
+  `drawn_day_slots` clamps its widening to the boxes on the date, so a stored
+  index that a later Day Start change puts off the date goes to the outside
+  group instead of being drawn at a floored "00:00" and refusing every move.
+  Found independently by all three cold passes.
+- ✅ **Both free-box scans bound the span, not just its start**, so AutoLoad and
+  "block this item" cannot finish a block inside the drawn extension past the
+  configured Day End.
+- ✅ **The extension no longer writes Settings (PD-M13).** The user's words:
+  "when add to start and End of day do NOT change the length of Day in
+  Settings". `extend_day_for` had done `setattr(self.settings,
+  "plan_day_start", ...)` + `settings.save()` + `shift_all_slots(span)`. All
+  three are gone. The block now takes a `slot_index` one span before the first
+  drawn box, or one box after the last — **negative indexes are allowed** — and
+  `drawn_day_slots(bounds, blocks)` lays the day out from the configured range
+  widened to cover whatever sits outside it. `Slot.index` is consequently no
+  longer the list position in `build_day_grid`; every lookup there goes through
+  a `position` dict.
+- ✅ **Clear Day resets the range (PD-M13.7), with no reset code.** The first
+  reported fault. Because the extra half hours are derived from the blocks in
+  them, removing the blocks narrows the drawn day by itself. The decision
+  recorded in the plan, and asked of the user: a break left outside the
+  configured range keeps its box, so the day shrinks to the configured range
+  *or* to what is still outside it, whichever is wider.
+- ✅ **`shift_all_slots` and `extended_day_bound` are deleted**, with their
+  eight tests. The renumber existed only to keep clock times true while the
+  bound moved; with the bound fixed there is nothing to compensate for. The
+  midnight guarantee moved off the bound and onto the box
+  (`slot_is_on_the_date`), and `LAST_DAY_END_MINUTES` went with
+  `extended_day_bound` — the 23:30 ceiling was about a bound that could be
+  pushed past a storable time, and the limit left is the date, checked in
+  minutes.
+- ⚠️ **`can_place` gained `allow_outside_range`, and the default matters.**
+  My first cut removed the configured-range refusal outright, for every caller.
+  Two real regressions came out of it, both caught by the existing suite: AutoLoad
+  filled a 17:00 box that Day End excluded (`test_pdm34_autoload_does_not_run_past_the_day_end`),
+  and adoption of a pre-grid 19:00 row invented a box past Day End for it
+  instead of leaving it for the outside group
+  (`test_a_length_chosen_for_an_unplaced_block_does_not_show_the_row_id`). The
+  limit for every ordinary write is now the day *as drawn*; the
+  Earlier/Later extension is the only caller that passes the flag, and the two
+  free-slot scans walk the configured range rather than `self._grid.slots`.
+- 🐛 **`times_for_slot` clamped the index at zero.** Found by PD-M13.6's test.
+  A block at box -1 was stored as 08:00 while the grid drew it at 07:30 — the
+  row and the screen disagreeing with nothing marked wrong, which is the exact
+  failure the deleted renumber was built to prevent. The clamp is gone;
+  `format_hhmm` still floors at midnight and `slot_is_on_the_date` refuses
+  before the write.
+- 🐛 **`on_settings_saved` blamed itself for pre-grid rows.** It said "N blocks
+  no longer fit the day" whenever the outside group was non-empty after a save.
+  A save can no longer orphan anything, so on any day holding an unadoptable
+  row the user was told their save had displaced a block it had nothing to do
+  with. It now reports only the increase, keeping the warning for the case it
+  was written for.
+- ✅ **PD-M14 and PD-M15 are no code, as the plan predicted.** There is no
+  adjacency guard on the Earlier/Later path to remove, and the weekday gate
+  already asks once per date on all four write paths. Both are covered by
+  regression tests that fail if either property is lost. PD-M15 reading (ii) —
+  refusing an unchecked day rather than warning — was declined by the user
+  ("No, once per day") and is not implemented.
+- ❗ **Not recoverable:** a day extended under the shipped behaviour keeps the
+  Day Start or Day End that extension wrote, and its blocks keep the indexes
+  the renumber gave them. There is no record of what the user had configured
+  before, so nothing tries to guess. `test_pdm1310_a_day_extended_under_the_old_behaviour_still_draws`
+  pins that such a day still draws coherently — every block at the time its own
+  row says, none of them in the outside group. Human-review line in the status
+  report, and a line in the user guide and CHANGELOG telling the user to check
+  ⚙ Day Settings once.
+
 ## Recent Changes (2026-11-07)
 
 ### The four Plan / Day Plan faults reported from the running screen (PD-M11, PD-M12)

@@ -336,24 +336,39 @@ Header:
   gesture wrote nothing and said nothing, which looked like a button that did
   not work.
 - **Earlier** / **Later** — What: A box at each end of the day column, above
-  the first half hour and below the last. Drop an item on one and the day
-  lengthens to hold it: *Day Start* moves back, or *Day End* moves forward, by
-  the item's own work-block length, and the item is blocked in the new half
-  hours. Why: the day you planned is not always the day you get, and the
-  alternative is opening Day Settings, working out the arithmetic and then
-  coming back to drag the item. The boxes are there on an empty day too — that
-  is the day with no first block to drop above.
+  the first half hour and below the last. Drop an item on one and it is blocked
+  in a new half hour just before the day's first box or just after its last,
+  and the day column is drawn wide enough to show it. Why: the day you planned
+  is not always the day you get, and the alternative is opening Day Settings,
+  working out the arithmetic and then coming back to drag the item. The boxes
+  are there on an empty day too — that is the day with no first block to drop
+  above — and they take a drop whatever else is on the day, including a block
+  sitting at the far end of it.
 
-  Everything already on the day keeps the time it had. The day cannot be
-  extended across midnight: an item too long to fit before *Day Start* or after
-  *Day End* is refused and says so, rather than being given a day too short for
-  it. Dragging a block that already has a box onto one of these does nothing
-  but say why — they exist to make room for work that is not planned yet.
+  **Your Day Settings are not touched.** *Day Start* and *Day End* stay the
+  hours you set; what changes is the day you are looking at, which is drawn
+  from those hours widened to cover whatever you have planned outside them. So
+  one drop on one date does not redefine your working day, and no other date
+  changes at all. The status line says so when it works: *the day is drawn
+  wider to show it and ⚙ Day Settings is unchanged*.
 
-  Lengthening the day does not count as confirming the day's hours, so if the
-  app guessed them it still says so afterwards. If the settings file cannot be
-  written, the day goes back to the hours it had and the reason appears on the
-  status line.
+  Everything already on the day keeps the time it had — the same box and the
+  same clock time. The day cannot be extended across midnight: an item that
+  would need a half hour belonging to the day before or the day after is
+  refused and says so, because a day is one date. Dragging a block that already
+  has a box onto one of these does nothing but say why — they exist to make
+  room for work that is not planned yet.
+
+  Drawing the day wider leaves Day Settings alone entirely, so it cannot count
+  as confirming the day's hours: if the app guessed them it still says so
+  afterwards, until you set them yourself in ⚙ Day Settings.
+
+  **Clear Day puts the column back.** Because the extra half hours are drawn
+  from the work in them rather than stored anywhere, taking the work off the
+  day narrows the column back to your *Day Start*–*Day End* range by itself. A
+  break or buffer you put outside those hours by hand keeps its box: Clear Day
+  removes scheduled items only, and the column stays wide enough to show what
+  it left behind.
 - **Day summary** — What: `4 of 18 boxes · 2h 00m occupied · 1h 45m planned`.
   Why: Three separate numbers, because they are three separate facts. A
   45-minute task occupies a whole hour of your day and plans 45 minutes of it;
@@ -503,13 +518,14 @@ Day pane (right):
   stopped it, in the screen's own words rather than the database's.
 - **Outside the day** — What: A group beneath the item list in the left
   column, headed *Outside the day (n) — drag onto a box to place*, holding any
-  block the grid can no longer hold: one whose box is past a Day End you have
-  moved earlier, one whose length now runs off the end, or one lunch has since
-  moved onto. The group scrolls, and its rows are the size a task is in a box,
-  so a day that fills it stays draggable to the last row. Why: planned work is
-  never dropped silently. It stays on screen,
-  and dragging it onto a box puts it back — the same move, from the same
-  column, as an item above it.
+  block the grid has no box for. In practice that is a block from a day planned
+  in an older version whose stored time your day has no half hour for: moving
+  *Day End* earlier does **not** put a block here, because the day column is
+  drawn wide enough to keep showing whatever is planned past it. The group
+  scrolls, and its rows are the size a task is in a box, so a day that fills it
+  stays draggable to the last row. Why: planned work is never dropped silently.
+  It stays on screen, and dragging it onto a box puts it back — the same move,
+  from the same column, as an item above it.
 
 Day Settings modal:
 - **Day Start** — What: The time of the first box. Why: A block remembers
@@ -538,16 +554,19 @@ Day Settings modal:
 - **Save** writes **nothing** to your blocks, on any day. Why: every block's box
   is stored relative to Day Start, so every day re-times itself the next time you
   open it. There is no day left showing times that no longer follow from your
-  settings, and no day that can be "too full to re-time". If a block no longer
-  fits the day you have just described, it appears under **Outside the day** and
-  the status line says how many — drag it onto a box, or shorten it.
+  settings, and no day that can be "too full to re-time". A block that falls
+  outside the hours you have just described keeps its box and its time, and the
+  day column is drawn wide enough to go on showing it — so narrowing your day
+  never takes planned work off the screen.
 
 **Days planned in an older version** are mapped onto the grid the first time you
 open them. A block with a readable start time goes on the box that time names,
 or — if that box is past your Day End, before your Day Start, in lunch, or
 already full — nowhere, and it appears under **Outside the day** for you to
 place. It is never slid to the nearest free box, because that would move your
-work to an hour you never picked.
+work to an hour you never picked, and the day is never widened to invent a box
+for it: that is a decision about your hours, and dragging it onto one is how you
+make it.
 
 The status line says how many blocks were placed **and which Day Start they were
 placed against**, because that mapping cannot be undone: a box is stored

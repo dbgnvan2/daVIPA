@@ -7,6 +7,59 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — the Plan day range batch (2026-11-08)
+
+- **A block can no longer end up stuck in a box showing the wrong time.** If
+  you moved *Day Start* earlier in ⚙ Day Settings while something was blocked
+  in one of the half hours before the old start, that block could be drawn at
+  00:00 and then refuse to be moved or resized, with deleting it the only way
+  out. Such a block is now listed under "outside the day" with the time its own
+  row holds, and you can drag it back onto the day.
+- **AutoLoad no longer finishes a task past *Day End*.** On a day drawn wider
+  than its settings, a task needing two half hours could start on the last box
+  of your configured day and run half an hour past it. It now takes only boxes
+  that both start and finish inside the hours you set.
+
+- **Dropping an item on *Earlier* or *Later* no longer changes your Day
+  Settings.** The item is blocked in a new half hour just before the day's
+  first box or just after its last, and the day column is drawn wide enough to
+  show it; *Day Start* and *Day End* stay the hours you set. Before this, one
+  drop moved the setting — which is a single value every date is drawn from, so
+  a drop on Thursday redefined the working day for every day in the file, and
+  every other date's blocks had to be renumbered to stay where they were. The
+  status line now says *the day is drawn wider to show it and ⚙ Day Settings is
+  unchanged*.
+- **Clear Day puts the day column back to your settings range.** The reported
+  fault: a day stretched by four drops stayed stretched after Clear Day, with
+  the empty half hours still drawn, because the range had been written into
+  Settings and nothing put it back. The extra half hours are now drawn from the
+  work in them rather than stored anywhere, so removing the work narrows the
+  column by itself. Clear Day still writes nothing to your settings, and a
+  break or buffer you put outside your hours by hand keeps its box — the column
+  stays wide enough to show what Clear Day left behind.
+- **Narrowing your day no longer takes planned work off the screen.** Moving
+  *Day End* earlier used to put every block past it into the *Outside the day*
+  group; the column is now drawn out to whatever is still planned there. The
+  group is still there for a block the grid genuinely has no box for — one from
+  a day planned in an older version whose stored time your day has no half hour
+  for — and saving Day Settings no longer reports such a block as something the
+  save had just displaced.
+- **A block dropped before your Day Start is stored at the time it is drawn
+  at.** Found while building the above: the stored clock time was clamped to
+  *Day Start*, so a block drawn at 07:30 had 08:00 in its own row, with nothing
+  marking either as wrong.
+- Two reported faults turned out to need no change, and are now covered by
+  tests so they cannot come back: *Earlier* and *Later* accept a drop whatever
+  else is on the day, including a block at the far end of it; and a day your
+  weekday list excludes asks once, on the first block, and not again — breaks,
+  buffers and lunch do not bring the question back, and a day holding one still
+  accepts items.
+- **Days you already extended keep the hours that extension wrote.** There is
+  no record of what you had configured before it, so nothing tries to guess:
+  check **⚙ Day Settings** once after upgrading if a day's hours look wider
+  than you set them.
+
+
 ### Added — the APE quarter/month consistency batch (2026-11-07)
 
 - **APE Month and APE Quarter both open on the period you are actually in,

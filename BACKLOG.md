@@ -1,6 +1,6 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (the four Plan / Day Plan faults reported from the running screen investigated: two fixed, one implemented, one still open with its measurements, plus one adjacent issue and a correction to the `_require_block_day` low finding below; then that batch's fix pass — six of the sweep's ten findings fixed including the high one, two refuted by measurement and recorded as such, two deferred here; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-08 (the Plan day-range batch: PD-M13 built — the configured day and the drawn day are now two things, `shift_all_slots` and `extended_day_bound` deleted, three defects found and fixed in the code it touches; PD-M14 and PD-M15 established as no-code and covered by regression tests; no adjacent issues — the one candidate was checked and is handled behaviour, recorded in the handoff note; four on-screen checklist items outstanding, which are the only acceptance criteria not done. Previously: the four Plan / Day Plan faults reported from the running screen investigated: two fixed, one implemented, one still open with its measurements, plus one adjacent issue and a correction to the `_require_block_day` low finding below; then that batch's fix pass — six of the sweep's ten findings fixed including the high one, two refuted by measurement and recorded as such, two deferred here; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
 
 ## Reported from the running screen — Plan / Day Plan (2026-11-07)
 
@@ -476,10 +476,61 @@ surface and the repo's budget stops in-loop fixes below medium.
   lands 2px left of a task's in the same pane. The two *panes* stay in step
   with each other; rows within one pane do not. Fixing it means changing the
   chip column contract and the tests that assert it, for 2px.
-- **`shift_all_slots` accepts a negative `by`.** Low, and listed for the record
-  rather than as a defect: nothing calls it with one, Day Start only ever moves
-  back on this path, and a negative shift would be the correct write if a
-  shortening path is ever added.
+
+## Deferred from the three cold passes on the Plan day-range batch (2026-11-08)
+
+Three cold passes ran over `2b2393f...HEAD` — failure patterns, correctness and
+security. Their two mediums and the one high are fixed in the batch; what
+follows is everything below medium, plus one adjacent issue that is not this
+change's to fix. Severity was set before any fix was written.
+
+- **Adjacent, not fixed: a block at the Later edge can never be lengthened,
+  while one at the Earlier edge can.** Drop an item on **Later** to get a block
+  in the box past Day End, then right-click it and ask for 60 minutes: refused
+  with "That is outside the day". The drawn day's last box *is* that block, so
+  growing it always needs a box past the drawn edge. The same block at the
+  Earlier edge grows into box 0 and is allowed. Graded medium by user impact
+  and listed here rather than fixed because it **predates this change**: the
+  old check refused `18 + 2 > 19` against a Day End that the Later drop had
+  just moved to 17:30, exactly as the new one refuses `19 > 18` against the
+  drawn edge. The remedy is unchanged too — widen Day End in ⚙ Day Settings,
+  then lengthen. Fixing it properly means deciding whether a resize may widen
+  the day the way the extension drag does, which is a PD-M13 follow-up and not
+  a defect introduced here.
+- **`extend_day_for` treats any edge that is not `DAY_EXTEND_EARLIER` as
+  "later".** Low. The deleted `extended_day_bound` raised
+  `ValueError(f"not an end of the day: {direction!r}")` for a third value and
+  `test_pdm5_an_end_of_the_day_that_is_not_one_is_an_error` pinned it; that
+  guarantee is now asserted nowhere. Not reachable today — the only caller
+  passes `virtual_under_pointer()`, which returns one of the two constants or
+  `None`, and `None` is filtered before the call. One `elif edge !=
+  DAY_EXTEND_LATER: raise ValueError(...)` restores it.
+- **`slot_occupancy`'s `bounds` parameter is now unused.** Low. The clamp to
+  `len(day_grid(bounds))` was its only consumer and was removed deliberately
+  (a negative-index block must occupy its box, or the free-box scan stacks a
+  second block invisibly on top of it). All four callers still pass `bounds`,
+  and the signature implies the result is bounds-relative when it is not.
+  Dropping the parameter touches every caller for no behaviour change, which
+  is why it is here and not in the batch.
+- **`can_place` and `drawn_day_slots` walk `blocks` twice and are typed
+  `Iterable`.** Low. `can_place` passes `blocks` to both `drawn_day_slots` and
+  `slot_occupancy`; a generator would be exhausted by the first and yield an
+  empty occupancy map to the second, losing the `SLOT_FULL` check silently.
+  All five current callers pass a list, and `build_day_grid` already guards
+  itself with `blocks = list(blocks)`. The fix is that one line in each, or
+  narrowing the annotation to `Sequence`.
+- **The day's capacity readout counts drawn boxes, not configured ones.** Low.
+  `plan.py` draws `f"{slots_used} of {len(self._grid.slots)} boxes"`, so one
+  Later drop turns the default day into "1 of 19 boxes" while the rest of the
+  summary is about the configured day. Left as it is for now because the drawn
+  total is what the user can count on screen, and the configured total would
+  read "19 of 18" once anything sits outside the range — but the two halves of
+  that line do disagree about which day they mean.
+- **"try a later box" is advice an Earlier drop cannot take.** Low. The only
+  refusal still reachable on the extension path is `CROSSES_LUNCH`, which
+  renders as "The day was not extended — That would run into lunch — try a
+  later box". Reachable at the Earlier edge with a lunch hour configured
+  before Day Start, which the settings dialog does not forbid.
 
 ## Deferred from the third cold pass — test quality (2026-11-07)
 
