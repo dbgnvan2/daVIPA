@@ -4,6 +4,12 @@
 **Branch:** a new branch off `claude/plan-day-faults-03c116` (or off `main` once
 that branch merges)
 **Status:** awaiting approval. No implementation code written.
+**Decisions taken 2026-11-07, by the user, on the three questions this plan
+raised:** an unchecked weekday is **warned about once per day, not refused**
+(PD-M15 reading (i)); after Clear Day the day **keeps showing a break that sits
+outside the configured range** (PD-M13.9 as written); and days already extended
+under the old behaviour are **left as they are** (no migration). All three are
+recorded in place below.
 
 Four things reported from the running screen. Three came through another
 session; the fourth the user added directly, and it changes what the first one
@@ -104,15 +110,15 @@ needs a position before box 0. Two ways:
 **I recommend (A)**, and the plan below assumes it. (B) is written down so the
 choice is visible, not because it is close.
 
-**Migration is a real question, and I cannot answer it from here.** Any day the
-user has already extended has both a moved `plan_day_start` and slot indices
-shifted to match. Under (A) those days stay internally consistent — they are
-just days with an early configured start — so **doing nothing is coherent**, and
-that is what I would do. What it costs is that their Day Settings keeps whatever
-value the extension wrote rather than what they originally typed, which is not
-recoverable: the original was overwritten. **Flagged for your decision, not
-guessed at.** Needs a human-review line in the status report either way, because
-no automated test can tell a configured 07:00 from an extension-written one.
+**Migration: decided — nothing is migrated.** Any day the user has already
+extended has both a moved `plan_day_start` and slot indices shifted to match.
+Under (A) those days stay internally consistent — they are just days with an
+early configured start — so doing nothing is coherent, and that is the decision
+taken. What it costs, and the user accepted this explicitly: Day Settings keeps
+whatever value the extension wrote rather than what they originally typed, and
+the original is not recoverable because it was overwritten. Still needs a
+human-review line in the status report, because no automated test can tell a
+configured 07:00 from an extension-written one.
 
 ### Acceptance criteria
 
@@ -129,9 +135,11 @@ no automated test can tell a configured 07:00 from an extension-written one.
 | PD-M13.9 | A break or buffer sitting before the configured Day Start keeps its box after Clear Day (the day shrinks to the configured range *or* to what is still outside it, whichever is wider) | `tests/test_plan_screen.py::test_pdm139_clear_day_keeps_a_break_outside_the_range_on_the_grid` |
 | PD-M13.10 | Dirty-state (P8): a database whose blocks already carry shifted indices from the old behaviour still draws every block | `tests/test_plan_screen.py::test_pdm1310_a_day_extended_by_the_old_code_still_draws` |
 
-PD-M13.9 is the one I most expect you to disagree with. It is what "reset to the
-range in settings" has to mean once breaks survive Clear Day: the day cannot
-shrink past a block that is still on it. Say so if you want the opposite.
+PD-M13.9 is **decided as written**. It is what "reset to the range in settings"
+has to mean once breaks survive Clear Day: the day cannot shrink past a block
+that is still on it, because a block that stops being drawn is the symptom class
+the previous batch was about. The alternative — shrink to the configured range
+and list the break under "outside the day" — was offered and declined.
 
 ---
 
@@ -191,8 +199,13 @@ So "you are simply ignoring the Work day settings" is either:
   every time because nothing is ever permitted. **Under this reading PD-M15 is
   a spec change and the plan above is the wrong shape for it.**
 
-I read your answer as (i) and the criteria below assume it. **If you meant that
-an unchecked day should refuse the drop outright, say so and I will replan.**
+**Decided: (i).** Asked directly whether an unchecked weekday should be warned
+about once per day or refused outright, the user chose warned once per day. So
+the weekday list stays a warning rather than a lock, the behaviour they
+described and the behaviour they asked for are confirmed to be the same one, and
+**PD-M15 is a regression test over behaviour that already exists plus the
+PD-M11 repair already pushed** — not new behaviour. Reading (ii) is declined and
+is not implemented.
 
 On the parenthetical: breaks, buffers and lunch must not refuse a drop or
 re-arm the warning. The warning is keyed on the date alone and reads nothing
