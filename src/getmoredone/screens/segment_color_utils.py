@@ -46,6 +46,67 @@ def resolve_lineage_colors(
     return segment_color, subsegment_color
 
 
+def load_category_color_map(vps_manager: Any) -> Dict[Tuple[str, str, str], str]:
+    """The category colour map, keyed by lower-cased (segment, subsegment, name).
+
+    Purpose: UPD-M6 — one owner for the key, which five screens build by hand.
+    Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m6
+    Tests:   tests/test_unified_panel_design.py::test_updm62_a_row_with_no_category_colour_takes_the_subsegments
+
+    Used by `week_actions` and by nothing else yet: the five other screens that
+    build this map are recorded as UPD-A9 rather than changed here.
+    """
+    return {
+        (
+            (row.get("segment_name", "") or "").strip().lower(),
+            (row.get("subsegment_name", "") or "").strip().lower(),
+            (row.get("name", "") or "").strip().lower(),
+        ): (row.get("color_hex") or "")
+        for row in vps_manager.get_vision_categories()
+    }
+
+
+def resolve_chip_colors(
+    segment_name: str,
+    subsegment_name: str,
+    category_name: str,
+    vps_manager: Any,
+    segment_colors: Dict[str, str],
+    subsegment_colors: Dict[Tuple[str, str], str],
+    category_colors: Dict[Tuple[str, str, str], str],
+) -> Tuple[str, str, str]:
+    """The three chip colours for one lineage row.
+
+    Purpose: UPD-M6 — one owner for the category lookup, which is a three-part
+             lower-cased key with a fall-back to the subsegment's colour. It is
+             easy to get subtly wrong in one copy and not another (P5), and
+             `week_actions` would have been the sixth copy.
+    Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m6
+    Tests:   tests/test_unified_panel_design.py::test_updm62_a_row_with_no_category_colour_takes_the_subsegments
+
+    Five screens still build that key themselves — `ape_assignment`,
+    `ape_period_view`, `annual_vision_segments`, `drag_schedule` and
+    `item_editor_weekly_tactic_dialog` — and two of them fall back differently
+    (`annual_vision_segments` prefers the row's own `category_color_hex` and
+    then the segment's; the tactic dialog adds a `gray20` floor). They are
+    recorded as UPD-A9 rather than swept here, because reconciling fall-backs
+    is a behaviour change on four screens and not UPD-M6's to make.
+    """
+    segment_color, subsegment_color = resolve_lineage_colors(
+        segment_name, subsegment_name, vps_manager, segment_colors,
+        subsegment_colors,
+    )
+    category_color = category_colors.get(
+        (
+            (segment_name or "").strip().lower(),
+            (subsegment_name or "").strip().lower(),
+            (category_name or "").strip().lower(),
+        ),
+        "",
+    ) or subsegment_color
+    return segment_color, subsegment_color, category_color
+
+
 def resolve_segment_color_for_item(
     item: ActionItem,
     segment_colors_by_id: Dict[str, str],

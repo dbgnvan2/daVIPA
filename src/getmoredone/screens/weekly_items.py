@@ -13,9 +13,18 @@ from .. import week_options
 from ..app_settings import AppSettings
 from ..weekly_tactic_logging import get_weekly_tactic_logger
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
-from .chip_table import APE_LEFT_COLUMNS, APE_RIGHT_COLUMNS, ChipTable
+from .chip_table import (
+    APE_LEFT_COLUMNS,
+    APE_RIGHT_COLUMNS,
+    ChipTable,
+    show_list_or_message,
+)
+from .lineage_filters import annual_plan_element_parts, weekly_tactic_parts
 from .row_drag import RowDragSource
-from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
+from .segment_color_utils import (
+    load_latest_lineage_color_maps,
+    resolve_chip_colors,
+)
 from .split_panel import SPLITTER_WIDTH, SplitPanel
 
 if TYPE_CHECKING:
@@ -390,13 +399,12 @@ class WeeklyItemsScreen(ctk.CTkFrame):
                  gridded at a time.
         Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m5
         Tests:   tests/test_unified_panel_design.py::test_updm56_both_panels_still_say_when_they_are_empty
+
+        UPD-M6 moved the body into `chip_table.show_list_or_message`, where
+        APE Week Actions' left panel needs the same swap. This stays as the
+        seam the two render methods and their tests call.
         """
-        if empty:
-            list_frame.grid_remove()
-            message.grid()
-        else:
-            message.grid_remove()
-            list_frame.grid()
+        show_list_or_message(list_frame, message, empty)
 
     def _render_left_rows(self):
         """Render the month-assigned APEs into the shared chip table.
@@ -508,19 +516,14 @@ class WeeklyItemsScreen(ctk.CTkFrame):
 
         The same four lines were written out in both render methods; the
         category lookup in particular is a three-part lower-cased key that is
-        easy to get subtly wrong in one copy and not the other (P5).
+        easy to get subtly wrong in one copy and not the other (P5). UPD-M6
+        moved the body into `segment_color_utils.resolve_chip_colors`, which
+        APE Week Actions' rows need too; this stays as this screen's seam.
         """
-        segment_color, subsegment_color = resolve_lineage_colors(
-            segment_name, subsegment_name, self.vps_manager,
-            self.segment_colors, self.subsegment_colors,
+        return resolve_chip_colors(
+            segment_name, subsegment_name, category_name, self.vps_manager,
+            self.segment_colors, self.subsegment_colors, self.category_colors,
         )
-        category_color = self.category_colors.get(
-            (segment_name.strip().lower(),
-             subsegment_name.strip().lower(),
-             category_name.strip().lower()),
-            "",
-        ) or subsegment_color
-        return segment_color, subsegment_color, category_color
 
     def on_select_weekly_item(self, idx: int):
         if idx < 0 or idx >= len(self.right_items):
@@ -662,16 +665,14 @@ class WeeklyItemsScreen(ctk.CTkFrame):
             return False
         return True
 
+    # Both readers moved into screens/lineage_filters.py at UPD-M6, where APE
+    # Week Actions reads the same Weekly Tactic rows. The `ape_*` keys and the
+    # `who` fall-back are one rule and now have one owner; these stay as the
+    # seams this screen's render and filter paths call.
+
     @staticmethod
     def _ape_parts(row: Dict[str, object]) -> tuple[str, str, str]:
-        return (
-            (row.get("segment_name") or "-").strip(),
-            (row.get("subsegment_name") or "-").strip(),
-            (row.get("category_name") or "-").strip(),
-        )
+        return annual_plan_element_parts(row)
 
     def _weekly_parts(self, row: Dict[str, object]) -> tuple[str, str, str]:
-        seg = (row.get("ape_segment_name") or row.get("who") or "").strip()
-        sub = (row.get("ape_subsegment_name") or "").strip()
-        cat = (row.get("ape_category_name") or "").strip()
-        return seg or "-", sub or "-", cat or "-"
+        return weekly_tactic_parts(row)

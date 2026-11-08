@@ -23,8 +23,21 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import customtkinter as ctk
 
 from .. import week_options
+from ..app_settings import AppSettings
 from ..models import ActionItem
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
+from .chip_table import (
+    WEEK_ACTIONS_LEFT_COLUMNS,
+    ChipTable,
+    show_list_or_message,
+)
+from .lineage_filters import LineageFilters, weekly_tactic_parts
+from .segment_color_utils import (
+    load_category_color_map,
+    load_latest_lineage_color_maps,
+    resolve_chip_colors,
+)
+from .split_panel import MIN_PANEL_WIDTH, SPLITTER_WIDTH, SplitPanel
 from .today import TodayScreen
 from .week_collision_notice import notify_weekly_tactic_changes
 
@@ -193,22 +206,40 @@ class WeekActionsScreen(ctk.CTkFrame):
     Tests:   tests/test_ape_week_actions.py::test_awam42_left_panel_lists_the_weeks_tactics
     """
 
-    LEFT_PANE_MIN_WIDTH = 380
+    # UPD-M6 — one prefix for this screen's own state. The left panel's column
+    # widths are stored under `<prefix>_left_col_widths` and the divider under
+    # `<prefix>_split_ratio`. The right panel is a `TodayScreen` subclass and
+    # keeps the `week_actions_col_widths` field it already had (UPD-D3): a
+    # rename would discard widths a user has set, saying nothing.
+    SETTINGS_PREFIX = "week_actions"
 
     def __init__(self, parent, vps_manager: "VPSManager", app: "GetMoreDoneApp"):
         super().__init__(parent)
         self.vps_manager = vps_manager
         self.app = app
+        self.settings = getattr(app, "settings", None) or AppSettings.load()
 
         self.week_var = ctk.StringVar(value="")
+        # Every tactic in the chosen week, and the subset the filters leave.
+        # Both are kept: the counts the screen reports are "shown of total",
+        # and a count of what a filter hid cannot be recovered from the
+        # filtered list alone (P2).
         self.tactic_rows: List[Dict[str, Any]] = []
-        self.tactic_buttons: Dict[str, ctk.CTkButton] = {}
+        self.visible_rows: List[Dict[str, Any]] = []
+        self.tactic_row_frames: Dict[str, ctk.CTkFrame] = {}
         self.selected_tactic_id: Optional[str] = None
+
+        self.segment_colors: Dict[str, str] = {}
+        self.subsegment_colors: Dict[Any, str] = {}
+        self.category_colors: Dict[Any, str] = {}
+
+        self.filters = LineageFilters(weekly_tactic_parts)
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
         self.create_ui()
+        self._reload_color_maps()
         self.jump_to_current_week()
 
     # ----------------------------------------------------------------------- ui
@@ -216,7 +247,6 @@ class WeekActionsScreen(ctk.CTkFrame):
     def create_ui(self):
         header = ctk.CTkFrame(self)
         header.grid(row=0, column=0, sticky="ew", padx=12, pady=12)
-        header.grid_columnconfigure(5, weight=1)
 
         ctk.CTkLabel(
             header,
@@ -243,29 +273,87 @@ class WeekActionsScreen(ctk.CTkFrame):
             command=self.jump_to_current_week, **button_style("secondary"),
         ).grid(row=1, column=3, padx=5, pady=(0, 8), sticky="w")
 
+        # UPD-M6.4 — the three filters the other five tabs all have, from
+        # screens/lineage_filters.py. The module owns the "All" sentinel, the
+        # option lists and the predicate; this screen owns where they sit and
+        # what it says when they hide everything.
+        next_column = self.filters.build_combos(
+            header, start_column=4, on_change=self.on_filters_changed)
+
         self.status_label = ctk.CTkLabel(
             header, text="", text_color=status_text_color("muted"))
-        self.status_label.grid(row=1, column=4, sticky="w", padx=10,
+        self.status_label.grid(row=1, column=next_column, sticky="w", padx=10,
                                pady=(0, 8))
+        header.grid_columnconfigure(next_column, weight=1)
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
-        body.grid_columnconfigure(0, weight=0, minsize=self.LEFT_PANE_MIN_WIDTH)
-        body.grid_columnconfigure(1, weight=1)
+        # The two panels open at the shared minimum and are re-sized by
+        # SplitPanel on the body's first `<Configure>`. Without a minimum here
+        # the first paint is two panels at their content width, which then
+        # jump when the ratio is applied.
+        body.grid_columnconfigure(0, weight=0, minsize=MIN_PANEL_WIDTH)
+        body.grid_columnconfigure(1, weight=0, minsize=SPLITTER_WIDTH)
+        body.grid_columnconfigure(2, weight=0, minsize=MIN_PANEL_WIDTH)
         body.grid_rowconfigure(1, weight=1)
+        self.body = body
 
         self.left_title_label = ctk.CTkLabel(
             body, text="Weekly Tactics", font=ctk.CTkFont(weight="bold"))
         self.left_title_label.grid(row=0, column=0, sticky="w", padx=8,
                                    pady=(8, 4))
 
-        self.left_frame = ctk.CTkScrollableFrame(body, label_text="")
-        self.left_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
+        # The shared table destroys every child of its container, so the
+        # empty-state label lives in a sibling frame rather than inside the
+        # scroll frame the table owns (chip_table's class docstring, AWA-S6 a).
+        self.left_frame = ctk.CTkFrame(body)
+        self.left_frame.grid(row=1, column=0, sticky="nsew")
         self.left_frame.grid_columnconfigure(0, weight=1)
+        self.left_frame.grid_rowconfigure(0, weight=1)
+
+        self.left_list = ctk.CTkScrollableFrame(self.left_frame, label_text="")
+        self.left_list.grid(row=0, column=0, sticky="nsew")
+        self.left_list.grid_columnconfigure(0, weight=1)
+
+        self.left_empty = ctk.CTkLabel(
+            self.left_frame,
+            text="No Weekly Tactics for this week.",
+            text_color=semantic_colors()["muted_text"],
+        )
+        self.left_empty.grid(row=0, column=0, pady=12, padx=8, sticky="nw")
+
+        divider = ctk.CTkFrame(
+            body,
+            width=SPLITTER_WIDTH,
+            corner_radius=999,
+            fg_color=semantic_colors()["border"],
+            cursor="sb_h_double_arrow",
+        )
+        divider.grid(row=1, column=1, sticky="ns", padx=4, pady=4)
+        self.divider = divider
 
         self.actions_panel = WeekTacticActionsPanel(
             body, self.app.db_manager, self.app)
-        self.actions_panel.grid(row=0, column=1, rowspan=2, sticky="nsew")
+        self.actions_panel.grid(row=0, column=2, rowspan=2, sticky="nsew")
+
+        # UPD-M6.2 — the left list is the shared chip table, where it was one
+        # CTkButton per tactic. Its own prefix, so a drag here never moves the
+        # Actions panel's columns.
+        self.left_table = ChipTable(
+            self.left_list, self.settings,
+            f"{self.SETTINGS_PREFIX}_left", WEEK_ACTIONS_LEFT_COLUMNS,
+        )
+
+        # UPD-M6.1 — the divider, from screens/split_panel.py. The body used
+        # to be a fixed 380px minimum on the left and weight=1 on the right,
+        # so the split was not the user's to set.
+        self.split = SplitPanel(
+            body,
+            self.left_frame,
+            divider,
+            settings=self.settings,
+            prefix=self.SETTINGS_PREFIX,
+        )
 
     # -------------------------------------------------------------------- weeks
 
@@ -296,12 +384,12 @@ class WeekActionsScreen(ctk.CTkFrame):
     def load_selected_week(self):
         """AWA-M4.2/M4.3/M4.5 — list the week's tactics, selection cleared."""
         week_start = (self.week_var.get() or "").strip()
-        # AWA-M4.5 — a tactic from the previous week must not stay on screen
-        # beside a different week's list.
-        self.select_tactic(None)
         if not week_start:
             self.tactic_rows = []
-            self._render_tactics()
+            self.visible_rows = []
+            # AWA-M4.5 — a tactic from the previous week must not stay on
+            # screen beside a different week's list. This also renders.
+            self.select_tactic(None)
             self.status_label.configure(text="Choose a Week Start first.")
             return
 
@@ -311,51 +399,145 @@ class WeekActionsScreen(ctk.CTkFrame):
         # (P2). The count below says how many are listed.
         self.tactic_rows = self.vps_manager.get_weekly_action_items(
             week_start_date=week_start, ape_only=False)
-        self._render_tactics()
-        self.status_label.configure(
-            text=f"{len(self.tactic_rows)} Weekly Tactic(s) for week of {week_start}."
-        )
+        self.filters.refresh_options(self.tactic_rows)
+        self.visible_rows = self.filters.filtered(self.tactic_rows)
+        self.select_tactic(None)
+        self._report_counts()
+
+    def on_filters_changed(self):
+        """UPD-M6.4 — re-filter the list in place, keeping the selection.
+
+        The week has not changed, so the selected tactic is still this week's
+        and the right panel should keep it. It is cleared only when the filter
+        has hidden the row it belongs to: leaving it would show one tactic's
+        Action Items beside a list that does not contain it, which is the
+        confusion AWA-M4.5 exists to prevent.
+        Spec:  docs/spec_2026-11-07_unified_panel_design.md#upd-m6
+        Tests: tests/test_unified_panel_design.py::test_updm64_a_filter_that_hides_the_selected_row_clears_the_panel
+        """
+        self.visible_rows = self.filters.filtered(self.tactic_rows)
+        visible_ids = {row["id"] for row in self.visible_rows}
+        if self.selected_tactic_id and self.selected_tactic_id not in visible_ids:
+            self.select_tactic(None)
+        else:
+            self._render_tactics()
+        self._report_counts()
 
     # ------------------------------------------------------------------ tactics
 
+    def _reload_color_maps(self):
+        """The three lineage colour maps, read fresh from the VSP tables."""
+        self.segment_colors, self.subsegment_colors = (
+            load_latest_lineage_color_maps(self.vps_manager))
+        self.category_colors = load_category_color_map(self.vps_manager)
+
     def _render_tactics(self):
-        for child in self.left_frame.winfo_children():
-            child.destroy()
-        self.tactic_buttons = {}
+        """Render the week's tactics into the shared chip table.
 
-        self.left_title_label.configure(
-            text=f"Weekly Tactics ({len(self.tactic_rows)})")
+        Purpose: UPD-M6.2 — the left panel was one `CTkButton` per tactic,
+                 with the title and the segment name stacked on two lines and
+                 no column a user could size. It is the same table the other
+                 five panels draw now, with a Title column this tab needs
+                 because its rows are picked by name.
+        Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m6
+        Tests:   tests/test_unified_panel_design.py::test_updm62_left_panel_is_the_shared_table
+        """
+        self.tactic_row_frames = {}
+        self.left_title_label.configure(text=self._left_title())
+        self.left_empty.configure(text=self._empty_text())
 
-        if not self.tactic_rows:
-            ctk.CTkLabel(
-                self.left_frame,
-                text="No Weekly Tactics for this week.",
-                text_color=semantic_colors()["muted_text"],
-            ).grid(row=0, column=0, sticky="w", padx=8, pady=12)
+        empty = not self.visible_rows
+        show_list_or_message(self.left_list, self.left_empty, empty)
+        if empty:
+            self.left_table.clear()
             return
 
-        for row_index, row in enumerate(self.tactic_rows):
-            tactic_id = row["id"]
-            label = (row.get("title") or "(untitled)").strip()
-            ape = (row.get("ape_segment_name") or "").strip()
-            button = ctk.CTkButton(
-                self.left_frame,
-                text=f"{label}\n{ape}" if ape else label,
-                anchor="w",
-                command=lambda rid=tactic_id: self.select_tactic(rid),
-                **button_style("secondary"),
+        palette = semantic_colors()
+        self.left_table.build_header()
+        for idx, row in enumerate(self.visible_rows, start=1):
+            segment_name, subsegment_name, category_name = weekly_tactic_parts(row)
+            segment_color, subsegment_color, category_color = resolve_chip_colors(
+                segment_name, subsegment_name, category_name, self.vps_manager,
+                self.segment_colors, self.subsegment_colors, self.category_colors,
             )
-            button.grid(row=row_index, column=0, sticky="ew", padx=4, pady=3)
-            self.tactic_buttons[tactic_id] = button
+            tactic_id = row["id"]
+            selected = tactic_id == self.selected_tactic_id
+
+            frame, cells = self.left_table.add_row(
+                {
+                    "index": str(idx),
+                    "title": (row.get("title") or "(untitled)").strip(),
+                    "segment": segment_name,
+                    "subsegment": subsegment_name,
+                    "category": category_name,
+                },
+                {
+                    "segment": segment_color,
+                    "subsegment": subsegment_color,
+                    "category": category_color,
+                },
+                fg_color=palette["selected_tint"] if selected else None,
+                border_width=2,
+                border_color=segment_color,
+            )
+            self.tactic_row_frames[tactic_id] = frame
+
+            # UPD-M6.3 — every cell is a click target, not just the frame: a
+            # click lands on whichever widget is under the pointer, and a row
+            # whose chips do not select is a row that only works at its edges.
+            for widget in (frame, *cells.values()):
+                widget.bind(
+                    "<Button-1>",
+                    lambda _event, rid=tactic_id: self.select_tactic(rid),
+                )
+
+    def _left_title(self) -> str:
+        """The left panel's heading, which says what the filters left."""
+        total = len(self.tactic_rows)
+        shown = len(self.visible_rows)
+        if shown == total:
+            return f"Weekly Tactics ({total})"
+        return f"Weekly Tactics ({shown} of {total})"
+
+    def _empty_text(self) -> str:
+        """What an empty left panel says, and why it is empty (UPD-M6.5, P2).
+
+        A week with no tactics and a filter that hid every one of them are
+        different facts, and the second one has to name the filter and the
+        count: a panel that just says "none" after a filter is a panel that
+        looks like an empty week.
+        """
+        hidden = len(self.tactic_rows) - len(self.visible_rows)
+        if not self.tactic_rows:
+            return "No Weekly Tactics for this week."
+        return (
+            f"No Weekly Tactics match the filter: {self.filters.describe()}. "
+            f"{hidden} hidden."
+        )
+
+    def _report_counts(self):
+        """The status line: how many are listed, and how many a filter hid."""
+        week_start = (self.week_var.get() or "").strip()
+        total = len(self.tactic_rows)
+        shown = len(self.visible_rows)
+        if shown == total:
+            self.status_label.configure(
+                text=f"{total} Weekly Tactic(s) for week of {week_start}.")
+            return
+        self.status_label.configure(
+            text=(
+                f"{shown} of {total} Weekly Tactic(s) for week of {week_start}. "
+                f"{total - shown} hidden by {self.filters.describe()}."
+            )
+        )
 
     def select_tactic(self, tactic_id: Optional[str]):
         """AWA-M4.4 — set the selection and reload the right panel once."""
         self.selected_tactic_id = tactic_id
         row = next((r for r in self.tactic_rows if r["id"] == tactic_id), None)
-        for rid, button in self.tactic_buttons.items():
-            button.configure(
-                **button_style("primary" if rid == tactic_id else "secondary"))
+        self._render_tactics()
         self.actions_panel.set_tactic(row)
 
     def refresh(self):
+        self._reload_color_maps()
         self.load_selected_week()

@@ -11,9 +11,10 @@ were the same header frame, the same `grid_columnconfigure(minsize=…)` calls
 and the same chip labels three times over, and are now one call to
 `build_header()` and one `add_row()` per row.
 
-Still to come: `weekly_items`'s `_render_left_rows` + `_render_right_rows` at
-UPD-M5, and `vision_segments`'s three similar blocks, which UPD-A1 leaves
-alone.
+Adopted at UPD-M5 by `weekly_items` (both panels) and at UPD-M6 by
+`week_actions`'s left panel, which replaced a stack of one `CTkButton` per
+Weekly Tactic. Nine panels in all. `vision_segments`'s three similar blocks
+are left alone, per UPD-A1 and D8.
 
 The split of responsibility is deliberate: this module owns the header, the
 row frames, the chips and the widths, and knows nothing about Annual Plan
@@ -39,6 +40,25 @@ CHIP_INSET = 12
 # A chip whose colour is empty falls back to the panel's own surface, so a row
 # with no lineage colour still reads as a row rather than as a hole.
 DEFAULT_CHIP_KEY = "surface_subtle"
+
+
+def show_list_or_message(list_frame, message, empty: bool) -> None:
+    """Show a panel's list or its empty-state label, never both.
+
+    Purpose: UPD-M6 — one owner for the swap. Both widgets are gridded into
+             the same cell, and two widgets in one Tk cell both stay mapped
+             with the later one drawn on top, so "hide the list" has to mean
+             `grid_remove`, not "grid the label over it". That reads correct on
+             screen while the panel holds both.
+    Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m6
+    Tests:   tests/test_unified_panel_design.py::test_updm65_an_empty_filter_result_says_what_it_hid
+    """
+    if empty:
+        list_frame.grid_remove()
+        message.grid()
+    else:
+        message.grid_remove()
+        list_frame.grid()
 
 
 @dataclass(frozen=True)
@@ -95,6 +115,19 @@ APE_RIGHT_COLUMNS: Tuple[ChipColumn, ...] = _INDEX_AND_CHIPS + (
 # the only column width that differs across the three screens.
 ANNUAL_RIGHT_COLUMNS: Tuple[ChipColumn, ...] = _INDEX_AND_CHIPS + (
     ChipColumn("actions", "Actions", 140, chip=False, resizable=False),
+)
+
+# Left panel on APE Week Actions (UPD-M6.2). The only panel in the hub whose
+# rows are Weekly Tactics picked by name, so it carries a Title column the
+# other panels have no use for: the three chips say which lineage a tactic
+# belongs to, and the title says which tactic it is. No checkbox (nothing is
+# ticked here) and no Actions (clicking the row is the interaction, D6).
+WEEK_ACTIONS_LEFT_COLUMNS: Tuple[ChipColumn, ...] = (
+    ChipColumn("index", "#", 34, min_width=34, chip=False, resizable=False),
+    ChipColumn("title", "Weekly Tactic", 220, min_width=80, chip=False),
+    ChipColumn("segment", "Segment", 135, min_width=60),
+    ChipColumn("subsegment", "SubSegment", 155, min_width=60),
+    ChipColumn("category", "Category", 125, min_width=60),
 )
 
 
@@ -264,9 +297,23 @@ class ChipTable:
                 registered.append(
                     (column.key, label, full_text, 0, CHIP_INSET))
             else:
+                # A resizable plain column is clamped to its width here, the
+                # same way the resizer clamps it on a drag. Without this the
+                # first render is the one width at which the text can overrun
+                # its column -- it would be cut to fit the moment the handle
+                # was touched and not before, which on a Title column is a
+                # panel that opens wrong and corrects itself when dragged
+                # (UPD-M6.2). A fixed-width column keeps its raw text: `#` and
+                # `Actions` cannot overrun by construction, and the resizer
+                # never re-clamps a column with no handle, so clamping them
+                # here would be the only place the pad appeared.
+                text = (
+                    self.resizer.cell_text(column.key, full_text)
+                    if column.resizable else full_text
+                )
                 label = ctk.CTkLabel(
                     frame,
-                    text=full_text,
+                    text=text,
                     width=self.resizer.width(column.key),
                     anchor="w",
                 )

@@ -143,6 +143,7 @@ class AppSettings:
     ape_month_split_ratio: float = 0.5
     annual_vision_split_ratio: float = 0.5
     week_assignment_split_ratio: float = 0.5
+    week_actions_split_ratio: float = 0.5
 
     # UPD-M4 — a two-panel VSP tab's column widths, one field per *panel*: the
     # two panels of one tab are different shapes, and one store for both would
@@ -160,6 +161,10 @@ class AppSettings:
     annual_vision_right_col_widths: dict = field(default_factory=dict)
     week_assignment_left_col_widths: dict = field(default_factory=dict)
     week_assignment_right_col_widths: dict = field(default_factory=dict)
+    # UPD-M6 — the left panel of APE Week Actions only. Its right panel is a
+    # TodayScreen subclass and keeps the week_actions_col_widths field above,
+    # which already holds widths a user has set (UPD-D3).
+    week_actions_left_col_widths: dict = field(default_factory=dict)
 
     # Future date options (Drag Schedule)
     mid_term_offset_days: int = 90
