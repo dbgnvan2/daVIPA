@@ -1448,7 +1448,13 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         )
 
     def _refuse_unless_it_fits(
-        self, block_date: str, slot_index: int, minutes: int, bounds, ignoring=None
+        self,
+        block_date: str,
+        slot_index: int,
+        minutes: int,
+        bounds,
+        ignoring=None,
+        allow_outside_range: bool = False,
     ) -> None:
         """Raise ``SlotRefusedError`` unless the grid allows this placement."""
         from .time_block_layout import SlotRefusedError, can_place, slots_for_minutes
@@ -1459,11 +1465,19 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             slot_index,
             slots_for_minutes(minutes),
             ignoring=ignoring,
+            allow_outside_range=allow_outside_range,
         )
         if reason:
             raise SlotRefusedError(reason)
 
-    def add_block_at(self, block: TimeBlock, slot_index: int, bounds) -> TimeBlock:
+    def add_block_at(
+        self,
+        block: TimeBlock,
+        slot_index: int,
+        bounds,
+        *,
+        allow_outside_range: bool = False,
+    ) -> TimeBlock:
         """Create a block in a particular box.
 
         Purpose: TG-M9 -- an item dropped on the 10:00 box becomes a block at
@@ -1473,52 +1487,23 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
 
         The fit is checked before anything is written, so a refusal leaves the
         day exactly as it was rather than rolling a write back.
+
+        ``allow_outside_range`` belongs to the Earlier/Later extension alone
+        (PD-M13): it is the only write that means to put a block on a box the
+        day is not drawn on yet. Leaving it off is what keeps AutoLoad inside
+        the configured day.
         """
         self._refuse_unless_it_fits(
-            block.block_date, slot_index, block.planned_minutes, bounds
+            block.block_date,
+            slot_index,
+            block.planned_minutes,
+            bounds,
+            allow_outside_range=allow_outside_range,
         )
         with self.transaction():
             self._settle_block_on_slot(block, slot_index, bounds)
             self.create_time_block(block)
         return block
-
-    def shift_all_slots(self, by: int) -> int:
-        """Renumber every date's blocks so they keep their clock times when Day Start moves.
-
-        Purpose: PD-M5.5 -- a block's ``slot_index`` is its position counted
-                 from Day Start, not a time. Moving Day Start back two boxes
-                 without renumbering slides every planned task an hour earlier
-                 on the grid while its stored ``start_time`` still says
-                 otherwise, so the day on screen and the day in the row
-                 disagree and neither is marked wrong.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
-        Tests:   tests/test_time_block_crud.py::test_pdm55_blocks_keep_their_times_when_the_day_grows
-
-        Every date, not the one being looked at. ``plan_day_start`` is a single
-        setting and ``DayBounds.from_settings`` reads it for whatever date is
-        on screen, so there is no such thing as renumbering one day: a version
-        of this that filtered on ``block_date`` left every *other* date drawn
-        half an hour early with its own row still saying the old time -- the
-        exact disagreement above, one date over, and the reason the method
-        exists at all.
-
-        ``start_time`` and ``end_time`` are deliberately not touched: they are
-        the fact being preserved. Blocks with no slot index are left alone --
-        they are already outside the grid, and giving them one here would be
-        the adoption that TG-M5 gates on a confirmed day shape.
-        """
-        if not int(by):
-            return 0
-        with self.transaction() as conn:
-            cursor = conn.execute(
-                """
-                UPDATE time_blocks
-                SET slot_index = slot_index + ?, updated_at = ?
-                WHERE slot_index IS NOT NULL
-                """,
-                (int(by), datetime.now().isoformat()),
-            )
-            return cursor.rowcount
 
     def place_block_at(self, block_id: str, slot_index: int, bounds) -> TimeBlock:
         """Move an existing block to another box.

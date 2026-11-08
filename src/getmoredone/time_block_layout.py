@@ -491,54 +491,98 @@ def day_grid(bounds: DayBounds) -> List[Slot]:
         # Overlap, not containment: a lunch of 12:15--12:45 makes both the
         # 12:00 and the 12:30 slot unavailable, because a block in either
         # would run through part of it.
-        overlaps_lunch = (
-            bounds.lunch_length > 0 and at < lunch_end and lunch_start < at + SLOT_MINUTES
+        slots.append(
+            Slot(index=index, start_minutes=at, is_lunch=_overlaps_lunch(bounds, at))
         )
-        slots.append(Slot(index=index, start_minutes=at, is_lunch=overlaps_lunch))
         index += 1
         at += SLOT_MINUTES
     return slots
 
 
+def _overlaps_lunch(bounds: DayBounds, at: int) -> bool:
+    """Whether a box starting at ``at`` runs through any part of lunch.
+
+    Overlap, not containment: a lunch of 12:15--12:45 makes both the 12:00 and
+    the 12:30 box unavailable. Factored out because three places now build a
+    ``Slot`` -- ``day_grid``, ``drawn_day_slots`` and ``can_place`` -- and a
+    lunch rule written three times is a lunch rule that will disagree with
+    itself.
+    """
+    return (
+        bounds.lunch_length > 0
+        and at < bounds.lunch_end_minutes
+        and bounds.lunch_start_minutes < at + SLOT_MINUTES
+    )
+
+
+def drawn_day_slots(
+    bounds: DayBounds, blocks: Iterable[TimeBlock] = ()
+) -> List[Slot]:
+    """The configured day, widened to cover any blocks lying outside it.
+
+    Purpose: PD-M13 -- "when add to start and End of day do NOT change the
+             length of Day in Settings". Day Start and Day End are the day the
+             user configured; this is the day that gets drawn, which is that
+             range plus whatever has been dropped past either end.
+    Spec:    docs/implementation_plan_2026-11-07_plan_day_range.md#pd-m13
+    Tests:   tests/test_time_grid.py::test_pdm133_a_block_before_day_start_gets_a_box
+             tests/test_time_grid.py::test_pdm134_a_block_past_day_end_gets_a_box
+
+    ``Slot.index`` is counted from the configured Day Start and **may be
+    negative**, which is the whole mechanism: a box before the configured start
+    is index -1, and no other date's stored index has to move for it to exist.
+    The alternative -- what this replaces -- was to move ``plan_day_start`` and
+    renumber every date's blocks to compensate, so one drop on one date
+    redefined the working day everywhere.
+
+    With no blocks outside the range this returns exactly ``day_grid(bounds)``,
+    so the ordinary day is unchanged and the configured range is the floor:
+    the day never draws *narrower* than what the user set, however empty it is.
+    """
+    configured = day_grid(bounds)
+    first = 0
+    # ``len - 1``, so a configured range too short to yield a single box
+    # (Day End at or before Day Start) gives last < first and contributes
+    # nothing, rather than claiming a box at index -1.
+    last = len(configured) - 1
+    for block in blocks:
+        start = _slot_index_of(block)
+        if start is None:
+            continue
+        first = min(first, start)
+        last = max(last, start + slot_span_of(block) - 1)
+
+    day_start = bounds.day_start_minutes
+    slots: List[Slot] = []
+    for index in range(first, last + 1):
+        at = day_start + index * SLOT_MINUTES
+        slots.append(
+            Slot(index=index, start_minutes=at, is_lunch=_overlaps_lunch(bounds, at))
+        )
+    return slots
+
+
+def slot_is_on_the_date(bounds: DayBounds, slot_index: int, span: int = 1) -> bool:
+    """Whether a block of ``span`` boxes at this index stays inside one date.
+
+    Purpose: PD-M5.8's guarantee, moved off the bound and onto the box. The day
+             no longer grows by moving Day Start, so "a day is one date" can no
+             longer be enforced by refusing a new bound -- it is enforced here,
+             on the box the block would occupy.
+    Spec:    docs/implementation_plan_2026-11-07_plan_day_range.md#pd-m13
+    Tests:   tests/test_time_grid.py::test_pdm1311_a_box_before_midnight_is_refused
+
+    A block has no way to say it belongs to the next date, so a box that would
+    start before 00:00 or end after 24:00 is not a box this planner can hold.
+    """
+    span = max(1, int(span))
+    at = bounds.day_start_minutes + int(slot_index) * SLOT_MINUTES
+    return at >= 0 and at + span * SLOT_MINUTES <= MINUTES_PER_DAY
+
+
 #: The two ends a drop can extend the day from (PD-M5).
 DAY_EXTEND_EARLIER = "earlier"
 DAY_EXTEND_LATER = "later"
-
-#: The latest Day End that still yields whole boxes. A box running 23:30--24:00
-#: would need a Day End of "24:00", which is not a time of day, so the last box
-#: a day can offer starts at 23:00 and the day ends at 23:30.
-LAST_DAY_END_MINUTES = MINUTES_PER_DAY - SLOT_MINUTES
-
-
-def extended_day_bound(
-    bounds: DayBounds, direction: str, span: int
-) -> Optional[str]:
-    """The Day Start or Day End that makes room for ``span`` more boxes.
-
-    Purpose: PD-M5 -- a drop above the day or below it lengthens the day rather
-             than being refused.
-    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
-    Tests:   tests/test_time_block_layout.py::test_pdm58_the_day_cannot_cross_midnight
-
-    ``None`` when the day cannot grow that far, which the caller reports rather
-    than clamping: a clamped bound would make fewer boxes than the item needs,
-    so the block would land somewhere other than the end that was dropped on,
-    or not at all. Midnight is both the floor and the ceiling -- a day is one
-    date, and a block has no way to say it belongs to the next one.
-    """
-    span = max(1, int(span))
-    room = span * SLOT_MINUTES
-    if direction == DAY_EXTEND_EARLIER:
-        value = bounds.day_start_minutes - room
-        if value < 0:
-            return None
-    elif direction == DAY_EXTEND_LATER:
-        value = bounds.day_end_minutes + room
-        if value > LAST_DAY_END_MINUTES:
-            return None
-    else:
-        raise ValueError(f"not an end of the day: {direction!r}")
-    return format_hhmm(value)
 
 
 def slots_for_minutes(minutes: Optional[int]) -> int:
@@ -595,6 +639,7 @@ def can_place(
     span: int,
     *,
     ignoring: Optional[str] = None,
+    allow_outside_range: bool = False,
 ) -> Optional[str]:
     """``None`` if a block of ``span`` boxes may sit at ``slot_index``.
 
@@ -607,13 +652,46 @@ def can_place(
     ordinary answer about an ordinary gesture, not an error. ``ignoring`` is
     the block being moved, which must not count itself as occupying the slot
     it is leaving.
-    """
-    grid = day_grid(bounds)
-    span = max(1, int(span))
-    if slot_index < 0 or slot_index + span > len(grid):
-        return SlotRefusal.OUTSIDE_GRID
 
-    covered = grid[slot_index : slot_index + span]
+    ``allow_outside_range`` is for the one gesture that means to make the day
+    wider -- the Earlier/Later extension, which has to write a box that is not
+    drawn yet. Every other caller leaves it alone, and the default refuses a
+    box outside the day as drawn. That default is load-bearing in two places
+    that have nothing to do with drag and drop: AutoLoad fills the day it was
+    given rather than growing it, and adoption of a pre-grid row whose clock
+    time falls outside the day leaves the row unplaced for the outside group
+    to report (P2) instead of inventing a box past Day End for it.
+    """
+    span = max(1, int(span))
+    slot_index = int(slot_index)
+    # A box outside the date is refused whatever the caller asked for: a block
+    # has no way to say it belongs to the next one.
+    if not slot_is_on_the_date(bounds, slot_index, span):
+        return SlotRefusal.OUTSIDE_GRID
+    # PD-M13: the limit for everyone else is the day *as drawn* -- the
+    # configured range widened to cover the blocks already outside it -- not
+    # the configured range alone. A box past Day End that already holds work
+    # is a box the user can point at, so a drop there must be allowed; a box
+    # past the drawn edge is one nothing is drawn on, and only the extension
+    # gesture may write it.
+    if not allow_outside_range:
+        drawn = drawn_day_slots(bounds, blocks)
+        if not drawn:
+            return SlotRefusal.OUTSIDE_GRID
+        if slot_index < drawn[0].index or slot_index + span - 1 > drawn[-1].index:
+            return SlotRefusal.OUTSIDE_GRID
+
+    covered = [
+        Slot(
+            index=slot_index + step,
+            start_minutes=bounds.day_start_minutes
+            + (slot_index + step) * SLOT_MINUTES,
+            is_lunch=_overlaps_lunch(
+                bounds, bounds.day_start_minutes + (slot_index + step) * SLOT_MINUTES
+            ),
+        )
+        for step in range(span)
+    ]
     if any(slot.is_lunch for slot in covered):
         return SlotRefusal.CROSSES_LUNCH
 
@@ -635,7 +713,6 @@ def slot_occupancy(
     "is there room here" has to mean the whole box, not just where something
     started.
     """
-    grid_length = len(day_grid(bounds))
     occupancy: dict = {}
     for block in blocks:
         if ignoring is not None and str(getattr(block, "id", "")) == str(ignoring):
@@ -644,9 +721,10 @@ def slot_occupancy(
         if start is None:
             continue
         for offset in range(slot_span_of(block)):
-            index = start + offset
-            if 0 <= index < grid_length:
-                occupancy.setdefault(index, []).append(block)
+            # PD-M13: no clamp to the configured range. A block before Day
+            # Start has a negative index, and clamping it out would let a
+            # second block stack invisibly in the same box.
+            occupancy.setdefault(start + offset, []).append(block)
     return occupancy
 
 
@@ -663,8 +741,16 @@ def times_for_slot(slot_index: int, minutes: int, bounds: DayBounds) -> Tuple[st
     last box it occupies. A 45-minute block in two boxes ends at 09:45 and
     leaves 15 minutes of its second box spare; writing 10:00 there would be the
     row claiming minutes the item does not own.
+
+    PD-M13: the index is **not** clamped at zero. It was, from when a box
+    before Day Start could not exist, and under PD-M13 that clamp wrote Day
+    Start's own time onto every block dropped earlier than it -- a row at box
+    -1 saying 08:00 while the screen drew it at 07:30, which is the row and the
+    grid disagreeing with nothing marked wrong. ``slot_is_on_the_date`` is what
+    refuses an index far enough back to leave the date, so a start before
+    midnight does not reach this.
     """
-    start = bounds.day_start_minutes + max(0, int(slot_index)) * SLOT_MINUTES
+    start = bounds.day_start_minutes + int(slot_index) * SLOT_MINUTES
     return format_hhmm(start), format_hhmm(start + _positive_int(minutes, 0))
 
 
@@ -717,21 +803,27 @@ def build_day_grid(blocks: Iterable[TimeBlock], bounds: DayBounds) -> DayGrid:
     lunch box draws "Lunch" and nothing else, so leaving the block in it would
     hide it exactly as dropping it would.
     """
-    grid = [GridSlot(slot=slot) for slot in day_grid(bounds)]
+    blocks = list(blocks)
+    grid = [GridSlot(slot=slot) for slot in drawn_day_slots(bounds, blocks)]
+    # ``Slot.index`` is no longer the list position -- it is negative for the
+    # boxes before the configured Day Start -- so every lookup goes through
+    # this rather than indexing the list with a slot index.
+    position = {entry.slot.index: at for at, entry in enumerate(grid)}
     outside: List[TimeBlock] = []
 
     for block in sort_blocks_by_slot(blocks):
         start = _slot_index_of(block)
         span = slot_span_of(block)
-        if start is None or start < 0 or start + span > len(grid):
+        at = position.get(start) if start is not None else None
+        if at is None or at + span > len(grid):
             outside.append(block)
             continue
-        if any(entry.slot.is_lunch for entry in grid[start : start + span]):
+        if any(entry.slot.is_lunch for entry in grid[at : at + span]):
             outside.append(block)
             continue
-        grid[start].starting.append(block)
+        grid[at].starting.append(block)
         for offset in range(1, span):
-            grid[start + offset].continued.append(block)
+            grid[at + offset].continued.append(block)
 
     return DayGrid(slots=grid, outside=outside)
 
