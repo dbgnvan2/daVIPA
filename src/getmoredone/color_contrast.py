@@ -6,21 +6,27 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional
 import logging
+import re
 
 
 logger = logging.getLogger(__name__)
+
+#: The only shape Tk will parse as a hex colour, after upper-casing.
+#:
+#: ``int(text, 16)`` must not be used for this: Python accepts a leading sign,
+#: a ``0x`` prefix, PEP-515 underscores, surrounding whitespace and non-ASCII
+#: decimal digits, so ``int("0X1234", 16)`` succeeds while Tk raises on
+#: ``#0X1234``. The validator that exists to keep a bad colour away from Tk
+#: has to be at least as strict as Tk.
+_HEX_COLOR_RE = re.compile(r"#[0-9A-F]{6}\Z")
 
 
 def _normalize_hex(hex_color: str) -> str:
     text = (hex_color or "").strip().upper()
     if not text.startswith("#"):
         text = f"#{text}"
-    if len(text) != 7:
+    if not _HEX_COLOR_RE.match(text):
         raise ValueError(f"Invalid hex color: {hex_color}")
-    try:
-        int(text[1:], 16)
-    except ValueError as exc:
-        raise ValueError(f"Invalid hex color: {hex_color}") from exc
     return text
 
 
@@ -49,11 +55,7 @@ def normalize_hex_color(value: object) -> "Optional[str]":
         text = f"#{text}"
     if len(text) == 4:
         text = f"#{text[1] * 2}{text[2] * 2}{text[3] * 2}"
-    if len(text) != 7:
-        return None
-    try:
-        int(text[1:], 16)
-    except ValueError:
+    if not _HEX_COLOR_RE.match(text):
         return None
     return text
 

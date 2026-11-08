@@ -12,7 +12,7 @@ from ..db_manager import DatabaseManager
 from ..models import ActionItem
 from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
-from ..priority_levels import row_fill
+from ..priority_levels import row_control_kwargs, row_fill
 from ..date_utils import increment_date
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import notify_weekly_tactic_changes
@@ -535,7 +535,7 @@ class TodayScreen(ctk.CTkFrame):
                 text="⣿",  # Braille dots — a compact drag handle
                 width=14,
                 cursor="fleur",
-                text_color=palette["border"],
+                text_color=fill.text_color or palette["border"],
                 font=list_row_font(),
             )
             grip.pack(side="left", padx=(0, 2))
@@ -549,7 +549,8 @@ class TodayScreen(ctk.CTkFrame):
                 text="",
                 variable=var,
                 width=24,
-                command=lambda: self.complete_item(item.id)
+                command=lambda: self.complete_item(item.id),
+                **row_control_kwargs(fill),
             )
             checkbox.pack(side="left")
 

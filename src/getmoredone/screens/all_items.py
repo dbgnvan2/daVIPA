@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from ..models import Status
 from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
-from ..priority_levels import row_fill
+from ..priority_levels import row_control_kwargs, row_fill
 from .segment_color_utils import resolve_segment_color_for_item
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
 from .week_collision_notice import notify_weekly_tactic_changes
@@ -270,7 +270,8 @@ class AllItemsScreen(ctk.CTkFrame):
                         text="",
                         variable=var,
                         width=30,
-                        command=lambda i=item.id: self.complete_item(i)
+                        command=lambda i=item.id: self.complete_item(i),
+                        **row_control_kwargs(fill),
                     )
                     checkbox.grid(row=0, column=0, padx=5, pady=5)
                 else:

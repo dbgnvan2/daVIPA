@@ -163,9 +163,32 @@ def level_color(settings: Any, level: str) -> str:
     return normalized
 
 
-def level_colors(settings: Any) -> Dict[str, str]:
-    """Every level's effective colour, keyed by level."""
-    return {level: level_color(settings, level) for level in LEVEL_KEYS}
+def row_control_kwargs(fill: "RowFill") -> Dict[str, str]:
+    """Widget options that keep a row's controls legible on its fill.
+
+    Purpose: PLC-M4.9 -- ``priority_level_fill_colors`` is one value per level
+             with no light/dark branch, so in dark mode a level fill is a
+             *light* colour. A row's checkbox and drag grip take their colours
+             from the theme, which in dark mode means light-on-light: the
+             checkbox border measures about 2.6:1 against the shipped green,
+             under the 3:1 bar for a non-text control. PLC-M4.4 fixed the row
+             text and left the controls behind.
+    Spec:    docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m4
+    Tests:   tests/test_priority_level_colors.py::test_plcm49_controls_follow_a_level_fill
+
+    Empty for every other fill, so a segment-coloured or completed row keeps
+    the theme's own controls exactly as before. ``text_color`` already clears
+    4.5:1 against the fill (PLC-M4.4), so a control drawn in it clears the 3:1
+    non-text bar by construction, and a checkmark drawn in the fill itself sits
+    inside a box of that same colour.
+    """
+    if fill.source != SOURCE_LEVEL or not fill.text_color or not fill.fill:
+        return {}
+    return {
+        "border_color": fill.text_color,
+        "fg_color": fill.text_color,
+        "checkmark_color": fill.fill,
+    }
 
 
 def priority_color_rows(settings: Any) -> List[Tuple[str, str, str]]:

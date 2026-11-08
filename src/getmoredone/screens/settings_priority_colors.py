@@ -89,6 +89,16 @@ class SettingsPriorityColorsMixin:
             swatch.grid_propagate(False)
             self.priority_level_swatches[level] = swatch
 
+            # Follow the field as it is typed in, not only on Pick Colour /
+            # Restore / Save. Without this the swatch shows the previous colour
+            # while the user reads it as confirmation of what they just typed,
+            # and the user guide's "a swatch showing what is in the field"
+            # would not be true. Registered after the swatch exists, since the
+            # callback repaints it.
+            variable.trace_add(
+                "write", lambda *_: self._refresh_priority_swatches()
+            )
+
         buttons_row = len(LEVEL_KEYS) + 1
         self.priority_colors_save_btn = ctk.CTkButton(
             section,
@@ -120,7 +130,8 @@ class SettingsPriorityColorsMixin:
         info_text = (
             "A priority level is a rule on an item's Importance and Urgency, and "
             "it tints the whole row in Today, Upcoming, All Items, Hierarchical "
-            "and Completed.\n"
+            "and Completed, and in the Action Items panel of APE Week "
+            "Assignment, which draws Today's rows.\n"
             "  • Any Critical — Importance or Urgency is Critical.\n"
             "  • Any High, but no Critical — either is High, and neither is Critical.\n"
             "  • No high or critical — neither is High or Critical.\n"
@@ -137,9 +148,14 @@ class SettingsPriorityColorsMixin:
 
     def pick_priority_level_color(self, level: str):
         """Choose one level's colour with the system colour chooser."""
-        current = self.priority_level_color_vars[level].get().strip()
+        # Normalised, not raw: Tk raises on a colour it cannot parse, and the
+        # exception would escape the button command, leaving a dead button and
+        # no message. A half-typed "#12" opens on the level's default instead.
+        current = normalize_hex_color(
+            self.priority_level_color_vars[level].get()
+        ) or priority_level_fill_colors().get(level) or None
         picked = colorchooser.askcolor(
-            color=current or None,
+            color=current,
             title=f"Pick the colour for {LEVEL_LABELS[level]}",
         )
         if picked and picked[1]:
@@ -200,10 +216,22 @@ class SettingsPriorityColorsMixin:
                 return
             normalized[level] = value
 
+        previous = {
+            level: getattr(self.settings, settings_field_name(level), None)
+            for level in LEVEL_KEYS
+        }
         for level, value in normalized.items():
             setattr(self.settings, settings_field_name(level), value)
 
         if not self._write_settings(self.priority_colors_status_label):
+            # Put it back. ``self.settings`` is shared by every Save handler on
+            # this screen, so colours the user was just told were NOT saved
+            # would otherwise be written to disk by the next successful save
+            # from any other section. See the note in
+            # ``SettingsScreen._hand_settings_to_app``: the aliasing half of
+            # this is handled there, the rollback half is per handler.
+            for level, value in previous.items():
+                setattr(self.settings, settings_field_name(level), value)
             return
 
         self._hand_settings_to_app()
