@@ -1,7 +1,7 @@
 # Spec + implementation plan — one panel design across the VSP tabs
 
-Status: **approved 2026-11-07. UPD-M3, UPD-M1 and UPD-M2 built;
-UPD-M4 … UPD-M7 outstanding.** Per-criterion status is in §10.
+Status: **approved 2026-11-07. UPD-M3, UPD-M1, UPD-M2 and UPD-M4 built;
+UPD-M5 … UPD-M7 outstanding.** Per-criterion status is in §10.
 IDs: `UPD-M1` … `UPD-M7`. Use them verbatim in commits, docstrings and test
 names.
 
@@ -307,12 +307,24 @@ Each step is a commit, tests first, and each leaves the app working.
    so the diff is readable.
 3. **UPD-M2** — `row_drag.py`, adopted by `ape_assignment.py`.
 4. **UPD-M4** — roll all three modules through `ape_period_view.py` and
-   `annual_vision_segments.py`. Delete the duplicates as each adopts.
+   `annual_vision_segments.py`, and `chip_table.py` through
+   `ape_assignment.py`, which UPD-M3 built the table for but did not move
+   onto it. Delete the duplicates as each adopts.
+
+   **This step does not empty UPD-M1.5's or UPD-M2.5's holdout set**, which
+   §10's UPD-M1 block and the two guard tests said it would. The fourth copy
+   of each is in `weekly_items.py`, and that screen is rewritten at UPD-M5,
+   not here. Both criteria stay `partial` until then.
 5. **UPD-M5** — APE Week Assignment, including the right-panel rewrite.
 6. **UPD-M6** — APE Week Actions: divider, chip table, filters.
 7. **UPD-M7** — the meta test, the docs, the on-screen checklist.
 
 Steps 1-3 are the ones worth pausing after; from step 4 on it is repetition.
+
+Step 4 turned out not to be pure repetition: adopting the table surfaced two
+defects in UPD-M3's own config and closed the two findings
+(`BACKLOG.md`'s AWA-S5 and AWA-S6) that were filed to be settled before the
+first screen moved onto it. See §10.
 
 ---
 
@@ -438,7 +450,7 @@ screen to **lose** 80-120. `codex.md`'s maintainability policy is read before
 | M1.2 | done | `::test_updm12_drag_moves_both_panels_by_the_same_amount` — 60px right is +60 left and -60 right, and the press is asserted to have captured the panel's applied width |
 | M1.3 | done | `::test_updm13_neither_panel_can_be_crushed` — three roomy widths × six ratios, both drag edges, and three bodies too narrow to seat two minimums |
 | M1.4 | done | `::test_updm14_zero_width_body_is_a_noop` |
-| M1.5 | **partial** | `::test_updm15_no_screen_keeps_its_own_splitter`. The guard exists and is exact, but the count is not yet 0: UPD-M1 adopts `ape_assignment.py` alone, per §4 step 2. The three VSP holdouts are named in the test and adopt at UPD-M4; `project_boards.py` is UPD-A5 and stays. The criterion closes when the last holdout adopts. |
+| M1.5 | **partial** | `::test_updm15_no_screen_keeps_its_own_splitter`. The guard exists and is exact, but the count is not yet 0: UPD-M1 adopts `ape_assignment.py` alone, per §4 step 2. Two of the three VSP holdouts adopted at UPD-M4, which left `weekly_items.py`; `project_boards.py` is UPD-A5 and stays. **The claim that UPD-M4 would close this was wrong** — `weekly_items.py` is rewritten at UPD-M5, so the criterion closes there. |
 | M1.6 | done | `::test_updm16_split_ratio_survives_a_relaunch`, `::test_updm16_the_ratio_has_a_settings_field_to_land_in`, `::test_updm16_a_prefix_with_no_settings_field_says_so` |
 
 **One deliberate behaviour change, against D1's "no behaviour change".** M1.3
@@ -473,7 +485,7 @@ root.
 | M2.2 | done | `RowDragSource.finish`; `::test_updm22_drop_inside_the_target_assigns_once` (one call, one row, and a second release with no press adding nothing), plus `::test_updm22_the_quarter_screen_routes_its_drop_through_the_module` for the real screen's wiring |
 | M2.3 | done | `::test_updm23_drop_outside_the_target_does_nothing` — over another widget, and over nothing at all, which is the `None` `winfo_containing` returns past the window edge |
 | M2.4 | done | `::test_updm24_release_without_a_press_does_nothing`, asserted with the pointer *inside* the target so the drop test cannot be what saves it, plus `::test_updm24_is_descendant_walks_up_and_stops` |
-| M2.5 | **partial** | `::test_updm25_no_screen_keeps_its_own_drag`. Same shape as M1.5: the guard is exact, the count is not 0, because UPD-M2 adopts `ape_assignment.py` alone per §4 step 3. The three holdouts adopt at UPD-M4. |
+| M2.5 | **partial** | `::test_updm25_no_screen_keeps_its_own_drag`. Same shape as M1.5: the guard is exact and the count is not 0. Two of the three holdouts adopted at UPD-M4; the last, `weekly_items.py`, adopts at UPD-M5, which is where this closes. |
 
 **No behaviour change.** Unlike UPD-M1 this extraction carries none: the three
 identical methods moved as they were, and `finish` keeps the original order —
@@ -515,10 +527,82 @@ a drag actually assigns on screen is still UPD-M7.2/M7.3.
 
 `chip_table.py` exists with all seven criteria tested
 (`::test_updm31` … `::test_updm37`), and its own docstring opens by saying
-nothing uses it yet. It is adopted at UPD-M4. Two findings from its review are
+nothing uses it yet — which stopped being true at UPD-M4, where six panels
+across three screens adopted it and that docstring was rewritten. Two findings
+from its review are
 filed under the batch it shipped in, as `BACKLOG.md`'s **AWA-S5** (a chip's
 text is clamped to the column width, not to the pill) and **AWA-S6** (five
 lifecycle assumptions its API does not enforce). Both are named there as things
-to settle before UPD-M4 moves the first screen onto the table.
+to settle before UPD-M4 moves the first screen onto the table. Both were
+settled at UPD-M4: AWA-S5 fixed in `column_resize.py`, four of AWA-S6's five
+enforced and the fifth stated in the class docstring. See the UPD-M4 block.
 
-### UPD-M4 … UPD-M7 — **not started**
+### UPD-M4 — the three tabs, on the shared modules — **done**, with two criteria qualified
+
+| ID | Status | Where |
+|---|---|---|
+| M4.1 | `done` | 12 characterisation tests, `::test_updm41_*`. The six for APE Month and Annual were written and green **against the untouched screens** before a line of either was removed, which is what §5's first risk asked for. |
+| M4.2 | **`partial`** | Every existing test file of the three screens passes, but one test in `tests/test_ape_period_consistency.py` was changed: `::test_apcm23_drag_path_reaches_the_same_reporting` drove `_finish_row_drag`, which no longer exists on the screen. Case (b), the behaviour moved; it drives `_assign_dragged_row` now, exactly as its APE Quarter sibling did at UPD-M2, and it gained the same `refresh` assertion. "Unchanged" is therefore false and recorded as such. |
+| M4.3 | `done` | `::test_updm43_a_drop_assigns_on_each_tab` and `::test_updm43_a_drop_outside_the_target_assigns_nothing_on_each_tab`. One drop per tab through that screen's own `RowDragSource`, asserted against the call the manager got — three different methods with three different argument shapes, so a drop wired to the wrong one cannot pass by accident. |
+| M4.4 | `done` | `::test_updm44_<screen>_columns_resize_and_persist` (3), plus `::test_updm44_every_panel_prefix_has_a_settings_field` and `::test_updm44_the_panels_a_screen_builds_use_those_prefixes`. None of the three tabs had resizable columns before this step. |
+| M1.5 | **still `partial`** | Only `weekly_items.py` is left in `SPLITTER_HOLDOUTS`, and `project_boards.py` in `SPLITTER_OUT_OF_SCOPE` (UPD-A5). |
+| M2.5 | **still `partial`** | Only `weekly_items.py` is left in `DRAG_HOLDOUTS`. |
+
+**Two defects in UPD-M3's own config, both found by adoption.**
+
+- `ChipColumn.min_width` defaults to 40, and the checkbox and `#` columns were
+  declared 34 wide. `ColumnResizer` clamps a stored width into range, so both
+  rendered at 40 and nothing said so. UPD-M4.1's pixel assertion caught it on
+  the first run after APE Quarter adopted the table — which is the whole case
+  for writing that test before touching the screen.
+  `::test_updm31_every_shipped_column_declares_a_width_it_can_have` now holds
+  the invariant for every shipped set.
+- `APE_COLUMNS` was one six-column set holding both the checkbox column and
+  the Actions column. **No panel has both.** A column's grid index is its
+  position in the set, so that single set put every column of every panel one
+  place to the right of where it is. It is replaced by `APE_LEFT_COLUMNS`,
+  `APE_RIGHT_COLUMNS` and `ANNUAL_RIGHT_COLUMNS` — Annual's Actions column is
+  140px to the APE tabs' 84, because it holds Edit as well as Delete.
+
+**AWA-S5 and AWA-S6, the two findings filed to be settled before the first
+screen adopted the table.**
+
+- **AWA-S5 — fixed, and in `column_resize.py` rather than around it.** A chip
+  pill is `CHIP_INSET` narrower than its column, but the character budget was
+  measured from the column width, so the last character was clipped on every
+  chip of every row. `ColumnResizer.chars` and `.cell_text` now take the same
+  `width_delta` that `register_row` already took, and `_apply_live` passes it,
+  so the render and the live re-clamp agree. `drag_schedule.py` and `today.py`
+  pass 0 and are unaffected (UPD-A4) — their pills fill their columns, so
+  there was no sibling to fix (P5 checked, not assumed).
+- **AWA-S6 — four of five enforced, one settled by stating it.** (b) the
+  resizer has `clear_header()` and `ChipTable.clear()` calls it; (c)
+  `build_header()` weights the container's column 0, so the `sticky="ew"` on
+  the header and every row has something to stretch into; (d) `add_row` before
+  `build_header` raises instead of gridding the first row at row 1; (e)
+  `values` naming no column of the table raises instead of appending an
+  invisible zero-height row. (a) is **not changed**: `clear()` destroys every
+  child of its container, which is what all six adopting panels need, and the
+  constraint — the table owns its container, nothing else may be gridded into
+  it — is stated in the class docstring instead. Changing it to destroy only
+  the table's own widgets would leave a stale label behind for a screen that
+  added one, which is the worse failure.
+
+**Gate.** 13 mutations, each the verbatim original, each run alone, every file
+restored and sha256-compared: 13 red, first pass.
+
+**Not verified on screen.** Every test here builds its screens on a withdrawn
+root. Three tabs changed their renderer, their splitter and their drag in one
+step and none has been looked at. UPD-M7.2 and UPD-M7.3 are the on-screen
+criteria and are open.
+
+**Two cosmetic changes, stated because nothing pins them.** The header's blank
+checkbox cell is gridded with `padx=5` where the screens used `padx=2`, a 3px
+shift; and a clipped chip ends in `...` where the screens' own `_clip_label`
+used `…`, because the shared table clamps through
+`title_format.format_column_text`, as Today and the Scheduler do. Chip text
+also now follows the column width rather than a fixed 15 characters, which is
+UPD-M3.5 working as specified: at the default widths SubSegment shows 17
+characters where it showed 15, and Category 14.
+
+### UPD-M5 … UPD-M7 — **not started**

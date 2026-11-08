@@ -1,6 +1,11 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (UPD-M1 added two adjacent issues as UPD-A5 and UPD-A6 - a fifth copy of the splitter in Project Boards, whose clamp was already right where the four consolidated copies were wrong, and the holdout list UPD-M1.5 needs until UPD-M4 empties it; a third cold pass over the AWA re-sweep's fixes added AWA-S9 to AWA-S11, found no high, and showed that half of one low fixed in the previous round was not a defect; the cold re-sweep of the AWA fix commits added its four remaining lows as AWA-S5 to AWA-S8, with its one high, three mediums and one raised low fixed in-loop and one low fixed against the budget with its reason stated there; the AWA sweep's four below-medium findings added as AWA-S1 to AWA-S4, with its one high and five mediums fixed in-loop and AWA-A3 mostly closed by that fix; four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+Last Updated: 2026-11-07 (UPD-M4 moved the three APE/Annual tabs onto the
+shared chip table, splitter and row drag: AWA-S5 and AWA-S6 are resolved in
+place below, UPD-A6's claim that UPD-M4 would empty the holdout lists is
+corrected there - `weekly_items.py` is the last copy and UPD-M5 rewrites it -
+and one adjacent issue is filed as UPD-A7, two dead index-based members in
+`annual_vision_segments.py`; UPD-M1 added two adjacent issues as UPD-A5 and UPD-A6 - a fifth copy of the splitter in Project Boards, whose clamp was already right where the four consolidated copies were wrong, and the holdout list UPD-M1.5 needs until UPD-M4 empties it; a third cold pass over the AWA re-sweep's fixes added AWA-S9 to AWA-S11, found no high, and showed that half of one low fixed in the previous round was not a defect; the cold re-sweep of the AWA fix commits added its four remaining lows as AWA-S5 to AWA-S8, with its one high, three mediums and one raised low fixed in-loop and one low fixed against the budget with its reason stated there; the AWA sweep's four below-medium findings added as AWA-S1 to AWA-S4, with its one high and five mediums fixed in-loop and AWA-A3 mostly closed by that fix; four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
 
 ## Adjacent issues — one panel design across the VSP tabs (UPD, 2026-11-07)
 
@@ -41,7 +46,29 @@ leaves the list stale should not pass - but it does mean the list is a second
 place that has to be kept in step with the code until UPD-M4 empties it. It is
 recorded so that nobody reading the criterion as `done` is misled: the
 criterion is `partial` in the spec's §10 and in `docs/spec_coverage.md`, and it
-closes when the last holdout adopts. Not an action in itself; UPD-M4 closes it.
+closes when the last holdout adopts. Not an action in itself.
+**Update 2026-11-07, after UPD-M4:** the claim in this entry's title that
+UPD-M4 empties the list was wrong, and so was the spec's §4 and both guard
+docstrings. UPD-M4 covers the three APE/Annual tabs; the fourth copy of the
+splitter and of the drag is in `weekly_items.py`, which UPD-M5 rewrites. Both
+holdout sets are down to that one file, and both criteria close at UPD-M5.
+**Priority:** Low
+**Effort:** Low
+
+### 2026-11-07 - Type: Technical Debt
+
+**Title:** UPD-A7 - two dead members in annual_vision_segments.py, by index, left by the drag that moved to rows
+**Description:** `self.drag_index: Optional[int] = None`
+(`src/getmoredone/screens/annual_vision_segments.py:33`) has no reader anywhere
+in `src/` or `tests/` - grep returns the assignment and nothing else - and
+`_create_from_index(idx)` (`:272`) has no caller: it looks the row up in
+`self.left_items` by position and then calls `_create_from_row`, which is what
+the drag and the button both use directly. Both are leftovers from an earlier
+drag that carried a list index instead of the row. UPD-M4 did not remove them,
+under the standing rule: a feature change does not silently sweep adjacent
+code. They are harmless but they describe a drag the screen no longer has, and
+an index-based lookup is the kind of thing a later edit reaches for. Removing
+both is a two-line deletion with no test to change.
 **Priority:** Low
 **Effort:** Low
 
@@ -227,7 +254,8 @@ beats relying on precedence, but they carry no test and the commit message of
 predicate's own comment, rather than left standing. The `''` half is a real
 behaviour change and has a test.
 
-The four below-medium findings that remain:
+The four below-medium findings that remain, of which AWA-S5 and AWA-S6 were
+resolved at UPD-M4 (recorded in place, below, rather than deleted):
 
 ### 2026-11-07 - Type: Technical Debt
 
@@ -243,6 +271,16 @@ the cell is registered with `reserve=0` alongside `width_delta=CHIP_INSET`;
 code nothing imports yet, so it is low - but it should be settled before
 UPD-M4 moves the first screen onto the table, because every adopting screen
 inherits it.
+**Resolved 2026-11-07 at UPD-M4**, in `column_resize.py` rather than around it:
+`ColumnResizer.chars` and `.cell_text` take the same `width_delta` that
+`register_row` already took, and `_apply_live` passes it, so the first render
+and the live re-clamp agree. `reserve` was the wrong lever - the difference
+between the column budget and the pill budget is 1 or 2 characters depending on
+the column width, so a fixed `reserve=1` would be wrong at half the widths;
+`::test_updm35_chip_text_fits_the_pill_not_the_column` asserts at 135, 136 and
+160px for that reason. `drag_schedule.py` and `today.py` pass 0 and are
+unaffected: their pills fill their columns, so there was no sibling to fix (P5
+checked, not assumed).
 **Priority:** Low
 **Effort:** Low
 
@@ -264,6 +302,17 @@ module docstring says the table owns those frames; (d) `add_row` without a prior
 `build_header()` after `add_row` silently destroys the rows; (e) `values={}`
 appends a zero-cell, zero-height row with no error and no signal. None is
 reachable from the documented call order, which is why this is low.
+**Resolved 2026-11-07 at UPD-M4** - four enforced, one settled by stating it.
+(b) `ColumnResizer.clear_header()` exists and `ChipTable.clear()` calls it; (c)
+`build_header()` weights the container's column 0; (d) `add_row` before
+`build_header` raises `ValueError`; (e) `values` naming no column of the table
+raises `ValueError`. (a) is deliberately **not changed**: `clear()` destroying
+every child of its container is what all six adopting panels need, and
+destroying only the table's own widgets would leave a stale label behind for a
+screen that added one, which is the worse failure. The constraint - the table
+owns its container outright, nothing else may be gridded into it - is stated in
+the class docstring instead, with the four tests that hold the other four named
+there.
 **Priority:** Low
 **Effort:** Medium
 

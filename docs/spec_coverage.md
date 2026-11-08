@@ -719,7 +719,7 @@ Tests all live in `tests/test_unified_panel_design.py`.
 | M1.2 | A drag right widens the left and narrows the right by the same pixels | `SplitPanel.on_press`, `SplitPanel.on_drag` | `::test_updm12_drag_moves_both_panels_by_the_same_amount` | done |
 | M1.3 | Neither panel goes below its minimum, at any body width | `SplitPanel.clamp_left`, `SplitPanel.apply` | `::test_updm13_neither_panel_can_be_crushed` | done |
 | M1.4 | A body width of 0 or less is a no-op | `SplitPanel._usable_width` | `::test_updm14_zero_width_body_is_a_noop` | done |
-| M1.5 | No screen keeps its own splitter — exact count from the AST | `src/getmoredone/screens/ape_assignment.py` (adopted) | `::test_updm15_no_screen_keeps_its_own_splitter` | **partial** — the guard is exact, the count is not yet 0: UPD-M1 adopts `ape_assignment.py` only, per the spec's §4 step 2. `annual_vision_segments.py`, `ape_period_view.py` and `weekly_items.py` adopt at UPD-M4; `project_boards.py` is out of scope (UPD-A5). |
+| M1.5 | No screen keeps its own splitter — exact count from the AST | `ape_assignment.py`, `ape_period_view.py`, `annual_vision_segments.py` (all adopted) | `::test_updm15_no_screen_keeps_its_own_splitter` | **partial** — the guard is exact, the count is not yet 0. UPD-M4 adopted the two VSP holdouts above; `weekly_items.py` is the last copy and is rewritten at UPD-M5, which is where this closes. `project_boards.py` is out of scope (UPD-A5). The earlier claim here that UPD-M4 would close it was wrong. |
 | M1.6 | The ratio persists across a rebuild | `SplitPanel._load_ratio`, `SplitPanel._persist`, `AppSettings.ape_quarter_split_ratio` | `::test_updm16_split_ratio_survives_a_relaunch`, `::test_updm16_the_ratio_has_a_settings_field_to_land_in`, `::test_updm16_a_prefix_with_no_settings_field_says_so` | done |
 
 One deliberate behaviour change against D1, and the measurement behind it, are
@@ -735,7 +735,7 @@ without complaint. `apply()` holds both sides now.
 | M2.2 | A release inside the target calls the screen's handler once, with the row | `RowDragSource.finish`, `ape_assignment.py::_assign_dragged_row` | `::test_updm22_drop_inside_the_target_assigns_once`, `::test_updm22_the_quarter_screen_routes_its_drop_through_the_module` | done |
 | M2.3 | A release outside the target calls nothing | `RowDragSource.finish`, `row_drag.is_descendant` | `::test_updm23_drop_outside_the_target_does_nothing` | done |
 | M2.4 | A release with no drag in progress does nothing (P7) | `RowDragSource.finish` guard | `::test_updm24_release_without_a_press_does_nothing`, `::test_updm24_is_descendant_walks_up_and_stops` | done |
-| M2.5 | No screen keeps its own `_start_row_drag` or `_is_descendant` — exact count from the AST | `src/getmoredone/screens/ape_assignment.py` (adopted) | `::test_updm25_no_screen_keeps_its_own_drag` | **partial** — the guard is exact, the count is not yet 0: UPD-M2 adopts `ape_assignment.py` only, per the spec's §4 step 3. The three holdouts adopt at UPD-M4. |
+| M2.5 | No screen keeps its own `_start_row_drag` or `_is_descendant` — exact count from the AST | `ape_assignment.py`, `ape_period_view.py`, `annual_vision_segments.py` (all adopted) | `::test_updm25_no_screen_keeps_its_own_drag` | **partial** — the guard is exact, the count is not yet 0. Two of the three holdouts adopted at UPD-M4; `weekly_items.py` is the last and adopts at UPD-M5. |
 
 No behaviour change in this extraction, unlike UPD-M1's. Two mutations came
 back green and both were findings about the tests, not the code — a false
@@ -759,18 +759,46 @@ drove `_finish_row_drag`; it drives `_assign_dragged_row` now.
 | M3.6 | Widths persist per panel prefix | `ColumnResizer._setting_attr` | `::test_updm36_panels_keep_their_own_widths` | done |
 | M3.7 | Missing lineage renders without raising | `ChipTable` fallback palette | `::test_updm37_missing_lineage_falls_back_instead_of_raising`, `::test_updm37_the_fallback_chip_does_not_measure_a_named_colour` | done |
 
-**Adopted by nothing yet** — the module's own docstring says so, and UPD-M4 is
-the step that changes it. AWA-S5 and AWA-S6 in `BACKLOG.md` are its review
-findings, both to be settled before the first screen adopts.
+**Adopted by six panels across three screens** at UPD-M4; the docstring that
+said nothing used it was rewritten there. AWA-S5 and AWA-S6 in `BACKLOG.md`
+were its review findings and both were settled at UPD-M4, before the first
+screen adopted — see the UPD-M4 rows below.
 
-## UPD-M4 … UPD-M7
+Two defects in this module's config only surfaced when a screen adopted it, and
+both are covered now:
+`::test_updm31_every_shipped_column_declares_a_width_it_can_have` holds that no
+shipped column declares a `default_width` its own `min_width` would clamp, and
+the single `APE_COLUMNS` set — which described no panel that exists, because no
+panel has both a checkbox and an Actions column — is replaced by
+`APE_LEFT_COLUMNS`, `APE_RIGHT_COLUMNS` and `ANNUAL_RIGHT_COLUMNS`.
 
-`not done` — not started. UPD-M4.1's characterisation tests for APE Quarter
-Assignment exist and are green (`::test_updm41_*`), written before UPD-M1
-removed a line from that screen, which is what the spec's §5 required.
+## UPD-M4 — the three tabs, on the shared modules
+
+| Spec ID | Description | Implementation | Test | Status |
+|---|---|---|---|---|
+| M4.1 | The three screens each still build two panels, a divider and the same column order | `annual_vision_segments.py`, `ape_assignment.py`, `ape_period_view.py` | `::test_updm41_*` (12 tests) | done — the six for APE Month and Annual were green against the untouched screens before a line of either was removed (spec §5) |
+| M4.2 | Their existing test files pass unchanged | — | `tests/test_ape_period_consistency.py`, `tests/test_vps_ape_deletion_ui.py`, `tests/test_ape_week_actions.py` | **partial** — one test changed, case (b): `::test_apcm23_drag_path_reaches_the_same_reporting` drove `_finish_row_drag`, which the screen no longer has; it drives `_assign_dragged_row` now, as its APE Quarter sibling already did, and gained the same `refresh` assertion. "Unchanged" is false and is recorded as such. |
+| M4.3 | Assign-by-drag still assigns on all three | `RowDragSource` + each screen's `_assign_dragged_row` / `_create_from_row` | `::test_updm43_a_drop_assigns_on_each_tab`, `::test_updm43_a_drop_outside_the_target_assigns_nothing_on_each_tab` | done |
+| M4.4 | Each panel's columns are resizable and persist | `ChipTable` over `ColumnResizer`, six prefixes in `AppSettings` | `::test_updm44_ape_quarter_columns_resize_and_persist`, `::test_updm44_ape_month_columns_resize_and_persist`, `::test_updm44_annual_columns_resize_and_persist`, `::test_updm44_every_panel_prefix_has_a_settings_field`, `::test_updm44_the_panels_a_screen_builds_use_those_prefixes` | done — none of the three tabs had resizable columns before this step |
+
+AWA-S5 is fixed in `ColumnResizer.chars` / `.cell_text`, which now take the
+`width_delta` that `register_row` already took, so a chip's character budget is
+measured from the pill and not from the column it sits inside. Four of AWA-S6's
+five are enforced (`clear_header()`, the container's column weight, and two
+`add_row` guards); the fifth — the table owning its container outright — is
+stated in the class docstring instead, because destroying only the table's own
+widgets would leave a stale label behind for a screen that added one.
+
+Gate: 13 mutations, each the verbatim original, each run alone, all 13 red on
+the first pass.
+
+## UPD-M5 … UPD-M7
+
+`not done` — not started.
 
 ## Not verified on screen
 
 UPD-M7.2 and UPD-M7.3 are on-screen criteria and are `not done`. Nothing in
-UPD-M1 or UPD-M3 has been seen running; every test above builds its screen on
-a withdrawn root.
+UPD-M1, UPD-M2, UPD-M3 or UPD-M4 has been seen running; every test above builds
+its screen on a withdrawn root. UPD-M4 changed the renderer, the splitter and
+the drag of three tabs in one step and none has been looked at.

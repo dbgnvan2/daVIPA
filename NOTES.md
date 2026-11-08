@@ -1,5 +1,36 @@
 ## Recent Changes (2026-11-07)
 
+### One panel design across the VSP tabs - UPD-M4, the three tabs adopt
+
+- ✅ **APE Quarter Assignment, APE Month Assignment and Annual Vision Segments
+  all draw their two panels with the shared chip table, the shared splitter and
+  the shared row drag.** Six panels, one renderer. `annual_vision_segments.py`
+  is 106 lines shorter, `ape_period_view.py` 82 and `ape_assignment.py` 51;
+  nine splitter-and-drag methods and a private `_clip_label` went from each of
+  the two screens that still had them.
+- ✅ **Every column on all six panels can now be dragged wider or narrower, and
+  each panel remembers its own widths.** None of the three tabs had resizable
+  columns before. Eight new `AppSettings` fields hold them - six width maps and
+  two divider ratios - because an undeclared field is dropped silently at the
+  next launch, and `::test_updm44_every_panel_prefix_has_a_settings_field`
+  holds that every panel a screen builds has one.
+- ⚠️ **Two defects in the chip table's own config, both found by the first
+  screen that adopted it.** `ChipColumn.min_width` defaulted to 40 while the
+  checkbox and `#` columns declared 34, so both rendered at 40 and nothing said
+  so; and the single `APE_COLUMNS` set held both a checkbox and an Actions
+  column, which no panel does, putting every column of every panel one place to
+  the right. The characterisation test written before the screen was touched
+  caught the first on its first run - which is why that test was written first.
+- ⚠️ **"Their existing test files pass unchanged" is false and recorded as
+  such.** `test_apcm23_drag_path_reaches_the_same_reporting` drove a method the
+  screen no longer has; it drives `_assign_dragged_row` now, the same change
+  its APE Quarter sibling took at UPD-M2.
+- ⚠️ **UPD-M1.5 and UPD-M2.5 are still `partial`.** Earlier notes said UPD-M4
+  would close them. It does not: the fourth copy of the splitter and the drag
+  is in `weekly_items.py`, which is rewritten at UPD-M5.
+- ⚠️ **Not seen running.** Three tabs changed renderer, splitter and drag in
+  one step and every test builds its screen on a withdrawn root.
+
 ### One panel design across the VSP tabs - UPD-M2, the row drag
 
 - ✅ **Dragging a row from the left panel to the right has one owner:
@@ -7,7 +38,8 @@
   `_start_row_drag` and `_is_descendant` were byte-identical in the same four
   screens; `_finish_row_drag` differed only in the body of its final `if`,
   which is what a dropped row *means* and stays on the screen. APE Quarter
-  Assignment has adopted it; the other three adopt at UPD-M4.
+  Assignment has adopted it; two more adopted at UPD-M4 and
+  `weekly_items.py` follows at UPD-M5.
 - ⚠️ **The spec said the drag bound "press/motion/release on the row". It
   binds the press on the row and the release on the toplevel, and there is no
   motion handler anywhere** - nothing is drawn while a row is dragged, on any
@@ -30,7 +62,8 @@
   out in `annual_vision_segments.py`, `ape_assignment.py`,
   `ape_period_view.py` and `weekly_items.py` - `diff` of all four is
   byte-identical, measured before anything was removed. APE Quarter
-  Assignment has adopted it; the other three adopt at UPD-M4, and
+  Assignment has adopted it; two more adopted at UPD-M4, `weekly_items.py`
+  follows at UPD-M5, and
   `test_updm15_no_screen_keeps_its_own_splitter` names them so the list cannot
   go stale.
 - ✅ **A divider stays where you left it.** It never did: every tab opened at

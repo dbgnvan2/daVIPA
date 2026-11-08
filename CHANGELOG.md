@@ -9,6 +9,18 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed — one panel design across the VSP tabs (2026-11-07)
 
+- **Every column on APE Quarter Assignment, APE Month Assignment and Annual
+  Vision Segments can be dragged wider or narrower, and each panel remembers
+  its own widths.** Those three tabs had fixed columns and a 15-character clip,
+  so a long segment name was cut off with no way to see it. Each of the six
+  panels keeps its widths separately, the way the Today and Scheduler screens
+  already did.
+- **The divider on APE Month Assignment and Annual Vision Segments now stays
+  where you left it too**, as APE Quarter Assignment's already did.
+- **A chip no longer loses its last character.** The text was measured against
+  the column rather than against the coloured pill inside it, so the pill was
+  12px narrower than the text budget it was given, on every chip of every row.
+
 - **A two-panel tab's vertical divider stays where you left it.** It never did:
   every tab reopened with the divider in the middle, whatever you had dragged
   it to. The position is now remembered per tab, the way column widths already
@@ -22,6 +34,11 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Internal
 
+- The three VSP tabs with two panels now draw their rows with the shared chip
+  table, the shared splitter and the shared row drag rather than their own
+  copies: six panels, one renderer, and about 240 lines of duplicated screen
+  code removed. The fourth copy is in APE Week Assignment, which is rewritten
+  in the next step rather than converted.
 - Dragging a row from a two-panel tab's left list onto its right list was
   written out identically in four screen files and is now one module,
   `screens/row_drag.py`. What a dropped row means stays with the screen that
