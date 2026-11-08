@@ -538,8 +538,10 @@ def drawn_day_slots(
     With no blocks outside the range this returns exactly ``day_grid(bounds)``,
     so the ordinary day is unchanged and the configured range is the floor:
     the day never draws *narrower* than what the user set, however empty it is.
-    The date is the ceiling: the widening stops at the boxes that lie on the
-    date, so what is drawn is always what ``can_place`` will accept.
+    The date is the ceiling, and it is applied to each block rather than to
+    the result: a block the date cannot hold widens the day by nothing at all.
+    So every drawn box is one ``can_place`` will accept, and no box is drawn
+    past the configured range unless a block is actually drawn in it.
     """
     configured = day_grid(bounds)
     first = 0
@@ -551,25 +553,23 @@ def drawn_day_slots(
         start = _slot_index_of(block)
         if start is None:
             continue
+        span = slot_span_of(block)
+        # A block the date cannot hold widens nothing. It is not drawable, so
+        # ``build_day_grid`` routes it to ``outside`` either way -- and
+        # widening for it would add empty boxes past the configured range that
+        # hold nothing, for a block that is not drawn in them. This is also
+        # what keeps every drawn box one ``can_place`` accepts: a stored index
+        # counts from Day Start, so *reducing* Day Start in Settings
+        # reinterprets it, and a box placed before the old start can land
+        # before midnight. Drawn anyway, ``format_hhmm`` floors it to "00:00"
+        # and the block shows the wrong time in a box that refuses every move,
+        # with deleting it the only way out.
+        if not slot_is_on_the_date(bounds, start, span):
+            continue
         first = min(first, start)
-        last = max(last, start + slot_span_of(block) - 1)
+        last = max(last, start + span - 1)
 
     day_start = bounds.day_start_minutes
-    # Every drawn box has to be one ``can_place`` would accept, or the grid
-    # offers the user a box they cannot then use. A stored index is counted
-    # from Day Start, so *reducing* Day Start in Settings reinterprets it: a
-    # block dropped at 07:30 under an 08:00 start is index -1, and a later
-    # start of 00:00 turns that same -1 into 30 minutes before midnight --
-    # no longer a time of day, and no longer on the date. Unclamped, the box
-    # is still drawn, ``format_hhmm`` floors it to "00:00", and the block sits
-    # there showing the wrong time and refusing every move, because
-    # ``slot_is_on_the_date`` rejects the very box it was drawn in. Clamped,
-    # the block misses the grid and ``build_day_grid`` routes it to
-    # ``outside`` (P2) -- on screen, with its stored time, and draggable back
-    # onto the day. The same bound caps the grid's extent, so one unreadable
-    # stored index cannot ask the screen for thousands of rows.
-    first = max(first, -(day_start // SLOT_MINUTES))
-    last = min(last, (MINUTES_PER_DAY - SLOT_MINUTES - day_start) // SLOT_MINUTES)
     slots: List[Slot] = []
     for index in range(first, last + 1):
         at = day_start + index * SLOT_MINUTES
