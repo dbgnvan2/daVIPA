@@ -143,9 +143,17 @@ PD_AUTOSCROLL_MARGIN_PX = 24
 #: the user held still at the edge, which is exactly where they hold still.
 PD_AUTOSCROLL_INTERVAL_MS = 60
 
-#: PD-M12 — canvas scroll units per tick. One unit per 60ms is roughly a box
-#: every two ticks, which is slow enough to stop on the box you meant.
-PD_AUTOSCROLL_UNITS = 1
+#: PD-M12 — pixels per tick. 16px per 60ms is half a box at the default chip
+#: height, which is slow enough to stop on the box you meant.
+#:
+#: Pixels, and not canvas "units": ``CTkScrollableFrame`` configures
+#: ``yscrollincrement`` itself, differently on each platform -- 8 on macOS, 1
+#: on Windows, and unset on Linux, where Tk then treats one unit as a tenth of
+#: the pane. ``yview_scroll(1, "units")`` is therefore not a distance at all,
+#: and the same line of code moved the day at three speeds an order of
+#: magnitude apart. A multiple of 8, so the macOS increment cannot round the
+#: step away.
+PD_AUTOSCROLL_STEP_PX = 16
 
 # What each refusal reason is called on screen. Keyed by SlotRefusal, so a
 # rule added to the grid arithmetic has exactly one place to be worded here,
@@ -779,7 +787,8 @@ class PlanScreen(ctk.CTkFrame):
         Purpose: PD-M10 -- both panes are rebuilt by taking the scroll frame
                  out of the grid, destroying its children and putting it back.
                  Tk draws from an idle handler, and every one of these rebuilds
-                 runs inside an event callback or an ``after_idle`` of one, so
+                 runs inside an event callback or a timer dispatched from one,
+                 so
                  the re-gridded frame could stay undrawn until some later event
                  arrived. In the app that event was the next mouse movement
                  over the window: moving a block, resizing one or deleting one
@@ -792,8 +801,8 @@ class PlanScreen(ctk.CTkFrame):
         redisplay, which is all that is owed here. ``update`` also services the
         event queue, and these rebuilds run from drag handlers -- dispatching a
         queued click in the middle of one would re-enter a rebuild that is
-        destroying the widget the click is for, which is the hang the
-        ``after_idle`` in ``on_drag_release`` exists to avoid.
+        destroying the widget the click is for, which is the hang
+        ``_after_release`` exists to avoid.
 
         **Not sufficient for the blank pane reported on 2026-11-07** ("moving
         a Day Block leaves a blank panel until the mouse moves outside the
@@ -1414,9 +1423,18 @@ class PlanScreen(ctk.CTkFrame):
                 f"\n\nThe {kept} break and buffer blocks stay where they are."
             )
         question += "\n\nThis cannot be undone."
-        if not messagebox.askyesno(
-            "Clear Day", question, icon="warning", parent=self
-        ):
+        answer = self._ask_yes_no("Clear Day", question)
+        if answer is None:
+            # PD-M11 -- the same arm the non-work-day question carries, for the
+            # same reason: this one gates a transactional delete, so a raise
+            # here removes nothing and, without this, says nothing either.
+            self.set_status(
+                "Clear Day: the question could not be completed — nothing was "
+                "removed",
+                "error",
+            )
+            return
+        if not answer:
             self.set_status("Clear Day: nothing removed", "muted")
             return
 
@@ -1543,9 +1561,15 @@ class PlanScreen(ctk.CTkFrame):
             # as nothing rather than as a "no" (P1): the user has not declined
             # anything, and writing their silence down as a refusal is how a
             # transient failure becomes a permanent negative.
+            # The wording claims no cause. The ``TclError`` was measured out
+            # of the single Tcl call that both shows the dialog and returns
+            # the answer, so "it was never shown" and "it was answered and
+            # the answer was lost" are equally consistent with it, and the
+            # second one means the user did say yes.
             self.set_status(
                 f"{self.selected_date} is not a regular work day, and the "
-                "question could not be shown — nothing was scheduled",
+                "question could not be completed — nothing was scheduled. "
+                "Try the drop again, or allow the day in Day Settings",
                 "error",
             )
             return False
@@ -1571,24 +1595,42 @@ class PlanScreen(ctk.CTkFrame):
                  user never sees, and the drop wrote nothing and said nothing.
         Spec:    docs/changes/2026-11-07-plan-day-faults.md
         Tests:   tests/test_plan_screen.py::test_pdm11_a_dialog_that_raises_writes_nothing_says_so_and_asks_again
+        """
+        return self._ask_yes_no(
+            "Not a work day",
+            f"{self.selected_date} is not a regular work day.\n\n"
+            f"Day Settings allows {week}.\n\n"
+            "Schedule anyway?",
+        )
+
+    def _ask_yes_no(self, title: str, question: str) -> Optional[bool]:
+        """Ask a yes/no question. ``None`` if it could not be answered at all.
+
+        Purpose: PD-M11 -- the measured fault is a modal confirmation raising
+                 ``_tkinter.TclError`` instead of returning an answer, leaving
+                 the gesture with nothing written and nothing said. That is a
+                 property of putting a modal question on this screen, not of
+                 one question (P5), so every confirmation on it asks through
+                 here rather than calling ``askyesno`` directly.
+        Spec:    docs/changes/2026-11-07-plan-day-faults.md
+        Tests:   tests/test_plan_screen.py::test_pdm11_a_dialog_that_raises_writes_nothing_says_so_and_asks_again
+                 tests/test_plan_screen.py::test_pdm1110_a_clear_day_question_that_raises_removes_nothing
+
+        ``answer is True`` and not ``bool(answer)``: for a confirmation, the
+        unsafe direction is the truthy one, and anything that is not the
+        answer yes must not read as permission to write.
 
         ``TclError`` only, and not ``Exception``: a failure inside the dialog
         machinery is the one this arm is for, and swallowing anything wider
         would hide a bug in the caller's own arguments.
         """
         try:
-            return bool(
-                messagebox.askyesno(
-                    "Not a work day",
-                    f"{self.selected_date} is not a regular work day.\n\n"
-                    f"Day Settings allows {week}.\n\n"
-                    "Schedule anyway?",
-                    icon="warning",
-                    parent=self,
-                )
+            answer = messagebox.askyesno(
+                title, question, icon="warning", parent=self
             )
         except tk.TclError:
             return None
+        return answer is True
 
     # ================= the block context menu ===============================
 
@@ -1963,14 +2005,54 @@ class PlanScreen(ctk.CTkFrame):
         direction = self.day_autoscroll_direction()
         if not direction:
             return False
+        target = self.day_autoscroll_fraction(direction)
+        if target is None:
+            return False
         try:
-            self.blocks_scroll._parent_canvas.yview_scroll(
-                direction * PD_AUTOSCROLL_UNITS, "units"
-            )
+            self.blocks_scroll._parent_canvas.yview_moveto(target)
         except tk.TclError:
             return False
         self.update_hover_target()
         return True
+
+    def day_autoscroll_fraction(self, direction: int) -> Optional[float]:
+        """Where the day's scroll should land after one tick in ``direction``.
+
+        Purpose: PD-M12 -- express one step as a distance. The first version
+                 of this used ``yview_scroll(n, "units")``, which is not a
+                 distance: ``CTkScrollableFrame`` sets ``yscrollincrement`` per
+                 platform, so one unit was 8px on macOS, 1px on Windows and a
+                 tenth of the pane on Linux. A fraction of the scrollregion is
+                 the one quantity that means the same thing everywhere, and it
+                 is what ``yview()`` reports back.
+        Spec:    docs/changes/2026-11-07-plan-day-faults.md
+        Tests:   tests/test_plan_screen.py::test_pdm129_a_tick_moves_the_day_by_the_step_in_pixels
+                 tests/test_plan_screen.py::test_pdm129_a_step_cannot_scroll_past_the_end
+                 tests/test_plan_screen.py::test_pdm129_a_day_with_no_scrollregion_asks_for_nothing
+
+        ``None`` -- not zero -- when there is nothing to scroll: no
+        scrollregion yet, or a day that fits its pane. Zero is a real
+        destination and would be handed to ``yview_moveto``; this is "do not
+        call it at all".
+        """
+        canvas = getattr(self.blocks_scroll, "_parent_canvas", None)
+        if canvas is None:
+            return None
+        try:
+            first, last = canvas.yview()
+            region = canvas.bbox("all")
+        except tk.TclError:
+            return None
+        if not region:
+            return None
+        total = region[3] - region[1]
+        if total <= 0:
+            return None
+        # The visible slice is what cannot be scrolled past: a day twice its
+        # pane's height shows half of itself, so 0.5 is already the bottom.
+        visible = max(0.0, min(1.0, last - first))
+        step = direction * PD_AUTOSCROLL_STEP_PX / total
+        return max(0.0, min(1.0 - visible, first + step))
 
     def _start_autoscroll(self):
         """Arm the next autoscroll tick, if one is not already armed.
