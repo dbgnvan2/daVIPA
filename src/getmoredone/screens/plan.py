@@ -132,13 +132,16 @@ NOTE_MIN_WRAP_PX = 120
 MAX_ITEM_ROWS = 60
 
 #: PD-M12 — how close (px) a drag gets to the Day Plan's top or bottom edge
-#: before the day starts scrolling under it. An empty box is 34px --
-#: ``max(SLOT_MIN_HEIGHT_PX, chips * chip_height + 4)`` -- and is gridded
-#: ``pady=1``, so the pitch is 36px and this is about two-thirds of one: wide
-#: enough that the user does not have to find the pane's border. Most of the
-#: last visible box is therefore inside the band, which is the trade -- a
-#: pointer aimed at that box scrolls instead, and the box it wanted comes back
-#: under the pointer as the day moves.
+#: before the day starts scrolling under it. An empty box is 32px --
+#: ``slot_row_height`` is ``max(SLOT_MIN_HEIGHT_PX, chips * chip_height + 4)``
+#: and ``chips`` is 0 for an empty box, so the floor wins -- and it is gridded
+#: ``pady=1``, making the pitch 34px. So this is exactly three-quarters of a
+#: box: wide enough that the user does not have to find the pane's border.
+#: Three-quarters of the last visible box is therefore inside the band, which
+#: is the trade -- a pointer aimed at that box scrolls instead, and the box it
+#: wanted comes back under the pointer as the day moves. A box holding a task
+#: is taller (34px at the default chip height, a 36px pitch), so the fraction
+#: is smaller on a full day.
 PD_AUTOSCROLL_MARGIN_PX = 24
 
 #: PD-M12 — how often (ms) the day keeps scrolling while the pointer is held
@@ -1752,12 +1755,29 @@ class PlanScreen(ctk.CTkFrame):
         Its own arm rather than ``_ask_yes_no``: this one is not a yes/no
         question and has no answer to pass through.
         """
+        dialog = None
         try:
             dialog = ctk.CTkInputDialog(
                 text="Block length in minutes:", title="Block Length"
             )
             raw = dialog.get_input()
         except tk.TclError:
+            # Torn down before anything is said, and this is why the arm is
+            # not the shape ``_ask_yes_no``'s is. ``askyesno`` goes through
+            # ``tkinter.commondialog``, a native dialog Tk disposes of itself.
+            # ``CTkInputDialog`` is a Toplevel that takes ``grab_set`` and
+            # ``-topmost`` in its own ``__init__`` and is destroyed only by its
+            # Ok, Cancel and close handlers -- so returning from a raise would
+            # leave an application-modal window on screen holding the grab,
+            # and the status line below would be written to a screen the user
+            # can no longer click. That is worse than the silent failure this
+            # arm was added to cure.
+            if dialog is not None:
+                for step in (dialog.grab_release, dialog.destroy):
+                    try:
+                        step()
+                    except tk.TclError:
+                        pass
             logger.exception("the block length dialog could not be completed")
             self.set_status(
                 "The block length question could not be completed — the "
@@ -2423,11 +2443,18 @@ class PlanScreen(ctk.CTkFrame):
         misuse of the one emphasis colour.
         """
         if self._drag_hover_frame is not None:
+            # The colour is passed only when there is one to pass.
+            # ``CTkFrame.configure`` pops ``border_color`` and runs it through
+            # ``_check_color_type``, which raises ``ValueError`` -- not
+            # ``TclError`` -- on None, and it pops it *before* applying
+            # ``border_width``. So sending ``border_color=None`` would lose the
+            # width restore as well, which is the half of this method that was
+            # already right.
+            restore = {"border_width": self._drag_hover_border}
+            if self._drag_hover_color is not None:
+                restore["border_color"] = self._drag_hover_color
             try:
-                self._drag_hover_frame.configure(
-                    border_width=self._drag_hover_border,
-                    border_color=self._drag_hover_color,
-                )
+                self._drag_hover_frame.configure(**restore)
             except tk.TclError:
                 pass
             self._drag_hover_frame = None
