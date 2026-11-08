@@ -24,6 +24,7 @@ from __future__ import annotations
 import logging
 import re
 import tkinter as tk
+import _tkinter
 
 import customtkinter as ctk
 import pytest
@@ -36,6 +37,9 @@ from src.getmoredone.screens.plan import (
     ITEMS_TEXT_INSET_PX,
     NOTE_MIN_WRAP_PX,
     OUTSIDE_GROUP_HEIGHT_PX,
+    PD_AUTOSCROLL_INTERVAL_MS,
+    PD_AUTOSCROLL_MARGIN_PX,
+    PD_AUTOSCROLL_UNITS,
     PLAN_DIVIDER_WIDTH_PX,
     PLAN_ITEMS_COL_WIDTH_PX,
     PLAN_PANE_CHROME_PX,
@@ -5089,6 +5093,25 @@ def _virtual(screen, edge):
     return [frame for frame, which in screen._virtual_frames if which == edge][0]
 
 
+def _run_due_timers(widget, limit=50):
+    """Run the zero-delay timer a drop defers itself to, and nothing else.
+
+    ``TIMER_EVENTS`` and not every class of event, for two reasons. ``update()``
+    -- which is all classes until the queue is empty -- does not always
+    terminate in this suite: measured on 2026-11-07, the thirteenth
+    ``PlanScreen`` built in one process did not come back from an ``update()``
+    inside ``load_items``. And a bounded pass over *all* events does not get to
+    the timer at all: the panes' own ``<Configure>`` traffic alone is more than
+    200 events after a rebuild, so the drop was still waiting when the budget
+    ran out. Timers only, bounded, so the worst case here is a failed
+    assertion rather than a hung run or a dispatched stray click.
+    """
+    widget.update_idletasks()
+    for _ in range(limit):
+        if not widget.tk.dooneevent(_tkinter.TIMER_EVENTS | _tkinter.DONT_WAIT):
+            return
+
+
 def test_pdm51_a_virtual_box_sits_at_each_end(screen, manager):
     """PD-M5.1 — one above the first box and one below the last, every redraw."""
     assert [edge for _, edge in screen._virtual_frames] == [
@@ -5369,7 +5392,9 @@ def test_pdm5_an_item_drag_onto_a_virtual_box_extends_the_day(
 
     screen.start_item_drag(None, item)
     screen.on_drag_release(None)
-    screen.update_idletasks()
+    # Since PD-M11 the drop is deferred to a zero-delay timer rather than to
+    # the idle queue, so draining idle tasks alone no longer runs it.
+    _run_due_timers(screen)
 
     assert asked == [("Late finish", DAY_EXTEND_LATER)], asked
 
@@ -5425,7 +5450,9 @@ def test_pdm5_a_real_box_wins_over_a_virtual_one(screen, manager, monkeypatch):
 
     screen.start_item_drag(None, item)
     screen.on_drag_release(None)
-    screen.update_idletasks()
+    # See the note in the Later-box test: PD-M11 moved the drop off the idle
+    # queue and onto a timer.
+    _run_due_timers(screen)
 
     assert blocked == [("Draft the proposal", 0)], blocked
 
@@ -5609,3 +5636,342 @@ def test_pdm106_a_flush_on_a_screen_that_is_gone_does_not_raise(
     # What has to be true is that the raising path was actually entered and
     # swallowed: ``update_idletasks`` was called, and it threw.
     assert calls == [1], f"update_idletasks was called {len(calls)} times, not once"
+
+
+# ---------------------------------------------------------------------------
+# PD-M11 — a dialog that cannot be shown is not an answer
+# ---------------------------------------------------------------------------
+
+
+def test_pdm11_a_dialog_that_raises_writes_nothing_says_so_and_asks_again(
+    root, manager, settings, monkeypatch
+):
+    """PD-M11 — "Schedule anyway on a non-work day does nothing".
+
+    Measured against the running app on 2026-11-07: a Saturday drop raised the
+    dialog, and ``askyesno`` raised ``_tkinter.TclError`` with an empty message
+    instead of returning the answer. The traceback went to stderr, which the
+    user never sees; the drop wrote nothing and said nothing, so the gesture
+    read as broken. Answered Yes, the day's ``time_blocks`` table was still
+    empty -- which settles the half of the report that was open: it does not
+    schedule, rather than scheduling something that fails to appear.
+
+    Three claims in one test because each kills a different mutation of the
+    same two lines. Nothing is written, so the arm is not a silent yes. The
+    status says the question could not be shown, so it is not reported as the
+    user's refusal. And the failure is not cached either way, so the next drop
+    asks again and can still be agreed to -- a transient failure is not a
+    permanent negative (P1).
+    """
+    answers = []
+
+    def raise_then_agree(*args, **kwargs):
+        answers.append(1)
+        if len(answers) == 1:
+            raise tk.TclError("")
+        return True
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", raise_then_agree)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    first = _item(manager, "first", SATURDAY)
+    second = _item(manager, "second", SATURDAY)
+
+    panel.block_item(first)
+
+    assert answers == [1], f"the dialog was attempted {len(answers)} times, not once"
+    assert manager.get_time_blocks(SATURDAY) == [], (
+        "a question that could not be asked scheduled the item anyway"
+    )
+    status = panel.status_label.cget("text")
+    assert "could not be shown" in status, status
+    assert "nothing was scheduled" in status, status
+    assert SATURDAY not in panel._work_anyway, (
+        "a question that failed was cached as permission"
+    )
+
+    panel.block_item(second)
+
+    assert len(answers) == 2, "the second drop did not ask again after a failure"
+    assert SATURDAY in panel._work_anyway, "the Yes was not remembered"
+    assert [b.label for b in manager.get_time_blocks(SATURDAY)] == ["second"], (
+        manager.get_time_blocks(SATURDAY)
+    )
+
+
+def test_pdm11_a_drop_is_deferred_to_a_timer_not_the_idle_queue(
+    screen, manager, monkeypatch
+):
+    """PD-M11 — the drop's work runs from the event loop, not from idle.
+
+    The drop is a database write, a full pane rebuild and, outside the working
+    week, a modal question. ``after_idle`` means "before the next redraw",
+    which is the wrong queue for work that causes a redraw and can block on the
+    user answering -- and it is the context the raising ``askyesno`` was
+    measured in. A zero-delay timer meets the only requirement the idle call
+    was there for: let the ButtonRelease handler return before anything
+    destroys the row it is dispatching to.
+    """
+    item = _item(manager, "weekend work")
+    screen.refresh()
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    _pointer_on(screen, monkeypatch, frames[0])
+
+    idle, timers = [], []
+    monkeypatch.setattr(screen, "after_idle", lambda fn, *a: idle.append(fn))
+    monkeypatch.setattr(
+        screen, "after", lambda ms, fn=None, *a: timers.append((ms, fn))
+    )
+    blocked = []
+    monkeypatch.setattr(
+        screen, "block_item", lambda i, t: blocked.append((i.title, t))
+    )
+
+    screen.start_item_drag(None, item)
+    screen.on_drag_release(None)
+
+    assert idle == [], "the drop was queued as an idle task"
+    assert [ms for ms, _ in timers] == [0], timers
+    assert blocked == [], "the drop ran inside the release handler"
+
+    timers[0][1]()
+
+    assert blocked == [("weekend work", 0)], blocked
+
+
+# ---------------------------------------------------------------------------
+# PD-M12 — the day scrolls while a drag sits at its edge
+# ---------------------------------------------------------------------------
+
+
+def _fake_day_viewport(
+    screen, monkeypatch, *, top=100, height=300, left=400, width=200,
+    yview=(0.3, 0.6),
+):
+    """Give the day pane a viewport, without needing a mapped window.
+
+    ``winfo_*`` on a withdrawn window answers 1, so the real numbers are only
+    available to the 22 tests that take ``mapped_windows`` -- and those are the
+    ones skipped in the local workflow CLAUDE.md documents. The geometry is
+    faked instead, the same way ``_pointer_on`` fakes the pointer, so the
+    margin arithmetic is asserted against numbers the test chose.
+    """
+    canvas = screen.blocks_scroll._parent_canvas
+    monkeypatch.setattr(canvas, "winfo_ismapped", lambda: 1)
+    monkeypatch.setattr(canvas, "winfo_rootx", lambda: left)
+    monkeypatch.setattr(canvas, "winfo_rooty", lambda: top)
+    monkeypatch.setattr(canvas, "winfo_width", lambda: width)
+    monkeypatch.setattr(canvas, "winfo_height", lambda: height)
+    monkeypatch.setattr(canvas, "yview", lambda *a: yview)
+    return canvas
+
+
+def _fake_pointer(screen, monkeypatch, x, y):
+    monkeypatch.setattr(screen, "winfo_pointerx", lambda: x)
+    monkeypatch.setattr(screen, "winfo_pointery", lambda: y)
+
+
+def test_pdm121_a_drag_at_an_edge_asks_to_scroll_that_way(screen, monkeypatch):
+    """PD-M12.1 — within the margin of the top or bottom edge, the day moves.
+
+    The reported fault: "the Day Plan does not scroll while an item is dragged
+    past its edge", so a day taller than its pane could only be dropped into
+    the part of it that happened to be showing.
+    """
+    _fake_day_viewport(screen, monkeypatch)
+
+    _fake_pointer(screen, monkeypatch, 500, 100 + PD_AUTOSCROLL_MARGIN_PX - 1)
+    assert screen.day_autoscroll_direction() == -1
+
+    _fake_pointer(screen, monkeypatch, 500, 400 - PD_AUTOSCROLL_MARGIN_PX)
+    assert screen.day_autoscroll_direction() == 1
+
+
+def test_pdm121_a_drag_past_the_edge_still_asks_to_scroll(screen, monkeypatch):
+    """PD-M12.1 — past the edge counts as at it, which is the reported gesture.
+
+    A band that stopped at the border would ask the user to hold the pointer
+    inside a 24px strip, and the thing they actually do is drag beyond the
+    pane.
+    """
+    _fake_day_viewport(screen, monkeypatch)
+
+    _fake_pointer(screen, monkeypatch, 500, 100 - 200)
+    assert screen.day_autoscroll_direction() == -1
+
+    _fake_pointer(screen, monkeypatch, 500, 400 + 200)
+    assert screen.day_autoscroll_direction() == 1
+
+
+def test_pdm122_a_drag_clear_of_the_edges_asks_for_no_scroll(screen, monkeypatch):
+    """PD-M12.2 — the middle of the pane is where a drop is aimed, not a scroll.
+
+    Both boundaries, because the off-by-one that makes the band one pixel too
+    wide is the one that steals the last visible box's drop.
+    """
+    _fake_day_viewport(screen, monkeypatch)
+
+    _fake_pointer(screen, monkeypatch, 500, 250)
+    assert screen.day_autoscroll_direction() == 0
+
+    _fake_pointer(screen, monkeypatch, 500, 100 + PD_AUTOSCROLL_MARGIN_PX)
+    assert screen.day_autoscroll_direction() == 0
+
+    _fake_pointer(screen, monkeypatch, 500, 400 - PD_AUTOSCROLL_MARGIN_PX - 1)
+    assert screen.day_autoscroll_direction() == 0
+
+
+def test_pdm122_a_drag_beside_the_day_pane_asks_for_no_scroll(screen, monkeypatch):
+    """PD-M12.2 — the unscheduled list is at the same heights as the day pane.
+
+    Without the x range, dragging an item up its own list would scroll the day
+    under it.
+    """
+    _fake_day_viewport(screen, monkeypatch)
+
+    _fake_pointer(screen, monkeypatch, 399, 399)
+    assert screen.day_autoscroll_direction() == 0
+
+    _fake_pointer(screen, monkeypatch, 600, 399)
+    assert screen.day_autoscroll_direction() == 0
+
+
+def test_pdm123_an_end_already_reached_asks_for_no_scroll(screen, monkeypatch):
+    """PD-M12.3 — holding at the bottom of a fully scrolled day asks for nothing.
+
+    Otherwise the pane is re-scrolled and the hover re-read sixteen times a
+    second for no movement, for as long as the button is held.
+    """
+    canvas = _fake_day_viewport(screen, monkeypatch, yview=(0.0, 0.4))
+    _fake_pointer(screen, monkeypatch, 500, 100)
+    assert screen.day_autoscroll_direction() == 0
+
+    monkeypatch.setattr(canvas, "yview", lambda *a: (0.6, 1.0))
+    _fake_pointer(screen, monkeypatch, 500, 399)
+    assert screen.day_autoscroll_direction() == 0
+
+
+def test_pdm124_scrolling_the_day_moves_the_canvas_and_rereads_the_hover(
+    screen, monkeypatch
+):
+    """PD-M12.4 — one step of the canvas, and the hover follows the boxes.
+
+    The boxes move under a pointer that has not, so whichever box was lit is
+    no longer the one being dropped on.
+    """
+    canvas = _fake_day_viewport(screen, monkeypatch)
+    scrolled, hovered = [], []
+    monkeypatch.setattr(
+        canvas, "yview_scroll", lambda n, what: scrolled.append((n, what))
+    )
+    monkeypatch.setattr(screen, "update_hover_target", lambda: hovered.append(1))
+    _fake_pointer(screen, monkeypatch, 500, 399)
+
+    assert screen.autoscroll_day() is True
+
+    assert scrolled == [(PD_AUTOSCROLL_UNITS, "units")], scrolled
+    assert hovered == [1], hovered
+
+
+def test_pdm124_a_drag_clear_of_the_edges_scrolls_nothing(screen, monkeypatch):
+    """PD-M12.4 — and the middle of the pane touches neither the canvas nor the hover."""
+    canvas = _fake_day_viewport(screen, monkeypatch)
+    scrolled, hovered = [], []
+    monkeypatch.setattr(
+        canvas, "yview_scroll", lambda n, what: scrolled.append((n, what))
+    )
+    monkeypatch.setattr(screen, "update_hover_target", lambda: hovered.append(1))
+    _fake_pointer(screen, monkeypatch, 500, 250)
+
+    assert screen.autoscroll_day() is False
+
+    assert scrolled == [], scrolled
+    assert hovered == [], hovered
+
+
+def test_pdm125_a_held_drag_keeps_scrolling(screen, monkeypatch):
+    """PD-M12.5 — each tick re-arms the next, so holding still keeps scrolling.
+
+    Scrolling only on motion would stop the moment the user held the pointer
+    at the border, which is exactly where a drag that wants more of the day to
+    appear comes to rest.
+    """
+    screen._drag_kind = "item"
+    moves = []
+    monkeypatch.setattr(screen, "autoscroll_day", lambda: moves.append(1))
+
+    screen._autoscroll_tick()
+
+    assert moves == [1], moves
+    assert screen._autoscroll_after is not None, "the tick did not re-arm"
+    screen._stop_autoscroll()
+
+
+def test_pdm126_motion_does_not_stack_autoscroll_timers(screen, monkeypatch):
+    """PD-M12.6 — one timer, however many motion events arrive.
+
+    ``_start_autoscroll`` is called on every ``<B1-Motion>``, and a drag across
+    the pane produces dozens; a timer per event would scroll the day at the
+    speed of the mouse.
+    """
+    armed = []
+    monkeypatch.setattr(
+        screen,
+        "after",
+        lambda ms, fn=None, *a: armed.append(ms) or f"timer-{len(armed)}",
+    )
+
+    screen._start_autoscroll()
+    screen._start_autoscroll()
+    screen._start_autoscroll()
+
+    assert armed == [PD_AUTOSCROLL_INTERVAL_MS], armed
+
+
+def test_pdm127_a_tick_after_the_drag_ended_does_nothing(screen, monkeypatch):
+    """PD-M12.7 — a tick already in flight when the button came up is harmless.
+
+    ``_drag_kind`` is read now rather than trusted from when the timer was
+    armed, so the release does not have to win a race with it.
+    """
+    screen._drag_kind = None
+    screen._autoscroll_after = "a-pending-tick"
+    moves = []
+    monkeypatch.setattr(screen, "autoscroll_day", lambda: moves.append(1))
+
+    screen._autoscroll_tick()
+
+    assert moves == [], "a tick scrolled the day after the drag ended"
+    assert screen._autoscroll_after is None, "the dead tick armed another"
+
+
+def test_pdm128_motion_arms_the_autoscroll_and_the_release_cancels_it(
+    screen, manager, monkeypatch
+):
+    """PD-M12.8 — the day stops scrolling when the button comes up.
+
+    Both halves in one test because neither is worth much alone: an arm with
+    no cancel scrolls forever, and a cancel with no arm never scrolls.
+    """
+    item = _item(manager, "Fix login bug")
+    screen.refresh()
+    screen.start_item_drag(None, item)
+
+    screen.on_drag_motion(None)
+
+    armed = screen._autoscroll_after
+    assert armed is not None, "the first motion armed no autoscroll"
+
+    cancelled = []
+    real_cancel = screen.after_cancel
+    monkeypatch.setattr(
+        screen,
+        "after_cancel",
+        lambda which: cancelled.append(which) or real_cancel(which),
+    )
+
+    screen._end_drag()
+
+    assert cancelled == [armed], cancelled
+    assert screen._autoscroll_after is None, screen._autoscroll_after
