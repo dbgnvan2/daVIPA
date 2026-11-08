@@ -146,6 +146,50 @@ without it.
 **Priority:** Low (documentation)
 **Effort:** Small
 
+### WTP-A5 — the guarded-call-site AST test checks a name, not a gate (low)
+
+From the re-gate. `test_wtpm67_every_completion_call_site_is_guarded` asserts
+that each completing function *mentions*
+`confirm_weekly_tactic_completion` or `_confirm_tactic_completion`. It would
+therefore stay green if the guard were moved *after* the completion, or if its
+return value were ignored — the two ways to have the call and none of the
+protection. The gate accepted it because
+`test_wtpm67_a_declined_prompt_completes_nothing_on_any_surface` drives each
+real screen method against a real `DatabaseManager`, answers No, and reads the
+row back, which does catch both; the AST pair is a second net, not the net.
+Worth strengthening to assert the call precedes the completion in the same
+block, which is an AST ordering check rather than a name lookup.
+
+**Priority:** Low (mitigated by a behavioural test that does gate)
+**Effort:** Medium
+
+### WTP-A6 — the call-site pin only walks `screens/*.py` (low)
+
+From the re-gate. `_completion_call_sites` globs
+`src/getmoredone/screens/*.py`, so a `complete_action_item` caller added
+outside that directory — a utility, a CLI, a future `widgets/` module — is
+invisible to the pin and inherits no guard. P31: a check whose scope is
+narrower than the thing it claims to cover. No such caller exists today, which
+is why it is low. The fix is to walk `src/getmoredone/` entirely and keep the
+expected dict keyed by path relative to that root.
+
+**Priority:** Low (no out-of-scope caller exists today)
+**Effort:** Small
+
+### WTP-A7 — `item_editor.py` imports the guard inside the function (low)
+
+From the re-gate, and already recorded in
+`docs/changes/2026-11-08-weekly-tactic-completion-surfaces.md`.
+`_confirm_tactic_completion` does `from .week_collision_notice import
+confirm_weekly_tactic_completion` in the function body, although the module
+already imports that same module at the top. The reason is not a cycle: the
+module-level import line sat inside another session's uncommitted hunk, and
+editing it would have put two changes in one hunk. Move it to the top once
+that session has landed.
+
+**Priority:** Low (style; no behavioural effect)
+**Effort:** Small
+
 ## Adjacent issues — priority level colours (PLC, 2026-11-08)
 
 Found while building PLC-M1 to PLC-M5. Flagged, not fixed (global rule 10):
