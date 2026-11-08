@@ -32,7 +32,6 @@ from src.getmoredone.app_settings import AppSettings
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem, BlockType, TimeBlock
 from src.getmoredone.color_contrast import contrast_ratio, pick_text_color
-from src.getmoredone.widgets import confirm_dialog
 from src.getmoredone.screens.plan import (
     ITEMS_TEXT_INSET_PX,
     NOTE_MIN_WRAP_PX,
@@ -538,26 +537,6 @@ def test_a_created_block_is_given_its_clock_times_immediately(screen, manager):
     assert (block.start_time, block.end_time) == ("08:00", "09:00")
 
 
-def test_tbm82_drop_on_non_block_day_is_refused(root, manager, settings):
-    """TB-M8.2 — an unchecked weekday creates no block, and says why.
-
-    2026-11-07 is a Saturday, which the default settings exclude. Refused with
-    the reason on screen: a drop that does nothing and says nothing is
-    indistinguishable from a drag that missed.
-    """
-    panel = PlanScreen(root, manager, _App(settings))
-    panel.selected_date = SATURDAY
-    panel.refresh()
-    item = _item(manager, "weekend work", SATURDAY)
-
-    panel.block_item(item)
-
-    assert manager.get_time_blocks(SATURDAY) == []
-    status = panel.status_label.cget("text")
-    assert "not a block day" in status
-    assert "Mon, Tue, Wed, Thu, Fri" in status
-
-
 def test_a_weekend_accepts_blocks_once_it_is_checked(root, manager, settings):
     settings.plan_block_weekdays = [True] * 7
     panel = PlanScreen(root, manager, _App(settings))
@@ -570,24 +549,24 @@ def test_a_weekend_accepts_blocks_once_it_is_checked(root, manager, settings):
     assert len(manager.get_time_blocks(SATURDAY)) == 1
 
 
-def test_pdm7_a_non_work_day_asks_before_scheduling(
-    root, manager, settings, monkeypatch
+def test_pdm131_a_drop_on_a_non_work_day_asks_nothing_and_writes(
+    root, manager, settings, messageboxes
 ):
-    """PD-M7 — a day outside the working week is a warning, not a wall.
+    """PD-M13.1 — a drop never asks, and it never does nothing.
 
-    The screen opens on today, so on a weekend every write path returned
-    before doing anything: AutoLoad before it read an item, a dropped item
-    before it wrote one. Four gestures doing nothing read as the screen being
-    broken. The weekday list describes a normal week; it does not get a veto
-    over a Saturday someone has decided to work.
+    Reported twice from the running screen, 2026-11-07. ``messagebox.askyesno``
+    raises ``_tkinter.TclError`` with no message when it is called from the
+    idle callback ``on_drag_release`` schedules, and the question is the first
+    statement of this write path, so the drop wrote nothing and said nothing.
+    The app's own toplevel in its place hung the application: its window could
+    not become visible from there and the grab was up with nothing able to
+    take it.
+
+    No modal survives that moment on this platform, so there is none. The
+    block is written -- the weekday list describes a normal week, it is not a
+    lock on the calendar -- and the status line carries the warning, which is
+    the one place on this screen that cannot fail to appear.
     """
-    asked = []
-
-    def say_yes(_parent, title, message, **kwargs):
-        asked.append((title, message))
-        return True
-
-    monkeypatch.setattr(confirm_dialog, "ask_yes_no", say_yes)
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = SATURDAY
     panel.refresh()
@@ -595,7 +574,69 @@ def test_pdm7_a_non_work_day_asks_before_scheduling(
 
     panel.block_item(item)
 
-    assert len(asked) == 1, f"the drop asked {len(asked)} times, not once: {asked}"
+    assert messageboxes == [], f"the drop asked something: {messageboxes}"
+    assert len(manager.get_time_blocks(SATURDAY)) == 1, (
+        "the drop wrote nothing on a day outside the working week"
+    )
+    status = panel.status_label.cget("text")
+    assert "Blocked 30m for weekend work" in status, status
+    assert "not a regular work day" in status, status
+    assert "Mon, Tue, Wed, Thu, Fri" in status, status
+
+
+def test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day(
+    root, manager, settings, messageboxes
+):
+    """PD-M13.1 — the second gesture the dialog took out.
+
+    Reported as "I can't move an item into the early or late extended
+    sections", and still broken after PD-M11 moved those two boxes out of the
+    scrolling grid: the hit test and the write were both working, the day was
+    a Saturday, and ``extend_day_for`` asks the same question in its first
+    statement.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    started_at = panel.bounds.day_start
+    item = _item(manager, "weekend work", SATURDAY)
+
+    panel.extend_day_for(item, DAY_EXTEND_EARLIER)
+
+    assert messageboxes == [], f"the drop asked something: {messageboxes}"
+    assert panel.bounds.day_start < started_at, (
+        f"the day still starts at {panel.bounds.day_start}"
+    )
+    assert len(manager.get_time_blocks(SATURDAY)) == 1, (
+        "the day was lengthened and nothing was put in the room it made"
+    )
+    status = panel.status_label.cget("text")
+    assert "The day now runs" in status, status
+    assert "not a regular work day" in status, status
+
+
+def test_pdm132_a_button_still_asks_on_a_non_work_day(
+    root, manager, settings, monkeypatch
+):
+    """PD-M13.2 — the buttons keep the question.
+
+    A modal raised from a button press is the ordinary case and the one the
+    platform is content with, and AutoLoad fills a whole day from the item
+    list, which is worth stopping for. Only the drop paths lost the question.
+    """
+    asked = []
+    monkeypatch.setattr(
+        "tkinter.messagebox.askyesno",
+        lambda *a, **k: asked.append((a[0], a[1])) or True,
+    )
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    _item(manager, "weekend work", SATURDAY)
+
+    panel.autoload_day()
+
+    assert len(asked) == 1, f"AutoLoad asked {len(asked)} times, not once: {asked}"
     title, message = asked[0]
     assert "work day" in title.lower(), title
     assert SATURDAY in message, message
@@ -606,37 +647,36 @@ def test_pdm7_a_non_work_day_asks_before_scheduling(
     )
 
 
-def test_pdm7_the_question_is_asked_once_per_date(
+def test_pdm132_the_question_is_asked_once_per_date(
     root, manager, settings, monkeypatch
 ):
-    """One decision about the day, not one per item dropped on it."""
+    """One decision about the day, not one per press."""
     asked = []
     monkeypatch.setattr(
-        confirm_dialog,
-        "ask_yes_no",
+        "tkinter.messagebox.askyesno",
         lambda *a, **k: asked.append(1) or True,
     )
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = SATURDAY
     panel.refresh()
-    first = _item(manager, "first", SATURDAY)
-    second = _item(manager, "second", SATURDAY)
+    _item(manager, "first", SATURDAY)
 
-    panel.block_item(first)
-    panel.block_item(second)
+    panel.autoload_day()
+    _item(manager, "second", SATURDAY)
+    panel.autoload_day()
 
-    assert len(asked) == 1, f"two drops onto one Saturday asked {len(asked)} times"
+    assert len(asked) == 1, f"two presses on one Saturday asked {len(asked)} times"
     assert len(manager.get_time_blocks(SATURDAY)) == 2, (
-        "the second drop was refused on a day already allowed"
+        "the second press was refused on a day already allowed"
     )
 
 
-def test_pdm7_answering_no_writes_nothing(
-    root, manager, settings, confirms
+def test_pdm132_answering_no_writes_nothing(
+    root, manager, settings, messageboxes
 ):
-    """No means no, and the reason stays on screen.
+    """No means no on the paths that still ask, and the reason stays on screen.
 
-    ``ask_yes_no`` answers False under the suite's own stub, so this is the
+    ``askyesno`` answers False under the suite's own stub, so this is the
     declining path without patching anything: the sentence is the one the flat
     refusal used to leave, because the answer to "why did nothing happen" is
     the days the week is set to.
@@ -644,233 +684,110 @@ def test_pdm7_answering_no_writes_nothing(
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = SATURDAY
     panel.refresh()
-    item = _item(manager, "weekend work", SATURDAY)
+    _item(manager, "weekend work", SATURDAY)
 
-    panel.block_item(item)
+    panel.autoload_day()
 
-    assert [title for title, _, _ in confirms] == ["Not a work day"], confirms
+    assert [name for name, _, _ in messageboxes] == ["askyesno"], messageboxes
     assert manager.get_time_blocks(SATURDAY) == []
     status = panel.status_label.cget("text")
     assert "not a block day" in status
     assert "Mon, Tue, Wed, Thu, Fri" in status
 
 
-def test_pdm7_a_work_day_asks_nothing(screen, manager, messageboxes, confirms):
-    """The question is for the exception, so a Thursday must not see it.
-
-    Both records, because PD-M12 moved the question from one to the other and
-    an assertion against the empty one would pass whatever the screen did.
-    """
-    item = _item(manager, "ordinary Thursday work")
-
-    screen.block_item(item)
-
-    assert confirms == [], f"a work day asked anyway: {confirms}"
-    assert messageboxes == [], f"a work day asked anyway: {messageboxes}"
-    assert len(manager.get_time_blocks(THURSDAY)) == 1
-
-
-def test_pdm121_the_question_is_asked_by_the_app(
-    root, manager, settings, monkeypatch, messageboxes
+def test_pdm132_a_question_that_raises_does_not_take_the_gesture(
+    root, manager, settings, monkeypatch
 ):
-    """PD-M12.1 — the platform's dialog is not on this path at all.
+    """PD-M13.2 — the asking path is wrapped too.
 
-    Reported from the running screen, 2026-11-07: an item dropped on a
-    Saturday raised ``_tkinter.TclError`` with no message out of
-    ``messagebox.askyesno``, and because the question is the first statement
-    of ``block_item`` the drop wrote nothing and said nothing. macOS will not
-    run its native dialog from the idle callback that follows a drag release.
-
-    So the native call is made to raise exactly what the user's traceback
-    carried. A test that only checked the write would pass with the old code
-    under this suite's stub, which is how this shipped: conftest replaces
-    every ``messagebox`` function with a recorder that cannot raise.
+    The platform has not refused a dialog from a button press, but it refused
+    one from a drag release with a bare ``TclError``, and the whole of what
+    went wrong was that the exception left the Tk callback and took the write
+    with it. So the question is wrapped wherever it is asked: a dialog that
+    raises means the work goes ahead and the status line says which day it was
+    on.
     """
     def explode(*_args, **_kwargs):
         raise tk.TclError()
 
     monkeypatch.setattr("tkinter.messagebox.askyesno", explode)
-    monkeypatch.setattr(confirm_dialog, "ask_yes_no", lambda *a, **k: True)
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = SATURDAY
     panel.refresh()
-    item = _item(manager, "weekend work", SATURDAY)
+    _item(manager, "weekend work", SATURDAY)
 
-    panel.block_item(item)
+    panel.autoload_day()
 
     assert len(manager.get_time_blocks(SATURDAY)) == 1, (
-        "the drop did not write the block the user said yes to"
+        "a dialog that raised swallowed the press"
     )
-    assert messageboxes == [], (
-        f"the platform's dialog is still on the drop path: {messageboxes}"
+    assert "not a regular work day" in panel.status_label.cget("text"), (
+        panel.status_label.cget("text")
     )
 
 
-def test_pdm121_the_question_names_the_answer_it_wants(
+def test_pdm132_a_break_added_after_a_failed_question_says_the_day(
     root, manager, settings, monkeypatch
 ):
-    """PD-M12.1 — the yes button says what saying yes does.
+    """PD-M13.2 — all four status lines owe the note, not just the two drops.
 
-    ``askyesno`` could only offer Yes and No. The app's own dialog is asked
-    for the words, so the button carries the gesture rather than leaving the
-    user to map "Yes" onto it.
+    The break and buffer button asks like AutoLoad does, so it reaches the
+    same fallback when the dialog raises, and it composes its own status text.
+    Written because the mutation gate found this line deletable with every
+    other test green (P5: when you fix one, fix its siblings -- and test them).
     """
-    asked = []
     monkeypatch.setattr(
-        confirm_dialog,
-        "ask_yes_no",
-        lambda *a, **kwargs: asked.append(kwargs) or True,
+        "tkinter.messagebox.askyesno",
+        lambda *a, **k: (_ for _ in ()).throw(tk.TclError()),
     )
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = SATURDAY
     panel.refresh()
 
+    panel.add_padding_block(BlockType.BREAK)
+
+    assert len(manager.get_time_blocks(SATURDAY)) == 1, (
+        "a dialog that raised swallowed the press"
+    )
+    status = panel.status_label.cget("text")
+    assert "Added a" in status, status
+    assert "not a regular work day" in status, status
+
+
+def test_pdm133_the_note_belongs_to_the_gesture(
+    root, manager, settings
+):
+    """PD-M13.3 — said for the drop it was raised for, and then cleared.
+
+    Not held on the screen: the note is read by the status line the gesture
+    writes, so one left set would be appended to the next gesture's line as
+    well -- and that one may be on a Thursday.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
     panel.block_item(_item(manager, "weekend work", SATURDAY))
+    weekend = panel.status_label.cget("text")
 
-    assert asked, "nothing was asked"
-    assert asked[0].get("yes_text") == "Schedule anyway", asked[0]
-    assert asked[0].get("no_text") == "Cancel", asked[0]
-
-
-@pytest.mark.parametrize(
-    "problem",
-    [confirm_dialog.ConfirmNotShown("no window"), tk.TclError()],
-    ids=["not-shown", "tcl-error"],
-)
-def test_pdm122_a_question_that_cannot_be_asked_still_schedules(
-    root, manager, settings, monkeypatch, problem
-):
-    """PD-M12.2 — a dialog that fails must not eat the drag.
-
-    There are two ways to be wrong when the question cannot be put on the
-    screen: write without asking, or lose the gesture. Losing it is what
-    happened on 2026-11-07 -- four gestures, nothing written, nothing said --
-    and it is the worse of the two, because the user has no way to tell a
-    refusal from a dead screen. So the work is done and the status line says
-    the question could not be shown.
-
-    Both shapes, because the raw ``TclError`` is what the platform threw and
-    ``ConfirmNotShown`` is what the app's own dialog raises when its window
-    never appears.
-    """
-    def explode(*_args, **_kwargs):
-        raise problem
-
-    monkeypatch.setattr(confirm_dialog, "ask_yes_no", explode)
-    panel = PlanScreen(root, manager, _App(settings))
-    panel.selected_date = SATURDAY
+    panel.selected_date = THURSDAY
     panel.refresh()
-    item = _item(manager, "weekend work", SATURDAY)
+    panel.block_item(_item(manager, "ordinary work", THURSDAY))
+    weekday = panel.status_label.cget("text")
 
-    panel.block_item(item)
-
-    assert len(manager.get_time_blocks(SATURDAY)) == 1, (
-        "a dialog that could not be shown swallowed the drop"
-    )
-    status = panel.status_label.cget("text")
-    assert "could not be shown" in status, status
-    assert SATURDAY in status, status
+    assert "not a regular work day" in weekend, weekend
+    assert "not a regular work day" not in weekday, weekday
 
 
-def test_pdm122_the_note_belongs_to_the_gesture_not_to_the_day(
-    root, manager, settings, monkeypatch
-):
-    """PD-M12.2 — said once, about the drop it happened to.
+def test_pdm7_a_work_day_says_nothing(screen, manager, messageboxes):
+    """A Thursday must see neither the question nor the note."""
+    item = _item(manager, "ordinary Thursday work")
 
-    The day is remembered in ``_work_anyway``, so the second item dropped on
-    the same Saturday is not asked about at all -- and a note saying the
-    question could not be shown would be describing a question that was never
-    put. Every later status line on that day would carry it.
-    """
-    monkeypatch.setattr(
-        confirm_dialog,
-        "ask_yes_no",
-        lambda *a, **k: (_ for _ in ()).throw(confirm_dialog.ConfirmNotShown("no")),
-    )
-    panel = PlanScreen(root, manager, _App(settings))
-    panel.selected_date = SATURDAY
-    panel.refresh()
+    screen.block_item(item)
 
-    panel.block_item(_item(manager, "first", SATURDAY))
-    first = panel.status_label.cget("text")
-    panel.block_item(_item(manager, "second", SATURDAY))
-    second = panel.status_label.cget("text")
-
-    assert "could not be shown" in first, first
-    assert "could not be shown" not in second, second
-    assert len(manager.get_time_blocks(SATURDAY)) == 2, (
-        "the second drop onto an allowed day was refused"
-    )
-
-
-def test_pdm123_a_drop_on_an_end_of_a_non_work_day_extends_the_day(
-    root, manager, settings, monkeypatch
-):
-    """PD-M12.3 — the second gesture the dialog took out.
-
-    Reported as "I can't move an item into the early or late extended
-    sections". The hit test and the write were both working; the day was a
-    Saturday, and ``extend_day_for`` asks the same question in its first
-    statement, so the exception killed it before it read the pointer's answer.
-    """
-    monkeypatch.setattr(confirm_dialog, "ask_yes_no", lambda *a, **k: True)
-    panel = PlanScreen(root, manager, _App(settings))
-    panel.selected_date = SATURDAY
-    panel.refresh()
-    started_at = panel.bounds.day_start
-    item = _item(manager, "weekend work", SATURDAY)
-
-    panel.extend_day_for(item, DAY_EXTEND_EARLIER)
-
-    assert panel.bounds.day_start < started_at, (
-        f"the day still starts at {panel.bounds.day_start}"
-    )
-    assert len(manager.get_time_blocks(SATURDAY)) == 1, (
-        "the day was lengthened and nothing was put in the room it made"
-    )
-
-
-def test_pdm122_the_end_of_the_day_says_it_too(
-    root, manager, settings, monkeypatch
-):
-    """PD-M12.2 — the other success line owes the same sentence.
-
-    Written because the mutation gate found the note's line in
-    ``extend_day_for`` could be deleted with every test still green: the two
-    write paths compose their own status text, so a note added to one of them
-    is absent from the other and nothing said so.
-    """
-    monkeypatch.setattr(
-        confirm_dialog,
-        "ask_yes_no",
-        lambda *a, **k: (_ for _ in ()).throw(confirm_dialog.ConfirmNotShown("no")),
-    )
-    panel = PlanScreen(root, manager, _App(settings))
-    panel.selected_date = SATURDAY
-    panel.refresh()
-
-    panel.extend_day_for(_item(manager, "weekend work", SATURDAY), DAY_EXTEND_EARLIER)
-
-    status = panel.status_label.cget("text")
-    assert "The day now runs" in status, status
-    assert "could not be shown" in status, status
-
-
-def test_pdm124_a_test_cannot_open_a_real_dialog(screen, confirms):
-    """PD-M12.4 — the suite's guard over the new dialog.
-
-    The real ``ask_yes_no`` builds a toplevel and waits on it. Every window in
-    this suite is withdrawn, so it would wait out its own visibility timeout
-    on every question -- and before that timeout existed, until someone killed
-    the run. This is the ``messagebox`` guard's hole, one module over (P5), so
-    it gets the test that proves the guard is installed.
-    """
-    answer = confirm_dialog.ask_yes_no(
-        screen, "Title", "Message", yes_text="Go on"
-    )
-
-    assert answer is False, "an unanswered question authorised something"
-    assert confirms == [("Title", "Message", "Go on")], confirms
+    assert messageboxes == [], f"a work day asked anyway: {messageboxes}"
+    assert len(manager.get_time_blocks(THURSDAY)) == 1
+    status = screen.status_label.cget("text")
+    assert "work day" not in status, status
 
 
 def test_pdm8_the_header_has_a_clear_day_button(screen):
@@ -5650,22 +5567,6 @@ def test_pdm5_a_real_box_wins_over_a_virtual_one(screen, manager, monkeypatch):
     screen.update_idletasks()
 
     assert blocked == [("Draft the proposal", 0)], blocked
-
-
-def test_pdm5_the_day_cannot_be_extended_onto_a_non_block_day(
-    root, manager, settings
-):
-    """The Saturday refusal covers this path too, not only the drops onto boxes."""
-    panel = PlanScreen(root, manager, _App(settings))
-    panel.selected_date = SATURDAY
-    panel.refresh()
-    item = _item(manager, "Weekend", start_date=SATURDAY)
-
-    panel.extend_day_for(item, DAY_EXTEND_EARLIER)
-
-    assert settings.plan_day_start == "08:00", "a non-block day lengthened the week"
-    assert manager.get_time_blocks(SATURDAY) == []
-    assert "not a block day" in panel.status_label.cget("text")
 
 
 def test_pdm5_an_item_that_would_cross_midnight_is_refused(
