@@ -235,6 +235,21 @@ def test_delete_weekly_action_item_removes_children(tmp_path):
         )
         manager.db_manager.create_action_item(child, apply_defaults=False)
 
+        # WTP-M5.6 — the second link shape, added when the cascade widened.
+        # The behaviour changed intentionally: until then this delete removed
+        # only the `parent_id` children, so an item linked by
+        # `weekly_tactic_id` was left in place with its link nulled by the
+        # column's ON DELETE SET NULL.
+        # Spec: docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m5
+        week_filed = ActionItem(
+            who="VSP",
+            title="Week-filed Item",
+            weekly_tactic_id=weekly.id,
+            start_date="2026-02-23",
+            due_date="2026-02-23",
+        )
+        manager.db_manager.create_action_item(week_filed, apply_defaults=False)
+
         deleted = manager.delete_weekly_action_item(weekly.id)
         assert deleted is True
 
@@ -246,8 +261,13 @@ def test_delete_weekly_action_item_removes_children(tmp_path):
             "SELECT id FROM action_items WHERE id = ?",
             (child.id,),
         ).fetchone()
+        week_filed_row = manager.db.conn.execute(
+            "SELECT id FROM action_items WHERE id = ?",
+            (week_filed.id,),
+        ).fetchone()
         assert parent_row is None
         assert child_row is None
+        assert week_filed_row is None
     finally:
         manager.close()
 
