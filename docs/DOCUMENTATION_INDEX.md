@@ -167,6 +167,24 @@ spec's §10):
   instead
 - How it sequences against the unpushed APE Week Actions batch
 
+### docs/implementation_plan_2026-11-08_priority_level_colours.md
+
+Implementation plan for configurable priority level colours (PLC-M1 - PLC-M5).
+**Approved 2026-11-08 and built the same day**; per-criterion status in
+`docs/spec_coverage_2026-11-08_priority_level_colours.md`, and the batch's
+handoff note is `docs/changes/2026-11-08-priority-level-colours.md`:
+
+- The three levels — Any Critical; Any High, but no Critical; No high or
+  critical — and that a level is a rule on Importance and Urgency, not a
+  threshold on the priority score
+- Why priority *levels* and priority *bands* are kept as two name sets, and the
+  case where the two answers come apart
+- The five screens that each wrote the rule out by hand, with the line numbers
+  they wrote it on
+- Why one colour per level and not one per theme, and what that costs
+- Why the control is a new tab rather than a third section on Appearance
+- Five adjacent issues found and not fixed, filed in `BACKLOG.md`
+
 ## Feature-Specific Documentation
 
 ### Requirements (Consolidated)

@@ -1,6 +1,10 @@
 # Priority level colours — PLC-M1 to PLC-M5
 
-Status: **awaiting approval**
+Status: **approved and implemented** (approved 2026-11-08, built the same day).
+Per-criterion status in `docs/spec_coverage_2026-11-08_priority_level_colours.md`;
+handoff note in `docs/changes/2026-11-08-priority-level-colours.md`. The five
+adjacent issues below are filed as PLC-A1 to PLC-A5 in `BACKLOG.md`, and the
+open question at the foot is still open.
 Date: 2026-11-08
 Supersedes nothing. Touches the row-fill rule introduced ad hoc across the five
 list screens; does not touch `priority_band_colors` / `priority_stripe_colors` /

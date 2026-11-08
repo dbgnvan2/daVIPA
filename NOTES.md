@@ -1,3 +1,43 @@
+## Recent Changes (2026-11-08)
+
+### Priority level colours are settable - PLC-M1 to PLC-M5
+
+- ✅ **Three priority levels, named and decided in one place.** Any Critical;
+  Any High, but no Critical; No high or critical. A level is a rule on an
+  item's own Importance and Urgency, read off `PriorityFactors` rather than off
+  a literal 20 or 10. New module `src/getmoredone/priority_levels.py`.
+- ✅ **The "high" tier is new.** Before this, a High item looked exactly like a
+  Low one: the five list screens only ever looked for Critical.
+- ✅ **Any Critical defaults to green** (`#DCFCE7`), Any High to amber
+  (`#FEF3C7`), the third level to no fill. Asked for directly, and confirmed
+  before the plan was written. The pale red `critical_tint` is no longer used
+  for a row fill.
+- ✅ **Settings → Priority Colours**, a new tab: a `#RRGGBB` field, a Pick
+  Colour button and a swatch per level, plus Apply / Save and Restore Defaults.
+  A value that is not a colour is refused with the level's name and nothing is
+  written — it is not silently rewritten to a default, the way
+  `save_date_increment_settings` does. Clearing a field means no fill, and that
+  survives a reload.
+- ✅ **Five copies of the rule became one.** `importance == 20 or urgency == 20`
+  was written out by hand in `today.py`, `upcoming.py`, `all_items.py`,
+  `hierarchical.py` and `completed.py`, each with its own precedence chain;
+  `priority_levels.row_fill` is now the single decision. Precedence is
+  unchanged, including the branches three of those screens never used.
+- ✅ **One colour per level, both modes, with the text colour derived.** A
+  colour the user picks cannot have a light and a dark variant, so a level fill
+  brings `pick_text_color` of itself instead of keeping the theme's `row_text`.
+  Held to 4.5:1 across the range, not only at the two defaults.
+- ✅ **A saved colour shows without a relaunch.** All five screens now reload
+  `AppSettings` in `refresh()`; two of them had no `self.settings` at all.
+- ✅ **New coverage, not a restatement.** The row tint had no test of any kind
+  before this batch — `grep critical_tint tests/` returned nothing. 41 tests,
+  none of them building a window; PLC-M4.1, M4.4 and M4.7 mutation-proved.
+- ⚠️ **Not checked on screen.** Whether the green *reads* right is the one
+  thing no test covers; the checklist is in
+  `docs/changes/2026-11-08-priority-level-colours.md`.
+- ⚠️ **The red `P:` chip is unchanged**, by the user's choice, so a green
+  critical row sits beside a red chip. Logged as PLC-A3.
+
 ## Recent Changes (2026-11-07)
 
 ### APE Week Assignment joins the one panel design - UPD-M5

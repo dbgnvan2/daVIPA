@@ -1,6 +1,6 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-07 (UPD-M5 moved APE Week Assignment's two panels onto
+Last Updated: 2026-11-08 (PLC-M1 to PLC-M5 made the three priority level colours settable and added five adjacent issues as PLC-A1 to PLC-A5 - the segment-fill text contrast the new priority fill fixes only for itself, two screens that ignore their own segment colour for the row fill, the `P:` chip's hard-coded red, `settings.py`'s length, and this index's own staleness; UPD-M5 moved APE Week Assignment's two panels onto
 the shared chip table, splitter and row drag, the last screen in scope: UPD-A6
 is resolved in place below, both holdout lists are empty and UPD-M1.5 and
 UPD-M2.5 are `done`, and one adjacent issue is filed as UPD-A8, an unused
@@ -10,6 +10,57 @@ place below, UPD-A6's claim that UPD-M4 would empty the holdout lists is
 corrected there - `weekly_items.py` is the last copy and UPD-M5 rewrites it -
 and one adjacent issue is filed as UPD-A7, two dead index-based members in
 `annual_vision_segments.py`; UPD-M1 added two adjacent issues as UPD-A5 and UPD-A6 - a fifth copy of the splitter in Project Boards, whose clamp was already right where the four consolidated copies were wrong, and the holdout list UPD-M1.5 needs until UPD-M4 empties it; a third cold pass over the AWA re-sweep's fixes added AWA-S9 to AWA-S11, found no high, and showed that half of one low fixed in the previous round was not a defect; the cold re-sweep of the AWA fix commits added its four remaining lows as AWA-S5 to AWA-S8, with its one high, three mediums and one raised low fixed in-loop and one low fixed against the budget with its reason stated there; the AWA sweep's four below-medium findings added as AWA-S1 to AWA-S4, with its one high and five mediums fixed in-loop and AWA-A3 mostly closed by that fix; four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Adjacent issues — priority level colours (PLC, 2026-11-08)
+
+Found while building PLC-M1 to PLC-M5. Flagged, not fixed (global rule 10):
+each is real, none is what was asked for, and a fix for any of them would be a
+silent sweep of behaviour nobody asked about.
+
+### PLC-A1 — a segment-coloured row keeps the theme's text colour (medium)
+
+All five list screens set `row_text = palette["row_text"]` and then fill the
+row with a VSP segment colour from the database, so a pale segment colour in
+the dark theme gets near-white text on it. `today.py:487` is where the new fill pays for it; `upcoming.py`, `all_items.py`, `hierarchical.py` and `completed.py` have
+the same shape.
+
+Exactly the defect PLC-M4.4 fixes for the new priority fill, and fixed there in
+the obvious way — derive the text colour from the fill with `pick_text_color`.
+Not extended to segment fills in this batch, because that changes how every
+segment-coloured row already on the user's screen looks.
+
+### PLC-A2 — Hierarchical and Completed ignore their own segment colour for the fill (low)
+
+Both resolve `segment_color`, apply it as an accent, and then never consider it
+for the row background, unlike Today, Upcoming and All Items
+(`hierarchical.py:231-239`, `completed.py:204-212`). Either the accent-only
+treatment is right and the other three are wrong, or the reverse; nothing
+records which, and `row_fill` preserves the difference by having both pass
+`segment_color=None`.
+
+### PLC-A3 — the `P:` chip hard-codes `danger` for critical, in five screens (low)
+
+`fg_color=palette["danger"] if is_priority_critical else "transparent"`, with
+its own inline `importance == 20 or urgency == 20` beside it
+(`today.py:652`, `upcoming.py:417`, `all_items.py:371`, `hierarchical.py:309`,
+`completed.py:271`). Out of scope by the user's explicit choice — the colour
+setting paints the row tint only — but with Any Critical now green, the row and
+its chip disagree by design. Worth a decision rather than leaving it implicit.
+
+### PLC-A4 — `settings.py` is 1214 lines (low)
+
+Well past the 700-line refactor mark in
+`~/.claude/standards/file-maintainability.md`. This batch added nothing to it
+but a mixin import and a tab, following `settings_integrations.py`, so the
+direction is right; the six sections already in it remain.
+
+### PLC-A5 — `docs/DOCUMENTATION_INDEX.md` is stale and unenforced (low)
+
+It ends "**Current Status**: ✅ All documentation up to date as of 2026-01-24",
+which has not been true for months, and no test checks that every document is
+listed in it — which global rule 13 asks for. The index also mixes per-document
+sections with category descriptions, so "every document is listed" is not
+currently a well-defined property of it.
 
 ## Adjacent issues — one panel design across the VSP tabs (UPD, 2026-11-07)
 

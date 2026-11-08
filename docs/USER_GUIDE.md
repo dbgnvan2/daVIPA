@@ -679,6 +679,43 @@ Date Increment Settings:
 - **Completion Badge** — What: Optional image shown on completed Today items. Why: Replace the default large green check mark with your preferred badge.
 - **Confetti Every N Completions** — What: Controls how often confetti triggers on Today completions. Why: Tune or disable celebration feedback.
 
+Priority Colours (added 2026-11-08):
+- What: The row tint for each of the three **priority levels**. A priority level
+  is a rule on an item's own Importance and Urgency, and it tints the whole row
+  in Today, Upcoming, All Items, Hierarchical and Completed.
+- Why: The old behaviour had one tint, a pale red, for Critical items only, with
+  no way to change it and no tier between Critical and nothing.
+- The three levels, checked in this order:
+  - **Any Critical** — Importance *or* Urgency is Critical. Default `#DCFCE7`,
+    a green. One Critical factor outranks a High one.
+  - **Any High, but no Critical** — either factor is High, and neither is
+    Critical. Default `#FEF3C7`, an amber. This tier is new; before
+    2026-11-08 a High item looked the same as a Low one.
+  - **No high or critical** — neither factor is High or Critical. Default: no
+    fill, so the row keeps the theme's own background, as it always has.
+- A missing factor does not disqualify an item: Urgency Critical with
+  Importance unset is still **Any Critical**.
+- Controls per level: a `#RRGGBB` field, a **Pick Colour** button, and a swatch
+  showing what is in the field.
+  - **Apply / Save** — Writes all three. Nothing is written if any of the three
+    is not a colour; the status line names the level and the value it refused,
+    rather than silently substituting one.
+  - **Restore Defaults** — Puts the three shipped defaults back into the
+    fields. It does not save them; press Apply / Save to keep them.
+- **Clear a field** to give that level no fill.
+- One colour per level, used in both light and dark mode. The row's *text*
+  colour is chosen automatically for contrast against whatever you pick, so a
+  pale colour gets dark text in either mode.
+- A saved colour shows the next time you open one of the five list screens; no
+  relaunch is needed.
+- These are **not** the Plan screen's priority bands. A band comes from the
+  priority *score* — the product of all four factors — and has its own five
+  colours. An item can sit in the top band while being in no critical level:
+  Medium Importance and Urgency with XL Size and Value scores 6400, which is
+  the critical band, and is "No high or critical" as a level.
+- The red `P:` priority chip on a row is unchanged and still marks a Critical
+  item, so with a green Any Critical the row and its chip differ by design.
+
 ### Vision Planning (Unified Hub)
 - What: A single workspace with top navigation for all vision-planning flows.
 - Why: Removes redundant screens and keeps workflows in one place.
