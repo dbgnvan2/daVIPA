@@ -1,9 +1,10 @@
 # Spec + implementation plan — one panel design across the VSP tabs
 
 Status: **approved 2026-11-07. UPD-M3, UPD-M1, UPD-M2, UPD-M4, UPD-M5 and
-UPD-M6 built. UPD-M7.1 done; UPD-M7.2 and UPD-M7.3 are on-screen criteria
-and are open — nothing in UPD-M1 through UPD-M6 has been seen running.**
-Per-criterion status is in §10; the on-screen checklist is §11.
+UPD-M6 built. UPD-M7.1 done. §11 was walked on 2026-11-08: UPD-M7.2 is
+`partial` and UPD-M7.3 is `not done` — column widths and divider positions
+do not survive a relaunch.** Per-criterion status is in §10; the follow-up
+plan is `docs/implementation_plan_2026-11-08_unified_panel_followups.md`.
 IDs: `UPD-M1` … `UPD-M7`. Use them verbatim in commits, docstrings and test
 names.
 
@@ -493,10 +494,11 @@ named.
 **Mutation gate:** 8, each the verbatim original, each run alone, every file
 restored and sha256-compared. 8 red.
 
-**Not verified on screen.** Nothing in UPD-M1 has been seen running; M7.2 and
-M7.3 are the on-screen criteria and are still open. The divider's persistence
-in particular has only been proved against the real screen on a withdrawn
-root.
+**Verified on screen 2026-11-08**, by the §11 walk. UPD-M1's divider drags and
+does not crush either panel (step 7). Its persistence does **not** hold: step
+10 found no divider position surviving a relaunch, which is UPD-F1. Until that
+is fixed, the persistence this module's tests assert is proved only against a
+withdrawn root, which is exactly where the fault hid.
 
 ### UPD-M2 — one row-drag, not four — **done**, with one criterion partial
 
@@ -806,13 +808,13 @@ green again, verified here after that commit landed.
 **Not verified on screen.** Every test here builds the screen on a withdrawn
 root. UPD-M7.2 and UPD-M7.3 are the on-screen criteria and are open.
 
-### UPD-M7 — it holds together on screen — **M7.1 done, M7.2 and M7.3 open**
+### UPD-M7 — it holds together on screen — **M7.1 done, M7.2 partial, M7.3 not done**
 
 | ID | Status | Where |
 |---|---|---|
 | M7.1 | `done` | `::test_updm71_screens_construct_withdrawn` builds all five rewritten screens and asserts that **no `Toplevel` was opened anywhere beneath the root** — a dialog at construction would be a modal thrown over whoever is using the machine, once per test that builds the screen. That count is the failable claim, and it is an exact zero walked to the bottom of each widget tree. The two assertions beside it — the root is withdrawn, the screen is unmapped — are stated in the test as what they are: `conftest.py` withdraws every window at construction and re-withdraws after any `deiconify`, so no change to a screen can turn them red, and `tests/test_tk_offscreen.py` is the guard on that patching rather than this test (P24). `::test_updm71_no_test_here_needs_a_mapped_window` counts the tests in this file that take the `mapped_windows` fixture from the AST: exact 0, so the number `test_ci_contract.py::test_the_documented_mapped_window_count_is_the_real_one` checks is the 22 it was before this plan. |
-| M7.2 | `not done` | needs a person at the running app — §11's checklist, steps 1 to 6 |
-| M7.3 | `not done` | needs a person at the running app — §11's checklist, steps 7 to 10 |
+| M7.2 | `partial` | walked 2026-11-08. Steps 1, 2, 5 and 6 pass. The six tabs do read as one design in header card, divider, row height and chip style — the two exceptions are the filter area, which is one line on Annual Plan Elements and two elsewhere (UPD-F2), and the blank heading over Week Assignment's checkbox column, which should read "Pick" (UPD-F3). |
+| M7.3 | `not done` | walked 2026-11-08. Steps 8 and 9 pass: a column drag moves only its own column, in both panels, and the panels keep their own widths. **Step 10 fails** — nothing survives a relaunch (UPD-F1). Step 7's divider passes, with a request that the columns rescale with it (UPD-F4). |
 
 **M7.2 and M7.3 are not written as tests, deliberately.** Both are about how
 six tabs *read* beside each other, and the thing that would make them
@@ -822,10 +824,15 @@ measurement cannot settle: whether the six look like one design at a real
 window size, with real data, and whether a width a user set is still there the
 next morning. §11 is the checklist for it.
 
-**Nothing in UPD-M1 through UPD-M6 has been seen running.** Every test in
-`tests/test_unified_panel_design.py` builds its screen on a withdrawn root,
-which is what keeps a full run off the user's screen and is also the reason
-none of them can answer M7.2 or M7.3.
+**UPD-M1 through UPD-M6 have now been seen running** — §11 was walked on
+2026-11-08, and the verdict per step is in the M7.2 and M7.3 rows above.
+Every test in `tests/test_unified_panel_design.py` still builds its screen on
+a withdrawn root, which is what keeps a full run off the user's screen and is
+why none of them could answer M7.2 or M7.3 in the first place. What the walk
+found is four items, `UPD-F1` to `UPD-F4`, in
+`docs/implementation_plan_2026-11-08_unified_panel_followups.md`; the one
+defect among them is that no column width or divider position survives a
+relaunch.
 
 ---
 

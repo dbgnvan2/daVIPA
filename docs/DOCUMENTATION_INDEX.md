@@ -172,6 +172,21 @@ spec's §10, and the batch's handoff note is
 - §11: the ten-step on-screen checklist UPD-M7.2 and UPD-M7.3 are waiting on,
   written for the user to walk in the running app rather than for a test
 
+### docs/implementation_plan_2026-11-08_unified_panel_followups.md
+
+Spec and implementation plan for what the unified panel design's on-screen
+check found (UPD-F1 - UPD-F4). **Not approved. Written 2026-11-08 from the
+§11 walk**, which closed UPD-M7.2 as `partial` and UPD-M7.3 as `not done`:
+
+- UPD-F1, the one defect: no column width or divider position survives a
+  relaunch, because `AppSettings.save()` writes the whole object and a screen
+  holding its own snapshot reverts what another screen wrote
+- UPD-F2: the filter area is three lines deep on every tab that has filters
+- UPD-F3: Week Assignment's checkbox column is headed "Pick"
+- UPD-F4: the columns rescale with the divider, down to five characters
+- §6: the three criteria that cannot be made code-testable, each with a
+  human-review step proposed for the spec's §11
+
 ### docs/implementation_plan_2026-11-08_priority_level_colours.md
 
 Implementation plan for configurable priority level colours (PLC-M1 - PLC-M5).

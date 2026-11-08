@@ -856,8 +856,10 @@ restored and sha256-compared. 20 red, no finding.
 | ID | Status | Evidence |
 |---|---|---|
 | M7.1 | `done` | `tests/test_unified_panel_design.py::test_updm71_screens_construct_withdrawn` builds all five rewritten screens and asserts no `Toplevel` was opened anywhere beneath the root — an exact zero, walked to the bottom of each widget tree. The withdrawn/unmapped assertions beside it are held by `conftest.py`, not by this test, and are stated as such in its docstring; `tests/test_tk_offscreen.py` is the guard on that patching (P24). `::test_updm71_no_test_here_needs_a_mapped_window` reads this file's AST and asserts exactly zero tests take the `mapped_windows` fixture, so the 22 in `CLAUDE.md` that `tests/test_ci_contract.py::test_the_documented_mapped_window_count_is_the_real_one` checks did not move. |
-| M7.2 | `not done` | needs a person at the running app — the spec's §11 checklist, steps 1 to 6 |
-| M7.3 | `not done` | needs a person at the running app — the spec's §11 checklist, steps 7 to 10 |
+| M7.2 | `partial` | walked 2026-11-08. The six tabs read as one design in header card, divider, row height and chip style. Two exceptions: the filter area's depth differs on Annual Plan Elements (UPD-F2), and Week Assignment's checkbox column should be headed "Pick" (UPD-F3). |
+| M7.3 | `not done` | walked 2026-11-08. A column drag moves only its own column, in both panels, on every tab — but **no width or divider position survives a relaunch** (UPD-F1). The divider itself passes, with a request that the columns rescale with it (UPD-F4). |
+
+**Walked on 2026-11-08.** Steps 1, 2, 5, 6, 8 and 9 pass. Step 3 passes except the filter area, step 4 asks for a "Pick" heading, step 7 passes and asks for the columns to rescale with the divider, and **step 10 fails: no width or divider position survives a relaunch.** The four items are `docs/implementation_plan_2026-11-08_unified_panel_followups.md` (UPD-F1 to UPD-F4).
 
 M7.2 and M7.3 are deliberately not tests: both are about how six tabs read
 beside each other at a real window size with real data, and about whether a
@@ -867,9 +869,13 @@ holds the ten steps.
 Mutation gate: 4 mutations, each the verbatim original, one at a time, every
 file restored and sha256-compared. 4 red, no finding.
 
-## Not verified on screen
+## Verified on screen 2026-11-08
 
-UPD-M7.2 and UPD-M7.3 are on-screen criteria and are `not done`. Nothing in
-UPD-M1 through UPD-M6 has been seen running; every test above builds its
-screen on a withdrawn root. UPD-M4 changed the renderer, the splitter and
-the drag of three tabs in one step and none has been looked at.
+§11 of the unified panel spec was walked in the running app. UPD-M7.2 is
+`partial` and UPD-M7.3 is `not done`; the per-step verdict is in the UPD-M7
+table above. UPD-M4's renderer, splitter and row drag across three tabs have
+now been looked at and the drag behaviour holds — what does not is
+persistence, on every tab, which is `UPD-F1` in
+`docs/implementation_plan_2026-11-08_unified_panel_followups.md`. Every test
+above still builds its screen on a withdrawn root, which is why a relaunch
+was the one thing none of them could check.
