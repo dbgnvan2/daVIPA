@@ -1,6 +1,14 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-08 (WTP-M1 to WTP-M6 made a Weekly Tactic the parent of
+Last Updated: 2026-11-08 (UPD-F2, UPD-F3 and UPD-F4 built what the unified
+panel design's on-screen walk asked for - the filter area a line of its own on
+every VSP tab, "Pick" over the checkbox column, and columns that rescale with
+the divider down to five characters - and added four adjacent issues as UPD-A10
+to UPD-A13: the heading a column at the five-character floor clips, the Week
+Actions right panel the fitter does not reach, two filter labels abbreviated on
+three tabs and written out on two, and this repo's documentation index having no
+test. UPD-F1, the one defect of the four, is NOT built - it must change
+`app_settings.py`, which the calendar-export batch holds open; WTP-M1 to WTP-M6 made a Weekly Tactic the parent of
 the Action Items filed under it in every reader of parenthood, all 38 criteria
 built, and added one adjacent issue as WTP-A1 - the shipped-column width test
 that enumerates three of the five column sets by hand; UPD-M6 put APE Week
@@ -18,6 +26,94 @@ place below, UPD-A6's claim that UPD-M4 would empty the holdout lists is
 corrected there - `weekly_items.py` is the last copy and UPD-M5 rewrites it -
 and one adjacent issue is filed as UPD-A7, two dead index-based members in
 `annual_vision_segments.py`; UPD-M1 added two adjacent issues as UPD-A5 and UPD-A6 - a fifth copy of the splitter in Project Boards, whose clamp was already right where the four consolidated copies were wrong, and the holdout list UPD-M1.5 needs until UPD-M4 empties it; a third cold pass over the AWA re-sweep's fixes added AWA-S9 to AWA-S11, found no high, and showed that half of one low fixed in the previous round was not a defect; the cold re-sweep of the AWA fix commits added its four remaining lows as AWA-S5 to AWA-S8, with its one high, three mediums and one raised low fixed in-loop and one low fixed against the budget with its reason stated there; the AWA sweep's four below-medium findings added as AWA-S1 to AWA-S4, with its one high and five mediums fixed in-loop and AWA-A3 mostly closed by that fix; four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Adjacent issues — the unified panel walk's follow-ups (UPD-F, 2026-11-08)
+
+Found while building UPD-F2, UPD-F3 and UPD-F4. Recorded rather than fixed,
+per the standing rule that a feature change does not silently sweep adjacent
+code. The plan's §8 holds the same list with its reasoning.
+
+### 2026-11-08 - Type: Technical Debt
+
+**Title:** UPD-A10 - a column at the five-character floor clips its own heading
+**Description:** UPD-F4 dropped every resizable chip column's minimum to
+`column_resize.min_column_width()`, five characters, 40px at `CHAR_PX = 8`,
+because step 7 of the on-screen walk asked for "all columns to resize ... down
+to 5 character widths". Three headings are longer than that floor: measured in
+the bold header font inside pytest, "SubSegment" is **84px**, "Category" 60px
+and "Segment" 58px, against a 40px minimum. A column dragged or fitted to the
+floor therefore shows about five characters of a ten-character heading, and
+`build_header` clips rather than wraps, so the heading reads "SubSe...".
+
+This was already true at the old 60px minimum - "SubSegment" did not fit that
+either - so UPD-F4 made an existing fault worse rather than introducing one.
+The two honest fixes are both design decisions nobody has made: shorten the
+headings ("Sub", "Cat", which is what `weekly_items.py`'s *filter* labels
+already say - see UPD-A12), or give each column a floor measured from its own
+heading, which would mean a `min_width` that is computed rather than declared
+and would break the `min_width <= default_width` invariant
+`::test_updm31_every_shipped_column_declares_a_width_it_can_have` pins.
+**Priority:** Low
+**Effort:** Low
+
+### 2026-11-08 - Type: Technical Debt
+
+**Title:** UPD-A11 - APE Week Actions' right panel does not rescale with the divider
+**Description:** UPD-F4 wires `SplitPanel`'s new `on_apply` callback to
+`chip_table.panel_fitter(...)` on all five two-panel tabs, but Week Actions
+passes its **left** table only: its right panel is
+`WeekTacticActionsPanel(TodayScreen)`, which has its own `ColumnResizer` under
+the `week_actions` prefix and its own grid padding, and is not a `ChipTable`.
+So on that one tab, dragging the divider rescales the left panel's columns and
+leaves the right panel's where they were.
+
+`panel_fitter`'s docstring says this, and
+`::test_updf41_the_divider_is_wired_to_both_panels` asserts the one-table
+wiring verbatim so it cannot become half-done by accident. Fixing it means
+either `fit_to_width` called directly on `TodayScreen`'s resizer with that
+screen's own padding accounted for - which is a second padding accounting to
+keep in step with the first - or moving Today's columns onto `ChipTable`,
+which is a batch of its own. The same question applies to the Today and
+Scheduler screens, which use `ColumnResizer` without a `SplitPanel` at all.
+**Priority:** Low
+**Effort:** Medium
+
+### 2026-11-08 - Type: Technical Debt
+
+**Title:** UPD-A12 - weekly_items.py abbreviates two filter labels the APE tabs write out
+**Description:** `src/getmoredone/screens/weekly_items.py` labels its three
+lineage filters "Segment:", **"Sub:"** and **"Cat:"**, where
+`ape_assignment.py` and `ape_period_view.py` write "Segment:",
+"SubSegment:" and "Category:". `screens/lineage_filters.build_combos`, which
+APE Week Actions uses, also writes the short forms - so three tabs say "Sub"
+and two say "SubSegment" for the same filter.
+
+UPD-F2 moved all of those labels onto a new row without touching their text.
+Which wording is right is a decision about the design, and the unification is
+UPD-A9's work: that entry already owns the five remaining copies of the filter
+triple, and the wording should be settled once, there, rather than twice.
+**Priority:** Low
+**Effort:** Low
+
+### 2026-11-08 - Type: Technical Debt
+
+**Title:** UPD-A13 - no test enforces docs/DOCUMENTATION_INDEX.md's completeness
+**Description:** The global rule in `~/.claude/CLAUDE.md` is that where a repo
+keeps a documentation index, every document is listed in it **and a test
+enforces that**. `grep -rn DOCUMENTATION_INDEX tests/` returns nothing, so
+this repo's index is kept entirely by hand - which is how it came to carry a
+"Not approved" line for a plan that had been approved and built the same day,
+found while writing this batch's entry.
+
+The test is small: walk `docs/*.md` plus `docs/changes/*.md`, read the
+`### <path>` headings out of the index, and assert the two sets match, with an
+explicit allow-list for anything deliberately unlisted. It was not written
+inside this batch because the batch's own entry is one of the things it would
+police, and a check written by the change it is checking is the wrong order.
+This is the same class as P25: a rule that holds on only one surface, and not
+the one anyone uses.
+**Priority:** Medium
+**Effort:** Low
 
 ## Adjacent issues — Plan day calendar export (CE, 2026-11-08)
 

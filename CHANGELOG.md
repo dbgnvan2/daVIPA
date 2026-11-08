@@ -7,6 +7,38 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — what the VSP tabs' on-screen walk asked for (2026-11-08)
+
+- **The filter area is a line of its own on every VSP tab.** Segment, Sub and
+  Cat were the back half of a row that already held Year, Quarter, Load, Save
+  and Refresh -- eleven widgets on one line, and the filters were the hardest
+  part of it to find. They now sit on their own line below those controls, with
+  the status line below them. **Annual Plan Elements has no filters** -- there
+  is nothing above an annual plan element to filter by -- so it carries a blank
+  line of the same depth, which means the two panels start at the same height
+  on all five tabs and nothing jumps as you move between them.
+- **The checkbox column on APE Week Assignment's left panel is headed
+  "Pick".** It was blank, which left the ticks with no name. The word measures
+  28px in the header font against a 34px column, so no column moved to make
+  room for it.
+- **The columns now move with the divider.** Dragging the divider between two
+  panels used to widen the panel and leave the extra space sitting to the
+  right of the last column. Every resizable column now grows and shrinks with
+  its panel, in proportion to the width it already had -- so a Segment column
+  you have made twice the width of Category stays twice the width -- with a
+  floor of five characters. The three fixed columns (the Pick ticks, `#`, and
+  the row's buttons) are reserved out and do not move. A width a user sets by
+  dragging a column becomes the proportion the next resize shares the panel
+  out by, so the *shape* of a panel survives a window of a different size.
+
+### Known gap — column widths still do not survive a relaunch (2026-11-08)
+
+- This is the defect the same walk found and it is **not** fixed here: it needs
+  a change to `AppSettings.save()`, which writes the whole settings object and
+  so lets a screen holding an older snapshot revert what another screen wrote.
+  Another batch holds that file open. Until then, every width above is for as
+  long as the app is running.
+
 ### Changed — the one panel design is finished and is waiting to be looked at (2026-11-08)
 
 - **UPD-M7 closes the plan**, and what it adds is a guard rather than a

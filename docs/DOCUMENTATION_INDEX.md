@@ -155,10 +155,11 @@ the screen is still open there:
 
 Spec and implementation plan for one panel design across the VSP tabs
 (UPD-M1 - UPD-M7). **Approved 2026-11-07. UPD-M3, UPD-M1, UPD-M2, UPD-M4,
-UPD-M5 and UPD-M6 built; UPD-M7.1 done, UPD-M7.2 and UPD-M7.3 open** -- the
-two on-screen criteria need a person at the running app, and nothing in
-UPD-M1 through UPD-M6 has been seen running (per-criterion status in the
-spec's §10, and the batch's handoff note is
+UPD-M5 and UPD-M6 built; UPD-M7.1 done, UPD-M7.2 `partial` and UPD-M7.3 `not
+done`.** §11 was walked on 2026-11-08 and produced four follow-ups,
+`UPD-F1` - `UPD-F4`, in the plan below; three are built and the §11 walk is
+owed again, steps 4, 7 and the new 11 to 13 included (per-criterion status in
+the spec's §10, and the batch's handoff note is
 `docs/changes/2026-11-08-unified-panel-m7.md`):
 
 - The feature matrix: which of the six tabs has panels, a divider, drag and
@@ -169,23 +170,35 @@ spec's §10, and the batch's handoff note is
 - The two places "the same design" cannot be taken literally, and what is done
   instead
 - How it sequences against the unpushed APE Week Actions batch
-- §11: the ten-step on-screen checklist UPD-M7.2 and UPD-M7.3 are waiting on,
-  written for the user to walk in the running app rather than for a test
+- §11: the on-screen checklist UPD-M7.2 and UPD-M7.3 are waiting on, written
+  for the user to walk in the running app rather than for a test -- ten steps
+  as walked on 2026-11-08, with steps 4 and 7 rewritten and steps 11 to 13
+  added for what UPD-F2, UPD-F3 and UPD-F4 changed
 
 ### docs/implementation_plan_2026-11-08_unified_panel_followups.md
 
 Spec and implementation plan for what the unified panel design's on-screen
-check found (UPD-F1 - UPD-F4). **Not approved. Written 2026-11-08 from the
-§11 walk**, which closed UPD-M7.2 as `partial` and UPD-M7.3 as `not done`:
+check found (UPD-F1 - UPD-F4). **Approved 2026-11-08. UPD-F2, UPD-F3 and
+UPD-F4 built the same day; UPD-F1 not built** -- it is the only defect of the
+four and the only one that must change `src/getmoredone/app_settings.py`,
+which the concurrent calendar-export batch holds uncommitted (per-criterion
+status in `docs/spec_coverage.md`, and the batch's handoff note is
+`docs/changes/2026-11-08-unified-panel-followups.md`):
 
 - UPD-F1, the one defect: no column width or divider position survives a
   relaunch, because `AppSettings.save()` writes the whole object and a screen
   holding its own snapshot reverts what another screen wrote
-- UPD-F2: the filter area is three lines deep on every tab that has filters
-- UPD-F3: Week Assignment's checkbox column is headed "Pick"
-- UPD-F4: the columns rescale with the divider, down to five characters
-- §6: the three criteria that cannot be made code-testable, each with a
-  human-review step proposed for the spec's §11
+- UPD-F2: the filter area is three lines deep on every tab -- the three combos
+  on a row of their own, and a blank row of the same depth on the one tab that
+  has no filters
+- UPD-F3: Week Assignment's checkbox column is headed "Pick", which reverses
+  the text half of UPD-M5.5
+- UPD-F4: the columns rescale with the divider, down to five characters, with
+  a stored width read as a weight rather than a pixel promise
+- The four corrections made to the plan against the code after it was
+  approved, each with its measurement
+- §6: the three criteria that cannot be made code-testable, now §11 steps 11,
+  12 and 13 of the unified panel spec
 
 ### docs/implementation_plan_2026-11-08_priority_level_colours.md
 

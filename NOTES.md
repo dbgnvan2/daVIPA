@@ -1,5 +1,47 @@
 ## Recent Changes (2026-11-08)
 
+### What the walk asked for - UPD-F2, UPD-F3, UPD-F4 built; UPD-F1 not
+
+The §11 walk happened. Three of its four items are built and the fourth, the
+only defect among them, is not.
+
+- ✅ **UPD-F2** - the three lineage filters moved off the controls row onto a
+  row of their own on all five tabs, in a frame of their own at header row 2,
+  with the status line below them at row 3. Annual Plan Elements has no
+  filters at all, so its title now has row 0 to itself, its controls sit on
+  row 1, and row 2 is an empty frame one combo high - the blank line asked
+  for by name. 7 of 7 mutations red.
+- ✅ **UPD-F3** - `APE_LEFT_COLUMNS`' checkbox column is headed "Pick" again,
+  which reverses the text half of UPD-M5.5. The plan expected the 34px column
+  to widen; measured in the bold header font, "Pick" is 28px, so nothing
+  moved. Four panels share that column set, not the three the plan said. 6 of
+  6 mutations red.
+- ✅ **UPD-F4** - `ColumnResizer.fit_to_width` shares a panel across its
+  resizable columns by weight, floor five characters (40px at `CHAR_PX = 8`),
+  fixed columns reserved out, and returns the shortfall when a panel cannot
+  seat the floors rather than clipping in silence. `SplitPanel.apply` gained
+  an `on_apply` callback and the five screens pass `panel_fitter(...)`. Every
+  resizable chip column's minimum dropped to the floor, from 60, 52 and 80.
+  9 of 9 mutations red - one survived the first gate and the assertion was
+  tightened to an exact panel fill.
+- ❌ **UPD-F1 is not built.** `AppSettings.save()` writes the whole object, so
+  a screen holding an older snapshot reverts fields another object changed -
+  which is why no width survives a relaunch. It must change
+  `src/getmoredone/app_settings.py`, which the calendar-export batch holds
+  uncommitted, so `CLAUDE.md`'s "One build batch at a time" rules it out
+  here. Proposed as its own worktree session.
+- ⚠️ **None of the three has been seen running.** UPD-F2.6, UPD-F3.5 and
+  UPD-F4.7 are `not done` and are steps 11, 12 and 13 of the spec's §11.
+  Steps 4 and 7 were rewritten, so those two are owed again as well: what was
+  walked on 2026-11-08 is not what is there now.
+- ⚠️ **A column at the five-character floor clips its own heading.**
+  "SubSegment" measures 84px against a 40px minimum. True at the old 60px
+  minimum too, and the narrower floor is what was asked for, so it is
+  recorded as UPD-A10 rather than fixed.
+- ⚠️ **APE Week Actions' right panel is not fitted** (UPD-A11). It is a
+  `TodayScreen` subclass with its own column store, not a `ChipTable`, so its
+  columns keep their pixel widths when the divider moves.
+
 ### The one panel design is built, and has not been looked at - UPD-M7
 
 - ✅ **UPD-M7.1** - `tests/test_unified_panel_design.py` builds all five
