@@ -2305,3 +2305,39 @@ pass**, which is the useful part of this entry: changing the two strings turned
 Finishing the change meant editing two passing tests to match a cosmetic
 rewording — the exact trade the below-medium rule exists to refuse. Reverted and
 recorded instead.
+
+### 2026-11-07 - Type: Debt - Not fixed, below the fix threshold
+
+**Title:** Three test-quality gaps from the cold fifth pass
+**Description:** All three in `tests/test_plan_screen.py`, raised by a cold pass
+whose only lens was test quality.
+1. `test_pdm1115` asserts the teardown's internal order as
+   `["grab_release", "destroy", "set_status"]`. The contract is "the modal is
+   gone before the status is written", and `destroy` releases the grab by
+   itself, so dropping the redundant `grab_release` is a legitimate
+   simplification that would turn the test red with no defect behind it.
+   Narrow it to `order[-1] == "set_status"` and `"destroy" in order[:-1]`. Note
+   that the same pin in `test_pdm1116` **is** load-bearing — the two steps
+   failing independently is the whole point of that one — so only 1115 moves.
+2. `test_pdm1115` / `test_pdm1116` assert calls on a hand-written `_Stuck`
+   double, and nothing ties it to the real class: neither would notice if
+   `CTkInputDialog` lost `grab_release`, or if the production call site moved
+   to positional arguments (the fake is `lambda **kw`). One
+   `assert callable(getattr(ctk.CTkInputDialog, "grab_release", None))` per
+   method would make API drift fail rather than pass against the fake.
+3. `day_autoscroll_direction`'s `canvas is None` and `except tk.TclError` arms
+   have no test, and neither does `CTkInputDialog.__init__` raising *after*
+   `grab_set` — where `dialog` is unbound, the teardown is skipped and the grab
+   leaks. `test_pdm1112` patches the constructor to raise but asserts nothing
+   about teardown, so that seam is invisible to the suite. The `winfo_ismapped`
+   arm is relied on implicitly by `test_pdm128`.
+**Priority:** Low
+**Effort:** Small for 1 and 2. For 3, the post-`grab_set` constructor failure is
+the one worth doing: it is a real leak on a seam no test sees.
+**Notes:** The same pass's four mediums were fixed (the untested
+`on_drag_motion` hover call, the untested release-path clear, the unreachable
+state a docstring presented as reachable, and autoscroll termination) along with
+two docstrings and a live-timer leak. These three were recorded because the
+budget does not fix below-medium findings in-loop: a cosmetic fix buys none of
+the safety it costs, and this batch has already had one high-severity defect
+introduced by a fix pass.

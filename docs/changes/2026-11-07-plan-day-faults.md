@@ -129,7 +129,7 @@ reader does not re-derive it.
 ## Verification
 
 - Command: `GETMOREDONE_NO_MAPPED_WINDOWS= taskpolicy -b venv/bin/python -m pytest tests/test_plan_screen.py tests/test_ci_contract.py -q`
-- Result: **red, with a known cause outside this change** — 298 passed, 1
+- Result: **red, with a known cause outside this change** — 301 passed, 1
   failed, 1 skipped at the final count. Reported as red rather than as a pass:
   the exit status is non-zero, and a batch that calls that PASS teaches the next
   reader to read past a failure line.
@@ -424,6 +424,89 @@ meant editing two passing tests to match a cosmetic rewording. That is the trade
 the below-medium rule refuses. Recorded in `BACKLOG.md` with that reasoning.
 
 3 new tests, 6 more mutants, all killed, source sha verified after each.
+
+## Fifth pass — cold, test quality only
+
+The fourth pass produced two highs, and the budget's rule for that is one
+further pass, cold, in a *different failure family*. Four families had been
+used: failure-hiding patterns (three times), correctness, and the UI/theme
+contract. The family nobody had looked at was **the tests themselves** — which
+is the right one for this batch, because every defect the fourth pass found was
+in a fix commit, and a fix commit's test is written at the same moment and in
+the same anchored state as the fix.
+
+Read-only, no prior context, no suite run: **no high, 4 medium, 5 low.** All
+four mediums are about the tests, not the production code. **This pass changed
+no production code at all**, so the on-screen checklist is unaffected by it.
+
+Two of the mediums claimed a mutant would survive, and both were checked by
+running it rather than taken on the reviewer's word — the mistake the fourth
+pass had to correct:
+
+- **`on_drag_motion`'s compensating hover call was untested.** The line reads
+  `if not self.autoscroll_day(): self.update_hover_target()`, and
+  `autoscroll_day` deliberately leaves the hover alone when it did not move the
+  day. So for every drag clear of the two edge bands — most of the pane — that
+  one line is the only thing moving the outline. **Deleting it left the suite
+  green: 201 passed.** The two tests on that path both stub
+  `update_hover_target` and assert a call count, which is the same shape as
+  asserting the arguments to `yview_scroll` instead of a distance, the error
+  this batch already had to fix once. `test_pdm1213` now drives
+  `on_drag_motion` mid-pane and asserts which box is outlined.
+- **`clear_hover_target` was never reached through a gesture.** PD-M12.10
+  called it directly, while the fault its own docstring describes — a drag
+  abandoned away from the boxes — runs through `on_drag_release`. **Deleting
+  that call left the suite green: 202 passed.** `test_pdm1214` releases off the
+  boxes, where nothing rebuilds, and asserts the width and the colour are both
+  back. The colour assertion was also missing from the one test that drives a
+  real scroll, which is the path where PD-M12.10 matters most, and is added.
+- **Autoscroll termination was untested.** The end-stop and the clamp were each
+  asserted against hand-written numbers and never against each other, and
+  `_fake_day_viewport` patches `yview` to a constant, so no test ran two ticks
+  against a viewport that moves. `test_pdm1212` makes the fake write
+  `yview_moveto` back into `yview` and asserts the loop stops.
+  **The first version of that test was vacuous and the mutation run caught
+  it**: with `visible = 0.3` the step divides the distance to the end-stop
+  exactly 25 times, so the *unclamped* walk landed on the same number the clamp
+  produces and the test passed with the clamp deleted. At 0.25 the end-stop is
+  28.125 steps away and the mutant dies. Recorded here because it is the
+  clearest instance in this batch of a test asserting its own fake.
+- **A docstring presented an unreachable state as a reachable one.**
+  `test_pdm1211` sets `_drag_hover_color = None` by hand and claimed that is
+  the state before the first hover. It is not: the colour is assigned in the
+  same block as the frame, so a frame to restore always implies a colour, and
+  before the first hover the frame is None too and the method returns at its
+  first `if`. The guard is a code-shape one and the docstring now says so.
+
+One more docstring corrected: the PD-M11 test's "answered Yes, the table was
+still empty" is the pre-fix measurement, sitting a few lines above an assertion
+that a Yes now does schedule. It is marked as the pre-fix observation.
+
+One low was fixed rather than recorded because it can fail *other* tests:
+`test_pdm125` arms a real 60ms timer and cancelled it on the last line, outside
+any `try/finally`, so a failing assertion left a callback queued against a
+screen about to be destroyed — and `_run_due_timers` in a later test dispatches
+timer events indiscriminately. It is in a `finally` now.
+
+Three lows are in `BACKLOG.md`: `test_pdm1115` pins the teardown's internal
+order where only "the modal is gone before the status is written" is the
+contract; the two teardown tests assert against a hand-written double with
+nothing tying it to the real class; and three defensive arms have no test, of
+which the one worth doing is `CTkInputDialog.__init__` raising *after*
+`grab_set`, where `dialog` is unbound, the teardown is skipped and the grab
+leaks.
+
+The pass also judged the modified tests independently, which is the check that
+matters most here, and found **no narrowing**: it identified 2 pre-existing
+tests changed in the first range (`update_idletasks` → `_run_due_timers`,
+reason (b), and it verified the reason against the `after_idle` → `after(0)`
+change rather than accepting it) and 3 more changed later in the range, all
+retargets or strengthenings. It called the `yview_scroll`-arguments → distance
+change the best change in the range. It could not assess anything needing a
+mapped window, and it did not run the suite.
+
+4 new tests and 1 strengthened, 4 mutants, all killed after the vacuous one was
+repaired.
 
 ## Risks / Known gaps
 
