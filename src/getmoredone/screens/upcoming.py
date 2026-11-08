@@ -9,6 +9,7 @@ from typing import Optional, TYPE_CHECKING
 from ..models import ActionItem
 from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
+from ..priority_levels import row_fill
 from ..date_utils import increment_date
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import notify_weekly_tactic_changes
@@ -162,6 +163,10 @@ class UpcomingScreen(ctk.CTkFrame):
     def refresh(self):
         """Refresh the list of upcoming items."""
         self.palette = semantic_colors()
+        # Reloaded here, not only in __init__, so a colour saved in
+        # Settings > Priority Colours shows the next time this screen is
+        # opened rather than only after a relaunch (PLC-M4).
+        self.settings = AppSettings.load()
         # Temporarily remove scroll_frame from grid to prevent flickering during rebuild
         grid_info = self.scroll_frame.grid_info()
         self.scroll_frame.grid_remove()
@@ -283,13 +288,18 @@ class UpcomingScreen(ctk.CTkFrame):
             self._ape_segment_cache,
             self._week_action_segment_cache,
         )
-        is_critical = (item.importance == 20 or item.urgency == 20)
-        if segment_color:
-            bg_color = segment_color
-        elif is_critical:
-            bg_color = palette["critical_tint"]
-        else:
-            bg_color = None
+        # use_completed_tint=False: this screen has never had a completed
+        # branch, and giving it one here would be a behaviour change nobody
+        # asked for (BACKLOG).
+        fill = row_fill(
+            self.settings,
+            palette,
+            item=item,
+            use_completed_tint=False,
+            segment_color=segment_color,
+        )
+        bg_color = fill.fill
+        row_text = fill.text_color or palette["row_text"]
         frame = ctk.CTkFrame(self.scroll_frame, fg_color=bg_color)
         apply_segment_accent(frame, segment_color)
         frame.grid_columnconfigure(1, weight=1)

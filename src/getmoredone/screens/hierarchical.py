@@ -6,7 +6,9 @@ import customtkinter as ctk
 from typing import Optional, TYPE_CHECKING, List
 
 from ..models import ActionItem, Status
+from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
+from ..priority_levels import row_fill
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import notify_weekly_tactic_changes
@@ -30,6 +32,9 @@ class HierarchicalScreen(ctk.CTkFrame):
         super().__init__(parent)
         self.db_manager = db_manager
         self.app = app
+        # Reloaded again at the top of refresh(); here so a row build that does
+        # not come through refresh() still has settings to read.
+        self.settings = AppSettings.load()
         self.search_query = ""  # Track search query
         self.segment_colors_by_id = {}
         self.segment_colors_by_name = {}
@@ -119,6 +124,10 @@ class HierarchicalScreen(ctk.CTkFrame):
     def refresh(self):
         """Refresh the hierarchical list."""
         self.palette = semantic_colors()
+        # Reloaded here, not only in __init__, so a colour saved in
+        # Settings > Priority Colours shows the next time this screen is
+        # opened rather than only after a relaunch (PLC-M4).
+        self.settings = AppSettings.load()
         # Temporarily remove scroll_frame from grid to prevent flickering during rebuild
         grid_info = self.scroll_frame.grid_info()
         self.scroll_frame.grid_remove()
@@ -219,12 +228,18 @@ class HierarchicalScreen(ctk.CTkFrame):
             self._ape_segment_cache,
             self._week_action_segment_cache,
         )
-        if item.status == Status.COMPLETED:
-            bg_color = palette["success_tint"]
-        elif item.importance == 20 or item.urgency == 20:
-            bg_color = palette["critical_tint"]
-        else:
-            bg_color = None
+        # segment_color=None: this screen applies its segment colour as an
+        # accent only and has never used it as a row fill, unlike Today,
+        # Upcoming and All Items (BACKLOG).
+        fill = row_fill(
+            self.settings,
+            palette,
+            item=item,
+            use_completed_tint=item.status == Status.COMPLETED,
+            segment_color=None,
+        )
+        bg_color = fill.fill
+        row_text = fill.text_color or palette["row_text"]
         frame = ctk.CTkFrame(self.scroll_frame, fg_color=bg_color)
         apply_segment_accent(frame, segment_color)
         frame.grid_columnconfigure(0, weight=1)

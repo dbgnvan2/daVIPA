@@ -12,6 +12,7 @@ from ..db_manager import DatabaseManager
 from ..models import ActionItem
 from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
+from ..priority_levels import row_fill
 from ..date_utils import increment_date
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import notify_weekly_tactic_changes
@@ -473,16 +474,17 @@ class TodayScreen(ctk.CTkFrame):
             self._ape_segment_cache,
             self._week_action_segment_cache,
         )
-        is_critical = (item.importance == 20 or item.urgency == 20)
-        row_text = palette["row_text"]
-        if segment_color:
-            bg_color = segment_color
-        elif is_completed:
-            bg_color = palette["success_tint"]
-        elif is_critical:
-            bg_color = palette["critical_tint"]
-        else:
-            bg_color = None
+        fill = row_fill(
+            self.settings,
+            palette,
+            item=item,
+            use_completed_tint=is_completed,
+            segment_color=segment_color,
+        )
+        bg_color = fill.fill
+        # None from row_fill means "leave the theme's row text alone"; only a
+        # priority-level fill brings a text colour of its own (PLC-M4.4).
+        row_text = fill.text_color or palette["row_text"]
 
         frame = ctk.CTkFrame(self.scroll_frame, fg_color=bg_color)
         apply_segment_accent(frame, segment_color)

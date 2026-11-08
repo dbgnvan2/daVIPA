@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from ..models import Status
 from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
+from ..priority_levels import row_fill
 from .segment_color_utils import resolve_segment_color_for_item
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
 from .week_collision_notice import notify_weekly_tactic_changes
@@ -155,6 +156,10 @@ class AllItemsScreen(ctk.CTkFrame):
     def refresh(self):
         """Refresh the list of items."""
         self.palette = semantic_colors()
+        # Reloaded here, not only in __init__, so a colour saved in
+        # Settings > Priority Colours shows the next time this screen is
+        # opened rather than only after a relaunch (PLC-M4).
+        self.settings = AppSettings.load()
         # Temporarily remove scroll_frame from grid to prevent flickering during rebuild
         grid_info = self.scroll_frame.grid_info()
         self.scroll_frame.grid_remove()
@@ -234,14 +239,15 @@ class AllItemsScreen(ctk.CTkFrame):
                     self._ape_segment_cache,
                     self._week_action_segment_cache,
                 )
-                if segment_color:
-                    bg_color = segment_color
-                elif item.status == Status.COMPLETED:
-                    bg_color = palette["success_tint"]
-                elif item.importance == 20 or item.urgency == 20:
-                    bg_color = palette["critical_tint"]
-                else:
-                    bg_color = None
+                fill = row_fill(
+                    self.settings,
+                    palette,
+                    item=item,
+                    use_completed_tint=item.status == Status.COMPLETED,
+                    segment_color=segment_color,
+                )
+                bg_color = fill.fill
+                row_text = fill.text_color or palette["row_text"]
                 item_frame = ctk.CTkFrame(self.scroll_frame, fg_color=bg_color)
                 apply_segment_accent(item_frame, segment_color)
                 item_frame.grid(row=idx, column=0, sticky="ew", pady=2, padx=5)

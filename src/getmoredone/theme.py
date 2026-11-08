@@ -361,6 +361,49 @@ def priority_fill_colors() -> Dict[str, str]:
     }
 
 
+def priority_level_fill_colors() -> Dict[str, str]:
+    """PLC-M2 — the default row tint for each of the three priority *levels*.
+
+    Purpose: the one place the shipped level colours are written down.
+    Spec:    docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m2
+    Tests:   tests/test_priority_level_colors.py::test_plcm22_settings_defaults_match_the_theme_table
+
+    A *level* is a rule on importance and urgency, not a band on
+    ``priority_score`` — see ``priority_levels`` for why the two are kept
+    apart. These are only the defaults: the user sets their own in
+    Settings → Priority Colours, and ``priority_levels.level_color`` prefers
+    theirs. The empty string is "no fill", which is what rows with no high or
+    critical factor have always had.
+
+    **One value per level, not one per theme**, unlike every other table in
+    this module. A colour the user picks in a colour chooser cannot have a
+    light and a dark variant, and a setting that silently did something
+    different in the two appearance modes would be worse than one that does
+    the same thing in both. The consequence — a pale fill needs dark text, in
+    either mode — is handled where the fill is applied:
+    ``priority_levels.row_fill`` derives the row's text colour from the fill
+    with ``pick_text_color`` rather than leaving the theme's ``row_text`` on
+    it. Both defaults below are held to 4.5:1 against that picked text in both
+    modes by
+    ``tests/test_priority_level_colors.py::test_plcm46_default_level_colours_are_legible_in_both_themes``.
+
+    Green for Any Critical is the user's choice, asked for directly and
+    confirmed before this was built. It is not the conventional red, and it is
+    deliberately not ``critical_tint``, the pale red these rows used to take.
+    """
+    from .priority_levels import (
+        LEVEL_ANY_CRITICAL,
+        LEVEL_ANY_HIGH,
+        LEVEL_NO_HIGH_OR_CRITICAL,
+    )
+
+    return {
+        LEVEL_ANY_CRITICAL: "#DCFCE7",
+        LEVEL_ANY_HIGH: "#FEF3C7",
+        LEVEL_NO_HIGH_OR_CRITICAL: "",
+    }
+
+
 def block_type_colors() -> Dict[str, str]:
     """TB-M10/TB-M12 — the accent for a block that has no priority behind it.
 

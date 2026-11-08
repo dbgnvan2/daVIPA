@@ -5,7 +5,9 @@ Completed screen - view completed items.
 import customtkinter as ctk
 from typing import TYPE_CHECKING
 
+from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
+from ..priority_levels import row_fill
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import notify_weekly_tactic_changes
 from ..theme import apply_segment_accent, semantic_colors, button_style, combo_box_style, list_row_font
@@ -27,6 +29,9 @@ class CompletedScreen(ctk.CTkFrame):
         super().__init__(parent)
         self.db_manager = db_manager
         self.app = app
+        # Reloaded again at the top of refresh(); here so a row build that does
+        # not come through refresh() still has settings to read.
+        self.settings = AppSettings.load()
         self.segment_colors_by_id = {}
         self.segment_colors_by_name = {}
         self._parent_segment_cache = {}
@@ -127,6 +132,10 @@ class CompletedScreen(ctk.CTkFrame):
     def refresh(self):
         """Refresh the list of completed items."""
         self.palette = semantic_colors()
+        # Reloaded here, not only in __init__, so a colour saved in
+        # Settings > Priority Colours shows the next time this screen is
+        # opened rather than only after a relaunch (PLC-M4).
+        self.settings = AppSettings.load()
         # Temporarily remove scroll_frame from grid to prevent flickering during rebuild
         grid_info = self.scroll_frame.grid_info()
         self.scroll_frame.grid_remove()
@@ -192,11 +201,18 @@ class CompletedScreen(ctk.CTkFrame):
                     self._ape_segment_cache,
                     self._week_action_segment_cache,
                 )
-                is_critical = (item.importance == 20 or item.urgency == 20)
-                if is_critical:
-                    bg_color = palette["critical_tint"]
-                else:
-                    bg_color = None
+                # Every row here is completed and none of them has ever
+                # taken the completed tint -- it would be the whole screen --
+                # and the segment colour is an accent only (BACKLOG).
+                fill = row_fill(
+                    self.settings,
+                    palette,
+                    item=item,
+                    use_completed_tint=False,
+                    segment_color=None,
+                )
+                bg_color = fill.fill
+                row_text = fill.text_color or palette["row_text"]
                 item_frame = ctk.CTkFrame(self.scroll_frame, fg_color=bg_color)
                 apply_segment_accent(item_frame, segment_color)
                 item_frame.grid(row=idx, column=0, sticky="ew", pady=2, padx=5)

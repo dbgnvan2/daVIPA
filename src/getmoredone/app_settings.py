@@ -47,6 +47,33 @@ class AppSettings:
     theme_name: str = "apple_grey"
     list_row_font_size: int = 14
 
+    # PLC-M2 — the row tint for each of the three priority *levels*, which are
+    # rules on importance and urgency: Any Critical, Any High but no Critical,
+    # and neither. Not priority *bands* (thresholds on priority_score) — see
+    # priority_levels.py for why the two are kept apart.
+    #
+    # Three declared fields and not one dict field, because the set of levels
+    # is closed and named, and the UPD-M4 comment below records what an
+    # *undeclared* key costs: it is set, used for the session, and silently
+    # dropped at the next launch, because save() writes declared fields only.
+    # Three names cannot do that, and
+    # tests/test_priority_level_colors.py::test_plcm21_every_level_has_a_settings_field
+    # holds the mapping from priority_levels.LEVEL_KEYS to these names in both
+    # directions.
+    #
+    # "" means no fill — the row keeps the theme's own background, which is
+    # what a row with no high or critical factor has always had. It is not a
+    # stand-in for "unset": there is no such state, and the Restore Defaults
+    # button is how a default comes back.
+    #
+    # The defaults are duplicated from theme.priority_level_fill_colors(),
+    # which is where the project rule puts a colour. A dataclass default has to
+    # be a literal, so it cannot read that table; test_plcm22 asserts the two
+    # agree so the copy cannot drift.
+    priority_level_color_any_critical: str = "#DCFCE7"
+    priority_level_color_any_high: str = "#FEF3C7"
+    priority_level_color_no_high_or_critical: str = ""
+
     # Timer settings
     default_time_block_minutes: int = 30
     default_break_minutes: int = 5

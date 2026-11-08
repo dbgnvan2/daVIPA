@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Optional
 import logging
 
 
@@ -20,6 +21,40 @@ def _normalize_hex(hex_color: str) -> str:
         int(text[1:], 16)
     except ValueError as exc:
         raise ValueError(f"Invalid hex color: {hex_color}") from exc
+    return text
+
+
+def normalize_hex_color(value: object) -> "Optional[str]":
+    """Coerce a stored or typed colour to ``#RRGGBB``, or ``None`` if it cannot be.
+
+    Purpose: PLC-M2.5 -- a colour read back from settings.json, or typed into an
+             entry, reaches Tk, and Tk raises on a value it does not recognise.
+             A raised ``TclError`` inside a row build takes the whole list
+             screen down, so a bad value has to be caught before it gets there.
+    Spec:    docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m2
+    Tests:   tests/test_priority_level_colors.py::test_plcm25_a_malformed_stored_colour_falls_back_to_the_default
+
+    Returns rather than raises, unlike ``_normalize_hex``: every caller here has
+    a default to fall back to and wants to log the bad value, not handle an
+    exception. A three-digit ``#ABC`` is expanded, because that is a form people
+    type and every browser accepts; a named colour such as ``"red"`` is not,
+    because accepting some names and not others is worse than accepting none.
+    """
+    if not isinstance(value, str):
+        return None
+    text = value.strip().upper()
+    if not text:
+        return None
+    if not text.startswith("#"):
+        text = f"#{text}"
+    if len(text) == 4:
+        text = f"#{text[1] * 2}{text[2] * 2}{text[3] * 2}"
+    if len(text) != 7:
+        return None
+    try:
+        int(text[1:], 16)
+    except ValueError:
+        return None
     return text
 
 

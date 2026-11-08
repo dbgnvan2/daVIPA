@@ -14,6 +14,7 @@ from .. import week_calendar
 from ..obsidian_utils import validate_obsidian_setup
 from ..theme import APPEARANCE_MODES, THEME_NAMES, button_style, combo_box_style, status_text_color
 from .settings_integrations import SettingsIntegrationsMixin
+from .settings_priority_colors import SettingsPriorityColorsMixin
 from .settings_vsp_segments import SettingsVSPSegmentsMixin
 from ..utils.icon_loader import load_volume_icon
 
@@ -22,7 +23,12 @@ if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
 
 
-class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CTkFrame):
+class SettingsScreen(
+    SettingsIntegrationsMixin,
+    SettingsPriorityColorsMixin,
+    SettingsVSPSegmentsMixin,
+    ctk.CTkFrame,
+):
     """Screen for application settings."""
 
     def __init__(self, parent, db_manager: 'DatabaseManager', app: 'GetMoreDoneApp'):
@@ -72,22 +78,30 @@ class SettingsScreen(SettingsIntegrationsMixin, SettingsVSPSegmentsMixin, ctk.CT
         self.create_appearance_section(appearance_tab)
         self.create_date_increment_section(appearance_tab)
 
-        # Tab 3: Future Dates
+        # Tab 3: Priority Colours. Its own tab rather than a third section
+        # on Appearance: that tab's page is not scrollable and its two
+        # sections already run eight rows each, so a third would risk sitting
+        # below the bottom of a short window.
+        priority_tab = self.tabview.add("Priority Colours")
+        priority_tab.grid_columnconfigure(0, weight=1)
+        self.create_priority_colors_section(priority_tab)
+
+        # Tab 4: Future Dates
         future_tab = self.tabview.add("Future Dates")
         future_tab.grid_columnconfigure(0, weight=1)
         self.create_future_date_options_section(future_tab)
 
-        # Tab 4: Timer & Audio
+        # Tab 5: Timer & Audio
         timer_tab = self.tabview.add("Timer & Audio")
         timer_tab.grid_columnconfigure(0, weight=1)
         self.create_timer_audio_section(timer_tab)
 
-        # Tab 5: Organizational Factors
+        # Tab 6: Organizational Factors
         org_tab = self.tabview.add("Organizational Factors")
         org_tab.grid_columnconfigure(0, weight=1)
         self.create_organizational_factors_section(org_tab)
 
-        # Tab 6: Email Import
+        # Tab 7: Email Import
         email_tab = self.tabview.add("Email Import")
         email_tab.grid_columnconfigure(0, weight=1)
         self.create_email_import_section(email_tab)
