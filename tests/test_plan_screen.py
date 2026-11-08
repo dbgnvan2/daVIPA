@@ -5899,6 +5899,10 @@ def test_pdm57_a_block_drag_onto_a_virtual_box_is_refused(
     assert screen.settings.plan_day_start == "08:00", "a block lengthened the day"
     text = screen.status_label.cget("text")
     assert "cannot make a new half hour" in text, text
+    # The second clause too. Changed 2026-11-08 under reason (b): the wording
+    # was "lengthen the day", which PD-M13 made untrue -- the day is drawn
+    # wider and ⚙ Day Settings is untouched.
+    assert "drag an item here to add one" in text, text
 
 
 def test_pdm5_an_item_drag_onto_a_virtual_box_extends_the_day(
@@ -7203,8 +7207,14 @@ def test_pdm13_the_free_box_scan_bounds_the_span_too(root, manager, settings):
     scan as far as the end of the configured day.
     """
     panel = _short_day(root, manager, settings, end="09:00")  # boxes 0 and 1
-    # A Later drop has drawn the day out to box 2 (09:00-09:30).
-    _add_block(manager, 30, "Later", slot_index=2, outside_range=True)
+    # A Later drop has drawn the day out to box 2 (09:00-09:30). ``bounds`` is
+    # the short day the screen is on, so the write is checked against the same
+    # day -- without it the helper checks against its own 08:00-17:00 default,
+    # where box 2 is well inside the day and the flag does nothing.
+    short_day = DayBounds(day_start="08:00", day_end="09:00")
+    _add_block(
+        manager, 30, "Later", slot_index=2, bounds=short_day, outside_range=True
+    )
     for seat in range(MAX_BLOCKS_PER_SLOT):
         _add_block(manager, 30, f"Full {seat}", slot_index=0)
     panel.refresh()
@@ -7237,23 +7247,35 @@ def test_pdm13_a_failed_extension_redraws_before_it_reports(
     and a failure that is *not* pre-checked cannot be staged from outside.
     """
     item = _item(manager, "Early start")
-    redraws = []
+    # One list for both calls, so the *order* is asserted and not just that
+    # each happened -- the name of this test is a claim about the order.
+    calls = []
     real_refresh = screen.refresh
+    real_set_status = screen.set_status
 
-    def counted_refresh(*args, **kwargs):
-        redraws.append(1)
+    def traced_refresh(*args, **kwargs):
+        calls.append("refresh")
         return real_refresh(*args, **kwargs)
+
+    def traced_set_status(*args, **kwargs):
+        calls.append("set_status")
+        return real_set_status(*args, **kwargs)
 
     def boom(*args, **kwargs):
         raise RuntimeError("the disk went away")
 
-    monkeypatch.setattr(screen, "refresh", counted_refresh)
+    monkeypatch.setattr(screen, "refresh", traced_refresh)
+    monkeypatch.setattr(screen, "set_status", traced_set_status)
     monkeypatch.setattr(manager, "add_block_at", boom)
 
     screen.extend_day_for(item, DAY_EXTEND_EARLIER)
 
-    assert redraws, (
+    assert "refresh" in calls, (
         "the day was not redrawn after the extension failed, so a failure "
         "after the write would leave the screen showing a day that is gone"
+    )
+    assert calls.index("refresh") < calls.index("set_status"), (
+        "the day was redrawn after the error was reported; if the redraw "
+        f"itself throws, the user loses the sentence. Order was {calls}"
     )
     assert "the disk went away" in screen.status_label.cget("text")

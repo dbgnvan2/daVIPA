@@ -667,7 +667,25 @@ def test_pdm1311_a_box_before_midnight_is_refused():
     assert slot_is_on_the_date(BOUNDS, 31, 2) is False
 
 
-def test_pdm13_the_grid_never_draws_a_box_the_date_cannot_hold():
+# Both directions, because Day Start moves either way and the two used to fail
+# differently: below midnight ``format_hhmm`` floors to "00:00" and several
+# boxes share one label, above it the label counts on past 24 and reads "40:00".
+# Parametrized rather than looped so that each clamp is reported on its own --
+# the two cases exercise the lower and upper ends independently, and a loop
+# would stop at the first failure and hide the other.
+@pytest.mark.parametrize(
+    "bounds, stored_index",
+    [
+        # A block stored at 07:30 under an 08:00 Day Start, read back after the
+        # user moved Day Start to 00:00: the box now falls before midnight.
+        (DayBounds(day_start="00:00"), -1),
+        # A block stored at 20:00 under an 08:00 Day Start, read back after the
+        # user moved Day Start to 20:00: the box now falls past midnight.
+        (DayBounds(day_start="20:00", day_end="23:30"), 40),
+    ],
+    ids=["day_start_moved_earlier", "day_start_moved_later"],
+)
+def test_pdm13_the_grid_never_draws_a_box_the_date_cannot_hold(bounds, stored_index):
     """PD-M13.15 — what is drawn is what ``can_place`` will accept.
 
     Purpose: close the gap between the two limits. ``slot_is_on_the_date`` is
@@ -677,33 +695,24 @@ def test_pdm13_the_grid_never_draws_a_box_the_date_cannot_hold():
     Spec:    docs/implementation_plan_2026-11-07_plan_day_range.md#pd-m13
     Tests:   this test
 
-    A stored index counts from Day Start, so reducing Day Start in ⚙ Day
-    Settings reinterprets every stored index -- and an index placed *before*
-    the old start can land before midnight under the new one.
+    A stored index counts from Day Start, so changing Day Start in ⚙ Day
+    Settings reinterprets every stored index, and a box can end up off the
+    date entirely. Such a block widens the day by **nothing**: it is not drawn
+    in the extra boxes, so they would stand empty past the configured range.
     """
-    # Both directions, because Day Start moves either way and the two fail
-    # differently: before midnight format_hhmm floors to "00:00" and two boxes
-    # share one label, past midnight it counts on past 24 and draws "40:00".
-    cases = [
-        # A block stored at 07:30 under an 08:00 start, read back from 00:00.
-        (DayBounds(day_start="00:00"), _block(30, slot_index=-1, label="07:30")),
-        # A block stored at 20:00 under an 08:00 start, read back from 20:00.
-        (
-            DayBounds(day_start="20:00", day_end="23:30"),
-            _block(30, slot_index=40, label="20:00"),
-        ),
-    ]
-    for bounds, stored in cases:
-        drawn = drawn_day_slots(bounds, [stored])
-        assert drawn, "the configured day is still the floor"
-        for slot in drawn:
-            assert slot_is_on_the_date(bounds, slot.index), (
-                f"box {slot.index} is drawn but no write path will accept it"
-            )
-            assert 0 <= slot.start_minutes < 24 * 60, (
-                f"box {slot.index} starts at {slot.start_minutes} minutes past "
-                "midnight, which is not a time of day on this date"
-            )
+    drawn = drawn_day_slots(bounds, [_block(30, slot_index=stored_index)])
+
+    assert drawn == day_grid(bounds), (
+        "a block the date cannot hold must widen the day by nothing, because "
+        "it is not drawn in the boxes the widening would add"
+    )
+    # The symptom the user saw, and a check on ``format_hhmm`` rather than on
+    # the widening: an off-date box was floored or counted on, so two boxes in
+    # the time column carried the same clock label.
+    labels = [slot.start_time for slot in drawn]
+    assert len(set(labels)) == len(labels), (
+        f"two boxes in the day carry the same clock label: {labels}"
+    )
 
 
 def test_pdm13_an_index_the_new_day_start_puts_off_the_date_goes_outside():
@@ -744,6 +753,9 @@ def test_pdm13_one_unreadable_index_cannot_ask_for_an_unbounded_grid():
     """
     grid = build_day_grid([_block(30, slot_index=100_000, label="corrupt")], BOUNDS)
 
-    # 48 half hours is the most any date can hold.
-    assert len(grid.slots) <= 48
+    # Exactly the configured day, box for box -- not "at most 48", which would
+    # pass for any wrong-but-small extent as well as for the right one.
+    assert [entry.slot.index for entry in grid.slots] == [
+        slot.index for slot in day_grid(BOUNDS)
+    ]
     assert [b.label for b in grid.outside] == ["corrupt"]
