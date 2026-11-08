@@ -1,6 +1,10 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-08 (UPD-M6 put APE Week Actions on the shared divider
+Last Updated: 2026-11-08 (WTP-M1 to WTP-M6 made a Weekly Tactic the parent of
+the Action Items filed under it in every reader of parenthood, all 38 criteria
+built, and added one adjacent issue as WTP-A1 - the shipped-column width test
+that enumerates three of the five column sets by hand; UPD-M6 put APE Week
+Actions on the shared divider
 and chip table, gave it the three lineage filters it never had, and moved the
 filter rule and the category chip colour into one owner each rather than a
 sixth copy: one adjacent issue is filed as UPD-A9, the five copies left under
@@ -14,6 +18,82 @@ place below, UPD-A6's claim that UPD-M4 would empty the holdout lists is
 corrected there - `weekly_items.py` is the last copy and UPD-M5 rewrites it -
 and one adjacent issue is filed as UPD-A7, two dead index-based members in
 `annual_vision_segments.py`; UPD-M1 added two adjacent issues as UPD-A5 and UPD-A6 - a fifth copy of the splitter in Project Boards, whose clamp was already right where the four consolidated copies were wrong, and the holdout list UPD-M1.5 needs until UPD-M4 empties it; a third cold pass over the AWA re-sweep's fixes added AWA-S9 to AWA-S11, found no high, and showed that half of one low fixed in the previous round was not a defect; the cold re-sweep of the AWA fix commits added its four remaining lows as AWA-S5 to AWA-S8, with its one high, three mediums and one raised low fixed in-loop and one low fixed against the budget with its reason stated there; the AWA sweep's four below-medium findings added as AWA-S1 to AWA-S4, with its one high and five mediums fixed in-loop and AWA-A3 mostly closed by that fix; four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## Adjacent issues — Plan day calendar export (CE, 2026-11-08)
+
+Found while building CE-M1 to CE-M5. Flagged, not fixed (global rule 10): each
+is real, none is what was asked for, and each sits in code the export only
+reads past.
+
+### CE-A1 — `update_event` silently drops `location` and `attendees` (medium)
+
+`src/getmoredone/google_calendar.py::update_event` sends the body it fetched
+with `summary`, `start`, `end` and `description` replaced. `location` and
+`attendees` survive only because the fetched body carries them; nothing in the
+signature lets a caller change them, and a caller that means to clear one has
+no way to say so. The day export never sets either, so this batch cannot
+trigger it — but the Item Editor's calendar dialog sets both on create, and
+the first code that edits such an event through `update_event` will find it
+can only ever preserve what is already there.
+
+**Priority:** Medium
+**Effort:** Small
+
+### CE-A2 — `_say` prints to stdout from a GUI app (low)
+
+`src/getmoredone/google_calendar.py::_say` writes status lines to stdout.
+Same family as the fixed defect where a status `print` inside a credential
+`try` discarded a valid token when the stdout write failed: a packaged app's
+stdout is not guaranteed writable, and a print in a `try` makes the failure
+look like the thing being tried. The export path calls it through the shared
+helpers.
+
+**Priority:** Low
+**Effort:** Small
+
+### CE-A3 — `GoogleCalendarManager.__init__` authenticates (low)
+
+Constructing the manager runs the OAuth flow or raises, so the class cannot be
+built to ask it a cheap question. The export works around it with an injected
+client factory on the screen (CE-M4.5) rather than reshaping the constructor,
+because every existing caller depends on construction meaning "authenticated".
+
+**Priority:** Low
+**Effort:** Medium
+
+### CE-A4 — the calendar dialog's create path is a second exporter (low)
+
+`screens/calendar_dialog.py::create_event` writes an `ItemLink`, sets
+`is_meeting` and opens a browser tab. The day export deliberately does none of
+that, so there are now two ways an event reaches Google from this app with
+different side effects. Not unified in this batch: the dialog's side effects
+are what the Item Editor's flow is for, and dropping them would be a silent
+change to it.
+
+**Priority:** Low
+**Effort:** Medium
+
+## Adjacent issue — weekly tactic as parent (WTP, 2026-11-08)
+
+Found while building WTP-M6.4. Flagged, not fixed (global rule 10).
+
+### WTP-A1 — the shipped-column width test names its sets by hand (low)
+
+`tests/test_unified_panel_design.py::test_updm31_every_shipped_column_declares_a_width_it_can_have`
+holds a literal dict of column sets, so a set added to `chip_table.py` is not
+checked until somebody remembers to add it there too. That is what had
+happened: `WEEK_ACTIONS_LEFT_COLUMNS` shipped in UPD-M6 and was never in the
+dict, and the two sets this batch touched were added by hand for the same
+reason. The guarantee the test is written to give — *every* shipped column
+declares a width inside its own bounds — is not the guarantee it enforces.
+
+The fix is to enumerate the module instead: every module-level
+`Tuple[ChipColumn, ...]` in `chip_table.py`, found by name rather than listed.
+Not fixed here because it is a change to a test's subject, which is the kind of
+rewrite that wants its own pass rather than riding along with a feature.
+
+**Priority:** Low
+**Effort:** Small
 
 ## Adjacent issues — priority level colours (PLC, 2026-11-08)
 

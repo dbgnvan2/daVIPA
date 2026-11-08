@@ -185,19 +185,70 @@ handoff note is `docs/changes/2026-11-08-priority-level-colours.md`:
 - Why the control is a new tab rather than a third section on Appearance
 - Five adjacent issues found and not fixed, filed in `BACKLOG.md`
 
+### docs/implementation_plan_2026-11-08_plan_calendar_export.md
+
+Implementation plan for exporting a planned day to Google Calendar
+(CE-M1 - CE-M5). **Approved 2026-11-08 and built the same day**;
+per-criterion status, the verification runs and seven deviations from this
+plan's wording are in
+`docs/spec_coverage_2026-11-08_plan_calendar_export.md`, and the batch's
+handoff note is `docs/changes/2026-11-08-plan-calendar-export.md`:
+
+- What the Plan screen's "⤴ Google Calendar" button exports, and the three
+  named, counted reasons a block is skipped rather than guessed at
+- The two halves of idempotency — an event id on the block and the block's id
+  in the event's private properties — and why a tombstone table was not needed
+- Why an event without daVIPA's marker is never updated or deleted, whatever
+  its title or time
+- Hardening the Google layer as a class: timeouts, retry on 429/5xx only, and
+  404/410 as "the event is gone" rather than as a failure
+- Why the worker thread hands its result back by polling instead of calling
+  `after()` — Tk is not thread-safe and `after` is not an exception
+- Four adjacent issues found and not fixed
+- The six-step manual checklist, which is the part no test can cover
+
+### docs/spec_2026-11-08_weekly_tactic_as_parent.md
+
+Spec and implementation plan for a Weekly Tactic acting as the parent of the
+Action Items filed under it (WTP-M1 - WTP-M6). **Approved 2026-11-08 and built
+the same day: 32 of 35 criteria `done`, 3 not built** - per-criterion status in
+the spec's §6, and the batch's handoff note is
+`docs/changes/2026-11-08-weekly-tactic-as-parent.md`:
+
+- Why the tactic is made a parent in the readers rather than in storage: the
+  launch migration nulls `parent_id` for week parents, so writing it would be
+  undone at the next start
+- The nine readers of parenthood the app had, and what each did with
+  `weekly_tactic_id` before this
+- `parent_of` as the one object-level authority, `get_children` as its SQL
+  form, and the test that holds the two to the same answer over every link
+  shape
+- Why `parent_id` wins when both columns are set, so one item has one place in
+  the tree
+- Three faults found while implementing: a second parenthood reader in the
+  Hierarchy dialog, a delete that removed subtasks before deciding it should
+  not have, and a vacuous test whose own justification in this spec was wrong
+- The corrected account of what a tactic delete used to do, with the counts it
+  was verified against
+- The three criteria not built, and the concurrent session that holds their
+  files - filed as WTP-A1 to WTP-A3 in `BACKLOG.md`
+
 ## Feature-Specific Documentation
 
 ### Requirements (Consolidated)
 
 All requirements are now maintained in `daVIPA_MasterSpec_SQLite_v1.md`. The timer-specific requirements document is retained only for archival reference.
 
-### docs/google-calendar-setup.md (8.7KB)
+### docs/google-calendar-setup.md (13KB)
 
 Google Calendar integration guide:
 
 - OAuth 2.0 setup instructions
 - credentials.json configuration
 - Authorization flow
+- **Exporting a planned day** from the Plan screen: what goes out, what is
+  skipped and why, what a second export of the same day does, and which
+  calendar is written to
 - Troubleshooting common issues
 - API quota information
 

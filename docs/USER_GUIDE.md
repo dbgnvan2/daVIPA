@@ -52,8 +52,16 @@ daVIPA is a desktop task manager focused on prioritization and execution.
 - Why: Keeps the context for a task inside the task.
 
 ### Hierarchy (parent/child tasks)
-- What: Any item can have child items.
-- Why: Useful for breaking large work into smaller next actions.
+- What: Any item can have child items. An item gets a parent in one of two
+  ways: you set one with **Set Parent**, or you file the item under a Weekly
+  Tactic — a tactic is the parent of the items filed under it, and behaves like
+  one everywhere a parent is shown (the Hierarchical tree, **Show Related**,
+  the editor's `Parent:` line, and the delete guard).
+- Why: Useful for breaking large work into smaller next actions, and it means
+  a week's plan and the work under it are one tree rather than two lists.
+- If an item has both — a parent you set *and* a Weekly Tactic — the parent you
+  set wins, so the item appears in one place in the tree, not two. The tactic
+  is still shown on the editor's Organise tab.
 
 ### VSP (Vision Strategy Plan)
 - What: A planning hierarchy from long-term vision down to weekly actions, grouped by life segment.
@@ -129,7 +137,9 @@ Header controls:
 - **+ New Item** — What: Creates a new item. Why: Add tasks from the hierarchy view.
 
 Behavior:
-- Without search: shows roots and children indented.
+- Without search: shows roots and children indented. A Weekly Tactic is a root,
+  with the items filed under it indented beneath it, and its row shows `(N sub)`
+  counting them.
 - With search: shows a flat list of matching items.
 
 ### Scheduler
@@ -841,6 +851,10 @@ Main fields:
   you leave it blank here, the Timer asks for one when you start a session on an item
   that belongs to a Project — so it is only ever optional, never skipped where it counts.
 - **Planned Minutes** — What: Time estimate. Why: Better scheduling and stats.
+- **Parent** — What: Shown only when the item has one: `Parent: <title>`, with a
+  **View Parent** button that opens that item in its own editor. The parent is the item
+  you set with **Set Parent**, or — if you have not set one — the Weekly Tactic this item
+  is filed under. Why: Know what this task belongs to, and step up to it in one click.
 
 Action Plan (top left):
 - **Project** — What: The Project Board this item is filed under. Why: See at a glance where
@@ -895,13 +909,22 @@ Buttons (paired below):
   the link back to the original.)
 - **Add Subtasks** — What: Creates one child item per line in Next Action. Why: Quickly split work.
 - **Set Parent** — What: Assigns a parent item. Why: Organize tasks into a tree.
-- **Show Related** — What: Shows parent and children. Why: Navigate the hierarchy.
+- **Show Related** — What: Shows parent and children — for an item filed under a
+  Weekly Tactic, the tactic is the parent, and opening it on a tactic lists that
+  week's items as its children. Why: Navigate the hierarchy.
 - **Set Wk Tactic** — What: Files the item under a Weekly Tactic. Why: Tie daily work to the week's plan.
 - **Set Project** — What: Files the item under a Project Board — and can create a new Project on
   the spot with **+ New Project**. Why: Create a task and the project it belongs to without
   leaving the editor. **Clear Project** unfiles it. Not available on a Weekly Tactic record.
-- **Complete** — What: Marks the item completed. Why: Track progress.
-- **Delete** — What: Deletes the item (children are preserved). Why: Remove obsolete tasks.
+- **Complete** — What: Marks the item completed. On a Weekly Tactic with items
+  still open it asks first, naming how many; completing the tactic does not
+  complete them. Why: Track progress without silently closing a week that is
+  not finished.
+- **Delete** — What: Deletes the item. Refused if the item has child items,
+  naming how many — including, for a Weekly Tactic, the items filed under it.
+  Why: Remove obsolete tasks without losing the work underneath them.
+  (Deleting a Weekly Tactic from the VSP screen's weekly list is a different
+  path: it *does* delete the items under it, after a confirmation.)
 - **Save + New** (new items only) — What: Saves and opens a new item. Why: Rapid entry of multiple tasks.
 
 Note: filing an item under a Project also stamps that project's Annual Plan Element onto the
