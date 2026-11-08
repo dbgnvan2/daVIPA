@@ -321,11 +321,14 @@ def test_awam23_one_home_for_the_link_predicate():
 
     assert counts == {"weekly_tactic.py": 1}
 
-    # And it is the constant both callers use, not a third thing.
-    from src.getmoredone import vps_manager, weekly_tactic_maintenance
+    # And it is the constant every caller uses, not a third thing. WTP-M2
+    # added the fourth: ``db_manager.get_children`` answers for a Weekly
+    # Tactic from this predicate rather than from a copy of it.
+    from src.getmoredone import db_manager, vps_manager, weekly_tactic_maintenance
     from src.getmoredone.weekly_tactic import LINK_PREDICATE_SQL
     assert vps_manager.LINK_PREDICATE_SQL is LINK_PREDICATE_SQL
     assert weekly_tactic_maintenance.LINK_PREDICATE_SQL is LINK_PREDICATE_SQL
+    assert db_manager.LINK_PREDICATE_SQL is LINK_PREDICATE_SQL
 
 
 def test_awam23_an_item_is_listed_under_one_tactic_only(tmp_path):
@@ -695,12 +698,28 @@ def test_awam57_no_selection_is_not_an_error(tmp_path):
 
 # --------------------------- AWA-M4: left panel, the week's Weekly Tactics
 
+def _settings_stub(first_day=0):
+    """A settings double carrying the fields this tab's panels write to.
+
+    UPD-M6 gave APE Week Actions a persisted divider ratio and a persisted
+    column-width store. ``split_panel`` warns when its prefix has no field to
+    land in and ``ColumnResizer._persist`` calls ``save()``, so a bare
+    namespace would log on every construction here and raise on a drag.
+    """
+    return SimpleNamespace(
+        first_day_of_week=first_day,
+        week_actions_split_ratio=0.5,
+        week_actions_left_col_widths={},
+        save=lambda: None,
+    )
+
+
 def _week_screen(tmp_path, vps, first_day=0):
     """A WeekActionsScreen on a withdrawn root, Monday-start by default."""
     from src.getmoredone.screens.week_actions import WeekActionsScreen
     root = _root()
     app = _app_stub(vps.db_manager, vps)
-    app.settings = SimpleNamespace(first_day_of_week=first_day)
+    app.settings = _settings_stub(first_day)
     screen = WeekActionsScreen(root, vps, app)
     screen.update_idletasks()
     return root, screen
@@ -746,7 +765,11 @@ def test_awam42_left_panel_lists_the_weeks_tactics(tmp_path):
             listed = {row["id"] for row in screen.tactic_rows}
             assert listed == {mine.id}
             assert theirs.id not in listed
-            assert set(screen.tactic_buttons) == {mine.id}
+            # UPD-M6.2: the left panel is the shared chip table now, so the
+            # row widget per tactic is a row frame where it was a CTkButton.
+            # The claim is unchanged -- one widget for this week's tactic and
+            # none for another week's.
+            assert set(screen.tactic_row_frames) == {mine.id}
         finally:
             root.destroy()
     finally:
@@ -874,7 +897,7 @@ def _hub(tmp_path, vps):
     )
     root = _root()
     app = _app_stub(vps.db_manager, vps)
-    app.settings = SimpleNamespace(first_day_of_week=0)
+    app.settings = _settings_stub()
     hub = VisionPlanningHubScreen(root, vps, app)
     hub.update_idletasks()
     return root, hub
@@ -919,7 +942,7 @@ def test_awam12_screen_header_matches_the_tab(tmp_path):
     try:
         root = _root()
         app = _app_stub(vps.db_manager, vps)
-        app.settings = SimpleNamespace(first_day_of_week=0)
+        app.settings = _settings_stub()
         try:
             screen = WeeklyItemsScreen(root, vps, app)
             screen.update_idletasks()
