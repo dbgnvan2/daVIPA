@@ -93,6 +93,65 @@ files must be updated in the same change. Enforced by the docs sync gate
 (`.github/workflows/agent-docs-gate.yml`), which treats both `requirements.txt`
 and `requirements-dev.txt` as dependency files.
 
+### One build batch at a time
+
+**Only one session builds in this checkout at a time.** A working tree has one
+git index, so every concurrent writer races on the same one, whatever the
+sessions are to each other — siblings, children of one task, or unrelated. This
+is not a rule about tidiness; it is the shape of the tool.
+
+On 2026-11-08 four batches built here at once (WTP, PLC, CE, UPD-M6). What it
+cost, measured rather than feared:
+
+- **A commit swept another session's work.** `869cbd6` carried an uncommitted
+  `_settings_stub` addition to `tests/test_ape_week_actions.py` that belonged
+  to another batch. It is in the repo and no longer shows as pending in the
+  tree that wrote it. Two more near-misses followed: six staged PLC source
+  files caught before the commit landed, and a `git add` of three shared docs
+  that froze a mid-edit snapshot of someone else's prose into the index.
+- **Work was deferred that did not need to be.** WTP-M5.2, WTP-M6.4's
+  rendering and WTP-M6.5 were filed in `BACKLOG.md` as not built, because
+  `screens/weekly_items.py` and `screens/week_actions.py` carried 327
+  uncommitted lines from another batch. They were built an hour later when that
+  session committed. The spec, the backlog and the handoff note all had to be
+  rewritten.
+- **The suite could not be run.** Not once all day, because the files kept
+  moving underneath it.
+
+Nine files took two or three of those four batches: `BACKLOG.md`,
+`docs/DOCUMENTATION_INDEX.md`, `docs/USER_GUIDE.md`, `screens/weekly_items.py`,
+`screens/week_actions.py`, `screens/chip_table.py`,
+`tests/test_unified_panel_design.py`, `app_settings.py` and `NOTES.md`. That is
+not bad luck: the screens share `chip_table.py` and `theme.py`, and every batch
+appends to the same three documents, so two UI batches will nearly always
+overlap.
+
+So:
+
+- **Finish a batch before starting the next** — `/csdp`, then pushed. This is
+  what the working process at the top of `~/.claude/CLAUDE.md` already
+  prescribes; the four-at-once day broke it.
+- **A session that runs alongside a build is read-only.** Cold review passes,
+  "where is X done" investigations, drafting a spec into a new file of its own.
+  It commits nothing and stages nothing, so sharing the checkout is safe.
+- **Two builds at once means two worktrees**, and the file sets are checked for
+  overlap *before* either starts, not discovered mid-batch. Worktrees give each
+  session its own index, which ends the swept commits; they turn the nine files
+  above into merge conflicts instead, so disjointness is still the thing that
+  makes it work.
+- **Keep a batch's doc work in its own new files** while the batch runs — its
+  spec, its handoff note — and add the `BACKLOG.md`, `docs/USER_GUIDE.md` and
+  `docs/DOCUMENTATION_INDEX.md` entries last, after the merge. Those three are
+  the chronic conflict surface because every batch writes to the same region of
+  each.
+
+**Never stage a file to protect your own committed work.** The index is shared;
+staging a file another session is editing freezes its half-finished state where
+an index-based `git commit` will pick it up. Commit your own paths explicitly
+instead — `git commit -- <paths>`, or a filtered patch applied to a temporary
+`GIT_INDEX_FILE` when one file holds two sessions' hunks — and leave the index
+as you found it.
+
 ## Review sweeps
 
 A sweep is a review pass over a batch before it is pushed. The rules exist

@@ -7,6 +7,15 @@
 > requirements below are retained because they were never about the agent
 > split — they are about not losing context between sessions.
 
+## One build batch at a time
+
+Only one session builds in this checkout at a time. A working tree has one git
+index, so concurrent writers race on it however the sessions are related. A
+session running alongside a build is read-only; two builds at once means two
+worktrees with checked-disjoint file sets. The rule, and what four concurrent
+batches cost on 2026-11-08, are in `CLAUDE.md` under *Working agreements →
+One build batch at a time*.
+
 ## Required handoff artifact
 
 Every batch of work writes a handoff note at:
