@@ -429,17 +429,24 @@ def test_wtpw_the_prompt_survives_a_real_always_on_top_parent(
 
 
 def test_wtpw_the_screens_with_a_completion_control_are_pinned():
-    """Which screens actually offer a control that completes an item.
+    """Which screens wire a widget to ``complete_item``.
 
-    Not the same question as "which complete_item call sites are guarded",
-    which tests/test_weekly_tactic_completion_surfaces.py pins at seven. This
-    one is the set a user can reach, found by looking for a widget whose
-    command calls complete_item -- and it is four, not six, because
-    HierarchicalScreen.complete_item has no caller anywhere in src (WTP-A8)
-    and project_boards' own call site is the only one outside a row checkbox.
+    Exactly that, and not "every completion control a user can reach": the
+    predicate looks for a ``command=`` whose value names ``complete_item``, so
+    the timer's Done button is outside this pin by construction -- it reaches
+    ``complete_action_item`` through ``finished_action``. That is not a
+    coverage hole, since the two timer tests in this file press it and
+    ``EXPECTED_CALL_SITES`` in the surfaces file pins the call site, but the
+    pin's reach stops where its predicate does.
+
+    Five screens, not the seven guarded call sites that
+    tests/test_weekly_tactic_completion_surfaces.py pins: the timer is
+    excluded as above, and ``HierarchicalScreen.complete_item`` has no caller
+    anywhere in src (WTP-A8). Of the five, four wire a row checkbox and
+    item_editor wires a Complete button.
 
     An exact set, so wiring a control to a new screen fails here and has to be
-    added to this file's parametrize list rather than shipping unpressed.
+    added to this file's BUILDERS rather than shipping unpressed.
     """
     import ast
 
