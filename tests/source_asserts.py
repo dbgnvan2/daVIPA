@@ -110,6 +110,54 @@ def calls_method_on_name(func: Callable, name: str, method: str) -> bool:
     return calls_attribute(func, name, method)
 
 
+def local_assignments(func: Callable, name: str) -> "list[ast.AST]":
+    """Every value assigned to the local ``name`` in ``func``, in source order.
+
+    Used where the *shape* of an assignment is the contract and a behavioural
+    check cannot reach it: PLC-M4.7 needs "``bg_color`` is assigned once, from
+    ``fill.fill``", which proves the five list screens no longer each decide a
+    row fill for themselves. Returns the value nodes so the caller can assert
+    an exact count -- never a floor, which would hide the narrowing the guard
+    exists to catch.
+    """
+    found = []
+    for node in ast.walk(_tree(func)):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == name:
+                    found.append(node.value)
+        elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
+            target = node.target
+            if isinstance(target, ast.Name) and target.id == name:
+                found.append(node.value)
+    return found
+
+
+def count_calls(func: Callable, name: str) -> int:
+    """How many times ``func`` calls the bare function ``name(...)``.
+
+    A call, not a mention: a docstring naming the function, a string literal
+    and an import of it do not count.
+    """
+    return sum(
+        1
+        for node in ast.walk(_tree(func))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == name
+    )
+
+
+def assigns_attribute_of(value: ast.AST, owner: str, attr: str) -> bool:
+    """Is ``value`` exactly the expression ``<owner>.<attr>``?"""
+    return (
+        isinstance(value, ast.Attribute)
+        and value.attr == attr
+        and isinstance(value.value, ast.Name)
+        and value.value.id == owner
+    )
+
+
 def iterates_mapping(func: Callable, name: str) -> bool:
     """Does ``func`` call ``<name>.items()`` or ``<name>.values()``?
 
