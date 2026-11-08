@@ -15,7 +15,10 @@ from ..color_contrast import pick_text_color
 from ..priority_levels import row_control_kwargs, row_fill
 from ..date_utils import increment_date
 from .segment_color_utils import resolve_segment_color_for_item
-from .week_collision_notice import notify_weekly_tactic_changes
+from .week_collision_notice import (
+    confirm_weekly_tactic_completion,
+    notify_weekly_tactic_changes,
+)
 from ..theme import apply_segment_accent, celebration_colors, semantic_colors, button_style, list_row_font
 from .inline_editors import InlineDateDialog, InlinePriorityDialog
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
@@ -722,6 +725,10 @@ class TodayScreen(ctk.CTkFrame):
 
     def complete_item(self, item_id: str):
         """Mark item as complete."""
+        # WTP-M6.1 - the same question the editor asks. A declined
+        # prompt completes nothing and says nothing.
+        if not confirm_weekly_tactic_completion(self.db_manager, item_id, self):
+            return
         completed = self.db_manager.complete_action_item(item_id)
         # Outside the branch: a False return is the one that carries a
         # collision, and the five sibling screens report unconditionally.

@@ -11,7 +11,10 @@ from ..color_contrast import pick_text_color
 from ..priority_levels import row_control_kwargs, row_fill
 from .segment_color_utils import resolve_segment_color_for_item
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
-from .week_collision_notice import notify_weekly_tactic_changes
+from .week_collision_notice import (
+    confirm_weekly_tactic_completion,
+    notify_weekly_tactic_changes,
+)
 from ..theme import apply_segment_accent, semantic_colors, button_style, combo_box_style, list_row_font
 from .inline_editors import InlineDateDialog, InlinePriorityDialog
 from .title_format import (
@@ -448,6 +451,10 @@ class AllItemsScreen(ctk.CTkFrame):
 
     def complete_item(self, item_id: str):
         """Mark item as complete."""
+        # WTP-M6.1 - the same question the editor asks. A declined
+        # prompt completes nothing and says nothing.
+        if not confirm_weekly_tactic_completion(self.db_manager, item_id, self):
+            return
         self.db_manager.complete_action_item(item_id)
         notify_weekly_tactic_changes(self.db_manager, self)
         self.refresh()

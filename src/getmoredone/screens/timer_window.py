@@ -15,7 +15,10 @@ from pathlib import Path
 from ..models import ActionItem, WorkLog
 from ..db_manager import DatabaseManager
 from ..app_settings import AppSettings
-from .week_collision_notice import notify_weekly_tactic_changes
+from .week_collision_notice import (
+    confirm_weekly_tactic_completion,
+    notify_weekly_tactic_changes,
+)
 from ..theme import button_style, semantic_colors, status_text_color
 from ..utils.audio_playback import play_audio_file_async, play_system_beep
 from ..utils.music_library import select_track
@@ -1134,6 +1137,16 @@ class TimerWindow(TimerRewardMixin, TrackedAfterMixin, ctk.CTkToplevel):
             # Check if window still exists
             if not self.winfo_exists():
                 print("[ERROR] Window already destroyed, cannot complete action")
+                return
+
+            # WTP-M6.1 - asked here, as early as the flow allows: before the
+            # note dialog and before the Next Action window is destroyed, so
+            # declining costs the user neither a typed note nor a window.
+            # Both completions below are downstream of this one point, which
+            # is why there is one guard and not two.
+            if not confirm_weekly_tactic_completion(
+                self.db_manager, self.item.id, self
+            ):
                 return
 
             # Close the Next Action window FIRST if it exists

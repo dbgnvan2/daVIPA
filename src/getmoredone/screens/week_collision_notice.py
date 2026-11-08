@@ -1,9 +1,13 @@
-"""Tell the user when a Weekly Tactic refused to move.
+"""The shared user-facing moments of a Weekly Tactic, on any screen.
 
 Purpose: give the collision signal one wording and one place, so every surface
-         that can move a week item reports it the same way.
+         that can move a week item reports it the same way; and the same for
+         the question asked before completing a tactic that still has open
+         children, which was written on one screen of seven.
 Spec:    docs/spec_2026-08-18_weekly_tactic_scheduling.md#wt-m1c5
+         docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m6
 Tests:   tests/test_weekly_tactic_schema.py::test_wt_m1c5_collision_notice_reaches_the_user
+         tests/test_weekly_tactic_completion_surfaces.py
 
 ``update_action_item`` and ``reschedule_item`` return False when a week item's
 target week is already taken, and record the detail on
@@ -14,6 +18,8 @@ silence as no return value at all (P25) — so this is the reader.
 from contextlib import contextmanager
 from tkinter import messagebox
 from typing import Any, Optional
+
+from ..models import Status
 
 
 @contextmanager
@@ -137,3 +143,54 @@ def notify_week_collision(db_manager: Any, parent: Any = None) -> bool:
     with _parent_not_on_top(parent):
         messagebox.showwarning("Week Already Taken", message, parent=parent)
     return True
+
+
+def confirm_weekly_tactic_completion(
+    db_manager: Any, item_id: str, parent: Any = None
+) -> bool:
+    """WTP-M6.1 - ask before completing a Weekly Tactic with open children.
+
+    Purpose: a tactic is the parent of the items filed under it, so completing
+             one is a claim about a week's work. It asks rather than refuses,
+             because a week does end with items still open and the user is the
+             one who decides what that means. This lives here, not on a
+             screen, because there are seven places that complete an item and
+             a guard on one of them is the same as no guard (P25) - the Today
+             checkbox and the Hierarchical tree are the surfaces people
+             actually tick things off from.
+    Spec:    docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m6
+    Tests:   tests/test_weekly_tactic_completion_surfaces.py::test_wtpm67_every_completion_surface_asks_first
+             tests/test_weekly_tactic_completion_surfaces.py::test_wtpm67_a_declined_prompt_completes_nothing_on_any_surface
+
+    Returns True when there is nothing to ask about, so the ordinary path is
+    unchanged for every item that is not a tactic and for a tactic whose
+    children are all done. Completion does not cascade either way (WTP-D8):
+    the question is about what the user is claiming, not about what the save
+    will touch.
+
+    The item type is read from the stored row rather than taken from the
+    caller, because five of the seven call sites have only an ``item_id`` in
+    hand and a caller that had to know would be a second reader of parenthood.
+    """
+    item = db_manager.get_action_item(item_id)
+    if item is None or getattr(item, "item_type", None) != "week":
+        return True
+    open_children = [
+        child
+        for child in db_manager.get_children(item_id)
+        if getattr(child, "status", None) != Status.COMPLETED
+    ]
+    if not open_children:
+        return True
+    count = len(open_children)
+    noun = "Action Item" if count == 1 else "Action Items"
+    with _parent_not_on_top(parent):
+        return bool(
+            messagebox.askyesno(
+                "Complete Weekly Tactic",
+                f"{count} {noun} under this Weekly Tactic "
+                f"{'is' if count == 1 else 'are'} still open.\n\n"
+                "Completing the tactic leaves them open. Complete it anyway?",
+                parent=parent,
+            )
+        )

@@ -1529,27 +1529,14 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
         is unchanged for every item that is not a tactic (WTP-D8). Completion
         does not cascade either way.
 
-        ``messagebox.askyesno`` with ``parent=self``, the same shape the
-        Change Project confirmation uses, so the two read alike.
+        The question itself lives in ``week_collision_notice``, because six
+        other screens complete items too and a guard on one of them is the
+        same as no guard (P25). This method stays as the editor's name for it,
+        so the call in ``complete_item`` still reads as the editor asking.
         """
-        if not self._is_weekly_tactic_record():
-            return True
-        open_children = [
-            child for child in self.db_manager.get_children(self.item_id)
-            if child.status != Status.COMPLETED
-        ]
-        if not open_children:
-            return True
-
-        import tkinter.messagebox as messagebox
-        count = len(open_children)
-        noun = "Action Item" if count == 1 else "Action Items"
-        return messagebox.askyesno(
-            "Complete Weekly Tactic",
-            f"{count} {noun} under this Weekly Tactic "
-            f"{'is' if count == 1 else 'are'} still open.\n\n"
-            "Completing the tactic leaves them open. Complete it anyway?",
-            parent=self,
+        from .week_collision_notice import confirm_weekly_tactic_completion
+        return confirm_weekly_tactic_completion(
+            self.db_manager, self.item_id, self
         )
 
     def complete_item(self):

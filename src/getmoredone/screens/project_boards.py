@@ -17,7 +17,10 @@ from .project_link_notice import (
     confirm_exclusive_relink,
     describe_outstanding_multi_links,
 )
-from .week_collision_notice import notify_weekly_tactic_changes
+from .week_collision_notice import (
+    confirm_weekly_tactic_completion,
+    notify_weekly_tactic_changes,
+)
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
 from ..utils.duration import format_minutes
 
@@ -1677,6 +1680,10 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             messagebox.showerror("Error Creating Item", f"Failed to create action item: {str(e)}", parent=self)
 
     def complete_item(self, item_id: str):
+        # WTP-M6.1 - the same question the editor asks. A declined
+        # prompt completes nothing and says nothing.
+        if not confirm_weekly_tactic_completion(self.db_manager, item_id, self):
+            return
         self.db_manager.complete_action_item(item_id)
         notify_weekly_tactic_changes(self.db_manager, self)
         self.refresh()
