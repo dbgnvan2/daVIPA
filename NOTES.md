@@ -29,9 +29,10 @@
   inference only; stays in `BACKLOG.md` until it has been tried on a weekday.
 - ❌ **"Moving a Day Block leaves a blank panel" is NOT fixed.** Measured
   immediately after a real `move_block_to_slot`, with no event-loop turn in
-  between: the pane is mapped at full size, every child is mapped at the right
-  size and position, and the scroll canvas's window width, `bbox("all")`,
-  scrollregion and yview already match what a following `update()` leaves them.
+  between: the pane is mapped at full size, none of its 20 children is
+  unmapped, the three boxes sampled are at the right size and root position,
+  and the scroll canvas's window width, `bbox("all")`, scrollregion and yview
+  already match what a following `update()` leaves them.
   Nothing in the tree or the canvas is stale. A "settle the scroll panes" fix
   was built and withdrawn because it was measured to change nothing at all, and
   `self.update()` in `_flush_redraw` was withdrawn because it does not reliably

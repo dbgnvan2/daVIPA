@@ -19,9 +19,10 @@ fills in as soon as the mouse moves outside the panel area.
 **Effort:** Unknown
 **Notes:** Narrowed, not solved, and **not fixed**. Measured immediately after
 a real `move_block_to_slot`, with no event-loop turn in between: the pane is
-mapped at full size, all 20 children are mapped at correct sizes and positions,
-and the scroll canvas's window width, `bbox("all")`, scrollregion and yview are
-already byte-identical to what a following `update()` leaves them. So nothing
+mapped at full size, none of its 20 children is unmapped, the three boxes
+sampled are at correct sizes and root positions, and the scroll canvas's window
+width, `bbox("all")`, scrollregion and yview are already byte-identical to what
+a following `update()` leaves them. So nothing
 in the widget tree or the canvas is stale, and the repaint class the PD-*
 batch's `_flush_redraw` was written for is not what this is — the move path
 does call the flush.
@@ -121,6 +122,27 @@ depth bar starts a drag.
 **Notes:** Found while looking for fault 2 and left alone rather than swept
 into that change. It is also the first place to look if fault 2 survives a
 weekday retry.
+
+### 2026-11-07 - Found by the batch's own review, not fixed
+
+**Title:** A drag whose ButtonRelease never arrives leaves the autoscroll running
+**Description:** `_autoscroll_tick` continues while `self._drag_kind` is set,
+and only `_end_drag` clears it. If a drag's `<ButtonRelease-1>` never reaches
+the bound widget — the row it was pressed on is destroyed mid-drag, or a motion
+handler raises — `_drag_kind` stays set and the timer re-arms every 60ms, so
+the Day Plan scrolls continuously with nothing short of quitting to stop it.
+**Priority:** Low-medium
+**Effort:** Small
+**Notes:** New exposure from PD-M12, and recorded rather than fixed because of
+how narrow the path is: the Plan screen has no periodic refresh (`autoload_day`
+is a button), and leaving the screen through the sidebar destroys the whole
+`PlanScreen`, which deletes the timer's Tcl command so the tick never runs. The
+pre-existing version of the same lost release already left a stale `_drag_kind`
+and a stranded drag label; the autoscroll makes that state louder rather than
+creating it. A guard needs something the Tk API does not offer directly —
+whether the button is still down — so the likely shape is a cap on consecutive
+ticks with no intervening motion, which is a design decision rather than a
+one-line fix.
 
 
 ## Deferred from the APE period-consistency sweep (2026-11-07)

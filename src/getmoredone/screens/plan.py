@@ -798,10 +798,11 @@ class PlanScreen(ctk.CTkFrame):
         **Not sufficient for the blank pane reported on 2026-11-07** ("moving
         a Day Block leaves a blank panel until the mouse moves outside the
         panel area"). Measured after a real ``move_block_to_slot``, with no
-        event-loop turn in between: the pane is mapped at its full size, all
-        20 children are mapped at correct sizes and positions, and the scroll
-        canvas's window width, ``bbox("all")``, scrollregion and yview are
-        already byte-identical to what a following ``update()`` leaves them.
+        event-loop turn in between: the pane is mapped at its full size, none
+        of its 20 children is unmapped, the three boxes sampled are at correct
+        sizes and root positions, and the scroll canvas's window width,
+        ``bbox("all")``, scrollregion and yview are already byte-identical to
+        what a following ``update()`` leaves them.
         So nothing in the widget tree or the canvas is stale, and settling it
         again -- which an earlier version of this method did -- changed
         nothing at all. ``update()`` was also tried here and is not an option:

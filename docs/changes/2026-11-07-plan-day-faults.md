@@ -88,10 +88,11 @@ re-arms the next; `_end_drag` cancels it.
 ### Fault 1 — moving a block leaves a blank panel. **NOT FIXED.**
 
 Narrowed, not solved. Measured immediately after a real `move_block_to_slot`,
-with no event-loop turn in between: the pane is mapped at full size, all 20
-children are mapped at correct sizes and positions, and the scroll canvas's
-window width, `bbox("all")`, scrollregion and yview are already byte-identical
-to what a following `update()` leaves them. So nothing in the widget tree or
+with no event-loop turn in between: the pane is mapped at full size, none of
+its 20 children is unmapped, the three boxes sampled are at correct sizes and
+root positions, and the scroll canvas's window width, `bbox("all")`,
+scrollregion and yview are already byte-identical to what a following
+`update()` leaves them. So nothing in the widget tree or
 the canvas is stale.
 
 Two candidate fixes were built and both withdrawn rather than shipped:
@@ -129,7 +130,7 @@ reader does not re-derive it.
   mapped-window layout assertion over `plan_blocks.build_item_row`. It fails on
   `HEAD` too, this change touches neither `plan_blocks.py` nor that test, and it
   matches the layout test already known red on `main`.
-- 14 new tests, 2 existing tests adjusted. Every new test proved by mutation:
+- 13 new tests, 2 existing tests adjusted. Every new test proved by mutation:
   17 mutants applied one at a time to the line each test names, each run
   against that test alone, all 17 killed, source restored verbatim after each.
   Two mutants had to be rewritten after surviving, and both survivals were
