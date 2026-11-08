@@ -435,15 +435,21 @@ def test_wtpw_the_screens_with_a_completion_control_are_pinned():
     predicate looks for a ``command=`` whose value names ``complete_item``, so
     the timer's Done button is outside this pin by construction -- it reaches
     ``complete_action_item`` through ``finished_action``. That is not a
-    coverage hole, since the two timer tests in this file press it and
-    ``EXPECTED_CALL_SITES`` in the surfaces file pins the call site, but the
-    pin's reach stops where its predicate does.
+    coverage hole, since the two timer tests in this file call
+    ``finished_action`` -- the method Done reaches, through
+    ``done_action``'s reward sequence -- and ``EXPECTED_CALL_SITES`` in the
+    surfaces file pins the call site. They do not press the button itself, so
+    ``done_action`` is covered by neither; the pin's reach stops where its
+    predicate does.
 
     Five screens, not the seven guarded call sites that
     tests/test_weekly_tactic_completion_surfaces.py pins: the timer is
     excluded as above, and ``HierarchicalScreen.complete_item`` has no caller
-    anywhere in src (WTP-A8). Of the five, four wire a row checkbox and
-    item_editor wires a Complete button.
+    anywhere in src (WTP-A8). Of the five, three wire a row checkbox (today,
+    all_items, upcoming) and two wire a Complete button (project_boards at
+    1532, item_editor at 487). A project board row also carries a checkbox,
+    but that one toggles the screen's selection set through
+    ``_on_item_checkbox_changed`` and completes nothing.
 
     An exact set, so wiring a control to a new screen fails here and has to be
     added to this file's BUILDERS rather than shipping unpressed.
