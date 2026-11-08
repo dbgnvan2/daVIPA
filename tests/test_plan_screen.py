@@ -6161,6 +6161,83 @@ def test_pdm129_a_day_with_no_scrollregion_asks_for_nothing(screen, monkeypatch)
     assert moved == [], moved
 
 
+def test_pdm129_scrolling_rereads_the_hover_onto_the_box_now_under_the_pointer(
+    screen, manager, monkeypatch
+):
+    """PD-M12.9 — the outline follows the boxes, asserted as an outline.
+
+    The two PD-M12.4 tests stub ``update_hover_target`` and assert that it was
+    *called*, which is the same shape as asserting the arguments to
+    ``yview_scroll`` rather than any movement -- the thing this batch already
+    had to fix once. The hover outline is the only feedback telling the user
+    which half hour a drop will land in, and the autoscroll makes a 60ms timer
+    responsible for keeping it right, so one test runs the real thing: scroll,
+    then assert which box is outlined.
+    """
+    _item(manager, "Draft the proposal")
+    screen.refresh()
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    assert len(frames) >= 2, "the day pane built too few boxes to move between"
+    screen._drag_kind = "item"
+
+    _fake_day_viewport(screen, monkeypatch)
+    _fake_pointer(screen, monkeypatch, 500, 399)
+    # The pointer does not move; which box is under it does, because the day
+    # scrolls beneath it. Faked as the box the second read lands on.
+    under = [frames[0], frames[1]]
+    monkeypatch.setattr(screen, "slot_under_pointer", lambda: 0)
+    screen.update_hover_target()
+
+    assert screen._drag_hover_frame is under[0], "the first box was not outlined"
+    assert under[0].cget("border_width") == 2, under[0].cget("border_width")
+
+    monkeypatch.setattr(screen, "slot_under_pointer", lambda: 1)
+    assert screen.autoscroll_day() is True
+
+    assert screen._drag_hover_frame is under[1], (
+        "the outline stayed on the box the pointer is no longer over"
+    )
+    assert under[1].cget("border_width") == 2, under[1].cget("border_width")
+    assert under[0].cget("border_width") == 1, (
+        "the box the day scrolled past kept its outline"
+    )
+
+
+def test_pdm1210_clearing_the_hover_puts_the_colour_back(
+    screen, manager, monkeypatch
+):
+    """PD-M12.10 — width and colour, not width alone.
+
+    ``clear_hover_target`` put back only the border width, so the accent
+    stayed on at 1px. A drag abandoned away from the boxes gets no rebuild to
+    hide it, and since the autoscroll re-reads the hover every 60ms a pointer
+    held at an edge walks it down every box the day scrolls past — the trail
+    is the whole day rather than one box. A persistent primary accent on boxes
+    with no action pending is also what the theme rules call a misuse of the
+    one emphasis colour.
+    """
+    _item(manager, "Draft the proposal")
+    screen.refresh()
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    box = frames[0]
+    before = box.cget("border_color")
+    screen._drag_kind = "item"
+    monkeypatch.setattr(screen, "slot_under_pointer", lambda: 0)
+
+    screen.update_hover_target()
+
+    assert box.cget("border_color") != before, (
+        "the hover did not change the colour, so this test asserts nothing"
+    )
+
+    screen.clear_hover_target()
+
+    assert box.cget("border_color") == before, (
+        f"the box kept the hover colour: {box.cget('border_color')} != {before}"
+    )
+    assert box.cget("border_width") == 1, box.cget("border_width")
+
+
 def test_pdm125_a_held_drag_keeps_scrolling(screen, monkeypatch):
     """PD-M12.5 — each tick re-arms the next, so holding still keeps scrolling.
 
