@@ -58,7 +58,6 @@ from ..time_block_layout import (
     weekday_names,
 )
 from ..widgets.date_picker import DatePickerButton
-from ..widgets import confirm_dialog
 from .drag_schedule_support import widget_contains_pointer
 from .plan_blocks import (
     PD_EARLIER_HINT,
@@ -238,10 +237,10 @@ class PlanScreen(ctk.CTkFrame):
         #: so it is asked once per date rather than once per drop -- five
         #: items onto a Saturday is one decision, not five.
         self._work_anyway: set = set()
-        # PD-M12.2 -- set when the non-work-day question could not be put
-        # on the screen, and read by the next status line this screen
-        # writes, so the fact is not overwritten by the success it caused.
-        self._could_not_ask = False
+        # PD-M13 -- set when this gesture went ahead on a day outside the
+        # working week without asking, and read by the status line the
+        # gesture writes, so the fact is not overwritten by its own success.
+        self._non_work_day = False
 
         # Drag state. One drag at a time, and its kind decides what a release
         # means: an item drop creates a block, a block drop reorders the day.
@@ -1202,7 +1201,9 @@ class PlanScreen(ctk.CTkFrame):
             return
         self.load_blocks()
         self.set_status(
-            f"Added a {minutes}m {block_type} at {block.start_time}", "success"
+            f"Added a {minutes}m {block_type} at {block.start_time}"
+            + self._take_non_work_note(),
+            "success",
         )
 
     def block_item(self, item: ActionItem, slot_index: Optional[int] = None):
@@ -1219,7 +1220,8 @@ class PlanScreen(ctk.CTkFrame):
         An earlier version of this docstring claimed an item-row double-click
         used it; there has never been such a binding (`BACKLOG.md`).
         """
-        if not self._require_block_day():
+        # PD-M13 -- a drop never asks; see _require_block_day.
+        if not self._require_block_day(ask=False):
             return
 
         minutes = duration_for_item(item, self.bounds.default_block_minutes)
@@ -1250,7 +1252,7 @@ class PlanScreen(ctk.CTkFrame):
         boxes = slots_for_minutes(minutes)
         spare = boxes * SLOT_MINUTES - minutes
         text = f"Blocked {minutes}m for {item.title} at {block.start_time}"
-        text += self._take_unasked_note()
+        text += self._take_non_work_note()
         if spare:
             # Said out loud, because the box the task does not fill is still
             # spent: the next task starts at the following box, not at the
@@ -1387,6 +1389,7 @@ class PlanScreen(ctk.CTkFrame):
         )
         if unseen:
             said += f", {unseen} past the {MAX_ITEM_ROWS}-row list"
+        said += self._take_non_work_note()
         self.set_status(said, "success" if placed else "warning")
 
     def clear_day(self):
@@ -1532,51 +1535,46 @@ class PlanScreen(ctk.CTkFrame):
                 return entry.slot.index
         return None
 
-    def _require_block_day(self) -> bool:
-        """Ask before writing a block onto a day the user does not work.
+    def _require_block_day(self, *, ask: bool = True) -> bool:
+        """Allow a write onto a day the user does not work, and say so.
 
         Purpose: PD-M7 -- a day outside the working week is a warning, not a
                  wall.
         Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m7
-        Tests:   tests/test_plan_screen.py::test_pdm7_a_non_work_day_asks_before_scheduling
-                 tests/test_plan_screen.py::test_pdm7_answering_no_writes_nothing
-                 tests/test_plan_screen.py::test_pdm7_a_work_day_asks_nothing
-                 tests/test_plan_screen.py::test_pdm121_the_question_is_asked_by_the_app
-                 tests/test_plan_screen.py::test_pdm122_a_question_that_cannot_be_asked_still_schedules
+        Tests:   tests/test_plan_screen.py::test_pdm131_a_drop_on_a_non_work_day_asks_nothing_and_writes
+                 tests/test_plan_screen.py::test_pdm132_a_button_still_asks_on_a_non_work_day
+                 tests/test_plan_screen.py::test_pdm7_a_work_day_says_nothing
 
-        PD-M12: asked with the app's own dialog, not ``messagebox.askyesno``.
-        The platform's dialog cannot be used from here. Every item drop lands
-        in an idle callback scheduled by ``on_drag_release``, and on macOS
-        ``tk_messageBox`` called from there raises ``_tkinter.TclError`` with
-        no message -- which took out the first statement of both
-        ``block_item`` and ``extend_day_for``, so a drop on a non-work day and
-        a drop on either end of the day both did nothing at all, silently.
-        Reported from the running screen on 2026-11-07; the whole suite passed
-        throughout, because conftest replaces every ``messagebox`` function
-        with a recorder that returns a value and cannot raise (P25: a check
-        that only exists on a surface nobody uses).
+        PD-M13: **a drop never asks.** No modal of any kind survives the
+        moment a drag is released on macOS. The platform's own dialog raises
+        ``_tkinter.TclError`` with no message from the idle callback
+        ``on_drag_release`` schedules, which killed both write paths silently
+        (PD-M12's traceback). An ordinary Tk toplevel with a grab and
+        ``wait_window`` in its place hung the application outright: its window
+        could not become visible from there, so the grab was up with nothing
+        able to take it. Both were reported from the running screen on
+        2026-11-07, three hours apart.
 
-        And a question that still cannot be put on the screen no longer eats
-        the gesture. There are two ways to be wrong here: write without asking,
-        or lose the user's drag. Losing it is what happened today, and it is
-        the worse of the two -- nothing on screen said anything, four times
-        over -- so a dialog that fails is reported in the status line and the
-        work is scheduled, which is also what PD-M7's "a warning, not a wall"
-        says to do when the warning cannot be given.
+        So the drop paths pass ``ask=False`` and the question is gone from
+        them. The day is not a wall -- the weekday list describes a normal
+        week, and a Saturday someone has decided to work is not a mistake to
+        be corrected -- so the block is written and the status line names the
+        day and the week it is outside of. That is PD-M7's "a warning, not a
+        wall" with the warning in the one place on this screen that cannot
+        fail to appear.
 
-        Asked rather than refused. The weekday list describes a normal week;
-        it is not a lock on the calendar, and a Saturday someone has decided
-        to work is not a mistake to be corrected. The screen opens on today,
-        so on a weekend every write path returned before doing anything --
-        AutoLoad before it read a single item, a dropped item before it wrote
-        one -- and four separate gestures doing nothing read as the screen
-        being broken rather than as the day being closed.
+        The two buttons keep the question (``ask=True``, the default): a modal
+        raised from a button press is the ordinary case and the one the
+        platform is content with, and AutoLoad fills a whole day, which is
+        worth stopping for. Their question is wrapped all the same, because a
+        dialog that raises must not take the gesture with it.
 
-        Once per date, not once per drop: the question is about the day, so
-        five items onto the same Saturday is one decision. The answer is held
-        on the screen rather than written anywhere, so it lasts as long as the
-        screen does and no longer -- it is permission for this sitting, not a
-        change to the working week, which is what Day Settings is for.
+        Once per date, not once per drop, for the asking paths: the question
+        is about the day, so five AutoLoads onto the same Saturday is one
+        decision. The answer is held on the screen rather than written
+        anywhere, so it lasts as long as the screen does and no longer -- it
+        is permission for this sitting, not a change to the working week,
+        which is what Day Settings is for.
 
         Declining leaves the same sentence the refusal used to, which is why
         the weekday list is in it: the answer to "why did nothing happen" is
@@ -1591,28 +1589,27 @@ class PlanScreen(ctk.CTkFrame):
             name for name, on in zip(weekday_names(), self.bounds.block_weekdays) if on
         ]
         week = ", ".join(allowed) if allowed else "no days"
-        question = (
-            f"{self.selected_date} is not a regular work day.\n\n"
-            f"Day Settings allows {week}.\n\n"
-            "Schedule anyway?"
-        )
+
+        if not ask:
+            self._non_work_day = True
+            return True
         try:
-            said_yes = confirm_dialog.ask_yes_no(
-                self,
+            said_yes = messagebox.askyesno(
                 "Not a work day",
-                question,
-                yes_text="Schedule anyway",
-                no_text="Cancel",
+                f"{self.selected_date} is not a regular work day.\n\n"
+                f"Day Settings allows {week}.\n\n"
+                "Schedule anyway?",
+                icon="warning",
+                parent=self,
             )
-        except (confirm_dialog.ConfirmNotShown, tk.TclError) as problem:
+        except tk.TclError as problem:
+            # The failure PD-M12 was reported for, on the path that still
+            # asks. A button is not the drop path and the platform has not
+            # refused one, but a dialog that raises must not take the gesture
+            # with it -- that is the whole of what went wrong before.
             logger.warning("the non-work-day question could not be asked: %s", problem)
             self._work_anyway.add(self.selected_date)
-            self._could_not_ask = True
-            self.set_status(
-                f"{self.selected_date} is not a work day (Day Settings allows "
-                f"{week}) — scheduled anyway; the question could not be shown",
-                "warning",
-            )
+            self._non_work_day = True
             return True
 
         if said_yes:
@@ -1626,26 +1623,35 @@ class PlanScreen(ctk.CTkFrame):
         )
         return False
 
-    def _take_unasked_note(self) -> str:
-        """What a status line owes when the question could not be asked.
+    def _take_non_work_note(self) -> str:
+        """What a status line owes when the gesture was on a non-work day.
 
-        Purpose: PD-M12.2 -- the fallback writes a warning and then the write
-                 it allowed writes its own success over the top, so the user
-                 was told the block was made and not that the app had failed
-                 to ask about the day. Surfaced, not dropped (P2).
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m12
-        Tests:   tests/test_plan_screen.py::test_pdm122_a_question_that_cannot_be_asked_still_schedules
+        Purpose: PD-M13 -- a drop on a day outside the working week is not
+                 asked about any more, so the status line it writes is the
+                 only place the user learns which day they dropped on. Without
+                 this the gesture's own success ("Blocked 30m for X at 09:00")
+                 is written over the warning, and the warning is the half that
+                 was not obvious. Surfaced, not dropped (P2).
+        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m13
+        Tests:   tests/test_plan_screen.py::test_pdm131_a_drop_on_a_non_work_day_asks_nothing_and_writes
+                 tests/test_plan_screen.py::test_pdm133_the_note_belongs_to_the_gesture
 
-        One-shot: the note belongs to the gesture that could not be asked
-        about, not to every later gesture on the same day. The day itself is
-        remembered in ``_work_anyway``, which is what stops it asking again.
+        One-shot: it belongs to the gesture it was raised for. The day itself
+        is remembered in ``_work_anyway`` by the paths that ask, and nothing
+        is remembered by the paths that do not -- so a second drop on the same
+        Saturday is told the same thing, which is right, and a later gesture
+        on a work day is not told anything, which is what the clearing is for.
         """
-        if not self._could_not_ask:
+        if not self._non_work_day:
             return ""
-        self._could_not_ask = False
+        self._non_work_day = False
+        allowed = [
+            name for name, on in zip(weekday_names(), self.bounds.block_weekdays) if on
+        ]
+        week = ", ".join(allowed) if allowed else "no days"
         return (
-            f" — {self.selected_date} is not a regular work day and the"
-            " question could not be shown"
+            f" — {self.selected_date} is not a regular work day"
+            f" (Day Settings allows {week})"
         )
 
     # ================= the block context menu ===============================
@@ -2168,7 +2174,8 @@ class PlanScreen(ctk.CTkFrame):
         as a side effect, so everything already planned -- on this date and
         every other -- has to stay where the person put it.
         """
-        if not self._require_block_day():
+        # PD-M13 -- a drop never asks; see _require_block_day.
+        if not self._require_block_day(ask=False):
             return
         if self.settings is None:
             self.set_status(
@@ -2259,7 +2266,7 @@ class PlanScreen(ctk.CTkFrame):
         self.set_status(
             f"The day now runs {new_bounds.day_start}–{new_bounds.day_end}; "
             f"blocked {minutes}m for {item.title} at {block.start_time}"
-            + self._take_unasked_note(),
+            + self._take_non_work_note(),
             "success",
         )
 
