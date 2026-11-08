@@ -18,6 +18,7 @@ window count that tests/test_ci_contract.py pins at 22.
 
 import ast
 import dataclasses
+import importlib
 import logging
 import sys
 from datetime import date, timedelta
@@ -237,18 +238,22 @@ def test_updm41_ape_quarter_layout_is_unchanged():
 
 
 def test_updm41_ape_quarter_left_header_columns_are_unchanged():
-    """UPD-M4.1 — left header: an empty checkbox cell, then the four names.
+    """UPD-M4.1 — left header: Pick over the checkbox, then the four names.
 
-    The left panel is the selectable one, so its first cell is the blank
-    header over the checkbox column. Column order is asserted by position,
-    not by set membership, because the order is the thing the shared table has
-    to reproduce.
+    The left panel is the selectable one, so its first cell is the header over
+    the checkbox column. Column order is asserted by position, not by set
+    membership, because the order is the thing the shared table has to
+    reproduce.
+
+    That first heading was `""` until UPD-F3: case (b), the behaviour changed
+    intentionally — the on-screen walk asked for a word over the ticks. The
+    set and the order are what this test pins and neither moved.
     """
     root, screen = _quarter_screen(left_rows=[_ape_row(1)])
     try:
         header = _header_frame(screen.left_list)
         texts = [text for _col, _cls, text in _cells(header)]
-        assert texts == ["", "#", "Segment", "SubSegment", "Category"]
+        assert texts == ["Pick", "#", "Segment", "SubSegment", "Category"]
     finally:
         root.destroy()
 
@@ -412,14 +417,14 @@ def test_updm41_ape_month_headers_and_widths_are_unchanged():
     """UPD-M4.1 — APE Month's two headers, and the left panel's pixel widths.
 
     Byte for byte the same `_render_rows` as APE Quarter's, so the same
-    numbers: a blank checkbox cell then the four names on the left, the four
-    names then Actions on the right.
+    numbers: the Pick cell over the checkboxes then the four names on the
+    left, the four names then Actions on the right.
     """
     root, screen = _month_screen(left_rows=[_ape_row(1)], right_rows=[_ape_row(2)])
     try:
         left = _header_frame(screen.left_list)
         assert [text for _col, _cls, text in _cells(left)] == [
-            "", "#", "Segment", "SubSegment", "Category"]
+            "Pick", "#", "Segment", "SubSegment", "Category"]
         assert _minsizes(left, (0, 1, 2, 3, 4)) == [34, 34, 135, 155, 125]
 
         right = _header_frame(screen.right_list)
@@ -489,7 +494,7 @@ def test_updm41_annual_headers_and_widths_are_unchanged():
     try:
         left = _header_frame(screen.left_list)
         assert [text for _col, _cls, text in _cells(left)] == [
-            "", "#", "Segment", "SubSegment", "Category"]
+            "Pick", "#", "Segment", "SubSegment", "Category"]
         assert _minsizes(left, (0, 1, 2, 3, 4)) == [34, 34, 135, 155, 125]
 
         right = _header_frame(screen.right_list)
@@ -570,7 +575,7 @@ def test_updm31_table_renders_header_and_rows():
                 {"segment": "#3366cc", "subsegment": "#44aa88", "category": "#cc7744"},
             )
         assert [c.heading for c in table.columns] == [
-            "", "#", "Segment", "SubSegment", "Category"]
+            "Pick", "#", "Segment", "SubSegment", "Category"]
         assert len(table.rows) == 3
         texts = [lbl.cget("text").strip() for lbl in table.rows[0][1].values()]
         assert "Purposeful Work" in texts
@@ -1891,11 +1896,15 @@ def test_updm51_right_panel_has_the_actions_column():
 
 
 def test_updm55_left_header_matches_the_other_tabs():
-    """UPD-M5.5 — the first cell is empty, where it used to read "Pick".
+    """UPD-M5.5 — the left header is the one the other three tabs have.
 
-    The other three tabs' left header has a blank cell over the checkboxes;
-    this one said "Pick" in a 52px column. Both the text and the width change,
-    so the header is asserted as text *and* pixels — a cell that was merely
+    UPD-M5.5 blanked this cell to match them: this tab said "Pick" in a 52px
+    column where the others had nothing over the checkboxes. **UPD-F3 reverses
+    the text half of that**, on all four panels at once and at 34px, because
+    the on-screen walk asked for a word over the ticks — case (b), the
+    behaviour changed intentionally. What UPD-M5.5 was really pinning survives
+    and is still asserted: the width, and that the four panels agree. The
+    header is asserted as text *and* pixels because a cell that was merely
     blanked would leave the row's cells one place to the right of the other
     tabs'.
     """
@@ -1903,7 +1912,7 @@ def test_updm55_left_header_matches_the_other_tabs():
     try:
         left = _header_frame(screen.left_list)
         assert [text for _col, _cls, text in _cells(left)] == [
-            "", "#", "Segment", "SubSegment", "Category"]
+            "Pick", "#", "Segment", "SubSegment", "Category"]
         assert _minsizes(left, (0, 1, 2, 3, 4)) == [34, 34, 135, 155, 125]
 
         row = _row_frames(screen.left_list)[0]
@@ -2780,3 +2789,683 @@ def test_updm71_no_test_here_needs_a_mapped_window():
         and "mapped_windows" in [arg.arg for arg in node.args.args]
     )
     assert needs_window == []
+
+
+# ------------------------------------- UPD-F3: the checkbox column has a name
+#
+# The on-screen walk of the spec's §11 asked, at step 4, for a word over the
+# ticks. UPD-M5.5 had blanked it; this names it on every panel that has one.
+
+# Every panel built from APE_LEFT_COLUMNS, by the screen that renders it.
+# Four, not the three the plan said: Annual Plan Elements shares the set.
+_PICK_PANELS = (
+    ("ape_quarter", lambda: _quarter_screen(left_rows=[_ape_row(1)])),
+    ("ape_month", lambda: _month_screen(left_rows=[_ape_row(1)])),
+    ("annual_vision", lambda: _annual_screen(left_rows=[_ape_row(1)])),
+    ("week_assignment", lambda: _week_screen(left_rows=[_ape_row(1)])),
+)
+
+
+def test_updf31_the_checkbox_column_is_headed_pick():
+    """UPD-F3.1 — the first header cell on Week Assignment's left panel reads Pick.
+
+    Purpose: the heading the user asked for is the one the header renders.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#4-upd-f3
+    Tests:   this test
+
+    Asserted on the rendered header rather than on `APE_LEFT_COLUMNS`, because
+    the constant is one builder away from what is on screen: a heading set in
+    the constant and dropped by `build_header` would leave an assertion
+    against the constant green. The grid column is asserted with it, so a
+    heading that reads Pick in the wrong column still fails.
+    """
+    root, screen = _week_screen(left_rows=[_ape_row(1)])
+    try:
+        column, _cls, text = _cells(_header_frame(screen.left_list))[0]
+        assert (column, text) == (0, "Pick")
+    finally:
+        root.destroy()
+
+
+def test_updf32_the_pick_column_fits_its_heading_and_has_no_handle():
+    """UPD-F3.2 — Pick fits the column it is declared in, and cannot be dragged.
+
+    Purpose: the heading is not clipped, and the column stays fixed-width.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#4-upd-f3
+    Tests:   this test
+
+    Measured in the header's own font rather than compared against a number
+    written here: `build_header` sets each label's width to its column width
+    and anchors it west, so a heading wider than its column is clipped, not
+    wrapped, and 34px of column is only enough while "Pick" measures 28. The
+    minimum is checked as well as the default, because `ColumnResizer` clamps
+    a stored width up to `min_width` and a settings file written before this
+    change can still hold the old one.
+
+    The no-handle half matters because a fixed column is how the checkbox
+    keeps its grid index: give it a handle and the header gains a widget in
+    column 0, which is what `_cells` would then read first.
+    """
+    root = _root()
+    try:
+        font = ctk.CTkFont(weight="bold")
+        checkbox = chip_table.APE_LEFT_COLUMNS[0]
+        assert checkbox.key == "checkbox"
+        needed = font.measure(checkbox.heading)
+        assert needed <= checkbox.min_width, (
+            f"{checkbox.heading!r} measures {needed}px against a "
+            f"{checkbox.min_width}px minimum")
+        assert needed <= checkbox.default_width
+        assert checkbox.resizable is False
+    finally:
+        root.destroy()
+
+    root, screen = _week_screen(left_rows=[_ape_row(1)])
+    try:
+        header = _header_frame(screen.left_list)
+        handles = [c for c in header.winfo_children() if _is_resize_handle(c)]
+        assert 0 not in {int(h.grid_info()["column"]) for h in handles}
+    finally:
+        root.destroy()
+
+
+def test_updf33_the_checkbox_still_toggles_in_the_same_column():
+    """UPD-F3.3 — naming the column left the checkbox and its wiring alone.
+
+    Purpose: the only thing UPD-F3 changed is a word.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#4-upd-f3
+    Tests:   this test
+
+    The widget is driven, not its `BooleanVar`: setting the variable directly
+    would pass even if the checkbox were no longer bound to it, which is the
+    failure a column change could actually cause. `toggle()` is what a click
+    reaches.
+    """
+    root, screen = _week_screen(left_rows=[_ape_row(1)])
+    try:
+        row = _row_frames(screen.left_list)[0]
+        boxes = [c for c in row.winfo_children()
+                 if type(c).__name__ == "CTkCheckBox"]
+        assert len(boxes) == 1
+        assert int(boxes[0].grid_info()["column"]) == 0
+
+        before = [var.get() for var in screen.left_checks.values()]
+        assert before == [False]
+        boxes[0].toggle()
+        assert [var.get() for var in screen.left_checks.values()] == [True]
+    finally:
+        root.destroy()
+
+
+def test_updf34_every_ape_left_panel_says_pick():
+    """UPD-F3.4 — all four panels built from APE_LEFT_COLUMNS, not three.
+
+    Purpose: the heading is the same on every panel that shares the set.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#4-upd-f3
+    Tests:   this test
+
+    The plan said three panels share `APE_LEFT_COLUMNS`. Four do — Annual Plan
+    Elements shares it as well — so the count is asserted here rather than
+    left as prose that was already wrong once. Exact count, not a floor: a
+    fifth adopter that forgot the checkbox column would otherwise pass.
+    """
+    importers = sorted(
+        path.name for path in
+        Path("src/getmoredone/screens").glob("*.py")
+        if "APE_LEFT_COLUMNS" in path.read_text(encoding="utf-8")
+        and path.name != "chip_table.py")
+    assert importers == ["annual_vision_segments.py", "ape_assignment.py",
+                         "ape_period_view.py", "weekly_items.py"]
+
+    for name, build in _PICK_PANELS:
+        root, screen = build()
+        try:
+            column, _cls, text = _cells(_header_frame(screen.left_list))[0]
+            assert (column, text) == (0, "Pick"), name
+        finally:
+            root.destroy()
+
+
+# -------------------------- UPD-F2: the filter area is a line of its own
+#
+# The on-screen walk of the spec's §11 asked, at step 3, for the three filters
+# to move off the controls row onto the line below it, and for the one tab with
+# no filters to carry a blank line of the same depth so the hub stops jumping.
+#
+# What the plan said and what the code was differ on two points, and these
+# tests follow the code:
+#
+# * The plan's UPD-F2.2 described "a blank spacer row between them". There was
+#   never a blank row between the title and the filters -- the three lines the
+#   user counted are title, controls, filters.
+# * The plan's UPD-F2.4 said Annual Plan Elements "had its filters inline". It
+#   has no lineage filters at all: there is nothing above an annual plan
+#   element to filter by. What it had was its title and its controls on one
+#   row, which made it two lines shallower than its neighbours.
+
+# The five hub tabs with a header card, and whether that card has filters.
+_FILTER_TABS = (
+    ("ape_quarter", lambda tmp_path: _quarter_screen(left_rows=[_ape_row(1)]), True),
+    ("ape_month", lambda tmp_path: _month_screen(left_rows=[_ape_row(1)]), True),
+    ("week_assignment", lambda tmp_path: _week_screen(left_rows=[_ape_row(1)]), True),
+    ("week_actions",
+     lambda tmp_path: _week_actions_with(tmp_path, [("A tactic", "Living Systems", "Writing")])[1:],
+     True),
+    ("annual_vision", lambda tmp_path: _annual_screen(left_rows=[_ape_row(1)]), False),
+)
+
+
+def _header_of(screen):
+    """The header card a screen grids its filter row into."""
+    return screen.filter_row.master
+
+
+def _rows_of(widget):
+    """The set of header grid rows the given widgets occupy."""
+    return {int(w.grid_info()["row"]) for w in widget}
+
+
+def _combos_of(screen):
+    """This screen's three lineage filter combos, whichever way it holds them."""
+    if hasattr(screen, "filters"):
+        return (screen.filters.segment_combo,
+                screen.filters.subsegment_combo,
+                screen.filters.category_combo)
+    return (screen.segment_filter_combo,
+            screen.subsegment_filter_combo,
+            screen.category_filter_combo)
+
+
+def test_updf21_the_filters_are_on_their_own_row(tmp_path):
+    """UPD-F2.1 — the three combos sit below the row holding the tab's controls.
+
+    Purpose: UPD-F2.1 — the filters are on a line of their own, not sharing
+             the controls row, on every tab that has them.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+    Tests:   tests/test_unified_panel_design.py::test_updf21_the_filters_are_on_their_own_row
+
+    Asserted against the rendered widgets' real grid placement, so the claim
+    is about where Tk put them and not about where the source says to put
+    them. Each combo must be a child of the filter row, and the filter row
+    must sit below every interactive control in the header card -- a combo
+    left behind on row 1 fails on the first assertion, and a filter row
+    gridded above the controls fails on the second.
+    """
+    for name, build, has_filters in _FILTER_TABS:
+        if not has_filters:
+            continue
+        root, screen = build(tmp_path)
+        try:
+            header = _header_of(screen)
+            filter_row = int(screen.filter_row.grid_info()["row"])
+
+            for combo in _combos_of(screen):
+                assert combo.master is screen.filter_row, (
+                    f"{name}: a filter combo is not in the filter row")
+
+            controls = [c for c in header.winfo_children()
+                        if isinstance(c, (ctk.CTkButton, ctk.CTkEntry, ctk.CTkComboBox))]
+            assert controls, f"{name}: no controls found in the header"
+            assert max(_rows_of(controls)) < filter_row, (
+                f"{name}: a control sits on or below the filter row "
+                f"{filter_row}; rows {sorted(_rows_of(controls))}")
+        finally:
+            root.destroy()
+
+
+def test_updf22_the_header_card_is_three_rows_deep(tmp_path):
+    """UPD-F2.2 — title, then controls, then filters: three rows, in that order.
+
+    Purpose: UPD-F2.2 — the depth the user counted is three lines.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+    Tests:   tests/test_unified_panel_design.py::test_updf22_the_header_card_is_three_rows_deep
+
+    The title is found by its font size rather than its text, so the
+    assertion does not have to carry five tab names that are free to change.
+    """
+    for name, build, _has_filters in _FILTER_TABS:
+        root, screen = build(tmp_path)
+        try:
+            header = _header_of(screen)
+            titles = [c for c in header.winfo_children()
+                      if isinstance(c, ctk.CTkLabel) and c.cget("font").cget("size") >= 20]
+            assert len(titles) == 1, f"{name}: expected one title, got {len(titles)}"
+            assert int(titles[0].grid_info()["row"]) == 0, f"{name}: title is not on row 0"
+            assert int(screen.filter_row.grid_info()["row"]) == 2, (
+                f"{name}: the filter row is not row 2")
+        finally:
+            root.destroy()
+
+
+def test_updf23_every_tab_puts_its_filter_row_in_the_same_place(tmp_path):
+    """UPD-F2.3 — one assertion over the set, so no tab can drift on its own.
+
+    Purpose: UPD-F2.3 — the depth is the same on all five tabs.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+    Tests:   tests/test_unified_panel_design.py::test_updf23_every_tab_puts_its_filter_row_in_the_same_place
+
+    The five tabs are collected into one set of (title row, filter row)
+    pairs; the set must hold exactly one pair. One tab moving its filter row
+    makes the set two pairs wide and names itself in the failure.
+    """
+    placements = {}
+    for name, build, _has_filters in _FILTER_TABS:
+        root, screen = build(tmp_path)
+        try:
+            header = _header_of(screen)
+            titles = [c for c in header.winfo_children()
+                      if isinstance(c, ctk.CTkLabel) and c.cget("font").cget("size") >= 20]
+            placements[name] = (int(titles[0].grid_info()["row"]),
+                                int(screen.filter_row.grid_info()["row"]))
+        finally:
+            root.destroy()
+
+    assert len(_FILTER_TABS) == 5, "the tab list changed; update this assertion"
+    assert set(placements.values()) == {(0, 2)}, (
+        f"the tabs do not agree on the header's shape: {placements}")
+
+
+def test_updf24_the_tab_with_no_filters_is_the_same_depth(tmp_path):
+    """UPD-F2.4 — Annual Plan Elements has no filters and still has the row.
+
+    Purpose: UPD-F2.4 — the blank line the user asked for, one combo deep, so
+             the body of this tab starts where the body of the others does.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+    Tests:   tests/test_unified_panel_design.py::test_updf24_the_tab_with_no_filters_is_the_same_depth
+
+    The height is asserted against the same constant the filtered tabs' own
+    combos are built from, and against the height a real combo on another tab
+    reports, so the blank row cannot drift away from the thing it is standing
+    in for. `grid_propagate` must stay off: an empty CTkFrame asks for 200px,
+    and with propagation on an empty one collapses instead.
+    """
+    from src.getmoredone.screens.lineage_filters import FILTER_ROW_HEIGHT
+
+    root, screen = _annual_screen(left_rows=[_ape_row(1)])
+    try:
+        assert screen.filter_row.winfo_children() == [], (
+            "Annual Plan Elements has no lineage filters; its filter row holds nothing")
+        assert int(screen.filter_row.cget("height")) == FILTER_ROW_HEIGHT
+        # Tkinter's own `grid_propagate()` returns None when read, so the
+        # state is read back out of Tcl.
+        propagate = screen.filter_row.tk.call(
+            "grid", "propagate", screen.filter_row._w)
+        assert int(propagate) == 0, (
+            "propagation is on, so the empty row collapses instead of standing "
+            "one combo deep")
+    finally:
+        root.destroy()
+
+    root, screen = _week_screen(left_rows=[_ape_row(1)])
+    try:
+        assert int(screen.segment_filter_combo.cget("height")) == FILTER_ROW_HEIGHT, (
+            "the blank row is standing in for a combo of a different height")
+    finally:
+        root.destroy()
+
+
+def test_updf25_the_status_line_moved_below_the_filters(tmp_path):
+    """UPD-F2.5 — the controls are the same set, and status is under the filters.
+
+    Purpose: UPD-F2.5 — nothing in the header card changed but where the rows
+             sit: the same controls in the same order, and the status line
+             below the filters rather than beside them.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+    Tests:   tests/test_unified_panel_design.py::test_updf25_the_status_line_moved_below_the_filters
+
+    Week Assignment had its status label on the controls row at column 12 and
+    Week Actions had it beside the last combo, so both were a column of the
+    row above rather than a line of their own. The button sets are asserted
+    verbatim: UPD-F2 moves rows, and a control that disappeared in the move
+    would otherwise go unnoticed.
+    """
+    expected_buttons = {
+        "ape_quarter": ["Load", "Save", "Refresh"],
+        "ape_month": ["Load", "Save", "Refresh"],
+        "week_assignment": ["Load", "This Week", "Save", "Refresh"],
+        "week_actions": ["Load", "This Week"],
+        "annual_vision": ["Load Year", "Save", "Refresh"],
+    }
+    for name, build, has_filters in _FILTER_TABS:
+        root, screen = build(tmp_path)
+        try:
+            header = _header_of(screen)
+            buttons = [c.cget("text") for c in header.winfo_children()
+                       if isinstance(c, ctk.CTkButton)]
+            assert buttons == expected_buttons[name], (
+                f"{name}: header buttons are {buttons}")
+
+            if has_filters:
+                assert screen.status_label.master is header, (
+                    f"{name}: the status label left the header card")
+                assert int(screen.status_label.grid_info()["row"]) == 3, (
+                    f"{name}: the status label is on row "
+                    f"{screen.status_label.grid_info()['row']}, not below the filters")
+                assert int(screen.status_label.grid_info()["column"]) == 0, (
+                    f"{name}: the status label is not at the left of its row")
+        finally:
+            root.destroy()
+
+
+# ------------------- UPD-F4: the columns rescale with the divider
+#
+# Step 7 of the on-screen walk: "I want all columns to resize as I move the
+# vertical bar left or right, down to 5 character widths." Until UPD-F4 a
+# column kept the pixel width it was given however wide its panel became, so
+# widening a panel added empty space to the right of the last column instead
+# of giving the space to the columns.
+#
+# A withdrawn root has no layout, so `body.winfo_width()` is 1 and
+# `SplitPanel.apply` returns early. These tests therefore drive the fit with
+# an explicit pixel width -- which is the number `apply` would pass -- and
+# assert the wiring from `apply` to the tables separately.
+
+
+def test_updf41_a_divider_move_rescales_every_resizable_column():
+    """UPD-F4.1 — a wider panel is shared out across every resizable column.
+
+    Purpose: UPD-F4.1 — moving the divider rescales every resizable column in
+             proportion to its stored width.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Tests:   tests/test_unified_panel_design.py::test_updf41_a_divider_move_rescales_every_resizable_column
+
+    Proportion, not equal shares: a user who has made Segment twice the width
+    of Category has said something about the shape of their panel, and a
+    rescale that evened them out would throw it away. The ratio is asserted
+    against the ratio before the fit, to one part in twenty, which is as
+    close as integer pixels allow at these widths.
+    """
+    root, screen = _quarter_screen(left_rows=[_ape_row(1)])
+    try:
+        table = screen.left_table
+        resizable = [c.key for c in table.columns if c.resizable]
+        assert len(resizable) >= 2, "this tab has no proportions to keep"
+        before = {k: table.width(k) for k in resizable}
+
+        table.fit_to_panel(1200)
+        after = {k: table.width(k) for k in resizable}
+
+        assert sum(after.values()) > sum(before.values()), (
+            f"the extra width went nowhere: {before} -> {after}")
+        for key in resizable:
+            assert after[key] > before[key], f"{key} did not grow: {after}"
+
+        available = table.available_width(1200)
+        used = sum(table.width(c.key) for c in table.columns)
+        at_a_bound = [k for k in resizable
+                      if after[k] in (table.resizer.specs[k].min_width,
+                                      table.resizer.specs[k].max_width)]
+        assert not at_a_bound, (
+            f"{at_a_bound} are pinned at a bound, so this panel cannot show "
+            f"an exact fill; pick another width")
+        assert used == available, (
+            f"the panel is not filled exactly: {used} of {available}; integer "
+            f"shares leave a remainder, and it has to go to a column")
+
+        widest = max(resizable, key=lambda k: before[k])
+        narrowest = min(resizable, key=lambda k: before[k])
+        want = before[widest] / before[narrowest]
+        got = after[widest] / after[narrowest]
+        assert abs(got - want) < 0.05, (
+            f"the shape changed: {want:.3f} -> {got:.3f}; {before} -> {after}")
+    finally:
+        root.destroy()
+
+
+def test_updf41_the_divider_is_wired_to_both_panels():
+    """UPD-F4.1 — `SplitPanel.apply` hands each panel's width to its columns.
+
+    Purpose: UPD-F4.1 — the wiring, which the fit itself cannot show: a
+             correct `fit_to_panel` that nothing calls is the behaviour the
+             user reported.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Tests:   tests/test_unified_panel_design.py::test_updf41_the_divider_is_wired_to_both_panels
+
+    Driven through a stand-in body rather than a real one: a withdrawn root
+    has no layout, so a real `body.winfo_width()` is 1 and `apply` returns
+    before it reaches the callback. The stand-in answers the three calls
+    `SplitPanel` makes on its body and nothing else.
+    """
+    calls = []
+
+    class FakeBody:
+        def winfo_width(self):
+            return 1208  # 1200 usable at SPLITTER_WIDTH = 8
+
+        def grid_columnconfigure(self, *args, **kwargs):
+            calls.append(("grid", args, kwargs))
+
+        def bind(self, *args, **kwargs):
+            pass
+
+    class FakeDivider:
+        def bind(self, *args, **kwargs):
+            pass
+
+    fitted = []
+    split = split_panel.SplitPanel(
+        FakeBody(), SimpleNamespace(winfo_width=lambda: 600), FakeDivider(),
+        on_apply=lambda left, right: fitted.append((left, right)))
+    split.ratio = 0.5
+    split.apply()
+
+    assert fitted == [(600, 600)], fitted
+    minsizes = [kwargs.get("minsize") for _tag, _args, kwargs in calls]
+    assert minsizes == [600, 600], minsizes
+
+    # Every tab that has two chip panels hands both to the fitter, and the one
+    # with a single chip panel hands one. Asserted as the set of screens, so a
+    # new tab cannot be added without a decision about this.
+    import inspect
+
+    wired = {}
+    for name in ("ape_assignment", "ape_period_view", "annual_vision_segments",
+                 "weekly_items", "week_actions"):
+        module = importlib.import_module(f"src.getmoredone.screens.{name}")
+        source = inspect.getsource(module)
+        matches = [line.strip() for line in source.splitlines()
+                   if "on_apply=panel_fitter(" in line]
+        assert len(matches) == 1, f"{name}: {matches}"
+        wired[name] = matches[0]
+
+    # The width handed to the columns is the panel's less what the table
+    # spends on its own padding. Read off the rendered widgets rather than
+    # restated here: `available_width` and the `grid` calls are two places
+    # that have to agree, and this is what catches them drifting.
+    root, screen = _quarter_screen(left_rows=[_ape_row(1)])
+    try:
+        table = screen.left_table
+        header = _header_frame(screen.left_list)
+        header_padx = int(header.grid_info()["padx"])
+        cell_padx = {int(label.grid_info()["padx"])
+                     for label in header.winfo_children()
+                     if isinstance(label, ctk.CTkLabel)}
+        assert len(cell_padx) == 1, f"cells disagree on their padding: {cell_padx}"
+        spent = 2 * header_padx + 2 * cell_padx.pop() * len(table.columns)
+        assert table.available_width(1000) == 1000 - spent, (
+            f"available_width does not match the layout: "
+            f"{table.available_width(1000)} != {1000 - spent}")
+    finally:
+        root.destroy()
+
+    assert wired == {
+        "ape_assignment": "on_apply=panel_fitter(self.left_table, self.right_table),",
+        "ape_period_view": "on_apply=panel_fitter(self.left_table, self.right_table),",
+        "annual_vision_segments": "on_apply=panel_fitter(self.left_table, self.right_table),",
+        "weekly_items": "on_apply=panel_fitter(self.left_table, self.right_table),",
+        # The right panel here is a TodayScreen subclass, not a ChipTable.
+        "week_actions": "on_apply=panel_fitter(self.left_table),",
+    }, wired
+    assert callable(chip_table.panel_fitter)
+
+
+def test_updf42_a_fixed_column_keeps_its_width_when_the_panel_moves():
+    """UPD-F4.2 — Pick, `#` and Actions are reserved out, not rescaled.
+
+    Purpose: UPD-F4.2 — a fixed column holds a checkbox or a pair of buttons,
+             whose size does not depend on how wide the panel is.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Tests:   tests/test_unified_panel_design.py::test_updf42_a_fixed_column_keeps_its_width_when_the_panel_moves
+
+    Both directions: a panel twice as wide and one half as wide. A fit that
+    shared the budget across every column would move these on either call.
+    """
+    root, screen = _annual_screen(left_rows=[_ape_row(1)])
+    try:
+        for table in (screen.left_table, screen.right_table):
+            fixed = [c.key for c in table.columns if not c.resizable]
+            assert fixed, "this panel has no fixed columns to hold"
+            before = {k: table.width(k) for k in fixed}
+            for panel_px in (1600, 500):
+                table.fit_to_panel(panel_px)
+                assert {k: table.width(k) for k in fixed} == before, (
+                    f"a fixed column moved at {panel_px}px: "
+                    f"{ {k: table.width(k) for k in fixed} } != {before}")
+    finally:
+        root.destroy()
+
+
+def test_updf43_no_column_goes_below_five_characters():
+    """UPD-F4.3 — five characters is the floor, and the rest absorb the squeeze.
+
+    Purpose: UPD-F4.3 — the width the user named: "down to 5 character
+             widths", and no narrower.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Tests:   tests/test_unified_panel_design.py::test_updf43_no_column_goes_below_five_characters
+
+    The floor is asserted against `min_column_width()` rather than against 40,
+    so it follows `CHAR_PX` if the list font ever changes, and against five
+    times `CHAR_PX` as well, so the constant cannot quietly stop meaning five
+    characters.
+    """
+    from src.getmoredone.screens.column_resize import (
+        CHAR_PX, MIN_COLUMN_CHARS, min_column_width)
+
+    assert MIN_COLUMN_CHARS == 5
+    assert min_column_width() == 5 * CHAR_PX == 40
+
+    root, screen = _week_screen(left_rows=[_ape_row(1)])
+    try:
+        table = screen.left_table
+        resizable = [c.key for c in table.columns if c.resizable]
+        # Narrow enough that an even share would be well under the floor.
+        table.fit_to_panel(300)
+        for key in resizable:
+            assert table.width(key) >= min_column_width(), (
+                f"{key} is {table.width(key)}px, below the "
+                f"{min_column_width()}px floor")
+    finally:
+        root.destroy()
+
+
+def test_updf44_a_panel_too_narrow_for_the_floor_surfaces_it(caplog):
+    """UPD-F4.4 — P7: a panel that cannot seat the floors says by how much.
+
+    Purpose: UPD-F4.4 — the adversarial case. A fit that returned a negative
+             or zero width here would look like it had worked, and the panel
+             would render columns of nothing with no record of why.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Tests:   tests/test_unified_panel_design.py::test_updf44_a_panel_too_narrow_for_the_floor_surfaces_it
+
+    The number is checked, not just its truthiness: the shortfall is what
+    tells a reader whether a panel is 4px or 400px too narrow.
+    """
+    from src.getmoredone.screens.chip_table import panel_fitter
+    from src.getmoredone.screens.column_resize import min_column_width
+
+    root, screen = _week_screen(left_rows=[_ape_row(1)])
+    try:
+        table = screen.left_table
+        resizable = [c.key for c in table.columns if c.resizable]
+        fixed_px = sum(table.width(c.key) for c in table.columns
+                       if not c.resizable)
+        floors = len(resizable) * min_column_width()
+
+        # One pixel of panel: the floors cannot be seated at all.
+        overflow = table.fit_to_panel(1)
+        assert overflow == floors + fixed_px, (
+            f"overflow {overflow} does not account for {len(resizable)} floors "
+            f"and {fixed_px}px of fixed columns")
+        for key in resizable:
+            assert table.width(key) == min_column_width(), (
+                f"{key} is {table.width(key)}px, not pinned to the floor")
+
+        with caplog.at_level("WARNING"):
+            panel_fitter(table)(1, 0)
+        assert any("too narrow" in r.message for r in caplog.records), (
+            f"nothing was logged: {[r.message for r in caplog.records]}")
+    finally:
+        root.destroy()
+
+
+def test_updf45_a_drag_still_moves_only_its_own_column():
+    """UPD-F4.5 — a column drag is unchanged, and is what gets stored.
+
+    Purpose: UPD-F4.5 — UPD-F4 adds a second writer to the same widths, and
+             the failure to guard against is a fit running on the back of a
+             drag and undoing it.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Tests:   tests/test_unified_panel_design.py::test_updf45_a_drag_still_moves_only_its_own_column
+
+    The drag is taken after a fit, so the widths it starts from are fitted
+    ones rather than the defaults -- which is the state a real drag happens
+    in, the panel having been laid out before the user reaches for a handle.
+    """
+    settings = FakeSettings(week_assignment_split_ratio=0.5)
+    root, screen = _week_screen(left_rows=[_ape_row(1)], settings=settings)
+    try:
+        table = screen.left_table
+        table.fit_to_panel(1100)
+        before = {c.key: table.width(c.key) for c in table.columns}
+
+        _resize(table, key="segment", delta=70)
+
+        after = {c.key: table.width(c.key) for c in table.columns}
+        assert after["segment"] == before["segment"] + 70
+        for key, width in before.items():
+            if key != "segment":
+                assert after[key] == width, f"{key} moved with the drag"
+        assert settings.week_assignment_left_col_widths["segment"] == (
+            before["segment"] + 70)
+    finally:
+        root.destroy()
+
+
+def test_updf46_stored_widths_survive_a_different_window_size():
+    """UPD-F4.6 — the stored widths are a shape, so a wider window keeps it.
+
+    Purpose: UPD-F4.6 — step 10 of the walk asked for the sizing to come
+             back; step 7 asked for it to follow the divider. Both hold only
+             if the stored number is read as a weight.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Tests:   tests/test_unified_panel_design.py::test_updf46_stored_widths_survive_a_different_window_size
+
+    The second build is the relaunch, at a panel 300px wider than the one the
+    widths were set in. The pixel widths must differ -- there is more room --
+    and the ratio between two of them must not.
+    """
+    settings = FakeSettings(ape_quarter_split_ratio=0.5)
+    root, screen = _quarter_screen(left_rows=[_ape_row(1)], settings=settings)
+    try:
+        table = screen.left_table
+        table.fit_to_panel(900)
+        _resize(table, key="segment", delta=120)
+        narrow = {c.key: table.width(c.key) for c in table.columns if c.resizable}
+        shape = narrow["segment"] / narrow["category"]
+    finally:
+        root.destroy()
+
+    root, screen = _quarter_screen(left_rows=[_ape_row(1)], settings=settings)
+    try:
+        table = screen.left_table
+        assert table.width("segment") == narrow["segment"], (
+            "the stored width did not come back")
+        table.fit_to_panel(1200)
+        wide = {c.key: table.width(c.key) for c in table.columns if c.resizable}
+        assert sum(wide.values()) > sum(narrow.values()), (
+            f"the wider panel gave the columns nothing: {narrow} -> {wide}")
+        assert abs(wide["segment"] / wide["category"] - shape) < 0.05, (
+            f"the shape was lost: {shape:.3f} -> "
+            f"{wide['segment'] / wide['category']:.3f}")
+    finally:
+        root.destroy()
