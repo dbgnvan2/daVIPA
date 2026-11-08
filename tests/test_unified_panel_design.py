@@ -44,6 +44,7 @@ from src.getmoredone.screens.annual_vision_segments import (  # noqa: E402
 )
 from src.getmoredone.screens.ape_assignment import APEAssignmentScreen  # noqa: E402
 from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen  # noqa: E402
+from src.getmoredone.screens.weekly_items import WeeklyItemsScreen  # noqa: E402
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "getmoredone"
 
@@ -173,6 +174,31 @@ def _bound_sequences(widget) -> tuple:
 def _minsizes(frame, columns):
     """The grid minsize of each named column on a frame."""
     return [frame.grid_columnconfigure(col).get("minsize") for col in columns]
+
+
+def _topmost_at_grid_row(scroll_frame, grid_row):
+    """The last frame gridded at `grid_row`, which is the one drawn on top.
+
+    Two widgets gridded into one cell both stay mapped, and the later one is
+    what the user sees. Before UPD-M5 this panel really did hold several
+    frames per row (see
+    ::test_updm57_selecting_a_row_repaints_the_panel_instead_of_stacking_it),
+    so reading the first child would read a frame the user cannot see.
+    """
+    at_row = [c for c in scroll_frame.winfo_children()
+              if c.grid_info() and int(c.grid_info()["row"]) == grid_row]
+    assert at_row, f"nothing gridded at row {grid_row}"
+    return at_row[-1]
+
+
+def _label_texts(widget) -> list:
+    """The text of every CTkLabel at or under a widget, in child order."""
+    out = []
+    if isinstance(widget, ctk.CTkLabel):
+        out.append(widget.cget("text"))
+    for child in widget.winfo_children():
+        out.extend(_label_texts(child))
+    return out
 
 
 # ------------------------------- UPD-M4.1: APE Quarter Assignment, as it stands
@@ -885,14 +911,12 @@ def test_updm37_the_fallback_chip_does_not_measure_a_named_colour():
 
 SPLITTER_METHODS = ("_apply_split_ratio", "_on_divider_drag")
 
-# The screens that still carry their own copy of the splitter. UPD-M1 adopts
-# ape_assignment only (the spec's implementation order, step 2); these three
-# adopt at UPD-M4, and this set must shrink to empty as they do. It is asserted
-# as an exact set rather than a ceiling, so it cannot quietly grow a fourth
-# entry and it cannot stay stale after an adoption.
-SPLITTER_HOLDOUTS = {
-    "weekly_items.py",
-}
+# The screens that still carry their own copy of the splitter. Empty as of
+# UPD-M5: ape_assignment adopted at UPD-M1, ape_period_view and
+# annual_vision_segments at UPD-M4, and weekly_items here. It stays as an
+# exact set rather than a ceiling, so a seventh screen that grows its own copy
+# appears in `found` and this goes red.
+SPLITTER_HOLDOUTS: set = set()
 
 # A fifth copy, older than the four and not one of them: a different minimum
 # (300), a different default ratio (0.6), a clamp that holds both panels, and
@@ -1093,24 +1117,20 @@ def _screens_with_their_own_splitter():
 
 
 def test_updm15_no_screen_keeps_its_own_splitter():
-    """UPD-M1.5 — counted from the AST, as an exact set.
+    """UPD-M1.5 — counted from the AST, as an exact set. Zero at UPD-M5.
 
-    Still not zero after UPD-M4, and saying it is would be a false claim. The
-    spec's §4 said UPD-M4 would empty this set; it was wrong, because UPD-M4
-    is the three APE/Annual tabs and the fourth copy is in weekly_items.py,
-    which is rewritten at UPD-M5. What is asserted instead is exact: the one
-    file that still defines a splitter defines the whole copy rather than part
-    of one. The set goes red when another screen grows one, and again when the
-    last holdout adopts and is not struck off here.
+    Every screen in the alignment has adopted screens/split_panel.py, so the
+    holdout set is empty and the only file left with a splitter is
+    project_boards.py, which is out of scope by UPD-A5. Asserted as an exact
+    set in both directions: red if any of the four grows a copy back, and red
+    if project_boards.py is consolidated and not struck off here.
     """
     found = _screens_with_their_own_splitter()
-    assert set(found) == SPLITTER_HOLDOUTS | SPLITTER_OUT_OF_SCOPE
+    assert SPLITTER_HOLDOUTS == set(), "strike a holdout off the set when it adopts"
+    assert set(found) == SPLITTER_OUT_OF_SCOPE
     for adopted in ("ape_assignment.py", "ape_period_view.py",
-                    "annual_vision_segments.py"):
+                    "annual_vision_segments.py", "weekly_items.py"):
         assert adopted not in found, f"{adopted} grew a splitter back"
-    whole_copy = {"_apply_split_ratio", "_on_divider_drag", "SPLITTER_WIDTH"}
-    for name in SPLITTER_HOLDOUTS:
-        assert found[name] == whole_copy, (name, sorted(found[name]))
     # project_boards.py inlines its apply into _on_body_resize, so it has no
     # _apply_split_ratio to find. Asserted exactly, so that the day it is
     # consolidated this test says so.
@@ -1186,13 +1206,11 @@ def test_updm16_a_prefix_with_no_settings_field_says_so(caplog):
 
 DRAG_METHODS = ("_start_row_drag", "_is_descendant")
 
-# The screens that still carry their own copy of the row drag. UPD-M2 adopts
-# ape_assignment only (the spec's §4 step 3); these three adopt at UPD-M4 and
-# this set must shrink to empty as they do. Exact, like SPLITTER_HOLDOUTS, and
-# for the same reason.
-DRAG_HOLDOUTS = {
-    "weekly_items.py",
-}
+# The screens that still carry their own copy of the row drag. Empty as of
+# UPD-M5, and with no out-of-scope file beside it: project_boards.py has a
+# splitter but no row drag, so this set reaching zero means no screen under
+# screens/ defines either drag method. Exact, like SPLITTER_HOLDOUTS.
+DRAG_HOLDOUTS: set = set()
 
 
 class _FakeWidget:
@@ -1388,20 +1406,17 @@ def _screens_with_their_own_drag():
 
 
 def test_updm25_no_screen_keeps_its_own_drag():
-    """UPD-M2.5 — counted from the AST, as an exact set.
+    """UPD-M2.5 — counted from the AST, as an exact set. Zero at UPD-M5.
 
-    Partial for the same reason UPD-M1.5 is, and still partial after UPD-M4:
-    the last copy is in weekly_items.py, which is rewritten at UPD-M5. The set
-    is exact in both directions — red if another screen grows its own copy,
-    red again when that holdout adopts and is not struck off here.
+    Nothing under screens/ defines `_start_row_drag` or `_is_descendant` any
+    more: all four copies are gone and screens/row_drag.py is the only owner.
+    Unlike the splitter there is no out-of-scope file, so this is a plain
+    emptiness assertion, and it goes red the moment any screen writes its own
+    again.
     """
     found = _screens_with_their_own_drag()
-    assert set(found) == DRAG_HOLDOUTS
-    for adopted in ("ape_assignment.py", "ape_period_view.py",
-                    "annual_vision_segments.py"):
-        assert adopted not in found, f"{adopted} grew a drag back"
-    for name in DRAG_HOLDOUTS:
-        assert found[name] == set(DRAG_METHODS), (name, sorted(found[name]))
+    assert DRAG_HOLDOUTS == set(), "strike a holdout off the set when it adopts"
+    assert found == {}, f"a screen grew its own row drag back: {sorted(found)}"
 
 
 def test_updm22_the_quarter_screen_routes_its_drop_through_the_module():
@@ -1616,3 +1631,485 @@ def test_updm44_the_panels_a_screen_builds_use_those_prefixes():
             assert screen.left_table.resizer._setting_attr() == f"{prefix}_left_col_widths"
         finally:
             root.destroy()
+
+
+# ------------------------- UPD-M5: APE Week Assignment, before and after
+
+def _weekly_row(idx, segment="Purposeful Work", subsegment="Living Systems",
+                category="Blog", start_date="2026-11-02"):
+    """A weekly tactic row, in the shape `_weekly_parts` reads.
+
+    The right panel's lineage comes from `ape_*` keys, not the `*_name` keys
+    the left panel's APE rows carry, so a row built by `_ape_row` would render
+    four dashes here and the header assertions would pass against nothing.
+    """
+    return {
+        "id": f"wt-{idx}",
+        "title": f"Tactic {idx}",
+        "start_date": start_date,
+        "ape_segment_name": segment,
+        "ape_subsegment_name": subsegment,
+        "ape_category_name": category,
+    }
+
+
+def _fake_week_vps(left_rows, right_rows):
+    """A VPS double for APE Week Assignment.
+
+    `get_weekly_action_items` ignores the week it is asked for and returns the
+    same rows, so a test does not have to make the screen's week picker agree
+    with a fixture date to see a right-hand row.
+    """
+    calls = []
+    return SimpleNamespace(
+        calls=calls,
+        get_weekly_action_items=lambda **_kw: list(right_rows),
+        get_annual_plan_elements_for_month=lambda year, month: list(left_rows),
+        get_vision_categories=lambda: [],
+        get_vision_subsegments=lambda: [],
+        get_segment_color_map=lambda: {},
+        get_segment_colors_by_id=lambda: {},
+        resolve_segment_color=lambda name, colors: "",
+        create_week_action_items_for_ape=lambda *a: calls.append(("create",) + a) or {
+            "created_count": 1, "skipped_count": 0, "collided_count": 0},
+        delete_weekly_action_item=lambda item_id: calls.append(("delete", item_id)) or True,
+    )
+
+
+def _week_screen(left_rows=(), right_rows=(), settings=None):
+    """APE Week Assignment on a withdrawn root, already rendered."""
+    root = _root()
+    vps = _fake_week_vps(left_rows, right_rows)
+    app = SimpleNamespace(vps_manager=vps)
+    if settings is not None:
+        app.settings = settings
+    screen = WeeklyItemsScreen(root, vps, app)
+    screen.update_idletasks()
+    return root, screen
+
+
+def _button_texts(frame):
+    """The text of every CTkButton anywhere under a frame, in child order."""
+    out = []
+    for child in frame.winfo_children():
+        if isinstance(child, ctk.CTkButton):
+            out.append(child.cget("text"))
+        else:
+            out.extend(_button_texts(child))
+    return out
+
+
+def test_updm56_week_assignment_body_is_left_divider_right():
+    """UPD-M5.6 — the body and the divider, pinned before the move.
+
+    Characterisation, in the sense this file opens with: the screen already
+    has the three-column body and the three divider bindings, and the move
+    onto split_panel must not change either. `<ButtonPress-1>` and
+    `<Button-1>` are one event in Tk and `bind()` reports the canonical name,
+    so this holds before the move, where the screen binds the long form, and
+    after, where split_panel binds the short one.
+    """
+    root, screen = _week_screen()
+    try:
+        body = screen.body
+        assert int(screen.left_frame.grid_info()["column"]) == 0
+        assert int(screen.right_frame.grid_info()["column"]) == 2
+        assert body.grid_columnconfigure(1).get("minsize") == split_panel.SPLITTER_WIDTH
+
+        divider = [c for c in body.winfo_children()
+                   if c.grid_info() and int(c.grid_info()["column"]) == 1][0]
+        bound = set(_bound_sequences(divider))
+        assert {"<Button-1>", "<B1-Motion>", "<ButtonRelease-1>"} <= bound
+    finally:
+        root.destroy()
+
+
+def test_updm56_both_panels_still_say_when_they_are_empty():
+    """UPD-M5.6 — neither empty state is lost to the move (P2).
+
+    Both are the only thing on screen that distinguishes "this week has
+    nothing in it" from "the filters hid everything", and the shared table
+    renders a bare header for both. The table owns its container outright, so
+    each label has to move to a sibling frame rather than be dropped.
+
+    The labels are built in `create_ui` and only gridded or un-gridded as the
+    panel fills, so their *existence* says nothing: an earlier version of this
+    test read the text off a label that had been removed from the grid and
+    passed with the two branches swapped. What is asserted is which of the two
+    widgets in that cell is gridded.
+    """
+    root, screen = _week_screen()
+    try:
+        for message, listing in ((screen.left_empty, screen.left_list),
+                                 (screen.right_empty, screen.right_list)):
+            assert message.grid_info(), f"{message.cget('text')} is not on screen"
+            assert not listing.grid_info(), "the empty list is still taking the space"
+        assert "No month-assigned Annual Plan Elements" in screen.left_empty.cget("text")
+        assert "No weekly tactics exist" in screen.right_empty.cget("text")
+    finally:
+        root.destroy()
+
+    root, screen = _week_screen(left_rows=[_ape_row(1)],
+                                right_rows=[_weekly_row(1)])
+    try:
+        for message, listing in ((screen.left_empty, screen.left_list),
+                                 (screen.right_empty, screen.right_list)):
+            assert listing.grid_info(), "the list is not on screen"
+            assert not message.grid_info(), (
+                f"{message.cget('text')} is shown over a panel that has rows")
+    finally:
+        root.destroy()
+
+
+def test_updm54_the_selection_buttons_act_on_the_selection():
+    """UPD-M5.4 — Edit Weekly Tactic and Add Action Item stay, and still warn.
+
+    They act on the *selected* tactic and have no per-row equivalent in the
+    image, so UPD-D5 keeps them below the list. Both warn when nothing is
+    selected; a rewrite that left them wired to a stale index would warn on a
+    screen that does have a selection, which is what the second half checks.
+    """
+    import src.getmoredone.screens.weekly_items as wi
+
+    root, screen = _week_screen(right_rows=[_weekly_row(1)])
+    warned = []
+    original = wi.messagebox.showwarning
+    wi.messagebox.showwarning = lambda title, msg: warned.append(title)
+    try:
+        actions_bar = [c for c in screen.right_frame.winfo_children()
+                       if c.grid_info() and int(c.grid_info()["row"]) == 1][0]
+        assert _button_texts(actions_bar) == [
+            "Edit Weekly Tactic", "Delete Weekly", "Add Action Item"]
+
+        screen.selected_weekly_item = None
+        screen.open_selected_weekly_item()
+        screen.create_action_item_for_selected_weekly()
+        assert warned == ["No Weekly Item Selected", "No Weekly Item Selected"]
+
+        screen.on_select_weekly_item(0)
+        assert screen.selected_weekly_item["id"] == "wt-1"
+        assert screen.selected_weekly_idx == 0
+    finally:
+        wi.messagebox.showwarning = original
+        root.destroy()
+
+
+def test_updm57_clicking_a_right_row_selects_it_and_double_click_opens_it():
+    """UPD-M5.7 — the selection tint and double-click-to-open survive.
+
+    Both are on every widget of the row, frame and cells alike, and both have
+    to be re-bound by hand after the move: the shared table knows nothing
+    about selection. The tint is asserted as the theme's own token, so a
+    rewrite that tinted with a literal would fail.
+    """
+    root, screen = _week_screen(right_rows=[_weekly_row(1), _weekly_row(2)])
+    try:
+        rows = _row_frames(screen.right_list)
+        assert len(rows) == 2
+        # Every widget of the row but its Delete button: a click on Delete
+        # opens the confirmation, not the selection, so it is deliberately
+        # not a selection handle (UPD-M5.2).
+        clickable = [rows[0]] + [c for c in rows[0].winfo_children()
+                                 if not isinstance(c, ctk.CTkButton)]
+        assert len(clickable) == 5
+        for widget in clickable:
+            bound = set(_bound_sequences(widget))
+            assert "<Button-1>" in bound
+            assert "<Double-Button-1>" in bound
+
+        screen.on_select_weekly_item(1)
+        screen.update_idletasks()
+        tint = chip_table.semantic_colors()["selected_tint"]
+        assert _topmost_at_grid_row(screen.right_list, 2).cget("fg_color") == tint
+        assert _topmost_at_grid_row(screen.right_list, 1).cget("fg_color") != tint
+    finally:
+        root.destroy()
+
+
+def test_updm57_selecting_a_row_repaints_the_panel_instead_of_stacking_it():
+    """UPD-M5.7 — a selection click must not leave the old rows behind.
+
+    `on_select_weekly_item` re-renders the right panel to move the tint, and
+    before UPD-M5 it did so without destroying what was there: both headers
+    and both sets of rows ended up gridded in the same cells, one on top of
+    the other, and every further click added another set. The shared table
+    clears its container in `build_header`, which is what fixes it, so this
+    counts the children rather than trusting that.
+    """
+    root, screen = _week_screen(right_rows=[_weekly_row(1), _weekly_row(2)])
+    try:
+        before = len(screen.right_list.winfo_children())
+        for idx in (0, 1, 0):
+            screen.on_select_weekly_item(idx)
+            screen.update_idletasks()
+        assert len(screen.right_list.winfo_children()) == before, (
+            "three selection clicks left extra row frames stacked in the panel"
+        )
+    finally:
+        root.destroy()
+
+
+def test_updm51_right_panel_has_the_actions_column():
+    """UPD-M5.1 — `#` / Segment / SubSegment / Category / Actions.
+
+    The right panel had four columns and three buttons in a bar below the
+    list; the image has a fifth column with the row's own Delete in it. The
+    widths are the other APE tabs' now, not this screen's old 180s, which is
+    the alignment the request asked for and the part of it that is a visible
+    change rather than a move.
+    """
+    root, screen = _week_screen(left_rows=[_ape_row(1)],
+                               right_rows=[_weekly_row(1)])
+    try:
+        right = _header_frame(screen.right_list)
+        assert [text for _col, _cls, text in _cells(right)] == [
+            "#", "Segment", "SubSegment", "Category", "Actions"]
+        assert _minsizes(right, (0, 1, 2, 3, 4)) == [34, 135, 155, 125, 84]
+    finally:
+        root.destroy()
+
+
+def test_updm55_left_header_matches_the_other_tabs():
+    """UPD-M5.5 — the first cell is empty, where it used to read "Pick".
+
+    The other three tabs' left header has a blank cell over the checkboxes;
+    this one said "Pick" in a 52px column. Both the text and the width change,
+    so the header is asserted as text *and* pixels — a cell that was merely
+    blanked would leave the row's cells one place to the right of the other
+    tabs'.
+    """
+    root, screen = _week_screen(left_rows=[_ape_row(1)])
+    try:
+        left = _header_frame(screen.left_list)
+        assert [text for _col, _cls, text in _cells(left)] == [
+            "", "#", "Segment", "SubSegment", "Category"]
+        assert _minsizes(left, (0, 1, 2, 3, 4)) == [34, 34, 135, 155, 125]
+
+        row = _row_frames(screen.left_list)[0]
+        assert [cls for _col, cls, _text in _cells(row)][0] == "CTkCheckBox"
+    finally:
+        root.destroy()
+
+
+def test_updm52_a_row_delete_removes_that_row_not_the_selection():
+    """UPD-M5.2 — the row's Delete deletes the row it is on.
+
+    The screen already had a Delete that acted on the selection, so a per-row
+    button wired to `delete_selected_weekly_item` would look right and delete
+    the wrong tactic. Row 2's button is pressed with row 1 selected, and the
+    id the manager is given is the assertion.
+    """
+    import src.getmoredone.screens.weekly_items as wi
+
+    root, screen = _week_screen(right_rows=[_weekly_row(1), _weekly_row(2)])
+    original = wi.messagebox.askyesno
+    wi.messagebox.askyesno = lambda *_a, **_k: True
+    try:
+        screen.on_select_weekly_item(0)
+        assert screen.selected_weekly_item["id"] == "wt-1"
+
+        second_row = _row_frames(screen.right_list)[1]
+        delete = [c for c in second_row.winfo_children()
+                  if isinstance(c, ctk.CTkButton)][0]
+        assert delete.cget("text") == "Delete"
+        delete.invoke()
+
+        assert ("delete", "wt-2") in screen.vps_manager.calls, screen.vps_manager.calls
+        assert ("delete", "wt-1") not in screen.vps_manager.calls
+    finally:
+        wi.messagebox.askyesno = original
+        root.destroy()
+
+
+def test_updm53_delete_is_confirmed_before_it_happens():
+    """UPD-M5.3 — a refused confirmation deletes nothing, from either button.
+
+    Both the row's Delete and Delete Weekly go through one method, so the
+    confirmation cannot be present on one path and missing on the other. Both
+    are driven here: one method with two callers is only safe while both
+    callers really use it.
+    """
+    import src.getmoredone.screens.weekly_items as wi
+
+    root, screen = _week_screen(right_rows=[_weekly_row(1)])
+    asked = []
+    original = wi.messagebox.askyesno
+    wi.messagebox.askyesno = lambda title, msg, **_k: asked.append(msg) or False
+    try:
+        screen.delete_weekly_row({"id": "wt-1", "title": "Tactic 1"})
+        screen.on_select_weekly_item(0)
+        screen.delete_selected_weekly_item()
+
+        assert len(asked) == 2, asked
+        assert all("Tactic 1" in msg for msg in asked), asked
+        assert not any(call[0] == "delete" for call in screen.vps_manager.calls), (
+            screen.vps_manager.calls
+        )
+    finally:
+        wi.messagebox.askyesno = original
+        root.destroy()
+
+
+def test_updm54_delete_weekly_still_deletes_the_selection():
+    """UPD-M5.4 — the selection Delete survives the per-row one.
+
+    UPD-D5 keeps Edit Weekly Tactic and Add Action Item below the list; the
+    spec's §5 keeps Delete Weekly beside them and says both delete paths have
+    to pass, because two ways to delete one thing is the easy mistake here.
+    This is the second way.
+    """
+    import src.getmoredone.screens.weekly_items as wi
+
+    root, screen = _week_screen(right_rows=[_weekly_row(1), _weekly_row(2)])
+    original_ask = wi.messagebox.askyesno
+    original_warn = wi.messagebox.showwarning
+    warned = []
+    wi.messagebox.askyesno = lambda *_a, **_k: True
+    wi.messagebox.showwarning = lambda title, msg: warned.append(title)
+    try:
+        screen.delete_selected_weekly_item()
+        assert warned == ["No Weekly Item Selected"]
+        assert not any(c[0] == "delete" for c in screen.vps_manager.calls)
+
+        screen.on_select_weekly_item(1)
+        screen.delete_selected_weekly_item()
+        assert ("delete", "wt-2") in screen.vps_manager.calls
+    finally:
+        wi.messagebox.askyesno = original_ask
+        wi.messagebox.showwarning = original_warn
+        root.destroy()
+
+
+def test_updm56_week_assignment_uses_the_shared_table_and_module_wiring():
+    """UPD-M5.6 — both panels are ChipTables, under this screen's own prefixes.
+
+    And the splitter and the drag source are the shared ones, pointed at the
+    right widgets: a `SplitPanel` built over the wrong frame, or a
+    `RowDragSource` pointed at the panel frame rather than the list, would
+    pass every rendering assertion above and misbehave only under the mouse.
+    """
+    root, screen = _week_screen(left_rows=[_ape_row(1)], right_rows=[_weekly_row(1)])
+    try:
+        assert isinstance(screen.left_table, chip_table.ChipTable)
+        assert isinstance(screen.right_table, chip_table.ChipTable)
+        assert screen.left_table.prefix == "week_assignment_left"
+        assert screen.right_table.prefix == "week_assignment_right"
+        assert screen.left_table.container is screen.left_list
+        assert screen.right_table.container is screen.right_list
+
+        assert isinstance(screen.split, split_panel.SplitPanel)
+        assert screen.split.left_panel is screen.left_frame
+        assert screen.split.prefix == "week_assignment"
+
+        assert isinstance(screen.row_drag, row_drag.RowDragSource)
+        assert screen.row_drag.drop_target is screen.right_list
+        assert screen.row_drag.on_drop == screen._assign_dragged_row
+    finally:
+        root.destroy()
+
+
+def test_updm56_week_assignment_columns_resize_and_persist():
+    """UPD-M5.6 — a drag on either panel is kept, and the panels are separate.
+
+    The two panels were one set of class constants, so neither could be sized
+    without the other. They have their own stores now, and the test drags one
+    and asserts the other did not move, then rebuilds the screen from the same
+    settings object and reads the width back.
+    """
+    settings = FakeSettings(
+        week_assignment_left_col_widths={},
+        week_assignment_right_col_widths={},
+        week_assignment_split_ratio=0.5,
+    )
+    root, screen = _week_screen(left_rows=[_ape_row(1)],
+                                right_rows=[_weekly_row(1)], settings=settings)
+    try:
+        _resize(screen.left_table, "segment", 40)
+        assert screen.left_table.width("segment") == 175
+        assert screen.right_table.width("segment") == 135
+        assert settings.week_assignment_left_col_widths["segment"] == 175
+        assert "segment" not in settings.week_assignment_right_col_widths
+    finally:
+        root.destroy()
+
+    root, screen = _week_screen(left_rows=[_ape_row(1)],
+                                right_rows=[_weekly_row(1)], settings=settings)
+    try:
+        assert screen.left_table.width("segment") == 175
+        assert _minsizes(_header_frame(screen.left_list), (2,)) == [175]
+        # And the right panel is still at its default on the new build. The
+        # in-memory check above cannot see a shared store: a right table built
+        # on the left prefix reads it before the drag happens and holds 135
+        # for the rest of that session. Only the next build loads the width
+        # the drag wrote, which is where two panels on one store show.
+        assert screen.right_table.width("segment") == 135
+        assert _minsizes(_header_frame(screen.right_list), (1,)) == [135]
+    finally:
+        root.destroy()
+
+
+def test_updm56_the_week_assignment_prefixes_have_settings_fields():
+    """UPD-M5.6 — and the three fields the screen writes to are declared.
+
+    `ColumnResizer._persist` setattrs the attribute and calls `save()`, which
+    writes declared dataclass fields only, so an undeclared field is kept for
+    the session and silently gone at the next launch. Same guard as UPD-M4.4's,
+    extended to this screen.
+    """
+    names = {f.name for f in dataclasses.fields(AppSettings)}
+    prefix = WeeklyItemsScreen.SETTINGS_PREFIX
+    assert prefix == "week_assignment"
+    assert f"{prefix}_split_ratio" in names
+    assert getattr(AppSettings(), f"{prefix}_split_ratio") == 0.5
+    for side in ("left", "right"):
+        field_name = f"{prefix}_{side}_col_widths"
+        assert field_name in names, field_name
+        assert getattr(AppSettings(), field_name) == {}
+
+
+def test_updm56_a_left_row_is_a_drag_source_on_this_tab_too():
+    """UPD-M5.6 — the left rows are bound to the shared drag, cells included.
+
+    The frame and its four cells, not the checkbox: a click on the checkbox
+    ticks it. Dragging is one-way, so nothing on a left row is bound to the
+    selection handlers the right rows carry.
+    """
+    root, screen = _week_screen(left_rows=[_ape_row(1)], right_rows=[_weekly_row(1)])
+    try:
+        left_row = _row_frames(screen.left_list)[0]
+        draggable = [left_row] + [c for c in left_row.winfo_children()
+                                  if not isinstance(c, ctk.CTkCheckBox)]
+        assert len(draggable) == 5
+        for widget in draggable:
+            assert "<Button-1>" in set(_bound_sequences(widget))
+        assert "<Double-Button-1>" not in set(_bound_sequences(left_row))
+    finally:
+        root.destroy()
+
+
+def test_updm56_a_row_with_no_category_colour_takes_the_subsegments():
+    """UPD-M5.6 — the two render methods' colour lookup is one method now.
+
+    Both panels resolved lineage colours with the same four lines, including a
+    three-part lower-cased category key that is easy to get subtly wrong in
+    one copy and not the other. `_row_colors` is that code once; this drives
+    it through both panels and asserts the fallback, which is the branch a
+    typo'd key would silently take on every row.
+    """
+    root, screen = _week_screen(left_rows=[_ape_row(1)], right_rows=[_weekly_row(1)])
+    try:
+        screen.segment_colors = {}
+        screen.subsegment_colors = {("purposeful work", "living systems"): "#4477aa"}
+        screen.category_colors = {}
+        seg, sub, cat = screen._row_colors(
+            "Purposeful Work", "Living Systems", "Blog")
+        assert sub == "#4477aa"
+        assert cat == sub, "a category with no colour of its own takes the subsegment's"
+
+        screen.category_colors = {
+            ("purposeful work", "living systems", "blog"): "#cc7744"}
+        _seg, _sub, cat = screen._row_colors(
+            "Purposeful Work", "Living Systems", "Blog")
+        assert cat == "#cc7744"
+    finally:
+        root.destroy()

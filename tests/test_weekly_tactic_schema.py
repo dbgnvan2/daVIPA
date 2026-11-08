@@ -410,12 +410,6 @@ def test_wt_m1c3_both_creation_paths_report_collisions(tmp_path):
     # asserting the wiring would not have caught the original defect (P25).
     calls = []
     stub = SimpleNamespace(
-        dragged_row={"id": "ape-1"},
-        winfo_toplevel=lambda: SimpleNamespace(unbind=lambda _e: None),
-        winfo_pointerxy=lambda: (0, 0),
-        right_list=object(),
-        winfo_containing=lambda *_: "target",
-        _is_descendant=lambda *_: True,
         _selected_week_context=lambda: ("2026-02-23", 2026, 2),
         vps_manager=SimpleNamespace(
             create_week_action_items_for_ape=lambda *_a, **_k: {
@@ -426,7 +420,11 @@ def test_wt_m1c3_both_creation_paths_report_collisions(tmp_path):
         status_label=SimpleNamespace(configure=lambda **kw: calls.append(kw["text"])),
         _describe_week_creation=describe,
     )
-    WeeklyItemsScreen._finish_row_drag(stub, SimpleNamespace(x_root=0, y_root=0))
+    # UPD-M5 moved the drag machinery to screens/row_drag.py; what a dropped
+    # row *means* is still the screen's and is still this method. The stub
+    # members that only faked the press, the pointer and the descendant walk
+    # are gone with it.
+    WeeklyItemsScreen._assign_dragged_row(stub, {"id": "ape-1"})
 
     assert "refresh" in calls, "a collided drag must still refresh"
     assert any("already existed" in c for c in calls if isinstance(c, str)), (
@@ -440,18 +438,13 @@ def test_wt_m1c3_drag_without_a_week_selected_says_so(tmp_path):
 
     said = []
     stub = SimpleNamespace(
-        dragged_row={"id": "ape-1"},
-        winfo_toplevel=lambda: SimpleNamespace(unbind=lambda _e: None),
-        winfo_pointerxy=lambda: (0, 0),
-        right_list=object(),
-        winfo_containing=lambda *_: "target",
-        _is_descendant=lambda *_: True,
         _selected_week_context=lambda: None,
         refresh=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
     )
-    WeeklyItemsScreen._finish_row_drag(stub, SimpleNamespace(x_root=0, y_root=0))
+    WeeklyItemsScreen._assign_dragged_row(stub, {"id": "ape-1"})
     assert any("Select a Week Start" in s for s in said if isinstance(s, str)), said
+    assert "refresh" not in said, "a drop with no week chosen must not redraw"
 
 
 def test_wt_m1c3_drag_reports_a_stale_ape_instead_of_a_traceback(tmp_path):
@@ -464,19 +457,14 @@ def test_wt_m1c3_drag_reports_a_stale_ape_instead_of_a_traceback(tmp_path):
         raise ValueError("Annual Plan Element not found")
 
     stub = SimpleNamespace(
-        dragged_row={"id": "ape-gone"},
-        winfo_toplevel=lambda: SimpleNamespace(unbind=lambda _e: None),
-        winfo_pointerxy=lambda: (0, 0),
-        right_list=object(),
-        winfo_containing=lambda *_: "target",
-        _is_descendant=lambda *_: True,
         _selected_week_context=lambda: ("2026-02-23", 2026, 2),
         vps_manager=SimpleNamespace(create_week_action_items_for_ape=_raise),
         refresh=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
     )
-    WeeklyItemsScreen._finish_row_drag(stub, SimpleNamespace(x_root=0, y_root=0))
+    WeeklyItemsScreen._assign_dragged_row(stub, {"id": "ape-gone"})
     assert any("Could not create" in s for s in said if isinstance(s, str)), said
+    assert "refresh" not in said, "a refused create must not claim a redraw"
 
 
 # --------------------------------------------------------------------------
