@@ -13,7 +13,7 @@ import re
 from .database import Database
 from .link_integrity import resolve_segment_id_exact
 from .db_manager_project_boards import DBManagerProjectBoardsMixin
-from .weekly_tactic import tactic_of
+from .weekly_tactic import LINK_PREDICATE_SQL, tactic_of
 from .models import (
     ActionItem, ItemLink, ContactLink, Defaults, RescheduleHistory,
     TimeBlock, WorkLog, Status, Contact, ProjectBoard, ProjectBoardStatus, ProjectBoardLink,
@@ -814,20 +814,59 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
     # ==================== HIERARCHICAL OPERATIONS ====================
 
     def get_children(self, parent_id: str) -> List[ActionItem]:
-        """
-        Get direct children of a parent item.
+        """WTP-M2 — the direct children of a record, Weekly Tactic links included.
+
+        Purpose: a Weekly Tactic is the parent of the Action Items linked to
+                 it, so the tree, the Hierarchy dialog, the ``(N sub)`` count
+                 and the delete guard all see those items as its children.
+                 Before this, the link lived in ``weekly_tactic_id`` and this
+                 reader asked only about ``parent_id``, so a tactic had no
+                 children and its items had no parent.
+        Spec:    docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m2
+        Tests:   tests/test_weekly_tactic_parent.py::test_wtpm21_tactic_children_by_tactic_column
+                 tests/test_weekly_tactic_parent.py::test_wtpm24_sql_and_object_readers_agree
 
         Args:
-            parent_id: ID of the parent item
+            parent_id: ID of the parent item — an ordinary item or a Weekly
+                Tactic.
 
         Returns:
             List of child items sorted by priority_score descending
+
+        This is the SQL form of ``weekly_tactic.parent_of``, and
+        ``test_wtpm24_sql_and_object_readers_agree`` holds the two to the same
+        answer for every link shape. The predicate itself is
+        ``LINK_PREDICATE_SQL`` — not a third copy of it (AWA-M2.3) — and the
+        week test is ``is_weekly_tactic``, the same one PL6 uses.
+
+        **Narrower than the panel reader, deliberately** (WTP-D4). An item
+        that is both a subtask of X and week-filed to tactic T is a child of X
+        only, so each item has one place in the tree and the child counts sum;
+        ``get_action_items_for_weekly_tactic`` still lists it under T, because
+        "what work sits under this week" is a different question from "what
+        hangs directly off this record".
+
+        A week row is never a child, in either branch — a tactic is a root
+        (WTP-M1.7), its lineage being an Annual Plan Element rather than an
+        Action Item.
         """
-        rows = self.db.conn.execute("""
-            SELECT * FROM action_items
-            WHERE parent_id = ?
-            ORDER BY priority_score DESC, created_at ASC
-        """, (parent_id,)).fetchall()
+        if not parent_id:
+            return []
+
+        if self.is_weekly_tactic(parent_id):
+            rows = self.db.conn.execute(f"""
+                SELECT * FROM action_items
+                WHERE {LINK_PREDICATE_SQL}
+                  AND (COALESCE(parent_id, '') = '' OR parent_id = ?)
+                ORDER BY priority_score DESC, created_at ASC
+            """, (parent_id, parent_id, parent_id)).fetchall()
+        else:
+            rows = self.db.conn.execute("""
+                SELECT * FROM action_items
+                WHERE parent_id = ?
+                  AND COALESCE(item_type, 'daily') != 'week'
+                ORDER BY priority_score DESC, created_at ASC
+            """, (parent_id,)).fetchall()
 
         return [self._row_to_action_item(row) for row in rows]
 
@@ -853,18 +892,47 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         return result
 
     def get_root_items(self, status_filter: Optional[str] = None) -> List[ActionItem]:
-        """
-        Get all items that have no parent (root items).
+        """WTP-M3 — the items that have no parent, Weekly Tactic links included.
+
+        Purpose: the Hierarchical screen's top level. A week-filed item used to
+                 appear here, as a root beside its own tactic at the same
+                 indent, because this asked only about ``parent_id``.
+        Spec:    docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m3
+        Tests:   tests/test_weekly_tactic_parent.py::test_wtpm31_week_filed_items_are_not_roots
+                 tests/test_weekly_tactic_parent.py::test_wtpm32_dangling_link_stays_a_root
 
         Args:
             status_filter: Optional status filter ('open', 'completed')
 
         Returns:
             List of root items sorted by priority_score descending
+
+        Weekly Tactics themselves are still roots (WTP-M1.7).
+
+        **The existence test is load-bearing** (WTP-D6/P2). The exclusion fires
+        only when the ``weekly_tactic_id`` names a row that is still there, so
+        an item whose tactic was deleted keeps appearing here instead of
+        vanishing from the only tree view. That state is not hypothetical: a
+        tactic delete orphaned its ``weekly_tactic_id`` items until WTP-M5, and
+        both live databases hold the result. Such an item is a child of nothing
+        — ``get_children`` on a missing id returns nothing — so it shows once,
+        at the top level, which is where an item with a broken link should be
+        found.
+
+        ``COALESCE(parent_id, '') = ''`` rather than ``IS NULL``, so a blank
+        string counts as no parent — the same test ``parent_of`` applies.
         """
         query = """
-            SELECT * FROM action_items
-            WHERE parent_id IS NULL
+            SELECT * FROM action_items AS child
+            WHERE COALESCE(child.parent_id, '') = ''
+              AND (
+                COALESCE(child.weekly_tactic_id, '') = ''
+                OR NOT EXISTS (
+                    SELECT 1 FROM action_items AS week
+                    WHERE week.id = child.weekly_tactic_id
+                      AND week.item_type = 'week'
+                )
+              )
         """
         params = []
 
@@ -1313,13 +1381,14 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             INSERT INTO time_blocks (
                 id, item_id, block_date, start_time, end_time,
                 planned_minutes, label, block_type, slot_index, position,
-                created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                calendar_event_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             block.id, block.item_id, block.block_date,
             block.start_time, block.end_time, block.planned_minutes,
             block.label, BlockType.normalize(block.block_type),
             block.slot_index, block.position,
+            block.calendar_event_id,
             block.created_at, block.updated_at
         ))
         self.db.conn.commit()
@@ -1346,6 +1415,15 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         ``block_date`` is deliberately *not* updated: moving a block to another
         day is a different operation from editing one, and letting an edit
         silently relocate a block is how a day loses work nobody deleted.
+
+        ``calendar_event_id`` is deliberately not updated either, and for a
+        related reason: ``set_block_calendar_event_id`` is its only writer
+        (CE-M1.3). Every screen path here edits a block object the screen
+        loaded earlier -- before an export, in the common case -- so writing
+        this column from that object would set it back to ``None`` and orphan
+        a real Google Calendar event on a resize.
+        Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
+        Tests: tests/test_time_block_crud.py::test_cem13_an_edit_does_not_erase_the_event_id
         """
         block.updated_at = datetime.now().isoformat()
         self.db.conn.execute("""
@@ -1360,6 +1438,34 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             block.slot_index, block.position,
             block.updated_at, block.id
         ))
+        self.db.conn.commit()
+
+    def set_block_calendar_event_id(
+        self, block_id: str, event_id: Optional[str]
+    ) -> None:
+        """Record which Google Calendar event a block owns.
+
+        Purpose: CE-M1.3 -- the only writer of ``calendar_event_id``, and it
+                 writes nothing else.
+        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
+        Tests:   tests/test_time_block_crud.py::test_cem13_recording_an_event_id_leaves_the_block_where_it_was
+
+        Deliberately not ``update_time_block``. The exporter reads a day,
+        talks to Google, and comes back to write the ids it got -- by which
+        time the user may have dragged a block to another box on the screen
+        the export was started from. Writing a whole block back here would
+        restore the slot and position the exporter read minutes ago and move
+        work nobody asked to move (P39 -- an operation whose output lands
+        inside its own input).
+        """
+        self.db.conn.execute(
+            """
+            UPDATE time_blocks
+            SET calendar_event_id = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (event_id, datetime.now().isoformat(), block_id),
+        )
         self.db.conn.commit()
 
     def get_time_blocks(self, block_date: str) -> List[TimeBlock]:
@@ -2616,6 +2722,16 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         if slot_index is not None:
             slot_index = int(slot_index)
 
+        # CE-M1.2 -- read defensively for the same reason as the three above:
+        # a row selected before the migration ran, or by a query that does not
+        # project this column, must not raise here.
+        # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+        # Tests: tests/test_time_block_crud.py::test_cem12_a_row_without_the_column_still_reads
+        try:
+            calendar_event_id = row["calendar_event_id"]
+        except (IndexError, KeyError):
+            calendar_event_id = None
+
         return TimeBlock(
             id=row["id"],
             item_id=row["item_id"],
@@ -2627,6 +2743,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             block_type=BlockType.normalize(block_type),
             slot_index=slot_index,
             position=int(position or 0),
+            calendar_event_id=calendar_event_id,
             created_at=row["created_at"],
             updated_at=row["updated_at"]
         )

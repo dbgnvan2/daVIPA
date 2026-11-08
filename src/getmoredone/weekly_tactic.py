@@ -145,6 +145,51 @@ def tactic_of(item: Optional[ActionItem]) -> Optional[str]:
     return tactic_id or None
 
 
+def parent_of(item: Optional[ActionItem]) -> Optional[str]:
+    """WTP-M1 — the one predicate that decides what an item's parent *is*.
+
+    Purpose: a Weekly Tactic is the parent of the Action Items linked to it, so
+             every reader of parenthood — the tree, the Hierarchy dialog, the
+             editor's parent line, the delete guard, the cascade — has to agree
+             on one answer. Before this, each read ``parent_id`` directly and a
+             week-filed item had no parent at all.
+    Spec:    docs/spec_2026-11-08_weekly_tactic_as_parent.md#wtp-m1
+    Tests:   tests/test_weekly_tactic_parent.py::test_wtpm11_parent_id_alone
+             tests/test_weekly_tactic_parent.py::test_wtpm13_parent_id_wins_over_tactic
+
+    ``parent_id`` wins when both columns are set (WTP-D3): an item that is both
+    a subtask of X and week-filed to tactic T belongs under X, once, so the
+    tree stays a tree and the child counts sum.
+
+    Built on ``tactic_of`` rather than reading ``weekly_tactic_id`` itself, and
+    deliberately *not* folded into it (WTP-D5): WT-INV6 depends on ``tactic_of``
+    answering from one column, so this adds no row to what the re-filing
+    cascade will touch.
+
+    A Weekly Tactic itself has no parent, whatever its columns hold (WTP-M1.7).
+    A tactic's real lineage is its Annual Plan Element, which is not an Action
+    Item, so a week row is a root. Without this, a week row that somehow
+    carried a ``parent_id`` would be a child here while
+    ``LINK_PREDICATE_SQL``'s ``item_type != 'week'`` kept it out of the SQL
+    reader — the two definitions of "child" would disagree, which is the whole
+    failure AWA-A3 recorded.
+
+    The id is the link **as recorded**; whether that row still exists is the
+    caller's check, as ``item_editor.py:306`` already makes it. A
+    ``weekly_tactic_id`` naming a deleted tactic is real in the live databases,
+    and WTP-D6 keeps such an item visible rather than resolving it here.
+
+    Empty strings count as unset, the same test ``tactic_of`` applies — a blank
+    column is a column with no link in it, not a link to "".
+    """
+    if item is None:
+        return None
+    if getattr(item, "item_type", None) == "week":
+        return None
+    parent_id = getattr(item, "parent_id", None) or None
+    return parent_id or tactic_of(item)
+
+
 # One home for "which Weekly Tactic's panel lists this Action Item", in SQL.
 #
 # Deliberately *wider* than `tactic_of` above, and not the same question.
