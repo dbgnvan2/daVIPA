@@ -11,13 +11,18 @@ import re
 
 logger = logging.getLogger(__name__)
 
-#: The only shape Tk will parse as a hex colour, after upper-casing.
+#: The one hex shape this module stores and hands on, after upper-casing.
 #:
-#: ``int(text, 16)`` must not be used for this: Python accepts a leading sign,
-#: a ``0x`` prefix, PEP-515 underscores, surrounding whitespace and non-ASCII
-#: decimal digits, so ``int("0X1234", 16)`` succeeds while Tk raises on
-#: ``#0X1234``. The validator that exists to keep a bad colour away from Tk
-#: has to be at least as strict as Tk.
+#: Tk itself also parses ``#RGB``, ``#RRRGGGBBB`` and ``#RRRRGGGGBBBB``; those
+#: are refused here rather than carried, and ``normalize_hex_color`` expands
+#: the three-digit form before matching. What matters is the other direction:
+#: ``int(text, 16)`` must not be used for this, because Python accepts a
+#: leading sign, a ``0x`` prefix, PEP-515 underscores, surrounding whitespace
+#: and non-ASCII decimal digits, so ``int("0X1234", 16)`` succeeds while Tk
+#: raises on ``#0X1234``. A validator that exists to keep a bad colour away
+#: from Tk has to be at least as strict as Tk, and this is stricter.
+#: Checked against the real Tk by
+#: ``tests/test_priority_level_colors.py::test_plcm3_the_section_builds_on_real_widgets``.
 _HEX_COLOR_RE = re.compile(r"#[0-9A-F]{6}\Z")
 
 
