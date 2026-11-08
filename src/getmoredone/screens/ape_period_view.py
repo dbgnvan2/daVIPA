@@ -6,11 +6,14 @@ from typing import TYPE_CHECKING, Optional
 
 import customtkinter as ctk
 
-from ..color_contrast import pick_text_color
+from ..app_settings import AppSettings
 from ..date_utils import months_of_quarter, quarter_of_month
 from ..theme import button_style, semantic_colors, status_text_color
 from ..weekly_tactic_logging import get_weekly_tactic_logger
+from .chip_table import APE_LEFT_COLUMNS, APE_RIGHT_COLUMNS, ChipTable
+from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
+from .split_panel import SPLITTER_WIDTH, SplitPanel
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
@@ -22,8 +25,11 @@ logger = get_weekly_tactic_logger()
 
 class APEPeriodViewScreen(ctk.CTkFrame):
     """Assign quarter-selected APEs to a selected month."""
-    SPLITTER_WIDTH = 8
-    MIN_PANEL_WIDTH = 420
+
+    # UPD-D3/D4 — this screen's own corner of AppSettings. The divider's ratio
+    # is stored under ``<SETTINGS_PREFIX>_split_ratio`` and each panel's column
+    # widths under ``<SETTINGS_PREFIX>_<side>_col_widths``.
+    SETTINGS_PREFIX = "ape_month"
 
     def __init__(self, parent, vps_manager: "VPSManager", app: "GetMoreDoneApp"):
         super().__init__(parent)
@@ -44,10 +50,11 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         self.subsegment_colors = {}
         self.category_colors = {}
         self.left_checks: dict[str, ctk.BooleanVar] = {}
-        self._split_ratio = 0.5
-        self._drag_start_x: Optional[int] = None
-        self._drag_start_left: Optional[int] = None
-        self.dragged_row: Optional[dict] = None
+        # The app's own instance where there is one, so a saved divider or
+        # column width does not overwrite a setting changed elsewhere since
+        # this screen was built; its own load when constructed without an app
+        # (tests).
+        self.settings = getattr(app, "settings", None) or AppSettings.load()
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -118,7 +125,7 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         body = ctk.CTkFrame(self)
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
         body.grid_columnconfigure(0, weight=0, minsize=520)
-        body.grid_columnconfigure(1, weight=0, minsize=self.SPLITTER_WIDTH)
+        body.grid_columnconfigure(1, weight=0, minsize=SPLITTER_WIDTH)
         body.grid_columnconfigure(2, weight=0, minsize=520)
         body.grid_rowconfigure(1, weight=1)
         self.body = body
@@ -136,15 +143,12 @@ class APEPeriodViewScreen(ctk.CTkFrame):
 
         divider = ctk.CTkFrame(
             body,
-            width=self.SPLITTER_WIDTH,
+            width=SPLITTER_WIDTH,
             fg_color=semantic_colors()["border"],
             corner_radius=2,
             cursor="sb_h_double_arrow",
         )
         divider.grid(row=1, column=1, sticky="ns", padx=0, pady=(0, 8))
-        divider.bind("<ButtonPress-1>", self._on_divider_press)
-        divider.bind("<B1-Motion>", self._on_divider_drag)
-        divider.bind("<ButtonRelease-1>", self._on_divider_release)
         self.divider = divider
 
         right_frame = ctk.CTkFrame(body)
@@ -160,7 +164,33 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         self.right_list = ctk.CTkScrollableFrame(right_frame)
         self.right_list.grid(row=0, column=0, sticky="nsew")
         self.right_list.grid_columnconfigure(0, weight=1)
-        body.bind("<Configure>", self._on_body_resize)
+
+        # UPD-M4 — one table per panel, from screens/chip_table.py.
+        self.left_table = ChipTable(
+            self.left_list, self.settings,
+            f"{self.SETTINGS_PREFIX}_left", APE_LEFT_COLUMNS,
+        )
+        self.right_table = ChipTable(
+            self.right_list, self.settings,
+            f"{self.SETTINGS_PREFIX}_right", APE_RIGHT_COLUMNS,
+        )
+
+        # UPD-M1 — the ratio, the clamp and the four handlers live in
+        # screens/split_panel.py. UPD-M4 is where this screen stopped keeping
+        # its own copy of them, and gained the persistence it never had.
+        self.split = SplitPanel(
+            body,
+            left_frame,
+            divider,
+            settings=self.settings,
+            prefix=self.SETTINGS_PREFIX,
+        )
+
+        # UPD-M2 — the row drag, the drop test and the descendant walk live in
+        # screens/row_drag.py. What a dropped row means is this screen's.
+        self.row_drag = RowDragSource(
+            self, self.right_list, self._assign_dragged_row
+        )
 
     @staticmethod
     def default_period(today: date) -> tuple[int, int, int]:
@@ -260,8 +290,8 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         self._refresh_filter_options()
         self.left_title_label.configure(text=f"APE For Quarter Q{quarter} (check APEs to add to Month M{month} and hit save)")
         self.right_title_label.configure(text=f"APE For Month M{month}")
-        self._render_rows(self.left_list, self._filtered_rows(self.left_items), selectable=True)
-        self._render_rows(self.right_list, self._filtered_rows(self.right_items), selectable=False)
+        self._render_rows(self.left_table, self._filtered_rows(self.left_items), selectable=True)
+        self._render_rows(self.right_table, self._filtered_rows(self.right_items), selectable=False)
 
     def _filtered_rows(self, rows: list[dict]) -> list[dict]:
         seg = self.segment_filter_var.get().strip()
@@ -306,8 +336,8 @@ class APEPeriodViewScreen(ctk.CTkFrame):
 
     def on_filters_changed(self):
         self._refresh_filter_options()
-        self._render_rows(self.left_list, self._filtered_rows(self.left_items), selectable=True)
-        self._render_rows(self.right_list, self._filtered_rows(self.right_items), selectable=False)
+        self._render_rows(self.left_table, self._filtered_rows(self.left_items), selectable=True)
+        self._render_rows(self.right_table, self._filtered_rows(self.right_items), selectable=False)
 
     def add_selected(self):
         """Assign every checked APE to the selected month.
@@ -457,42 +487,16 @@ class APEPeriodViewScreen(ctk.CTkFrame):
             )
         return text
 
-    def _render_rows(self, container: ctk.CTkScrollableFrame, rows: list[dict], selectable: bool):
-        for w in container.winfo_children():
-            w.destroy()
+    def _render_rows(self, table: ChipTable, rows: list[dict], selectable: bool):
+        """Render one panel into the shared chip table.
 
-        col_widths = {
-            "index": 34,
-            "segment": 135,
-            "subsegment": 155,
-            "category": 125,
-            "actions": 84,
-            "checkbox": 34,
-        }
-
-        header = ctk.CTkFrame(container, fg_color=semantic_colors()["surface_subtle"])
-        header.grid(row=0, column=0, sticky="ew", padx=4, pady=(0, 4))
-        if selectable:
-            header.grid_columnconfigure(0, minsize=col_widths["checkbox"])
-            offset = 1
-            ctk.CTkLabel(header, text="", width=col_widths["checkbox"]).grid(row=0, column=0, padx=2, pady=5, sticky="w")
-        else:
-            offset = 0
-        header.grid_columnconfigure(offset + 0, minsize=col_widths["index"])
-        header.grid_columnconfigure(offset + 1, minsize=col_widths["segment"])
-        header.grid_columnconfigure(offset + 2, minsize=col_widths["subsegment"])
-        header.grid_columnconfigure(offset + 3, minsize=col_widths["category"])
-        header.grid_columnconfigure(offset + 4, weight=1 if selectable else 0, minsize=0 if selectable else col_widths["actions"])
-
-        for idx, label in enumerate(("#", "Segment", "SubSegment", "Category")):
-            width = col_widths[("index", "segment", "subsegment", "category")[idx]]
-            ctk.CTkLabel(header, text=label, width=width, font=ctk.CTkFont(weight="bold"), anchor="w").grid(
-                row=0, column=offset + idx, padx=5, pady=5, sticky="w"
-            )
-        if not selectable:
-            ctk.CTkLabel(header, text="Actions", width=col_widths["actions"], font=ctk.CTkFont(weight="bold"), anchor="e").grid(
-                row=0, column=offset + 4, padx=5, pady=5, sticky="e"
-            )
+        Purpose: UPD-M4 — the header, the row frames, the chips and the column
+                 widths come from screens/chip_table.py. The checkbox and the
+                 Actions cell stay here, because what they do is this screen's.
+        Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m4
+        Tests:   tests/test_unified_panel_design.py::test_updm41_ape_month_headers_and_widths_are_unchanged
+        """
+        table.build_header()
 
         for idx, row in enumerate(rows):
             segment_name = row.get("segment_name") or ""
@@ -510,18 +514,19 @@ class APEPeriodViewScreen(ctk.CTkFrame):
                 "",
             ) or subsegment_color
 
-            item = ctk.CTkFrame(container)
-            item.grid(row=idx + 1, column=0, sticky="ew", padx=4, pady=2)
-            if selectable:
-                item.grid_columnconfigure(0, minsize=col_widths["checkbox"])
-                offset = 1
-            else:
-                offset = 0
-            item.grid_columnconfigure(offset + 0, minsize=col_widths["index"])
-            item.grid_columnconfigure(offset + 1, minsize=col_widths["segment"])
-            item.grid_columnconfigure(offset + 2, minsize=col_widths["subsegment"])
-            item.grid_columnconfigure(offset + 3, minsize=col_widths["category"])
-            item.grid_columnconfigure(offset + 4, weight=1 if selectable else 0, minsize=0 if selectable else col_widths["actions"])
+            item, cells = table.add_row(
+                {
+                    "index": str(idx + 1),
+                    "segment": segment_name,
+                    "subsegment": subsegment_raw,
+                    "category": category_raw,
+                },
+                {
+                    "segment": segment_color,
+                    "subsegment": subsegment_color,
+                    "category": category_color,
+                },
+            )
 
             if selectable:
                 item_id = row.get("id", f"row-{idx}")
@@ -529,53 +534,22 @@ class APEPeriodViewScreen(ctk.CTkFrame):
                 if var is None:
                     var = ctk.BooleanVar(value=False)
                     self.left_checks[item_id] = var
-                ctk.CTkCheckBox(item, text="", variable=var, width=20).grid(row=0, column=0, padx=2, pady=5, sticky="w")
-
-            index_label = ctk.CTkLabel(item, text=str(idx + 1), width=col_widths["index"], anchor="w")
-            index_label.grid(
-                row=0, column=offset + 0, padx=5, pady=5, sticky="w"
-            )
-            seg_chip = ctk.CTkLabel(
-                item,
-                text=f" {self._clip_label(segment_name, 15)} ",
-                fg_color=segment_color,
-                text_color=pick_text_color(segment_color),
-                corner_radius=6,
-                width=col_widths["segment"] - 12,
-                anchor="w",
-            )
-            seg_chip.grid(row=0, column=offset + 1, padx=5, pady=5, sticky="w")
-            sub_chip = ctk.CTkLabel(
-                item,
-                text=f" {self._clip_label(subsegment_raw, 15)} ",
-                fg_color=subsegment_color,
-                text_color=pick_text_color(subsegment_color),
-                corner_radius=6,
-                width=col_widths["subsegment"] - 12,
-                anchor="w",
-            )
-            sub_chip.grid(row=0, column=offset + 2, padx=5, pady=5, sticky="w")
-            cat_chip = ctk.CTkLabel(
-                item,
-                text=f" {self._clip_label(category_raw, 15)} ",
-                fg_color=category_color,
-                text_color=pick_text_color(category_color),
-                corner_radius=6,
-                width=col_widths["category"] - 12,
-                anchor="w",
-            )
-            cat_chip.grid(row=0, column=offset + 3, padx=5, pady=5, sticky="w")
-
-            if not selectable:
+                ctk.CTkCheckBox(item, text="", variable=var, width=20).grid(
+                    row=0, column=table.grid_col("checkbox"), padx=2, pady=5, sticky="w"
+                )
+                self.row_drag.bind_row(
+                    (item, cells["index"], cells["segment"],
+                     cells["subsegment"], cells["category"]),
+                    row,
+                )
+            else:
                 ctk.CTkButton(
                     item,
                     text="Delete",
                     width=72,
                     command=lambda r=row: self.delete_month_item(r),
                     **button_style("danger"),
-                ).grid(row=0, column=offset + 4, padx=5, pady=5, sticky="e")
-            else:
-                self._bind_drag_widgets((item, index_label, seg_chip, sub_chip, cat_chip), row)
+                ).grid(row=0, column=table.grid_col("actions"), padx=5, pady=5, sticky="e")
 
     def delete_month_item(self, row: dict):
         parsed = self._parse_period()
@@ -628,83 +602,27 @@ class APEPeriodViewScreen(ctk.CTkFrame):
             )
         return False
 
-    def _bind_drag_widgets(self, widgets: tuple, row: dict):
-        for widget in widgets:
-            widget.bind("<ButtonPress-1>", lambda _event, r=row: self._start_row_drag(r))
+    def _assign_dragged_row(self, row: dict):
+        """Assign one dragged row to the selected month, and report it.
 
-    def _start_row_drag(self, row: dict):
-        self.dragged_row = row
-        self.winfo_toplevel().bind("<ButtonRelease-1>", self._finish_row_drag)
-
-    def _finish_row_drag(self, _event):
-        self.winfo_toplevel().unbind("<ButtonRelease-1>")
-        if not self.dragged_row:
-            return
-        pointer_x, pointer_y = self.winfo_pointerxy()
-        target = self.winfo_containing(pointer_x, pointer_y)
-        row = self.dragged_row
-        self.dragged_row = None
-        if self._is_descendant(target, self.right_list):
-            parsed = self._parse_period()
-            if parsed:
-                _year, quarter, month = parsed
-                ok = self._assign_one(row["id"], quarter, month)
-                self.refresh_lists()
-                self.status_label.configure(
-                    text=self._describe_month_assignment(
-                        [row["id"]],
-                        {row["id"]} if ok else set(),
-                        self._ids_in_month(),
-                        month,
-                    )
+        Purpose: UPD-M2 — what a dropped row means on this screen. The drag,
+                 the drop test and the descendant walk are in
+                 screens/row_drag.py; this is the body of what was
+                 _finish_row_drag's final `if`, moved as it was.
+        Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m2
+        Tests:   tests/test_unified_panel_design.py::test_updm43_a_drop_assigns_on_each_tab
+        """
+        parsed = self._parse_period()
+        if parsed:
+            _year, quarter, month = parsed
+            ok = self._assign_one(row["id"], quarter, month)
+            self.refresh_lists()
+            self.status_label.configure(
+                text=self._describe_month_assignment(
+                    [row["id"]],
+                    {row["id"]} if ok else set(),
+                    self._ids_in_month(),
+                    month,
                 )
+            )
 
-    def _on_body_resize(self, _event):
-        if self._drag_start_x is None:
-            self._apply_split_ratio()
-
-    def _on_divider_press(self, event):
-        self._drag_start_x = event.x_root
-        self._drag_start_left = self.left_frame.winfo_width()
-
-    def _on_divider_drag(self, event):
-        if self._drag_start_x is None or self._drag_start_left is None:
-            return
-        total = self.body.winfo_width() - self.SPLITTER_WIDTH
-        if total <= 0:
-            return
-        left = self._drag_start_left + (event.x_root - self._drag_start_x)
-        max_left = max(self.MIN_PANEL_WIDTH, total - self.MIN_PANEL_WIDTH)
-        left = max(self.MIN_PANEL_WIDTH, min(max_left, left))
-        self._split_ratio = left / total
-        self._apply_split_ratio()
-
-    def _on_divider_release(self, _event):
-        self._drag_start_x = None
-        self._drag_start_left = None
-
-    def _apply_split_ratio(self):
-        total = self.body.winfo_width() - self.SPLITTER_WIDTH
-        if total <= 0:
-            return
-        max_left = max(self.MIN_PANEL_WIDTH, total - self.MIN_PANEL_WIDTH)
-        left = int(total * self._split_ratio)
-        left = max(self.MIN_PANEL_WIDTH, min(max_left, left))
-        right = total - left
-        self.body.grid_columnconfigure(0, minsize=left)
-        self.body.grid_columnconfigure(2, minsize=right)
-
-    def _is_descendant(self, widget, ancestor) -> bool:
-        current = widget
-        while current is not None:
-            if current == ancestor:
-                return True
-            current = getattr(current, "master", None)
-        return False
-
-    @staticmethod
-    def _clip_label(value: str, limit: int) -> str:
-        text = (value or "").strip()
-        if len(text) <= limit:
-            return text
-        return text[:limit - 1].rstrip() + "…"

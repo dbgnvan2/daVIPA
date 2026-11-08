@@ -5,14 +5,15 @@ Purpose: UPD-M3 — one renderer for the VSP tabs' lists, with the draggable,
 Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m3
 Tests:   tests/test_unified_panel_design.py::test_updm31_table_renders_header_and_rows
 
-**Nothing uses this yet.** It is UPD-M3, the module and its tests; the five
-screens are moved onto it one at a time in UPD-M4 to UPD-M7, and until then
-their own renderers are still in place and still drifting. The five:
-`_render_rows` in `ape_assignment`, `ape_period_view` and
-`annual_vision_segments`, `_render_left_rows` + `_render_right_rows` in
-`weekly_items`, and three similar blocks in `vision_segments`. Their bodies
-are the same header frame, the same `grid_columnconfigure(minsize=…)` calls
-and the same chip labels, with the widths already drifted between the copies.
+Adopted at UPD-M4 by `ape_assignment`, `ape_period_view` and
+`annual_vision_segments` — six panels, two each. Their `_render_rows` methods
+were the same header frame, the same `grid_columnconfigure(minsize=…)` calls
+and the same chip labels three times over, and are now one call to
+`build_header()` and one `add_row()` per row.
+
+Still to come: `weekly_items`'s `_render_left_rows` + `_render_right_rows` at
+UPD-M5, and `vision_segments`'s three similar blocks, which UPD-A1 leaves
+alone.
 
 The split of responsibility is deliberate: this module owns the header, the
 row frames, the chips and the widths, and knows nothing about Annual Plan
@@ -54,27 +55,57 @@ class ChipColumn:
     key: str
     heading: str
     default_width: int
+    # A width below this is refused. It must not be above `default_width`:
+    # the resizer clamps the stored width into range, so a column declared
+    # 34 wide with the default minimum of 40 renders at 40 and nothing says
+    # so. Pinned for every shipped set by
+    # ::test_updm31_every_shipped_column_declares_a_width_it_can_have.
     min_width: int = 40
     max_width: int = 600
     chip: bool = True
     resizable: bool = True
 
 
-# The column set the APE tabs share. The widths are the ones those screens
-# used before this module existed (UPD-M4.1 pins them), so no saved layout
-# moves on the first launch after the change.
-APE_COLUMNS: Tuple[ChipColumn, ...] = (
-    ChipColumn("checkbox", "", 34, chip=False, resizable=False),
-    ChipColumn("index", "#", 34, chip=False, resizable=False),
+# The column sets the two-panel tabs use. The widths are the ones those
+# screens used before this module existed (UPD-M4.1 pins them), so no saved
+# layout moves on the first launch after the change.
+#
+# One set per *panel*, not per tab: a left panel is selectable and has no
+# Actions column, a right panel has Actions and no checkbox. A column's grid
+# index is its position in the set, so a single set holding both would put
+# every column of every panel one place to the right of where it is today.
+_INDEX_AND_CHIPS: Tuple[ChipColumn, ...] = (
+    ChipColumn("index", "#", 34, min_width=34, chip=False, resizable=False),
     ChipColumn("segment", "Segment", 135, min_width=60),
     ChipColumn("subsegment", "SubSegment", 155, min_width=60),
     ChipColumn("category", "Category", 125, min_width=60),
+)
+
+# Left panel: a blank cell over the checkboxes, then the four names.
+APE_LEFT_COLUMNS: Tuple[ChipColumn, ...] = (
+    ChipColumn("checkbox", "", 34, min_width=34, chip=False, resizable=False),
+) + _INDEX_AND_CHIPS
+
+# Right panel on the two APE tabs: one Delete button, 84px.
+APE_RIGHT_COLUMNS: Tuple[ChipColumn, ...] = _INDEX_AND_CHIPS + (
     ChipColumn("actions", "Actions", 84, chip=False, resizable=False),
+)
+
+# Right panel on Annual Vision Segments: Edit *and* Delete, so 140px. This is
+# the only column width that differs across the three screens.
+ANNUAL_RIGHT_COLUMNS: Tuple[ChipColumn, ...] = _INDEX_AND_CHIPS + (
+    ChipColumn("actions", "Actions", 140, chip=False, resizable=False),
 )
 
 
 class ChipTable:
     """Header + chip rows over a `ColumnResizer`.
+
+    **The table owns its container outright.** `clear()` destroys every child
+    of it, so a screen must not grid anything of its own into the frame it
+    hands over -- an empty-state label belongs in a sibling frame. All five
+    adopting panels satisfy this; it is stated because nothing enforces it
+    (AWA-S6 a).
 
     Purpose: UPD-M3.1 — render one panel's list and own its column widths.
     Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m3
@@ -128,18 +159,26 @@ class ChipTable:
     def clear(self) -> None:
         """Destroy every rendered widget and forget the rows.
 
-        The resizer's row registry is cleared too: a row frame that has been
-        destroyed but is still registered would be walked on every later drag.
+        The resizer's registries are cleared too: a row frame or a header
+        that has been destroyed but is still registered would be walked on
+        every later drag.
         """
         for widget in self.container.winfo_children():
             widget.destroy()
         self.rows = []
         self.header = None
         self.resizer.clear_rows()
+        self.resizer.clear_header()
 
     def build_header(self) -> ctk.CTkFrame:
         """Clear the container and render the header, with its drag handles."""
         self.clear()
+        # The header and every row are gridded sticky="ew" in column 0, which
+        # does nothing unless that column can stretch. The adopting screens
+        # all set this on their scroll frames already; the table sets it so a
+        # screen that does not is not silently left with a ragged panel
+        # (AWA-S6 c).
+        self.container.grid_columnconfigure(0, weight=1)
         header = ctk.CTkFrame(
             self.container, fg_color=semantic_colors()["surface_subtle"])
         header.grid(row=0, column=0, sticky="ew", padx=4, pady=(0, 4))
@@ -176,6 +215,15 @@ class ChipTable:
         panel surface rather than raising — rows with no subsegment or category
         exist in the live database (UPD-M3.7).
         """
+        if self.header is None:
+            raise ValueError(
+                "ChipTable.add_row before build_header: the first row would be "
+                "gridded at row 1 and row 0 left empty (AWA-S6 d)")
+        if not any(column.key in values for column in self.columns):
+            raise ValueError(
+                "ChipTable.add_row with no known column key: the row would be "
+                f"a zero-cell, zero-height frame. Got {sorted(values)}, "
+                f"columns {[c.key for c in self.columns]} (AWA-S6 e)")
         colors = colors or {}
         palette = semantic_colors()
         frame = ctk.CTkFrame(self.container, **frame_kwargs)
@@ -206,7 +254,8 @@ class ChipTable:
                     chip_colors = {"fg_color": palette[DEFAULT_CHIP_KEY]}
                 label = ctk.CTkLabel(
                     frame,
-                    text=self.resizer.cell_text(column.key, full_text),
+                    text=self.resizer.cell_text(
+                        column.key, full_text, width_delta=CHIP_INSET),
                     width=self._chip_width(column.key),
                     corner_radius=6,
                     anchor="w",

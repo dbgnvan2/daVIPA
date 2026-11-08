@@ -113,6 +113,23 @@ class AppSettings:
     # screen, named <screen prefix>_split_ratio. One per adopting screen, added
     # as each adopts; screens/split_panel.py logs a prefix with no field here.
     ape_quarter_split_ratio: float = 0.5
+    ape_month_split_ratio: float = 0.5
+    annual_vision_split_ratio: float = 0.5
+
+    # UPD-M4 — a two-panel VSP tab's column widths, one field per *panel*: the
+    # two panels of one tab are different shapes, and one store for both would
+    # make a drag in either move the other (UPD-M3.6). An undeclared field is
+    # worse here than a missing ratio, because ColumnResizer._persist setattrs
+    # it and calls save(), which writes declared dataclass fields only -- the
+    # width is kept for the session and gone at the next launch, with nothing
+    # said. Held by
+    # tests/test_unified_panel_design.py::test_updm44_every_panel_prefix_has_a_settings_field.
+    ape_quarter_left_col_widths: dict = field(default_factory=dict)
+    ape_quarter_right_col_widths: dict = field(default_factory=dict)
+    ape_month_left_col_widths: dict = field(default_factory=dict)
+    ape_month_right_col_widths: dict = field(default_factory=dict)
+    annual_vision_left_col_widths: dict = field(default_factory=dict)
+    annual_vision_right_col_widths: dict = field(default_factory=dict)
 
     # Future date options (Drag Schedule)
     mid_term_offset_days: int = 90

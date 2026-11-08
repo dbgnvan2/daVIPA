@@ -89,12 +89,24 @@ class ColumnResizer:
     def width(self, key: str) -> int:
         return self._widths[key]
 
-    def chars(self, key: str, reserve: int = 0) -> int:
-        return max(1, chars_for_width(self._widths[key], self.char_px) - reserve)
+    def chars(self, key: str, reserve: int = 0, width_delta: int = 0) -> int:
+        """The character budget for a cell in this column.
 
-    def cell_text(self, key: str, full_text, reserve: int = 0) -> str:
-        """Clamped, padded text for a cell at the column's current width."""
-        clamped = format_column_text(full_text, self.chars(key, reserve))
+        `width_delta` is the same number `register_row` takes: how much
+        narrower than its column the cell is. A chip pill is inset inside its
+        column, so a budget measured from the column width overruns the pill
+        and clips the last character (AWA-S5). It defaults to 0, so every
+        caller that predates it is unaffected.
+        """
+        return max(
+            1,
+            chars_for_width(self._widths[key] - width_delta, self.char_px) - reserve,
+        )
+
+    def cell_text(self, key: str, full_text, reserve: int = 0,
+                  width_delta: int = 0) -> str:
+        """Clamped, padded text for a cell at the width that cell is given."""
+        clamped = format_column_text(full_text, self.chars(key, reserve, width_delta))
         return f"{self.text_pad}{clamped}{self.text_pad}"
 
     def _persist(self) -> None:
@@ -160,6 +172,16 @@ class ColumnResizer:
     def clear_rows(self) -> None:
         self._rows = []
 
+    def clear_header(self) -> None:
+        """Forget the registered header.
+
+        `clear_rows` has always had a counterpart in the caller -- the header
+        frame is destroyed with the rows -- but nothing dropped the reference,
+        so `_apply_live` went on reaching for a destroyed frame and relied on
+        its `winfo_exists()` guard to say nothing happened (AWA-S6 b).
+        """
+        self._header = None
+
     # -------------------------------------------------------------------- drag
     def _on_start(self, event, key) -> None:
         self._drag = (key, event.x_root, self._widths[key])
@@ -200,4 +222,5 @@ class ColumnResizer:
                 if self.set_cell_width:
                     label.configure(width=max(1, width - width_delta))
                 if full is not None:
-                    label.configure(text=self.cell_text(key, full, reserve))
+                    label.configure(
+                        text=self.cell_text(key, full, reserve, width_delta))

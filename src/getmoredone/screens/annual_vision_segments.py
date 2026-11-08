@@ -5,10 +5,13 @@ from tkinter import messagebox
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
+from ..app_settings import AppSettings
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
-from ..color_contrast import pick_text_color
 from ..vps_manager import ActionItemsAttachedError, ProjectBoardsAttachedError
+from .chip_table import ANNUAL_RIGHT_COLUMNS, APE_LEFT_COLUMNS, ChipTable
+from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
+from .split_panel import SPLITTER_WIDTH, SplitPanel
 
 if TYPE_CHECKING:
     from ..vps_manager import VPSManager
@@ -17,8 +20,11 @@ if TYPE_CHECKING:
 
 class AnnualVisionSegmentsScreen(ctk.CTkFrame):
     """Drag vision elements into annual list to create annual plan records."""
-    SPLITTER_WIDTH = 8
-    MIN_PANEL_WIDTH = 420
+
+    # UPD-D3/D4 — this screen's own corner of AppSettings. The divider's ratio
+    # is stored under ``<SETTINGS_PREFIX>_split_ratio`` and each panel's column
+    # widths under ``<SETTINGS_PREFIX>_<side>_col_widths``.
+    SETTINGS_PREFIX = "annual_vision"
 
     def __init__(self, parent, vps_manager: "VPSManager", app: "GetMoreDoneApp"):
         super().__init__(parent)
@@ -35,10 +41,11 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         self.subsegment_colors: dict[tuple[str, str], str] = {}
         self.category_colors: dict[tuple[str, str, str], str] = {}
         self.left_checks: dict[str, ctk.BooleanVar] = {}
-        self._split_ratio = 0.5
-        self._drag_start_x: Optional[int] = None
-        self._drag_start_left: Optional[int] = None
-        self.dragged_row: Optional[dict] = None
+        # The app's own instance where there is one, so a saved divider or
+        # column width does not overwrite a setting changed elsewhere since
+        # this screen was built; its own load when constructed without an app
+        # (tests).
+        self.settings = getattr(app, "settings", None) or AppSettings.load()
 
         self.create_ui()
         self.refresh_lists()
@@ -67,7 +74,7 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         body = ctk.CTkFrame(self)
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
         body.grid_columnconfigure(0, weight=0, minsize=520)
-        body.grid_columnconfigure(1, weight=0, minsize=self.SPLITTER_WIDTH)
+        body.grid_columnconfigure(1, weight=0, minsize=SPLITTER_WIDTH)
         body.grid_columnconfigure(2, weight=0, minsize=520)
         body.grid_rowconfigure(1, weight=1)
         self.body = body
@@ -97,15 +104,12 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
 
         divider = ctk.CTkFrame(
             body,
-            width=self.SPLITTER_WIDTH,
+            width=SPLITTER_WIDTH,
             fg_color=semantic_colors()["border"],
             corner_radius=2,
             cursor="sb_h_double_arrow",
         )
         divider.grid(row=1, column=1, sticky="ns", padx=0, pady=(0, 8))
-        divider.bind("<ButtonPress-1>", self._on_divider_press)
-        divider.bind("<B1-Motion>", self._on_divider_drag)
-        divider.bind("<ButtonRelease-1>", self._on_divider_release)
         self.divider = divider
 
         right_frame = ctk.CTkFrame(body)
@@ -120,7 +124,36 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         self.right_list = ctk.CTkScrollableFrame(right_frame)
         self.right_list.grid(row=0, column=0, sticky="nsew")
         self.right_list.grid_columnconfigure(0, weight=1)
-        body.bind("<Configure>", self._on_body_resize)
+
+        # UPD-M4 — one table per panel, from screens/chip_table.py. The right
+        # panel's Actions column is 140px, not the APE tabs' 84: it holds Edit
+        # as well as Delete.
+        self.left_table = ChipTable(
+            self.left_list, self.settings,
+            f"{self.SETTINGS_PREFIX}_left", APE_LEFT_COLUMNS,
+        )
+        self.right_table = ChipTable(
+            self.right_list, self.settings,
+            f"{self.SETTINGS_PREFIX}_right", ANNUAL_RIGHT_COLUMNS,
+        )
+
+        # UPD-M1 — the ratio, the clamp and the four handlers live in
+        # screens/split_panel.py, and the ratio now persists.
+        self.split = SplitPanel(
+            body,
+            left_frame,
+            divider,
+            settings=self.settings,
+            prefix=self.SETTINGS_PREFIX,
+        )
+
+        # UPD-M2 — the row drag lives in screens/row_drag.py. This screen's
+        # drop target is the right *frame*, not the list inside it, which is
+        # one pixel-level difference from the APE tabs and is kept: a drop on
+        # the frame's padding counts here and does not there.
+        self.row_drag = RowDragSource(
+            self, self.right_frame, self._create_from_row
+        )
 
     def _parse_year(self) -> Optional[int]:
         try:
@@ -151,55 +184,21 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         self.right_title_label.configure(
             text=f"Annual Plan Elements for the year {year}"
         )
-        self._render_rows(self.left_list, self.left_items, selectable=True)
-        self._render_rows(self.right_list, self.right_items, selectable=False)
+        self._render_rows(self.left_table, self.left_items, selectable=True)
+        self._render_rows(self.right_table, self.right_items, selectable=False)
 
-    def _render_rows(self, container: ctk.CTkScrollableFrame, rows: list[dict], selectable: bool):
-        for w in container.winfo_children():
-            w.destroy()
+    def _render_rows(self, table: ChipTable, rows: list[dict], selectable: bool):
+        """Render one panel into the shared chip table.
 
-        col_widths = {
-            "index": 34,
-            "segment": 135,
-            "subsegment": 155,
-            "category": 125,
-            "actions": 140,
-            "checkbox": 34,
-        }
-
-        header = ctk.CTkFrame(container, fg_color=semantic_colors()["surface_subtle"])
-        header.grid(row=0, column=0, sticky="ew", padx=4, pady=(0, 4))
-        if selectable:
-            header.grid_columnconfigure(0, minsize=col_widths["checkbox"])
-            offset = 1
-            ctk.CTkLabel(header, text="", width=col_widths["checkbox"]).grid(row=0, column=0, padx=2, pady=5, sticky="w")
-        else:
-            offset = 0
-        header.grid_columnconfigure(offset + 0, minsize=col_widths["index"])
-        header.grid_columnconfigure(offset + 1, minsize=col_widths["segment"])
-        header.grid_columnconfigure(offset + 2, minsize=col_widths["subsegment"])
-        header.grid_columnconfigure(offset + 3, minsize=col_widths["category"])
-        if selectable:
-            header.grid_columnconfigure(offset + 4, weight=1)
-        else:
-            header.grid_columnconfigure(offset + 4, minsize=col_widths["actions"])
-
-        ctk.CTkLabel(header, text="#", width=col_widths["index"], font=ctk.CTkFont(weight="bold"), anchor="w").grid(
-            row=0, column=offset + 0, padx=5, pady=5, sticky="w"
-        )
-        ctk.CTkLabel(header, text="Segment", width=col_widths["segment"], font=ctk.CTkFont(weight="bold"), anchor="w").grid(
-            row=0, column=offset + 1, padx=5, pady=5, sticky="w"
-        )
-        ctk.CTkLabel(header, text="SubSegment", width=col_widths["subsegment"], font=ctk.CTkFont(weight="bold"), anchor="w").grid(
-            row=0, column=offset + 2, padx=5, pady=5, sticky="w"
-        )
-        ctk.CTkLabel(header, text="Category", width=col_widths["category"], font=ctk.CTkFont(weight="bold"), anchor="w").grid(
-            row=0, column=offset + 3, padx=5, pady=5, sticky="w"
-        )
-        if not selectable:
-            ctk.CTkLabel(header, text="Actions", width=col_widths["actions"], font=ctk.CTkFont(weight="bold"), anchor="e").grid(
-                row=0, column=offset + 4, padx=5, pady=5, sticky="e"
-            )
+        Purpose: UPD-M4 — the header, the row frames, the chips and the column
+                 widths come from screens/chip_table.py. The checkbox and the
+                 Actions cell stay here: this screen's Actions cell is a frame
+                 holding Edit and Delete, which is why the table renders no
+                 widget for a column the caller leaves out of `values`.
+        Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m4
+        Tests:   tests/test_unified_panel_design.py::test_updm41_annual_right_row_keeps_edit_beside_delete
+        """
+        table.build_header()
 
         for idx, row in enumerate(rows):
             segment_name = row.get("segment_name", "")
@@ -211,9 +210,7 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
                 self.segment_colors,
                 self.subsegment_colors,
             )
-            subsegment_name = self._clip_label(subsegment_raw, 15)
             category_raw = row.get("category_name") or "-"
-            category_name = self._clip_label(category_raw, 15)
             category_color = row.get("category_color_hex") or self.category_colors.get(
                 (
                     segment_name.strip().lower(),
@@ -224,21 +221,20 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
             )
             if not category_color:
                 category_color = subsegment_color
-            item = ctk.CTkFrame(container)
-            item.grid(row=idx + 1, column=0, sticky="ew", padx=4, pady=2)
-            if selectable:
-                item.grid_columnconfigure(0, minsize=col_widths["checkbox"])
-                offset = 1
-            else:
-                offset = 0
-            item.grid_columnconfigure(offset + 0, minsize=col_widths["index"])
-            item.grid_columnconfigure(offset + 1, minsize=col_widths["segment"])
-            item.grid_columnconfigure(offset + 2, minsize=col_widths["subsegment"])
-            item.grid_columnconfigure(offset + 3, minsize=col_widths["category"])
-            if selectable:
-                item.grid_columnconfigure(offset + 4, weight=1)
-            else:
-                item.grid_columnconfigure(offset + 4, minsize=col_widths["actions"])
+
+            item, cells = table.add_row(
+                {
+                    "index": str(idx + 1),
+                    "segment": segment_name,
+                    "subsegment": subsegment_raw,
+                    "category": category_raw,
+                },
+                {
+                    "segment": segment_color,
+                    "subsegment": subsegment_color,
+                    "category": category_color,
+                },
+            )
 
             if selectable:
                 item_id = row.get("id", f"row-{idx}")
@@ -247,49 +243,17 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
                     var = ctk.BooleanVar(value=False)
                     self.left_checks[item_id] = var
                 ctk.CTkCheckBox(item, text="", variable=var, width=20).grid(
-                    row=0, column=0, padx=2, pady=5, sticky="w"
+                    row=0, column=table.grid_col("checkbox"), padx=2, pady=5, sticky="w"
                 )
-
-            index_label = ctk.CTkLabel(item, text=str(idx + 1), width=col_widths["index"], anchor="w")
-            index_label.grid(
-                row=0, column=offset + 0, padx=5, pady=5, sticky="w"
-            )
-            seg_chip = ctk.CTkLabel(
-                item,
-                text=f" {self._clip_label(segment_name, 15)} ",
-                fg_color=segment_color,
-                text_color=pick_text_color(segment_color),
-                corner_radius=6,
-                width=col_widths["segment"] - 12,
-                anchor="w",
-            )
-            seg_chip.grid(row=0, column=offset + 1, padx=5, pady=5, sticky="w")
-
-            sub_chip = ctk.CTkLabel(
-                item,
-                text=f" {subsegment_name} ",
-                fg_color=subsegment_color,
-                text_color=pick_text_color(subsegment_color),
-                corner_radius=6,
-                width=col_widths["subsegment"] - 12,
-                anchor="w",
-            )
-            sub_chip.grid(row=0, column=offset + 2, padx=5, pady=5, sticky="w")
-
-            cat_chip = ctk.CTkLabel(
-                item,
-                text=f" {category_name} ",
-                fg_color=category_color,
-                text_color=pick_text_color(category_color),
-                corner_radius=6,
-                anchor="w",
-                width=col_widths["category"] - 12,
-            )
-            cat_chip.grid(row=0, column=offset + 3, padx=5, pady=5, sticky="w")
-
-            if not selectable:
+                self.row_drag.bind_row(
+                    (item, cells["index"], cells["segment"],
+                     cells["subsegment"], cells["category"]),
+                    row,
+                )
+            else:
                 actions = ctk.CTkFrame(item, fg_color="transparent")
-                actions.grid(row=0, column=offset + 4, padx=(4, 2), pady=5, sticky="w")
+                actions.grid(row=0, column=table.grid_col("actions"),
+                             padx=(4, 2), pady=5, sticky="w")
                 ctk.CTkButton(
                     actions,
                     text="Edit",
@@ -304,43 +268,6 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
                     command=lambda r=row: self.delete_annual_item(r),
                     **button_style("danger"),
                 ).pack(side="left", padx=(2, 0))
-            else:
-                self._bind_drag_widgets((item, index_label, seg_chip, sub_chip, cat_chip), row)
-
-    def _on_body_resize(self, _event):
-        if self._drag_start_x is None:
-            self._apply_split_ratio()
-
-    def _on_divider_press(self, event):
-        self._drag_start_x = event.x_root
-        self._drag_start_left = self.left_frame.winfo_width()
-
-    def _on_divider_drag(self, event):
-        if self._drag_start_x is None or self._drag_start_left is None:
-            return
-        total = self.body.winfo_width() - self.SPLITTER_WIDTH
-        if total <= 0:
-            return
-        left = self._drag_start_left + (event.x_root - self._drag_start_x)
-        max_left = max(self.MIN_PANEL_WIDTH, total - self.MIN_PANEL_WIDTH)
-        left = max(self.MIN_PANEL_WIDTH, min(max_left, left))
-        self._split_ratio = left / total
-        self._apply_split_ratio()
-
-    def _on_divider_release(self, _event):
-        self._drag_start_x = None
-        self._drag_start_left = None
-
-    def _apply_split_ratio(self):
-        total = self.body.winfo_width() - self.SPLITTER_WIDTH
-        if total <= 0:
-            return
-        max_left = max(self.MIN_PANEL_WIDTH, total - self.MIN_PANEL_WIDTH)
-        left = int(total * self._split_ratio)
-        left = max(self.MIN_PANEL_WIDTH, min(max_left, left))
-        right = total - left
-        self.body.grid_columnconfigure(0, minsize=left)
-        self.body.grid_columnconfigure(2, minsize=right)
 
     def _create_from_index(self, idx: int):
         year = self._parse_year()
@@ -371,39 +298,6 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
                 self.vps_manager.create_annual_records_from_vision_element(year, row["id"])
         self.refresh_lists()
 
-    def _bind_drag_widgets(self, widgets: tuple, row: dict):
-        for widget in widgets:
-            widget.bind("<ButtonPress-1>", lambda _event, r=row: self._start_row_drag(r))
-
-    def _start_row_drag(self, row: dict):
-        self.dragged_row = row
-        self.winfo_toplevel().bind("<ButtonRelease-1>", self._finish_row_drag)
-
-    def _finish_row_drag(self, _event):
-        self.winfo_toplevel().unbind("<ButtonRelease-1>")
-        if not self.dragged_row:
-            return
-        pointer_x, pointer_y = self.winfo_pointerxy()
-        target = self.winfo_containing(pointer_x, pointer_y)
-        row = self.dragged_row
-        self.dragged_row = None
-        if self._is_descendant(target, self.right_frame):
-            self._create_from_row(row)
-
-    def _is_descendant(self, widget, ancestor) -> bool:
-        current = widget
-        while current is not None:
-            if current == ancestor:
-                return True
-            current = getattr(current, "master", None)
-        return False
-
-    @staticmethod
-    def _clip_label(value: str, limit: int) -> str:
-        text = (value or "").strip()
-        if len(text) <= limit:
-            return text
-        return text[:limit - 1].rstrip() + "…"
 
     def edit_annual_item(self, row: dict):
         """Edit a right-side annual item by updating its source Vision Element."""

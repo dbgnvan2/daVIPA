@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, Optional
 import customtkinter as ctk
 
 from ..app_settings import AppSettings
-from ..color_contrast import pick_text_color
 from ..date_utils import current_quarter
 from ..theme import button_style, semantic_colors, status_text_color
 from ..weekly_tactic_logging import get_weekly_tactic_logger
+from .chip_table import APE_LEFT_COLUMNS, APE_RIGHT_COLUMNS, ChipTable
 from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .split_panel import SPLITTER_WIDTH, SplitPanel
@@ -155,6 +155,19 @@ class APEAssignmentScreen(ctk.CTkFrame):
         self.right_list.grid(row=0, column=0, sticky="nsew")
         self.right_list.grid_columnconfigure(0, weight=1)
 
+        # UPD-M4 — the header, the chips and the column widths come from
+        # screens/chip_table.py, one table per panel. The prefixes are this
+        # screen's corner of AppSettings; the two panels are different shapes
+        # and must not share a width store (UPD-M3.6).
+        self.left_table = ChipTable(
+            self.left_list, self.settings,
+            f"{self.SETTINGS_PREFIX}_left", APE_LEFT_COLUMNS,
+        )
+        self.right_table = ChipTable(
+            self.right_list, self.settings,
+            f"{self.SETTINGS_PREFIX}_right", APE_RIGHT_COLUMNS,
+        )
+
         # UPD-M1 — the ratio, the clamp, the three divider handlers and the
         # body's resize handler all live in screens/split_panel.py.
         self.split = SplitPanel(
@@ -204,8 +217,8 @@ class APEAssignmentScreen(ctk.CTkFrame):
         self._refresh_filter_options()
         self.left_title_label.configure(text=f"Annual Plan Elements (check APEs to add to Quarter Q{quarter} and hit save)")
         self.right_title_label.configure(text=f"APE For Quarter Q{quarter}")
-        self._render_rows(self.left_list, self._filtered_rows(self.left_items), selectable=True)
-        self._render_rows(self.right_list, self._filtered_rows(self.right_items), selectable=False)
+        self._render_rows(self.left_table, self._filtered_rows(self.left_items), selectable=True)
+        self._render_rows(self.right_table, self._filtered_rows(self.right_items), selectable=False)
 
     def _filtered_rows(self, rows: list[dict]) -> list[dict]:
         seg = self.segment_filter_var.get().strip()
@@ -250,8 +263,8 @@ class APEAssignmentScreen(ctk.CTkFrame):
 
     def on_filters_changed(self):
         self._refresh_filter_options()
-        self._render_rows(self.left_list, self._filtered_rows(self.left_items), selectable=True)
-        self._render_rows(self.right_list, self._filtered_rows(self.right_items), selectable=False)
+        self._render_rows(self.left_table, self._filtered_rows(self.left_items), selectable=True)
+        self._render_rows(self.right_table, self._filtered_rows(self.right_items), selectable=False)
 
     def add_selected(self):
         """Assign every checked APE to the selected quarter.
@@ -368,42 +381,16 @@ class APEAssignmentScreen(ctk.CTkFrame):
             )
         return text
 
-    def _render_rows(self, container: ctk.CTkScrollableFrame, rows: list[dict], selectable: bool):
-        for w in container.winfo_children():
-            w.destroy()
+    def _render_rows(self, table: ChipTable, rows: list[dict], selectable: bool):
+        """Render one panel into the shared chip table.
 
-        col_widths = {
-            "index": 34,
-            "segment": 135,
-            "subsegment": 155,
-            "category": 125,
-            "actions": 84,
-            "checkbox": 34,
-        }
-
-        header = ctk.CTkFrame(container, fg_color=semantic_colors()["surface_subtle"])
-        header.grid(row=0, column=0, sticky="ew", padx=4, pady=(0, 4))
-        if selectable:
-            header.grid_columnconfigure(0, minsize=col_widths["checkbox"])
-            offset = 1
-            ctk.CTkLabel(header, text="", width=col_widths["checkbox"]).grid(row=0, column=0, padx=2, pady=5, sticky="w")
-        else:
-            offset = 0
-        header.grid_columnconfigure(offset + 0, minsize=col_widths["index"])
-        header.grid_columnconfigure(offset + 1, minsize=col_widths["segment"])
-        header.grid_columnconfigure(offset + 2, minsize=col_widths["subsegment"])
-        header.grid_columnconfigure(offset + 3, minsize=col_widths["category"])
-        header.grid_columnconfigure(offset + 4, weight=1 if selectable else 0, minsize=0 if selectable else col_widths["actions"])
-
-        for idx, label in enumerate(("#", "Segment", "SubSegment", "Category")):
-            width = col_widths[("index", "segment", "subsegment", "category")[idx]]
-            ctk.CTkLabel(header, text=label, width=width, font=ctk.CTkFont(weight="bold"), anchor="w").grid(
-                row=0, column=offset + idx, padx=5, pady=5, sticky="w"
-            )
-        if not selectable:
-            ctk.CTkLabel(header, text="Actions", width=col_widths["actions"], font=ctk.CTkFont(weight="bold"), anchor="e").grid(
-                row=0, column=offset + 4, padx=5, pady=5, sticky="e"
-            )
+        Purpose: UPD-M4 — the header, the row frames, the chips and the column
+                 widths come from screens/chip_table.py. The checkbox and the
+                 Actions cell stay here, because what they do is this screen's.
+        Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m4
+        Tests:   tests/test_unified_panel_design.py::test_updm41_ape_quarter_left_header_columns_are_unchanged
+        """
+        table.build_header()
 
         for idx, row in enumerate(rows):
             segment_name = row.get("segment_name") or ""
@@ -421,18 +408,19 @@ class APEAssignmentScreen(ctk.CTkFrame):
                 "",
             ) or subsegment_color
 
-            item = ctk.CTkFrame(container)
-            item.grid(row=idx + 1, column=0, sticky="ew", padx=4, pady=2)
-            if selectable:
-                item.grid_columnconfigure(0, minsize=col_widths["checkbox"])
-                offset = 1
-            else:
-                offset = 0
-            item.grid_columnconfigure(offset + 0, minsize=col_widths["index"])
-            item.grid_columnconfigure(offset + 1, minsize=col_widths["segment"])
-            item.grid_columnconfigure(offset + 2, minsize=col_widths["subsegment"])
-            item.grid_columnconfigure(offset + 3, minsize=col_widths["category"])
-            item.grid_columnconfigure(offset + 4, weight=1 if selectable else 0, minsize=0 if selectable else col_widths["actions"])
+            item, cells = table.add_row(
+                {
+                    "index": str(idx + 1),
+                    "segment": segment_name,
+                    "subsegment": subsegment_raw,
+                    "category": category_raw,
+                },
+                {
+                    "segment": segment_color,
+                    "subsegment": subsegment_color,
+                    "category": category_color,
+                },
+            )
 
             if selectable:
                 item_id = row.get("id", f"row-{idx}")
@@ -440,55 +428,22 @@ class APEAssignmentScreen(ctk.CTkFrame):
                 if var is None:
                     var = ctk.BooleanVar(value=False)
                     self.left_checks[item_id] = var
-                ctk.CTkCheckBox(item, text="", variable=var, width=20).grid(row=0, column=0, padx=2, pady=5, sticky="w")
-
-            index_label = ctk.CTkLabel(item, text=str(idx + 1), width=col_widths["index"], anchor="w")
-            index_label.grid(
-                row=0, column=offset + 0, padx=5, pady=5, sticky="w"
-            )
-            seg_chip = ctk.CTkLabel(
-                item,
-                text=f" {self._clip_label(segment_name, 15)} ",
-                fg_color=segment_color,
-                text_color=pick_text_color(segment_color),
-                corner_radius=6,
-                width=col_widths["segment"] - 12,
-                anchor="w",
-            )
-            seg_chip.grid(row=0, column=offset + 1, padx=5, pady=5, sticky="w")
-            sub_chip = ctk.CTkLabel(
-                item,
-                text=f" {self._clip_label(subsegment_raw, 15)} ",
-                fg_color=subsegment_color,
-                text_color=pick_text_color(subsegment_color),
-                corner_radius=6,
-                width=col_widths["subsegment"] - 12,
-                anchor="w",
-            )
-            sub_chip.grid(row=0, column=offset + 2, padx=5, pady=5, sticky="w")
-            cat_chip = ctk.CTkLabel(
-                item,
-                text=f" {self._clip_label(category_raw, 15)} ",
-                fg_color=category_color,
-                text_color=pick_text_color(category_color),
-                corner_radius=6,
-                width=col_widths["category"] - 12,
-                anchor="w",
-            )
-            cat_chip.grid(row=0, column=offset + 3, padx=5, pady=5, sticky="w")
-
-            if not selectable:
+                ctk.CTkCheckBox(item, text="", variable=var, width=20).grid(
+                    row=0, column=table.grid_col("checkbox"), padx=2, pady=5, sticky="w"
+                )
+                self.row_drag.bind_row(
+                    (item, cells["index"], cells["segment"],
+                     cells["subsegment"], cells["category"]),
+                    row,
+                )
+            else:
                 ctk.CTkButton(
                     item,
                     text="Delete",
                     width=72,
                     command=lambda r=row: self.delete_quarter_item(r),
                     **button_style("danger"),
-                ).grid(row=0, column=offset + 4, padx=5, pady=5, sticky="e")
-            else:
-                self.row_drag.bind_row(
-                    (item, index_label, seg_chip, sub_chip, cat_chip), row
-                )
+                ).grid(row=0, column=table.grid_col("actions"), padx=5, pady=5, sticky="e")
 
     def delete_quarter_item(self, row: dict):
         parsed = self._parse_period()
@@ -565,9 +520,3 @@ class APEAssignmentScreen(ctk.CTkFrame):
                 )
             )
 
-    @staticmethod
-    def _clip_label(value: str, limit: int) -> str:
-        text = (value or "").strip()
-        if len(text) <= limit:
-            return text
-        return text[:limit - 1].rstrip() + "…"
