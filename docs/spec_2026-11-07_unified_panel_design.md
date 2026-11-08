@@ -1,12 +1,15 @@
 # Spec + implementation plan — one panel design across the VSP tabs
 
 Status: **approved 2026-11-07. UPD-M3, UPD-M1, UPD-M2, UPD-M4, UPD-M5 and
-UPD-M6 built. UPD-M7.1 done. §11 was walked on 2026-11-08: UPD-M7.2 is
-`partial` and UPD-M7.3 is `not done` — column widths and divider positions
-do not survive a relaunch.** Per-criterion status is in §10; the follow-up
-plan is `docs/implementation_plan_2026-11-08_unified_panel_followups.md`.
-IDs: `UPD-M1` … `UPD-M7`. Use them verbatim in commits, docstrings and test
-names.
+UPD-M6 built. UPD-M7.1 done. §11 was walked on 2026-11-08: UPD-M7.2 was
+`partial` and UPD-M7.3 `not done`. The four follow-ups the walk produced were
+approved the same day; `UPD-F2`, `UPD-F3` and `UPD-F4` are built and
+`UPD-F1` — nothing surviving a relaunch — is not. M7.2 and M7.3 stay at
+`partial` and `not done` until §11 is walked again, steps 11 to 13
+included.** Per-criterion status is in §10; the follow-up plan is
+`docs/implementation_plan_2026-11-08_unified_panel_followups.md`.
+IDs: `UPD-M1` … `UPD-M7`, then `UPD-F1` … `UPD-F4`. Use them verbatim in
+commits, docstrings and test names.
 
 ---
 
@@ -813,8 +816,8 @@ root. UPD-M7.2 and UPD-M7.3 are the on-screen criteria and are open.
 | ID | Status | Where |
 |---|---|---|
 | M7.1 | `done` | `::test_updm71_screens_construct_withdrawn` builds all five rewritten screens and asserts that **no `Toplevel` was opened anywhere beneath the root** — a dialog at construction would be a modal thrown over whoever is using the machine, once per test that builds the screen. That count is the failable claim, and it is an exact zero walked to the bottom of each widget tree. The two assertions beside it — the root is withdrawn, the screen is unmapped — are stated in the test as what they are: `conftest.py` withdraws every window at construction and re-withdraws after any `deiconify`, so no change to a screen can turn them red, and `tests/test_tk_offscreen.py` is the guard on that patching rather than this test (P24). `::test_updm71_no_test_here_needs_a_mapped_window` counts the tests in this file that take the `mapped_windows` fixture from the AST: exact 0, so the number `test_ci_contract.py::test_the_documented_mapped_window_count_is_the_real_one` checks is the 22 it was before this plan. |
-| M7.2 | `partial` | walked 2026-11-08. Steps 1, 2, 5 and 6 pass. The six tabs do read as one design in header card, divider, row height and chip style — the two exceptions are the filter area, which is one line on Annual Plan Elements and two elsewhere (UPD-F2), and the blank heading over Week Assignment's checkbox column, which should read "Pick" (UPD-F3). |
-| M7.3 | `not done` | walked 2026-11-08. Steps 8 and 9 pass: a column drag moves only its own column, in both panels, and the panels keep their own widths. **Step 10 fails** — nothing survives a relaunch (UPD-F1). Step 7's divider passes, with a request that the columns rescale with it (UPD-F4). |
+| M7.2 | `partial` | walked 2026-11-08. Steps 1, 2, 5 and 6 pass. The six tabs do read as one design in header card, divider, row height and chip style — the two exceptions were the filter area, which was one line on Annual Plan Elements and two elsewhere (UPD-F2), and the blank heading over Week Assignment's checkbox column, which should read "Pick" (UPD-F3). **Both are built**; M7.2 stays `partial` until §11 steps 11 and 12 confirm it on screen, since what was walked is not what is now there. |
+| M7.3 | `not done` | walked 2026-11-08. Steps 8 and 9 pass: a column drag moves only its own column, in both panels, and the panels keep their own widths. **Step 10 fails** — nothing survives a relaunch (UPD-F1, **still not built**). Step 7's divider passes, with a request that the columns rescale with it (UPD-F4, **built**, to be confirmed by §11 step 13). |
 
 **M7.2 and M7.3 are not written as tests, deliberately.** Both are about how
 six tabs *read* beside each other, and the thing that would make them
@@ -833,6 +836,30 @@ found is four items, `UPD-F1` to `UPD-F4`, in
 `docs/implementation_plan_2026-11-08_unified_panel_followups.md`; the one
 defect among them is that no column width or divider position survives a
 relaunch.
+
+---
+
+### UPD-F1 to UPD-F4 — what the walk asked for — **F2/F3/F4 done, F1 not done**
+
+Approved 2026-11-08. The plan, with every criterion and the two corrections
+made to it against the code, is
+`docs/implementation_plan_2026-11-08_unified_panel_followups.md`.
+
+| ID | Status | Where |
+|---|---|---|
+| UPD-F1 | `not done` | The defect: `AppSettings.save()` writes `asdict(self)`, the whole object, so a screen holding its own snapshot reverts every field another object changed since that snapshot loaded. Not built in this batch — `src/getmoredone/app_settings.py` carries the calendar-export batch's uncommitted hunk, and `CLAUDE.md`'s "One build batch at a time" rules out a second writer in this index. Proposed as its own worktree session. The evidence is in the plan's §2: the demo settings file holds populated widths for two prefixes and empty dicts for five. |
+| UPD-F2 | `done` | `self.filter_row`, a frame of its own at header row 2 on all five tabs, holding the three combos at its own row 0; the status line moved to row 3 on the four tabs that have one; Annual Plan Elements' title alone on row 0, its controls on row 1 and an empty frame one combo high on row 2. `::test_updf21_the_filters_are_on_their_own_row`, `::test_updf22_the_header_card_is_three_rows_deep`, `::test_updf23_every_tab_puts_its_filter_row_in_the_same_place`, `::test_updf24_the_tab_with_no_filters_is_the_same_depth`, `::test_updf25_the_status_line_moved_below_the_filters`. 7 of 7 mutations red. |
+| UPD-F2.6 | `not done` | On screen. §11 step 11. |
+| UPD-F3 | `done` | `ChipColumn("checkbox", "Pick", 34, …)`. The word measures 28px in the bold header font against a 34px column, so no width moved — `::test_updf32_the_pick_column_fits_its_heading_and_has_no_handle` asserts the measurement. Four panels share `APE_LEFT_COLUMNS`, not the three the plan said, and `::test_updf34_every_ape_left_panel_says_pick` pins the adopter list. 6 of 6 mutations red. |
+| UPD-F3.5 | `not done` | On screen. §11 step 11. |
+| UPD-F4 | `done` | `ColumnResizer.fit_to_width` shares a panel out across its resizable columns by weight, floor `min_column_width()` = 5 × `CHAR_PX` = 40, fixed columns reserved out, and returns the shortfall when a panel cannot seat the floors. `SplitPanel.apply` gained `on_apply(left_px, right_px)`; the five screens pass `chip_table.panel_fitter(...)`. `::test_updf41_a_divider_move_rescales_every_resizable_column` and the five criteria tests beside it. 9 of 9 mutations red. **APE Week Actions' right panel is not fitted** — it is a `TodayScreen` subclass, not a `ChipTable`. |
+| UPD-F4.7 | `not done` | On screen. §11 step 13. |
+
+**UPD-F3 reverses the text half of UPD-M5.5.** That step blanked this heading
+when the five panels were unified, on the reasoning that a tick column needs
+no name. The walk disagreed, and the walk is the authority on how it reads.
+The UPD-M5 block above is left as the record of what was done then; this is
+what it is now.
 
 ---
 
@@ -860,7 +887,9 @@ a traceback at the end.
    column or wrapping to a second line.
 4. **APE Week Assignment**: the right panel should have five columns ending in
    **Actions**, with a Delete button on each row, and the left panel's first
-   column should be a checkbox under a blank header — not the word "Pick".
+   column should be a checkbox headed **Pick**. (This step said "a blank
+   header — not the word Pick" when it was walked on 2026-11-08. The walk
+   asked for the word; UPD-F3 put it there.)
 5. **APE Week Actions**: the left panel should be a table — `#`, Weekly
    Tactic, Segment, SubSegment, Category — not a stack of buttons. Clicking
    anywhere in a row, including on a coloured chip, should select that tactic
@@ -877,7 +906,9 @@ a traceback at the end.
 7. On each of the five tabs, drag the divider between the panels left and
    right. Both panels should move together, neither should be crushed below
    about a third of the window, and the divider should not jump when the
-   window is resized.
+   window is resized. Since UPD-F4 **the columns should move with it** —
+   every column except Pick, `#` and Actions should widen and narrow in
+   proportion, and none should go below about five characters.
 8. On each of the five tabs, drag the **SubSegment** column's right-hand edge
    in the **left** panel. Only that column should change width; the columns
    either side should stay put, and the text in the dragged column should be
@@ -895,3 +926,27 @@ crowding or wrapping at the window size you actually use, a header card
 overflowing its pane, row heights differing between tabs, a chip colour that
 makes its text unreadable, and a divider that snaps back on the first resize
 after a relaunch.
+
+**What UPD-F2, UPD-F3 and UPD-F4 ask you to look at (UPD-F2.6, F3.5, F4.7)**
+
+11. **The filter area, UPD-F2.6 and UPD-F3.5.** Open the five tabs in turn.
+    Each header card should be three lines: the title, then that tab's own
+    controls, then Segment / Sub / Cat on a line of their own, with the status
+    line under them. **Annual Plan Elements has no filters** and should carry
+    a blank line of the same depth, so the two panels start at the same height
+    on every tab — flip between it and APE Quarter and nothing should jump.
+    On APE Week Assignment, check that **Pick** reads as a column heading over
+    the ticks and not as a button you could press.
+12. **At your real window size.** Narrow the window until the header card is
+    tight. The three lines should stay three lines — no control should wrap to
+    a fourth, and nothing should be clipped by the card's edge.
+13. **The columns and the divider, UPD-F4.7.** On each of the five tabs, drag
+    the divider slowly from left to right and back. Every chip column should
+    grow and shrink with it rather than leaving empty space beside the last
+    column, the proportions you set by dragging a column should be kept, and
+    no column should shrink past about five characters. Watch for flicker or
+    lag while dragging, and for a column heading that clips: "SubSegment" is
+    ten characters in a column that can now be five wide, which is a known
+    cost of the five-character floor and is recorded in the plan's §8. On
+    **APE Week Actions**, the *right* panel's columns are expected **not** to
+    move — it is a different table and is out of UPD-F4's scope.

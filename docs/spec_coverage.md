@@ -879,3 +879,49 @@ persistence, on every tab, which is `UPD-F1` in
 `docs/implementation_plan_2026-11-08_unified_panel_followups.md`. Every test
 above still builds its screen on a withdrawn root, which is why a relaunch
 was the one thing none of them could check.
+
+---
+
+## UPD-F1 to UPD-F4 — the on-screen walk's four items (2026-11-08)
+
+Plan: `docs/implementation_plan_2026-11-08_unified_panel_followups.md`.
+Spec: `docs/spec_2026-11-07_unified_panel_design.md` §10, §11.
+
+| ID | Status | Proof |
+|---|---|---|
+| UPD-F1 | `not done` | Not built. `src/getmoredone/app_settings.py` carries the calendar-export batch's uncommitted hunk and `CLAUDE.md` forbids a second writer in one index; proposed as its own worktree session. The defect stands: `AppSettings.save()` writes the whole object, so a screen holding an older snapshot reverts fields another object changed. |
+| UPD-F2.1 | `done` | `tests/test_unified_panel_design.py::test_updf21_the_filters_are_on_their_own_row` — every combo is a child of `screen.filter_row` and every header control sits above it, on all four tabs that filter. |
+| UPD-F2.2 | `done` | `::test_updf22_the_header_card_is_three_rows_deep` — title on row 0, filter row on row 2, on all five tabs. |
+| UPD-F2.3 | `done` | `::test_updf23_every_tab_puts_its_filter_row_in_the_same_place` — the five tabs' (title row, filter row) pairs collapse to one pair, `{(0, 2)}`. |
+| UPD-F2.4 | `done` | `::test_updf24_the_tab_with_no_filters_is_the_same_depth` — Annual Plan Elements' filter row holds nothing, is `FILTER_ROW_HEIGHT` high, has grid propagation off, and that height is the height a real combo on APE Week Assignment reports. |
+| UPD-F2.5 | `done` | `::test_updf25_the_status_line_moved_below_the_filters` — the five button sets verbatim, and the status label at row 3 column 0 on the four tabs that have one. |
+| UPD-F2.6 | `not done` | On screen. Spec §11 step 11 and step 12. |
+| UPD-F3.1 | `done` | `::test_updf31_the_checkbox_column_is_headed_pick` — the rendered first header cell of Week Assignment's left panel reads `Pick` at grid column 0. |
+| UPD-F3.2 | `done` | `::test_updf32_the_pick_column_fits_its_heading_and_has_no_handle` — `CTkFont(weight="bold").measure("Pick")` is 28px against a 34px column, `resizable is False`, and no handle in grid column 0. The plan's guess of "about 40 plus padding" was wrong and no width moved. |
+| UPD-F3.3 | `done` | `::test_updf33_the_checkbox_still_toggles_in_the_same_column` — the real `CTkCheckBox.toggle()` flips `screen.left_checks`, in grid column 0. |
+| UPD-F3.4 | `done` | `::test_updf34_every_ape_left_panel_says_pick` — the exact adopter list `["annual_vision_segments.py", "ape_assignment.py", "ape_period_view.py", "weekly_items.py"]`, four panels, then all four rendered. |
+| UPD-F3.5 | `not done` | On screen. Spec §11 step 11. |
+| UPD-F4.1 | `done` | `::test_updf41_a_divider_move_rescales_every_resizable_column` (proportions kept, panel filled exactly) and `::test_updf41_the_divider_is_wired_to_both_panels` (`SplitPanel.apply` calls `on_apply(600, 600)`; the five screens' `panel_fitter(...)` lines asserted verbatim; `available_width` checked against the `padx` the rendered header and cells actually carry). |
+| UPD-F4.2 | `done` | `::test_updf42_a_fixed_column_keeps_its_width_when_the_panel_moves` — Pick, `#` and Actions unchanged at 1600px and at 500px, in both panels. |
+| UPD-F4.3 | `done` | `::test_updf43_no_column_goes_below_five_characters` — `MIN_COLUMN_CHARS == 5`, `min_column_width() == 5 * CHAR_PX == 40`, and no resizable column below it at a 300px panel. |
+| UPD-F4.4 | `done` | `::test_updf44_a_panel_too_narrow_for_the_floor_surfaces_it` — P7: a 1px panel returns the exact shortfall (three floors plus 68px of fixed columns), pins every column to the floor, and `panel_fitter` logs "too narrow". A zero-width panel returned 0 before this test was written; that was the silence the criterion exists to catch. |
+| UPD-F4.5 | `done` | `::test_updf45_a_drag_still_moves_only_its_own_column` — a drag taken *after* a fit moves only its own column and is what lands in settings. |
+| UPD-F4.6 | `done` | `::test_updf46_stored_widths_survive_a_different_window_size` — a width set at a 900px panel comes back and, fitted to 1200px, keeps the segment/category ratio to within 0.05. Verifiable without UPD-F1 because the test seeds the settings double the resizer reads. |
+| UPD-F4.7 | `not done` | On screen. Spec §11 step 13. |
+
+Mutation gates, each mutation the verbatim original, applied one at a time to
+a pristine copy and compared back byte-for-byte:
+
+- UPD-F3: **6 of 6 red** over `chip_table.py` and `weekly_items.py`.
+- UPD-F2: **7 of 7 red** over `weekly_items.py`, `ape_assignment.py`,
+  `annual_vision_segments.py` and `week_actions.py`.
+- UPD-F4: **9 of 9 red** over `column_resize.py`, `chip_table.py` and
+  `split_panel.py`. One mutation — dropping the spare pixels left by integer
+  shares — survived the first gate, because the assertion allowed one pixel
+  per column of slack. The assertion was tightened to an exact fill and the
+  mutation re-run red.
+
+**Not covered.** APE Week Actions' right panel is a `TodayScreen` subclass
+with its own `ColumnResizer`, not a `ChipTable`, so UPD-F4 does not fit its
+columns and no test claims it does. Nothing here exercises a real relaunch:
+UPD-F1 is why.

@@ -115,14 +115,34 @@ fallback is a per-field dirty set on `AppSettings`, which is a larger change.
 | ID | Criterion | Test |
 |---|---|---|
 | UPD-F2.1 | On every tab with the three filters, the Segment / SubSegment / Category combos sit on their own grid row, below the row holding that tab's other controls | `test_updf21_the_filters_are_on_their_own_row` |
-| UPD-F2.2 | A blank spacer row sits between them, so the header card is three rows deep | `test_updf22_a_spacer_row_sits_above_the_filters` |
-| UPD-F2.3 | The depth is the same on all of them — one assertion over the set of tabs, not one per tab | `test_updf23_every_filtered_tab_is_three_rows_deep` |
-| UPD-F2.4 | Annual Plan Elements, which had its filters inline, is one of them | `test_updf24_annual_plan_elements_is_three_rows_deep_too` |
-| UPD-F2.5 | Nothing else in the header card moved — the existing control set and its order are unchanged | `test_updf25_the_header_controls_are_the_same_set_in_the_same_order` |
+| UPD-F2.2 | The header card is three rows deep: title, then controls, then filters | `test_updf22_the_header_card_is_three_rows_deep` |
+| UPD-F2.3 | The depth is the same on all of them — one assertion over the set of tabs, not one per tab | `test_updf23_every_tab_puts_its_filter_row_in_the_same_place` |
+| UPD-F2.4 | Annual Plan Elements, which has no filters, carries a blank row of the same depth | `test_updf24_the_tab_with_no_filters_is_the_same_depth` |
+| UPD-F2.5 | The control set and its order are unchanged, and the status line moved below the filters | `test_updf25_the_status_line_moved_below_the_filters` |
 
-"Three lines deep" is asserted as the filter widgets' grid row index and the
-presence of a spacer row of a fixed height, which a withdrawn root can read.
-Whether it *looks* three lines deep is UPD-F2.6 below.
+**Two criteria were corrected against the code after the plan was approved,
+and the IDs kept:**
+
+* **UPD-F2.2** said "a blank spacer row sits between them". There is no blank
+  row between the title and the filters and there never was. The three lines
+  the user counted are the title, the controls and the filters, and that is
+  what the criterion now says.
+* **UPD-F2.4** said Annual Plan Elements "had its filters inline". It has no
+  lineage filters at all — there is nothing above an annual plan element to
+  filter by. What it had was its title and its controls sharing row 0, which
+  left it two lines shallower than its neighbours. It now puts the title on
+  row 0, the controls on row 1 and an empty frame one combo high on row 2.
+  That empty frame is the blank line the user asked for by name.
+
+"Three lines deep" is asserted as each widget's real grid row on a rendered
+header, which a withdrawn root can read, and the blank row's height against
+the combo height it stands in for. Whether it *looks* three lines deep is
+UPD-F2.6 below.
+
+Built as `self.filter_row`, a frame of its own on all five tabs, rather than
+six more cells in each header's grid: grid columns are shared between rows, so
+filters gridded straight into the header at row 2 would have coupled a 150px
+combo's column to the column the Year entry sits in.
 
 ---
 
@@ -139,11 +159,22 @@ table is **not** in scope and gains no checkbox.
 | UPD-F3.1 | `APE_LEFT_COLUMNS`' checkbox column has the heading `"Pick"` | `test_updf31_the_checkbox_column_is_headed_pick` |
 | UPD-F3.2 | The column is wide enough for the word without clipping it, and is still fixed-width with no drag handle | `test_updf32_the_pick_column_fits_its_heading_and_has_no_handle` |
 | UPD-F3.3 | The checkbox itself is unchanged — same cell, same column index, same toggle behaviour | `test_updf33_the_checkbox_still_toggles_in_the_same_column` |
-| UPD-F3.4 | APE Quarter and APE Month share `APE_LEFT_COLUMNS`, so they get the same heading; asserted rather than assumed | `test_updf34_all_three_ape_left_panels_say_pick` |
+| UPD-F3.4 | Every panel built from `APE_LEFT_COLUMNS` gets the same heading; asserted rather than assumed | `test_updf34_every_ape_left_panel_says_pick` |
 
-`ChipColumn("checkbox", "", 34, …)` is 34px; "Pick" at `CHAR_PX = 8` needs
-about 40 plus padding, so UPD-F3.2 will move the width. That is a visible
-change on three tabs and is listed as a deviation, not slipped in.
+**Two corrections to this section, made against the code and measurement:**
+
+* The plan said "Pick" needs about 40px plus padding, so the 34px column would
+  have to widen. Measured in the real header font inside pytest, **"Pick" is
+  28px**. The column did not move, and `test_updf32` now asserts the
+  measurement rather than a guess. There is no width deviation to declare.
+* The plan said three panels share `APE_LEFT_COLUMNS`. **Four do** — Annual
+  Plan Elements shares the set as well as APE Quarter, APE Month and APE Week
+  Assignment. The test asserts the exact four-file adopter list, so a fifth
+  adopter cannot arrive unnoticed.
+
+UPD-F3 **reverses the text half of UPD-M5.5**, which blanked this heading when
+the five panels were unified. It read "Pick" in a 52px column before that
+step; it reads "Pick" in a 34px column now.
 
 ---
 
@@ -170,8 +201,23 @@ its new weight. This is why UPD-F4.6 exists: the behaviour the user asked for
 in step 7 and the behaviour they asked for in step 10 are only compatible if
 the stored number is a weight.
 
-The chip columns' `min_width` is 60 today (`screens/chip_table.py:99-101`);
-the floor moves to 40. That is a deliberate behaviour change on five tabs.
+The chip columns' `min_width` was 60 for the three chips, 52 for Done and 80
+for Week Actions' Title; every resizable column now takes the five-character
+floor from `column_resize.min_column_width()`, which is 40 at `CHAR_PX = 8`.
+That is a deliberate behaviour change on five tabs, asked for in step 7.
+
+**The divider does the telling.** `SplitPanel.apply` is the only place that
+knows a panel's new width, so it gained an `on_apply(left_px, right_px)`
+callback and the five screens pass `chip_table.panel_fitter(...)`. A panel's
+columns get the panel's width less the padding the table itself grids
+(`HEADER_PADX` and `CELL_PADX`, named so `available_width` and the `grid`
+calls cannot drift apart).
+
+**UPD-F4.6 did not need UPD-F1 after all.** The plan ordered F4 last because
+F4.6 is about surviving a relaunch. The test seeds the widths through the
+settings double the other UPD tests use, which is the object the resizer
+reads, so the shape-across-sizes claim is verifiable without the `save()`
+fix. F1 is still owed for the real relaunch.
 
 ---
 
@@ -203,6 +249,12 @@ test and no test will claim them.
 Each lands as its own commit pair (src, then tests), and the batch ends with
 `/csdp` — which is already owed over 42 unpushed commits before any of this.
 
+**What was actually built, 2026-11-08:** UPD-F3, then UPD-F2, then UPD-F4.
+**UPD-F1 was not built here.** `src/getmoredone/app_settings.py` still carries
+the calendar-export batch's uncommitted hunk, and §9 below rules that out
+under `CLAUDE.md`'s "One build batch at a time". It was proposed as its own
+worktree session instead and is recorded `not done`.
+
 ---
 
 ## 8. Adjacent issues found, not fixed
@@ -223,6 +275,24 @@ Per the global rule on surrounding code:
   colour key) is still open in `BACKLOG.md` and is not swept here. UPD-F2
   touches the filter *layout* on those same five files, which makes UPD-A9
   cheaper to do first — recorded, not decided.
+
+- **A column at the five-character floor clips its own heading.** "SubSegment"
+  measures 84px in the bold header font and the floor is 40px, so a column
+  dragged or fitted to the minimum shows about five characters of a
+  ten-character heading. This was already true at the old 60px minimum and
+  step 7 asked for the narrower floor explicitly, so it is not fixed. The
+  honest fixes — a shorter heading, or a per-column floor measured from its
+  own heading — are both design decisions nobody has made.
+- **APE Week Actions' right panel is not fitted.** It is a `TodayScreen`
+  subclass with its own `ColumnResizer` and its own padding, not a
+  `ChipTable`, so `panel_fitter` is passed the left table alone and the right
+  panel's columns keep their pixel widths when the divider moves. Stated in
+  `panel_fitter`'s docstring and asserted by `test_updf41_the_divider_is_wired_to_both_panels`,
+  which pins the one-table wiring so it cannot be half-done by accident.
+- **`weekly_items.py` abbreviates two filter labels** — "Sub:" and "Cat:"
+  where the APE tabs write "SubSegment:" and "Category:". UPD-F2 moved those
+  labels onto a new row without changing their text: the wording is UPD-A9's
+  to unify, and rewording them here would be a silent sweep.
 
 - **No test enforces `docs/DOCUMENTATION_INDEX.md`'s completeness.** The global
   rule is that where a repo keeps a documentation index, a test asserts every
