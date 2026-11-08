@@ -122,20 +122,27 @@ reader does not re-derive it.
 - `BACKLOG.md`
 - `NOTES.md`
 - `docs/changes/2026-11-07-plan-day-faults.md` (this note)
+- `docs/USER_GUIDE.md`
 - `docs/changes/2026-11-07-plan-day-faults-screen-checklist.md` (the on-screen
   pass this batch cannot do itself)
 
 ## Verification
 
 - Command: `GETMOREDONE_NO_MAPPED_WINDOWS= taskpolicy -b venv/bin/python -m pytest tests/test_plan_screen.py tests/test_ci_contract.py -q`
-- Result: **red, with a known cause outside this change** — 284 passed, 1
-  failed, 1 skipped. Reported as red rather than as a pass: the exit status is
-  non-zero, and a batch that calls that PASS teaches the next reader to read
-  past a failure line.
+- Result: **red, with a known cause outside this change** — 298 passed, 1
+  failed, 1 skipped at the final count. Reported as red rather than as a pass:
+  the exit status is non-zero, and a batch that calls that PASS teaches the next
+  reader to read past a failure line.
   The failure is `test_pbm61_a_tall_row_keeps_its_two_lines_together`, a
-  mapped-window layout assertion over `plan_blocks.build_item_row`. It fails on
-  `HEAD` too, this change touches neither `plan_blocks.py` nor that test, and it
-  matches the layout test already known red on `main`.
+  mapped-window layout assertion over `plan_blocks.build_item_row`.
+  **Established rather than assumed**, because a red test that a batch is merely
+  assumed not to own is how one gets inherited silently: the merge base
+  `6d86791` was checked out into a throwaway worktree and that test run there
+  alone. It fails identically — same assertion, same two labels, `detail is
+  None` — and `git merge-base --is-ancestor 6d86791 origin/main` confirms the
+  merge base is on `origin/main`, so the failure is on `main`, not on this
+  branch. This range also touches `plan_blocks.py` by 0 lines and does not
+  touch that test.
 - 13 new tests, 2 existing tests adjusted, before the fix pass below added 6
   more tests and adjusted 3. **Commit `1ae0397`'s subject line says "fourteen
   tests" and is wrong** — there are 13. It is left as it is because the commit
@@ -310,13 +317,12 @@ are errors in the checklist the user will act on.
   a question that cannot be completed says on each of the three paths.
 - **Two more checklist errors, both of which would have produced a false
   failure report.** It told the tester to hold "within about a box height" of
-  the edge, which is outside a 24px band — an empty box is 34px on a 36px
-  pitch — so a correct build would have read as "it does not scroll"; and it
-  offered the sidebar and the pane heading as interchangeable release targets
-  for item 5 when only the heading sets a status line. Item 4 now says 20
-  pixels, item 5 is split in two, and `PD_AUTOSCROLL_MARGIN_PX`'s comment no
-  longer claims the band is three-quarters of a box or that it stays clear of
-  the last visible one.
+  the edge, which is outside a 24px band, so a correct build would have read as
+  "it does not scroll"; and it offered the sidebar and the pane heading as
+  interchangeable release targets for item 5 when only the heading sets a
+  status line. Item 4 now gives the band in pixels and item 5 is split in two.
+  **The box arithmetic in this pass was wrong, and the next pass caught it** —
+  see the fourth pass below.
 
 One minor was recorded rather than fixed, in `BACKLOG.md`: the autoscroll band
 is the scroll canvas, while the pane the user sees is the canvas plus its
@@ -326,7 +332,7 @@ substitution.
 
 The pass also reported clean on what it was pointed at and found nothing wrong
 with, which is worth as much: no hard-coded colour is introduced, the
-`set_status` severity words match the file's own use at all 30 call sites, every
+`set_status` severity words match the file's own use at all 41 call sites, every
 new sentence names what was not done and keeps the file's em-dash convention, no
 control is removed, renamed or relocated, the drag label cannot be left stale by
 a scroll, and `yview_moveto` drives `yscrollcommand` so the scrollbar stays in
@@ -335,9 +341,89 @@ and 3 of the checklist.
 
 2 new tests, 4 more mutants, all killed. **It also could not read the diff** —
 no Bash tool reached that worker, so it reconstructed the change set from the
-brief and read the present state of each hunk. Its findings were verified
-against the code here before being acted on; the box-pitch arithmetic in
-particular was checked against `plan_blocks.py` rather than taken on trust.
+brief and read the present state of each hunk. Its findings were verified against the code here before
+being acted on **with one exception, and it is the one that mattered**: its box
+arithmetic (`max(32, 1 * 30 + 4) = 34`) was taken on trust, and it is wrong for
+an empty box, where `chips` is 0 and the 32px floor wins. An earlier draft of
+this note claimed that arithmetic had been checked against `plan_blocks.py`.
+It had not been. See the fourth pass.
+
+## Fourth pass — cold, over the two unswept fix rounds
+
+`learning-qa` over `eaa11af...HEAD`, the two fix rounds the earlier sweeps had
+not covered: **8 findings, 2 high, 3 medium, 3 low. Not a clean pass, and both
+highs were in the fix commits themselves.** This is the budget's own prediction
+holding — a fix commit is the least-reviewed code in a change, written last and
+in the most anchored state — and it is the second batch in this repo where the
+fix rounds, not the original work, carried the worst defect.
+
+Both highs were verified against the code here before anything was written.
+
+**High 1 — the PD-M11.12 arm left the modal it was reporting on the screen.**
+`ask_custom_minutes` grew an `except tk.TclError` that logged and set a status
+and returned. But `CTkInputDialog.__init__` calls `grab_set()` and
+`attributes("-topmost", True)` (`ctk_input_dialog.py:50-54`), and the Toplevel
+is destroyed only by its Ok, Cancel and close handlers (105, 109, 113) —
+`get_input` is nothing but `self.master.wait_window(self)`. So a raise out of
+`wait_window` left an application-modal, always-on-top window up still holding
+the grab, and wrote the error status to a screen the user could no longer
+click. Worse than the silent failure the arm was added to cure. The P5
+reasoning had carried the arm across the whole class of modals without noticing
+that the cleanup obligation is not the same across it: `askyesno` goes through
+`tkinter.commondialog` and a native dialog Tk disposes of itself. Fixed with
+`dialog = None` before the `try` and a teardown that calls `grab_release()` then
+`destroy()`, each failing independently, **before** anything is said. Two tests,
+one on the order and one on `grab_release` itself raising.
+
+**High 2 — the box arithmetic, and a verification claim with nothing behind
+it.** The third pass rewrote `PD_AUTOSCROLL_MARGIN_PX`'s comment to say an empty
+box is 34px on a 36px pitch and the 24px band is "about two-thirds" of one. It
+is not. `build_slot_row` passes `chips = len(starting) + len(continued)`, which
+is **0** for an empty box, so `slot_row_height` returns
+`max(SLOT_MIN_HEIGHT_PX=32, 0 * 30 + 4) = 32`, and `pady=1` makes the pitch
+34px. 24/32 is exactly three-quarters — **which is what the comment said before
+the third pass changed it.** The 34px came from the cold UI worker's
+`max(32, 1 * 30 + 4)`, a box holding one task rather than an empty one; it was
+taken on trust, and an earlier draft of this note claimed it had been checked
+against `plan_blocks.py` instead. That claim has been removed. Corrected in the
+constant's comment, `docs/USER_GUIDE.md` (the band is 24px, not 20),
+`NOTES.md`, the checklist's item 4 — where "within about 20 pixels … further in
+than that is meant to do nothing" would have produced a false failure report
+from a correct build, the same class of error the third pass was fixing when it
+introduced this one — and in the third pass's own section above, which no longer
+states the wrong figures.
+
+**Medium, fixed: the PD-M12.10 colour restore could cost the width restore.**
+`CTkFrame.configure` pops `border_color` and runs it through
+`_check_color_type`, which raises `ValueError` — not `TclError`, so the existing
+guard did not cover it — when the colour is None, and it pops it *before*
+applying `border_width`. Adding the colour to the restore therefore put the
+width restore, which had been working, behind a call that could raise. Fixed by
+building the kwargs and omitting the colour when there is none, which is
+stronger than widening the `except`: widening would have stopped the crash and
+still lost the width. One test.
+
+**Medium, disposed by narrowing the claim:** `docs/USER_GUIDE.md` said "Every
+question this screen asks … reports it if the question itself fails", while the
+`tk_popup` that offers *Custom…* has no arm of its own (`plan.py:1692`, a `try`
+whose only clause is `finally: menu.grab_release()`) — the PD-M11 mechanism one
+level earlier. The sentence now reads "Each of the three questions this screen
+asks", which is exact: all three do carry the arm, and a menu is not a question.
+`tk_popup` is in `BACKLOG.md` as a medium of its own.
+
+**Medium, fixed:** `docs/USER_GUIDE.md` was edited by the third pass and left
+out of this note's "Files changed". It is listed now.
+
+Three lows. The `set_status` call-site count in this note said 30 where an AST
+count gives 41, corrected. The `weekly_items.py:427` `CTkInputDialog` and the
+widened denominator are in the deferred modal entry. The third — the two new
+arms log a sentence rather than the file's `<Feature> failed` convention — was
+**attempted and reverted**: changing the strings turned `test_pdm1112` and
+`test_pdm1113` red, because both assert on the message text, so finishing it
+meant editing two passing tests to match a cosmetic rewording. That is the trade
+the below-medium rule refuses. Recorded in `BACKLOG.md` with that reasoning.
+
+3 new tests, 6 more mutants, all killed, source sha verified after each.
 
 ## Risks / Known gaps
 
@@ -369,7 +455,8 @@ particular was checked against `plan_blocks.py` rather than taken on trust.
   in `BACKLOG.md`, but the reported fault is the raise, not the race: the
   traceback shows the dialog never returned at all. The BACKLOG note that said
   "this report may be that demonstration" has been corrected.
-- The autoscroll speed (16px per 60ms, half a box per tick) is a judgement and
+- The autoscroll speed (16px per 60ms, half an empty box per tick) is a
+  judgement and
   has not been felt by a human. Item 4 of the checklist asks whether it is
   usable. It is now the same speed on all three platforms, which it was not
   before the fix pass, but it has been measured on none of them — the tests

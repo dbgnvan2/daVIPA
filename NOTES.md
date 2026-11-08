@@ -30,7 +30,7 @@
   implemented, and **not yet seen on screen**. A pointer within
   `PD_AUTOSCROLL_MARGIN_PX` (24) of the pane's top or bottom — or beyond it,
   which is the gesture reported — scrolls it `PD_AUTOSCROLL_STEP_PX` (16) every
-  60ms, half a box at the default box height, and the hover highlight is re-read after each step because the boxes
+  60ms, half the height of an empty box, and the hover highlight is re-read after each step because the boxes
   have moved under a pointer that has not. The x range is the pane's own, an
   end already reached asks for nothing, and `_end_drag` cancels the timer.
   Pixels and not canvas "units": the first version scrolled one unit per tick,

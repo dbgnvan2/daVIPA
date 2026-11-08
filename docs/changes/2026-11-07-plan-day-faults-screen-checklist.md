@@ -93,7 +93,7 @@ Make the window short enough that the Day Plan has a scrollbar.
 
 1. Pick up an unscheduled item and drag it over the Day Plan.
 2. Hold the pointer near the **bottom edge** of the Day Plan pane — within
-   about 20 pixels of it, which is a bit less than a box — and **hold still**.
+   about 24 pixels of it, three-quarters of an empty box — and **hold still**.
    Further in than that is meant to do nothing.
 3. Expected: the day scrolls down steadily under the pointer, and the box
    highlighted under the pointer keeps up as the boxes move.
@@ -106,8 +106,9 @@ Make the window short enough that the Day Plan has a scrollbar.
    stops immediately.
 
 Record whether the **speed** is usable — it is set to 16 pixels every 60ms,
-about 270 pixels a second, which is half a box at the default box height (if
-you have raised the box height in Plan Settings it is less than half). Too fast to aim,
+about 270 pixels a second, which is half the height of an empty box. (A box
+holding a task is taller, so it is a little under half there; an empty box stays
+32px whatever the chip height is set to, because a floor wins.) Too fast to aim,
 too slow to be worth it, or about right?
 
 ## 5. Does the drag label still disappear on release?

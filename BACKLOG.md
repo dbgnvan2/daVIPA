@@ -106,7 +106,8 @@ screen should scroll the Day Plan window to follow it.
 `PD_AUTOSCROLL_INTERVAL_MS` (60), `PD_AUTOSCROLL_STEP_PX` (16) and the
 `day_autoscroll_direction` / `day_autoscroll_fraction` / `autoscroll_day` /
 `_start_autoscroll` / `_autoscroll_tick` / `_stop_autoscroll` group. The speed
-is a judgement — 16px per 60ms, half a box per tick — and has not been felt by
+is a judgement — 16px per 60ms, half an empty box per tick — and has not been
+felt by
 a human. The first version of it scrolled one canvas *unit* per tick, which the
 sweep showed was not a distance at all; see the fix-pass section below.
 
@@ -158,7 +159,7 @@ left. See `docs/changes/2026-11-07-plan-day-faults.md`.
 
 ### 2026-11-07 - Type: Debt - Not fixed, scope
 
-**Title:** 20 modals outside the Plan screen have no failure arm
+**Title:** 21 modals outside the Plan screen have no failure arm
 **Description:** The PD-M11 fault is a modal raising `_tkinter.TclError`
 instead of returning an answer, which leaves the gesture with nothing written
 and nothing said. The class is every modal that can fail to return an answer,
@@ -171,7 +172,12 @@ across 14 files (`weekly_items`,
 `vision_segments` ×3, `vision_elements`, `project_boards`, `ape_assignment`,
 `ape_period_view`, `settings`, `edit_contact` ×2, `vps_planning` ×2,
 `item_editor`, …), still call `messagebox` directly and would fail the same
-silent way.
+silent way — and so does the one other `CTkInputDialog` in the app,
+`weekly_items.py:427`, which needs the stronger arm the Plan screen's now has:
+a `CTkInputDialog` that raises out of `wait_window` leaves an
+application-modal, `-topmost` Toplevel on screen still holding the grab, so
+that arm must `grab_release()` and `destroy()` before it says anything. 21 sites
+in all.
 **Priority:** Medium
 **Effort:** Medium — one shared `ask_yes_no(parent, title, question) ->
 Optional[bool]` helper in `utils/`, every call site routed through it, and a
@@ -254,18 +260,21 @@ safer than the collapse, because both callers' `None` arms already fail safe.
 ### 2026-11-07 - Type: Debt - Not fixed, below the fix threshold
 
 **Title:** The autoscroll step is a fixed 16px against a configurable box height
-**Description:** `PD_AUTOSCROLL_STEP_PX`'s comment says "half a box at the
-default chip height", which is true (`SLOT_CHIP_HEIGHT_PX` is 30) and
-qualified. But the box height is a user setting — `drag_schedule_box_height_px`,
+**Description:** `PD_AUTOSCROLL_STEP_PX` is half the height of an *empty* box,
+which is fixed at 32px by `SLOT_MIN_HEIGHT_PX` whatever the chip height is. But
+a box holding a task is `chips * chip_height + 4`, and the chip height is a user
+setting — `drag_schedule_box_height_px`,
 floor 30, read at `plan.py:371` — so for a user who raises it the "half a box
 per tick" calibration stops holding, and the step is also in the canvas's
 scaled pixels, so CustomTkinter widget scaling shifts it against the box again.
 **Priority:** Low
 **Effort:** Small — derive the step from the box-height setting, rounded to a
 multiple of 8 so the macOS `yscrollincrement` cannot round it away.
-**Notes:** Found by the re-sweep. The two documents that repeated the claim
-unqualified (`NOTES.md`, the on-screen checklist) now say "at the default box
-height", which is the honest half of this; deriving the step is the other half.
+**Notes:** Found by the re-sweep. `NOTES.md`, the checklist and the constant's
+own comment now state the empty-box figure the step is actually half of, and say
+that a box holding a task is taller; deriving the step from the setting is the
+other half. The fourth pass had to correct all three of them a second time —
+see the fourth-pass entries below.
 
 ### 2026-11-07 - Type: Bug - Not fixed, below the fix threshold
 
@@ -2258,3 +2267,41 @@ already like this before.
 **Effort:** [Small/Medium/Large]
 **Notes:**
 ```
+
+### 2026-11-07 - Type: Bug - Not fixed, same class as the modals above
+
+**Title:** The block menu's own `tk_popup` has no failure arm
+**Description:** `PlanScreen` posts the block context menu with `tk_popup`
+inside a `try` whose only clause is `finally: menu.grab_release()`
+(`plan.py:1692`). If the post itself raises `_tkinter.TclError` — the PD-M11
+mechanism, one level earlier — the right-click is lost with nothing written and
+nothing said, exactly like the fault this batch fixed. It is the only
+`tk_popup` in `src/`.
+**Priority:** Medium
+**Effort:** Small — an `except tk.TclError` that logs and sets a status, plus a
+test.
+**Notes:** Raised by the fourth pass as the gap behind a `docs/USER_GUIDE.md`
+sentence that read "Every question this screen asks … reports it if the question
+itself fails". Disposed by narrowing the sentence to "Each of the three
+questions this screen asks", which is now exact: the menu that offers *Custom…*
+is not a question, and all three questions do carry the arm. Not fixed in-loop
+because the batch is already two fix rounds past the warm-pass cap, and a menu
+post wants its own test on a mapped window rather than the fake-viewport
+harness the other three use.
+
+### 2026-11-07 - Type: Debt - Not fixed, below the fix threshold
+
+**Title:** The two new failure arms log a sentence, not the file's `<Feature> failed`
+**Description:** `_ask_yes_no` logs "a confirmation on the Plan screen could not
+be put" and `ask_custom_minutes` logs "the block length dialog could not be
+completed", while the rest of `plan.py` logs `<Feature> failed` with the detail
+as a `%s` argument. Grep-ability across `app.log` is the point of the
+convention.
+**Priority:** Low
+**Effort:** Trivial — two strings, and the two tests that assert on the text.
+**Notes:** Raised by the fourth pass, and **attempted and reverted in the same
+pass**, which is the useful part of this entry: changing the two strings turned
+`test_pdm1112` and `test_pdm1113` red, because both assert on the message text.
+Finishing the change meant editing two passing tests to match a cosmetic
+rewording — the exact trade the below-medium rule exists to refuse. Reverted and
+recorded instead.

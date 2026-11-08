@@ -326,9 +326,9 @@ Header:
   does not ask about the weekday list: taking work off a day is not planning
   work onto it, so a Saturday you filled can be cleared without being asked
   about the week again.
-- **A question that cannot be completed** — What: Every question this screen
-  asks — the non-work-day one, Clear Day's, and the block length one on the
-  block menu's *Custom…* — reports it if the question itself fails rather than
+- **A question that cannot be completed** — What: Each of the three questions
+  this screen asks — the non-work-day one, Clear Day's, and the block length one
+  on the block menu's *Custom…* — reports it if the question itself fails rather than
   your answer. The status line says *the question could not be completed* and
   names what was not done: *nothing was scheduled*, *nothing was removed*, *the
   block was not changed*. Why: The gesture is not treated as your refusal, so
@@ -420,7 +420,7 @@ Items pane (left):
   pick an hour for you. A release over the heading or the summary is not a
   choice of time, so it is reported rather than guessed at.
 - **Hold the drag at the top or bottom edge of the Day Plan** — What: The day
-  scrolls under the pointer while you hold it there, about 20 pixels in from the
+  scrolls under the pointer while you hold it there, about 24 pixels in from the
   edge or anywhere past it, and the outlined box keeps up as the boxes move. It
   stops at either end of the day. Why: A box out of view cannot be dropped on,
   and letting go to scroll loses the drag. Holding still at the edge is what a
