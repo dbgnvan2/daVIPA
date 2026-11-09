@@ -761,6 +761,11 @@ inside this batch because the batch's own entry is one of the things it would
 police, and a check written by the change it is checking is the wrong order.
 This is the same class as P25: a rule that holds on only one surface, and not
 the one anyone uses.
+
+**The same gap is filed again, at low, as `PLC-A5`**, whose own text is where
+six other places route a reader for it. Whichever is taken, close both: the
+test design is here, the routing is there, and `SSC-8` was the finding that
+they had no pointer between them.
 **Priority:** Medium
 **Effort:** Low
 
@@ -1564,13 +1569,23 @@ Well past the 700-line refactor mark in
 but a mixin import and a tab, following `settings_integrations.py`, so the
 direction is right; the six sections already in it remain.
 
-### PLC-A5 — `docs/DOCUMENTATION_INDEX.md` is stale and unenforced (low)
+### PLC-A5 — `docs/DOCUMENTATION_INDEX.md` is unenforced (low)
 
-It ends "**Current Status**: ✅ All documentation up to date as of 2026-01-24",
-which has not been true for months, and no test checks that every document is
-listed in it — which global rule 13 asks for. The index also mixes per-document
-sections with category descriptions, so "every document is listed" is not
-currently a well-defined property of it.
+No test checks that every document is listed in the index, which global rule 13
+asks for. The index also mixes per-document sections with category
+descriptions, so "every document is listed" is not currently a well-defined
+property of it.
+
+**The same gap is filed at medium, with the test designed, as `UPD-A13`**
+(`grep -n "UPD-A13 - no test enforces" BACKLOG.md`). This is the item six other
+places route a reader to, and it was the lower of the two with none of the
+design — which is `SSC-8`. Take `UPD-A13`; closing it closes this.
+
+**Corrected 2026-11-08 by the SST batch** (`SSC-5`): this filing opened by
+quoting a footer — "All documentation up to date as of 2026-01-24" — and saying
+it had not been true for months. The footer had already been rewritten, and the
+index now records that it used to read that. The clause was describing a
+document that no longer existed, in a filing that routes six other readers.
 
 ## Below-medium findings from the PLC cold review passes (2026-11-08)
 
