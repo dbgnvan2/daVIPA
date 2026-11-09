@@ -276,7 +276,8 @@ added one assertion to `test_pbm55` and five reference edits to
   references — the PRI gap, which predates this batch (`models.py` is in none
   of its commits and the same `Tests:` lines are present at `4ca7116`).
   `test_every_referenced_test_name_exists` passes. See Risks.
-- **CI has now run this range.** Run `42571150206` at `67612d5` (the batch's
+- **CI has now run this range**, 2026-11-08 (the run's own timestamps are
+  2026-11-09 UTC). Run `42571150206` at `67612d5` (the batch's
   last commit): `10 failed, 2599 passed, 2 skipped` on each of 3.11, 3.12 and
   3.13. The ten are the nine CI-environment failures listed under Risks plus
   `test_every_referenced_test_file_exists`, red on the PRI gap this batch could

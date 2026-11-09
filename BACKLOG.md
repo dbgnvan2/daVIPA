@@ -61,7 +61,8 @@ and **nine are left** — the nine in items 3 and 5, in two groups rather than
 three. Nothing red is a meta test any more. `NOTES.md` carries the same count;
 this section is the authoritative go-green list, so the two must agree.
 
-**CI confirms the eleven, 2026-11-09.** Run `42574256150` on `5eef83d`:
+**CI confirms the eleven, 2026-11-08.** Run `42574256150` on `5eef83d`
+(started 2026-11-09T06:43Z, which is 2026-11-08 locally):
 **9 failed, 2635 passed, 2 skipped**, identical on 3.11, 3.12 and 3.13, and the
 nine are exactly the nine in items 3 and 5. Against run 42550648188's twenty on
 `b6d6ddf`, that is the eleven closed and nothing new red. The intermediate run
