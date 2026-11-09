@@ -594,24 +594,47 @@ def test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day(
     scrolling grid: the hit test and the write were both working, the day was
     a Saturday, and ``extend_day_for`` asks the same question in its first
     statement.
+
+    PDT-M2 — PD-M13.1's own subject is the first two assertions: the drop asks
+    nothing, and it writes. What this used to assert as well was
+    ``bounds.day_start`` moving back, which PD-M14.1 withdrew on purpose, and
+    which made this test the opposite of
+    ``test_pdm141_a_drop_on_earlier_writes_no_settings`` -- two tests on one
+    branch asserting contradictory things about one call. The hours are a
+    template for a blank day, and writing them per drop is what ratcheted the
+    one shared setting to 05:30 on the reporter's instance.
+
+    The capability the report asked for is unchanged and is asserted here
+    against the mechanism that survived: the block lands at a **negative box**,
+    in room made before the day's first box, at this date only. Do not restore
+    the ``day_start`` assertion -- ``test_pdm141_a_drop_on_earlier_never_calls_save``
+    is the guard that the hours stay untouched.
     """
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = SATURDAY
     panel.refresh()
-    started_at = panel.bounds.day_start
     item = _item(manager, "weekend work", SATURDAY)
 
     panel.extend_day_for(item, DAY_EXTEND_EARLIER)
 
     assert messageboxes == [], f"the drop asked something: {messageboxes}"
-    assert panel.bounds.day_start < started_at, (
-        f"the day still starts at {panel.bounds.day_start}"
-    )
-    assert len(manager.get_time_blocks(SATURDAY)) == 1, (
+    blocks = manager.get_time_blocks(SATURDAY)
+    assert len(blocks) == 1, (
         "the day was lengthened and nothing was put in the room it made"
     )
+    assert blocks[0].slot_index == -1, (
+        f"the block is at box {blocks[0].slot_index}, not in the room the drop "
+        "asked for before the day's first box"
+    )
+    assert blocks[0].start_time == "07:30", (
+        f"the block starts at {blocks[0].start_time}, so the day on screen did "
+        "not grow earlier"
+    )
+    assert panel.bounds.day_start == "08:00", (
+        f"PD-M14.1: the drop wrote Day Start, now {panel.bounds.day_start}"
+    )
     status = panel.status_label.cget("text")
-    assert "The day now runs" in status, status
+    assert "The day now shows" in status, status
     assert "not a regular work day" in status, status
 
 
@@ -1437,15 +1460,25 @@ def test_a_longer_task_marks_the_boxes_it_runs_through(screen, manager):
 def test_tgm31_an_outside_block_is_drawn(screen, manager, settings):
     """TG-M3.1 — a block no box can hold is shown, not dropped (P2).
 
-    Day End moving earlier is the ordinary way this happens. The block still
-    exists and is still the user's planned work; the day it stops being drawn
-    is the day that work is lost with nothing on screen to say so.
+    The lunch hour moving over planned work is the ordinary way this happens.
+    The block still exists and is still the user's planned work; the day it
+    stops being drawn is the day that work is lost with nothing on screen to
+    say so.
+
+    PDT-M1.1 — the vehicle was Day End moving earlier, which PD-M14.2 made
+    unable to do this: the drawn day is now stretched to cover the date's own
+    blocks (``span_for_blocks``), so tightening the hours cannot orphan one.
+    Lunch still can, because ``can_place`` refuses a lunch box and a lunch box
+    draws "Lunch" and nothing else, so a block left under one would be hidden
+    exactly as dropping it would. Nothing about what this test asserts changed.
     """
     _add_block(manager, 30, "late afternoon", 16)
     screen.load_blocks()
     assert screen._grid.outside == []
 
-    screen.on_settings_saved(DayBounds(day_end="12:00"))
+    # 16:00 is the box the block is on, so saving lunch over it is the one
+    # settings change that still takes work off the grid.
+    screen.on_settings_saved(DayBounds(lunch_start="16:00"))
 
     assert [b.label for b in screen._grid.outside] == ["late afternoon"]
     drawn = _label_texts(screen.outside_frame)
@@ -2303,10 +2336,14 @@ def test_every_part_of_an_outside_row_starts_a_drag(screen, manager):
     levels below the widget the handlers were bound to. Binding only the
     direct children left a press on the text doing nothing at all, in the one
     group the screen tells the user to drag blocks out of.
+
+    PDT-M1.2 — lunch over the block, not Day End moving earlier; see
+    ``test_tgm31_an_outside_block_is_drawn`` for why the old vehicle stopped
+    producing an outside block at PD-M14.2.
     """
     _add_block(manager, 30, "late afternoon", 16)
     screen.load_blocks()
-    screen.on_settings_saved(DayBounds(day_end="12:00"))
+    screen.on_settings_saved(DayBounds(lunch_start="16:00"))
 
     label = _find_label(screen.outside_frame, "late afternoon")
     assert label is not None, (
@@ -2636,10 +2673,14 @@ def test_the_outside_group_does_not_outlive_the_day_that_had_one(screen, manager
     The group lives in the items pane now, which ``load_blocks`` does not
     otherwise touch: emptied inside the "there are blocks outside the day"
     branch, yesterday's group would still be on screen under today's items.
+
+    PDT-M1.4 — lunch over the block, not Day End moving earlier; see
+    ``test_tgm31_an_outside_block_is_drawn`` for why the old vehicle stopped
+    producing an outside block at PD-M14.2.
     """
     _add_block(manager, 30, "late afternoon", 16)
     screen.load_blocks()
-    screen.on_settings_saved(DayBounds(day_end="12:00"))
+    screen.on_settings_saved(DayBounds(lunch_start="16:00"))
     assert "late afternoon" in _label_texts(screen.outside_frame)
 
     screen.selected_date = FRIDAY
@@ -3144,13 +3185,19 @@ def test_pbm55_the_settings_reach_the_outside_group_on_screen(
     Separate from the test above for the reason PB-M5.1 and PB-M5.2 are
     separate: one proves the function can be told, the other proves the screen
     tells it. A keyword argument with no caller is the failure being fixed.
+
+    PDT-M1.3 — lunch over the block, not Day End moving earlier; see
+    ``test_tgm31_an_outside_block_is_drawn`` for why the old vehicle stopped
+    producing an outside block at PD-M14.2. This test had been reading the
+    height off an *in-grid* block since that change, so it had never once
+    measured the holder it names.
     """
     settings.drag_schedule_box_height_px = 64
     _add_block(manager, 30, "late afternoon", 16)
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = THURSDAY
     panel.refresh()
-    panel.on_settings_saved(DayBounds(day_end="12:00"))
+    panel.on_settings_saved(DayBounds(lunch_start="16:00"))
 
     # Read off what the screen recorded as draggable rather than off the
     # container's children: a scrollable frame has children of its own.
@@ -3204,19 +3251,25 @@ def test_the_outside_group_scrolls_instead_of_growing_past_the_pane(
 ):
     """A full outside group stays reachable.
 
-    The group has no cap -- shortening Day End can put every block of a full
-    day into it at once -- and this batch moved it out of a scrollable
-    container into a plain frame in the items pane. Every row past the bottom
-    edge was then clipped, while the header went on counting them: the screen
-    telling the user that work it had made undraggable was still there, which
-    is worse than the silent drop P2 is about.
+    The group has no cap -- a lunch hour laid over an afternoon of planned
+    work puts every one of those blocks into it at once -- and this batch
+    moved it out of a scrollable container into a plain frame in the items
+    pane. Every row past the bottom edge was then clipped, while the header
+    went on counting them: the screen telling the user that work it had made
+    undraggable was still there, which is worse than the silent drop P2 is
+    about.
+
+    PDT-M1.5 — the vehicle was Day End moving to 10:00, which PD-M14.2 made
+    unable to orphan anything. Eight boxes of lunch fill the group just as
+    full, and eight is still what the fixed height is measured against.
     """
     for slot in range(10, 18):
         _add_block(manager, 30, f"late {slot}", slot)
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = THURSDAY
     panel.refresh()
-    panel.on_settings_saved(DayBounds(day_end="10:00"))
+    # 13:00 for four hours is boxes 10 to 17 -- the eight the blocks are on.
+    panel.on_settings_saved(DayBounds(lunch_start="13:00", lunch_minutes=240))
 
     assert len(panel._grid.outside) == 8, (
         f"{len(panel._grid.outside)} blocks outside the day, expected 8"
@@ -3237,6 +3290,10 @@ def test_the_outside_group_takes_no_room_on_a_day_without_one(
 
     The group is held back rather than gridded empty, so an ordinary day gives
     the whole pane to the item list.
+
+    PDT-M1.6 — lunch over the block, not Day End moving earlier; see
+    ``test_tgm31_an_outside_block_is_drawn`` for why the old vehicle stopped
+    producing an outside block at PD-M14.2.
     """
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = THURSDAY
@@ -3252,7 +3309,7 @@ def test_the_outside_group_takes_no_room_on_a_day_without_one(
 
     _add_block(manager, 30, "late afternoon", 16)
     panel.load_blocks()
-    panel.on_settings_saved(DayBounds(day_end="12:00"))
+    panel.on_settings_saved(DayBounds(lunch_start="16:00"))
 
     assert panel.outside_frame.grid_info() != {}, (
         "the group is not gridded on a day that has blocks outside the day"

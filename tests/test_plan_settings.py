@@ -791,6 +791,14 @@ def test_pdm54_extending_the_day_is_not_confirming_it(settings_file, tmp_path):
     is exactly the shape of change that *looks* like confirmation and is not:
     the user said where one item goes, not that 08:00, 12:00, 60 and 17:00 are
     their day.
+
+    PDT-M3 — the precondition used to be ``plan_day_start == "07:30"``, the
+    settings write PD-M14.1 withdrew. A drop now writes no settings at all, so
+    the flag cannot be reached through this path by construction, and the
+    precondition is the thing that *is* still true: the block was written. The
+    stronger guard that nothing is saved is
+    ``tests/test_plan_screen.py::test_pdm141_a_drop_on_earlier_never_calls_save``;
+    this pair is about the flag in particular.
     """
     import customtkinter as ctk
 
@@ -811,16 +819,23 @@ def test_pdm54_extending_the_day_is_not_confirming_it(settings_file, tmp_path):
 
         panel.extend_day_for(item, DAY_EXTEND_EARLIER)
 
-        assert settings.plan_day_start == "07:30", (
+        placed = manager.get_time_blocks("2026-11-05")
+        assert [b.slot_index for b in placed] == [-1], (
             "precondition for the real assertion: the extension has to have "
-            f"happened, and the day start is {settings.plan_day_start}"
+            f"happened, and the day holds {[(b.label, b.slot_index) for b in placed]}"
         )
         assert settings.plan_day_shape_unconfirmed is True, (
             "lengthening the day was taken as the user confirming its shape"
         )
-        assert json.loads(settings_file.read_text())[
-            "plan_day_shape_unconfirmed"
-        ] is True, "the file now says a guessed day shape is the user's"
+        # The file itself, not a parse of it: PD-M14.1 writes no settings, so
+        # the unreadable text this test started from has to still be there. A
+        # save of any kind would replace it with valid JSON, and that is both
+        # how the flag would reach the file and why the day's shape would stop
+        # being a guess.
+        assert settings_file.read_text() == "{ not json", (
+            "the drop wrote the settings file, so a guessed day shape was "
+            f"persisted as the user's: {settings_file.read_text()!r}"
+        )
     finally:
         root.destroy()
         manager.close()
@@ -832,6 +847,9 @@ def test_pdm54_an_already_confirmed_day_stays_confirmed(settings_file, tmp_path)
     Without this, the test above would pass for an implementation that wrote
     ``True`` unconditionally -- which would put every user who has opened Day
     Settings back behind the warning and stop their old blocks being placed.
+
+    PDT-M3 — see the test above for why the precondition is the block rather
+    than ``plan_day_end == "17:30"``.
     """
     import customtkinter as ctk
 
@@ -857,7 +875,14 @@ def test_pdm54_an_already_confirmed_day_stays_confirmed(settings_file, tmp_path)
 
         panel.extend_day_for(item, DAY_EXTEND_LATER)
 
-        assert settings.plan_day_end == "17:30", settings.plan_day_end
+        placed = manager.get_time_blocks("2026-11-05")
+        assert [b.slot_index for b in placed] == [18], (
+            "precondition for the real assertion: the extension has to have "
+            f"happened, and the day holds {[(b.label, b.slot_index) for b in placed]}"
+        )
+        assert settings.plan_day_end == "17:00", (
+            f"PD-M14.1: the drop wrote Day End, now {settings.plan_day_end}"
+        )
         assert settings.plan_day_shape_unconfirmed is False, (
             "extending the day put a confirmed day back behind the warning"
         )
