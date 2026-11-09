@@ -211,10 +211,12 @@ Flagged per rule 10 rather than swept in:
    not filed — recorded here because it is a file this batch would otherwise
    not touch.
 2. **The suite reports 2 skipped on CI for display reasons already.** After
-   this batch it will be 10 — the seven, the one that already skipped, and
-   `test_cigm15_the_precondition_does_not_skip_where_the_attribute_works`,
-   which skips wherever the capability is missing. The first draft said 9 and
-   forgot the last of those. Nothing asserts that number, and a count that
+   this batch it will be 10. The first draft said 9, and the correction to 10
+   still listed only nine items: the eight of CIG-M1.4 (one of which already
+   skipped), `test_cigm15_the_precondition_does_not_skip_where_the_attribute_works`,
+   and — the one both drafts forgot — `tests/test_audio.py`'s music-folder
+   skip, which is not display-related at all. Run 42592428542 reports exactly
+   that: 6 `-topmost`, 2 `-alpha`, `test_cigm15`, and the audio one. Nothing asserts that number, and a count that
    nobody checks is how the test figures in `CLAUDE.md` drifted. Filed as
    `CIG-A1` rather than fixed, because the right form — a test asserting *why*
    each skip happened — is a judgement about how much the suite should know

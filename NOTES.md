@@ -59,7 +59,9 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   `tests/display_capabilities.py`; two were rewritten to measure the code
   rather than the display. The claim that CI is **green** is not made here: it
   is closed by a run id in `docs/changes/2026-11-09-ci-green.md` and by nothing
-  else. Two of this item's own statements were falsified while fixing it —
+  else: **run 42592428542 at `abf0125`, green on all three Python versions,
+  2654 passed and 10 skipped on each**. It is the first green run of this
+  workflow since at least `3f705b4`. Two of this item's own statements were falsified while fixing it —
   Xvfb does report `-alpha` for a mapped window, and the `test_pbm61` exclusion
   below rested on a criterion PD-M1 had already made false:
   - **Seven** always-on-top tests (`test_t51`, `test_t52`, `test_t56`,

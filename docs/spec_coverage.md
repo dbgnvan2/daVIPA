@@ -1220,7 +1220,7 @@ nine names as run 42574953009 at `a2c3124`: the SST batch changed none of them.
 
 | | item | status |
 |---|---|---|
-| CIG-N1 | **That CI is green.** No test can assert the state of a GitHub run from inside the suite. | recorded by run id in `docs/changes/2026-11-09-ci-green.md`. Open at the time this table was written: the batch is verified locally only, and a green run is what closes it. |
+| CIG-N1 | **That CI is green.** No test can assert the state of a GitHub run from inside the suite. | **done** — run 42592428542 at `abf0125`: 2654 passed, 10 skipped on each of 3.11, 3.12 and 3.13. The first green run of this workflow since at least `3f705b4`. Recorded by run id in `docs/changes/2026-11-09-ci-green.md`, which is the only place it can be. |
 
 ### Test counts
 
