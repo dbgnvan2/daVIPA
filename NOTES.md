@@ -167,7 +167,10 @@ and are corrected in `BACKLOG.md` item 1 with the measurements.
   creation cited as the successor to a move, and two coverage rows marked
   `done` whose criterion sentences the new evidence contradicts. All fixed.
   `SBN-A1` to `SBN-A7` filed, not fixed. `CLAUDE.md`'s meta count moves from
-  243 to **247**; the app count is unchanged at 2439.
+  243 to **247**; the app count is unchanged at 2439. **CI run
+  `42646001919` on `617b1a1` is green on 3.11, 3.12 and 3.13** —
+  `2676 passed, 10 skipped` each, which is the 2686 those two figures add
+  up to.
   See `docs/changes/2026-11-09-bare-name-citations.md`.
 
 ## Recent Changes (2026-11-08)
