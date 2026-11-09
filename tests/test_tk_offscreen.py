@@ -19,6 +19,7 @@ import customtkinter as ctk
 import pytest
 
 from conftest import reapply_transparency, wrap_reapplying_transparency
+from tests.display_capabilities import require
 
 
 class _FakeWindow:
@@ -351,7 +352,14 @@ def test_alpha_still_passes_through_the_attributes_wrapper():
 
     The wrapper intercepts attributes() wholesale, so it would be easy to drop
     -alpha with it — and every window in the suite would become visible.
+
+    Reading -alpha back needs a compositor to have honoured it; CI's Xvfb has
+    none, and there is no desktop there for a visible window to appear on. The
+    precondition skips in that case rather than asserting what the display
+    does.
     """
+    require("-alpha")
+
     root = ctk.CTk()
     try:
         window = ctk.CTkToplevel(root)
@@ -479,13 +487,22 @@ def test_raw_tkinter_windows_are_hidden_and_registered_too():
 
     root = tk.Tk()
     try:
+        # These four hold on any display, so they come before the precondition
+        # rather than after it. This is the only test in the suite that drives
+        # a raw tk.Tk and tk.Toplevel through the guard -- WL-5's whole
+        # subject -- and putting require() first took that coverage away from
+        # CI altogether. Found by the cold pass, 2026-11-09.
         assert root in _LIVE_WINDOWS, "a raw tk.Tk was not registered for cleanup"
         assert root.state() == "withdrawn", "a raw tk.Tk was left on screen"
-        assert float(root.attributes("-alpha")) == 0.0
 
         child = tk.Toplevel(root)
         assert child in _LIVE_WINDOWS, "a raw tk.Toplevel was not registered"
         assert child.state() == "withdrawn"
+
+        # Only the read-back needs a display that reports -alpha on an
+        # unmapped window.
+        require("-alpha")
+        assert float(root.attributes("-alpha")) == 0.0
     finally:
         root.destroy()
 

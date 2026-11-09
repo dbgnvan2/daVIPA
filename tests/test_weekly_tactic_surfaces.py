@@ -689,6 +689,9 @@ def test_wt_m6b6_a_notice_lowers_an_always_on_top_parent(monkeypatch):
     import customtkinter as ctk
 
     from src.getmoredone.screens import week_collision_notice as notice
+    from tests.display_capabilities import require
+
+    require("-topmost")
 
     def really_topmost(window):
         window.tk.call("wm", "attributes", window._w, "-topmost", True)

@@ -1085,9 +1085,31 @@ def test_updm14_zero_width_body_is_a_noop():
         try:
             panel.apply()
             laid_out = _minsizes(body, (0, 2))
-            body.configure(width=body_width)
-            root.update_idletasks()
-            assert body.winfo_width() <= split_panel.SPLITTER_WIDTH
+
+            # CIG-M2.1 — the one reading the code takes, forced, rather than
+            # a resize of the real widget.
+            #
+            # `body.configure(width=body_width)` is what this did until
+            # 2026-11-09. It shrinks the body here and did nothing under X11,
+            # where CI reported `assert 1208 <= 8` on every run: the test
+            # failed before reaching the code it names. Two attempts to force
+            # the resize instead — a fixed-width holder, then cancelling the
+            # root's `wm geometry` — were both withdrawn after measurement,
+            # the first because the body then reported 1px whatever the holder
+            # did, the second because the root's geometry is not what the body
+            # follows (`_root()` sets 1400x900, and 1208 is the body's own
+            # request). The X11 cause is still undiagnosed, and a comment
+            # asserting a cause nobody measured is the defect this batch is
+            # about.
+            #
+            # So the input is forced where the code reads it. The arithmetic,
+            # the widgets and the grid minsizes it writes are all still real;
+            # what is stubbed is the one number the criterion is about, which
+            # is "before the first layout pass, when winfo_width() is 1".
+            body.winfo_width = lambda: body_width
+            assert body.winfo_width() <= split_panel.SPLITTER_WIDTH, (
+                "the stub did not take, so this test is not measuring a body "
+                "with nothing to divide")
 
             panel.ratio = 0.75
             panel.apply()

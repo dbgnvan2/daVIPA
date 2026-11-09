@@ -29,6 +29,8 @@ import customtkinter as ctk
 import pytest
 import tkinter as tk
 
+from tests.display_capabilities import require
+
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem
 from src.getmoredone.screens import timer_window as tw
@@ -212,6 +214,7 @@ def _topmost_now(window) -> bool:
 
 def test_t51_a_modal_drops_the_timers_always_on_top(root, manager, hushed,):
     """T5.1 — while the note dialog is up, the timer is not on top of it."""
+    require("-topmost")
     item = _item(manager)
     timer = _stopped_timer(root, manager, item)
     _really_topmost(timer)
@@ -237,6 +240,8 @@ def test_t51_a_modal_drops_the_timers_always_on_top(root, manager, hushed,):
 
 def test_t52_the_timer_is_topmost_again_afterwards(root, manager, hushed):
     """T5.2 — the flag is borrowed for the modal, not thrown away."""
+    require("-topmost")
+
     from src.getmoredone.screens.timer_window_dialogs import suspend_parent_topmost
 
     item = _item(manager)
@@ -428,6 +433,8 @@ def test_t56_a_second_modal_does_not_hand_the_flag_back_early():
     restore. Then A closes and raises the parent back over B, which is still
     holding grab_set() — the reported bug, rebuilt out of its own fix.
     """
+    require("-topmost")
+
     from src.getmoredone.screens.timer_window_dialogs import (
         _resume_topmost, _suspend_topmost)
 
@@ -466,6 +473,8 @@ def test_t57_an_unbalanced_resume_does_not_break_the_next_modal():
     raise the flag. It could not fail: nothing had been saved, so the write
     was skipped for a reason unrelated to the guard.
     """
+    require("-topmost")
+
     from src.getmoredone.screens.timer_window_dialogs import (
         _resume_topmost, _suspend_topmost)
 

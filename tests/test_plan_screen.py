@@ -3645,8 +3645,8 @@ def test_pbm61_every_line_of_a_row_is_drawn_inside_it(root, manager, mapped_wind
 
     It fails on that combination, not on the weight alone: with the floor in
     place a one-box row is 67px and nothing is collapsed even with the weight
-    back on row 0. ``test_pbm61_a_tall_row_keeps_its_two_lines_together`` is
-    what pins the weight by itself.
+    back on row 0. ``test_pbm61_a_tall_row_keeps_its_slack_below_its_text``
+    is what pins the weight by itself.
     """
     item = _scored_item(manager, "Draft the proposal")
 
@@ -3681,21 +3681,30 @@ def test_pbm61_every_line_of_a_row_is_drawn_inside_it(root, manager, mapped_wind
         row.destroy()
 
 
-def test_pbm61_a_tall_row_keeps_its_two_lines_together(
+def test_pbm61_a_tall_row_keeps_its_slack_below_its_text(
     root, manager, mapped_windows
 ):
-    """PB-M6.1 — the slack goes under the text, not between the two lines.
+    """PB-M6.1 — the slack goes under the text, not around it.
 
-    A 90-minute item at the default is a 274px row holding two lines of text.
+    A 90-minute item at the default is a 274px row holding one line of text.
     With the weight on the title's row the title was centred in it: drawn at
-    y=100 with its own detail line 124px below it and the depth bars pinned to
-    the top, so the row stopped reading as one item. Asserted as a distance,
-    because "the title is above the detail line" held in the broken version too.
+    y=100 with the depth bars pinned to the top, so the row stopped reading as
+    one item.
 
-    The second line used to be the depth word, and is the blocked marker since
-    PD-M1.5 moved the depth onto the bars alone. The item is built blocked for
-    that reason: this test needs two lines of text to measure between, and the
-    marker is the only thing that puts a second line on the row now.
+    Rewritten 2026-11-09 (CIG-M3.1). It asserted a distance between the title
+    and a second label reading "already blocked", and there is no such label:
+    PD-M9 replaced those words with a glyph in a column of row 0, recorded at
+    `src/getmoredone/screens/plan_blocks.py:404-409` as costing the row its
+    second line on purpose. So the test looked for a label that the design had
+    deliberately removed and reported "the row lost a label" on every CI run,
+    while being skipped here as one of the mapped-window tests — case (b) of
+    this repo's test rules, the behaviour changed intentionally, with (c) over
+    it: the lookup matched prose rather than a behaviour.
+
+    What survives of the criterion is the half that can still be measured, and
+    the half the defect was about: the text at the top, the slack beneath it.
+    `docs/spec_coverage.md` states PB-M6.1 as "its two lines of text at the top
+    and the slack at the bottom", and the row now has one line.
     """
     item = _scored_item(manager, "Draft the proposal", depth="Medium")
     row = build_item_row(
@@ -3708,17 +3717,31 @@ def test_pbm61_a_tall_row_keeps_its_two_lines_together(
     root.update()
 
     title = _find_label(row, "Draft the proposal")
-    detail = _find_label(row, "already blocked")
-    assert title is not None and detail is not None, "the row lost a label"
+    assert title is not None, "the row lost its title"
 
-    gap = detail.winfo_y() - (title.winfo_y() + title.winfo_height())
-    assert 0 <= gap <= 8, (
-        f"{gap}px between the title and its own detail line in a "
-        f"{row.winfo_height()}px row -- the slack is between them, not below"
+    # The marker PD-M9 put in row 0's own column, beside the title rather than
+    # below it. Asserted so that a return to a second line of text is a red
+    # test and not a silently different row.
+    marker = _find_label(row, PD_BLOCKED_TEXT)
+    assert marker is not None, "the blocked marker is gone from the row"
+    assert abs(marker.winfo_y() - title.winfo_y()) <= 8, (
+        f"the marker is at y={marker.winfo_y()} and the title at "
+        f"y={title.winfo_y()}: they are no longer on one line"
     )
+
     assert title.winfo_y() < row.winfo_height() // 4, (
         f"the title sits at y={title.winfo_y()} in a {row.winfo_height()}px "
         "row, not at the top of it"
+    )
+    # The *bottom* of the text, not a floor on what is left below it. The
+    # cold pass measured the floor this replaces: in the documented broken
+    # state the title sits at y=100 in a 274px row, which leaves 154px below
+    # it and passes a floor of 137. An assertion that the broken layout
+    # satisfies is not an assertion.
+    text_bottom = title.winfo_y() + title.winfo_height()
+    assert text_bottom <= row.winfo_height() // 4, (
+        f"the text ends at y={text_bottom} in a {row.winfo_height()}px row, "
+        "so it is not the top of the row with the slack below it"
     )
 
 

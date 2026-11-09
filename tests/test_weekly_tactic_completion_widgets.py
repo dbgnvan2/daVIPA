@@ -43,6 +43,7 @@ import customtkinter as ctk  # noqa: E402
 import pytest  # noqa: E402
 
 from src.getmoredone.models import ActionItem, ProjectBoard, Status  # noqa: E402
+from tests.display_capabilities import require  # noqa: E402
 from src.getmoredone.screens.week_collision_notice import (  # noqa: E402
     confirm_weekly_tactic_completion,
 )
@@ -394,7 +395,10 @@ def test_wtpw_a_tactic_whose_children_are_all_done_is_not_questioned(
 
 
 # The strings Tk returns for a -topmost that is on: an int on some platforms,
-# a bool-ish word on others.
+# a bool-ish word on others. Kept for the restore assertion below; the
+# precondition that used to be written out here is now
+# `tests/display_capabilities.require`, shared with the six other tests that
+# read a display attribute back (CIG-M1.4).
 _TOPMOST_ON = ("1", "True", "true")
 
 
@@ -416,16 +420,12 @@ def test_wtpw_the_prompt_survives_a_real_always_on_top_parent(
     precondition below skips in that case; the assertions keep their teeth on a
     desktop, where this is the one test that drives a real parent.
     """
+    require("-topmost")
+
     vps, tactic, _children = world
     parent = ctk.CTkToplevel(root)
     parent.withdraw()
     parent.tk.call("wm", "attributes", parent._w, "-topmost", True)
-    if str(parent.tk.call(
-            "wm", "attributes", parent._w, "-topmost")) not in _TOPMOST_ON:
-        parent.destroy()
-        pytest.skip(
-            "this display does not honour -topmost (no window manager), so "
-            "the restore this test measures cannot be observed on it")
     try:
         answer = confirm_weekly_tactic_completion(
             vps.db_manager, tactic.id, parent)
