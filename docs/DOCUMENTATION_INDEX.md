@@ -959,22 +959,14 @@ is not.
 The user-facing getting-started guide, 791 lines. Sits beside
 `docs/USER_GUIDE.md`, which is the same genre and was already here.
 
-### `docs/daVIPA_rebrand_prompt.md`
+### The four prompt briefs — filed 2026-11-09
 
-The rebrand task brief, and the `Spec:` reference of
-`src/getmoredone/branding.py` and `tests/test_branding.py`. Both docstrings
-were updated to this path in the same commit as the move.
-
-### `docs/prompt-test-suite-remediation.md`
-
-The brief behind the 2026-08-20 test-suite remediation batch. Cited by
-`BACKLOG.md` and by two handoff notes under `docs/unused-docs/changes/`, all three updated
-with the move.
-
-### `docs/prompt-update-claude-md-and-learnings.md`
-
-The brief for folding the 2026-08-20 audit into `CLAUDE.md` and
-`learnings.md`. Nothing references it.
+`daVIPA_rebrand_prompt.md`, `demo-install-prompt.md`,
+`prompt-test-suite-remediation.md` and `prompt-update-claude-md-and-learnings.md`
+are task briefs for batches that are finished. They moved to
+`docs/unused-docs/` on 2026-11-09, where they are kept for history and no test
+reads them. The `Spec:` docstrings in `src/getmoredone/branding.py` and
+`tests/test_branding.py` were repointed at the new path in the same change.
 
 ## Maintenance
 
