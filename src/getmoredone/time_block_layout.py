@@ -58,8 +58,11 @@ DEPTH_BARS = {"deep": 3, "medium": 2, "shallow": 1}
 DEFAULT_DEPTH_BARS = 1
 MAX_DEPTH_BARS = 3
 
-# priority_score is the *product* of importance x urgency x size x value
-# (20 x 20 x 16 x 16), so it runs 4 .. 102400 -- not 1 .. 10. Bands are
+# priority_score is the *product* of importance x urgency x size x value,
+# so it runs 4 .. 9999 -- not 1 .. 10. PRI-M2 capped it at
+# PriorityFactors.MAX_SCORE; before that the product ran to 102400
+# (20 x 20 x 16 x 16), and rows written then still hold the raw number, so
+# these thresholds have to keep classifying scores above the cap. Bands are
 # thresholds on that product, lowest bound first match wins from the top.
 # The colours for these band names live in theme.py; only the arithmetic is
 # here, so a theme change cannot alter which band an item is in.
