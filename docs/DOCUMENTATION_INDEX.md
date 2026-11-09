@@ -392,6 +392,34 @@ entry rather than as an entry of its own, as every handoff note is:
   eight known callers, so it cannot detect a *new* test written the way these
   seven were
 
+### docs/implementation_plan_2026-11-09_bare_name_citations.md
+
+Implementation plan for bringing the bare `::name` citation form into the
+traceability guard (SBN-M1 - SBN-M2), closing `BACKLOG.md`'s `SAG-A17`
+(medium). **Approved under the standing instruction 2026-11-09 and built the
+same day: 6 of 6 criteria `done`, one item not code-testable (SBN-N1, that a
+resolving bare name is the right test for its row)** - per-criterion status in
+`docs/spec_coverage.md`. No file under `src/` or `tools/` is touched. Handoff
+note: `docs/changes/2026-11-09-bare-name-citations.md`, which is listed here
+only inside this entry rather than as an entry of its own, as every handoff
+note is:
+
+- A citation written as a bare continuation was matched by nothing, so about a
+  third of this repo's test citations were unchecked: 68 dead occurrences, 59
+  distinct names, in 14 documents, 52 of them reading as live evidence. All 68
+  are repaired - a renamed test re-cited by its real name, a retired one named
+  with neither the path nor the `::`.
+- `SAG-A17`'s own recommended fix was measured and **rejected**: anchoring a
+  bare name to the nearest preceding path citation puts the anchor on the wrong
+  file 356 times against 52 genuinely dead names.
+- `_FULL`, a masking regex, was deleted after a mutation came back green proved
+  it changed no outcome anywhere in the repo.
+- Repairing the documents exposed ten criteria whose tests were never written,
+  and PD-M14.4 and PD-M14.7 have no test under any name: `SBN-A3`.
+- Nine mutations, two green and both recorded. One cold pass, in the family the
+  plan named as its own risk - no high and eight mediums, all fixed, two of
+  them in the guard's own prose. `SBN-A1` to `SBN-A7` filed, not fixed.
+
 ### docs/implementation_plan_2026-11-09_status_allow_list.md
 
 Implementation plan for inverting the status-claim guard into an allow-list and
@@ -863,7 +891,7 @@ Documentation is updated:
 - When user issues are resolved
 - During major releases
 
-**Current Status**: last index entry added 2026-11-09 (the SAG status-allow-list plan). This index is not enforced by any test (PLC-A5) and does not list every
+**Current Status**: last index entry added 2026-11-09 (the SBN bare-name-citations plan). This index is not enforced by any test (PLC-A5) and does not list every
 file under `docs/`: of the 76 Markdown files directly under `docs/`, 43 are not
 named in it anywhere and 48 have no entry of their own. `docs/` holds 222 files
 in all, so the gap over its subdirectories is wider still and uncounted. `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`

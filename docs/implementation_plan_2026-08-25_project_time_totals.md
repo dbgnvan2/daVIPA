@@ -61,7 +61,7 @@ because the repo has none.
 | PT1.4 | **The new columns do not corrupt the existing counts** — an item with several sessions must not inflate `open_item_count` / `completed_item_count` / `linked_item_count` | `::test_pt14_the_existing_counts_survive_multiple_sessions_per_item` |
 | PT1.5 | Time on a completed item and on a follow-up still counts toward the project | `::test_pt15_completed_items_and_follow_ups_still_count` |
 | PT2.1 | `format_minutes` renders 0, minutes-only, hours-only and mixed | `::test_pt21_minutes_render_the_way_a_person_reads_them` |
-| PT3.1 | The detail pane shows both values | `::test_pt31_the_project_record_shows_the_session_count_and_total` |
+| PT3.1 | The detail pane shows both values | `tests/test_project_time_totals.py::test_pt31_the_time_line_renders_the_boards_own_numbers` (named `test_pt31_the_project_record_shows_the_session_count_and_total` here until 2026-11-09) |
 
 ## Order
 

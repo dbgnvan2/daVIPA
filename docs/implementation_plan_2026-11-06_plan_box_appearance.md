@@ -72,7 +72,7 @@ two call sites.
   `tests/test_plan_screen.py::test_a_task_chips_title_is_inside_the_box_it_is_drawn_in`
   *(already written, currently failing — this is the sliver, measured)*
 - PB-M2.2 An item row in the left pane is no taller than its two lines of text.
-  Test *as planned*: `::test_an_item_row_is_as_tall_as_its_text_not_the_stripe_default`
+  Test *as planned*: `test_an_item_row_is_as_tall_as_its_text_not_the_stripe_default`
   — that test no longer exists under that name; see below.
   **Superseded by PB-M6.1.** The criterion was right for the 200px defect it
   was written against and wrong afterwards: a row is now a multiple of the box
@@ -233,11 +233,11 @@ Starting" row.
 - PB-M6.1 The row equals the span of the real boxes holding the task, measured
   on screen. Test: `::test_pbm61_a_row_is_as_tall_as_the_boxes_beside_it`
 - PB-M6.1 A row is never shorter than its two lines, and above the floor it is
-  exactly the day's height. Test: `::test_pbm61_a_row_too_short_for_its_text_keeps_its_text`
+  exactly the day's height. Test: `tests/test_plan_screen.py::test_pbm61_a_row_is_the_days_own_height_at_every_usable_box_height` (written here as `test_pbm61_a_row_too_short_for_its_text_keeps_its_text`)
 - PB-M6.1 Every child of the row is drawn inside it, at the floor and above it.
   Test: `::test_pbm61_every_line_of_a_row_is_drawn_inside_it`
 - PB-M6.1 A tall row keeps its two lines together at the top.
-  Test: `::test_pbm61_a_tall_row_keeps_its_two_lines_together`
+  Test: `tests/test_plan_screen.py::test_pbm61_a_tall_row_keeps_its_slack_below_its_text` (written here as `test_pbm61_a_tall_row_keeps_its_two_lines_together`)
 - PB-M6.1 The screen passes the setting it draws the day with, read off the
   rendered row. Test: `::test_pbm61_the_item_row_height_comes_from_the_setting`
 - PB-M6.1 The row lays out at the height it asks for on a real window.
@@ -245,7 +245,7 @@ Starting" row.
 - PB-M6.2 No label on the row carries the score or a `P `-prefixed form of it.
   Test: `::test_pbm62_an_item_row_does_not_print_its_priority_score`
 - PB-M6.3 The length label is in the bars' column and on a later row.
-  Test: `::test_pbm63_the_work_block_length_is_under_the_depth_bars`
+  Test: `test_pbm63_the_work_block_length_is_under_the_depth_bars`
   **Superseded by PD-M1.2**; the test is replaced by
   `::test_pdm12_the_length_sits_beside_the_depth_bars`, which asserts the same
   row and the next column along.

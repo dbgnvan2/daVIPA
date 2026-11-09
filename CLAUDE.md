@@ -15,12 +15,14 @@ python run.py
 # Tests
 pytest                                          # All tests
 pytest -m "not meta"                            # App behaviour only (2439 tests)
-pytest -m meta                                  # Repo/infra assertions only (243 tests)
-# Both counts measured 2026-11-09 (after the SAG batch, whose own nine tests
-# are all in the meta figure; the app figure moved with `c190b9f`) with
+pytest -m meta                                  # Repo/infra assertions only (247 tests)
+# Both counts measured 2026-11-09 (after the SBN batch, whose own four tests
+# are all in the meta figure; the app figure has not moved since the SAG
+# batch, where it moved with `c190b9f`) with
 # `-m <marker> --collect-only -q`, whose last line prints collected/deselected
 # — re-measure rather than trusting them. They had been 1691 and 212, stale by
-# 741 and 13, and 2432/225 earlier the same day. No test asserts either number,
+# 741 and 13, and 2432/225 earlier the same day; the meta figure was 243 until
+# the SBN batch. No test asserts either number,
 # which is why they drift; one that did would go red on every batch.
 pytest -v                                       # Verbose
 pytest tests/test_vps_integration.py -v        # Single file

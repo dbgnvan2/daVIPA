@@ -140,6 +140,36 @@ and are corrected in `BACKLOG.md` item 1 with the measurements.
   records until the second cold pass measured it.
   See `docs/changes/2026-11-09-status-allow-list.md`.
 
+- **The bare `::name` citation form is checked** (SBN batch, 2026-11-09).
+  `SAG-A17` is closed. The traceability guard read a citation written as a path
+  and not one written as a bare continuation, so about a third of this repo's
+  test citations were unchecked: **68 dead occurrences, 59 distinct names, in
+  14 documents**, 52 of them reading as live evidence on rows that cite nothing
+  that exists. All 68 are repaired — a renamed test re-cited by its real name,
+  a retired one named with neither the path nor the `::`, so it reads as
+  history. `SAG-A17`'s own recommended fix was measured and rejected: anchoring
+  a bare name to the nearest preceding path citation puts the anchor on the
+  wrong file 356 times against 52 genuinely dead names, so the rule is the
+  weaker one — the name must be defined somewhere under `tests/` — with the
+  residue filed as `SBN-A1`. A masking regex, `_FULL`, was deleted after a
+  mutation came back green showed it changed no outcome anywhere in the repo;
+  the lookbehind it duplicated is what holds the behaviour, and dropping that
+  fails three tests. Repairing the documents is what the batch actually cost:
+  ten criteria in the day-hours plan name tests that were never written, and
+  **PD-M14.4 and PD-M14.7 have no test under any name** — there is no
+  production caller of `shift_all_slots` and no repair pass in `src/` at all
+  (`SBN-A3`). One cold pass, in the family the plan named as its own risk —
+  whether a repaired row says something true — found **no high and eight
+  mediums**, so the sweep closed by the budget's own rule. Two were in the
+  guard's own prose, including a docstring that would have sent a future author
+  into a red guard; six were repairs whose sentences were false, among them a
+  rename recorded against a test name `git log -S` finds in no commit, a
+  creation cited as the successor to a move, and two coverage rows marked
+  `done` whose criterion sentences the new evidence contradicts. All fixed.
+  `SBN-A1` to `SBN-A7` filed, not fixed. `CLAUDE.md`'s meta count moves from
+  243 to **247**; the app count is unchanged at 2439.
+  See `docs/changes/2026-11-09-bare-name-citations.md`.
+
 ## Recent Changes (2026-11-08)
 
 ### What the walk asked for - UPD-F1 to UPD-F4 all built and on `main`

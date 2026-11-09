@@ -255,7 +255,7 @@ user choice, not a layout rule.
 | TG-M2.2 | **Adversarial (P7)** — a 2-slot block whose second slot is lunch is refused, not drawn across it | `::test_tgm22_a_span_cannot_cross_lunch` |
 | TG-M2.3 | A refusal names its reason; every reason is a distinct named value | `::test_tgm23_each_refusal_has_its_own_reason` |
 | TG-M2.4 | **Real scale (P9)** — a 9-hour day fully occupied: the 19th placement is refused, the 18 placed are all returned | `::test_tgm24_a_full_day_refuses_the_next_one` |
-| TG-M3.1 | A block whose slot no longer exists is returned flagged, never dropped | `::test_tgm31_blocks_outside_the_grid_are_surfaced` |
+| TG-M3.1 | A block whose slot no longer exists is returned flagged, never dropped | `tests/test_time_grid.py::test_tgm31_a_block_with_no_box_is_surfaced` and `tests/test_plan_screen.py::test_tgm31_an_outside_block_is_drawn` (this row named `test_tgm31_blocks_outside_the_grid_are_surfaced` until 2026-11-09) |
 | TG-M3.1a | A block sitting in a box lunch has since moved onto is surfaced too — a lunch box draws no tasks, so one left there would vanish | `::test_a_block_sitting_in_a_lunch_box_is_surfaced_not_hidden` |
 | TG-M3.1b | The "outside the day" group is **drawn**, and a settings change that creates one says so | `tests/test_plan_screen.py::test_tgm31_an_outside_block_is_drawn` |
 | TG-M4.1 | Migration adds `slot_index`, is idempotent on a second run | `tests/test_time_block_schema.py::test_tgm41_migration_adds_slot_index_idempotently` |

@@ -5187,7 +5187,7 @@ Filed 2026-11-09 by the fourth cold pass over the SAG batch.
 **Notes:**
 ```
 
-### SAG-A17 — the bare `::name` citation form is outside the traceability guard, in four document families now (medium)
+### ~~SAG-A17~~ — the bare `::name` citation form is outside the traceability guard, in four document families now (medium) — **CLOSED 2026-11-09**
 
 `tests/test_traceability_refs.py`'s `_REF` requires the `tests/…py` prefix, so
 a continuation written as `` `::test_name` `` is never checked. That was
@@ -5217,6 +5217,19 @@ which is what a human reader does. The second is the real convention and the
 harder change. Either way the rows carrying genuinely retired names have to be
 rewritten first, or the guard goes red on honest history.
 
+**Closed by the SBN batch, 2026-11-09**
+(`docs/implementation_plan_2026-11-09_bare_name_citations.md`,
+`docs/changes/2026-11-09-bare-name-citations.md`). The arm resolves a bare name
+against every name defined anywhere under `tests/`; the recommendation above —
+read the file from the nearest preceding path citation — was measured and
+rejected, because carried across lines and reset at headings it puts the anchor
+on the wrong file 356 times against 52 citations that are actually dead. The
+figures in this item (69 dead, 52 unmarked) were taken before that resolver
+existed; re-measured over the same documents with it, the count is **68
+occurrences, 59 distinct names, in 14 documents**, 16 of them already carrying
+a retirement marker. All 68 are repaired. What is left is `SBN-A1` to
+`SBN-A7` below.
+
 ### SAG-A18 — `tests/` itself is outside the traceability scan, undocumented (low)
 
 `SCANNED` covers `src`, `tools`, `conftest.py` and four document globs, but not
@@ -5230,3 +5243,94 @@ scanned and a test suite that is not. Either document the exclusion where
 `SCANNED` is defined, or add the arm with a named exemption for the fixtures.
 Measured by the sixth cold pass, which also confirmed all 118 resolve today
 except the deliberate fixtures.
+
+### SBN-A1 — a bare `::name` citation resolves against the whole suite, not against its own file (medium)
+
+`tests/test_traceability_refs.py`'s bare arm (`SBN-M1`) accepts a name defined
+anywhere under `tests/`. The path arm resolves inside the file the citation
+names, which is the stronger check. So a row citing `` `::test_x` `` under a
+table that named `tests/test_a.py` passes even when `test_x` lives in
+`tests/test_z.py` and has nothing to do with the criterion — and the batch's
+own plan demonstrated it: `SBN-M2.1` cited the path arm's test while meaning
+the bare arm's, and the guard was green on it.
+
+Not fixed because the anchoring rule was measured and rejected: see the closed
+`SAG-A17` above and §1.2 of
+`docs/implementation_plan_2026-11-09_bare_name_citations.md`. The honest
+options are a per-document convention (declare the file a table's bare names
+belong to, in the document) or leaving it as the weaker check it is. The first
+is a documentation change across 34 documents, not a guard change.
+
+### SBN-A2 — bare `::name` citations that name a `src/` symbol are read by nothing (low)
+
+68 bare names in the scanned families are not test names — `::update_action_item`,
+`::export_day`, `::_build_service` — almost all of them continuing a
+`src/…py::func` citation in a neighbouring table cell, and 51 of them resolve
+against nothing under `tests/`, which is why they are excluded by `_TESTISH`
+rather than merely unresolved. Checking them means resolving against `src/`,
+which `tests/test_doc_status_claims.py::test_sstm5_every_implementation_reference_resolves`
+already does for the Implementation column of the coverage family only. The arm
+to add is that resolver over the bare form, in all four families.
+
+### SBN-A3 — PD-M14.4 and PD-M14.7 have no automated test, under any name (medium)
+
+Found by repairing `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`:
+ten of its criteria name tests that were never written. Measured per criterion
+after the cold pass corrected an over-broad first claim:
+
+- **PD-M14.5's first bullet** and **PD-M14.3's break/buffer clause** *are*
+  covered, by `tests/test_plan_screen.py::test_pdm34_autoload_does_not_run_past_the_day_end`,
+  `::test_pdm36_a_full_day_writes_nothing` and
+  `::test_pdm8_clear_day_leaves_breaks_and_buffers`.
+- **PD-M14.3's span clause** (the day still starts at −1) is not.
+- **PD-M14.4** and **PD-M14.7** are not covered at all. There is no production
+  caller of `shift_all_slots`, and no repair pass exists in `src/`: `grep -rn
+  "def .*repair" src/` finds only VPS and weekly-tactic ones. So the question
+  is not only "write the test" but whether the criteria describe code that was
+  ever built.
+
+A product judgement, which is why it is filed rather than answered.
+
+### SBN-A4 — the guard asserts that bare citations keep existing, so improving a family turns it red (low)
+
+`::test_this_guard_can_actually_fire` asserts membership per family: at least
+one bare `::name` citation must be found in the coverage family, the plans, the
+dated specs and the handoff notes. That is deliberate — an exact count goes red
+on every batch and a floor is forbidden here — but it means a future batch that
+converts one family's bare citations to the path form, which is the stronger
+form, fails the guard for having improved the documents. The fix is to assert
+the arm's *mechanism* against a fixture (a document the test writes) rather
+than against the repo's current prose, the same move the sixth SAG cold pass
+made for the resolver probe.
+
+### SBN-A5 — T5.3's raising-handler case is not covered (low)
+
+`docs/implementation_plan_2026-08-25_timer_session_endings.md`'s T5.3 is
+"topmost restored even when the modal's handler **raises**". The test that
+carries `T5.3` asserts the other half (a parent that was not topmost is left
+alone), and no test in `tests/test_timer_session_endings.py` raises inside a
+modal's handler and then checks the restore — `grep -n raise` over that file
+finds none. The plan said `::test_t57_an_unbalanced_resume_does_not_break_the_next_modal`
+covered it; that test drives a stray resume, which is the depth counter. The
+document now says the case is uncovered. The test is a few lines of work: open
+a modal whose handler raises, assert topmost comes back and the depth returns
+to zero.
+
+### SBN-A6 — the plan's §1.2 measurement is not reproducible from the repo (low)
+
+`docs/implementation_plan_2026-11-09_bare_name_citations.md`'s anchoring table
+(206/257/390, 754/356/283, 814/556/23) is the measurement that rejected
+`SAG-A17`'s recommended fix, and it was taken with a scratch script that is not
+committed. The rule it chose instead is asserted by tests; the argument for
+rejecting the alternative is not reproducible. Either commit the script under
+`tools/agents/` or restate the table as a test over fixtures.
+
+### SBN-A7 — two alternatives in `_BARE`'s lookbehind are unexercised (low)
+
+`_BARE = re.compile(r"(?<![\w.)])::(\w+)")`. Measured over the scanned
+documents: of 1930 `::name` tokens, the character before is a backtick (1098),
+the `y` of `.py` or another name character (794), an ellipsis (37) or a line
+start — `)` never occurs and the one `.` case is excluded by `_TESTISH` anyway.
+The `_FULL` mask was deleted in the same batch on exactly this ground, that it
+changed no outcome; these two alternatives were kept. Either drop them or add
+the fixture that exercises them.

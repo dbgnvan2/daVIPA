@@ -389,8 +389,8 @@ Read this note with two of its claims amended:
   task's one line, and the item row now does the same. PB-M6.3 mirrored a box's
   facts without mirroring its layout, and on screen the left pane still read as
   a different kind of thing from the right -- which is what the user asked
-  PD-M1 to fix. `::test_pbm63_the_work_block_length_is_under_the_depth_bars` is
-  replaced by `::test_pdm12_the_length_sits_beside_the_depth_bars`.
+  PD-M1 to fix. `test_pbm63_the_work_block_length_is_under_the_depth_bars` is
+  replaced by `tests/test_plan_screen.py::test_pdm12_the_length_sits_beside_the_depth_bars`.
 - **The floor is 66, and the exact match with the day starts at 62.** 67 and 63
   were right for the row described here, where the `{minutes}m` label's 6px
   bottom pad was the larger of the second row's two. PD-M1 moved that label up

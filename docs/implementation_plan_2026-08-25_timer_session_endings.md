@@ -135,16 +135,16 @@ not holding — the user watched Next Steps open behind the timer today.
 |---|---|---|
 | T5.1 | A modal opened over the timer leaves the timer **not** topmost while it is up | `tests/test_timer_session_endings.py::test_t51_a_modal_drops_the_timers_always_on_top` |
 | T5.2 | The timer's topmost is restored once the modal closes | `::test_t52_the_timer_is_topmost_again_afterwards` |
-| T5.3 | Restored even when the modal's handler raises | `::test_t53_topmost_is_restored_when_the_ending_fails` |
-| T5.4 | Every timer modal goes through the same helper — no sibling left unhardened (P5) | `::test_t54_every_timer_modal_suspends_the_parents_topmost` |
+| T5.3 | Restored even when the modal's handler raises | `test_t53_topmost_is_restored_when_the_ending_fails` — no test of that name exists. The `T5.3` test that does, `tests/test_timer_session_endings.py::test_t53_a_parent_that_was_not_topmost_is_left_alone`, asserts the other half of the criterion; the raising-handler case is **not covered**: no test in this file raises inside a modal's handler and then asserts the restore (`grep -n raise tests/test_timer_session_endings.py` finds none). `::test_t57_an_unbalanced_resume_does_not_break_the_next_modal` was named here as the cover and is not — it drives a stray resume, which is the depth counter, not a raising handler. Filed as `SBN-A5` |
+| T5.4 | Every timer modal goes through the same helper — no sibling left unhardened (P5) | `tests/test_timer_session_endings.py::test_t54_every_grabbing_dialog_suspends_the_parents_topmost` (named `test_t54_every_timer_modal_suspends_the_parents_topmost` here until 2026-11-09) |
 | T1.1 | `save_and_close_action` leaves `winfo_exists()` false (already green; kept as the regression floor) | `::test_t11_save_related_closes_the_window_after_a_real_modal` |
 | T1.2 | A `destroy()` that fails is reported, not swallowed as "safe to ignore" | `::test_t12_a_failed_destroy_is_reported_not_swallowed` |
 | T2.1 | The follow-up carries the original's start and due dates unchanged — no `+1` shift | `::test_t21_the_followup_keeps_the_items_dates` |
 | T2.2 | An original dated in the past yields a follow-up with those same past dates | `::test_t22_a_past_dated_item_yields_a_past_dated_followup` |
 | T2.3 | The follow-up's description is the prompt, not a copy of the original's notes | `::test_t23_the_followup_description_is_the_prompt` |
-| T3.1 | No `NextStepsDialog` is constructed anywhere in the ending | `::test_t31_the_next_steps_dialog_is_gone` |
+| T3.1 | No `NextStepsDialog` is constructed anywhere in the ending | `tests/test_timer_session_endings.py::test_b41_the_dead_dialog_is_gone`, whose docstring records that it replaces `test_t31_the_next_steps_dialog_is_gone`: `NextStepsDialog` had no caller, so the class itself was deleted |
 | T3.2 | The ending opens the **follow-up's** editor, carrying `vps_manager` | `::test_t32_the_followup_editor_opens_with_a_vps_manager` |
-| T3.3 | The work log is written, the original completed, the child created | `::test_t33_continue_writes_log_completes_original_creates_child` |
+| T3.3 | The work log is written, the original completed, the child created | `tests/test_timer_session_endings.py::test_t33_continue_records_the_session_and_leaves_the_item_open` — and the criterion's middle clause no longer holds: that test records that "complete" in this button's name is the timer session, not the Action Item, which is left open |
 | T4.1 | A session ending that writes no work log logs why | `::test_t41_a_silent_ending_says_so` |
 | T6.1 | The button reads "Complete & Create Follow Up" | `::test_t61_the_button_says_what_it_does` |
 

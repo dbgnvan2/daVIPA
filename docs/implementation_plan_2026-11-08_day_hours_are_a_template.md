@@ -100,13 +100,13 @@ assume the grid starts at index 0 — lines 613, 667, 726 and 809 — and each
 widens to the drawn span's own first index. `times_for_slot` already computes
 `day_start + index * 30`, which is correct for a negative index with no change.
 
-- **Automated:** `::test_pdm142_a_negative_slot_keeps_its_clock_time` — a block
+- **Automated:** `tests/test_time_grid.py::test_pdm142_a_block_before_the_first_box_is_drawn_too` (planned here as `test_pdm142_a_negative_slot_keeps_its_clock_time`) — a block
   at slot −2 with a template start of 09:00 reads 08:00, round-tripped through
   the database.
-- **Automated:** `::test_pdm142_the_drawn_day_covers_what_is_planned_on_it` —
+- **Automated:** `tests/test_time_block_layout.py::test_pdm142_a_block_before_the_hours_widens_the_span` and `::test_pdm142_the_span_says_what_it_holds_including_a_block_s_length` (planned here as `test_pdm142_the_drawn_day_covers_what_is_planned_on_it`) —
   blocks at −2 and at the last box + 1; assert the grid's first and last slot,
   and that the lunch boxes are still marked at their clock times.
-- **Automated (adversarial, P7):** `::test_pdm142_a_block_outside_the_day_is_not_silently_dropped`
+- **Automated (adversarial, P7):** `tests/test_time_grid.py::test_pdm142_a_block_whose_index_leaves_the_date_is_still_surfaced` and `::test_pdm142_a_block_past_the_last_box_is_drawn_rather_than_surfaced` (planned here as `test_pdm142_a_block_outside_the_day_is_not_silently_dropped`)
   — the "outside the day" group stays for blocks with **no** slot index, and a
   negative index is *not* outside the day. One looks like the other and must not
   be treated as one.
@@ -121,13 +121,39 @@ break or buffer you placed outside the hours keeps the day stretched that far �
 and Clear Day's status line says so, because a day that did not fully collapse
 needs to account for why.
 
-- **Automated:** `::test_pdm143_clearing_the_day_restores_the_hours` — extend
+> **2026-11-09, `SBN-M2`:** ten of the test names below are marked
+> **(not written)**. No test of any of those names exists —
+> `grep -rho "^def test_pdm14[0-9a-z_]*" tests/*.py` returns only PD-M14.1,
+> PD-M14.2 and PD-M14.6 families, and nothing under `tests/` names PD-M14.3,
+> PD-M14.4, PD-M14.5 or PD-M14.7 as its criterion. The names are written
+> without a `::` because they are not pointers.
+>
+> That is **not** the same as the criteria being unverified, and the first
+> version of this note said it was — corrected by the cold pass over the batch
+> that added the bare-name arm, which found the evidence by looking past the
+> `test_pdm14` prefix:
+>
+> - **PD-M14.5's first bullet** (AutoLoad stops at the hours you set, the
+>   overflow reported as "did not fit" and no block placed outside the
+>   template) is asserted by
+>   `tests/test_plan_screen.py::test_pdm34_autoload_does_not_run_past_the_day_end`
+>   and `::test_pdm36_a_full_day_writes_nothing`.
+> - **PD-M14.3's second bullet**, in part: that a break or buffer survives
+>   Clear Day and that the status line names it is
+>   `tests/test_plan_screen.py::test_pdm8_clear_day_leaves_breaks_and_buffers`.
+>   The span clause — that the day still starts at −1 — is not covered.
+> - **PD-M14.4 and PD-M14.7** are genuinely uncovered. There is no production
+>   caller of `shift_all_slots`, and no repair pass exists in `src/` at all.
+>
+> What is left of the gap is `SBN-A3`, filed rather than answered here.
+
+- **Automated:** `test_pdm143_clearing_the_day_restores_the_hours` **(not written)** — extend
   earlier twice, clear the day, assert the drawn grid's first slot is 0 again
   and `settings.plan_day_start` never changed throughout.
-- **Automated:** `::test_pdm143_a_break_outside_the_hours_keeps_the_day_open` —
+- **Automated:** `test_pdm143_a_break_outside_the_hours_keeps_the_day_open` **(not written)** —
   a buffer at slot −1 survives Clear Day, the day still starts at −1, and the
   status line names the kept block.
-- **Automated (dirty state, P8):** `::test_pdm143_a_day_reopened_is_the_day_that_was_left`
+- **Automated (dirty state, P8):** `test_pdm143_a_day_reopened_is_the_day_that_was_left` **(not written)**
   — write, close the screen, build a second screen on the same database, assert
   the same drawn span. The hours must not depend on who drew them last.
 - **On screen:** extend the day earlier, press **Clear Day**, confirm. The day
@@ -160,10 +186,10 @@ blocks 3½ hours out.
 that changes behaviour you did not report. It is in the plan because without it
 the thirteen blocks happen again the next time the hours change.
 
-- **Automated:** `::test_pdm144_changing_the_hours_keeps_clock_times` — blocks
+- **Automated:** `test_pdm144_changing_the_hours_keeps_clock_times` **(not written)** — blocks
   on three dates, move Day Start from 09:00 to 08:00, assert every block's drawn
   time is the time it had before and its slot index moved by +2.
-- **Automated:** `::test_pdm144_a_renumber_that_fails_leaves_the_hours_alone` —
+- **Automated:** `test_pdm144_a_renumber_that_fails_leaves_the_hours_alone` **(not written)** —
   one transaction: the settings write and the renumber land together or not at
   all, and the status line says which.
 - **On screen:** plan three items on a day. Change Day Start by an hour and
@@ -175,10 +201,10 @@ the thirteen blocks happen again the next time the hours change.
 invent hours. Only a drag onto **Earlier** or **Later** goes outside them, which
 is the one gesture that says so explicitly.
 
-- **Automated:** `::test_pdm145_autoload_stops_at_the_hours_you_set` — more
+- **Automated:** `test_pdm145_autoload_stops_at_the_hours_you_set` **(not written)** — more
   items than the day has boxes; assert the overflow is reported as "did not fit"
   and no block has a slot index outside the template.
-- **Automated:** `::test_pdm145_a_break_is_refused_rather_than_placed_outside` —
+- **Automated:** `test_pdm145_a_break_is_refused_rather_than_placed_outside` **(not written)** —
   a full day, press break, assert the refusal and no new block.
 - **On screen:** fill a day with AutoLoad. The day stays the length you set it.
 
@@ -206,12 +232,12 @@ This is the only irreversible step in the plan. It runs once per date, when the
 day's shape is confirmed (the same gate adoption uses), reports how many blocks
 it moved and from where, and does nothing at all if the two agree.
 
-- **Automated:** `::test_pdm147_a_block_is_put_back_on_the_time_it_was_planned_at`
+- **Automated:** `test_pdm147_a_block_is_put_back_on_the_time_it_was_planned_at` **(not written)**
   — a block at slot 6 recorded 08:30 with a 09:00 template becomes slot −1, and
   its recorded time does not change.
-- **Automated:** `::test_pdm147_a_day_that_agrees_is_not_touched` — snapshot
+- **Automated:** `test_pdm147_a_day_that_agrees_is_not_touched` **(not written)** — snapshot
   every row, load twice, assert no write (idempotent, and no second pass).
-- **Automated:** `::test_pdm147_an_unconfirmed_day_shape_repairs_nothing` — the
+- **Automated:** `test_pdm147_an_unconfirmed_day_shape_repairs_nothing` **(not written)** — the
   guard, for the same reason adoption has one: a template we are guessing at
   would move work to an hour nobody chose.
 - **On screen:** open 5, 6 and 7 November. Everything is at the time you planned
@@ -235,13 +261,13 @@ above, in one pass, on a weekday and on a Saturday.
 | TG-M6.4 | Saving Day Settings writes no blocks | ~~Reversed by PD-M14.4: it must renumber, or work already planned moves on the clock.~~ **Not what was built.** The box is stored relative to Day Start, so the clock times follow on read and nothing is renumbered — the same mechanism the PD-M5.5 row above describes. TG-M6.4 and TG-M6.4a stay `done` in `docs/spec_coverage.md`, and both named tests are live and green: `tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks` and `tests/test_time_block_crud.py::test_tgm64_a_day_start_change_writes_no_rows`. Neither was deleted: PD-M14.4 was not built, and the deletion list below is corrected to the three tests that were. *(Corrected 2026-11-08, ninth cold pass of the PDT batch.)* |
 
 **Three** tests assert the withdrawn behaviour and were deleted with it:
-`::test_pdm52_a_drop_above_moves_day_start_back`,
-`::test_pdm52_a_long_item_dropped_above_takes_the_day_back_far_enough` and
-`::test_pdm53_a_drop_below_moves_day_end_forward`. All three are replaced by
+`test_pdm52_a_drop_above_moves_day_start_back`,
+`test_pdm52_a_long_item_dropped_above_takes_the_day_back_far_enough` and
+`test_pdm53_a_drop_below_moves_day_end_forward`. All three are replaced by
 the PD-M14 tests above.
 
 ~~`::test_tgm64_saving_settings_writes_no_blocks`~~ was listed here as a
-fourth, to be replaced by `::test_pdm144_changing_the_hours_keeps_clock_times`.
+fourth, to be replaced by `test_pdm144_changing_the_hours_keeps_clock_times` **(not written)**.
 Neither happened: PD-M14.4 was not built (see the note at its head), the
 `test_pdm144` tests were never written, and
 `tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks` is
@@ -253,7 +279,7 @@ delete it.
 strengthened: under PD-M14.1 it holds for both ends, not one. It is live in
 `tests/test_plan_screen.py` (`grep -n "def test_pdm53_a_drop_below_does_not_renumber" tests/test_plan_screen.py`).
 
-~~`::test_pdm55_a_block_on_another_date_keeps_its_clock_time`~~ was named here
+~~`test_pdm55_a_block_on_another_date_keeps_its_clock_time`~~ was named here
 as a second. **It is not on `main`.** It was there — `git log -S` on the name
 finds it added and later removed (`5543476`, `436264f`) — and it is still live
 on `refs/heads/claude/elegant-neumann-ab55c9` and two other refs, so a reader

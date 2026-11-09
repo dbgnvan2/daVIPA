@@ -142,7 +142,7 @@ are reported as "N of M" (P2, P9).
 `plan_blocks._block_title` becomes a one-line delegation so the screen and the
 exporter cannot drift (P19, and P25's "two surfaces, one of them unchecked").
 
-- Test: `::test_cem221_the_exporter_and_the_screen_name_a_block_identically` — asserts against `plan_blocks._block_title` for item, buffer, break, and the orphaned-item case.
+- Test: `tests/test_calendar_export.py::test_cem221_every_branch_of_the_title_rule_names_a_block` — asserts the five branches of the title rule (item, buffer, break, an orphaned item that kept its label, and one that did not) against **literals**. It compared them to `plan_blocks._block_title` as planned here, and a cold pass removed that: comparing a function to its own one-line delegate is true for any implementation, broken ones included. What it was reaching for — that the screen draws what the export sends — is `tests/test_plan_screen_calendar_export.py::test_cem221a_an_event_is_titled_what_the_day_draws_on_the_block`.
 
 ### CE-M2.3 — Clock times, in the user's timezone
 
@@ -159,7 +159,7 @@ Duck-typed client with `create_event`, `update_event`, `delete_event`,
 fake, so **no test in this batch reaches the network**. Returns
 `{blocks_seen, created, updated, deleted_orphans, skipped_unplaced, skipped_no_minutes, failed}`.
 
-- Test: `::test_cem241_export_day_never_constructs_the_real_manager` (asserts the seam)
+- Test: `tests/test_calendar_export.py::test_cem241_export_day_uses_the_client_it_was_given` (asserts the seam)
 
 ### CE-M2.5 — Idempotent
 
@@ -211,7 +211,7 @@ All four call sites changed in one commit, not just the new one.
 `privateExtendedProperty` + `singleEvents=True`, **paginated** (E6), same loop
 shape as the importer.
 - Test: `::test_cem321_two_pages_are_both_returned`
-- Test: `::test_cem322_only_our_marker_is_requested`
+- Test: `tests/test_google_calendar_export_calls.py::test_cem322_only_our_own_marked_events_are_requested`
 
 ### CE-M3.3 — The marker is written and preserved
 `extendedProperties.private` set on create; `update_event` must not drop it.

@@ -43,7 +43,7 @@ removed the priority number for.
 | PD-M1.2 | The length label and the bar stack sit on one grid row, adjacent columns | `::test_pdm12_the_length_sits_beside_the_depth_bars` |
 | PD-M1.3 | The row is still `item_row_height(span, box_height)` tall — PB-M6.1 regression | `::test_pbm61_an_item_row_is_the_height_the_day_would_give_it` (existing, must stay green) |
 | PD-M1.4 | Every child is still drawn inside the frame at the floor and above it | `::test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it` (on-screen, `mapped_windows`) |
-| PD-M1.5 | The depth word is gone from the second line; `already blocked` is not | `::test_pdm14_the_second_line_is_the_blocked_marker_alone` |
+| PD-M1.5 | The depth word is gone from the second line; `already blocked` is not | `tests/test_plan_screen.py::test_pdm14_the_blocked_marker_is_a_glyph_left_of_the_depth_bars` (this row named `test_pdm14_the_second_line_is_the_blocked_marker_alone` until 2026-11-09; the marker became a glyph on one line, so the criterion's wording is the older design) |
 | PD-M1.6 | The bar stack takes the title's own vertical justification: centred on the line, not pinned to the top or the bottom of the row, and the bars fill the stack with no slack at either end | `::test_pdm16_the_depth_bars_are_justified_like_the_text_on_the_line` — unplanned; reported from the screen three times, as "justified TOP", then "should be BOTTOM", then "justify vertically like TEXT on the line" |
 
 **Note on the mapped-window count:** PD-M1.4 and PD-M6.1 add on-screen tests.
@@ -79,7 +79,7 @@ the file does not.
 | ID | Criterion | Verified by |
 |---|---|---|
 | PD-M2.1 | A drag of the grip changes column 0's `minsize` by the pointer delta | `tests/test_plan_screen.py::test_pdm21_dragging_the_grip_changes_the_items_column` |
-| PD-M2.2 | The width is clamped to a usable range; neither pane can be dragged shut | `::test_pdm22_the_width_is_clamped_at_both_ends` |
+| PD-M2.2 | The width is clamped to a usable range; neither pane can be dragged shut | `tests/test_plan_screen.py::test_pdm22_the_items_pane_cannot_be_dragged_shut` and `::test_pdm22_the_day_pane_cannot_be_dragged_shut` — the two ends, named together as `test_pdm22_the_width_is_clamped_at_both_ends` in this row until 2026-11-09 |
 | PD-M2.3 | Motion does not write the settings file; release writes it once | `::test_pdm23_the_file_is_written_once_on_release_not_per_motion` |
 | PD-M2.4 | A refused write leaves the running app the width it had, and says so | `::test_pdm24_a_refused_write_leaves_the_old_width` (P41) |
 | PD-M2.5 | The dragged width survives a rebuild of the screen | `::test_pdm25_the_dragged_width_survives_a_rebuild` |
@@ -238,11 +238,11 @@ half hour that drop created.
 | ID | Criterion | Verified by |
 |---|---|---|
 | PD-M5.1 | A virtual box is drawn above the first slot and below the last, every redraw | `tests/test_plan_screen.py::test_pdm51_a_virtual_box_sits_at_each_end` |
-| PD-M5.2 | A drop on the top box moves Day Start back by the item's span and blocks it there | *withdrawn by PD-M14 — the day's hours became a template, so the drop no longer touches the bound; `::test_pdm52_a_drop_above_moves_day_start_back` is deleted, and what holds now is* `tests/test_plan_screen.py::test_pdm141_a_drop_on_earlier_writes_no_settings` |
-| PD-M5.3 | A drop on the bottom box moves Day End forward by the span and blocks it there | *withdrawn by PD-M14, at the other end; `::test_pdm53_a_drop_below_moves_day_end_forward` is deleted, and what holds now is* `tests/test_plan_screen.py::test_pdm141_a_drop_on_later_writes_no_settings`. *`::test_pdm53_a_drop_below_does_not_renumber_the_day` is a different test, and is live* |
+| PD-M5.2 | A drop on the top box moves Day Start back by the item's span and blocks it there | *withdrawn by PD-M14 — the day's hours became a template, so the drop no longer touches the bound; `test_pdm52_a_drop_above_moves_day_start_back` is deleted, and what holds now is* `tests/test_plan_screen.py::test_pdm141_a_drop_on_earlier_writes_no_settings` |
+| PD-M5.3 | A drop on the bottom box moves Day End forward by the span and blocks it there | *withdrawn by PD-M14, at the other end; `test_pdm53_a_drop_below_moves_day_end_forward` is deleted, and what holds now is* `tests/test_plan_screen.py::test_pdm141_a_drop_on_later_writes_no_settings`. *`::test_pdm53_a_drop_below_does_not_renumber_the_day` is a different test, and is live* |
 | PD-M5.4 | Extending does **not** clear `plan_day_shape_unconfirmed` | `tests/test_plan_settings.py::test_pdm54_extending_the_day_is_not_confirming_it` |
 | PD-M5.5 | Every existing block keeps its clock time when either bound moves | `tests/test_time_block_crud.py::test_pdm55_blocks_keep_their_times_when_the_day_grows` (+ `::test_pdm55_a_shift_of_zero_writes_nothing`, `::test_pdm55_a_block_outside_the_grid_is_not_given_a_box`, `::test_pdm55_every_date_is_renumbered_not_only_the_one_on_screen`), and *(`test_pdm52_existing_blocks_keep_their_clock_times`, named without its path because it no longer exists — one of the dead bare names `BACKLOG.md` PDT-A1 lists)* — in `test_time_block_crud.py` rather than `test_time_block_layout.py` as planned, because keeping the time turned out to need a *write*, not arithmetic |
-| PD-M5.6 | A refused settings write leaves the day, the grid and the app as they were | *withdrawn by PD-M14 together with `_DayNotWritten`, which is what the refusal was built on (`docs/changes/2026-11-08-day-hours-are-a-template-wip.md`); `::test_pdm56_a_refused_write_leaves_the_day_unchanged` is deleted and is one of the dead bare names in* `BACKLOG.md` *PDT-A1. Recorded* **withdrawn** *in* `docs/spec_coverage.md` |
+| PD-M5.6 | A refused settings write leaves the day, the grid and the app as they were | *withdrawn by PD-M14 together with `_DayNotWritten`, which is what the refusal was built on (`docs/changes/2026-11-08-day-hours-are-a-template-wip.md`); `test_pdm56_a_refused_write_leaves_the_day_unchanged` is deleted and is one of the dead bare names in* `BACKLOG.md` *PDT-A1. Recorded* **withdrawn** *in* `docs/spec_coverage.md` |
 | PD-M5.7 | The virtual boxes are not droppable for a *block* drag — a block cannot invent a half hour | `::test_pdm57_a_block_drag_onto_a_virtual_box_is_refused` |
 | PD-M5.9 | A real box always wins over a virtual one, so a box flush against the Earlier box still gets its own drops | `::test_pdm5_a_real_box_wins_over_a_virtual_one` — unplanned; the read order is a one-line change nothing else would notice |
 | PD-M5.10 | The drop gesture itself routes to the right end, not only the method | `::test_pdm5_an_item_drag_onto_a_virtual_box_extends_the_day` — unplanned; without it the extension is only reachable by calling `extend_day_for` |
@@ -659,17 +659,20 @@ asks through `messagebox` from inside its own `ButtonRelease` handler.
 ### Acceptance criteria
 
 > Every test named in this table was deleted with the module. The dialog they
-> covered hung the application; PD-M13's table is the one that holds.
+> covered hung the application; PD-M13's table is the one that holds. The names
+> are written without a `::`, because none of them is a pointer any more —
+> `tests/test_traceability_refs.py` reads the bare `::name` form as of `SBN-M1`
+> and would fail on them.
 
 | ID | Criterion | Test |
 |---|---|---|
-| PD-M12.1 | The non-work-day question is asked by the app's dialog; the platform's is not on the drop path | `::test_pdm121_the_question_is_asked_by_the_app` |
-| PD-M12.1 | The yes button names the gesture | `::test_pdm121_the_question_names_the_answer_it_wants` |
-| PD-M12.2 | A dialog that cannot be shown schedules the work and says so | `::test_pdm122_a_question_that_cannot_be_asked_still_schedules` |
-| PD-M12.2 | The note is said once, for the gesture, not for every later one on that day | `::test_pdm122_the_note_belongs_to_the_gesture_not_to_the_day` |
-| PD-M12.2 | The day-lengthening status line says it too | `::test_pdm122_the_end_of_the_day_says_it_too` |
-| PD-M12.3 | A drop on an end of a non-work day lengthens the day and blocks the item | `::test_pdm123_a_drop_on_an_end_of_a_non_work_day_extends_the_day` |
-| PD-M12.4 | No test can open a real confirm dialog | `::test_pdm124_a_test_cannot_open_a_real_dialog` |
+| PD-M12.1 | The non-work-day question is asked by the app's dialog; the platform's is not on the drop path | `test_pdm121_the_question_is_asked_by_the_app` |
+| PD-M12.1 | The yes button names the gesture | `test_pdm121_the_question_names_the_answer_it_wants` |
+| PD-M12.2 | A dialog that cannot be shown schedules the work and says so | `test_pdm122_a_question_that_cannot_be_asked_still_schedules` |
+| PD-M12.2 | The note is said once, for the gesture, not for every later one on that day | `test_pdm122_the_note_belongs_to_the_gesture_not_to_the_day` |
+| PD-M12.2 | The day-lengthening status line says it too | `test_pdm122_the_end_of_the_day_says_it_too` |
+| PD-M12.3 | A drop on an end of a non-work day lengthens the day and blocks the item | `test_pdm123_a_drop_on_an_end_of_a_non_work_day_extends_the_day` |
+| PD-M12.4 | No test can open a real confirm dialog | `test_pdm124_a_test_cannot_open_a_real_dialog` |
 | PD-M12.5 | On the running app: the dialog appears on a Saturday drop, *Schedule anyway* writes the block, and a drop on either end lengthens the day | *(not code-testable — no test in this suite can build a visible window, and this failure was invisible to every test that did not)* |
 
 `widgets/confirm_dialog.py` itself has no direct test: it builds a toplevel and
@@ -721,11 +724,11 @@ this module removes, and both are withdrawn rather than re-pointed:
 - **TB-M8.2** "A drop on an unchecked weekday creates **no** block and reports
   why" — the second half stands, the first does not. PD-M7 had already softened
   it from a refusal to a question; PD-M13 removes the question from the drop
-  path. `::test_tbm82_drop_on_non_block_day_is_refused` is deleted; it had been
+  path. `test_tbm82_drop_on_non_block_day_is_refused` is deleted; it had been
   passing only because the suite's messagebox stub answers no.
 - **PD-M5.11** "Extending is refused on a non-working day" — the same, for the
   **Earlier** / **Later** path.
-  `::test_pdm5_the_day_cannot_be_extended_onto_a_non_block_day` is deleted.
+  `test_pdm5_the_day_cannot_be_extended_onto_a_non_block_day` is deleted.
 
 The refusal they covered still exists on the paths that ask, and
 `::test_pdm132_answering_no_writes_nothing` covers it there.

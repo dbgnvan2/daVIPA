@@ -106,19 +106,19 @@ suite-wide changes the behaviour of every test that reaches one.
 |---|---|---|
 | B0.1 | Follow-up title is `"<original> - Follow up MM-DD"` with today's date | `tests/test_timer_session_endings.py::test_b01_the_followup_title_carries_the_day_it_was_made` |
 | B0.2 | A follow-up of a follow-up replaces the suffix, never stacks | `::test_b02_the_dated_suffix_does_not_stack` |
-| B0.3 | Three consecutive days give three distinct titles | `::test_b03_consecutive_days_are_distinguishable` |
+| B0.3 | Three consecutive days give three distinct titles | `tests/test_timer_session_endings.py::test_b04_consecutive_days_are_distinguishable` (`B0.3`'s test, named `test_b03_…` here until 2026-11-09) |
 | B1.1 | The follow-up keeps the original's project link | `::test_b11_the_followup_stays_filed_under_its_project` |
-| B1.2 | …its weekly lineage | `::test_b12_the_followup_keeps_its_weekly_lineage` |
+| B1.2 | …its weekly lineage | `tests/test_weekly_tactic_completion.py::test_b12_the_timer_ending_also_inherits_the_weekly_lineage` (named `test_b12_the_followup_keeps_its_weekly_lineage` here until 2026-11-09) |
 | B1.3 | …and its item links | `::test_b13_the_followup_keeps_its_links` |
 | B1.4 | Both copy paths use one helper — no second field list | `::test_b14_both_followup_paths_inherit_through_the_same_helper` |
 | B2.1 | A second `open_for` on a live item returns the first window | `::test_b21_a_second_timer_returns_the_first` |
 | B2.2 | One test per opener: the screen calls `open_for`, not the constructor | `::test_b22_<screen>_opens_through_the_registry` ×4 |
 | B2.3 | The registry entry is released on destroy | `::test_b23_closing_a_timer_frees_the_item` |
 | B3.1 | `_cleanup_and_destroy` returns False when the window survives | `::test_b31_cleanup_reports_whether_it_closed` |
-| B3.2 | `continue_action` does not open the editor behind a live timer | `::test_b32_the_editor_waits_for_a_timer_that_did_not_close` |
+| B3.2 | `continue_action` does not open the editor behind a live timer | `tests/test_timer_session_endings.py::test_b32_the_editor_is_raised_over_a_timer_that_did_not_close` — raised over it rather than waiting for it, which is what the test asserts and what the criterion should have said |
 | B4.1 | `NextStepsDialog` no longer exists | `::test_b41_the_dead_dialog_is_gone` |
 | B5.1 | A `messagebox` call in a test records instead of displaying | `tests/test_tk_offscreen.py::test_b51_a_messagebox_records_instead_of_blocking` |
-| B5.2 | A test raising inside a timer ending completes rather than hanging | `::test_b52_a_failing_ending_does_not_hang_the_run` |
+| B5.2 | A test raising inside a timer ending completes rather than hanging | `tests/test_tk_offscreen.py::test_b52_a_failing_timer_ending_does_not_hang_the_run` (named `test_b52_a_failing_ending_does_not_hang_the_run` here until 2026-11-09) |
 | B5.3 | The 15 tests that patch messagebox themselves still pass | full suite |
 
 ## Order
