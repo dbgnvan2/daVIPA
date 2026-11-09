@@ -233,13 +233,13 @@ What closed them, and what now holds them:
 | filing | closed by | guard |
 |---|---|---|
 | `SSC-1` | the PRI plan's status line, then `PRI-A1`–`PRI-A4` filed | `test_sstm1_…`, `test_sstm9_…` |
-| `SSC-2`, `SSC-4` | fifteen status lines in fourteen documents, each naming its evidence | `test_sstm1_no_document_claims_unwritten_code_outside_the_register` |
+| `SSC-2`, `SSC-4` | seventeen stale lines in sixteen documents — sixteen status claims and one prose sentence — each naming its evidence | `test_sstm1_no_document_claims_unwritten_code_outside_the_register` |
 | `SSC-5` | `PLC-A5` no longer quotes a rewritten footer | — (prose) |
 | `SSC-6` | the count is 41, measured from the spec's own rows | `test_sstm3_the_wtp_criterion_count_is_what_the_spec_lists` |
 | `SSC-7` | `RP-2.5` points at `update_action_item`, which exists | `test_sstm5_every_implementation_reference_resolves` |
 | `SSC-8` | `UPD-A13` and `PLC-A5` name each other | `test_sstm7_the_two_filings_of_the_index_gap_cross_reference` |
 | `SSC-9` | the WTP spec no longer denies its two outstanding items | `test_sstm4_the_wtp_spec_does_not_deny_its_own_outstanding_items` |
-| `SSC-10` | twelve cites rewritten as quoted text plus a grep | `test_sstm8_the_chronic_documents_are_not_cited_by_line_number` |
+| `SSC-10` | twelve cites in nine documents, rewritten as quoted text plus a grep | `test_sstm8_the_chronic_documents_are_not_cited_by_line_number` |
 
 All in `tests/test_doc_status_claims.py`. Plan:
 `docs/implementation_plan_2026-11-08_status_claims.md`; note:
@@ -400,7 +400,7 @@ never reaches the designed fix.
 and nothing is outstanding." The same file at `:428-437` — two "not
 code-testable" items, both `not done`, "as foreseen".
 
-### SSC-10 — eight documents cite `BACKLOG.md` and `docs/spec_coverage.md` by line number — CLOSED 2026-11-08 (there were twelve cites, in eleven documents)
+### SSC-10 — eight documents cite `BACKLOG.md` and `docs/spec_coverage.md` by line number — CLOSED 2026-11-08 (there were twelve cites, in nine documents)
 
 The same class this batch wrote a rule about, in other batches' documents. The
 cites rot silently because no test reads them:
@@ -486,6 +486,96 @@ fourteenth would stop looking like a live pointer.
 
 **Priority:** Low
 **Effort:** Low
+
+### SST-A3 — the "not built" guard is a phrase list, so a new wording escapes it (medium)
+
+`tests/test_doc_status_claims.py`'s `_NOT_BUILT` is a fixed alternation: ten
+phrasings this repo has actually used, plus the nearest variants. A plan headed
+"Draft, implementation not scheduled" passes it. The guard is therefore a
+tripwire, not a proof, and `SST-N1` already says it cannot judge whether a
+replacement sentence is true.
+
+Filed 2026-11-09 by the cold pass over the SST batch, which wrote the sentence
+"Draft, implementation not started. No code exists yet." and found it accepted.
+Four phrases were added in response — `not started`, `no code exists`,
+`not yet implemented`, `not yet built` — which narrows the hole without
+closing it.
+
+The fix is not a longer list. It is to invert the check: a plan's status line
+must *match* one of a small set of recognised forms (built, superseded,
+registered as a draft), so an unrecognised sentence fails rather than passing.
+That is a convention imposed on 35 existing documents, which is why it was not
+done in-loop.
+
+**Priority:** Medium
+**Effort:** Medium
+
+### SST-A4 — four of the seven guards have no companion proving they can fire (low)
+
+`tests/test_doc_status_claims.py` ships seven guards and three companions.
+SST-M4, SST-M7, SST-M9 and the second half of SST-M3 have none. Each asserts on
+a named anchor in a named file — a heading, a declaration line, a section — so
+a guard that stopped finding its subject fails on the anchor rather than
+passing vacuously, which is weaker than a companion but not silent.
+
+Two of this batch's guards shipped unable to fail, and both were found by
+asking what the assertion would accept rather than by running it, so "it fails
+on its anchor" is an argument, not a measurement.
+
+Filed 2026-11-09 by the cold pass, which also corrected the claim in
+`docs/spec_coverage.md` that each guard had a companion.
+
+**Priority:** Low
+**Effort:** Low
+
+### SST-A5 — `RP-2.5` names the method that delegates, not the one that writes (low)
+
+The row was repointed from a method that never existed to
+`db_manager.py::update_action_item`, and the records say that method "is what
+writes `deliverable`". It is not, quite: `update_action_item` delegates through
+`_save_action_item` to `_write_action_item`, which issues the `deliverable = ?`
+UPDATE. Find it with
+`grep -n "deliverable = ?" src/getmoredone/db_manager.py`.
+
+Naming the entry point is defensible and is what most rows in the coverage
+files do. It is filed because the batch that repointed the row asserted the
+stronger claim.
+
+Filed 2026-11-09 by the cold pass over the SST batch.
+
+**Priority:** Low
+**Effort:** Low
+
+### SST-A6 — the reference guard resolves a symbol anywhere, not in the file named (low)
+
+`tests/test_doc_status_claims.py::test_sstm5_every_implementation_reference_resolves`
+collects every `def` and `class` name in `src/`, `tools/` and `conftest.py`
+into one set, so `screens/plan.py::build` resolves against a `build` defined in
+any other module. The test's own docstring says why: a row naming the wrong
+file but a real method is a lesser defect, and resolving per file would fail on
+the many rows that name a helper's home module rather than its caller.
+
+The defect it was written for — a name that exists nowhere — is still caught.
+The fix is a two-tier check: fail on a name defined nowhere, warn on a name
+defined somewhere other than the file named.
+
+Filed 2026-11-09 by the cold pass over the SST batch.
+
+**Priority:** Low
+**Effort:** Medium
+
+### SST-A7 — SST-M4 is a literal-phrase check (low)
+
+`test_sstm4_the_wtp_spec_does_not_deny_its_own_outstanding_items` asserts the
+string "nothing is outstanding" is absent and that the section holding the two
+items is present. A spec that denied its outstanding items in any other words
+would pass. The behavioural form — read the two items' status cells and require
+the summary to agree with them — is what the guard should do.
+
+Filed 2026-11-09 by the cold pass over the SST batch.
+
+**Priority:** Low
+**Effort:** Medium
 
 ## Adjacent issues — priority defaults and the cap (PRI, filed 2026-11-08)
 

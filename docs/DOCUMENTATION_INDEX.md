@@ -368,10 +368,13 @@ No file under `src/` is touched. Handoff note:
 `docs/changes/2026-11-08-status-claims.md`, which is listed here only inside
 this entry rather than as an entry of its own, as every handoff note is:
 
-- Fifteen status lines in fourteen documents saying no implementation code was
+- A cold pass on 2026-11-09 found eleven medium-or-higher defects in this
+  batch, all confirmed and all fixed, four of them guards or figures that could
+  not fail on the thing they named. `SST-A3`–`SST-A7` filed.
+- Seventeen stale lines in sixteen documents saying no implementation code was
   written, over work that is built — the oldest wrong since August, and one of
   them about PD-M14, the surviving plan-day design. `SSC-4` called its four "a
-  sample, not a list"; the other ten were checked, and each correction names
+  sample, not a list"; the other twelve were checked, and each correction names
   the coverage document or module that is its evidence
 - The WTP criterion count measured from the spec's own rows: 41, against 38 in
   `BACKLOG.md` and 40 in the spec, whose arithmetic double-counted §3's

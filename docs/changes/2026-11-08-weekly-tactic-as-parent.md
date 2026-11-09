@@ -8,7 +8,12 @@
 
 A Weekly Tactic is now the parent of the Action Items linked to it, in every
 reader of parenthood the app has. Spec and per-criterion status:
-`docs/spec_2026-11-08_weekly_tactic_as_parent.md`. All 38 criteria are `done`.
+`docs/spec_2026-11-08_weekly_tactic_as_parent.md`. All 41 criteria are `done`,
+with two human-review items outstanding under §6's "not code-testable"
+heading. Corrected 2026-11-09 by the cold pass over the SST batch: this
+sentence gave the count as 38 and said nothing about the two outstanding
+items. The spec's §3 rows have never numbered fewer than 41; count them with
+`grep -cE '^\| *\*{0,2}WTP-M[0-9.]+' docs/spec_2026-11-08_weekly_tactic_as_parent.md`.
 
 Storage did not change. The link stays in `action_items.weekly_tactic_id`,
 because `weekly_tactic_migrations._move_week_links_off_parent_id` nulls

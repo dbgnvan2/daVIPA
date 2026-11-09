@@ -417,6 +417,14 @@ DOCUMENTATION_INDEX "40 of 40": matches the spec's §6 summary line ("all 40 cri
 WTP-M6.7 / WTP-M6.8 / "21 tests" descriptions match §6's rows. The index is now aligned with §6, which
 the previous "32 of 35" was not.
 
+> **Note added 2026-11-09, by the cold pass over the SST batch.** The paragraph
+> above is left as the gate wrote it: it records what the spec and the index
+> said on 2026-11-08, which is what a gate record is for. Both figures were
+> wrong, and neither is current. The spec's §3 rows numbered 41 then and number
+> 41 now; §6, `BACKLOG.md` and `docs/DOCUMENTATION_INDEX.md` were corrected to
+> 41 by the SST batch, and `tests/test_doc_status_claims.py` now recounts the
+> rows rather than trusting any of those figures.
+
 ## Non-blocking observation
 
 §6's summary says "40" but its tables list 41 `done` rows (M1×7, M2×8, M3×6, M4×6, M5×6, M6×8). The

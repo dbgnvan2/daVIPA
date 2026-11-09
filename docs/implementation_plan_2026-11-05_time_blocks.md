@@ -1,8 +1,16 @@
 # Implementation plan — Time Blocks (2026-11-05)
 
 Status: **built and on `main`.** `docs/spec_coverage.md` carries 28 `TB-M`
-rows, all `done`. Corrected 2026-11-08 by the SST batch: this line read
-"awaiting approval. No implementation code written" (`SSC-4`).
+rows: 19 `done` and 9 superseded — eight of the nine by the time-grid design
+in `implementation_plan_2026-11-05_time_grid.md` (the reorder, the day-packing,
+the proportional block height), and `TB-M8.2` by `PD-M13.1`, which took the
+refusal out of the drop path. Nothing here is outstanding: the nine were
+replaced rather than left undone, and each row names its successor. Re-measure
+with `grep -cE '^\| \*{0,2}TB-M' docs/spec_coverage.md` for the 28 and
+`grep -E '^\| \*{0,2}TB-M' docs/spec_coverage.md | grep -c superseded` for the 9.
+Corrected 2026-11-08 by the SST batch: this line read "awaiting approval. No
+implementation code written" (`SSC-4`), and its first correction said all 28
+were `done`.
 Source: user requirements, 2026-11-05 ("The time block functionality doesn't
 seem to work", seven numbered requirements).
 

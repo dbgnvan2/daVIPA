@@ -14,8 +14,12 @@ python run.py
 
 # Tests
 pytest                                          # All tests
-pytest -m "not meta"                            # App behaviour only (1691 tests)
-pytest -m meta                                  # Repo/infra assertions only (212 tests)
+pytest -m "not meta"                            # App behaviour only (2432 tests)
+pytest -m meta                                  # Repo/infra assertions only (224 tests)
+# Both counts measured 2026-11-09 with `-m <marker> --collect-only -q`, whose
+# last line prints collected/deselected — re-measure rather than trusting them.
+# They had been 1691 and 212, stale by 741 and 12. No test asserts either
+# number, which is why they drifted; one that did would go red on every batch.
 pytest -v                                       # Verbose
 pytest tests/test_vps_integration.py -v        # Single file
 pytest --cov=src/getmoredone                   # With coverage

@@ -149,4 +149,18 @@ Existing users have notes already in `<vault>/GetMoreDone/`. They are **not move
 
 ## Status
 
-**Plan ready for approval.** No code changed yet. Awaiting your sign-off before starting M1.
+**Built and on `main`.** `docs/spec_coverage.md`'s first table is this plan's
+coverage: 25 `M…` rows, every one `done`. Count them with
+`grep -cE '^\| M[0-9]\.[A-Z]\.[0-9]' docs/spec_coverage.md`. The open question
+above was settled by the build — `get_project_board_links` orders
+most-recently-linked first, which is `M2.A.3`.
+
+Corrected 2026-11-09 by the cold pass over the SST batch. This section said
+the plan was ready for approval, that nothing had been written yet, and that
+M1 awaited a sign-off — all three untrue since the work shipped. The sentence
+is paraphrased rather than quoted here on purpose: quoting it would put the
+claim back in the file, where that guard reads it. It escaped the
+first version of the guard in `tests/test_doc_status_claims.py`, which read
+only lines *beginning* with "Status": here the claim sits on the line after a
+`## Status` heading. The guard now reads the lines under such a heading too,
+which is the only reason this one was found.
