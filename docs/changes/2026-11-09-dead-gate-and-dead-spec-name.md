@@ -86,13 +86,13 @@ or the leading `::`.
   only that way, so the fallback is load-bearing and cannot simply be dropped;
   what it lets through is a bare root pointer to a file that lives in a
   subdirectory.
-- Not assessed: whether a depth-1 CI checkout collects both guards with the
-  cross-module `from test_ci_contract import …` intact. It passes locally both
-  in isolation and in combination; the CI run is the measurement.
+- Answered since: a depth-1 CI checkout does collect both guards with the
+  cross-module `from test_ci_contract import …` intact. Run `42656944129` on
+  `1d05a4c` is green on 3.11, 3.12 and 3.13 at `2678 passed, 10 skipped`,
+  2688 collected.
 
 ## Next agent actions
 
-- Read the CI run for the pushed range and reconcile it against 2688 collected.
 - `GSF-A1` to `GSF-A5` are filed in `BACKLOG.md`, none fixed here: the
   retired three-agent workflow that `docs/MULTI_AGENT_WORKFLOW.md` still
   describes throughout, the pull-request template kept for PRs this repo never

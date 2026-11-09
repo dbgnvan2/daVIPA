@@ -1529,3 +1529,10 @@ was fixed:
 The fix for the first of those changed guard logic rather than prose, so it is
 new unreviewed surface; no high-severity finding means the budget allows no
 further pass, and it is recorded here rather than swept.
+
+**CI run `42656944129` on `1d05a4c` is green on all three Python versions** —
+`2678 passed, 10 skipped` each, 2688 collected, which reconciles with the
+marker counts: 2439 app plus 249 meta, the meta figure having moved by this
+batch's two tests. It also answers the one thing the cold pass could not
+assess: a depth-1 CI checkout collects both guards with the cross-module
+`from test_ci_contract import …` intact.

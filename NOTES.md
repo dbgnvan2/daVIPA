@@ -15,6 +15,8 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   deletable with both guards green — and incomplete, missing two documents the
   batch itself repaired; the root half is derived from `git ls-files` now. The
   three conventions for naming a thing that no longer exists are in `CLAUDE.md`.
+  Pushed as `fcc73f0..1d05a4c`; CI run `42656944129` is green on 3.11, 3.12 and
+  3.13 at 2688 collected, which reconciles with 2439 app plus 249 meta.
 
 - **The nine open `SSC` filings are closed** (SST batch, 2026-11-08). Every
   status claim this repo made about itself that nothing checked: seventeen stale
