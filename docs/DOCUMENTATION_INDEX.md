@@ -312,15 +312,15 @@ stretch**, which the plan records rather than assumes:
   name, with the shape of each test and why that shape
 - The two tests whose subject is source text rather than behaviour (PRI-M2.5's
   AST walk, PRI-M2.7's comment), and the exact-count rule they are written to
-- Why the three widget tests add no mapped window: `conftest.py` already
-  silences `grab_set` and withdraws every window on creation
+- Why the widget tests add no mapped window: `conftest.py` already silences
+  `grab_set` and withdraws every window on creation
 
 **Built 2026-11-08: all 15 criteria `done`** - 14 by test, PRI-M2.7 by an
 existing test whose comment was corrected - per-criterion status in
-`docs/spec_coverage.md`. 31 tests, mutation-proved against six mutations.
+`docs/spec_coverage.md`. 35 tests, mutation-proved against eight mutations.
 Handoff note: `docs/changes/2026-11-08-pri-tests.md`, listed here only inside
 this entry rather than as an entry of its own, as every handoff note is. The
-plan says "fourteen tests"; 31 is the collected count, the parametrized rows
+plan says "fourteen tests"; 35 is the collected count, the parametrized rows
 counted individually.
 
 ### docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md

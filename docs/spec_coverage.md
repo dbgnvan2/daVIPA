@@ -992,7 +992,7 @@ changed in this batch.
 | PDT-M5.2 | `docs/spec_coverage.md` gains the PDT rows and loses the dead references | — | **not code-testable** for the rows; the references are held by `tests/test_traceability_refs.py::test_every_referenced_test_name_exists` | done (by review) |
 | PDT-M5.3 | The handoff note exists, from the template, with its required fields | — | **not code-testable** — `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md` | done (by review) |
 | PDT-M5.4 | `docs/DOCUMENTATION_INDEX.md` lists this plan and the handoff note | — | **not code-testable**, and nothing enforces the index (PLC-A5). The note is listed inside the plan's entry rather than as an entry of its own, as every handoff note is | done (by review) |
-| PDT-M5.5 | `NOTES.md`'s "Where `main` stands" is updated to the real red count | — | **not code-testable** — `NOTES.md`, ten closed / ten left in three groups | done (by review) |
+| PDT-M5.5 | `NOTES.md`'s "Where `main` stands" is updated to the real red count | — | **not code-testable** — `NOTES.md`. It read ten closed / ten left in three groups when this criterion was met; the PRIT batch closed the eleventh and rewrote it to eleven closed / nine left in two groups (`f3937d3`). The criterion is "updated to the real count", so it stays `done` against the current file rather than against that snapshot | done (by review) |
 | PDT-N1 | `refs/heads/claude/plan-day-range-pdm13` is superseded, not merged or lost | a git ref at `c8125af` | **not code-testable** — recorded in `BACKLOG.md` item 1 and the handoff note | done (by review) |
 | PDT-N2 | Each rewrite still protects what the test it replaced protected | — | **not code-testable** — the old-vehicle/new-vehicle table in `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`, read by the cold sweep | done (by review) |
 
@@ -1017,14 +1017,14 @@ header — filed as `PRIT-N1`, not a test gap.
 | PRI-M1.3 | A who default and a system default both outrank the floor | unchanged `src/getmoredone/db_manager.py::_apply_defaults` | `::test_prim13_defaults_outrank_the_floor` | done |
 | PRI-M1.4 | A partial default fills only what it names; the floor fills the rest | same | `::test_prim14_the_floor_fills_only_what_is_missing` | done |
 | PRI-M1.5 | An explicitly set factor is never lowered, including on `apply_defaults=False` | unchanged `src/getmoredone/models.py::apply_priority_floor` | `::test_prim15_an_explicit_factor_survives_the_floor` | done |
-| PRI-M1.6 | `update_action_item` on a row whose factors are `None` leaves them `None` and the score 0 (D3) | the **absence** of a second `apply_priority_floor` call site — `grep -n apply_priority_floor src/getmoredone/db_manager.py` returns one line | `::test_prim16_editing_an_unscored_row_does_not_backfill` — a dirty-state test (P8): written, re-read, cleared, updated, re-read, updated again | done |
+| PRI-M1.6 | `update_action_item` on a row whose factors are `None` leaves them `None` and the score 0 (D3) | the **absence** of a second `apply_priority_floor` call site — `grep -rn 'apply_priority_floor(' src/` returns exactly one call, `src/getmoredone/db_manager.py:172`, on the create path. (A bare `grep -n apply_priority_floor src/getmoredone/db_manager.py` returns two lines, the import and the call; this cell said one) | `::test_prim16_editing_an_unscored_row_does_not_backfill` — a dirty-state test (P8): written, re-read, cleared, updated, re-read, updated again | done |
 | PRI-M1.7 | The new-item editor shows the floor before the first save | unchanged `src/getmoredone/screens/item_editor.py::apply_defaults_to_form` | `tests/test_priority_floor_form.py::test_prim17_the_new_item_form_shows_the_lowest_factors` and `::test_prim17_a_default_still_shows_instead_of_the_floor` | done |
 | PRI-M1.8 | The editor on an **existing** unscored row leaves its comboboxes empty | unchanged `src/getmoredone/screens/item_editor.py::load_item_data` | `::test_prim18_an_existing_row_is_not_shown_a_floor_it_does_not_have` | done |
 | PRI-M2.1 | `MAX_SCORE == 9999`, four digits, above the top `PRIORITY_BANDS` threshold | unchanged `src/getmoredone/models.py::PriorityFactors.MAX_SCORE`, `src/getmoredone/time_block_layout.py::PRIORITY_BANDS` | `tests/test_priority_floor_and_cap.py::test_prim21_the_cap_is_four_digits_and_leaves_every_band_reachable` | done |
 | PRI-M2.2 | All 256 combinations are `min(product, MAX_SCORE)`: 223 unchanged, 33 clamped | unchanged `src/getmoredone/models.py::priority_score_from_factors` | `::test_prim22_every_factor_combination_is_capped` — exact counts, not floors; also asserts the four distinct capped raws, that 6400 is the highest below and that no raw equals the cap, which is what makes a stored 9999 mean "capped" | done |
 | PRI-M2.3 | A missing or zero factor is still 0 — not the cap, not the floor | same | `::test_prim23_a_missing_factor_is_still_unscored` (8 cases: `None` and `0` in each of the four positions) | done |
 | PRI-M2.4 | The **stored** row is capped on create and on update | unchanged `::create_action_item` and `::update_action_item`, both via `update_priority_score` | `::test_prim24_the_stored_score_is_capped_on_create_and_on_update` | done |
-| PRI-M2.5 | One function computes the score; no module multiplies the four factors itself | `src/getmoredone/models.py`, `screens/item_editor.py`, `screens/inline_editors.py` | `::test_prim25_only_one_function_multiplies_the_factors` — AST walk, **exact count of 0**, parsed not grepped. Shipped with `::test_prim25_the_product_detector_finds_a_product` as a positive control, without which a blind detector would pass the guard for the wrong reason (P7); mutation F confirms the control is load-bearing | done |
+| PRI-M2.5 | One function computes the score; no module multiplies the four factors itself | `src/getmoredone/models.py`, `screens/item_editor.py`, `screens/inline_editors.py` | `::test_prim25_only_one_function_multiplies_the_factors` — AST walk over the whole module, **exact count of 0**, parsed not grepped, and **not filtered by operand name**. The first version matched only operands named `importance`/`urgency`/`size`/`value`, which left it blind at the one site PRI-M2 exists to protect: `screens/inline_editors.py::update_score` already names its factors `i`, `u`, `s`, `v`, so a re-introduced `i * u * s * v` kept the guard green at 0. Measured: the three modules hold no four-operand product of any kind, so the strict form is achievable. Six positive controls, `::test_prim25_the_product_detector_finds_a_product` (4 namings, including the single letters) and `::test_prim25_the_product_detector_excuses_the_one_scorer`; mutations F, G and H confirm all of them load-bearing | done |
 | PRI-M2.6 | Both score labels say when the score was capped | unchanged `src/getmoredone/models.py::priority_score_label`, and both render sites | the model boundary in `::test_prim26_the_label_says_capped_only_above_the_cap` (6400 and 12800, the two numbers either side of the cap), and both sites driven as behaviour in `tests/test_priority_floor_form.py::test_prim26_a_capped_label_says_it_is_capped` | done |
 | PRI-M2.7 | `priority_band` still classifies pre-cap rows, so the cap does not re-colour history | unchanged `src/getmoredone/time_block_layout.py::priority_band` | existing `tests/test_time_block_layout.py` row (`102400 → critical`), whose comment called that "the top of the scale" and now says "a legacy pre-cap score" (`d58f5e0`). The `PRIORITY_BANDS` comment said the score runs to 102400 and was corrected the same way (`3db5807`) | done |
 
@@ -1037,8 +1037,10 @@ header — filed as `PRIT-N1`, not a test gap.
 
 ### Final test counts
 
-31 tests across the two new files. `tests/test_priority_floor_and_cap.py` 27
+35 tests across the two new files. `tests/test_priority_floor_and_cap.py` 31
 (the parametrized rows counted individually), `tests/test_priority_floor_form.py` 4.
+It was 27 + 4 until the cold pass's medium 2 added four more controls to the
+PRI-M2.5 walk.
 Measure rather than trust this number:
 `GETMOREDONE_NO_MAPPED_WINDOWS=1 nice -n 19 taskpolicy -b ./venv/bin/python -m pytest tests/test_priority_floor_and_cap.py tests/test_priority_floor_form.py -q`.
 
@@ -1054,6 +1056,8 @@ Six mutations, each restored verbatim and the suite re-run.
 | D | `floor()` hard-coded to `1,1,2,2` | 4 failed — all four renumber cases; the plain minimum test stayed green, which is why PRI-M1.1 needs both |
 | E | the form's floor loop disabled in `apply_defaults_to_form` | 2 failed |
 | F | the AST product detector made blind | 1 failed — the positive control |
+| G | the detector's operand-name filter reinstated (the cold pass's medium 2) | 4 failed — the three controls whose operands are not the field names, plus the `skip_functions` control. This is the direct proof the name filter was the hole: `i * u * s * v` is how `inline_editors.update_score` already writes its factors |
+| H | `skip_functions` made a no-op | 1 failed — `::test_prim25_the_product_detector_excuses_the_one_scorer`. Nothing else in the file can see that exclusion, because the function it excuses holds no four-way product |
 
 A–E were restored with `git checkout --` and confirmed byte-identical by
 `git diff --quiet`. F mutated a file still untracked at the time, where

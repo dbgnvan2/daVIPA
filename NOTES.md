@@ -14,7 +14,7 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   `main` at both layers the whole time
   (`docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`). The eleventh,
   `test_every_referenced_test_file_exists`, by the PRIT batch, which wrote the
-  31 tests PRI-M1 and PRI-M2 had shipped without
+  35 tests PRI-M1 and PRI-M2 had shipped without
   (`docs/changes/2026-11-08-pri-tests.md`). That also closes PDT-M4.2, the one
   criterion the PDT batch recorded `not done`. Verified locally on targeted
   files; **no CI run covers this range yet**.
@@ -33,7 +33,7 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
 - **The coverage gap is closed, and PRI-M3 is open in its place.** PRI-M1/M2
   had shipped with `models.py` naming two test files and three tests that had
   never existed, so the cap, the floor and the "(capped)" label were
-  unverified. Both files now exist, 31 tests, mutation-proved, and the meta
+  unverified. Both files now exist, 35 tests, mutation-proved, and the meta
   test is green — closed by writing the tests, not by editing the docstrings.
   `BACKLOG.md` item 2. What the same measurement turned up: **PRI-M3, the
   four-digit column, was never built at all**, so nothing yet proves `"P:9999"`

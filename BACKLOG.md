@@ -54,8 +54,12 @@ earlier draft of this paragraph said eleven, by adding
 `test_pbm55_the_settings_reach_the_outside_group_on_screen` and then saying in
 the same sentence that it was already one of the nine. It is one of the nine.)
 
-**Ten are left:** the nine in items 3 and 5, and
-`test_every_referenced_test_file_exists`, which is item 2.
+**Updated again 2026-11-08 by the PRIT batch**, which closed the eleventh:
+`test_every_referenced_test_file_exists` is **green**, because the two test
+files `models.py` named were written. So **eleven of the twenty are closed**
+and **nine are left** — the nine in items 3 and 5, in two groups rather than
+three. Nothing red is a meta test any more. `NOTES.md` carries the same count;
+this section is the authoritative go-green list, so the two must agree.
 
 These ten closures are **verified locally only** — five targeted test files,
 listed in the handoff note. There is no CI run for this range: `main` is ahead
@@ -107,8 +111,8 @@ Deleting it is a separate decision nobody has taken.
 ### 2. CLOSED 2026-11-08 — PRI-M1/M2 shipped without its tests (medium)
 
 **Closed by the PRIT batch**: `tests/test_priority_floor_and_cap.py` and
-`tests/test_priority_floor_form.py` exist, 31 tests, mutation-proved against
-six mutations (`750afe6`), and
+`tests/test_priority_floor_form.py` exist, 35 tests, mutation-proved against
+eight mutations (`750afe6` and the cold pass's follow-up), and
 `tests/test_traceability_refs.py::test_every_referenced_test_file_exists` is
 **green**. PDT-M4.2, the one criterion that batch recorded `not done`, is
 closed with it. Plan and per-criterion status:
@@ -166,8 +170,11 @@ other; it now points at
 `tests/test_plan_screen.py::test_pdm146_both_ends_refuse_at_midnight_and_say_which`,
 which is what asserts its limit reaches the message.
 
-`::test_every_referenced_test_file_exists` is **still red**, on the two
-`models.py` references only. That is item 2, and it is not a docstring fix.
+`::test_every_referenced_test_file_exists` was **still red** on the two
+`models.py` references only, which was item 2. **Closed 2026-11-08 by the PRIT
+batch** — the two files were written (`750afe6`), not the docstrings deleted,
+which is what item 2 said the closure had to be. Both tests in that file are
+green.
 
 ### 5. Two tests fail only in CI (low)
 
@@ -480,6 +487,27 @@ changed `plan_day_end` alone. Reword both messages together; PDT-A3 was filed
 for one of them and the other was written afterwards, in the commit that was
 correcting the first.
 
+### PRIT-A1 — four PRI assertions cannot fail independently (low)
+
+Found by the PRIT batch's cold pass. In
+`tests/test_priority_floor_and_cap.py`: `test_prim23_a_missing_factor_is_still_unscored`'s
+`assert got != PriorityFactors.MAX_SCORE` and `assert got != 4` are both
+implied by the `assert got == 0` above them;
+`test_prim21_the_cap_is_four_digits_and_leaves_every_band_reachable`'s
+`assert len(str(MAX_SCORE)) == 4` is implied by `assert MAX_SCORE == 9999`;
+and `test_prim26_the_label_says_capped_only_above_the_cap`'s two
+`"capped" in` / `not in` checks are implied by the exact string equalities
+above them.
+
+Not vacuous and not wrong — each states, in the failure message, the thing a
+reader would otherwise have to derive, which is why they were written. But they
+inflate the apparent assertion count, and a reader counting assertions as
+coverage would over-read these tests. The same pass noted that
+`test_prim21`'s name claims "leaves every band reachable" while the test
+asserts only that the cap exceeds the **top** threshold. That does imply the
+rest are reachable, so the name is true; asserting each band's reachability
+directly would make it self-evident rather than inferred.
+
 ### PRIT-N1 — PRI-M3, the four-digit column, is not built (medium)
 
 `docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md`'s third
@@ -750,11 +778,11 @@ on `main` partly because of them. At HEAD no CE reference fails.
 tests were red on nine stale references, seven of them `pdm*`/`tgm*` names in
 `docs/spec_coverage.md`, `plan.py` and `time_block_layout.py`. Those seven
 were repointed (PDT-M4.1, `2cd83a3` and the follow-ups), so
-`::test_every_referenced_test_name_exists` is **green** and only
-`::test_every_referenced_test_file_exists` is red, on the two
-`src/getmoredone/models.py` file references for PRI-M1/M2 -- item 2 above.
-Still none of it is CE's or UPD-F's, and whoever pushes still ships one red
-meta test.
+`::test_every_referenced_test_name_exists` went **green**, leaving only
+`::test_every_referenced_test_file_exists` red on the two
+`src/getmoredone/models.py` file references for PRI-M1/M2. **The PRIT batch
+closed that one too** (`750afe6`), so both tests in the file are green and a
+push no longer ships a red meta test. Still none of it was CE's or UPD-F's.
 
 ### WTP — the pin test's message names a check it does not make (medium-low)
 
