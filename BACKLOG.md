@@ -354,6 +354,11 @@ A test that pins it would record whether the note dialog was constructed at
 all on the declining path and assert it was not. Step 7 of the handoff note's
 on-screen checklist is the manual stand-in until then.
 
+Measured rather than reasoned, after the entry was first written: in a detached
+worktree at `ef69c5b` the guard was moved out of its place and re-inserted
+after `self.wait_window(dialog)`, and both timer tests still passed (`2 passed,
+19 deselected`). So the reordering really is invisible to them.
+
 **Priority:** Low (the placement is correct today and reviewed twice)
 **Effort:** Small
 

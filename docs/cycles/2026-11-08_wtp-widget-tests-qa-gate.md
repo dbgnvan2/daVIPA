@@ -355,3 +355,116 @@ The budget calls for a further pass only on a high-severity finding, and R2-1
 was medium. The corrections themselves were verified by re-reading the five
 widget definitions and the `done_action` route in the source, which is what the
 two false claims had skipped.
+
+---
+
+# Third pass — the corrections, re-read against source (2026-11-08)
+
+RANGE      `3b191ae..HEAD` (exactly two commits)
+COMMITS    fcd92ba — test(wtp): the pin test's docstring, wrong twice about its own five screens
+           ef69c5b — docs(wtp): the re-gate's four findings, two backlog entries, the index
+APPLICABLE P6 (doc honesty), P19/P31 (producer/consumer + scope)
+CHECKED    the two commits only; every factual claim below re-read off `src/`, not off the surrounding prose
+NOT COVERED the full suite (per instruction); no test run was needed — every claim here is a source fact, not a run result
+VERDICT    CLEAN — no new false claim. The one correction that had already been wrong twice is now right, and two of its
+           line numbers silently fix an error the second pass itself made.
+
+## What was verified, claim by claim
+
+Docstring (`test_wtpw_the_screens_with_a_completion_control_are_pinned`):
+
+- Three row checkboxes — `today.py:550`, `all_items.py:271`, `upcoming.py:321` each build a
+  `ctk.CTkCheckBox` with `command=…complete_item`. True.
+- Two buttons — `project_boards.py:1532` (`CTkButton`, text "Complete", `command=…complete_item`)
+  and `item_editor.py:487` (`CTkButton`, text "Complete", `command=self.complete_item`). True.
+- The project board row's own checkbox is a selection toggle — `project_boards.py:1497-1508` stores
+  its `BooleanVar` in `self.item_checkbox_vars[item.id]` and wires `_on_item_checkbox_changed`,
+  which adds/removes `item.id` in `self.selected_item_ids` (line 1697) and completes nothing. True.
+- The two timer tests call `finished_action` directly (`:572`, `:596`), not Done. Done's button
+  (`timer_window.py:522`, `command=self.done_action`) calls `timer_window_reward.done_action`
+  (`:261`), which runs `run_reward_sequence` inside the guarded `try` and then calls
+  `finished_action` (`:299`). True.
+
+Note on R2-1's own line numbers: the second pass's finding cited the project board row checkbox as
+"line 385 … `_on_item_checkbox_toggled`". That is the *link-item picker's* checkbox, not the board
+row. The resolution corrects this to `1497` / `_on_item_checkbox_changed`, and the correction is
+right — so this pass fixed a line-number error the prior pass introduced while fixing the count.
+
+Resolution section line numbers: `today.py:550`, `all_items.py:271`, `upcoming.py:321`,
+`project_boards.py:1497`, `project_boards.py:1532`, `item_editor.py:487` — all confirmed above.
+
+"Guard moved after the note dialog still passes the decline test" (R2-3, WTP-A10): holds. The
+decline test asserts `messageboxes == ["askyesno"]`, `get_work_logs == []`, status not COMPLETED, and
+`timer.winfo_exists()`. Moving the guard after the dialog still calls `askyesno`, still returns before
+the work-log write and the completion, and still leaves the timer alive; `CompletionNoteDialog` is a
+`ctk.CTkToplevel` (`timer_window_dialogs.py:217`), not a messagebox, so the `messageboxes` fixture
+never sees it, and `_skip_the_note_dialog` dismisses it with no assertion on whether it was needed.
+The ordering genuinely is unasserted; the sentence is accurate.
+
+Step-7 rewrite (`docs/changes/…completion-surfaces.md`): `next_action_window` is initialised to
+`None` (`timer_window.py:349`) and neither timer test opens one (`_stopped_timer` never calls
+`open_next_action_window`), so the destroy branch (`:1153-1156`) is never entered and the tests assert
+the TimerWindow survives (`timer.winfo_exists()`), not the Next Action window. Accurate.
+
+BACKLOG WTP-A9 / WTP-A10: both accurate. A9's route and the `try/except` swallowing the reward-stage
+exception (with the TclError comment recording the lost work log/completion/count) are exactly as
+described (`timer_window_reward.py:285-299`). A10's outcome-vs-ordering distinction is exactly what
+the test asserts. Severity: A10 is clearly Low. A9 is the closer call — the consequence if it regresses
+is the data loss the comment records, but the probability is narrow and the pieces (`finished_action`,
+the guard, the work-log save) are each already tested, so Low is defensible, not undersold.
+
+DOCUMENTATION_INDEX "40 of 40": matches the spec's §6 summary line ("all 40 criteria `done`"), and the
+WTP-M6.7 / WTP-M6.8 / "21 tests" descriptions match §6's rows. The index is now aligned with §6, which
+the previous "32 of 35" was not.
+
+## Non-blocking observation
+
+§6's summary says "40" but its tables list 41 `done` rows (M1×7, M2×8, M3×6, M4×6, M5×6, M6×8). The
+decomposition "35 + M1.7 + the two M5.2 extras + M6.7 + M6.8" counts M5.2's two extra *test cases* as
+criteria while omitting M6.4-M6.6. This is pre-existing in §6 (not in this range) and the index mirrors
+§6's summary faithfully, so it is not a finding against these commits — but §6's arithmetic is worth a
+one-line correction at some point.
+
+## On the two in-loop judgements
+
+Fixing the three prose false claims (R2-1 medium, R2-2/R2-3 low) in-loop rather than filing them was
+the right call. R2-1 was medium and had to be fixed. R2-2 and R2-3 were low but were *false*, not
+cosmetic: the below-medium rule's rationale is that a cosmetic fix "buys none of the safety it costs",
+i.e. code regression risk, and a prose correction carries none of that — while P6 and rule 13 require a
+known-false claim to be corrected, not filed. The one caveat is that a prose fix carries *new-false-claim*
+risk rather than behavioural risk — this very pass exists because the first correction got it wrong — and
+the resolution acknowledges that by re-reading the five widget definitions and the `done_action` route
+instead of trusting the prior fix.
+
+Filing WTP-A9 and WTP-A10 rather than fixing them was also right. Both are below-medium; A9's effort is
+Medium (build a TimerWindow with a project-linked item and press the real Done control, pulling the
+deliverable dialog and reward sequence into the test) for a Low-severity coverage gap whose pieces are
+already tested, and A10's placement is correct today and reviewed twice. The budget says file
+below-medium findings; filing both is consistent with it.
+
+## Follow-up
+
+- Optionally fix the §6 summary arithmetic (40 vs 41) noted above — it is a spec edit, not a correction
+  of these commits.
+
+
+---
+
+# The WTP-A10 claim, measured (2026-11-08, after the third pass)
+
+Both the third pass and I had reached "a guard moved after the note dialog
+would still pass the decline test" by reading the code. Since the two findings
+before it were claims that looked right and were not, it was measured: in a
+detached worktree at `ef69c5b`, the guard was removed from its place in
+`finished_action` and re-inserted after `self.wait_window(dialog)`.
+
+```
+GETMOREDONE_NO_MAPPED_WINDOWS=1 taskpolicy -b \
+  /Users/davemini2/ProjectsLocal/daVIPA/venv/bin/python \
+  -m pytest tests/test_weekly_tactic_completion_widgets.py -k timer -q
+2 passed, 19 deselected in 3.44s
+```
+
+The reordering is invisible to both timer tests, as WTP-A10 says. The worktree
+was removed and no file in the shared checkout was mutated, because the gate
+was reading that tree at the time.
