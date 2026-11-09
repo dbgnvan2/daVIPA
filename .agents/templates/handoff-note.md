@@ -1,7 +1,6 @@
 # Handoff Note
 
 - Date: YYYY-MM-DD
-- Agent: Code | Docs | GitHub
 - Topic: <short-topic>
 
 ## Summary

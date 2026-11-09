@@ -79,23 +79,17 @@ Feature backlog and task tracking:
 - Pending enhancements
 - Known issues
 
-### docs/MULTI_AGENT_WORKFLOW.md (NEW)
+### The multi-agent workflow document and the PR template (deleted 2026-11-09)
 
-Starter operational guide for multi-agent delivery:
-
-- Role definitions (Code / Docs / GitHub agents)
-- Worktree bootstrap command and branch model
-- Required handoff note workflow
-- PR template and CI docs-gate behavior
-
-### `.github/pull_request_template.md`
-
-Pull request template used for multi-agent delivery:
-
-- Summary / validation sections
-- Agent handoff reference
-- Docs sync checklist
-- Maintainability checklist aligned with `codex.md`
+Both had entries here. The workflow document described the three-agent branch
+model — role definitions, a worktree bootstrap, a PR step — which `CLAUDE.md`
+and `AGENTS.md` had recorded as retired since 2026-11-08; the template served
+that PR step, and this repo opens no pull requests. Deleted by the MAW batch
+along with the bootstrap script and the three role prompts (`GSF-A1`,
+`GSF-A2`, and the 2026-08-20 filing that first named the surface). The two
+rules worth keeping were already in `CLAUDE.md` and `AGENTS.md` in full:
+**docs sync** (*Working agreements* / *Docs sync*) and the **required handoff
+note** with its template at `.agents/templates/handoff-note.md`.
 
 ## VSP (Vision Strategy Plan) Documentation
 
@@ -419,6 +413,38 @@ note is:
 - Nine mutations, two green and both recorded. One cold pass, in the family the
   plan named as its own risk - no high and eight mediums, all fixed, two of
   them in the guard's own prose. `SBN-A1` to `SBN-A7` filed, not fixed.
+
+### docs/implementation_plan_2026-11-09_retired_agent_apparatus.md
+
+Implementation plan for deleting the retired three-agent workflow's apparatus
+(MAW-M1 - MAW-M4), closing `BACKLOG.md`'s `GSF-A1` (medium), `GSF-A2` (low)
+and the 2026-08-20 filing of the same surface. **Approved under the standing
+instruction 2026-11-09 and built the same day: 5 of 5 criteria `done`, one item
+not code-testable (MAW-N1, whether the remote `codex/agent-code` should be
+deleted)** - per-criterion status in `docs/spec_coverage.md`. No file under
+`src/` is touched. Handoff note:
+`docs/changes/2026-11-09-retired-agent-apparatus.md`, which is listed here only
+inside this entry rather than as an entry of its own, as every handoff note is:
+
+- Six files deleted: the workflow document, the worktree bootstrap script that
+  created `codex/agent-{code,docs,github}` plus a worktree on each, the three
+  role prompts, and the pull request template. `CLAUDE.md` and `AGENTS.md` had
+  recorded the workflow as retired since 2026-11-08 while all of it stayed
+  executable.
+- The document was deleted rather than rewritten: of its 70 lines, 35 described
+  the retired workflow and 35 were a third copy of rules `CLAUDE.md` and
+  `AGENTS.md` each carry in full. The one list only it held had drifted
+  unnoticed until the GSF batch repaired it hours earlier.
+- `AGENTS.md` still permitted two concurrent builds in two worktrees, which
+  `CLAUDE.md` withdrew on 2026-11-08. Corrected, and MAW-M4.1 holds the
+  agreement.
+- Eleven mutations, five green in the first round and all eleven discriminating
+  after the fixes they forced.
+- One cold pass - three highs and three mediums, all fixed. The `docs/`-path
+  guard had been written with the backticked form alone, so it would not have
+  read this index's own `###` entries; the branch distance every document gave
+  as "131 commits" measured 624 and an ancestor of `main`; and the handoff note
+  claimed two records that did not yet exist.
 
 ### docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md
 
@@ -925,9 +951,9 @@ Documentation is updated:
 - When user issues are resolved
 - During major releases
 
-**Current Status**: last index entry added 2026-11-09 (the GSF dead-gate-and-dead-spec-name plan). This index is not enforced by any test (PLC-A5) and does not list every
-file under `docs/`: of the 76 Markdown files directly under `docs/`, 43 are not
-named in it anywhere and 48 have no entry of their own. `docs/` holds 222 files
+**Current Status**: last index entry added 2026-11-09 (the MAW retired-agent-apparatus plan). This index is not enforced by any test (PLC-A5) and does not list every
+file under `docs/`: of the 82 Markdown files directly under `docs/`, 42 are not
+named in it anywhere and 48 have no entry of their own. `docs/` holds 234 files
 in all, so the gap over its subdirectories is wider still and uncounted. `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`
 (PD-M14) is one of the 48 - named here, with no entry - found while adding the
 PDT entry and left for the batch that owns it, which is what PLC-A5 is about.

@@ -33,9 +33,10 @@ Follow `AGENT_UI_REGRESSION_POLICY.md` for any UI change. Existing user-visible 
 - **Line Counts:** 200-400 (review), 400-700 (careful review), 700+ (refactor candidate).
 - **Refactor Triggers:** Branch-heavy functions, deep nesting, hard to test, or multiple unrelated concerns.
 
-### Multi-Agent Workflow
-- **Branching:** Work is typically split between Code, Docs, and GitHub agents.
-- **Handoff Notes:** After every task, create a note in `docs/changes/<yyyy-mm-dd>-<topic>.md` using the template in `.agents/templates/handoff-note.md`.
+### Working agreements
+- **Branching:** work happens on `main`, or on a feature branch merged into it. There are no per-role branches; the three-agent workflow this section used to describe was retired on 2026-11-09, with the role prompts and the worktree bootstrap script.
+- **One batch at a time:** only one session builds in this checkout at a time, with no worktree exception. A session running alongside a build is read-only. `CLAUDE.md` has the measurement this rule came from.
+- **Handoff Notes:** After every batch, create a note in `docs/changes/<yyyy-mm-dd>-<topic>.md` using the template in `.agents/templates/handoff-note.md`.
 - **Verification:** Changes are incomplete without updated tests and documentation sync.
 
 ## Testing Strategy
@@ -45,5 +46,5 @@ Follow `AGENT_UI_REGRESSION_POLICY.md` for any UI change. Existing user-visible 
 
 ## Documentation
 - Refer to `GetMoreDone_MasterSpec_SQLite_v1.md` for the full technical specification.
-- `AGENTS.md` contains detailed multi-agent rules and theme system specs.
+- `AGENTS.md` contains the working agreements and the theme system spec.
 - `codex.md` contains the full maintainability policy.

@@ -4428,16 +4428,31 @@ Its four highs and its medium were fixed. These were graded low and recorded.
   name claims. They need individual attention rather than a scan.
 
 
-### The retired multi-agent workflow is still described in four places (2026-08-20)
+### ~~The retired multi-agent workflow is still described in four places (2026-08-20)~~ — CLOSED 2026-11-09
 
-`CLAUDE.md` and `AGENTS.md` were corrected. These still describe branches that
-do not exist, and were left alone because rewriting them was out of scope:
+`CLAUDE.md` and `AGENTS.md` were corrected in 2026-08. These described
+branches that do not exist and were left alone because rewriting them was out
+of scope: the workflow document, the three role prompts under
+`.agents/prompts/`, and the worktree bootstrap script, which created
+`codex/agent-{code,docs,github}`.
 
-- `docs/MULTI_AGENT_WORKFLOW.md`
-- `.agents/prompts/code-agent.md`, `docs-agent.md`, `github-agent.md`
-- `tools/agents/setup_worktrees.sh` — creates `codex/agent-{code,docs,github}`
+**Closed 2026-11-09 by the MAW batch**
+(`docs/implementation_plan_2026-11-09_retired_agent_apparatus.md`,
+`docs/changes/2026-11-09-retired-agent-apparatus.md`). All five are deleted,
+together with pull_request_template.md — named here without backticks
+because it no longer exists, per the convention in `CLAUDE.md` — which was
+filed separately as `GSF-A2`.
 
-`tools/agents/check_docs_sync.py` is live and correct; it is not part of this.
+This is the filing that named five of the six parts, and it is the third time
+the surface was filed in three months. Each earlier filing scoped itself to
+the documents and left the executable parts behind, which is why it kept
+coming back.
+`tests/test_repo_hygiene.py::test_mawm12_the_retired_agent_apparatus_is_absent`
+holds it now, and names `CLAUDE.md` and `AGENTS.md` as what must say so first
+if the workflow is ever revived.
+
+`tools/agents/check_docs_sync.py` is live and correct; it was never part of
+this.
 
 
 ### Batch 3 final gate: test-quality findings (2026-08-20)
@@ -4942,16 +4957,17 @@ the diff say two things at once.
 (`docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md`,
 `docs/changes/2026-11-09-dead-gate-and-dead-spec-name.md`). The file is gone,
 and the four live documents that described it as an enforcement a reader gets —
-`AGENTS.md` twice, `CLAUDE.md` and `docs/MULTI_AGENT_WORKFLOW.md` — now name
-the suite's `tests/test_docs_sync_rule.py` instead.
+`AGENTS.md` twice, `CLAUDE.md` and the retired-workflow document (deleted the
+same day by the MAW batch) — now name the suite's
+`tests/test_docs_sync_rule.py` instead.
 `tests/test_ci_contract.py::test_gsfm11_no_document_cites_a_workflow_that_does_not_exist`
 holds the class: a live document may not point a reader at a
 `.github/workflows/<name>.yml` that is not there. A workflow that has been
 deleted is named **without** that path, the way a retired test is named without
 its `tests/` path, so it reads as history rather than as a pointer — which is
 why every mention of this one in `BACKLOG.md`, `NOTES.md`, `CLAUDE.md`,
-`AGENTS.md`, `docs/MULTI_AGENT_WORKFLOW.md` and
-`docs/DOCUMENTATION_INDEX.md` now reads `agent-docs-gate.yml` alone.
+`AGENTS.md` and `docs/DOCUMENTATION_INDEX.md` now reads
+`agent-docs-gate.yml` alone.
 
 **Priority:** Low
 **Effort:** Small
@@ -5364,26 +5380,42 @@ The `_FULL` mask was deleted in the same batch on exactly this ground, that it
 changed no outcome; these two alternatives were kept. Either drop them or add
 the fixture that exercises them.
 
-### GSF-A1 — `docs/MULTI_AGENT_WORKFLOW.md` describes a workflow this repo does not follow (medium)
+### ~~GSF-A1 — the retired-workflow document describes a workflow this repo does not follow (medium)~~ — CLOSED 2026-11-09
 
-Found while correcting that document's docs-gate paragraph (GSF, 2026-11-09).
-Only that paragraph was in scope. The rest of the document still prescribes the
-retired three-agent workflow: a worktree per role, `AGENTS.md` ownership
-boundaries between Code, Docs and GitHub agents, and "Open/update PR with
-`.github/pull_request_template.md`". `CLAUDE.md` records that workflow as
-retired — `codex/agent-docs` and `codex/agent-github` never existed as
-branches — and this repo opens no pull requests. A reader following this
-document would set up a process nobody here uses. Either rewrite it to the
-single-branch, one-batch-at-a-time agreement that `CLAUDE.md` and `AGENTS.md`
-carry, or delete it and let those two be the agreement.
+Found while correcting that document's docs-gate paragraph (GSF, 2026-11-09);
+only that paragraph had been in scope. The rest prescribed the retired
+three-agent workflow: a worktree per role, ownership boundaries between Code,
+Docs and GitHub agents, and a step 4 that said to open a pull request with a
+template. `CLAUDE.md` records that workflow as retired — `codex/agent-docs` and
+`codex/agent-github` never existed as branches — and this repo opens no pull
+requests, so a reader following the document would have set up a process nobody
+here uses.
 
-### GSF-A2 — `.github/pull_request_template.md` is kept for PRs this repo never opens (low)
+**Closed 2026-11-09 by the MAW batch**
+(`docs/implementation_plan_2026-11-09_retired_agent_apparatus.md`,
+`docs/changes/2026-11-09-retired-agent-apparatus.md`). The document is
+**deleted** rather than rewritten, with the measurement for why: of its 70
+lines, 35 described the retired workflow and the other 35 were a third copy of
+rules `CLAUDE.md` and `AGENTS.md` each already carry in full. Three copies is
+the drift surface — the one list only this document held had drifted
+(`requirements.txt` without `requirements-dev.txt`), unnoticed until the GSF
+batch repaired it in `1d05a4c` hours before this deletion, and that batch's
+cold pass had
+caught the paragraph above it reinstating a false enforcement claim two hours
+after that claim was removed from three other documents. The fix is two copies,
+not a repaired third. `MAW-M1.1` and `MAW-M3.1` hold the pointers.
+
+### ~~GSF-A2 — the pull request template is kept for PRs this repo never opens (low)~~ — CLOSED 2026-11-09
 
 Same class as the closed `SAG-A3`, one surface along: a file whose only trigger
 is a pull request, in a repo whose standing instruction is to open none. Unlike
-the workflow it is inert rather than misleading, which is why it is low. It is
-cited by `docs/MULTI_AGENT_WORKFLOW.md`, so `GSF-A1` and this should be settled
-together.
+the workflow it was inert rather than misleading, which is why it was low.
+
+**Closed 2026-11-09 by the MAW batch**, deleted with the rest of the
+apparatus. `tests/test_ci_contract.py::test_mawm21_no_document_cites_a_github_file_that_does_not_exist`
+is what stops a document pointing a reader at it, or at any other `.github/`
+file that is not tracked — `GSF-M1.1` reads only `.github/workflows/`, so it
+would not have caught this one.
 
 ### GSF-A3 — the `docs/` half of the GSF scanned set is hand-kept (medium)
 
@@ -5422,3 +5454,49 @@ distinct names. Either the file was renamed and these entries were not, or the
 entries describe work that was never built; the fix needs those items read
 rather than their citations rewritten, which is why it is filed and not
 repaired here.
+
+### MAW-A1 — `.agents/` now holds only a template (low)
+
+The three role prompts are deleted, so `.agents/prompts/` is gone and
+`.agents/` holds nothing but `templates/handoff-note.md`, which
+`tests/test_repo_hygiene.py::test_mawm12_the_retired_agent_apparatus_is_absent`
+positively requires to stay. Whether a one-file `.agents/` tree is worth
+keeping, or the template belongs under `docs/` or `.github/`, is a tidying
+question with a guard to update either way. Found while measuring the deletion
+set.
+
+### MAW-A2 — one entry in `PERMISSIVE_BUILD_PHRASES` exists only for the test's own fixture (low)
+
+`tests/test_doc_status_claims.py::PERMISSIVE_BUILD_PHRASES` has three entries.
+The first two both match the one sentence `AGENTS.md` actually carried; the
+third, "two builds at once is fine", has never appeared in this repo's history
+and is there to give the case-insensitivity assertion something to match. It
+buys no coverage of real prose. Either drop it and make that assertion use a
+re-cased copy of entry 0, or keep it and say in the docstring that it is a
+fixture phrase. Found by the MAW second cold pass; below medium, so filed
+rather than fixed in-loop.
+
+### MAW-A3 — a retired description outside the scanned set survived two batches (medium)
+
+`docs/GEMINI.md` described the three-agent split under its own
+*Multi-Agent Workflow* heading, and went on describing it after the GSF batch
+corrected the live documents and after the MAW batch's first cold pass. It was
+found by the second cold pass, by `git grep -i "docs agent"` over all tracked
+Markdown rather than over the 17 scanned documents. The class is the one
+`GSF-A3` describes — a guard that reads a hand-kept set — but the specific
+lesson is narrower and cheap to act on: a batch that retires a *concept* should
+grep the whole tree for the concept's vocabulary, not only resolve the
+pointers. A test cannot read "describes a retired workflow as current"; what it
+can do is hold a list of retired vocabulary and fail on any live document that
+uses it. That is the proposal, and it needs the vocabulary list to be editorial
+config rather than a literal in a test.
+
+### MAW-N1 — `origin/codex/agent-code` still exists on the remote (needs a decision)
+
+The last of the three role branches. Measured 2026-11-09:
+`git rev-list --left-right --count main...origin/codex/agent-code` gives
+**624 0** and `git merge-base --is-ancestor origin/codex/agent-code main`
+succeeds, so it is 624 commits behind `main`, nothing ahead, and every commit
+on it is already here. Deleting the ref would lose nothing. Last commit
+2026-04-03. Deleting a remote branch is the user's call, not mine, which is why
+this is filed as a decision rather than done.

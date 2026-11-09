@@ -2,8 +2,8 @@
 
 > **The three-agent branch workflow this file used to describe is retired.**
 > `codex/agent-docs` and `codex/agent-github` were never created as branches,
-> and `codex/agent-code` was last touched 2026-04-03, 131 commits behind
-> `main`. Work happens on `main`, or on a feature branch merged into it. The
+> and `codex/agent-code` was last touched 2026-04-03, 624 commits behind
+> `main` and an ancestor of it (re-measured 2026-11-09). Work happens on `main`, or on a feature branch merged into it. The
 > requirements below are retained because they were never about the agent
 > split — they are about not losing context between sessions.
 
@@ -11,10 +11,17 @@
 
 Only one session builds in this checkout at a time. A working tree has one git
 index, so concurrent writers race on it however the sessions are related. A
-session running alongside a build is read-only; two builds at once means two
-worktrees with checked-disjoint file sets. The rule, and what four concurrent
-batches cost on 2026-11-08, are in `CLAUDE.md` under *Working agreements →
-One build batch at a time*.
+session running alongside a build is read-only: it commits nothing and stages
+nothing.
+
+**There is no second build, and no worktree exception.** Two concurrent builds
+in separate worktrees, their file sets checked for overlap before either
+started, used to be allowed here. That was withdrawn on 2026-11-08, because
+worktrees fixed the shared index and not
+the thing that cost more: work finished and left on a branch, with `main`
+holding the tests for code it did not contain. The rule, and what four
+concurrent batches cost that day, are in `CLAUDE.md` under *Working agreements
+→ One build batch at a time* and *Why the worktree exception was withdrawn*.
 
 ## Required handoff artifact
 

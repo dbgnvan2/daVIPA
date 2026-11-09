@@ -1463,7 +1463,7 @@ deleted, two test files gain a guard each, and nine documents are repaired.
 
 | Criterion | What it required | Implementation | Tests | Status |
 |---|---|---|---|---|
-| GSF-M1.1 | the pull-request-only docs gate deleted, and no live document describing it as an enforcement a reader gets | workflow deleted; `AGENTS.md`, `CLAUDE.md`, `docs/MULTI_AGENT_WORKFLOW.md`, `NOTES.md` corrected | `::test_gsfm11_no_document_cites_a_workflow_that_does_not_exist` | done — the four live claims corrected, eight path-carrying mentions rewritten to the path-free form, records under `docs/changes/`, `docs/spec_*` and `docs/implementation_plan_*` left as written |
+| GSF-M1.1 | the pull-request-only docs gate deleted, and no live document describing it as an enforcement a reader gets | workflow deleted; `AGENTS.md`, `CLAUDE.md`, docs/MULTI_AGENT_WORKFLOW.md, `NOTES.md` corrected | `::test_gsfm11_no_document_cites_a_workflow_that_does_not_exist` | done — the four live claims corrected, eight path-carrying mentions rewritten to the path-free form, records under `docs/changes/`, `docs/spec_*` and `docs/implementation_plan_*` left as written |
 | GSF-M1.2 | the deletion cannot be undone silently: a document citing a `.github/workflows/<name>.yml` that is not there fails, proved against a fixture rather than against today's prose | `tests/test_ci_contract.py` (`_WORKFLOW_CITATION`, `workflow_citations`, `dangling_workflow_citations`) | same test, over a `tmp_path` `PROBE.md` | done — the helper takes `(label, text)` pairs precisely so the fixture can drive it; the repo scan alone is green once the repair lands |
 | GSF-M2.1 | every live citation of the master spec names the file that exists, and the index has no entry for a root document the repo does not contain | 11 citations in 7 documents | `::test_gsfm21_no_document_cites_a_root_doc_that_does_not_exist` | done — including a `###` entry heading in `docs/DOCUMENTATION_INDEX.md`, which is why the guard has a heading arm |
 | GSF-M2.2 | the four exempted names are exempt for a stated reason, checked in both directions | `tests/test_repo_hygiene.py` (`ROOT_DOC_CITATION_EXEMPTIONS`) | same test | done — one reason covers all four (`~/.claude/standards/`, outside any repo); a name that starts resolving has to leave the list |
@@ -1509,7 +1509,7 @@ was fixed:
   in both closure entries, which is the exact class the batch exists to close.
   No guard covers it: the root-doc arm excludes anything with a directory part
   by design. Fixed by writing the note.
-- **`docs/MULTI_AGENT_WORKFLOW.md` reinstated the false enforcement claim**
+- **docs/MULTI_AGENT_WORKFLOW.md reinstated the false enforcement claim**
   the batch had just removed from three other documents: it said the rule runs
   with the suite on every push and then described it failing on an
   undocumented change. What runs is `verdict` over fixtures; nothing diffs the
@@ -1536,3 +1536,147 @@ marker counts: 2439 app plus 249 meta, the meta figure having moved by this
 batch's two tests. It also answers the one thing the cold pass could not
 assess: a depth-1 CI checkout collects both guards with the cross-module
 `from test_ci_contract import …` intact.
+
+
+## MAW — the retired three-agent apparatus (2026-11-09)
+
+Spec and plan: `docs/implementation_plan_2026-11-09_retired_agent_apparatus.md`.
+Note: `docs/changes/2026-11-09-retired-agent-apparatus.md`.
+Closes `BACKLOG.md`'s `GSF-A1` (medium), `GSF-A2` (low), and the 2026-08-20
+filing "The retired multi-agent workflow is still described in four places" —
+the third filing of one surface in three months.
+
+No file under `src/` is touched. Six files are deleted, four guards are added
+across three test files (`tests/test_repo_hygiene.py` gains two), and six
+documents are repaired.
+
+| Criterion | What it required | Implementation | Tests | Status |
+|---|---|---|---|---|
+| MAW-M1.1 | the retired-workflow document gone, and no live document describing the three-agent workflow, the per-role branches or the worktree bootstrap as current | document deleted; `AGENTS.md`, `BACKLOG.md`, `docs/DOCUMENTATION_INDEX.md`, `docs/GEMINI.md` repaired | `::test_mawm11_no_document_cites_a_docs_path_that_does_not_exist` for the pointers; prose review for the descriptions | done, at the second attempt — deleted rather than rewritten, and §1.2 of the plan is the measurement for why: 35 of its 70 lines were a third copy of rules `CLAUDE.md` and `AGENTS.md` each carry in full, and the one list only it held had drifted unnoticed until the GSF batch repaired it hours earlier. `docs/GEMINI.md` was missed by the first cold pass and found by the second: it described the split between Code, Docs and GitHub agents under its own *Multi-Agent Workflow* heading, and it is in the scanned set |
+| MAW-M1.2 | the apparatus that served only that document gone — the bootstrap script and the three role prompts — and nothing citing them | 5 files deleted | `::test_mawm12_the_retired_agent_apparatus_is_absent` | done — the script created `codex/agent-{code,docs,github}` and a worktree on each; two of those three branches were never created by anything else |
+| MAW-M2.1 | the pull request template gone, and a live document citing any `.github/` file that is not tracked failing, proved against a fixture | `tests/test_ci_contract.py` (`_GITHUB_FILE_CITATION`, `github_file_citations`, `dangling_github_citations`) | `::test_mawm21_no_document_cites_a_github_file_that_does_not_exist` | done — `GSF-M1.1` reads only `.github/workflows/`, so it would not have caught this one |
+| MAW-M3.1 | a live document citing a `docs/` path that is not tracked failing, with exemptions carrying a stated reason and checked both ways | `tests/test_repo_hygiene.py` (`_DOCS_PATH_CITATIONS`, `DOCS_PATH_CITATION_EXEMPTIONS`, `docs_path_citations`, `dangling_docs_path_citations`) | `::test_mawm11_no_document_cites_a_docs_path_that_does_not_exist` | done — **five** arms, after the cold pass: backticked, with a line number, a heading, a markdown link, a list item. It shipped with the first alone, which would not have read this repo's own index |
+| MAW-M4.1 | `AGENTS.md` no longer permitting a second concurrent build in a worktree, which `CLAUDE.md` withdrew on 2026-11-08 | `AGENTS.md`, *One build batch at a time* | `::test_mawm41_agents_and_claude_agree_on_concurrent_builds` | done — `AGENTS.md` had pointed at `CLAUDE.md` for the detail of the rule it contradicted |
+| MAW-N1 | **not code-testable:** whether `origin/codex/agent-code` should be deleted | — | human | not code-testable — and the cold pass corrected the question: the branch is an ancestor of `main`, 624 commits behind and 0 ahead, so nothing would be lost. Residue: `MAW-N1` in `BACKLOG.md` |
+
+### Mutations
+
+Three rounds, twelve in all — the twelfth covers the second cold pass's one
+code fix. The first round discriminated on five of ten; the other five came
+back green and every one was the same shape — a repo-state assertion that
+cannot fail once the repo is clean, which is the lesson the GSF batch recorded
+one batch earlier and this one had to learn again. Each was restored with the
+verbatim original and confirmed by sha256.
+
+| # | Mutation | Result |
+|---|---|---|
+| MA | the `.github` citation regex loses its path anchor | 1 failed |
+| MB | the `.github` dangling comparison removed | 1 failed |
+| MC | the `.github` filename requirement dropped, so a directory becomes a citation | 1 failed |
+| MD | the `docs/` regex loses its subdirectory reach | 1 failed |
+| MF | an exemption added for a `docs/` path that does exist | 1 failed |
+| ME | the `docs/` dangling comparison removed | **GREEN** → fixed. `dangling_docs_path_citations` extracted and driven over a `PROBE.md` fixture; `ME'` fails |
+| MG | the apparatus tuple emptied of the bootstrap script | **GREEN** → fixed. A list of things that must be absent cannot fail by shrinking, so the tuple's own contents are now asserted against a literal; `MG'` fails |
+| MH | the apparatus presence comparison made a no-op | **GREEN** → fixed. `present_apparatus` extracted and driven over a listing written in the test; `MH'` fails |
+| MI | the concurrent-build phrase list emptied | **GREEN** → fixed. `permissive_build_phrases` extracted and driven over text written in the test; `MI'` fails |
+| MJ | the positive "AGENTS.md states the rule" assertion deleted | **GREEN**, and wrong-shaped: deleting an assertion cannot fail a test. Re-run as `MJ'`, a *document* mutation renaming the heading — which passed, because the assertion matched the bare phrase anywhere in the file and `AGENTS.md` also names the rule in a cross-reference. Anchored to the heading; `MJ'` now fails |
+| MK' | the permissive sentence put back into `AGENTS.md` | passed at first — the scan was case-sensitive and the sentence began a line, so it began with a capital. Lowered before matching; `MK'` now fails |
+| ML | `_DOCS_PATH` made greedy again, as it shipped | 1 failed, at `tests/test_repo_hygiene.py:567` — the two-paths-on-one-line assertion the second cold pass's fix needed. Restored verbatim, confirmed by sha256 |
+
+### The cold passes
+
+**First cold pass**, on the full diff, with the lens "can any of the four
+guards pass while reading nothing, and is every claim in the new prose true".
+It produced **three highs and three mediums**.
+
+- **High — the `docs/` guard had no heading arm.** It read the backticked form
+  alone. The deleted document's entry in `docs/DOCUMENTATION_INDEX.md` was
+  a `###` heading naming it with no backticks, and that
+  index names 26 documents that way; markdown links, list items and
+  backticked-with-line-number paths were also unread. So the guard would not
+  have caught the single citation this batch repaired by hand, and `GSF-M2.1`
+  has the same arm one directory up, added for the same reason one batch
+  earlier. Four arms added; all four were measured free, with zero new
+  dangling citations.
+- **High — "131 commits behind `main`" was false, and `MAW-N1`'s premise with
+  it.** Re-measured: 624 behind, 0 ahead, and
+  `git merge-base --is-ancestor origin/codex/agent-code main` succeeds. The
+  131 was an 2026-08-19 figure copied forward without re-measurement. Four
+  documents carry it at `097acf3`, of which two are live — `CLAUDE.md` and
+  `AGENTS.md` — and two are dated records accurate as of their own date, left
+  alone. This batch's plan, note and a test comment copied it again. Both live
+  copies and every new one are corrected. The question put to the user changed with it:
+  nothing is lost by deleting that ref.
+- **High — the handoff note claimed two records that did not exist.** It
+  listed `docs/spec_coverage.md` and `NOTES.md` as changed; neither was
+  touched and neither mentioned MAW, so the batch's five criteria were
+  recorded nowhere. This section and the `NOTES.md` bullet are the fix. It is
+  the second batch running to commit this exact defect, having written the
+  guard for its sibling.
+- **Mediums**: the plan was the only November plan missing from the
+  documentation index; a `BACKLOG.md` closure note attributed to `CLAUDE.md` a
+  backtick convention that was not in it, and the two conventions these guards
+  imply were not added to the section that exists so that a convention is not
+  learned by turning a test red; and two post-change counts in the note were
+  pre-change figures (21 scanned documents, now 17; and a count of `docs/`
+  files that no stated definition reproduced — measured, it is 28 of the 33
+  documents one level under `docs/` whose names carry no date). All fixed. Writing the convention down then caught a third
+  instance of itself: dropping the `.github/` path from a deleted `.md` leaves
+  a backticked bare name, which is what `GSF-M2.1` reads, so the rule for any
+  deleted Markdown file is no backticks at all.
+
+**Second cold pass**, required because the first produced highs, run on the
+whole diff with a different lens: the in-loop fixes themselves — the five
+`docs/` arms, the four helper extractions and the convention rewrite — and
+every number in the new prose, each re-measured. It produced **two highs, five
+mediums and eight lows**.
+
+- **High — docs/GEMINI.md still described the three-agent split as current.**
+  Under its own *Multi-Agent Workflow* heading: "Work is typically split
+  between Code, Docs, and GitHub agents", plus a pointer to `AGENTS.md` for
+  "detailed multi-agent rules" that `AGENTS.md` no longer carries. It is a
+  member of `DOCS_DIR_LIVE_DOCS`, so the batch's own scanned set held it the
+  whole time; what the guards resolve is *pointers*, and a description is not a
+  pointer. MAW-M1.1 had been recorded `done` on a prose review that did not
+  reach it. Rewritten to the surviving agreements; the class is filed as
+  `MAW-A3`.
+- **High — the justification for deleting rather than rewriting was false as
+  written.** Six documents said the one list only that file held "had gone
+  stale". It had drifted, but it was repaired in `1d05a4c` — by the GSF batch,
+  hours earlier the same day — so it was current at the moment of deletion. All
+  six corrected to what is true: a third copy drifted unnoticed until a cold
+  pass went looking, which is the argument for two copies rather than a
+  repaired third.
+- **Medium — the `docs/` path regex merged two citations on one line.** The
+  character class admits a space, because `docs/daVIPA - Get Started.md` is a
+  real document; greedy, a heading naming two documents was read as the single
+  path "docs/a.md and docs/b.md", tracked nowhere, so the guard would have
+  failed on correct prose. Non-greedy now, which stops at the first `.md`: no
+  false positive, at the cost of reading only the first path on such a line.
+- **Medium — the handoff-note template was the apparatus, kept and asserted.**
+  Its `- Agent: Code | Docs | GitHub` line offered a choice among three roles
+  whose prompts this batch deleted, and the batch's own note filled it in. Line
+  removed from the template and from this batch's note; past notes keep theirs
+  as records.
+- **Mediums, in the prose**: the plan still gave the pre-change scanned count;
+  a `docs/` file count no stated definition reproduced (measured: 28 of 33);
+  the provenance of the 131 figure was wrong in three ways (`BACKLOG.md` never
+  carried it; four documents do at `097acf3`, two live and two dated records);
+  and the mutation paragraph's arithmetic did not match its own table.
+- **Lows**, all in text this batch wrote, all fixed rather than filed bar one:
+  "Three conventions" over four bullets and a closing sentence pointing at the
+  wrong one; an overstatement that `MAW-M2.1` holds the whole of `.github/`
+  when it reads the backticked, dotted-extension form alone; 25 index headings
+  where there are 26; an identifier named in the note that does not exist;
+  "three test files gain a guard each" where one gains two; and three counts in
+  `docs/DOCUMENTATION_INDEX.md` edited without re-measuring (82, 42, 234). The
+  one filed is `MAW-A2`, a phrase in `PERMISSIVE_BUILD_PHRASES` that exists
+  only to feed the test's own fixture. The sharpest of them: this batch's own
+  documents named the deleted Markdown files in backticks, breaking the
+  convention it had just written into `CLAUDE.md`. 17 names unwrapped. They
+  passed only because the plan, the note and this file are outside the scanned
+  set — which is exactly `GSF-A3`.
+
+Both highs are corrections to claims rather than to code, and no guard changed
+behaviour except the non-greedy regex. A third pass is not run: the budget
+allows one after a high, and that was this one.

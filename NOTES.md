@@ -2,6 +2,31 @@
 
 One batch at a time from here, per `CLAUDE.md`. What that leaves:
 
+- **The retired three-agent apparatus is gone** (MAW batch, 2026-11-09,
+  `GSF-A1`, `GSF-A2` and the 2026-08-20 filing of the same surface). `CLAUDE.md`
+  and `AGENTS.md` had recorded the workflow as retired since 2026-11-08 while
+  all of its parts stayed here and read as current: the workflow document, the
+  bootstrap script that created `codex/agent-{code,docs,github}` plus a
+  worktree on each, the three role prompts, and the pull request template. All
+  six deleted. The document was deleted rather than rewritten because 35 of its
+  70 lines were a third copy of rules the two surviving documents each carry in
+  full — and the one list only it held had drifted, unnoticed, until the GSF
+  batch repaired it in `1d05a4c` hours earlier, which is the argument for two
+  copies rather than a repaired third. `AGENTS.md` also still permitted two
+  concurrent builds in two worktrees, which `CLAUDE.md` withdrew on 2026-11-08;
+  corrected, with a guard on the agreement. Four guards, twelve mutations (five
+  green in the first round, all twelve discriminating after), and **two** cold
+  passes. The first found three highs: the `docs/`-path guard read one citation
+  form where this repo writes five; the branch distance the two live documents
+  gave as 131 commits measured 624 and an ancestor of `main`; and the handoff
+  note claimed two records that did not yet exist. The second, run because the
+  first found highs, found two more: docs/GEMINI.md was still describing the
+  split between Code, Docs and GitHub agents — inside the scanned set, because
+  the guards resolve pointers and a description is not one — and the sentence
+  six documents used to justify deleting rather than rewriting was false as
+  written, the list in question having been repaired hours earlier rather than
+  left stale. `docs/spec_coverage.md` has both passes in full.
+
 - **The two dead pointers are closed** (GSF batch, 2026-11-09, `SAG-A3` and
   `SAG-A7`). agent-docs-gate.yml is deleted: it triggered on `pull_request`
   only, this repo opens none, so it had never run, and the rule it carried has
