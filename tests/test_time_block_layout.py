@@ -253,7 +253,10 @@ def test_default_minutes_for_block_type_works_without_settings():
 @pytest.mark.parametrize(
     "score, band",
     [
-        (102400, "critical"),  # 20 x 20 x 16 x 16, the top of the scale
+        (102400, "critical"),  # PRI-M2.7: a legacy pre-cap score, not the top
+        # of the scale -- 20 x 20 x 16 x 16 now stores as 9999. Rows written
+        # before the cap still hold the raw product, and the bands must not
+        # re-colour them.
         (2000, "critical"),
         (1999, "high"),
         (500, "high"),
