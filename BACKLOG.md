@@ -158,13 +158,23 @@ turn the meta test green while making the gap invisible, which is the opposite
 of what that test is for. It needs the three tests written. Belongs to the
 priority batch.
 
-### 3. Seven tests measure the CI display rather than the code — WTP-A11 (medium)
+### 3. CLOSED 2026-11-09 — seven tests measured the CI display, not the code (WTP-A11)
 
 Filed in full as **WTP-A11** below, with the list and the shape of the fix. In
 short: a test that sets a window attribute and reads it back needs a window
 manager to honour the write, and the CI display has none. Red since at least
 `3f705b4` (2026-11-07). One shared precondition rather than seven is the part
 worth designing; `23f0cc7` is the worked example for a single test.
+
+**Closed by the CIG batch, 2026-11-09**: `tests/display_capabilities.py` is the
+one precondition, and `CIG-M1.4` asserts all eight callers use it. Two things
+`WTP-A11` had wrong are corrected in the plan rather than here: Xvfb does
+report `-alpha` back, for a window that has been **mapped** (two sibling tests
+in `tests/test_tk_offscreen.py` prove it on CI), so the question is narrower
+than "does the display support the attribute"; and skipping the two `-alpha`
+tests does cost coverage, because one of them is the only test in the suite
+that drives a raw `tk.Tk` through the guard. `CIG-A2` is the better fix for
+those two. Per-criterion status in `docs/spec_coverage.md`.
 
 ### 4. PARTLY CLOSED — the traceability pair (low)
 
@@ -187,9 +197,15 @@ batch** — the two files were written (`750afe6`), not the docstrings deleted,
 which is what item 2 said the closure had to be. All three tests in
 `tests/test_traceability_refs.py` are green.
 
-### 5. Two tests fail only in CI (low)
+### 5. CLOSED 2026-11-09 — two tests failed only in CI (low)
 
-- `tests/test_plan_screen.py::test_pbm61_a_tall_row_keeps_its_two_lines_together`
+Both rewritten by the CIG batch: `CIG-M3` and `CIG-M2` in
+`docs/spec_coverage.md`. The second one's cause is **still not identified** —
+the test now forces the reading the code takes rather than resizing a widget,
+which needs no diagnosis; the X11 behaviour itself is filed as `CIG-A8`.
+
+- `tests/test_plan_screen.py::test_pbm61_a_tall_row_keeps_its_slack_below_its_text` (named `…_keeps_its_two_lines_together`
+  when this item was filed)
   — a mapped-window geometry test. It **cannot be reproduced on a working
   machine**: it is one of the 22 that `GETMOREDONE_NO_MAPPED_WINDOWS=1` skips
   because it needs a real on-screen window and takes keyboard focus. Red since
@@ -1918,8 +1934,9 @@ origin/main today (run 42538374520):
   `test_t57_an_unbalanced_resume_does_not_break_the_next_modal`
 - `tests/test_weekly_tactic_surfaces.py` — `test_wt_m6b6_a_notice_lowers_an_always_on_top_parent`
 
-The eighth, `tests/test_plan_screen.py::test_pbm61_a_tall_row_keeps_its_two_lines_together`,
+The eighth, `tests/test_plan_screen.py::test_pbm61_a_tall_row_keeps_its_slack_below_its_text`,
 was red at `3f705b4` too but for a different reason and is not part of this.
+(It was named `…_keeps_its_two_lines_together` until CIG-M3.1 renamed it.)
 
 The shape of the fix is in `23f0cc7`: read the attribute back straight after
 setting it and skip when the display did not take it, so the assertions keep
@@ -1934,6 +1951,155 @@ unnoticed in a run someone had already looked at.
 
 **Priority:** Medium
 **Effort:** Small to fix, Medium to fix once rather than seven times
+**Status:** CLOSED 2026-11-09 by the CIG batch — see item 3 above for what it
+corrected in this filing's own reasoning.
+
+## Adjacent issues — CI green (CIG, 2026-11-09)
+
+Found while building `CIG-M1` to `CIG-M4`. Flagged per rule 10, not fixed: each
+is real, none is what the batch was for, and every one of them is a second
+design decision about tests this batch is already rewriting.
+
+### CIG-A1 — the precondition registry cannot detect a new offender (medium)
+
+`tests/test_display_capabilities.py::EXPECTED_CALLERS` holds the eight tests
+that ask `require(...)`, and the guard asserts set equality both ways. That
+catches a precondition **dropped** from one of the eight and a skip nobody
+registered. It cannot catch what caused this batch: a *new* test that sets a
+window attribute and reads it back without asking the precondition at all. Six
+of the seven failures were written that way.
+
+Nothing asserts the skip count either. After this batch CI reports 10 skips for
+display reasons, and a count nobody checks is exactly how the test figures in
+`CLAUDE.md` drifted by 741 and 13.
+
+The right form is a test that finds the read-backs rather than listing their
+callers — an AST walk for `wm attributes`-shaped reads whose enclosing function
+does not call `require` — and that is a judgement about how much the suite
+should know about its own environment, which is why it is filed.
+
+**Priority:** Medium
+**Effort:** Medium
+
+### CIG-A2 — two `-alpha` tests skip where they could assert (medium)
+
+`tests/test_tk_offscreen.py::test_alpha_still_passes_through_the_attributes_wrapper`
+and `::test_raw_tkinter_windows_are_hidden_and_registered_too` now skip on CI.
+They need not: the same file has two `-alpha` read-backs at
+`test_a_remapped_window_is_made_transparent_again` and
+`test_a_mapped_window_is_invisible_but_still_measurable` that **pass on CI**,
+and what makes them different is that they take the `mapped_windows` fixture
+and so map and settle their window first. `conftest.py` records that those two
+were made green by CI measurement.
+
+So the fix is to map these two as well, which keeps them asserting on CI
+instead of skipping. Not done here because `mapped_windows` is the fixture the
+local throttle skips, so the change cannot be verified on this machine at all —
+it would be written blind and verified only by the next CI run.
+
+**Priority:** Medium
+**Effort:** Small
+
+### CIG-A3 — T5.6 and T5.7 now have no CI coverage, and a spy is available (medium)
+
+The plan rejected replacing the five always-on-top read-backs with a spy on
+`wm attributes`, on the ground that
+`tests/test_timer_session_endings.py` says the read-back is deliberately "past
+the patch in both directions". That is a real reason for T5.1 and T5.2, which
+are about the attribute reaching Tk. It is weaker for T5.6 and T5.7, which are
+about a **depth counter**: `_suspend_topmost` / `_resume_topmost` nest, and the
+bug they guard was an unbalanced resume handing the flag back early. A spy
+measures that without a window manager, and
+`tests/test_reward_protocol_timer.py` already spies on `wm attributes` with a
+stub window, so the mechanism exists in this suite.
+
+Filed rather than built because the plan stated a preference as a constraint
+and the cold pass caught it; building the alternative in the same batch would
+be the third design for these tests in one day.
+
+**Priority:** Medium
+**Effort:** Small
+
+### CIG-A4 — `test_cigm14_the_private_copy_of_the_precondition_is_gone` asserts by grep (low)
+
+Two unanchored substring checks over
+`tests/test_weekly_tactic_completion_widgets.py`. The repo rule is to parse
+rather than grep where a behavioural check is impractical, and
+`tests/source_asserts.py` exists for exactly this. The substance — that the
+private skip wording is gone and `_TOPMOST_ON` survives — is right; the form is
+not.
+
+**Priority:** Low
+**Effort:** Small
+
+### CIG-A5 — the `-alpha` probe is partly vacuous (low)
+
+`_PROBES["-alpha"]` sets 0.0 and asserts 0.0 comes back. `conftest` already
+sets alpha 0.0 on every test window at creation, so on a display where the
+attribute is simply ignored and the read-back returns whatever was last stored,
+the probe answers True without the display having honoured anything. A value
+the wrapper does not already set — 0.5 — would distinguish the two.
+
+Low rather than medium because the probe is measured against a second window by
+`CIG-M1.1`, so a wrong answer is a red test rather than a silent skip; and
+because the probe's window is built with raw `tk.Tk`, outside the wrapper.
+
+**Priority:** Low
+**Effort:** Small
+
+### CIG-A6 — `_requirers()` matches only a bare `require(...)` (low)
+
+The AST walk looks for `ast.Name` with `id == "require"`. A caller that writes
+`caps.require("-topmost")` — which the module's own docstring style invites —
+is an `ast.Attribute` and is invisible to it, so it would read as a missing
+precondition. Harmless today, because all eight callers import the bare name;
+it is the form that is wrong. Same family as `CIG-A1`.
+
+**Priority:** Low
+**Effort:** Small
+
+### CIG-A7 — the new test file carries no marker, and three smaller things (low)
+
+`tests/test_display_capabilities.py` AST-walks the test tree and reads source
+text, which is what the `meta` marker is for, and it has none: it is counted as
+app behaviour by `-m "not meta"`. Alongside it: `_independently()` in that file
+has no `except` mirror of the probe's own, so a display that raises leaves the
+comparison an error rather than a disagreement;
+`test_pbm61_a_tall_row_keeps_its_slack_below_its_text`'s docstring cites
+`plan_blocks.py` by line number, which `SST-M8` forbids for the chronic
+documents and is the same defect class here; and the probe builds a second Tcl
+interpreter, so it is the first `tk.Tk()` of a run and sets `_default_root`.
+
+**Priority:** Low
+**Effort:** Small
+
+### CIG-A8 — why the body reports 1208px under X11 is unknown (low)
+
+`test_updm14_zero_width_body_is_a_noop` failed on CI for months with
+`assert 1208 <= 8`: `body.configure(width=8)` did not change
+`body.winfo_width()` there, and does here. Two explanations were written into
+the test as comments and both were withdrawn after measurement — the body
+reports 1px whatever its holder does, and the root's geometry is not what the
+body follows. The test no longer depends on the answer, so this is filed as the
+open question it is rather than guessed at again.
+
+**Priority:** Low
+**Effort:** Medium (diagnosis, on a machine with the CI display)
+
+### CIG-A9 — the traceability guard cannot see a bare `::name` (low)
+
+`docs/spec_coverage.md` cited
+`::test_pbm61_a_tall_row_keeps_its_two_lines_together` after this batch renamed
+it, and `tests/test_traceability_refs.py` stayed green: its pattern is
+`(tests/[\w/]+\.py)(?:::(\w+))?`, so a `::name` with no file before it is not
+a reference it can check. The coverage file's Tests column is written that way
+throughout — the file is named once in a section header and every row uses the
+bare form — so the guard is blind to the majority of that column.
+
+Found by reading, not by a test, which is the point of filing it.
+
+**Priority:** Low
+**Effort:** Medium
 
 ## Adjacent issues — priority level colours (PLC, 2026-11-08)
 

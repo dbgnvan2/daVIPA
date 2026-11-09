@@ -328,7 +328,10 @@ The demo relaunched on the committed code, `drag_schedule_box_height_px = 30`.
   two-box row 70, so the difference is 3px and the demo's own setting hides the
   thing the criterion is about. Set to 86 the left pane shows it plainly: the
   60-minute item is exactly twice the height of each 30-minute item, with its
-  two lines of text at the top and the slack at the bottom.
+  text at the top and the slack at the bottom. (This bullet said "its two lines
+  of text" until 2026-11-09. The bullet three above it records PD-M1 moving the
+  length onto the task's one line, so the two readings contradicted each other
+  in one document — found by the cold pass over the CIG batch.)
 - **A saved box height did nothing until the next launch** — **found here, and
   fixed.** This is what the walk was for: three review passes and a green suite
   had not touched it, because every test builds a screen from an object it was
@@ -392,7 +395,7 @@ walkthrough, two more after those five were on screen. All tests are in
 | PB-M6.1 | A row is never shorter than its own two lines of text, and from a box height of 62 up it is exactly the day's own height (63 until PD-M1.2 took a pixel off the floor) | `src/getmoredone/screens/plan_blocks.py` (ITEM_ROW_MIN_HEIGHT_PX) | `::test_pbm61_a_row_too_short_for_its_text_keeps_its_text` | done |
 | PB-M6.1 | The floor is the height the row's own grid asks for, measured off the widgets rather than restated as a number | `src/getmoredone/screens/plan_blocks.py` (ITEM_ROW_MIN_HEIGHT_PX) | `::test_pbm61_the_floor_is_what_the_rows_own_grid_asks_for` | done |
 | PB-M6.1 | Every child of the row is drawn inside it and none is collapsed, at the floor and above it | `src/getmoredone/screens/plan_blocks.py` (build_item_row, grid_rowconfigure) | `::test_pbm61_every_line_of_a_row_is_drawn_inside_it` *(needs `mapped_windows`)* | done |
-| PB-M6.1 | A tall row keeps its two lines together at the top instead of centring the title in the slack | `src/getmoredone/screens/plan_blocks.py` (build_item_row, grid_rowconfigure) | `::test_pbm61_a_tall_row_keeps_its_two_lines_together` *(needs `mapped_windows`)* | done |
+| PB-M6.1 | A tall row keeps its text at the top of the row, with the slack below it, instead of centring the title in the slack | `src/getmoredone/screens/plan_blocks.py` (build_item_row, grid_rowconfigure) | `::test_pbm61_a_tall_row_keeps_its_slack_below_its_text` *(needs `mapped_windows`)* | done — criterion text and test name both rewritten by CIG-M3.1, 2026-11-09. The old wording said "keeps its two lines together", which PD-M1 had already falsified: the length moved onto the task's one line, so there is one line of text and not two. The traceability guard could not catch the dead `::name`, which is `CIG-A9` |
 | PB-M6.1 | The screen passes the setting it draws the day with, read off the rendered row | `src/getmoredone/screens/plan.py` (load_blocks → build_item_row) | `::test_pbm61_the_item_row_height_comes_from_the_setting` | done |
 | PB-M6.1 | The row lays out at the height it asks for, against its own text | `src/getmoredone/screens/plan_blocks.py` (build_item_row, grid_propagate) | `::test_an_item_row_lays_out_at_the_height_it_asks_for` *(needs `mapped_windows`)* | done |
 | PB-M6.2 | No label on an item row carries the priority score, in any form | `src/getmoredone/screens/plan_blocks.py` (build_item_row) | `::test_pbm62_an_item_row_does_not_print_its_priority_score` | done |
@@ -1188,3 +1191,56 @@ that a guard is worth only the question "what would this accept?", and that
 question is answered badly by whoever wrote the assertion. Every one of the four cold
 passes found its defects by asking it, not by running anything. The fourth
 added a second question: what would this *reject*?
+
+## CIG — the nine tests CI has been red on (2026-11-09)
+
+Spec and plan: `docs/implementation_plan_2026-11-09_ci_green.md`.
+Note: `docs/changes/2026-11-09-ci-green.md`.
+Closes `BACKLOG.md`'s `WTP-A11`, its item 3 and its item 5.
+
+No file under `src/` is touched. Every row below is a test or a document.
+
+The nine are the failures of run 42586742228 at `1eb6ef4`, which are the same
+nine names as run 42574953009 at `a2c3124`: the SST batch changed none of them.
+
+| Criterion | What it required | Implementation | Tests | Status |
+|---|---|---|---|---|
+| CIG-M1.1 | one shared probe for whether a window this display never maps still reports `-topmost` back, asked once per session against a real window | `tests/display_capabilities.py` (`_PROBES`, `_ask_the_display`, `honours`) | `tests/test_display_capabilities.py::test_cigm11_cigm12_the_probe_agrees_with_the_display` (parametrised; one test carries both IDs) | done |
+| CIG-M1.2 | the same for `-alpha` | same module, the `-alpha` row of `_PROBES` | same test, the `-alpha` parameter | done |
+| CIG-M1.3 | a missing capability is a **skip naming the attribute**, never a pass; and an unknown attribute is an error, not a skip | `tests/display_capabilities.py` (`require`, and `honours` raising `KeyError` off `_PROBES`) | `::test_cigm13_the_precondition_skips_rather_than_passing`, `::test_cigm13_an_unknown_attribute_is_an_error_not_a_skip` | done |
+| CIG-M1.4 | the eight display-dependent tests use the shared precondition, and the one private copy is gone | `require("-topmost")` in `tests/test_timer_session_endings.py` (T5.1, T5.2, T5.6, T5.7), `tests/test_weekly_tactic_surfaces.py` (WT-M6b.6), `tests/test_weekly_tactic_completion_widgets.py` (in place of its own skip block); `require("-alpha")` in `tests/test_tk_offscreen.py` (two) | `::test_cigm14_every_display_dependent_test_uses_the_shared_precondition` (AST walk, exact set equality both ways against `EXPECTED_CALLERS`), `::test_cigm14_the_private_copy_of_the_precondition_is_gone` | done — a **registry, not a detector**: it cannot see a *new* test that reads an attribute back without asking, and `_requirers()` matches only a bare `require(...)` call, so `caps.require(...)` would evade it. Both gaps are `CIG-A1` and `CIG-A6` |
+| CIG-M1.5 | the precondition must not become a way to skip on a machine that honours the attribute | same module | `::test_cigm15_the_precondition_does_not_skip_where_the_attribute_works` | done |
+| CIG-M2.1 | `test_updm14_zero_width_body_is_a_noop` forces the one number the code reads, rather than resizing a real widget and hoping every display agrees | `tests/test_unified_panel_design.py` — `body.winfo_width = lambda: body_width`, against `src/getmoredone/screens/split_panel.py:132` which reads `self.body.winfo_width()` | `::test_updm14_zero_width_body_is_a_noop` | done — **and twice built on an unmeasured cause before this.** A fixed-width holder was withdrawn when the body turned out to report 1px whatever the holder did; cancelling the root's `wm geometry` was withdrawn when the cold pass pointed out the root is set to 1400x900 by `_root()` and 1208 is the body's own request. The X11 cause is still undiagnosed: `CIG-A8` |
+| CIG-M2.2 | that test still fails loudly if the narrow reading does not take | same test — the precondition assertion is kept, now against the stub | same test | done — mutation AE |
+| CIG-M3.1 | PB-M6.1's row test measures the surviving design: the text at the top, the slack below it | `tests/test_plan_screen.py::test_pbm61_a_tall_row_keeps_its_slack_below_its_text` (renamed), asserting `title.winfo_y() + title.winfo_height() <= row.winfo_height() // 4` | that test | done — repo test rule (b) and (c), stated in its docstring: the behaviour changed with PD-M1, and the floor it replaced was satisfied by the broken layout |
+| CIG-M3.2 | the rewritten test fails on the defect PB-M6.1 was written for | — | proved by mutation AD below | done |
+| CIG-M4.1 | `conftest`'s documented count of tests that build real windows stays true after the rename | unchanged `conftest.py` and `CLAUDE.md` — the rename does not change the count | `tests/test_ci_contract.py::test_the_documented_mapped_window_count_is_the_real_one` (existing) | done |
+
+### Not code-testable
+
+| | item | status |
+|---|---|---|
+| CIG-N1 | **That CI is green.** No test can assert the state of a GitHub run from inside the suite. | recorded by run id in `docs/changes/2026-11-09-ci-green.md`. Open at the time this table was written: the batch is verified locally only, and a green run is what closes it. |
+
+### Test counts
+
+324 passed, 4 skipped over the six touched test files plus the new one, with
+`GETMOREDONE_NO_MAPPED_WINDOWS=1`; 134 passed, 3 skipped over the three files
+the cold pass's own fixes touched. The full suite was not run locally, by the
+standing throttle; CI runs it.
+
+### Mutations
+
+Seven, each restored with the **verbatim** original and the restore confirmed by
+sha256. Two were green on the first attempt and both were instructive rather
+than incidental.
+
+| | mutation | result |
+|---|---|---|
+| Z | `frame.grid_rowconfigure(0, weight=1)` back into `build_item_row` — the defect PB-M6.1 was written for | 1 failed — the test as a whole. What it did **not** show is that the assertion it was aimed at discriminates: the cold pass then measured the broken state and found the title at y=100 in a 274px row, which leaves 154px below it and satisfies the `below >= height // 2` floor. The assertion was replaced and the same mutation re-run as AD |
+| AA | `PD_BLOCKED_TEXT = "already blocked"` in place of the glyph | **green — proved nothing.** The test reads `PD_BLOCKED_TEXT` too, so the mutation moved the expectation with the code. Re-run by moving the marker to `row=1`, which is the thing the assertion is about: 1 failed |
+| AB | `require("-topmost")` deleted from T5.1 | 1 failed (`::test_cigm14_every_display_dependent_test_uses_the_shared_precondition`) |
+| AC | the fixed-width holder stopped forcing the width | **green twice, and withdrawn with the fix it tested.** `body.grid_forget()` is a no-op before `grid(in_=…)`, and `holder.grid_propagate(True)` changed nothing either — measurement then showed the body reports 1px whatever the holder does, so the holder passed for a reason nobody had established. Replaced by the stub, measured by AE |
+| AD | Z's mutation against CIG-M3.1's replacement assertion | 1 failed, 10 passed |
+| AE | `body.winfo_width = lambda: body_width` removed | 1 failed — the precondition, which is CIG-M2.2 |
+| AF | `require("-topmost")` deleted from WT-M6b.6 | 1 failed (the registry) |

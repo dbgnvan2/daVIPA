@@ -358,6 +358,40 @@ being the PDT-M5 document criteria with a
   human-review proposal for each
 - Nine CI-environment failures listed as adjacent and not touched
 
+### docs/implementation_plan_2026-11-09_ci_green.md
+
+Implementation plan for the nine tests CI has been red on since 2026-11-07
+(CIG-M1 - CIG-M4). **Approved 2026-11-09 and built the same day: 10 of 10
+criteria `done`, one item not code-testable (CIG-N1, that CI is green, closed
+by a run id and nothing else)** - per-criterion status in
+`docs/spec_coverage.md`. No file under `src/` is touched. Handoff note:
+`docs/changes/2026-11-09-ci-green.md`, which is listed here only inside this
+entry rather than as an entry of its own, as every handoff note is:
+
+- Seven of the nine set a window attribute and read it back, which needs a
+  window manager; CI runs under `xvfb-run -a`, which has none. One shared
+  precondition, `tests/display_capabilities.py`, replaces six absent ones and
+  one private copy - the private copy being why six stayed red after `23f0cc7`
+  fixed the seventh
+- One cold pass over the plan and the batch found six defects, two of which
+  falsified the plan's own premise: Xvfb **does** report `-alpha` back for a
+  window that has been mapped, which two sibling tests prove on CI, so the
+  probe asks the narrower question about a *withdrawn* window; and skipping the
+  two `-alpha` tests does cost coverage, because one of them is the only test
+  that drives a raw `tk.Tk` through the window-hiding guard. Both corrections
+  are in the plan with the measurement, not dropped
+- `test_updm14_zero_width_body_is_a_noop`'s cause is still unknown and is filed
+  as `CIG-A8`. Two comments asserting a cause were written and withdrawn after
+  measurement; the test now forces the one number the code reads, which needs
+  no diagnosis
+- PB-M6.1's row test was asserting a floor that the broken layout satisfied -
+  measured, not inferred - and was describing two lines of text that PD-M1 had
+  already reduced to one. Rewritten and renamed, repo test rule (b) and (c)
+- `WTP-A11`, `BACKLOG.md` item 3 and item 5 closed; `CIG-A1` - `CIG-A9` filed,
+  not fixed. `CIG-A1` is the one that matters: the new guard is a registry of
+  eight known callers, so it cannot detect a *new* test written the way these
+  seven were
+
 ### docs/implementation_plan_2026-11-08_status_claims.md
 
 Implementation plan for the nine open `SSC` filings — status claims this repo
@@ -797,8 +831,7 @@ Documentation is updated:
 - When user issues are resolved
 - During major releases
 
-**Current Status**: last index entry added 2026-11-08 (the PDT plan-day test
-plan). This index is not enforced by any test (PLC-A5) and does not list every
+**Current Status**: last index entry added 2026-11-09 (the CIG ci-green plan). This index is not enforced by any test (PLC-A5) and does not list every
 file under `docs/`: of the 76 Markdown files directly under `docs/`, 43 are not
 named in it anywhere and 48 have no entry of their own. `docs/` holds 222 files
 in all, so the gap over its subdirectories is wider still and uncounted. `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`

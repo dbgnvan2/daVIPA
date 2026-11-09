@@ -53,14 +53,23 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   `42574256150` on `5eef83d`: 9 failed, 2635 passed, 2 skipped, the same on
   3.11, 3.12 and 3.13** — twenty down to nine, with no new failure. The
   measurement and the intermediate run are in `BACKLOG.md` item 1.
-- **Nine failures are left, in two groups,** not three:
+- **Nine failures were left, in two groups,** not three. **All nine are
+  rewritten by the CIG batch, 2026-11-09** (`docs/spec_coverage.md`, the CIG
+  section). Seven now skip with a reason from one shared precondition,
+  `tests/display_capabilities.py`; two were rewritten to measure the code
+  rather than the display. The claim that CI is **green** is not made here: it
+  is closed by a run id in `docs/changes/2026-11-09-ci-green.md` and by nothing
+  else. Two of this item's own statements were falsified while fixing it —
+  Xvfb does report `-alpha` for a mapped window, and the `test_pbm61` exclusion
+  below rested on a criterion PD-M1 had already made false:
   - **Seven** always-on-top tests (`test_t51`, `test_t52`, `test_t56`,
     `test_t57`, `test_wt_m6b6`, `test_alpha_still_passes_through_the_attributes_wrapper`,
     `test_raw_tkinter_windows_are_hidden_and_registered_too`) pass locally and
     need one shared precondition — `BACKLOG.md` WTP-A11.
   - **Two that are not that family.** WTP-A11's own text excludes
     `test_pbm61`; the second exclusion is `BACKLOG.md` item 5's:
-    `test_pbm61_a_tall_row_keeps_its_two_lines_together` is **skipped**
+    `test_pbm61_a_tall_row_keeps_its_slack_below_its_text` (then named
+    `…_keeps_its_two_lines_together`) is **skipped**
     locally, not passing, because `GETMOREDONE_NO_MAPPED_WINDOWS=1` skips it,
     so it cannot be reproduced on a working machine at all; and
     `test_updm14_zero_width_body_is_a_noop` builds no window and its cause is
