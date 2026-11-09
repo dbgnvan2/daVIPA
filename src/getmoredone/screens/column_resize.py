@@ -78,6 +78,13 @@ class ColumnResizer:
         self._rows = []          # list[(frame, cells)] ; cells: [(key, label, full, reserve, width_delta)]
         self._header = None      # (header_frame, {key: label})
         self._drag = None        # (key, x_root_start, width_start)
+        # The widths held before a too-narrow panel pinned everything to the
+        # floor, so the shape can be given back when the panel is wide enough
+        # again. `_widths` is both the rendered width and the weight
+        # `_share` divides by, so flooring it in place would destroy the
+        # proportions the user set rather than suspend them. None whenever
+        # the floor is not in force.
+        self._pre_floor = None   # {key: width} | None
 
     # ------------------------------------------------------------------ widths
     def _setting_attr(self) -> str:
@@ -166,10 +173,23 @@ class ColumnResizer:
                   for k in order}
         floor_total = sum(floors.values())
         if budget < floor_total:
+            # Remember the shape once, on the way in -- not on every
+            # <Configure> of a drag that holds the window below the floor,
+            # which would overwrite it with the floors themselves.
+            if self._pre_floor is None:
+                self._pre_floor = {k: self._widths[k] for k in order}
             for key in order:
                 self._widths[key] = floors[key]
             self._apply_all()
             return floor_total - budget
+
+        if self._pre_floor is not None:
+            # Wide enough again: share out the shape the panel had before the
+            # floor, not the flat floors it was left holding.
+            for key in order:
+                if key in self._pre_floor:
+                    self._widths[key] = self._pre_floor[key]
+            self._pre_floor = None
 
         assigned = self._share(order, budget, floors)
         if assigned != {k: self._widths[k] for k in order}:
@@ -312,6 +332,11 @@ class ColumnResizer:
         new_width = self._clamp(self.specs[k], w0 + (event.x_root - x0))
         if new_width != self._widths[k]:
             self._widths[k] = new_width
+            # A width the user set by hand while the panel is floored is the
+            # newer intent: the restore must not give it back the old one.
+            # The other columns' remembered shape still stands.
+            if self._pre_floor is not None:
+                self._pre_floor.pop(k, None)
             self._apply_live(k)
 
     def _on_stop(self, event, key) -> None:
