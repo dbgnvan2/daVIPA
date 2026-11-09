@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
@@ -242,10 +243,19 @@ _ROOT_DOC_HEADING = re.compile(r"^#{1,6} +([\w.\-]+\.md)\b", re.M)
 # starts resolving has to leave this list, or the list becomes the place a
 # real defect hides.
 ROOT_DOC_CITATION_EXEMPTIONS = {
+    # The four under `~/.claude/standards/`, which are the author's machine
+    # and deliberately not in this repo.
     "learnings.md",
     "file-maintainability.md",
     "ui-regression.md",
     "security.md",
+    # A fixture filename, written by the guard tests themselves into a
+    # `tmp_path` and named in `docs/spec_coverage.md` when a mutation is
+    # recorded. It is not a pointer and will never be a tracked file; the
+    # both-directions check below fails if it ever becomes one. Added by
+    # LDS-M3.1, when deriving the scanned set brought `docs/spec_coverage.md`
+    # into it.
+    "PROBE.md",
 }
 
 
@@ -697,3 +707,530 @@ def test_mawm12_the_retired_agent_apparatus_is_absent():
         "the handoff-note template is gone, and CLAUDE.md requires a handoff "
         "note from every batch of work"
     )
+
+
+CONVENTION_SECTION_HEADING = "### Naming a thing that no longer exists"
+
+# Every guard that reads prose for a name that should not resolve. A guard
+# that is not named in the section is a convention a future author can only
+# learn by turning a test red, which is the thing the section exists to stop.
+PROSE_CITATION_GUARD_IDS = ("GSF-M1.1", "GSF-M2.1", "MAW-M2.1", "MAW-M3.1")
+
+_COUNT_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+}
+
+
+def convention_section(text: str) -> str:
+    """The *Naming a thing that no longer exists* section of a document."""
+    start = text.find(CONVENTION_SECTION_HEADING)
+    if start < 0:
+        return ""
+    rest = text[start + len(CONVENTION_SECTION_HEADING):]
+    end = rest.find("\n## ")
+    nxt = rest.find("\n### ")
+    if nxt >= 0 and (end < 0 or nxt < end):
+        end = nxt
+    return rest if end < 0 else rest[:end]
+
+
+def convention_bullet_count(section: str) -> int:
+    """How many conventions the section actually states, as bold bullets."""
+    return len(re.findall(r"^- \*\*", section, re.M))
+
+
+def stated_convention_count(section: str) -> int | None:
+    """The count the section's own opening sentence claims, or None."""
+    match = re.search(r"^(\w+) conventions\b", section.strip(), re.M)
+    if not match:
+        return None
+    return _COUNT_WORDS.get(match.group(1).lower())
+
+
+def test_ldsm32_the_conventions_name_every_form_a_guard_reads():
+    """LDS-M3.2 — the section's own count must match its bullets.
+
+    Purpose: a convention a future author can only learn by turning a test
+             red is a convention written in the wrong place, and a section
+             that miscounts itself is the first sign it has stopped being
+             maintained alongside the guards.
+    Spec:    docs/implementation_plan_2026-11-09_derived_live_document_set.md#lds-m32
+    Tests:   this test
+
+    The MAW second cold pass found this section opening "Three conventions"
+    over four bullets, with a closing sentence pointing at the wrong one. Both
+    were found by reading, which is the part that does not scale.
+    """
+    # The helpers, over text written here: the repo check below cannot fail
+    # once the section is correct.
+    probe = (
+        "## Working agreements\n\n"
+        f"{CONVENTION_SECTION_HEADING}\n\n"
+        "Two conventions, because.\n\n"
+        "- **A thing** is named so. `GSF-M2.1` is the guard.\n"
+        "- **Another thing** is named so. `MAW-M3.1` is the guard.\n\n"
+        "### The next section\n\n"
+        "- **Not a convention** at all.\n"
+    )
+    section = convention_section(probe)
+    assert "Not a convention" not in section, (
+        "the section reader runs past its own heading, so a bullet from the "
+        "next section would be counted as a convention"
+    )
+    assert convention_bullet_count(section) == 2
+    assert stated_convention_count(section) == 2
+    assert stated_convention_count("no count here at all") is None
+    assert convention_section("# A document with no such section") == ""
+
+    # And over the agreement itself.
+    claude = (REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    section = convention_section(claude)
+    assert section, (
+        f"CLAUDE.md has no '{CONVENTION_SECTION_HEADING}' section, so the "
+        "citation conventions the guards enforce are written nowhere a "
+        "future author will read them"
+    )
+    stated = stated_convention_count(section)
+    actual = convention_bullet_count(section)
+    assert stated == actual, (
+        f"the section says there are {stated} conventions and states {actual}. "
+        "A reader who counts is right and the sentence is wrong; a reader who "
+        "trusts the sentence stops reading early."
+    )
+    for guard in PROSE_CITATION_GUARD_IDS:
+        assert guard in section, (
+            f"{guard} reads prose for a name that should not resolve, and the "
+            "conventions section does not name it — so the only way to learn "
+            "its rule is to write a sentence and watch it fail"
+        )
+
+
+RETIRED_VOCABULARY_PATH = REPO_ROOT / "tools/agents/retired_vocabulary.json"
+
+
+def load_retired_vocabulary(path: Path) -> dict:
+    """The retired-vocabulary config, parsed."""
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+_BLOCK_START = re.compile(r"^\s*(?:[-*+>|]|#{1,6}\s|\d+[.)]\s)")
+_SELF_CONTAINED_BLOCK = re.compile(r"^\s*(?:#{1,6}\s|\|)")
+
+
+def prose_blocks(text: str) -> list[str]:
+    """``text`` split where a markdown block starts, each block on one line.
+
+    Purpose: a table row, a list item and a heading carry no terminal
+             punctuation, so flattening a document and splitting on `.` makes
+             a whole table into one sentence — and one `retired` in a far-off
+             row then exempts every row in it.
+    Spec:    docs/implementation_plan_2026-11-09_derived_live_document_set.md#lds-m41
+    Tests:   tests/test_repo_hygiene.py::test_ldsm41_no_live_document_uses_retired_vocabulary
+
+    A blank line, a bullet, a table row, a heading or a numbered item starts a
+    new block; any other line continues the one before it, which is what keeps
+    hard-wrapped prose readable as a single sentence. A heading and a table row
+    also *end* at their own newline, because a hard-wrapped continuation of
+    either is not a thing markdown has — without that, the line after a heading
+    joined it and a heading naming the retirement exempted the paragraph
+    beneath it.
+    """
+    blocks: list[list[str]] = []
+    for line in text.splitlines():
+        if not line.strip():
+            blocks.append([])
+        elif _BLOCK_START.match(line) or not blocks or not blocks[-1]:
+            blocks.append([line])
+            if _SELF_CONTAINED_BLOCK.match(line):
+                # A heading and a table row end at their own newline. Without
+                # this the line after a heading joined it, and a heading
+                # saying "What was retired" exempted the paragraph beneath —
+                # which is the MH defect in a third form.
+                blocks.append([])
+        else:
+            blocks[-1].append(line)
+    return [" ".join(block) for block in blocks if block]
+
+
+def prose_sentences(text: str) -> list[str]:
+    """``text`` as sentences, one markdown block at a time.
+
+    Hard-wrapped prose inside a block is flattened, so a sentence that spans
+    three lines is read whole; blocks are never joined to each other, which is
+    what stops a marker in one table row exempting the rest of the table.
+    Inline code spans go because a phrase quoted inside backticks is an
+    artifact being named — a grep pattern, a filename, a quoted specimen — and
+    not a description of how work is done.
+    """
+    out: list[str] = []
+    for block in prose_blocks(text):
+        flat = re.sub(r"`[^`]*`", " ", re.sub(r"\s+", " ", block))
+        out.extend(re.split(r"(?<=[.;:!?])\s+", flat))
+    return out
+
+
+def sentence_is_history(
+    sentence: str,
+    markers: Iterable[str],
+    reporting: Iterable[str] = (),
+    blockers: Iterable[str] = (),
+) -> bool:
+    """Whether ``sentence`` reports a retired thing rather than describing one.
+
+    Purpose: the exemption that keeps this guard from being a censor, split so
+             that a past-tense account ("the document described the split") is
+             history while a present-tense passive ("the Docs agent is
+             described in AGENTS.md") is not.
+    Spec:    docs/implementation_plan_2026-11-09_derived_live_document_set.md#lds-m41
+    Tests:   tests/test_repo_hygiene.py::test_ldsm41_no_live_document_uses_retired_vocabulary
+
+    ``markers`` are unconditional. A ``reporting`` verb counts only where it is
+    not immediately preceded by one of ``blockers`` — a cold pass measured bare
+    "described" exempting present-tense prose, and deleting it instead would
+    have forced honest history to be rewritten.
+    """
+    lowered = sentence.lower()
+    if any(marker.lower() in lowered for marker in markers):
+        return True
+    blockers = [blocker.lower() for blocker in blockers]
+    for verb in reporting:
+        verb = verb.lower()
+        start = lowered.find(verb)
+        while start != -1:
+            before = lowered[:start]
+            if not any(before.endswith(blocker) for blocker in blockers):
+                return True
+            start = lowered.find(verb, start + 1)
+    return False
+
+
+def retired_vocabulary_hits(
+    concepts: Iterable[dict],
+    documents: Iterable[tuple[str, str]],
+    markers: Iterable[str] = (),
+    reporting: Iterable[str] = (),
+    blockers: Iterable[str] = (),
+) -> list[str]:
+    """``label: concept id: phrase`` for every retired phrase used as current.
+
+    Purpose: a retired *concept* described as current is invisible to every
+             citation guard, because a citation is a path and a description is
+             prose.
+    Spec:    docs/implementation_plan_2026-11-09_derived_live_document_set.md#lds-m41
+    Tests:   tests/test_repo_hygiene.py::test_ldsm41_no_live_document_uses_retired_vocabulary
+
+    Case-insensitive substring matching, because the phrase that found
+    `docs/GEMINI.md` began a sentence and so began with a capital.
+
+    A phrase is a finding only when the *sentence* holding it carries none of
+    ``markers``. Without that window the guard failed on honest history —
+    `AGENTS.md` naming the two branches that never existed, and
+    `docs/GEMINI.md`'s own sentence saying the workflow was retired — which
+    makes it a censor rather than a guard, and the citation conventions in
+    `CLAUDE.md` exist precisely so that history stays writable.
+
+    The window was the paragraph for one mutation round, and mutation MH
+    measured what that cost: the exact sentence this guard exists for, put
+    back into `docs/GEMINI.md`, did not fail it, because the bullet below it
+    said "retired". A markdown paragraph of bullets is too coarse to carry
+    the distinction between describing a thing and reporting that it is
+    gone.
+
+    Narrowing it to a sentence was not enough either, which a cold pass found
+    after the mutation round: a table, a bullet list and a heading carry no
+    terminal punctuation, so flattening a document made each of them one
+    sentence and one `retired` anywhere in a table exempted every row of it.
+    The window is one markdown block, then one sentence inside it — see
+    `prose_blocks`.
+
+    Takes every side as an argument so the scan can be driven over text
+    written in a test: a comparison against the repository alone cannot fail
+    once the repository is clean, which five mutations in the MAW batch
+    established the hard way.
+    """
+    concepts = list(concepts)
+    markers = list(markers)
+    reporting = list(reporting)
+    blockers = list(blockers)
+    out = []
+    for label, text in documents:
+        for concept in concepts:
+            if label in concept.get("allowed_in", ()):
+                continue
+            for phrase in concept["phrases"]:
+                lowered_phrase = phrase.lower()
+                for sentence in prose_sentences(text):
+                    lowered = sentence.lower()
+                    if lowered_phrase not in lowered:
+                        continue
+                    if sentence_is_history(sentence, markers, reporting, blockers):
+                        continue
+                    out.append(f"{label}: {concept['id']}: {phrase}")
+                    break
+    return out
+
+
+def test_ldsm41_no_live_document_uses_retired_vocabulary():
+    """LDS-M4.1, LDS-M4.2, LDS-M4.3 — `MAW-A3` closed.
+
+    Purpose: retiring a concept must take its vocabulary out of the live
+             documents, not only its pointers.
+    Spec:    docs/implementation_plan_2026-11-09_derived_live_document_set.md#lds-m41
+    Tests:   this test
+
+    `docs/GEMINI.md` described the work as split between three named agents
+    for two batches after the workflow was retired, inside the scanned set the
+    whole time. Both guards that read that document resolve paths, and that
+    sentence contains none.
+    """
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from test_ci_contract import _live_documents
+
+    # The config: shape first, because a guard reading a malformed concept
+    # silently reads no phrases.
+    tracked = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", "tools/agents/retired_vocabulary.json"],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    assert tracked.returncode == 0, (
+        "tools/agents/retired_vocabulary.json is not tracked, so it is absent "
+        "on CI and this guard raises there instead of reading the documents. "
+        "The repo ignores *.json; an editorial config needs an explicit "
+        "negation in .gitignore, as email_cleaning_rules.json has."
+    )
+    config = load_retired_vocabulary(RETIRED_VOCABULARY_PATH)
+    assert config.get("_comment"), (
+        "the config has no _comment, so the next reader has no statement of "
+        "what it is for or how a phrase is matched (global rule 9)"
+    )
+    concepts = config["concepts"]
+    markers = config["retirement_markers"]
+    reporting = config["reporting_markers"]
+    blockers = config["reporting_marker_blockers"]
+    assert markers, (
+        "no retirement markers, so every mention of a retired concept is a "
+        "finding — including the sentences that say it was retired, which is "
+        "a censor and not a guard"
+    )
+    assert config.get("_retirement_markers_comment"), (
+        "the markers have no comment, so the next reader cannot tell what "
+        "window they are read over, or that it is one markdown block"
+    )
+    # The markers are the guard's entire exemption surface, and until a cold
+    # pass measured it nothing bounded them: adding `"the "` kept every
+    # fixture below green while exempting essentially every sentence in the
+    # repo. A marker must not occur in ordinary current-tense prose.
+    neutral_prose = (
+        "Work happens on main, or on a feature branch merged into it.",
+        "The sidebar drives navigation between 13 screens.",
+        "Every DatabaseManager in a test takes an explicit tmp_path database.",
+        "One batch builds in this checkout at a time, and the index is shared.",
+        "A cold pass gets the diff and the range and none of the narrative.",
+    )
+    for marker in markers:
+        assert len(marker) >= 5, (
+            f"retirement marker {marker!r} is short enough to appear inside "
+            "an unrelated word, and it exempts every sentence it lands in"
+        )
+        for ordinary in neutral_prose:
+            assert marker.lower() not in ordinary.lower(), (
+                f"retirement marker {marker!r} occurs in ordinary "
+                f"current-tense prose ({ordinary!r}), so it exempts "
+                "sentences that are describing present practice"
+            )
+    for marker in markers:
+        others = [other for other in markers if other != marker]
+        assert not any(other in marker for other in others), (
+            f"retirement marker {marker!r} contains another marker, so it is "
+            "dead config: the shorter one already matches everywhere it does"
+        )
+    assert concepts, "no retired concepts declared; the scan would be vacuous"
+    seen = set()
+    for concept in concepts:
+        for field in ("id", "retired", "reason", "write_instead", "phrases"):
+            assert concept.get(field), (
+                f"concept {concept.get('id', '?')!r} is missing {field!r}; a "
+                "prohibition without a date and a reason is archaeology a "
+                "future reader cannot date or argue with"
+            )
+        assert concept["id"] not in seen, f"duplicate concept id {concept['id']!r}"
+        seen.add(concept["id"])
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", concept["retired"]), (
+            f"concept {concept['id']!r} has retired={concept['retired']!r}, "
+            "which is not an ISO date"
+        )
+        assert all(len(phrase) >= 8 for phrase in concept["phrases"]), (
+            f"concept {concept['id']!r} has a phrase short enough to appear "
+            "in an ordinary sentence; a substring scan on it would fail on "
+            "prose that has nothing to do with the retired concept"
+        )
+        if concept.get("allowed_in"):
+            assert concept.get("allowed_because"), (
+                f"concept {concept['id']!r} exempts documents without saying "
+                "why, so the exemption cannot be reviewed"
+            )
+
+    # The scan, over text written here, in both directions and both cases.
+    sentence = "Work is typically split between Code, Docs, and GitHub agents."
+    history = (
+        "There are no per-role branches; the three-agent workflow this "
+        "section used to describe was retired on 2026-11-09."
+    )
+    # Two phrases of the one concept match it, which is deliberate: the long
+    # form is the sentence this repo actually wrote, the short one catches a
+    # paraphrase. Every hit is reported, so the failure message names the
+    # phrase to rewrite rather than the first phrase that happened to match.
+    assert retired_vocabulary_hits(concepts, [("PROBE.md", sentence)], markers, reporting, blockers) == [
+        "PROBE.md: three-agent-workflow: code, docs, and github agents",
+        "PROBE.md: three-agent-workflow: github agent",
+    ], "the sentence that two batches missed is no longer matched"
+    # The other direction, which is the whole design: the same vocabulary,
+    # named as history, is not a finding. Without this the guard rejected
+    # AGENTS.md, docs/GEMINI.md and docs/spec_coverage.md on their own
+    # accounts of the retirement.
+    assert retired_vocabulary_hits(concepts, [("PROBE.md", history)], markers, reporting, blockers) == [], (
+        "prose that says the concept was retired is reported as though it "
+        "described the concept as current, so the guard is a censor"
+    )
+    assert retired_vocabulary_hits(concepts, [("PROBE.md", history)]) != [], (
+        "the markers are not the mechanism — the history prose passes with "
+        "no markers given, so something else is exempting it"
+    )
+    # The window is the sentence, and the sentence alone. This is the
+    # assertion mutation MH was missing: with a paragraph window, the bad
+    # sentence sat beside a bullet saying "retired" and the guard stayed
+    # green on the one defect it was written for.
+    # And the window is one markdown *block*, not the flattened document.
+    # A table row, a bullet and a heading end without punctuation, so a
+    # sentence window over flattened text made each table one sentence. A
+    # cold pass measured all three forms of the MH defect passing.
+    # The fixtures end without punctuation on purpose. With a full stop the
+    # sentence split separates them by itself and the block boundary is never
+    # exercised — mutation MP measured exactly that, and came back green.
+    marked = "the three-agent workflow was retired on 2026-11-09"
+    unpunctuated = sentence.rstrip(".")
+    for shape, text in (
+        ("a bullet list", f"- {marked}\n- {unpunctuated}\n"),
+        ("a table", f"| x | {marked} |\n| y | {unpunctuated} |\n"),
+        ("a heading", f"### What was retired\n{unpunctuated}\n"),
+        ("a numbered list", f"1. {marked}\n2. {unpunctuated}\n"),
+    ):
+        assert retired_vocabulary_hits(concepts, [("PROBE.md", text)], markers, reporting, blockers), (
+            f"the defect sentence in {shape} is exempted by a marker "
+            "elsewhere in the same block, which is mutation MH again in the "
+            "form a cold pass found: a marker in one table row must not "
+            "exempt another row"
+        )
+        assert retired_vocabulary_hits(concepts, [("PROBE.md", text.replace(unpunctuated, marked))], markers, reporting, blockers) == [], (
+            f"{shape} holding only marked history is a finding, so the "
+            "block split has made the guard a censor instead"
+        )
+
+    assert retired_vocabulary_hits(
+        concepts, [("PROBE.md", f"{history}\n{sentence}")], markers
+    ) == [
+        "PROBE.md: three-agent-workflow: code, docs, and github agents",
+        "PROBE.md: three-agent-workflow: github agent",
+    ], (
+        "a retirement marker in a neighbouring sentence exempts this one, so "
+        "a description of current practice passes whenever it is written next "
+        "to an account of the retirement — which is where it would be written"
+    )
+    # Hard-wrapped prose is one sentence, not three lines.
+    wrapped = "The branches\ncodex/agent-docs and codex/agent-github never\nexisted here."
+    assert retired_vocabulary_hits(concepts, [("PROBE.md", wrapped)], markers, reporting, blockers) == [], (
+        "a sentence wrapped across lines is no longer read whole, so honest "
+        "history fails whenever its marker lands on another line"
+    )
+    # A phrase quoted inside backticks is an artifact named, not a
+    # description: `git grep -i \"docs agent\"` is a command.
+    assert retired_vocabulary_hits(
+        concepts, [("PROBE.md", 'Found by `git grep -i "docs agent"` over the tree.')], markers
+    ) == [], "an inline code span is read as prose, so quoting a command fails the guard"
+    assert prose_sentences("a `b c` d. e") == ["a   d.", "e"], (
+        "prose_sentences no longer strips inline code or splits on sentence "
+        "ends, so the window the markers are read over has changed"
+    )
+    assert retired_vocabulary_hits(concepts, [("PROBE.md", sentence.upper())], markers, reporting, blockers), (
+        "the scan is case-sensitive, so a phrase that opens a sentence "
+        "evades it — the exact way the MAW agreement scan first failed"
+    )
+    # A past-tense account is history; the present-tense passive of the same
+    # verb is not. A cold pass measured bare "described" exempting both.
+    assert retired_vocabulary_hits(
+        concepts,
+        [("PROBE.md", "docs/GEMINI.md described the split between Code, Docs and GitHub agents.")],
+        markers,
+        reporting,
+        blockers,
+    ) == [], "a past-tense account of what a document said is not history"
+    for passive in (
+        "The Docs agent is described in AGENTS.md and owns every document.",
+        "Each role is still described as owning a per-role branch.",
+    ):
+        assert retired_vocabulary_hits(
+            concepts, [("PROBE.md", passive)], markers, reporting, blockers
+        ), (
+            "a present-tense passive of a reporting verb exempts the "
+            f"sentence ({passive!r}), which is how bare 'described' let "
+            "current-tense prose through"
+        )
+
+    assert retired_vocabulary_hits(concepts, [("PROBE.md", "work happens on main")], markers, reporting, blockers) == [], (
+        "prose that names no retired concept is reported, so the guard "
+        "would fail on honest documents"
+    )
+    # A whole-document exemption is still honoured when a concept carries
+    # one, though no concept does: the markers do that work, and exempting
+    # docs/GEMINI.md as a document would have hidden the one sentence this
+    # guard was written for.
+    # The fixture phrase deliberately contains no retirement marker — an
+    # earlier draft used "a retired phrase", which the markers exempt, so the
+    # assertion passed for the wrong reason.
+    assert retired_vocabulary_hits(
+        [{"id": "x", "phrases": ["the bongo protocol"], "allowed_in": ["PROBE.md"]}],
+        [("PROBE.md", "here is the bongo protocol")],
+        markers,
+        reporting,
+        blockers,
+    ) == [], "a concept's allowed_in list is no longer honoured"
+    assert not any(c.get("allowed_in") for c in concepts), (
+        "a concept has taken a whole-document exemption; the per-sentence "
+        "markers are the mechanism, and a document-wide pass is how the "
+        "sentence in docs/GEMINI.md survived two batches"
+    )
+    assert retired_vocabulary_hits(
+        [{"id": "x", "phrases": ["the bongo protocol"]}],
+        [("PROBE.md", "here is The Bongo Protocol in prose")],
+        markers,
+        reporting,
+        blockers,
+    ) == ["PROBE.md: x: the bongo protocol"], (
+        "the scan reads the concepts it is given, not a list of its own"
+    )
+
+    # And over the live documents.
+    hits = retired_vocabulary_hits(
+        concepts,
+        [
+            (doc.relative_to(REPO_ROOT).as_posix(), doc.read_text(encoding="utf-8"))
+            for doc in _live_documents()
+        ],
+        markers,
+        reporting,
+        blockers,
+    )
+    if hits:
+        reasons = {
+            concept["id"]: f"{concept['reason']} Write it instead: {concept['write_instead']}"
+            for concept in concepts
+        }
+        detail = "\n  ".join(sorted(hits))
+        advice = "\n  ".join(f"{cid}: {why}" for cid, why in sorted(reasons.items()))
+        raise AssertionError(
+            "these live documents use the vocabulary of a retired "
+            f"concept:\n  {detail}\n\n  {advice}"
+        )

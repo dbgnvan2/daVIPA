@@ -32,6 +32,7 @@ import re
 import functools
 import subprocess
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
@@ -2020,13 +2021,73 @@ def test_the_opt_out_parsing_handles_whitespace_and_case(monkeypatch):
 # `docs/` part is the one place a name still has to be added by hand: that
 # directory holds dated records and one-off prompts alongside live reference
 # documents, and no path rule separates them.
-DOCS_DIR_LIVE_DOCS = (
+# `GSF-A3` closed (LDS-M1.1): the five names that used to sit here are
+# derived now. The rule below is the one path rule that separates this
+# directory's live reference documents from its records, and it is stated
+# rather than inferred:
+#
+#   live  = tracked, one level under `docs/`, `*.md`,
+#           name carries no ISO date, name does not contain "prompt"
+#
+# A date in the name is how this repo marks a record — `implementation_plan_`,
+# `spec_coverage_` and `status_report_` files all carry one, and
+# `docs/changes/` is a directory deeper. "prompt" is how it marks a one-off
+# instruction written for a single run. Both are excluded because a record is
+# a record of its own date: a guard that fails because a 2026-06-06 note names
+# a file deleted in November makes honest history unwritable, which is the
+# reason the citation conventions in `CLAUDE.md` exist at all. The measurement
+# is in §1.3 of the LDS plan — over the records, 13 citations do not resolve
+# and 11 of them were true when written.
+_DOCS_DIR_RECORD_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def _derived_docs_dir_live_docs(listing: Iterable[str]) -> list[str]:
+    """The live reference documents one level under ``docs/``, from a listing.
+
+    Purpose: the `docs/` half of the scanned set must not be a hand-kept list.
+    Spec:    docs/implementation_plan_2026-11-09_derived_live_document_set.md#lds-m11
+    Tests:   tests/test_ci_contract.py::test_ldsm11_the_docs_half_of_the_live_set_is_derived
+
+    Takes the listing so the rule can be asserted over names written in a
+    test. ``listing`` is in `git ls-files` form, so paths are posix and
+    relative to the repository root.
+    """
+    out = []
+    for path in listing:
+        if not path.startswith("docs/") or path.count("/") != 1:
+            continue
+        if not path.endswith(".md"):
+            continue
+        name = path.split("/", 1)[1]
+        if _DOCS_DIR_RECORD_DATE.search(name) or "prompt" in name.lower():
+            continue
+        out.append(path)
+    return sorted(out)
+
+
+def _docs_dir_live_docs() -> list[str]:
+    """`_derived_docs_dir_live_docs` over this repository's tracked files."""
+    listing = subprocess.run(
+        ["git", "ls-files", "docs"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    return _derived_docs_dir_live_docs(line for line in listing if line)
+
+
+# What the tuple held before `GSF-A3` was closed. Kept as the floor assertion
+# for LDS-M1.3: the derivation may widen the set, never narrow it below the
+# names someone had put in by hand.
+FORMERLY_HAND_KEPT_DOCS = (
     "docs/DOCUMENTATION_INDEX.md",
     "docs/USER_GUIDE.md",
     "docs/GEMINI.md",
     "docs/action-timer-requirements.md",
     "docs/daVIPA - Get Started.md",
 )
+DOCS_DIR_LIVE_DOCS = tuple(_docs_dir_live_docs())
 
 
 def _tracked_root_markdown() -> list[str]:
@@ -2117,11 +2178,11 @@ def test_gsfm11_no_document_cites_a_workflow_that_does_not_exist(tmp_path):
         "The root half of LIVE_DOCS is derived from git ls-files precisely so "
         "that it cannot be narrowed by hand"
     )
-    for required in DOCS_DIR_LIVE_DOCS:
-        assert required in scanned, (
-            f"{required} is named as a live document but is not being "
-            "scanned, so citations in it are checked by neither GSF guard"
-        )
+    # The loop that was here over DOCS_DIR_LIVE_DOCS is gone: it checked a
+    # hand-kept tuple against the scan, and both sides now come from
+    # _docs_dir_live_docs(), so it could no longer fail. What it was for is
+    # asserted in test_ldsm11_the_docs_half_of_the_live_set_is_derived, over a
+    # listing written there.
     for described in ("CLAUDE.md", "AGENTS.md"):
         assert described in scanned, (
             f"{described} is not being scanned, and it is one of the documents "
@@ -2317,4 +2378,75 @@ def test_mawm21_no_document_cites_a_github_file_that_does_not_exist(tmp_path):
         "no live document cites .github/workflows/tests.yml, so either this "
         "scan is reading nothing or the documents have stopped naming the one "
         "workflow that gates every push"
+    )
+
+
+def test_ldsm11_the_docs_half_of_the_live_set_is_derived():
+    """LDS-M1.1, LDS-M1.2, LDS-M1.3 — `GSF-A3` closed.
+
+    Purpose: the scanned set must not depend on someone remembering to add a
+             document to a tuple.
+    Spec:    docs/implementation_plan_2026-11-09_derived_live_document_set.md#lds-m11
+    Tests:   this test
+
+    The hand-kept tuple held five names. `docs/GEMINI.md` was one of them and
+    still described the retired three-agent workflow as current through two
+    batches — the guards resolve pointers, and a description is not a pointer
+    (`MAW-A3`, guarded by
+    `tests/test_repo_hygiene.py::test_ldsm41_no_live_document_uses_retired_vocabulary`).
+    What the tuple *did* decide was which documents get read at all, and five
+    of 29 is the part this test removes.
+    """
+    # The rule, over a listing written here. This is the half that can fail
+    # when the repo is clean; the repo check below cannot.
+    listing = [
+        "docs/USER_GUIDE.md",
+        "docs/daVIPA - Get Started.md",
+        "docs/sub/dir/deeper.md",
+        "docs/implementation_plan_2026-11-09_a_batch.md",
+        "docs/spec_coverage_2026-11-08_a_batch.md",
+        "docs/status_report_2026-06-06_a_batch.md",
+        "docs/changes/2026-11-09-a-topic.md",
+        "docs/prompt-do-one-thing.md",
+        "docs/daVIPA_rebrand_prompt.md",
+        "docs/ui_color_inventory.md",
+        "docs/not-markdown.txt",
+        "README.md",
+    ]
+    assert _derived_docs_dir_live_docs(listing) == [
+        "docs/USER_GUIDE.md",
+        "docs/daVIPA - Get Started.md",
+        "docs/ui_color_inventory.md",
+    ], (
+        "the derivation no longer separates this directory's live reference "
+        "documents from its records: a dated name, a name containing "
+        "'prompt', a deeper path and a non-Markdown file are all excluded, "
+        "and everything else is live"
+    )
+    # Both directions on each exclusion, so a rule cannot be dropped silently.
+    assert _derived_docs_dir_live_docs(["docs/a.md"]) == ["docs/a.md"]
+    assert _derived_docs_dir_live_docs(["docs/a_2026-01-01_b.md"]) == []
+    assert _derived_docs_dir_live_docs(["docs/PROMPT-shouting.md"]) == []
+    assert _derived_docs_dir_live_docs(["docs/changes/a.md"]) == []
+    assert _derived_docs_dir_live_docs(["notes/a.md"]) == []
+
+    # And over the repository, where the floor is what the tuple used to hold.
+    derived = set(_docs_dir_live_docs())
+    assert derived, "the derivation found nothing under docs/; the scan would be vacuous"
+    missing = sorted(set(FORMERLY_HAND_KEPT_DOCS) - derived)
+    assert not missing, (
+        "the derived set no longer reaches documents the hand-kept tuple "
+        f"held, so closing GSF-A3 has narrowed the scan: {missing}"
+    )
+    assert derived == set(DOCS_DIR_LIVE_DOCS), (
+        "DOCS_DIR_LIVE_DOCS is no longer the derived set, so something has "
+        "gone back to keeping it by hand"
+    )
+    # The widening is the point, asserted as a strict superset rather than as
+    # a count floor: `>` over repo state is the shape CLAUDE.md's test rules
+    # name, because it hides the narrowing it was written to catch.
+    assert set(FORMERLY_HAND_KEPT_DOCS) < derived, (
+        "the derived set does not strictly contain the five names kept by "
+        "hand, so either docs/ has lost a reference document or the rule "
+        "excludes too much"
     )
