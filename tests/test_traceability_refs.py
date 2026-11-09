@@ -12,9 +12,13 @@ it can fail at all (P24).
 
 ``docs/spec_coverage.md`` is scanned too, and from 2026-11-09 so are the plan,
 spec and handoff-note families. A retired criterion keeps its history by naming
-the deleted test in plain backticks **without** the ``tests/`` path, so the row
-still says what proved it without leaving a pointer a reviewer would follow to
-nothing.
+the deleted test in plain backticks with **neither** the ``tests/`` path nor
+the leading ``::``, so the row still says what proved it without leaving a
+pointer a reviewer would follow to nothing. Dropping the path alone is not
+enough: as of `SBN-M1` the bare ``::name`` form is checked too, so a retired
+name written ``::test_x`` fails. The first version of this docstring said only
+"without the ``tests/`` path", which would have sent a future author straight
+into a red guard — found by the cold pass over the batch that added the arm.
 """
 
 import re
@@ -69,11 +73,17 @@ SCANNED = (
 )
 SKIP_DIRS = {"venv", ".git", "build", "dist", "__pycache__"}
 
-# Coverage documents that name their tests without a ``tests/`` path, so they
-# contribute no reference to this guard and cannot be required to. One file:
-# it was generated from a real collection run and lists bare test names in a
-# table of its own. `SST-A2` files the convention that would bring such names
-# into a guard's domain. The exemption is checked in both directions.
+# Coverage documents that name no test by ``tests/`` path, so they contribute
+# nothing to the *path* arm of this guard and cannot be required to. One file:
+# it was generated from a real collection run and lists its test names in
+# plain backticks, with no ``::`` anywhere in the document except one line of
+# prose. So it is outside the bare arm as well, not just this one — its names
+# carry no citation form either arm reads, and it is the one document here
+# whose rows this guard cannot check at all. The exemption below is only about
+# the path form, and is checked in both directions. (The first version of this
+# comment said the bare arm had brought the file into the domain and credited
+# `SST-A2`, which is a third form — the basename ``test_x.py::name``, still
+# unread and still open. Both claims were false; found by the cold pass.)
 COVERAGE_WITHOUT_PATHS = {
     "docs/spec_coverage_2026-08-19_rename_safe_links.md",
 }
@@ -84,6 +94,67 @@ COVERAGE_WITHOUT_PATHS = {
 # checked — 15% of the domain the docstring claims (P24: a guard whose
 # unchecked input path is a silent pass).
 _REF = re.compile(r"(tests/[\w/]+\.py)(?:::(\w+))?")
+
+# The bare arm, `SBN-M1`. A citation written as a continuation — `` `::test_y`
+# `` under a row that named its file earlier — was matched by nothing, so a
+# third of this repo's test citations were never checked: 1097 of them when
+# measured on 2026-11-09, 68 of which named a test defined nowhere, 51 of
+# those reading as live evidence. `PDT-A1` filed that against one document;
+# `SAG-M4` widened the scan to four families and widened the gap with it.
+#
+# A bare name has no file, so it is resolved against the whole suite. That is
+# weaker than the path form — it does not prove the name is in the file the
+# reader would open next — and it is the whole of what can be checked here.
+# The alternative, resolving against the nearest preceding path in the same
+# document, was measured and rejected: these documents cite a second file in
+# the same table row often enough that the carried anchor is the wrong file
+# 356 times, against 51 citations that are actually dead. `SBN-A1` carries the
+# residue.
+#
+# The lookbehind is what keeps a full citation out of this arm: the `::` of
+# `path.py::name` is preceded by the `y` of `.py`, and the second `::` of a
+# `path::Class::method` chain by a name character, so neither is read as bare.
+# A mask over whole `path.py::name` matches was written here first and then
+# measured: removing it changed no outcome in the whole repo, because every
+# citation that carries a file puts a word character immediately before its
+# `::`. Dropping the lookbehind instead fails two tests. So the lookbehind is
+# the mechanism and the mask was dead code; it is gone rather than left as
+# untested protection.
+_BARE = re.compile(r"(?<![\w.)])::(\w+)")
+
+# A bare name is in the domain when it looks like a test. The names that do
+# not are mostly `src/` functions continuing a `src/…py` citation in a
+# neighbouring table cell — 51 of 68 of them resolve against nothing under
+# `tests/` for exactly that reason — and resolving those means reading `src/`,
+# which is a different guard: `SBN-A2`.
+_TESTISH = re.compile(r"^(?:test_|Test)")
+
+
+def _suite_names():
+    """Every name defined anywhere under ``tests/``.
+
+    Cached: the bare arm asks this once per reference and there are a thousand
+    of them over a hundred-odd files.
+    """
+    if not _SUITE_NAMES:
+        for path in sorted((REPO / "tests").rglob("*.py")):
+            if SKIP_DIRS & set(path.parts):
+                continue
+            _SUITE_NAMES.update(_defined_names(path))
+    return _SUITE_NAMES
+
+
+_SUITE_NAMES = set()
+
+
+def bare_names(text):
+    """The bare `::name` citations in ``text`` that are in the domain.
+
+    Public, because the three `SBN-M1` tests drive it over text of their own
+    rather than over a document that could stop using the form.
+    """
+    return [m.group(1) for m in _BARE.finditer(text)
+            if _TESTISH.match(m.group(1))]
 
 
 def _scanned_files():
@@ -143,6 +214,17 @@ def _defined_names(path):
             | set(re.findall(r"^(\w+)\s*=", text, re.M)))
 
 
+def _resolves_in_suite(name):
+    """`SBN-M1.1`'s resolution: anywhere under ``tests/``, same two forms."""
+    pool = _suite_names()
+    if name in pool:
+        return True
+    return any(
+        other.startswith(name)
+        and (name.endswith("_") or other[len(name):len(name) + 1] == "_")
+        for other in pool)
+
+
 def _resolves(path, name):
     """Is ``name`` something that exists in ``path``?
 
@@ -188,6 +270,52 @@ def test_every_referenced_test_name_exists():
     assert not missing, (
         "these references name a test that does not exist:\n  "
         + "\n  ".join(sorted(missing)))
+
+
+def test_sbnm11_a_bare_name_citation_is_checked():
+    """`SBN-M1.1`: a bare name that is defined nowhere is reported."""
+    assert bare_names("| M1 | a criterion | `::test_absent_from_the_suite` |") == [
+        "test_absent_from_the_suite"]
+    assert not _resolves_in_suite("test_absent_from_the_suite")
+    # and one that is real resolves, so the check is not simply always failing
+    assert _resolves_in_suite("test_this_guard_can_actually_fire")
+
+
+def test_sbnm12_a_name_in_a_full_citation_is_not_bare():
+    """`SBN-M1.2`: the three forms that carry their own file."""
+    assert bare_names("`tests/test_x.py::test_y`") == []
+    assert bare_names(
+        "`tests/test_project_notes.py::TestM1DataModel::test_link_status_roundtrip`") == []
+    assert bare_names("`src/getmoredone/db_manager.py::update_action_item`") == []
+    # the real shape this came from: a row naming a src function and then a
+    # test, where only the second is a citation this guard owns
+    row = ("| M1.A.4 | round-trips | `src/getmoredone/db_manager.py::create_action_item`, "
+           "`::update_action_item` | `::test_link_status_roundtrip` |")
+    assert bare_names(row) == ["test_link_status_roundtrip"]
+
+
+def test_sbnm13_a_bare_non_test_name_is_out_of_the_domain():
+    """`SBN-M1.3`: and out by construction, not by omission."""
+    assert bare_names("`::_build_service`, `::export_day`, `::_255b`") == []
+    assert bare_names("`::TestM3UI` and `::test_m3_ui`") == [
+        "TestM3UI", "test_m3_ui"]
+
+
+def test_sbnm21_every_bare_name_citation_resolves():
+    """`SBN-M2.1`: over the real documents, not a fixture."""
+    missing = []
+    for path in _scanned_files():
+        if path.suffix != ".md":
+            continue
+        rel = path.relative_to(REPO)
+        for name in bare_names(path.read_text(encoding="utf-8")):
+            if not _resolves_in_suite(name):
+                missing.append(f"{rel}: ::{name}")
+    assert not missing, (
+        "these documents cite a test by a bare ::name that is defined nowhere "
+        "under tests/. A test that no longer exists is named in plain "
+        "backticks WITHOUT the ::, so it reads as history rather than as a "
+        "pointer:\n  " + "\n  ".join(sorted(missing)))
 
 
 def test_this_guard_can_actually_fire(tmp_path):
@@ -289,6 +417,31 @@ def test_this_guard_can_actually_fire(tmp_path):
     assert not _resolves(probe, "test_absent"), (
         "a name the file does not define resolves, so the resolver accepts "
         "everything and both checks above it are inert")
+    # `SBN-M1.4` — the bare arm, over the documents, in both directions.
+    bare = [(str(p.relative_to(REPO)), n)
+            for p in _scanned_files() if p.suffix == ".md"
+            for n in bare_names(p.read_text(encoding="utf-8"))]
+    # Membership per family, not a count: an exact count goes red on every
+    # batch that writes a criterion row, and a floor is forbidden here because
+    # it hides the narrowing it was written to catch. What has to hold is that
+    # each family still yields bare citations — bare_names() going inert would
+    # otherwise be a silent pass over a third of this repo's test citations.
+    bare_sources = {src for src, _n in bare}
+    for family, label in (
+            ("docs/spec_coverage", "the coverage family"),
+            ("docs/implementation_plan_", "the implementation-plan family"),
+            ("docs/spec_2", "the dated specs"),
+            ("docs/changes/", "the handoff notes"),
+    ):
+        assert any(src.startswith(family) for src in bare_sources), (
+            f"no bare ::name citation is being found in {label}")
+    assert all(_resolves_in_suite(n) for _src, n in bare), (
+        "a bare citation does not resolve, which test_sbnm21 reports in "
+        "full — this assertion is here so the arm cannot be inert while that "
+        "test is green for the wrong reason")
+    assert not _resolves_in_suite("test_sbn_invented_name_for_the_guard"), (
+        "_resolves_in_suite accepts a name nothing defines, so the bare arm "
+        "passes everything")
     assert any(str(src) == "conftest.py" for src, _t, _n in found), (
         "conftest.py is not being scanned — that is where the first broken "
         "reference this guard missed was living")
