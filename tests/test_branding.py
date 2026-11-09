@@ -2,7 +2,7 @@
 
 Purpose: a rebrand must be a value change, not a hunt across three files —
          and it must NOT drag the user-data directory along with it.
-Spec:    daVIPA_rebrand_prompt.md
+Spec:    docs/daVIPA_rebrand_prompt.md
 Tests:   this file
 
 The window title, the sidebar wordmark and the --selftest banner each held
