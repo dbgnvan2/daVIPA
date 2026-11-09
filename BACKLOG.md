@@ -115,6 +115,111 @@ the one anyone uses.
 **Priority:** Medium
 **Effort:** Low
 
+## csdp sweep findings not fixed — UPD-F batch (2026-11-08)
+
+The sweep over `e7e260a...HEAD` ran `learning-qa` cold, a cold security pass,
+and a `/code-review` correctness pass. Nine findings came back from the first
+and four from the third, two of them the same finding reached independently.
+Three were fixed in-loop with tests and a 4-of-4 mutation gate (the floor
+branch flattening the stored shape, and the two tests that could not fail).
+These are the rest, with the reason each was not fixed.
+
+### UPD-A14 — `available_width` stops one layer short of the viewport (medium)
+
+`ChipTable.available_width` subtracts the table's own `HEADER_PADX` and
+`CELL_PADX` and nothing else. The table's container is a `CTkScrollableFrame`
+gridded inside a panel frame that is itself gridded `padx=(8, 2)`, so roughly
+26-30px of frame padding and scrollbar is never subtracted. The columns are
+therefore fitted to a width the viewport does not have; `CTkScrollableFrame`
+has no horizontal scrollbar, so the last column's right edge is clipped --
+and `fit_to_panel` returns 0, so `panel_fitter` logs nothing. That is the
+exact silence the return value was added to prevent (P2), and it is active at
+every window size rather than only at narrow ones.
+
+Found twice independently: `learning-qa` finding 4 and the `/code-review`
+pass's first finding.
+
+**Not fixed, and why.** The honest fix is to fit to the realised container
+width rather than to the body grid column's minsize. Which number is right --
+`container.winfo_width()`, the inner frame CustomTkinter reparents children
+into, or the outer width less a named scrollbar constant -- cannot be settled
+by reasoning, and the only test that settles it is a mapped-window one
+asserting `sum(widths) + spent <= left_list.winfo_width()` on a laid-out
+screen. This machine does not run mapped-window tests, and adding one changes
+the count `tests/test_ci_contract.py` asserts. Guessing the constant here
+risks over-correcting into the empty space beside the last column that UPD-F4
+was asked to remove. It needs the measurement, and the measurement needs the
+app on screen.
+
+### UPD-A15 — `fit_to_width` reports 0 for a fixed-only table (low)
+
+The `if not order: return 0` guard says "they fit" for a table whose columns
+are all `resizable=False`, at any width including 0. The honest return is
+`max(0, reserved - available)`, which is what the `budget` line four lines
+below is careful to compute for the mixed case. No such column set ships, so
+this is latent. Low, so it is recorded rather than fixed in-loop.
+
+### UPD-A16 — the overflow branch applies and logs on every `<Configure>` (low)
+
+The proportional path is guarded by `if assigned != current` before
+`_apply_all()`; the overflow path applies unconditionally and `panel_fitter`
+logs every call. A window held below the floor total re-configures every cell
+in every row and emits one WARNING per `<Configure>` -- hundreds during a
+resize drag. A warning that repeats that often stops being read, which costs
+the signal UPD-A14 depends on. Log on transition into and out of overflow,
+and apply only on change. Not reachable through the shipped wiring today
+(`MIN_PANEL_WIDTH` is wide enough for every column set's floors), which is
+why it is low.
+
+### UPD-A17 — a computed column index became a magic one (low)
+
+`week_actions.py` discards `build_combos`' return value and grids
+`header.grid_columnconfigure(4, weight=1)` where it used to use the returned
+`next_column`. The literal will not track a change to the controls row, and
+`lineage_filters.py` still documents a contract ("The caller keeps the
+returned column") that its only caller no longer honours. Name the column or
+drop the return value. Belongs with UPD-A9, which already owns the five
+remaining copies of the filter triple.
+
+## csdp sweep findings in other batches — not mine to fix (2026-11-08)
+
+The sweep covered the whole unpushed range, which holds four batches. Two
+findings are in code another session is still working in, so they are
+recorded here rather than fixed: that session holds the files uncommitted and
+a second writer in this index is what `CLAUDE.md`'s "One build batch at a
+time" exists to prevent.
+
+### CE — `calendar_event_calendar_id` is committed as half a pair (high)
+
+`f264cc3` exists to repair a commit that landed one half of a column/field
+pair, and it lands the same split again in the other direction. In the
+committed tree the name appears only in the schema, the migration and the
+dataclass field: `create_time_block` does not write it, `_row_to_time_block`
+does not read it, and `set_block_calendar_event_id` writes only the event id.
+With the field's documented semantics -- NULL means the default calendar -- a
+non-primary calendar can only ever be recorded as `primary`, which is the
+duplicate-events failure the column was added to prevent. Dormant until the
+uncommitted `db_manager.py` / `calendar_exporter.py` half lands.
+
+Its traceability references point at nothing: the field names
+`tests/test_time_block_crud.py::test_cem12b_the_event_calendar_round_trips`
+and the migration names two `test_cem11*` tests, none of which exist in the
+committed tree, and the `Spec:` target
+`docs/implementation_plan_2026-11-08_plan_calendar_export.md` is untracked.
+`tests/test_traceability_refs.py` is red on `main` for this and for the plan
+and time-block batches' refs -- nine stale references across two tests.
+
+### WTP — the pin test's message names a check it does not make (medium-low)
+
+`tests/test_weekly_tactic_completion_widgets.py`'s pin test says a new screen
+"must appear in this file's BUILDERS, or its control ships with nobody
+pressing it", and nothing compares `BUILDERS` to anything. It compares the
+AST-discovered set to the `SCREENS_WITH_A_CONTROL` literal, so the cheapest
+way to make it green when a sixth screen appears is to add the filename to
+the constant and leave the new control unpressed. One line closes it:
+`assert {name + ".py" for name in BUILDERS} == SCREENS_WITH_A_CONTROL`. Three
+commits in this range rewrote that test's docstring without touching the gap.
+
 ## Adjacent issues — Plan day calendar export (CE, 2026-11-08)
 
 Found while building CE-M1 to CE-M5. Flagged, not fixed (global rule 10): each

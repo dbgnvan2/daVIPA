@@ -145,3 +145,122 @@ Docs:
   fail before the fix (P10).
 - `/csdp` is owed over the whole unpushed range — 45-plus commits before this
   batch.
+
+
+## The csdp sweep, 2026-11-08
+
+Range `e7e260a...HEAD`, 12 commits, 25 files, 3071 insertions. The range holds
+four batches, not one: UPD-F (four commits), WTP (six), CE (one) and the
+earlier VSP docs commit. It was not narrowed, because the push is the gate and
+the push carries all of it.
+
+### Which passes ran
+
+| Pass | Lens | Warm or cold | Outcome |
+|---|---|---|---|
+| `learning-qa` | the P1-P42 failure-pattern catalogue | cold | 9 findings, 2 reported high |
+| security | injection, deserialisation, paths, secrets | cold | no findings |
+| `/code-review` | correctness | warm for UPD-F, cold for the other three | 4 findings, 2 of them the same as `learning-qa`'s |
+
+The security pass ran because a trigger grep over the diff hit SQL, not
+because it was judged to be needed: `src/getmoredone/database.py` adds two
+columns to a `CREATE TABLE` and to a migration list whose surrounding
+`conn.execute` is an f-string. It resolved as not injection -- `column` and
+`definition` come from a tuple literal in source, and the `execute` line is
+context in this diff, not an added line.
+
+**The program was not run.** This is a GUI app and launching it is out of
+bounds on this machine, so Phase 2c-ter is not satisfied and is not reported
+as satisfied. The substitute is the written checklist at
+`docs/spec_2026-11-07_unified_panel_design.md` §11, steps 11, 12 and 13. No
+pixel claim in UPD-F2, UPD-F3 or UPD-F4 has been verified by looking at the
+screen.
+
+### Fixed in-loop, with tests
+
+1. **The floor branch flattened the stored shape** (`column_resize.py`,
+   `learning-qa` finding 1). `self._widths` is both the rendered width and the
+   weight `_share` divides by, so pinning every column to its floor destroyed
+   the proportions rather than suspending them: the panel came back wide and
+   the columns came back equal, with the 135/155/125 shape gone and nothing
+   logged about losing it. A later drag then called `_persist`, which wrote
+   the flat set to disk.
+
+   Reported high; **corrected to medium** after checking reachability.
+   `SplitPanel.clamp_left` holds both panels at `MIN_PANEL_WIDTH = 420`, and
+   the widest column set's floors need 200px against a 318px budget there, so
+   `panel_fitter` never enters the branch. It is a latent trap -- one
+   `MIN_PANEL_WIDTH` change or one wider column set from being live -- not a
+   defect a user can reach today.
+
+   The fix is `_pre_floor`: the shape is remembered once on the way into the
+   floor, given back on the first fit wide enough to share it, and a column
+   the user drags while floored is dropped from it, because a hand-set width
+   is newer than a remembered one.
+
+   **`learning-qa`'s recommended fix was not taken.** It proposed a separate
+   weight store sourced from settings and from drags only. Checked against
+   `test_updf46`, that breaks UPD-F4.6: only dragged columns would carry a
+   user weight, so after a drag to 371px the shape on a 1200px refit moves
+   from 1.59 to 2.84 and the test's 0.05 tolerance fails. The fitted-width-
+   as-weight design is what makes UPD-F4.6 hold; only the floor branch needed
+   fixing.
+
+2. **`test_updf43` never reached the floor it is named for**
+   (`learning-qa` finding 3, settled by mutation as it asked). At
+   `fit_to_panel(300)` the budget was 174px against a 120px floor total, so
+   every share stayed above 40 and the `>=` assertion was trivially true. The
+   panel is now 251px, where the floor binds for some columns and not others,
+   and the test asserts that both are true -- one column exactly on the
+   floor, another above it.
+
+3. **`test_updf44` derived its expected shortfall from the constants it was
+   pinning.** `len(resizable) * min_column_width() + fixed_px` moved with
+   `MIN_COLUMN_CHARS`, so the mutation left it green -- it was the one
+   mutation that survived the first gate. It now asserts the literal 188,
+   with its three parts asserted separately so the number is readable.
+
+Mutation gate on the fix: **4 of 4 red** -- dropping the restore, re-
+remembering the shape on every floored fit, dropping the drag's exemption,
+and `MIN_COLUMN_CHARS = 1` (which now turns all three tests red, where it
+previously left `test_updf44` green). Each mutation was the verbatim original,
+applied to a pristine copy one at a time, restored and `filecmp`-verified,
+with the baseline re-run green afterwards.
+
+### Recorded, not fixed
+
+In `BACKLOG.md` under "csdp sweep findings not fixed":
+
+- **UPD-A14** (medium) -- `available_width` stops one layer short of the
+  viewport: the panel frame's `padx=(8, 2)` and the `CTkScrollableFrame`'s
+  scrollbar are never subtracted, so the columns are fitted ~26-30px wider
+  than the space they have, the last column is clipped, and `fit_to_panel`
+  returns 0. Found twice independently, by `learning-qa` and by the
+  correctness pass. Not fixed because the right number cannot be reasoned
+  out and the only test that settles it is a mapped-window one, which this
+  machine does not run and which changes the count
+  `tests/test_ci_contract.py` asserts. Guessing risks over-correcting back
+  into the empty space UPD-F4 was asked to remove.
+- **UPD-A15** (low) -- `fit_to_width` returns 0 for a table with no
+  resizable columns, however narrow.
+- **UPD-A16** (low) -- the overflow branch applies and logs on every
+  `<Configure>`.
+- **UPD-A17** (low) -- `week_actions.py`'s computed column index became the
+  literal `4`, and `build_combos` still documents a return value its only
+  caller discards.
+
+In `BACKLOG.md` under "csdp sweep findings in other batches":
+
+- **CE** (high) -- `calendar_event_calendar_id` is committed as half a pair
+  again, the thing `f264cc3` exists to repair. Nothing writes or reads it, so
+  a non-primary calendar can only be recorded as `primary`, which is the
+  duplicate-events failure the column was added to prevent. Its traceability
+  references name four tests and one spec file that do not exist, and
+  `tests/test_traceability_refs.py` is **red on `main`** for this and for the
+  plan and time-block batches -- nine stale references across two tests.
+- **WTP** (medium-low) -- the pin test's failure message names a `BUILDERS`
+  check it does not make.
+
+Neither is mine to fix: both sit in files another session holds uncommitted,
+and a second writer in this index is what "One build batch at a time" exists
+to prevent.
