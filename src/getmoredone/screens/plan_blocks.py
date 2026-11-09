@@ -31,6 +31,7 @@ from ..theme import (
     status_text_color,
 )
 from ..time_block_layout import (
+    block_title,
     MAX_DEPTH_BARS,
     depth_bars,
     priority_band,
@@ -452,18 +453,18 @@ def build_item_row(
 
 
 def _block_title(block: TimeBlock, item: Optional[ActionItem]) -> str:
-    """What to call a block: its item's title, its label, or its kind."""
-    kind = BlockType.normalize(block.block_type)
-    if kind == BlockType.BUFFER:
-        return block.label or "Buffer"
-    if kind == BlockType.BREAK:
-        return block.label or "Break"
-    if item is not None:
-        return item.title
-    # An item block whose item is gone. Named rather than blank: a block with
-    # no text looks like a rendering fault, and the label is the last record of
-    # what it was for.
-    return block.label or "(item no longer exists)"
+    """What to call a block: its item's title, its label, or its kind.
+
+    CE-M2.2 -- the rule itself lives in ``time_block_layout.block_title``,
+    which imports no GUI toolkit, so the Google Calendar export can name a
+    block exactly as this screen draws it. Kept as a delegation rather than
+    replaced at the call sites: this is the name the rest of this module and
+    its tests already use, and two implementations of "what is this block
+    called" is the drift the move exists to prevent.
+    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m22
+    Tests: tests/test_plan_screen_calendar_export.py::test_cem221a_an_event_is_titled_what_the_day_draws_on_the_block
+    """
+    return block_title(block, item)
 
 
 # ``build_lunch_band`` was here. The grid marks lunch slots rather than

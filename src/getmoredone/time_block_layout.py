@@ -465,29 +465,131 @@ class Slot:
         return format_hhmm(self.end_minutes)
 
 
-def day_grid(bounds: DayBounds) -> List[Slot]:
-    """Every half hour from Day Start to Day End, in order.
+@dataclass(frozen=True)
+class DaySpan:
+    """The inclusive range of boxes a day draws, counted from Day Start.
 
-    Purpose: the fixed set of boxes a day offers, which is the thing items are
+    Purpose: PD-M14.2 -- index 0 is the first box of the hours in Day
+             Settings, and a **negative** index is a box before them. A day is
+             the hours you set, stretched to cover whatever that date actually
+             holds, so the stretch is a property of the date's blocks and not
+             of the settings file. Nothing about it is stored, which is why it
+             cannot go stale (P6) and why taking the blocks away restores the
+             hours with no code at all (PD-M14.3).
+    Spec:    docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-2
+    Tests:   tests/test_time_block_layout.py::test_pdm142_the_template_span_is_the_hours_you_set
+             tests/test_time_block_layout.py::test_pdm142_a_block_before_the_hours_widens_the_span
+
+    ``last`` below ``first`` means a day with no boxes -- a Day End at or
+    before Day Start -- which every method here answers for rather than
+    raising, because a day's shape is read off a settings file.
+    """
+
+    first: int
+    last: int
+
+    @property
+    def count(self) -> int:
+        return max(0, self.last - self.first + 1)
+
+    def holds(self, slot_index: int, span: int = 1) -> bool:
+        """Whether a block of ``span`` boxes starting here is inside the day."""
+        span = max(1, int(span))
+        return self.first <= slot_index and slot_index + span - 1 <= self.last
+
+    def position_of(self, slot_index: int) -> int:
+        """Where this slot index sits in a list built over this span.
+
+        A signed slot index is not a list position: with a first index of -2,
+        box -2 is element 0. Every lookup goes through here, because a bare
+        ``grid[slot_index]`` on a negative index silently reads from the end
+        of the list instead -- an off-by-the-whole-day with no error.
+        """
+        return slot_index - self.first
+
+    def widened_to(self, slot_index: int, span: int = 1) -> "DaySpan":
+        span = max(1, int(span))
+        return DaySpan(
+            min(self.first, slot_index), max(self.last, slot_index + span - 1)
+        )
+
+
+def template_span(bounds: DayBounds) -> DaySpan:
+    """The boxes the hours in Day Settings offer, and nothing more.
+
+    Purpose: PD-M14.5 -- what AutoLoad and the break button are allowed to
+             fill. Only a drag onto one of the two ends goes outside it.
+    Spec:    docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-5
+    Tests:   tests/test_time_block_layout.py::test_pdm142_the_template_span_is_the_hours_you_set
+    """
+    room = bounds.day_end_minutes - bounds.day_start_minutes
+    return DaySpan(0, room // SLOT_MINUTES - 1)
+
+
+def _stays_inside_the_date(slot_index: int, span: int, bounds: DayBounds) -> bool:
+    """Whether a block at this index is still on the date it belongs to.
+
+    A day is one date. A stored slot index far outside the day -- a corrupt
+    row, or one written against a day shape that no longer exists -- must not
+    stretch the drawn day to reach it: ``build_day_grid`` surfaces it in the
+    "outside the day" group instead, which is where a block the grid cannot
+    hold has always gone (P2).
+    """
+    start = bounds.day_start_minutes + slot_index * SLOT_MINUTES
+    end = start + max(1, int(span)) * SLOT_MINUTES
+    return (
+        start >= 0
+        and start <= LAST_DAY_END_MINUTES - SLOT_MINUTES
+        and end <= LAST_DAY_END_MINUTES
+    )
+
+
+def span_for_blocks(blocks: Iterable[TimeBlock], bounds: DayBounds) -> DaySpan:
+    """The hours you set, stretched to cover what this date holds.
+
+    Purpose: PD-M14.2 -- the day on screen. Derived on every read from the
+             blocks themselves, so there is no second copy of the day's shape
+             to disagree with them.
+    Spec:    docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-2
+    Tests:   tests/test_time_block_layout.py::test_pdm142_a_block_before_the_hours_widens_the_span
+             tests/test_time_block_layout.py::test_pdm142_an_absurd_slot_index_does_not_stretch_the_day
+    """
+    span = template_span(bounds)
+    for block in blocks:
+        start = _slot_index_of(block)
+        if start is None:
+            continue
+        length = slot_span_of(block)
+        if not _stays_inside_the_date(start, length, bounds):
+            continue
+        span = span.widened_to(start, length)
+    return span
+
+
+def day_grid(bounds: DayBounds, span: Optional[DaySpan] = None) -> List[Slot]:
+    """Every half hour of the drawn day, in order.
+
+    Purpose: the set of boxes a day offers, which is the thing items are
              dropped onto.
     Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m1
     Tests:   tests/test_time_grid.py::test_tgm11_grid_covers_the_day_in_half_hours
 
-    A slot that would run past Day End is not produced at all, so a Day End of
-    16:45 gives a last slot of 16:00--16:30 rather than a 15-minute stub that
-    nothing can hold. Lunch slots are **marked, not removed**: the grid stays
-    contiguous in time, which is what lets a span's end be its start plus its
-    length without walking the list.
+    Without a ``span`` this is the hours in Day Settings: a slot that would run
+    past Day End is not produced at all, so a Day End of 16:45 gives a last
+    slot of 16:00--16:30 rather than a 15-minute stub that nothing can hold.
+    With one (PD-M14.2) the day runs from that span's first box to its last,
+    which may begin before Day Start -- a negative index -- or end after Day
+    End. Lunch slots are **marked, not removed**: the grid stays contiguous in
+    time, which is what lets a span's end be its start plus its length without
+    walking the list.
     """
-    start = bounds.day_start_minutes
-    end = bounds.day_end_minutes
+    drawn = template_span(bounds) if span is None else span
     lunch_start = bounds.lunch_start_minutes
     lunch_end = bounds.lunch_end_minutes
 
     slots: List[Slot] = []
-    index = 0
-    at = start
-    while at + SLOT_MINUTES <= end:
+    for index in range(drawn.first, drawn.last + 1):
+        at = bounds.day_start_minutes + index * SLOT_MINUTES
         # Overlap, not containment: a lunch of 12:15--12:45 makes both the
         # 12:00 and the 12:30 slot unavailable, because a block in either
         # would run through part of it.
@@ -495,8 +597,6 @@ def day_grid(bounds: DayBounds) -> List[Slot]:
             bounds.lunch_length > 0 and at < lunch_end and lunch_start < at + SLOT_MINUTES
         )
         slots.append(Slot(index=index, start_minutes=at, is_lunch=overlaps_lunch))
-        index += 1
-        at += SLOT_MINUTES
     return slots
 
 
@@ -510,35 +610,66 @@ DAY_EXTEND_LATER = "later"
 LAST_DAY_END_MINUTES = MINUTES_PER_DAY - SLOT_MINUTES
 
 
-def extended_day_bound(
-    bounds: DayBounds, direction: str, span: int
-) -> Optional[str]:
-    """The Day Start or Day End that makes room for ``span`` more boxes.
+def edge_limit_time(edge: str) -> str:
+    """The clock time one end of the day stops at.
 
-    Purpose: PD-M5 -- a drop above the day or below it lengthens the day rather
-             than being refused.
-    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
-    Tests:   tests/test_time_block_layout.py::test_pdm58_the_day_cannot_cross_midnight
+    Purpose: PD-M14.6 -- the two limits are genuinely different (a block may
+             start no earlier than midnight and end no later than the last
+             whole half hour), so the refusal has to name which one it hit.
+             One function, so the two ends cannot drift apart or name a time
+             the arithmetic does not actually enforce.
+    Spec:    docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-6
+    Tests:   tests/test_time_block_layout.py::test_pdm146_each_end_names_the_time_it_stops_at
+    """
+    if edge == DAY_EXTEND_EARLIER:
+        return format_hhmm(0)
+    if edge == DAY_EXTEND_LATER:
+        return format_hhmm(LAST_DAY_END_MINUTES)
+    raise ValueError(f"not an end of the day: {edge!r}")
 
-    ``None`` when the day cannot grow that far, which the caller reports rather
-    than clamping: a clamped bound would make fewer boxes than the item needs,
-    so the block would land somewhere other than the end that was dropped on,
-    or not at all. Midnight is both the floor and the ceiling -- a day is one
-    date, and a block has no way to say it belongs to the next one.
+
+@dataclass(frozen=True)
+class DayExtension:
+    """Where a drop on one of the two ends puts a block, and the day it makes."""
+
+    span: DaySpan
+    slot_index: int
+
+
+def extended_span(
+    drawn: DaySpan, bounds: DayBounds, direction: str, span: int
+) -> Optional[DayExtension]:
+    """The day that makes room for ``span`` more boxes at one end, and the box.
+
+    Purpose: PD-M14.1 -- a drop above the day or below it lengthens the **day
+             on screen** and writes one block. It does not move Day Start or
+             Day End: those are the hours a blank day begins from, and one
+             setting shared by every date is not a thing a single drop may
+             change (this replaces ``extended_day_bound``, which did exactly
+             that and ratcheted the hours outward with nothing to put them
+             back).
+    Spec:    docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-1
+    Tests:   tests/test_time_block_layout.py::test_pdm141_the_span_grows_at_the_end_that_was_dropped_on
+             tests/test_time_block_layout.py::test_pdm146_neither_end_can_leave_the_date
+
+    ``None`` when the new boxes would leave the date, which the caller reports
+    rather than clamping: a clamped day would make fewer boxes than the item
+    needs, so the block would land somewhere other than the end that was
+    dropped on, or not at all. A day is one date, and a block has no way to say
+    it belongs to the next one.
     """
     span = max(1, int(span))
-    room = span * SLOT_MINUTES
     if direction == DAY_EXTEND_EARLIER:
-        value = bounds.day_start_minutes - room
-        if value < 0:
-            return None
+        slot_index = drawn.first - span
     elif direction == DAY_EXTEND_LATER:
-        value = bounds.day_end_minutes + room
-        if value > LAST_DAY_END_MINUTES:
-            return None
+        slot_index = drawn.last + 1
     else:
         raise ValueError(f"not an end of the day: {direction!r}")
-    return format_hhmm(value)
+    if not _stays_inside_the_date(slot_index, span, bounds):
+        return None
+    return DayExtension(
+        span=drawn.widened_to(slot_index, span), slot_index=slot_index
+    )
 
 
 def slots_for_minutes(minutes: Optional[int]) -> int:
@@ -595,6 +726,7 @@ def can_place(
     span: int,
     *,
     ignoring: Optional[str] = None,
+    day_span: Optional[DaySpan] = None,
 ) -> Optional[str]:
     """``None`` if a block of ``span`` boxes may sit at ``slot_index``.
 
@@ -607,17 +739,25 @@ def can_place(
     ordinary answer about an ordinary gesture, not an error. ``ignoring`` is
     the block being moved, which must not count itself as occupying the slot
     it is leaving.
+
+    ``day_span`` is the day being drawn (PD-M14.2). Left out, it is the hours
+    in Day Settings, which is what every gesture inside the day wants. A drop
+    on one of the two ends passes a span that already covers the box it is
+    about to create, because that box is outside the hours by definition --
+    that is what the gesture means.
     """
-    grid = day_grid(bounds)
     span = max(1, int(span))
-    if slot_index < 0 or slot_index + span > len(grid):
+    drawn = template_span(bounds) if day_span is None else day_span
+    grid = day_grid(bounds, drawn)
+    if not drawn.holds(slot_index, span):
         return SlotRefusal.OUTSIDE_GRID
 
-    covered = grid[slot_index : slot_index + span]
+    at = drawn.position_of(slot_index)
+    covered = grid[at : at + span]
     if any(slot.is_lunch for slot in covered):
         return SlotRefusal.CROSSES_LUNCH
 
-    occupancy = slot_occupancy(blocks, bounds, ignoring=ignoring)
+    occupancy = slot_occupancy(blocks, bounds, ignoring=ignoring, day_span=drawn)
     if any(len(occupancy.get(slot.index, ())) >= MAX_BLOCKS_PER_SLOT for slot in covered):
         return SlotRefusal.SLOT_FULL
     return None
@@ -628,14 +768,21 @@ def slot_occupancy(
     bounds: DayBounds,
     *,
     ignoring: Optional[str] = None,
+    day_span: Optional[DaySpan] = None,
 ) -> dict:
     """Which blocks cover which slot index, spanning blocks included.
 
     A block at slot 4 with a span of 2 appears under both 4 and 5, because
     "is there room here" has to mean the whole box, not just where something
     started.
+
+    Only the boxes the drawn day has (PD-M14.2), which by default is the span
+    this date's own blocks need. A block the grid cannot hold is drawn in the
+    "outside the day" group instead, and one that is not on the day must not
+    hold a box against a drop -- a refusal whose cause is invisible reads as a
+    gesture that did nothing.
     """
-    grid_length = len(day_grid(bounds))
+    drawn = span_for_blocks(blocks, bounds) if day_span is None else day_span
     occupancy: dict = {}
     for block in blocks:
         if ignoring is not None and str(getattr(block, "id", "")) == str(ignoring):
@@ -645,7 +792,7 @@ def slot_occupancy(
             continue
         for offset in range(slot_span_of(block)):
             index = start + offset
-            if 0 <= index < grid_length:
+            if drawn.holds(index):
                 occupancy.setdefault(index, []).append(block)
     return occupancy
 
@@ -664,7 +811,10 @@ def times_for_slot(slot_index: int, minutes: int, bounds: DayBounds) -> Tuple[st
     leaves 15 minutes of its second box spare; writing 10:00 there would be the
     row claiming minutes the item does not own.
     """
-    start = bounds.day_start_minutes + max(0, int(slot_index)) * SLOT_MINUTES
+    # Signed (PD-M14.2). This clamped the index at 0, which gave every box
+    # before Day Start the time of the first one -- so a block dropped on
+    # Earlier could only ever record the hour it was not planned at.
+    start = bounds.day_start_minutes + int(slot_index) * SLOT_MINUTES
     return format_hhmm(start), format_hhmm(start + _positive_int(minutes, 0))
 
 
@@ -687,6 +837,12 @@ class DayGrid:
 
     slots: List[GridSlot] = field(default_factory=list)
     outside: List[TimeBlock] = field(default_factory=list)
+    # The boxes this grid actually drew, which is the template's hours
+    # stretched to the date's own blocks (PD-M14.2). Carried here so a caller
+    # that has the grid does not derive the same span a second time and get a
+    # different answer: ``slots[0].slot.index`` is the same number, but a day
+    # with no boxes at all has no slots to read it from.
+    span: DaySpan = field(default_factory=lambda: DaySpan(0, -1))
 
     @property
     def slots_used(self) -> int:
@@ -698,7 +854,11 @@ class DayGrid:
         return self.slots_used * SLOT_MINUTES
 
 
-def build_day_grid(blocks: Iterable[TimeBlock], bounds: DayBounds) -> DayGrid:
+def build_day_grid(
+    blocks: Iterable[TimeBlock],
+    bounds: DayBounds,
+    span: Optional[DaySpan] = None,
+) -> DayGrid:
     """Lay a day's blocks onto its grid.
 
     Purpose: the single function the screen draws from, so what is on screen
@@ -706,8 +866,13 @@ def build_day_grid(blocks: Iterable[TimeBlock], bounds: DayBounds) -> DayGrid:
     Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m3
     Tests:   tests/test_time_grid.py::test_tgm31_blocks_outside_the_grid_are_surfaced
 
-    A block whose slot no longer exists -- because Day End moved earlier, or
-    because its length now spans past the last box -- is **returned in
+    Without a ``span`` the day drawn is the hours in Day Settings stretched to
+    cover this date's own blocks (PD-M14.2), so a block dropped before Day
+    Start is on the grid rather than beside it.
+
+    A block whose slot no longer exists -- because its stored index is far
+    outside the date, or because its length now spans past the last box -- is
+    **returned in
     ``outside``, never dropped** (P2). The day it stops being drawn is the day
     the user loses work with nothing on screen to say so.
 
@@ -717,23 +882,26 @@ def build_day_grid(blocks: Iterable[TimeBlock], bounds: DayBounds) -> DayGrid:
     lunch box draws "Lunch" and nothing else, so leaving the block in it would
     hide it exactly as dropping it would.
     """
-    grid = [GridSlot(slot=slot) for slot in day_grid(bounds)]
+    blocks = list(blocks)
+    drawn = span_for_blocks(blocks, bounds) if span is None else span
+    grid = [GridSlot(slot=slot) for slot in day_grid(bounds, drawn)]
     outside: List[TimeBlock] = []
 
     for block in sort_blocks_by_slot(blocks):
         start = _slot_index_of(block)
-        span = slot_span_of(block)
-        if start is None or start < 0 or start + span > len(grid):
+        length = slot_span_of(block)
+        if start is None or not drawn.holds(start, length):
             outside.append(block)
             continue
-        if any(entry.slot.is_lunch for entry in grid[start : start + span]):
+        at = drawn.position_of(start)
+        if any(entry.slot.is_lunch for entry in grid[at : at + length]):
             outside.append(block)
             continue
-        grid[start].starting.append(block)
-        for offset in range(1, span):
-            grid[start + offset].continued.append(block)
+        grid[at].starting.append(block)
+        for offset in range(1, length):
+            grid[at + offset].continued.append(block)
 
-    return DayGrid(slots=grid, outside=outside)
+    return DayGrid(slots=grid, outside=outside, span=drawn)
 
 
 def sort_blocks_by_slot(blocks: Iterable[TimeBlock]) -> List[TimeBlock]:
@@ -764,21 +932,59 @@ def _slot_index_of(block: TimeBlock) -> Optional[int]:
         return None
 
 
-def slot_index_for_time(start_time: Optional[str], bounds: DayBounds) -> Optional[int]:
+def block_title(block: TimeBlock, item: Optional[ActionItem]) -> str:
+    """What to call a block: its item's title, its label, or its kind.
+
+    Purpose: CE-M2.2 -- one answer, used by the screen that draws the block
+             and by the export that names its calendar event.
+    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m22
+    Tests:   tests/test_calendar_export.py::test_cem221_every_branch_of_the_title_rule_names_a_block,
+             tests/test_plan_screen_calendar_export.py::test_cem221a_an_event_is_titled_what_the_day_draws_on_the_block
+
+    Moved here from ``screens/plan_blocks.py``, which imports CustomTkinter:
+    the exporter must be provable headless, and a second copy of this rule
+    would let an exported event be called something the day does not show
+    (P19 -- a format contract that drifts between producer and consumer).
+    """
+    kind = BlockType.normalize(block.block_type)
+    if kind == BlockType.BUFFER:
+        return block.label or "Buffer"
+    if kind == BlockType.BREAK:
+        return block.label or "Break"
+    if item is not None:
+        return item.title
+    # An item block whose item is gone. Named rather than blank: a block with
+    # no text looks like a rendering fault, and the label is the last record of
+    # what it was for.
+    return block.label or "(item no longer exists)"
+
+
+def slot_index_for_time(
+    start_time: Optional[str],
+    bounds: DayBounds,
+    *,
+    allow_before: bool = False,
+) -> Optional[int]:
     """The slot a stored clock time falls in, for the migration.
 
     Purpose: map the days already in the database onto the grid.
     Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
     Tests:   tests/test_time_block_schema.py::test_tgm51_existing_times_map_to_slots
 
-    ``None`` for a time that cannot be read or falls before Day Start, so the
-    caller can fall back to the row's position rather than inventing a slot.
+    ``None`` for a time that cannot be read, and -- for the migration, which
+    is this function's default caller -- for one that falls before Day Start,
+    so it can fall back to the row's position rather than inventing a slot.
+
+    ``allow_before`` is PD-M14.7, which wants the negative answer: a block
+    recorded at 08:30 under a 09:00 day was planned half an hour before the
+    hours now begin, and that is a box the day can draw. Floor division, so
+    an offset of -30 is box -1 and not box 0.
     """
     try:
         minutes = parse_hhmm(start_time)
     except TimeFormatError:
         return None
     offset = minutes - bounds.day_start_minutes
-    if offset < 0:
+    if offset < 0 and not allow_before:
         return None
     return offset // SLOT_MINUTES

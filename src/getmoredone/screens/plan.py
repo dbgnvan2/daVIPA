@@ -28,6 +28,8 @@ The arithmetic lives in ``time_block_layout``, which has no Tk in it.
 from __future__ import annotations
 
 import logging
+import gc
+import threading
 import tkinter as tk
 from tkinter import messagebox
 from datetime import date
@@ -48,12 +50,13 @@ from ..time_block_layout import (
     SlotRefusal,
     SlotRefusedError,
     build_day_grid,
-    day_grid,
     default_minutes_for_block_type,
     duration_for_item,
-    extended_day_bound,
+    edge_limit_time,
+    extended_span,
     is_block_day,
     slots_for_minutes,
+    times_for_slot,
     total_planned_minutes,
     weekday_names,
 )
@@ -140,6 +143,50 @@ OUTSIDE_GROUP_HEIGHT_PX = 150
 #: so it still starts at the first word.
 NOTE_MIN_WRAP_PX = 120
 
+#: Days with a calendar export in flight, keyed by (database path, day), and
+#: the lock that guards the set.
+#:
+#: The marker cannot live on the screen instance. ``App.show_plan`` clears the
+#: content frame and builds a **new** ``PlanScreen`` on every navigation, so
+#: leaving the Plan screen and coming back gives a second screen whose
+#: ``_export_running`` is False while the first screen's worker is still
+#: exporting -- two exports of one day, racing over the same rows. The loser
+#: writes an event id the winner has already replaced, so the work ends up on
+#: no calendar, with no id in the database and two success lines on screen
+#: (found by a cold review pass).
+#:
+#: Keyed by the database path as well as the day because a test fixture, or a
+#: second window, may be on another database entirely, where the same date is
+#: a different day's work.
+_EXPORTS_IN_FLIGHT: set = set()
+_EXPORTS_LOCK = threading.Lock()
+
+
+def _claim_export(db_path, block_date) -> bool:
+    """Take the one export slot for a day, or report that it is taken.
+
+    Purpose: CE-M4.4 -- one export per day per database, across screens.
+    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
+    Tests:   tests/test_plan_screen_calendar_export.py::test_cem444c_a_second_screen_cannot_export_the_same_day
+
+    Test-and-add under the lock, because the test and the add have to be one
+    step: two threads that checked first and added afterwards would both see
+    an empty set.
+    """
+    key = (str(db_path), str(block_date))
+    with _EXPORTS_LOCK:
+        if key in _EXPORTS_IN_FLIGHT:
+            return False
+        _EXPORTS_IN_FLIGHT.add(key)
+        return True
+
+
+def _release_export(db_path, block_date) -> None:
+    """Give the slot back. Called from whichever thread finishes with it."""
+    with _EXPORTS_LOCK:
+        _EXPORTS_IN_FLIGHT.discard((str(db_path), str(block_date)))
+
+
 # How many items the left pane will draw. Announced when it bites, never
 # silently applied (P2): a planner that quietly stopped listing an item would
 # be hiding the work it exists to surface.
@@ -164,13 +211,11 @@ REFUSAL_TEXT = {
 UNKNOWN_REFUSAL = "That block cannot go there"
 
 
-class _DayNotWritten(Exception):
-    """PD-M5 — the settings file refused the day's new hours.
-
-    Its own type so the one broad ``except`` in ``extend_day_for`` can tell a
-    refused write from a refused placement when it chooses the words, while
-    still rolling the database work back the same way for both.
-    """
+#: How often the Tk thread looks for the calendar export worker's result.
+#: Short enough that the status line does not feel stuck, long enough that a
+#: slow export is not a hundred idle callbacks a second.
+#: Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+EXPORT_POLL_INTERVAL_MS = 100
 
 
 def refusal_text(reason: str) -> str:
@@ -443,6 +488,22 @@ class PlanScreen(ctk.CTkFrame):
         )
         self.btn_settings.pack(side="right", padx=10)
 
+        # CE-M4.1 -- secondary, not primary: AutoLoad is this screen's one
+        # primary action and the theme rule allows exactly one.
+        # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
+        # Tests: tests/test_plan_screen_calendar_export.py::test_cem441_the_header_holds_the_export_button_wired_to_the_export
+        self.btn_export_calendar = ctk.CTkButton(
+            header,
+            text="⤴ Google Calendar",
+            # 150, not 160: the header is 8px inside the default window width
+            # at this size and was 3px over it at the old one. See the status
+            # label below and ``test_cem441b``.
+            width=150,
+            command=self.export_day_to_calendar,
+            **button_style("secondary"),
+        )
+        self.btn_export_calendar.pack(side="right", padx=4)
+
         self.btn_add_break = ctk.CTkButton(
             header,
             text="+ Break",
@@ -486,8 +547,23 @@ class PlanScreen(ctk.CTkFrame):
         )
         self.btn_clear_day.pack(side="right", padx=4)
 
-        self.status_label = ctk.CTkLabel(header, text="", anchor="e")
-        self.status_label.pack(side="right", padx=10)
+        # CE-M4.1 -- the status line is NOT in the header.
+        # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
+        # Tests: tests/test_plan_screen_calendar_export.py::test_cem441b_the_header_fits_the_window_it_opens_in
+        #
+        # Every other widget in this header is packed with a fixed width, and
+        # this label was packed last with no ``expand``, so Tk gave it
+        # whatever the cavity had left -- which the export button's 168px took
+        # to below zero: the header asked for 1203px inside a 1200px window
+        # (1180 after the header's own padx), and a label squeezed to nothing
+        # is never mapped. The one channel this screen reports anything
+        # through would have gone silent on a default-sized window, for the
+        # feature whose strings are the longest it produces. Its own row
+        # cannot be squeezed by a seventh button.
+        self.status_label = ctk.CTkLabel(self, text="", anchor="w")
+        self.status_label.grid(
+            row=2, column=0, columnspan=3, sticky="ew", padx=20, pady=(2, 8)
+        )
 
     def create_items_pane(self):
         frame = ctk.CTkFrame(self)
@@ -1259,6 +1335,336 @@ class PlanScreen(ctk.CTkFrame):
             # minute this one ends.
             text += f" — {boxes} boxes, {spare}m spare"
         self.set_status(text, "success")
+
+    # ================= exporting the day ====================================
+
+    def calendar_client(self):
+        """The Google Calendar client this screen exports with.
+
+        Purpose: CE-M4.5 -- the seam that keeps every UI test off the network.
+        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m45
+        Tests:   tests/test_plan_screen_calendar_export.py::test_cem451_the_screen_uses_its_injected_client_factory
+
+        A method rather than a client held on the screen: constructing
+        ``GoogleCalendarManager`` authenticates, so one built at screen
+        construction would run an OAuth flow for every user who never exports
+        anything. Tests replace ``self.calendar_client_factory``.
+        """
+        factory = getattr(self, "calendar_client_factory", None)
+        if factory is not None:
+            return factory()
+
+        from ..google_calendar import GoogleCalendarManager
+
+        # ``allow_interactive=False``, because this client is built on the
+        # export's worker thread. Signing in opens a browser, waits on a local
+        # HTTP server with no timeout, and falls back to ``input()`` on a
+        # console a double-clicked app does not have -- all three wait
+        # forever. The screen's token check refuses when there is no token
+        # file at all, but a token that is present and cannot be refreshed
+        # (revoked access, a changed password, a corrupt pickle) gets past it,
+        # and that is the case this flag covers: it raises
+        # ``AuthenticationRequired``, which ``work()`` reports.
+        return GoogleCalendarManager(allow_interactive=False)
+
+    def export_day_to_calendar(self):
+        """Push this day's blocks to Google Calendar, on a worker thread.
+
+        Purpose: CE-M4.1/4.2/4.3 -- the button's whole behaviour.
+        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
+        Tests:   tests/test_plan_screen_calendar_export.py::test_cem411_the_button_disables_before_the_work_starts
+
+        Order matters here. The button is disabled *before* anything slow or
+        fallible runs, and every refusal below re-enables it on the way out --
+        a disabled button and no explanation is the one outcome the user
+        cannot do anything about.
+        """
+        if getattr(self, "_export_running", False):
+            return
+
+        claimed = None
+        self._export_running = True
+        self._export_thread = None
+        self._export_result = None
+        self.btn_export_calendar.configure(state="disabled")
+
+        try:
+            from ..google_calendar import AuthenticationRequired, GoogleCalendarManager
+
+            if not GoogleCalendarManager.is_available():
+                self._finish_export_refusal(
+                    "Google Calendar libraries are not installed — run: "
+                    "pip install -r requirements.txt"
+                )
+                return
+
+            if not GoogleCalendarManager.has_credentials():
+                from .calendar_dialog import missing_credentials_message
+
+                self._finish_export_refusal(missing_credentials_message())
+                return
+
+            # No "nothing to export" refusal here. A day whose blocks have
+            # all been deleted is exactly the day whose events have to come
+            # off the calendar, and the sweep inside the export is the only
+            # code that removes them -- ``delete_event`` has no other caller.
+            # Refusing before it ran left those events on the user's calendar
+            # with no way to take them off, under a status line reading
+            # "nothing to export" (P25, P2). The exporter reports an empty day
+            # as such on its own, deletions included.
+
+            # The third refusal, and the reason this one is not just
+            # "credentials.json is there": ``has_credentials`` says nothing
+            # about ``token.pickle``, and the real client's ``__init__``
+            # authenticates -- ``flow.run_local_server`` with no timeout,
+            # waiting on a browser consent, on the export's worker thread.
+            # A user who has dropped credentials.json in place but never
+            # connected, and then closes the consent tab, left this screen
+            # disabled and reading "Exporting..." with no code path that
+            # restores either (P1, P15). ``exists``, not ``valid``: an expired
+            # token that can be refreshed reports ``valid`` False and needs no
+            # browser, so refusing on it would refuse a working setup.
+            if not GoogleCalendarManager.check_token_validity().get("exists"):
+                from .calendar_dialog import not_connected_message
+
+                self._finish_export_refusal(not_connected_message())
+                return
+
+            # Captured now, on the thread that owns them. The worker opens its own
+            # database connection from the path, the way the calendar importer
+            # does, because this screen's SQLite connection belongs to the main
+            # thread.
+            block_date = self.selected_date
+            db_path = self.db_manager.db.db_path
+
+            # The fourth refusal, and the only one that is not about this
+            # screen: ``_export_running`` is per instance, and navigating away
+            # from Plan and back builds a new one. Two screens exporting one
+            # day race over the same rows.
+            if not _claim_export(db_path, block_date):
+                self._finish_export_refusal(
+                    f"{block_date} is already being exported — "
+                    "wait for that export to finish."
+                )
+                return
+            claimed = (db_path, block_date)
+
+            self.set_status(
+                f"Exporting {self.selected_date} to Google Calendar…", "muted"
+            )
+            calendar_id = self._positive_calendar_id()
+            # The day's shape goes with it. ``DayBounds`` is frozen, so the
+            # worker cannot be handed a day that changes under it -- and
+            # without it the export would time the day from the stored clock
+            # columns, which record the bounds in force when each block was
+            # placed, not the ones the screen is drawing now.
+            bounds = self.bounds
+
+            self._export_result = None
+
+            def work():
+                # Nothing in here touches a widget. Tk is not thread-safe, and
+                # that includes ``after``: a worker that scheduled its own
+                # callback would be calling into the Tcl interpreter from a
+                # second thread, which wedges a process that has no mainloop
+                # running and is undefined behaviour in one that has. The worker
+                # leaves its result in an attribute and the Tk thread collects
+                # it (``_poll_export``).
+                try:
+                    from ..calendar_exporter import export_day
+
+                    outcome = export_day(
+                        block_date,
+                        client=self.calendar_client(),
+                        db_path=db_path,
+                        calendar_id=calendar_id,
+                        bounds=bounds,
+                    )
+                    # Inside the try, so the slot is not given back until the
+                    # result the poll reads has been recorded.
+                    self._export_result = ("outcome", outcome)
+                except AuthenticationRequired:
+                    # Named before the catch-all, and reported as the refusal
+                    # it is: "sign in again", not "export failed: Google
+                    # Calendar needs you to sign in again...". The class is
+                    # imported above, on the Tk thread, so a worker raising
+                    # this cannot meet an unbound name while handling it.
+                    from .calendar_dialog import not_connected_message
+
+                    self._export_result = ("error", not_connected_message())
+                    return
+                except Exception as error:  # noqa: BLE001 - P15: the worker has a
+                    # top-level guard, or a failure here is a silent no-op with a
+                    # button that never comes back.
+                    self._export_result = (
+                        "error", f"Google Calendar export failed: {error}"
+                    )
+                    return
+                finally:
+                    # On this thread, because this thread is the one holding
+                    # the slot: released whether the export succeeded, failed
+                    # or raised something nobody expected. A slot leaked here
+                    # refuses every later export of that day for the life of
+                    # the process, with a message saying to wait for an export
+                    # that has already finished (P1).
+                    _release_export(db_path, block_date)
+
+            # Drain pending finalizers on the thread that owns Tk, before the
+            # worker exists. A tkinter font -- CustomTkinter makes one per widget,
+            # and a destroyed screen's fonts become garbage -- calls into Tcl from
+            # its ``__del__``, and the collection that runs it happens on whichever
+            # thread next allocates. When that thread is the worker, the Tcl call
+            # blocks, the export never reports, and the button never comes back.
+            # A test run caught exactly that stack:
+            #     tkinter/font.py __del__ <- DatabaseManager.__init__ <- work()
+            # Collecting here runs those finalizers where they are safe to run.
+            gc.collect()
+
+            self._export_thread = threading.Thread(target=work, daemon=True)
+            self._export_thread.start()
+            self._schedule_export_poll()
+        except Exception as error:  # noqa: BLE001 - a refusal, not a crash
+            # The whole method, not just the prerequisite checks. Six
+            # statements used to sit outside this guard with the button
+            # already disabled and ``_export_running`` already True, so a
+            # ``RuntimeError: can't start new thread`` -- or anything raised by
+            # the attributes captured for the worker -- left the screen
+            # disabled under "Exporting..." forever: nothing had scheduled the
+            # poll, so nothing would ever re-enable it.
+            if claimed is not None:
+                # The claim is taken before the thread exists, so a failure
+                # between the two -- ``RuntimeError: can't start new thread``,
+                # most plausibly -- would leave the slot held by nothing.
+                _release_export(*claimed)
+            self._finish_export_refusal(f"Could not start the export: {error}")
+            return
+
+
+    def _positive_calendar_id(self) -> str:
+        """The configured calendar, or ``primary`` when nothing says otherwise."""
+        configured = getattr(self.settings, "plan_export_calendar_id", None)
+        configured = (configured or "").strip() if isinstance(configured, str) else ""
+        return configured or "primary"
+
+    def _schedule_export_poll(self):
+        """Ask the Tk thread to look for the worker's result shortly.
+
+        Scheduled from the thread that owns the widgets, every time, which is
+        the whole point: see the comment in ``work`` above.
+        """
+        try:
+            self._export_poll_id = self.after(
+                EXPORT_POLL_INTERVAL_MS, self._poll_export
+            )
+        except Exception:  # noqa: BLE001 - the widget is gone; nothing to tell
+            self._export_poll_id = None
+
+    def _poll_export(self):
+        """Collect the worker's result, or come back later.
+
+        Purpose: CE-M4.2 -- the hand-off from the worker to the status line.
+        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+        Tests:   tests/test_plan_screen_calendar_export.py::test_cem421_the_status_line_reports_the_real_counts,
+                 ::test_cem425_a_result_that_lands_between_the_two_reads_is_not_called_a_failure
+        """
+        result = self._export_result
+
+        if result is None:
+            thread = getattr(self, "_export_thread", None)
+            if thread is not None and thread.is_alive():
+                self._schedule_export_poll()
+                return
+            # Read again, and only then give up. The worker sets the result and
+            # *then* exits, so a result that lands between the read above and
+            # the liveness check above would otherwise be reported as "stopped
+            # without reporting a result" over a run that had just succeeded --
+            # two cold review passes flagged this ordering (P1: a transient
+            # read as terminal).
+            result = self._export_result
+            if result is None:
+                # The worker has a top-level guard, so this is close to
+                # unreachable -- and if it is ever reached, a button that never
+                # comes back is the worst possible way to find out.
+                self._finish_export_refusal(
+                    "The Google Calendar export stopped without reporting a result"
+                )
+                return
+
+        self._export_result = None
+        kind, payload = result
+        if kind == "outcome":
+            self._report_export(payload)
+        else:
+            self._finish_export_refusal(payload)
+
+    def _report_export(self, outcome):
+        """The status line, from the counts rather than from having finished.
+
+        Purpose: CE-M4.2 -- a run that failed says so (P24).
+        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+        Tests:   tests/test_plan_screen_calendar_export.py::test_cem422_a_failing_export_sets_an_error_status
+        """
+        self._export_running = False
+        if not self._still_on_screen():
+            return
+        self.btn_export_calendar.configure(state="normal")
+
+        line = outcome.summary_line()
+        if outcome.failed:
+            detail = outcome.errors[0] if outcome.errors else ""
+            self.set_status(f"{line}{(' — ' + detail) if detail else ''}", "error")
+        elif outcome.exported or outcome.deleted_orphans:
+            self.set_status(line, "success")
+        else:
+            self.set_status(line, "muted")
+
+    def _finish_export_refusal(self, message: str, kind: str = "error"):
+        """Give the button back, and say why nothing happened."""
+        self._export_running = False
+        if not self._still_on_screen():
+            return
+        self.btn_export_calendar.configure(state="normal")
+        self.set_status(message, kind)
+
+    def _still_on_screen(self) -> bool:
+        """Whether this screen's widgets are still there to be written to.
+
+        Purpose: CE-M4.2 / P15 -- the export reports from a Tk callback that
+                 outlives the screen when the user navigates away mid-run.
+        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+        Tests:   tests/test_plan_screen_calendar_export.py::test_cem423_a_screen_that_is_gone_is_not_written_to
+
+        ``app.clear_content`` destroys the screen on every navigation, and Tk
+        does not cancel a queued ``after`` when its widget dies. Without this
+        the callback configures a dead button and raises inside the Tk
+        callback, where nothing reports it. ``timer_window`` guards the same
+        class of callback the same way.
+        """
+        try:
+            return bool(self.winfo_exists())
+        except Exception:  # noqa: BLE001 - the widget or interpreter is gone
+            return False
+
+    def destroy(self):
+        """Cancel the pending export poll before the widgets go.
+
+        Purpose: CE-M4.2 / P15 -- the queued callback must not outlive what it
+                 writes to.
+        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+        Tests:   tests/test_plan_screen_calendar_export.py::test_cem424_destroying_the_screen_cancels_the_poll
+
+        The worker is a daemon thread and is left to finish: whatever it has
+        already written to Google is already written, and the ids it records
+        go to the database, not to this screen.
+        """
+        poll_id = getattr(self, "_export_poll_id", None)
+        if poll_id is not None:
+            try:
+                self.after_cancel(poll_id)
+            except Exception:  # noqa: BLE001 - already fired, or already gone
+                pass
+            self._export_poll_id = None
+        super().destroy()
 
     def autoload_day(self):
         """PD-M3 — block every item the day still has room for, in list order.
@@ -2141,72 +2547,66 @@ class PlanScreen(ctk.CTkFrame):
         return None
 
     def extend_day_for(self, item: ActionItem, edge: str):
-        """PD-M5 — lengthen the day at one end and block the item in the room it made.
+        """PD-M14.1 — block the item past one end of the day, writing no settings.
 
         Purpose: "allow items to extend the day earlier or later when they are
-                 dropped above the first block or below the last".
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
-        Tests:   tests/test_plan_screen.py::test_pdm52_a_drop_above_moves_day_start_back
+                 dropped above the first block or below the last" (PD-M5),
+                 rewritten to the instruction that the hours in Day Settings
+                 "are solely for starting a blank plan for the day".
+        Spec:    docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-1
+        Tests:   tests/test_plan_screen.py::test_pdm141_a_drop_on_earlier_writes_no_settings
 
-        ``plan_day_shape_unconfirmed`` is left exactly as it was found
-        (PD-M5.4), by not being touched at all. ``AppSettings.save`` does write
-        the field -- it writes every field -- but it never changes its value,
-        and ``_day_shape_was_confirmed`` only reads a literal ``False``, so a
-        save here cannot confirm a day shape. Lengthening a day is not the user
-        confirming the four
-        values the flag gates, and that flag is what stops the irreversible
-        grid adoption running against a day shape nobody chose. An earlier
-        version of this method snapshotted it and put it back on the failure
-        path; the mutation gate showed that line could never change anything,
-        because nothing on any path here sets it.
+        One block, in one transaction, and nothing else. Not ``plan_day_start``,
+        not ``plan_day_end``, not ``settings.save()``, and not
+        ``shift_all_slots``.
 
-        One unit of work. The settings write is the last thing inside the
-        database transaction, so a refused write takes the renumbering and the
-        new block back out with it rather than leaving the file and the day
-        disagreeing about where the day starts (P41: ``self.settings`` is the
-        app's own object, so the attribute has to go back too).
+        **What this replaces, and why it had to go.** The previous version moved
+        the bound and renumbered every date's blocks to compensate. Both halves
+        were forced by the same fact: ``slot_index`` counts boxes from Day
+        Start, and Day Start is **one setting shared by every date**, so there
+        was no way to lengthen one day without redefining all of them. Each
+        drop on **Earlier** moved the setting back permanently -- nothing wrote
+        it forward again, Clear Day included -- and the renumbering it needed
+        touched every date in the file. Both reported faults were that one
+        mechanism.
 
-        This renumbers and ``on_settings_saved`` (TG-M6.4) does not, and the
-        difference is the gesture rather than an inconsistency. Typing a new
-        Day Start into Settings is a decision about what the day is, and
-        re-timing the work inside it is what that decision means. Dropping one
-        item above the first box is a decision about that item: the bound moves
-        as a side effect, so everything already planned -- on this date and
-        every other -- has to stay where the person put it.
+        Now the drawn day is derived from the date's own blocks
+        (``DayGrid.span``, PD-M14.2) and a slot index is allowed to be
+        negative, so the day grows at this date only, by writing the block that
+        asked for it. Nothing is stored about the hours of a date, so nothing
+        about them can go stale (P6) and nothing has to be put back: deleting
+        the block is what un-stretches the day (PD-M14.3).
+
+        No settings object is needed any more either, so a drop works on an
+        instance whose settings file would not parse -- it used to refuse.
+
+        The rollback arm went with the settings write. The only write left is
+        the block, and ``add_block_at`` checks the fit before it writes
+        anything, so a refusal leaves the day exactly as it was.
         """
         # PD-M13 -- a drop never asks; see _require_block_day.
         if not self._require_block_day(ask=False):
             return
-        if self.settings is None:
-            self.set_status(
-                "The day's hours cannot be changed without a settings file",
-                "error",
-            )
-            return
 
         minutes = duration_for_item(item, self.bounds.default_block_minutes)
         span = slots_for_minutes(minutes)
-        new_bound = extended_day_bound(self.bounds, edge, span)
-        if new_bound is None:
-            where = "before midnight" if edge == DAY_EXTEND_EARLIER else "past midnight"
+        # The day as it is drawn, which is the day the user dropped past. Not
+        # the template's hours: with a block already outside them, "the box
+        # above the first one" is above that block.
+        grown = extended_span(self._grid.span, self.bounds, edge, span)
+        if grown is None:
+            # PD-M14.6 -- the two limits differ, so the message names the end
+            # that was dropped on and the time it stops at, in one sentence
+            # both ends share.
+            name = PD_EARLIER_TEXT if edge == DAY_EXTEND_EARLIER else PD_LATER_TEXT
             self.set_status(
-                f"{minutes}m of {item.title} would put the day {where}; "
-                "a day is one date",
+                f"{name} stops at {edge_limit_time(edge)}: "
+                f"{minutes}m of {item.title} would put the block outside "
+                f"{self.selected_date}",
                 "warning",
             )
             return
 
-        key = (
-            "plan_day_start" if edge == DAY_EXTEND_EARLIER else "plan_day_end"
-        )
-        previous = getattr(self.settings, key)
-        # Where the item lands. Earlier: box 0 of the day that is about to
-        # exist, the others having been renumbered past it. Later: the first
-        # box the old day did not have, which is the old box count.
-        slot_index = 0 if edge == DAY_EXTEND_EARLIER else len(day_grid(self.bounds))
-
-        setattr(self.settings, key, new_bound)
-        new_bounds = DayBounds.from_settings(self.settings)
         block = TimeBlock(
             block_date=self.selected_date,
             start_time="",
@@ -2216,55 +2616,31 @@ class PlanScreen(ctk.CTkFrame):
             label=item.title,
             block_type=BlockType.ITEM,
         )
-        wrote_the_file = False
         try:
-            with self.db_manager.transaction():
-                if edge == DAY_EXTEND_EARLIER:
-                    # Before the new block, and before anything reads the day:
-                    # a slot index counts boxes from Day Start, so moving Day
-                    # Start without renumbering slides every planned task
-                    # earlier on the clock (PD-M5.5). Every date, because
-                    # Day Start is one setting for all of them.
-                    self.db_manager.shift_all_slots(span)
-                self.db_manager.add_block_at(block, slot_index, new_bounds)
-                if not self.settings.save():
-                    raise _DayNotWritten(
-                        self.settings.last_save_error
-                        or "the day's new hours could not be saved"
-                    )
-                wrote_the_file = True
+            self.db_manager.add_block_at(
+                block, grown.slot_index, self.bounds, day_span=grown.span
+            )
+        except SlotRefusedError as refused:
+            self.set_status(refusal_text(refused.reason), "error")
+            return
         except Exception as problem:
-            # Broad on purpose. Whatever failed, the file and the database have
-            # to agree about where the day starts, and the only way to promise
-            # that is to put the day back on every path out of here. The
-            # settings write is last inside the transaction, so in every
-            # failure but a commit that itself fails the file was never
-            # touched and the attribute is the whole of it.
-            setattr(self.settings, key, previous)
-            restored = True
-            if wrote_the_file:
-                restored = bool(self.settings.save())
+            # Broad on purpose: a write that failed for any other reason is
+            # still a drop that did not happen, and the screen has to say so
+            # rather than leave the item looking placed. The class name when
+            # the exception carries no message, which several built-ins do.
             self.refresh()
-            if isinstance(problem, SlotRefusedError):
-                said = refusal_text(problem.reason)
-            else:
-                # The class name when the exception carries no message, which
-                # several built-ins do: "The day was not extended — " with
-                # nothing after the dash is a sentence that says less than the
-                # failure it is reporting.
-                said = str(problem) or type(problem).__name__
-            if not restored:
-                said += (
-                    " — and the day's hours could not be put back; "
-                    "check ⚙ Day Settings"
-                )
-            self.set_status(f"The day was not extended — {said}", "error")
+            self.set_status(
+                f"The day was not extended — "
+                f"{str(problem) or type(problem).__name__}",
+                "error",
+            )
             return
 
-        self.bounds = new_bounds
         self.refresh()
         self.set_status(
-            f"The day now runs {new_bounds.day_start}–{new_bounds.day_end}; "
+            f"The day now shows "
+            f"{times_for_slot(grown.span.first, SLOT_MINUTES, self.bounds)[0]}–"
+            f"{times_for_slot(grown.span.last, SLOT_MINUTES, self.bounds)[1]}; "
             f"blocked {minutes}m for {item.title} at {block.start_time}"
             + self._take_non_work_note(),
             "success",
