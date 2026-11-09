@@ -281,19 +281,34 @@ def test_sstm5_that_guard_can_fire():
 
 # ------------------------------------------------------------------- SST-M7
 
-def _filing_body(backlog, name):
-    """One filing's text, from its own heading to the next one.
+# Where each of the two filings declares itself. The two are written in two
+# different formats — `### PLC-A5 — …`, and a dated
+# `### 2026-11-08 - Type: Technical Debt` heading with `**Title:** UPD-A13 - …`
+# under it — so each is found by its own declaration line, not by a heading
+# built out of its name.
+_FILING_ANCHORS = {
+    "UPD-A13": re.compile(r"^\*\*Title:\*\* UPD-A13\b", re.M),
+    "PLC-A5": re.compile(r"^### PLC-A5\b", re.M),
+}
 
-    The two filings this guard reads are written in two different formats —
-    `### PLC-A5 — …` and a dated `### 2026-11-08 - Type: Technical Debt`
-    heading with `**Title:** UPD-A13 - …` under it — so the body is found from
-    the first mention of the name and walked back to whichever heading owns it,
-    not from a heading built out of the name.
+
+def _filing_body(backlog, name):
+    """One filing's text, from the heading that owns it to the next heading.
+
+    The first version of this took the body from the first *mention* of the
+    name. Both names are mentioned in this file's opening summary, above any
+    `###` heading, so the walk back found nothing, the slice started at byte 0,
+    and the guard asserted that the whole file contains both names — which it
+    does. It passed while neither filing mentioned the other. A guard that
+    cannot locate what it reads is the defect this batch is about, written into
+    the batch's own tooling.
     """
-    at = backlog.index(name)
-    start = backlog.rfind("\n### ", 0, at)
-    end = backlog.find("\n### ", at)
-    return backlog[start if start != -1 else 0:end if end != -1 else len(backlog)]
+    anchor = _FILING_ANCHORS[name].search(backlog)
+    assert anchor, f"the {name} filing's declaration line is gone"
+    start = backlog.rfind("\n### ", 0, anchor.start())
+    assert start != -1, f"the {name} filing sits under no heading"
+    end = backlog.find("\n### ", anchor.end())
+    return backlog[start:end if end != -1 else len(backlog)]
 
 
 def test_sstm7_the_two_filings_of_the_index_gap_cross_reference():
