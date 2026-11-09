@@ -3199,6 +3199,14 @@ def test_pbm55_the_settings_reach_the_outside_group_on_screen(
     panel.refresh()
     panel.on_settings_saved(DayBounds(lunch_start="16:00"))
 
+    # The anchor first: both loops in load_blocks append to _block_widgets
+    # and both pass the same chip_height, so without this the assertion below
+    # is satisfied by an in-grid holder just as well -- which is exactly the
+    # vacuity this test spent a generation in.
+    assert len(panel._grid.outside) == 1, (
+        f"the block is not outside the day, so the holder measured below "
+        f"would be an in-grid one: outside={panel._grid.outside}"
+    )
     # Read off what the screen recorded as draggable rather than off the
     # container's children: a scrollable frame has children of its own.
     assert len(panel._block_widgets) == 1, (
