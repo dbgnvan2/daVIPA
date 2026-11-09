@@ -2,6 +2,16 @@
 
 One batch at a time from here, per `CLAUDE.md`. What that leaves:
 
+- **The nine open `SSC` filings are closed** (SST batch, 2026-11-08). Every
+  status claim this repo made about itself that nothing checked: fifteen status
+  lines over built work, the WTP count (38/40/41 — it is 41), a coverage row
+  naming a method that never existed, twelve line-number cites, and
+  `PRI-A1`–`PRI-A4`, promised by two documents and filed in neither. Three
+  guards now hold the class in `tests/test_doc_status_claims.py`.
+  `docs/changes/2026-11-08-status-claims.md`. Two adjacent issues filed, not
+  fixed: `SST-A1` (a reference guard whose floor is 18% of its domain) and
+  `SST-A2`.
+
 - **Both leftover branches are settled.**
   `refs/heads/claude/elegant-neumann-ab55c9` (UPD-F1) is **merged** at
   `2fac9b3`. `refs/heads/claude/plan-day-range-pdm13` is **superseded and

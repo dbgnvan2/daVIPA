@@ -294,7 +294,10 @@ being written against this plan in
 - Why the floor is a create-time rule that never back-fills an existing row
 - The column-width criterion written as a font measurement rather than as a
   number in prose
-- Four adjacent issues found and not fixed, to be filed as PRI-A1 to PRI-A4
+- Four adjacent issues found and not fixed. **Filed as PRI-A1 to PRI-A4 on
+  2026-11-08** by the SST batch, which closed the rest of `SSC-1`; two of the
+  four descriptions were wrong and are corrected in the filings rather than
+  copied
 
 ### docs/implementation_plan_2026-11-08_pri_tests.md
 
@@ -355,12 +358,49 @@ being the PDT-M5 document criteria with a
   human-review proposal for each
 - Nine CI-environment failures listed as adjacent and not touched
 
+### docs/implementation_plan_2026-11-08_status_claims.md
+
+Implementation plan for the nine open `SSC` filings — status claims this repo
+makes about itself that nothing checks (SST-M1 - SST-M10). **Approved
+2026-11-08 and built the same day: 10 of 10 criteria `done`, one item flagged
+not code-testable (SST-N1)** — per-criterion status in `docs/spec_coverage.md`.
+No file under `src/` is touched. Handoff note:
+`docs/changes/2026-11-08-status-claims.md`, which is listed here only inside
+this entry rather than as an entry of its own, as every handoff note is:
+
+- Fifteen status lines in fourteen documents saying no implementation code was
+  written, over work that is built — the oldest wrong since August, and one of
+  them about PD-M14, the surviving plan-day design. `SSC-4` called its four "a
+  sample, not a list"; the other ten were checked, and each correction names
+  the coverage document or module that is its evidence
+- The WTP criterion count measured from the spec's own rows: 41, against 38 in
+  `BACKLOG.md` and 40 in the spec, whose arithmetic double-counted §3's
+  amendments
+- `RP-2.5` naming a `db_manager` method that has never existed, in a column no
+  test read
+- Twelve markdown line-number cites into the four documents every batch edits,
+  three of them measurably dead, two of them in this batch's own plan
+- `PRI-A1` to `PRI-A4` filed at last, with two of the four descriptions
+  corrected against the code
+- Three new guards, so the next one fails a test rather than waiting for a
+  sweep: a register of documents allowed to claim unwritten code, a check that
+  every `file::symbol` in an Implementation column resolves, and a check that
+  the four chronic documents are not cited by line
+- Two of those guards shipping unable to fail, both caught by the budget's rule
+  that an in-loop fix is in scope for the next pass
+- Two adjacent issues filed, not fixed: `SST-A1`, a reference guard whose floor
+  is 18% of its domain, and `SST-A2`, fourteen test references written in a
+  form no guard reads
+
 ### docs/spec_2026-11-08_weekly_tactic_as_parent.md
 
 Spec and implementation plan for a Weekly Tactic acting as the parent of the
 Action Items filed under it (WTP-M1 - WTP-M6). **Approved 2026-11-08 and built
-the same day, then extended through WTP-M6.8: 40 of 40 criteria `done`** -
-per-criterion status in the spec's §6. Three handoff notes:
+the same day, then extended through WTP-M6.8: 41 of 41 criteria `done`, with
+two human-review items outstanding** - per-criterion status in the spec's §6.
+This entry and the spec both said 40 and `BACKLOG.md` said 38; the spec's own
+criterion rows number 41, re-measured 2026-11-08 by the SST batch (`SSC-6`),
+and the spec denied the two outstanding items in the same sentence (`SSC-9`). Three handoff notes:
 `docs/changes/2026-11-08-weekly-tactic-as-parent.md` for the original batch,
 `docs/changes/2026-11-08-weekly-tactic-completion-surfaces.md` for the
 completion question on all seven surfaces (WTP-M6.7) and its widget tests

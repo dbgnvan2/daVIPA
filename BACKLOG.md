@@ -222,6 +222,37 @@ reader to rebuild merged code.
 
 Ordered by what a reader would wrongly act on.
 
+**CLOSED 2026-11-08 by the SST batch — all nine.** `SSC-3` was closed earlier
+the same day by `8edc0a4`; `SSC-1`'s first clause was closed by the PRIT batch
+and its second (`PRI-A1`–`PRI-A4` filed nowhere) by this one. The filings are
+kept below as written, because the measurements in them are the argument for
+the guards.
+
+What closed them, and what now holds them:
+
+| filing | closed by | guard |
+|---|---|---|
+| `SSC-1` | the PRI plan's status line, then `PRI-A1`–`PRI-A4` filed | `test_sstm1_…`, `test_sstm9_…` |
+| `SSC-2`, `SSC-4` | fifteen status lines in fourteen documents, each naming its evidence | `test_sstm1_no_document_claims_unwritten_code_outside_the_register` |
+| `SSC-5` | `PLC-A5` no longer quotes a rewritten footer | — (prose) |
+| `SSC-6` | the count is 41, measured from the spec's own rows | `test_sstm3_the_wtp_criterion_count_is_what_the_spec_lists` |
+| `SSC-7` | `RP-2.5` points at `update_action_item`, which exists | `test_sstm5_every_implementation_reference_resolves` |
+| `SSC-8` | `UPD-A13` and `PLC-A5` name each other | `test_sstm7_the_two_filings_of_the_index_gap_cross_reference` |
+| `SSC-9` | the WTP spec no longer denies its two outstanding items | `test_sstm4_the_wtp_spec_does_not_deny_its_own_outstanding_items` |
+| `SSC-10` | twelve cites rewritten as quoted text plus a grep | `test_sstm8_the_chronic_documents_are_not_cited_by_line_number` |
+
+All in `tests/test_doc_status_claims.py`. Plan:
+`docs/implementation_plan_2026-11-08_status_claims.md`; note:
+`docs/changes/2026-11-08-status-claims.md`; per-criterion status: the SST
+section of `docs/spec_coverage.md`.
+
+**The guards are the point, not the corrections.** Every one of these nine was
+corrected before, somewhere, by someone reading; the class came back because
+nothing failed when it did. Two of the guards themselves shipped a first
+version that could not fail — one matched a heading name as a substring, one
+asserted that the whole file contains two strings — so the budget's rule that
+every in-loop fix is in scope for the next pass is what caught them.
+
 **Cite by quoted text and a grep, not by line number, for any file this batch
 also edits** — this one, `docs/DOCUMENTATION_INDEX.md`, `docs/spec_coverage.md`,
 `CLAUDE.md`, `tests/test_plan_screen.py` and `tests/test_plan_settings.py`.
@@ -233,7 +264,7 @@ and specs stable — but plans cite into the test files, so that was the same
 mistake one level up. Line numbers into files the batch does not touch are
 stable and are kept.
 
-### SSC-1 — the priority batch's plan says no code was written; the code is on `main` (high)
+### SSC-1 — the priority batch's plan says no code was written; the code is on `main` — CLOSED 2026-11-08
 
 `docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md:3` and
 `docs/DOCUMENTATION_INDEX.md` (`grep -in "awaiting approval; no" docs/DOCUMENTATION_INDEX.md` — the index capitalises it) both say "awaiting approval; no
@@ -249,7 +280,7 @@ Related: `PRI-A1` to `PRI-A4`, which that plan promises and
 (`grep -n 'PRI-A1 to PRI-A4' docs/DOCUMENTATION_INDEX.md`), appear nowhere in
 this file.
 
-### SSC-2 — the WTP spec's header contradicts its own status section (high)
+### SSC-2 — the WTP spec's header contradicts its own status section — CLOSED 2026-11-08
 
 `docs/spec_2026-11-08_weekly_tactic_as_parent.md:6` — "awaiting approval. No
 implementation code written." The same file at `:336` — "all 40 criteria
@@ -304,7 +335,7 @@ What was wrong, for the record:
   surrounding section reads as a dated post-mortem but these sentences are
   present-tense.
 
-### SSC-4 — four more plans head themselves "no implementation code written" (medium)
+### SSC-4 — four more plans head themselves "no implementation code written" — CLOSED 2026-11-08
 
 `docs/implementation_plan_2026-11-05_time_blocks.md:3` and
 `docs/implementation_plan_2026-11-05_time_grid.md:3`, against
@@ -315,7 +346,7 @@ marked `done`. Same shape, older and checked less closely:
 further `awaiting approval` plans were not checked at all, so treat this as a
 sample, not a list.
 
-### SSC-5 — `PLC-A5` quotes an index footer that no longer exists (medium)
+### SSC-5 — `PLC-A5` quotes an index footer that no longer exists — CLOSED 2026-11-08
 
 `PLC-A5` in this file says the index "ends \"**Current Status**: ✅ All
 documentation up to date as of 2026-01-24\", which has not been true for
@@ -324,7 +355,7 @@ that it *used to* read that. The item's second clause — that no test enforces
 the index — still holds, and is the part six other places route readers to
 (listed in SSC-8).
 
-### SSC-6 — WTP's criterion count is given as 38, 40 and 41 (medium)
+### SSC-6 — WTP's criterion count is given as 38, 40 and 41 — CLOSED 2026-11-08, it is 41
 
 This file's header paragraph (`grep -n "38 criteria" BACKLOG.md`) says "all
 38 criteria built" — item 3 is WTP-A11, not this;
@@ -335,7 +366,7 @@ later and twice-stated figure, but the spec's arithmetic for it ("the 35 in
 §3, plus …") does not reproduce either, so none of the three is certified
 here.
 
-### SSC-7 — `docs/spec_coverage.md` names a method that does not exist (low)
+### SSC-7 — `docs/spec_coverage.md` names a method that does not exist — CLOSED 2026-11-08
 
 The `RP-2.5` row's Implementation column names
 `db_manager.py::_update_action_item`. `db_manager.py` has
@@ -349,7 +380,7 @@ one exception to PDT-A1's statement that the nine non-test bare names are all
 correct usage. Nothing checks that column —
 `tests/test_traceability_refs.py` reads only `Tests:` references.
 
-### SSC-8 — one gap filed twice, at two severities, with no cross-reference (low)
+### SSC-8 — one gap filed twice, at two severities, with no cross-reference — CLOSED 2026-11-08
 
 `UPD-A13` in this file files "no test enforces
 `docs/DOCUMENTATION_INDEX.md`'s completeness" at Priority: Medium, with the
@@ -363,13 +394,13 @@ item itself, the two that only record the filing, and this item's own text. None
 lands on the low item — whose first sentence is also stale, see SSC-5 — and
 never reaches the designed fix.
 
-### SSC-9 — the WTP spec says nothing is outstanding, then lists two `not done` (low)
+### SSC-9 — the WTP spec says nothing is outstanding, then lists two `not done` — CLOSED 2026-11-08
 
 `docs/spec_2026-11-08_weekly_tactic_as_parent.md:336` — "Nothing is `partial`
 and nothing is outstanding." The same file at `:428-437` — two "not
 code-testable" items, both `not done`, "as foreseen".
 
-### SSC-10 — eight documents cite `BACKLOG.md` and `docs/spec_coverage.md` by line number (low)
+### SSC-10 — eight documents cite `BACKLOG.md` and `docs/spec_coverage.md` by line number — CLOSED 2026-11-08 (there were twelve cites, in eleven documents)
 
 The same class this batch wrote a rule about, in other batches' documents. The
 cites rot silently because no test reads them:
@@ -401,6 +432,60 @@ outside the plan-day batch's file set — was right for that batch. Rewriting
 eight other batches' plans inside a plan-day test diff is the sweep rule 10
 exists to prevent; doing it in a batch whose whole subject is stale claims is
 not.
+
+## Adjacent issues — the status-claim batch (SST, 2026-11-08)
+
+Found while measuring for the SST batch, outside its scope, not fixed.
+
+### SST-A1 — a reference guard's floor is 18% of its domain (medium)
+
+`tests/test_traceability_refs.py::test_this_guard_can_actually_fire` asserts
+`len(found) >= 140`, under a comment calling it "An exact floor, not 'more than
+20'" and explaining that the previous version "was satisfied by 127 references
+as comfortably as by the 149 that exist, so narrowing the scan by 15% went
+unnoticed".
+
+Measured 2026-11-08: **784 references.** So the guard written to catch a 15%
+narrowing would now tolerate the deletion of 644 of the 784 — 82% of its own
+domain — and still pass. It is also a floor, which the repo's test rules
+forbid: "assert **exact counts**, never `> N` floors — a floor hides the
+narrowing it was written to catch."
+
+Not fixed here because the fix is a judgement, not a number: an exact count
+turns every added `Tests:` docstring into a red suite until the number is
+bumped, which is a cost the person who runs this repo should choose. The two
+new counts in `tests/test_doc_status_claims.py` are exact, and 35 documents and
+185 references move far less often than 784 docstring references do, so the
+same choice is cheap there and expensive here. Options: an exact count, a
+band, or a per-scanned-file count so a narrowing in one file cannot be masked
+by growth in another.
+
+**Priority:** Medium
+**Effort:** Low
+
+### SST-A2 — fourteen test references are written in a form no guard reads (low)
+
+`docs/spec_coverage*.md` carries 14 references of the form
+`test_time_block_layout.py::test_name` — the basename without the `tests/`
+prefix. `tests/test_traceability_refs.py`'s pattern requires `tests/`, so none
+of the fourteen is checked, and `tests/test_doc_status_claims.py` leaves bare
+`::test_…` names to that guard on purpose.
+
+Resolved by hand: thirteen point at tests that exist. The fourteenth,
+`test_time_block_layout.py::test_pdm58_the_day_cannot_cross_midnight`, does
+not — and it is a deliberate quotation, inside
+`docs/spec_coverage_2026-11-08_plan_calendar_export.md`'s record of which
+references were failing at the time. So widening the existing pattern to accept
+the bare form would turn a correct historical record red, which is why it was
+not widened here.
+
+The fix is the convention the `Tests:` guard already documents for retired
+tests — a quoted reference drops the `::` form — applied to records that quote
+a broken reference. Thirteen live references would then be checked, and the
+fourteenth would stop looking like a live pointer.
+
+**Priority:** Low
+**Effort:** Low
 
 ## Adjacent issues — priority defaults and the cap (PRI, filed 2026-11-08)
 
