@@ -4,7 +4,7 @@ Data models for GetMoreDone application.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Dict, Mapping, Optional
 from uuid import uuid4
 
 
@@ -80,24 +80,21 @@ class ActionItem:
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
     def calculate_priority_score(self) -> int:
-        """
-        Calculate priority score as product of all factors.
-        Returns 0 if any factor is 0 or None.
-        """
-        factors = [
-            self.importance or 0,
-            self.urgency or 0,
-            self.size or 0,
-            self.value or 0
-        ]
+        """This item's priority score: the capped product of its four factors.
 
-        if any(f == 0 for f in factors):
-            return 0
+        Purpose: PRI-M2.5 -- the score is computed in exactly one place, so the
+                 stored number, the Item Editor's label and the row-click popup
+                 cannot disagree about it or about the cap.
+        Spec:    docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md#pri-m2
+        Tests:   tests/test_priority_floor_and_cap.py::test_prim22_every_factor_combination_is_capped
 
-        score = 1
-        for f in factors:
-            score *= f
-        return score
+        Returns 0 when any factor is 0 or None. That is *unscored*, not
+        low-scoring: an item nobody has rated, which the bands draw in their
+        own grey rather than in the low colour.
+        """
+        return priority_score_from_factors(
+            self.importance, self.urgency, self.size, self.value
+        )
 
     def update_priority_score(self):
         """Update the priority_score field based on current factors."""
@@ -356,6 +353,119 @@ class PriorityFactors:
         "M": 4,
         "S": 2
     }
+
+    # The score is the product of all four factors, so the raw product runs
+    # 4 .. 102400 -- "P:102400", eight characters, in a list column sized for
+    # four digits. The product is capped here so no arithmetic can overflow
+    # that column.
+    #
+    # The cap costs ordering at the top of the scale, which was weighed and
+    # accepted when this was built (D1): 33 of the 256 factor combinations are
+    # above it, and they collapse onto one flat tier -- 12800, 25600, 51200 and
+    # 102400 all read 9999 -- so items up there are no longer ranked against
+    # each other and fall through to their list's secondary key. The highest
+    # product *below* the cap is 6400, so there is nothing in between.
+    MAX_SCORE = 9999
+
+    @staticmethod
+    def lowest(scale: Mapping[str, int]) -> int:
+        """The lowest value on one factor's scale.
+
+        Read from the scale rather than written out as 1 or 2, so renumbering
+        ``PriorityFactors`` moves the floor with it -- the same reasoning
+        ``priority_levels`` carries for the level thresholds.
+        """
+        return min(scale.values())
+
+    @staticmethod
+    def floor() -> Dict[str, int]:
+        """The lowest value on each of the four factor scales, by field name."""
+        return {
+            "importance": PriorityFactors.lowest(PriorityFactors.IMPORTANCE),
+            "urgency": PriorityFactors.lowest(PriorityFactors.URGENCY),
+            "size": PriorityFactors.lowest(PriorityFactors.SIZE),
+            "value": PriorityFactors.lowest(PriorityFactors.VALUE),
+        }
+
+
+def priority_score_from_factors(
+    importance: Optional[int],
+    urgency: Optional[int],
+    size: Optional[int],
+    value: Optional[int],
+) -> int:
+    """The one function that turns four priority factors into a score.
+
+    Purpose: PRI-M2 -- the product, capped at ``PriorityFactors.MAX_SCORE``.
+             Three copies of this arithmetic existed (the model, the Item
+             Editor's live label, the row-click popup's label); a cap added to
+             one of them and not its siblings is P5 by construction.
+    Spec:    docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md#pri-m2
+    Tests:   tests/test_priority_floor_and_cap.py::test_prim22_every_factor_combination_is_capped
+
+    A missing or zero factor returns 0 -- unscored, which is a different
+    statement from "scored low" and is deliberately not floored here. The floor
+    is a *create-time* rule and lives in ``apply_priority_floor``.
+    """
+    factors = [importance or 0, urgency or 0, size or 0, value or 0]
+
+    if any(f == 0 for f in factors):
+        return 0
+
+    score = 1
+    for f in factors:
+        score *= f
+    return min(score, PriorityFactors.MAX_SCORE)
+
+
+def priority_score_label(
+    importance: Optional[int],
+    urgency: Optional[int],
+    size: Optional[int],
+    value: Optional[int],
+) -> str:
+    """The score line both priority editors show: ``"n (i x u x s x v)"``.
+
+    Purpose: PRI-M2.6 -- at the cap the breakdown no longer multiplies out to
+             the number beside it, so the label has to say it is capped. Both
+             editors read this one function rather than formatting their own,
+             for the same reason the scoring is one function.
+    Spec:    docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md#pri-m2
+    Tests:   tests/test_priority_floor_form.py::test_prim26_a_capped_label_says_it_is_capped
+    """
+    numbers = [importance or 0, urgency or 0, size or 0, value or 0]
+    breakdown = "\u00d7".join(str(n) for n in numbers)
+    score = priority_score_from_factors(*numbers)
+
+    raw = 1
+    for n in numbers:
+        raw *= n
+    if raw > PriorityFactors.MAX_SCORE:
+        return f"{score} (capped \u2014 {breakdown})"
+    return f"{score} ({breakdown})"
+
+
+def apply_priority_floor(item: ActionItem) -> None:
+    """Give an item the lowest value on every factor it does not have.
+
+    Purpose: PRI-M1 -- a new Action Item starts at the bottom of the priority
+             order rather than outside it. Before this, an item created with no
+             Defaults configured was stored unscored: ``priority_score`` 0,
+             which sorts below every scored item in every list and draws in the
+             unscored grey rather than the low band.
+    Spec:    docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md#pri-m1
+    Tests:   tests/test_priority_floor_and_cap.py::test_prim12_a_new_item_is_never_unscored
+
+    Create-time only (D3). Nothing calls this on update, so a row that is
+    unscored today stays unscored until someone sets its factors by hand --
+    back-filling on save would write values the user never chose onto rows they
+    only opened to rename (P6).
+
+    A factor already set, by the caller or by the Defaults, is never lowered.
+    """
+    for field_name, lowest in PriorityFactors.floor().items():
+        if getattr(item, field_name) is None:
+            setattr(item, field_name, lowest)
 
 
 class BlockType:

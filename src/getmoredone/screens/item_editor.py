@@ -11,7 +11,10 @@ from datetime import datetime, timedelta, date
 from typing import Optional, TYPE_CHECKING, Dict, Any, Tuple, List
 
 from ..utils.after_tracker import TrackedAfterMixin
-from ..models import ActionItem, PriorityFactors, ItemLink, Status, SchedulingOptions
+from ..models import (
+    ActionItem, PriorityFactors, ItemLink, Status, SchedulingOptions,
+    priority_score_label,
+)
 from .week_collision_notice import notify_weekly_tactic_changes
 from ..weekly_tactic import parent_of
 from .. import week_calendar
@@ -1281,6 +1284,23 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
                     self.value_var.set(f"{k} ({v})")
                     break
 
+        # PRI-M1.7: whatever the Defaults did not name, show the floor that
+        # ``create_action_item`` will apply anyway, so a new item's Priority tab
+        # reads 4 before the first save instead of 0 (an unscored item it is
+        # not going to be).
+        for var, scale in (
+            (self.importance_var, PriorityFactors.IMPORTANCE),
+            (self.urgency_var, PriorityFactors.URGENCY),
+            (self.size_var, PriorityFactors.SIZE),
+            (self.value_var, PriorityFactors.VALUE),
+        ):
+            if not var.get():
+                lowest = PriorityFactors.lowest(scale)
+                for k, v in scale.items():
+                    if v == lowest:
+                        var.set(f"{k} ({v})")
+                        break
+
         # Apply organization defaults
         group = get_default("group")
         if group:
@@ -1616,13 +1636,10 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
         size = self.extract_factor_value(self.size_var.get()) or 0
         value = self.extract_factor_value(self.value_var.get()) or 0
 
-        if any(f == 0 for f in [importance, urgency, size, value]):
-            score = 0
-        else:
-            score = importance * urgency * size * value
-
+        # PRI-M2.5/PRI-M2.6: one scorer, one label format, shared with the
+        # row-click popup and with what the row will actually be stored as.
         self.priority_label.configure(
-            text=f"{score} ({importance}×{urgency}×{size}×{value})"
+            text=priority_score_label(importance, urgency, size, value)
         )
 
     def _refresh_scheduling_display(self):

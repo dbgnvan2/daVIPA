@@ -17,7 +17,7 @@ from .weekly_tactic import LINK_PREDICATE_SQL, tactic_of
 from .models import (
     ActionItem, ItemLink, ContactLink, Defaults, RescheduleHistory,
     TimeBlock, WorkLog, Status, Contact, ProjectBoard, ProjectBoardStatus, ProjectBoardLink,
-    BlockType
+    BlockType, apply_priority_floor
 )
 from .app_settings import AppSettings
 from . import week_calendar
@@ -163,6 +163,13 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
 
         # Validate and adjust dates
         item.validate_and_adjust_dates()
+
+        # PRI-M1: the lowest value on every factor still unset, on *every*
+        # create path rather than only the ones that pass apply_defaults. One
+        # rule -- no row this app creates is unscored -- so "Add Action Item"
+        # on the Weekly Items screen cannot disagree with the Item Editor about
+        # where a brand-new item sits in the order (D2).
+        apply_priority_floor(item)
 
         # Update priority score
         item.update_priority_score()

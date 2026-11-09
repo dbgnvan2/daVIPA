@@ -8,7 +8,7 @@ from typing import Optional
 
 from ..app_settings import AppSettings
 from ..date_utils import increment_date
-from ..models import PriorityFactors
+from ..models import PriorityFactors, priority_score_label
 from ..theme import button_style
 
 # Quick "days from today" offsets shown below the date field. Each button sets
@@ -199,8 +199,10 @@ class InlinePriorityDialog(ctk.CTkToplevel):
         u = self._value_from(self.urgency_var.get()) or 0
         s = self._value_from(self.size_var.get()) or 0
         v = self._value_from(self.value_var.get()) or 0
-        score = i * u * s * v if all([i, u, s, v]) else 0
-        self.score_label.configure(text=f"{score} ({i}×{u}×{s}×{v})")
+        # PRI-M2.5/PRI-M2.6: the score and its label come from the model, so
+        # this popup cannot disagree with the Item Editor or with the stored
+        # row about either the product or the cap.
+        self.score_label.configure(text=priority_score_label(i, u, s, v))
 
     def save(self):
         self.result = {
