@@ -177,6 +177,41 @@ standing elsewhere.
   filed again — a filing whose cite points at the wrong line sends the next
   reader to a non-problem, so the cite is the filing's payload, not cosmetics.
 
+### The thirteenth pass, and why the sweep stopped there
+
+Twelve passes had all read the same family: claims in documents. The thirteenth
+was given a different one and a scope that excluded every `.md` file —
+**correctness of the code**: the three `src/` hunks, the two test files, whether
+each rewritten assertion can detect what its message names, vacuity, the
+`tmp_path` database rule, and restored patched state. It found **nothing of
+medium or higher severity**, which is the repo's stopping condition, so the
+sweep ends at thirteen.
+
+What it confirmed, each from the production arithmetic rather than from this
+note: `DayBounds`' own constants give the `07:30` and `-1` the PDT-M2.1 test
+asserts, so neither is coincidental; `panel._grid.span.first == -1` does detect
+a PD-M14.2 regression, because `span_for_blocks` widens from `template_span`
+only via `widened_to` and would otherwise leave `first` at `0`; the five
+`DayBounds(day_end="12:00")` → `DayBounds(lunch_start="16:00")` substitutions
+orphan their block through the surviving lunch path in `build_day_grid`; every
+`DatabaseManager` in the changed tests and their helpers takes an explicit
+`tmp_path` database; all patched state goes through `monkeypatch`. It also
+machine-checked every `tests/<file>.py::<name>` reference in the three `src/`
+files against the actual `def` in the actual named file — **0 dangling, 0
+pointing at the wrong file**, which is what `2cd83a3` set out to achieve.
+
+Its three low findings are filed, not fixed, per the budget: `PDT-A6`
+(`edge_limit_time` has no test of its own) and `PDT-A7` (two plan-day tests now
+assert nearly the same thing), plus a **second instance** of `PDT-A3` — the
+same overclaiming message defect in a second assertion of the same test,
+written in the commit that was correcting the first. That is this batch's own
+recurring failure mode appearing in test code rather than in prose, which is
+why it is recorded here and not only in the filing.
+
+The pass was read-only, so it could not mutation-test; its detectability claims
+are reasoned from the production code, and it says so. `PDT-A6` is stated as a
+missing test rather than as a demonstrated hole for that reason.
+
 ## Files changed
 
 - `tests/test_plan_screen.py` — PDT-M1.1–M1.6, PDT-M2 (`a19a38a`)
@@ -194,7 +229,7 @@ standing elsewhere.
   PD-M5.6 rows marked **withdrawn**; and the M7.3 row with the two UPD-F1
   paragraphs under it
 - `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md` — this note
-- `BACKLOG.md` — items 1, 2 and 4 rewritten; `PDT-A1`–`PDT-A5` and `SSC-1`–`SSC-9`
+- `BACKLOG.md` — items 1, 2 and 4 rewritten; `PDT-A1`–`PDT-A7` and `SSC-1`–`SSC-10`
   filed; the `SSC` section's cite rule; `PDT-A1` rewritten to give the measuring
   command instead of totals that went stale inside this batch
 - `NOTES.md` — where `main` stands; the UPD-F1 and test-count corrections
@@ -221,7 +256,7 @@ docstring text only.
 ## Verification
 
 Run on the tree as this batch leaves it, **after** the sweep passes and their
-fixes (ten cold passes in all). **Re-run after the tenth pass**, which found
+fixes (thirteen cold passes in all). **Re-run after the tenth pass**, which found
 this section claiming a result for a tree two rounds of document fixes had
 since changed — `docs/spec_coverage.md` is in `tests/test_traceability_refs.py`'s
 `SCANNED`, so a document edit can move these numbers. The figures below are

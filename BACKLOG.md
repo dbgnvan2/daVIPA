@@ -456,6 +456,39 @@ detect a settings-file write, which the message implies. The real guards are
 `test_pdm141_a_drop_on_earlier_writes_no_settings` and
 `..._never_calls_save`. Reword the message to what it measures.
 
+The thirteenth cold pass found a **second** assertion in the same test with the
+same defect, which is this batch's own recurring failure mode arriving in test
+code: `AppSettings.load().plan_day_start == "08:00"`, message "PD-M14.1: the
+drop wrote Day Start to the settings file". The `settings` fixture never writes
+the file, so `load()` returns the defaults and `"08:00"` **is** the default. The
+assertion can therefore only fire for a write whose value differs from the
+default, and would stay green for a regression that saved the file having
+changed `plan_day_end` alone. Reword both messages together; PDT-A3 was filed
+for one of them and the other was written afterwards, in the commit that was
+correcting the first.
+
+### PDT-A6 — `edge_limit_time` has no direct test (low)
+
+`src/getmoredone/screens/plan.py`'s `edge_limit_time` is reached by no test of
+its own. Its only coverage is
+`tests/test_plan_screen.py::test_pdm146_both_ends_refuse_at_midnight_and_say_which`,
+which asserts that `"00:00"` and `"23:30"` appear in a status string — so the
+function's boundary arithmetic is checked only through the wording of a message
+about it, and a change that returned the right strings for the wrong reason
+would pass. Found by the thirteenth cold pass, which was read-only and so could
+not mutation-test the claim; the gap is stated as a missing test rather than as
+a demonstrated hole.
+
+### PDT-A7 — two plan-day tests now assert nearly the same thing (low)
+
+`test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day`'s three new
+settings assertions duplicate
+`test_pdm141_a_drop_on_earlier_writes_no_settings` almost line for line. The
+subjects differ — PDT-M2.1's test is about a Saturday, no prompt and a negative
+box index — so this is redundancy, not a defect, and the duplicated guard is
+the weaker of the two (see PDT-A3). Resolve it with PDT-A3 rather than
+separately: the reword and the de-duplication are one edit.
+
 ### PDT-A5 — a test count has drifted in a closed handoff note (low)
 
 `docs/changes/2026-11-08-unified-panel-m7.md` says at `:19` and `:49` that
