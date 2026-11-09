@@ -203,7 +203,7 @@ implementation docstrings are in `src/getmoredone/models.py:85,399,429,451`,
 implemented, so the repo contradicts itself three ways.
 
 Related: `PRI-A1` to `PRI-A4`, which that plan promises and
-`docs/DOCUMENTATION_INDEX.md:289` repeats, appear nowhere in this file.
+`docs/DOCUMENTATION_INDEX.md:291` repeats, appear nowhere in this file.
 
 ### SSC-2 — the WTP spec's header contradicts its own status section (high)
 
@@ -223,8 +223,11 @@ call, not a sweep's.
   either." It is on `main`:
   `git merge-base --is-ancestor refs/heads/claude/elegant-neumann-ab55c9 main`
   succeeds, merged at `2fac9b3`. `NOTES.md` and item 1 of this file both say
-  so. `docs/changes/2026-11-08-one-batch-at-a-time.md:65` records that wording
-  as deliberate, so it is a live edit gone stale.
+  so. `docs/changes/2026-11-08-one-batch-at-a-time.md:62-63` records that batch
+  writing this `CLAUDE.md` section with its measurements — it does not quote
+  this sentence, and `:64-65` records the parallel `NOTES.md` bullet being
+  corrected to the same "not on `main`" wording — so this was a live edit of
+  that batch, now gone stale.
 - `CLAUDE.md:170-172` — "A ninth,
   `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day`, is on
   `main`, fails there, and exists on no branch. No merge will make it pass."
@@ -250,11 +253,13 @@ sample, not a list.
 documentation up to date as of 2026-01-24\", which has not been true for
 months". That footer was rewritten; `docs/DOCUMENTATION_INDEX.md` now records
 that it *used to* read that. The item's second clause — that no test enforces
-the index — still holds, and is the part four other places route readers to.
+the index — still holds, and is the part six other places route readers to
+(listed in SSC-8).
 
 ### SSC-6 — WTP's criterion count is given as 38, 40 and 41 (medium)
 
-Item 3 of this file says "all 38 criteria built";
+This file's header paragraph (`BACKLOG.md:20`) says "all 38 criteria
+built" — item 3 is WTP-A11, not this;
 `docs/spec_2026-11-08_weekly_tactic_as_parent.md:336` says 40, as does
 `docs/cycles/2026-11-08_wtp-widget-tests-qa-gate.md:125` ("Spec count 39 →
 40"); the spec's own `| WTP-Mx.y |` rows hold **41** distinct IDs. 40 is the
@@ -280,8 +285,10 @@ correct usage. Nothing checks that column —
 
 `UPD-A13` in this file files "no test enforces
 `docs/DOCUMENTATION_INDEX.md`'s completeness" at Priority: Medium, with the
-test design written out. `PLC-A5` files the same gap at low. Three places
-route the reader to `PLC-A5` and none mentions `UPD-A13`, so a reader lands on
+test design written out. `PLC-A5` files the same gap at low. Six places
+route the reader to `PLC-A5` for this gap — `docs/DOCUMENTATION_INDEX.md:27`,
+`:713`, `:718`, `:722`, `BACKLOG.md:386` and `docs/spec_coverage.md:994` — and
+none mentions `UPD-A13`, so a reader lands on
 the low item — whose first sentence is also stale, see SSC-5 — and never
 reaches the designed fix.
 

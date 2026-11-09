@@ -360,7 +360,7 @@ Per the global rule on surrounding code:
 
 ## 9. Risk
 
-**This risk is spent — see §8: UPD-F1 was built in its own session (`31816a0`)
+**This risk is spent — see §7: UPD-F1 was built in its own session (`31816a0`)
 and merged at `2fac9b3`. The paragraph below is the risk as it stood when this
 plan was written.**
 

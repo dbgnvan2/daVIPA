@@ -212,7 +212,7 @@ above, in one pass, on a weekday and on a Saturday.
 | PD-M5.2 | A drop above the first box moves Day Start back | The drop no longer touches Day Start. The item still lands above the first box. |
 | PD-M5.3 | A drop below the last box moves Day End forward | The same, at the other end. |
 | PD-M5.5 | Blocks keep their clock times when the day grows | Still true, by a different mechanism: nothing is renumbered because nothing moves. `shift_all_slots` keeps this criterion under PD-M14.4. |
-| TG-M6.4 | Saving Day Settings writes no blocks | Reversed by PD-M14.4: it must renumber, or work already planned moves on the clock. |
+| TG-M6.4 | Saving Day Settings writes no blocks | ~~Reversed by PD-M14.4: it must renumber, or work already planned moves on the clock.~~ **Not what was built.** The box is stored relative to Day Start, so the clock times follow on read and nothing is renumbered — the same mechanism the PD-M5.5 row above describes. TG-M6.4 and TG-M6.4a stay `done` in `docs/spec_coverage.md`, and both named tests are live and green: `tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks` and `tests/test_time_block_crud.py::test_tgm64_a_day_start_change_writes_no_rows`. They are **not** among the four tests deleted below. *(Corrected 2026-11-08, ninth cold pass of the PDT batch.)* |
 
 Four tests assert the withdrawn behaviour and are deleted with it:
 `::test_pdm52_a_drop_above_moves_day_start_back`,

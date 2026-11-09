@@ -83,6 +83,55 @@ The grep `git diff 4ca7116 -- tests/test_plan_settings.py
 tests/test_plan_screen.py | grep -E '^-.*assert'` prints those six lines. One
 assertion was withdrawn and one inverted; the other four survive.
 
+### What the last two passes changed, and what they left
+
+Passes 8 and 9 stopped working from the diff and worked from the *statements*
+instead, grepping every duplicate of each claim. That is what caught the
+recurring shape: a statement corrected in one place with its copy left
+standing elsewhere.
+
+- **UPD-F1's defect was recorded as live in twelve places, not eleven.**
+  `ce7573c` fixed ten across five files, `86a9a53` found an eleventh in
+  `CHANGELOG.md` and called the enumeration complete; the ninth pass found a
+  twelfth in `docs/spec_coverage.md` (the M7.3 row and two paragraphs below
+  it), whose twin in `docs/spec_2026-11-07_unified_panel_design.md` `ce7573c`
+  had already corrected. `86a9a53`'s message says "the eleventh place" and is
+  wrong by one; the count was never a reliable unit, which is why this note
+  gives the places rather than a total.
+- **`docs/spec_coverage.md`'s PD-M5.3 cell overstated what was deleted.**
+  `86a9a53` wrote "the named tests were deleted"; only one of the two was.
+  `::test_pdm53_a_drop_below_does_not_renumber_the_day` is live at
+  `tests/test_plan_screen.py:5508` and was *strengthened* by PD-M14, which the
+  withdrawing plan says in as many words. The same cell cited the
+  earlier-direction guard for a bottom-box criterion; it now cites
+  `::test_pdm141_a_drop_on_later_writes_no_settings`. A reader acting on the
+  old cell would have deleted a green test.
+- **`docs/implementation_plan_2026-11-06_plan_day_controls.md` was the one
+  document PD-M14's own plan told the batch to update**, and nothing in it
+  mentioned PD-M14. Its PD-M5.2 and PD-M5.3 rows still named the deleted tests
+  as live. Annotated in place, in the same form the file's own PD-M5.11 row
+  already used. No test scans plan files, so nothing would have caught this.
+- **The day-hours plan predicted a reversal that was not built.** Its
+  withdrawn-criteria table says TG-M6.4 is "Reversed by PD-M14.4: it must
+  renumber". It does not: the box is stored relative to Day Start, so the
+  clock times follow on read, and both `test_tgm64` tests are live and green.
+  TG-M6.4 and TG-M6.4a stay `done`. The prediction is struck through in place
+  with the reason, because that table is cited by the PD-M5.2 and PD-M5.3
+  withdrawals above and a reader checking one would have reached the other.
+- **Nine findings were filed, not fixed** — `SSC-1` to `SSC-9` in
+  `BACKLOG.md`. They are the same failure shape in documents outside this
+  batch's file set: plans that head themselves "awaiting approval, no
+  implementation code written" over code that is on `main`, a spec whose
+  header contradicts its own status section 330 lines below. Sweeping them
+  into a plan-day test batch would produce an unreviewable diff, which is the
+  global rule 10 split. Two are high. `SSC-3` is left for the user: the two
+  false sentences are in `CLAUDE.md`, which is auto-loaded into every session,
+  so correcting the project's own instructions on a review finding is not a
+  sweep's decision.
+- **Four wrong line cites inside those filings were corrected** rather than
+  filed again — a filing whose cite points at the wrong line sends the next
+  reader to a non-problem, so the cite is the filing's payload, not cosmetics.
+
 ## Files changed
 
 - `tests/test_plan_screen.py` — PDT-M1.1–M1.6, PDT-M2 (`a19a38a`)
@@ -94,8 +143,16 @@ assertion was withdrawn and one inverted; the other four survive.
 - `src/getmoredone/screens/plan_blocks.py` — `build_outside_group`'s stale prose about Day End (`2cd83a3`)
 - `docs/spec_coverage.md` — 8 references repointed and 1 dropped, across 3
   rows (TG-M3.1, PD-M5.5, PD-M5.8), plus the 21 PDT rows
-- `BACKLOG.md` — items 1, 2 and 4 rewritten
-- `NOTES.md` — where `main` stands
+- `BACKLOG.md` — items 1, 2 and 4 rewritten; `PDT-A1`–`PDT-A5` and `SSC-1`–`SSC-9` filed
+- `NOTES.md` — where `main` stands; the UPD-F1 and test-count corrections
+- `CHANGELOG.md` — UPD-F1's `[Unreleased]` entry corrected
+- `docs/spec_2026-11-07_unified_panel_design.md` — the M7.3 row's UPD-F1 status
+- `docs/implementation_plan_2026-11-08_unified_panel_followups.md` — the §7
+  and §9 wrappers recording UPD-F1 as built
+- `docs/implementation_plan_2026-11-06_plan_day_controls.md` — PD-M5.2 and
+  PD-M5.3 annotated as withdrawn by PD-M14, which that plan asked for
+- `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md` — the
+  TG-M6.4 prediction struck through; it was not what was built
 - `docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md` — the plan (`11ec1dc`)
 - `docs/DOCUMENTATION_INDEX.md` — this note and the plan
 
@@ -104,8 +161,8 @@ docstring text only.
 
 ## Verification
 
-Run on the tree as this batch leaves it, **after** the four sweep passes and
-their fixes (seven cold passes in all). The earlier run recorded here
+Run on the tree as this batch leaves it, **after** the sweep passes and their
+fixes (nine cold passes in all). The earlier run recorded here
 covered **four** files, without
 `tests/test_traceability_refs.py`, and gave 396 passed / 17 skipped — 413
 cases, all accounted for. Folding the fifth file in adds its 3 cases, two of
