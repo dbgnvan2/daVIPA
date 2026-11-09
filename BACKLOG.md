@@ -61,12 +61,21 @@ and **nine are left** — the nine in items 3 and 5, in two groups rather than
 three. Nothing red is a meta test any more. `NOTES.md` carries the same count;
 this section is the authoritative go-green list, so the two must agree.
 
-These **eleven** closures are **verified locally only** — targeted test files,
-listed in the handoff note. There is no CI run for this range: `main` is ahead
-of `origin/main` as this is written, and the run cited above is the old one on
-`b6d6ddf`. The plan's own "Done means" asks for the CI count and that is **not
-met yet**; it is met when a run on this range is read, not when this paragraph
-says so.
+**CI confirms the eleven, 2026-11-09.** Run `42574256150` on `5eef83d`:
+**9 failed, 2635 passed, 2 skipped**, identical on 3.11, 3.12 and 3.13, and the
+nine are exactly the nine in items 3 and 5. Against run 42550648188's twenty on
+`b6d6ddf`, that is the eleven closed and nothing new red. The intermediate run
+`42571150206` on `67612d5` (the PDT batch's tip, before the PRIT push) was
+**10 failed, 2599 passed** — the ten being the nine plus
+`test_every_referenced_test_file_exists`, which is how the PDT batch's ten and
+the PRIT batch's eleventh are told apart on a machine that built neither. The
+plan's "Done means" asked for the CI count and it is **met**. Earlier drafts of
+this paragraph recorded the eleven as verified locally only; they were, until
+this run. Re-measure with:
+
+```
+gh run view 42574256150 --log-failed | grep -oE "_{3,} test_[a-z0-9_]+ _{3,}" | sed -E 's/_+ (test_[a-z0-9_]+) _+/\1/' | sort -u
+```
 
 ### 1. CLOSED — the nine plan-day failures, by PDT, not by a merge
 

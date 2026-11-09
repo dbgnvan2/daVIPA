@@ -276,9 +276,16 @@ added one assertion to `test_pbm55` and five reference edits to
   references — the PRI gap, which predates this batch (`models.py` is in none
   of its commits and the same `Tests:` lines are present at `4ca7116`).
   `test_every_referenced_test_name_exists` passes. See Risks.
-- **No full-suite run and no CI run covers this range.** `main` is ahead of
-  `origin/main`, so the twenty-failure CI picture quoted elsewhere is from run
-  42550648188, before this batch.
+- **CI has now run this range.** Run `42571150206` at `67612d5` (the batch's
+  last commit): `10 failed, 2599 passed, 2 skipped` on each of 3.11, 3.12 and
+  3.13. The ten are the nine CI-environment failures listed under Risks plus
+  `test_every_referenced_test_file_exists`, red on the PRI gap this batch could
+  not close and filed as `BACKLOG.md` item 2 — **no failure this batch
+  introduced.** The twenty-failure picture quoted elsewhere is from the earlier
+  run 42550648188. The meta test went green in the next batch's run
+  `42574256150`, which is `9 failed, 2635 passed, 2 skipped`.
+  Measure it again with:
+  `gh run view 42571150206 --log-failed | grep -oE "_{3,} test_[a-z0-9_]+ _{3,}" | sed -E 's/_+ (test_[a-z0-9_]+) _+/\1/' | sort -u`
 
 Mutation-proved, each restored byte-identical and confirmed so with
 `git diff --stat`:

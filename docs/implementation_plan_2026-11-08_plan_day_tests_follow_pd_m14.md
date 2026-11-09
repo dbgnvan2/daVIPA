@@ -33,13 +33,15 @@ shipped. Three things below are now wrong, and are wrong here on purpose:
    the `Tests:` lines would have greened the meta test while hiding the gap.
    `spec_coverage.md` records PDT-M4.2 as `not done`, and it is now `BACKLOG.md`
    item 2.
-3. **The "Done means" criterion is not met.** It asks for "CI on `main` down
-   from 20 failures to the nine CI-environment ones — a number stated in the
-   handoff note and checked against the run". No CI run covers this range yet,
-   so the handoff note states local targeted runs only, and the count of what
-   is left (**ten**, not nine: the nine plus
-   `test_every_referenced_test_file_exists`) is derived from local runs and
-   from reading the reference set, not from a CI run.
+3. **The "Done means" criterion is met, 2026-11-09.** It asks for "CI on
+   `main` down from 20 failures to the nine CI-environment ones — a number
+   stated in the handoff note and checked against the run". Run `42571150206`
+   on this batch's tip `67612d5` is **10 failed, 2599 passed**, the ten being
+   the nine plus `test_every_referenced_test_file_exists`, which this batch
+   could not close; the next batch closed it and run `42574256150` on `5eef83d`
+   is **9 failed, 2635 passed**. So the ten predicted here from local runs and
+   the reference set is what CI measured. When this paragraph was written no run
+   covered the range and it said so.
 
 Two corrections to this plan's own measurements, found by the cold sweep:
 

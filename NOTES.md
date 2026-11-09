@@ -16,8 +16,10 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   `test_every_referenced_test_file_exists`, by the PRIT batch, which wrote the
   35 tests PRI-M1 and PRI-M2 had shipped without
   (`docs/changes/2026-11-08-pri-tests.md`). That also closes PDT-M4.2, the one
-  criterion the PDT batch recorded `not done`. Verified locally on targeted
-  files; **no CI run covers this range yet**.
+  criterion the PDT batch recorded `not done`. **Confirmed by CI run
+  `42574256150` on `5eef83d`: 9 failed, 2635 passed, 2 skipped, the same on
+  3.11, 3.12 and 3.13** — twenty down to nine, with no new failure. The
+  measurement and the intermediate run are in `BACKLOG.md` item 1.
 - **Nine failures are left, in two groups,** not three:
   - **Seven** always-on-top tests (`test_t51`, `test_t52`, `test_t56`,
     `test_t57`, `test_wt_m6b6`, `test_alpha_still_passes_through_the_attributes_wrapper`,
