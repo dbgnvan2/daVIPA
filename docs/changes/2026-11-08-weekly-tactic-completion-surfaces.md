@@ -207,3 +207,27 @@ Toplevel parent — not for whether the modal is legible in front of it.
 - Cover the Next Action window on the timer's decline path: open one, decline,
   assert it is still there. The guard is placed before its destroy precisely
   for that, and nothing checks it.
+
+## CI on the pushed commit (run 42537946699, `4475d23`)
+
+**11 failed, 2459 passed, 1 skipped** on each of Python 3.11, 3.12 and 3.13.
+Red, and none of it is this batch:
+
+- All 11 are Calendar Export tests — `test_cem11*` and `test_cem11b` in
+  `tests/test_time_block_schema.py`, `test_cem12*`, `test_cem12b` and
+  `test_cem13*` in `tests/test_time_block_crud.py`. They call
+  `set_block_calendar_event_id` with three arguments; the signature on `main`
+  takes two. The implementation that matches them is 73 added and 18 removed
+  lines of `db_manager.py` still uncommitted in this shared checkout, held by
+  the Calendar Export session, whose user told it to leave the tree
+  uncommitted. Landing it is that session's call, not this one's.
+- No WTP test failed. The 21 widget tests of WTP-M6.8 are in the 2459, and
+  `test_ci_contract.py` still passes, which is the check that would have gone
+  red had any of them taken the `mapped_windows` fixture and moved the
+  documented count off 22.
+
+For scale: the run before this one, on `e7e260a`, failed 312 tests. That was
+`8c65080` half-sweeping the Calendar Export batch — its tests and part of its
+schema without `TimeBlock.calendar_event_id`. `f264cc3` in this push landed the
+model field and the two columns, which is what took 312 down to 11. The
+remaining 11 are the other half of the same trap.
