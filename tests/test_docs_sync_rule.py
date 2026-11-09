@@ -3,9 +3,11 @@
 Purpose: SAG-M2 — `tools/agents/check_docs_sync.py` is the check that says a
          code change must carry a documentation change and a handoff note. It
          existed only inside `.github/workflows/agent-docs-gate.yml`, which
-         triggers on `pull_request`, and this repo's standing instruction is to
-         open none. So the rule had never run on the way work ships here, and
-         `CLAUDE.md` described an enforcement that could not fire.
+         triggered on `pull_request`, and this repo's standing instruction is
+         to open none. So the rule had never run on the way work ships here,
+         and `CLAUDE.md` described an enforcement that could not fire. That
+         workflow was deleted on 2026-11-09 (`SAG-A3`), once these tests were
+         the rule's home.
 
          `.github/workflows/tests.yml` says it in its own header: "No check
          lives only here. Every assertion belongs in the pytest suite so it can

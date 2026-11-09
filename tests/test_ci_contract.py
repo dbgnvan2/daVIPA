@@ -1998,3 +1998,213 @@ def test_the_opt_out_parsing_handles_whitespace_and_case(monkeypatch):
 
     monkeypatch.delenv(conftest.NO_MAPPED_WINDOWS_ENV, raising=False)
     assert conftest.mapped_windows_suppressed() is False
+
+
+# --------------------------------------------------------------------------
+# GSF-M1 — a document may not cite a workflow that is not there
+# --------------------------------------------------------------------------
+
+# The live documents: the ones a reader is told to follow, as opposed to the
+# dated records under `docs/changes/`, `docs/implementation_plan_*` and
+# `docs/spec_*`, which say what was true when they were written and are left
+# alone on purpose. `.agents/` is in because its prompts are instructions to
+# an agent, which is a reader like any other.
+#
+# Two of the three parts are derived rather than listed, because a hand-kept
+# tuple is the thing that goes stale. A cold pass measured the first version
+# of this, which listed ten names: seven could be deleted from it and both GSF
+# guards stayed green, and two of the seven documents whose citations this
+# batch repaired — `docs/action-timer-requirements.md` and the Get Started
+# guide — were never in it at all, so the defect could have come straight
+# back in either. Every tracked root-level `*.md` is scanned now, and the
+# `docs/` part is the one place a name still has to be added by hand: that
+# directory holds dated records and one-off prompts alongside live reference
+# documents, and no path rule separates them.
+DOCS_DIR_LIVE_DOCS = (
+    "docs/DOCUMENTATION_INDEX.md",
+    "docs/USER_GUIDE.md",
+    "docs/GEMINI.md",
+    "docs/MULTI_AGENT_WORKFLOW.md",
+    "docs/action-timer-requirements.md",
+    "docs/daVIPA - Get Started.md",
+)
+
+
+def _tracked_root_markdown() -> list[str]:
+    """Every tracked ``*.md`` at the repository root, in sorted order."""
+    listing = subprocess.run(
+        ["git", "ls-files", "*.md"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    return sorted(line for line in listing if line and "/" not in line)
+
+
+LIVE_DOCS = tuple(_tracked_root_markdown()) + DOCS_DIR_LIVE_DOCS
+
+_WORKFLOW_CITATION = re.compile(r"\.github/workflows/([\w.-]+\.ya?ml)")
+
+
+def _live_documents() -> list[Path]:
+    found = [REPO_ROOT / name for name in LIVE_DOCS]
+    found += sorted((REPO_ROOT / ".agents").rglob("*.md"))
+    return [p for p in found if p.is_file()]
+
+
+def workflow_citations(text: str) -> list[str]:
+    """The workflow filenames a document points a reader at.
+
+    Public so the fixture below can drive it over text of its own rather than
+    over prose that could stop using the form.
+    """
+    return [m.group(1) for m in _WORKFLOW_CITATION.finditer(text)]
+
+
+def dangling_workflow_citations(documents, present):
+    """Which of ``documents`` point a reader at a workflow not in ``present``.
+
+    ``documents`` is a sequence of ``(label, text)`` pairs and ``present`` the
+    workflow filenames that exist, so the whole scan can be driven over a
+    document the test writes. The repo-state assertion below cannot fail once
+    the repo is clean — a mutation deleting the comparison left the test green
+    — so the mechanism is proved against a fixture, and the repo is then
+    checked with the same function.
+    """
+    return [
+        f"{label}: .github/workflows/{cited}"
+        for label, text in documents
+        for cited in workflow_citations(text)
+        if cited not in present
+    ]
+
+
+def test_gsfm11_no_document_cites_a_workflow_that_does_not_exist(tmp_path):
+    """GSF-M1.1, GSF-M1.2 — the shape `SAG-A3` was.
+
+    Purpose: a live document may not describe an enforcement a reader does not
+             get.
+    Spec:    docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md#gsf-m11
+    Tests:   this test
+
+    `.github/workflows/agent-docs-gate.yml` triggered on ``pull_request``,
+    which this repo never opens, so it had never run; its rule moved into
+    `tests/test_docs_sync_rule.py` when `SST-A8` closed. `AGENTS.md` went on
+    calling it a merge gate, `CLAUDE.md` described it as still existing, and
+    `docs/MULTI_AGENT_WORKFLOW.md` told a reader which script it runs. Nothing
+    checked, because no test asserted which workflows the repo has — this file
+    names two of them individually and otherwise iterates over whatever the
+    directory holds.
+    """
+    present = {wf.name for wf in _workflows()}
+    assert present, "no workflows at all; the check below would be vacuous"
+
+    # Which documents are read is itself an assertion, and it has to be an
+    # assertion over the whole set rather than a few names in it. A mutation
+    # that cut CLAUDE.md and AGENTS.md out of LIVE_DOCS left the first version
+    # of this test green, because the repair had already landed; a cold pass
+    # then showed that seven of the ten listed names could go the same way,
+    # including the index that held the one `###` entry GSF-M2.1 names. So:
+    # every tracked root-level `*.md` is scanned, each named `docs/` document
+    # is scanned, and each one exists.
+    scanned = {doc.relative_to(REPO_ROOT).as_posix() for doc in _live_documents()}
+    root_markdown = _tracked_root_markdown()
+    assert root_markdown, "git ls-files found no root *.md; the scan is vacuous"
+    unscanned_root = sorted(set(root_markdown) - scanned)
+    assert not unscanned_root, (
+        f"these tracked root documents are not being scanned: {unscanned_root}. "
+        "The root half of LIVE_DOCS is derived from git ls-files precisely so "
+        "that it cannot be narrowed by hand"
+    )
+    for required in DOCS_DIR_LIVE_DOCS:
+        assert required in scanned, (
+            f"{required} is named as a live document but is not being "
+            "scanned, so citations in it are checked by neither GSF guard"
+        )
+    for described in ("CLAUDE.md", "AGENTS.md", "docs/MULTI_AGENT_WORKFLOW.md"):
+        assert described in scanned, (
+            f"{described} is not being scanned, and it is one of the documents "
+            "that described the deleted docs gate as an enforcement a reader "
+            "gets"
+        )
+    for repaired in ("docs/action-timer-requirements.md",
+                     "docs/daVIPA - Get Started.md"):
+        assert repaired in scanned, (
+            f"{repaired} had a citation of the master spec repaired by this "
+            "batch and is no longer scanned, so the same defect could return "
+            "to it unnoticed"
+        )
+    missing_docs = sorted(name for name in LIVE_DOCS
+                          if not (REPO_ROOT / name).is_file())
+    assert not missing_docs, (
+        f"LIVE_DOCS names documents that do not exist: {missing_docs}. A stale "
+        "entry is a document silently dropped from both GSF guards"
+    )
+
+    dangling = dangling_workflow_citations(
+        [
+            (doc.relative_to(REPO_ROOT).as_posix(), doc.read_text(encoding="utf-8"))
+            for doc in _live_documents()
+        ],
+        present,
+    )
+    assert not dangling, (
+        "these documents point a reader at a workflow that does not exist:\n  "
+        + "\n  ".join(sorted(dangling))
+        + "\nA workflow that has been deleted is named WITHOUT the "
+        ".github/workflows/ path — `agent-docs-gate.yml` alone — the way a "
+        "retired test is named without its tests/ path, so the sentence reads "
+        "as history rather than as a pointer. That is why every mention of "
+        "the deleted docs gate in BACKLOG.md, NOTES.md, CLAUDE.md, AGENTS.md "
+        "and the two docs/ documents carries no path."
+    )
+
+    # The reader of this test should not have to take the scan on trust, and a
+    # scan asserted only against today's prose passes just as well when it has
+    # stopped reading anything. Both directions, over text written here.
+    assert workflow_citations(
+        "Enforced by `.github/workflows/agent-docs-gate.yml`, which treats"
+    ) == ["agent-docs-gate.yml"], "the citation form is no longer matched"
+    assert workflow_citations("- tests pass (`.github/workflows/tests.yml`)") == [
+        "tests.yml"
+    ], "a citation inside parentheses is no longer matched"
+    assert workflow_citations("the workflows under .github/ are the contract") == []
+    assert "agent-docs-gate.yml" not in present, (
+        "agent-docs-gate.yml is back. It runs on pull_request only and this "
+        "repo opens none, so it enforces nothing; the docs-sync rule it "
+        "carried is tests/test_docs_sync_rule.py"
+    )
+
+    # The scan itself, over a document written here. This is what the repo
+    # check above cannot do: once the repair has landed nothing dangles, so
+    # deleting the comparison leaves it green.
+    probe = tmp_path / "PROBE.md"
+    probe.write_text(
+        "Enforced by `.github/workflows/agent-docs-gate.yml`, which treats\n"
+        "both requirements files as dependencies.\n"
+        "- tests pass (`.github/workflows/tests.yml`)\n",
+        encoding="utf-8",
+    )
+    reported = dangling_workflow_citations(
+        [("PROBE.md", probe.read_text(encoding="utf-8"))], present
+    )
+    assert reported == ["PROBE.md: .github/workflows/agent-docs-gate.yml"], (
+        "a document citing a workflow that does not exist is not reported, so "
+        f"the scan is inert: {reported}"
+    )
+    assert dangling_workflow_citations(
+        [("PROBE.md", "- tests pass (`.github/workflows/tests.yml`)")], present
+    ) == [], "a workflow that exists is reported as dangling"
+
+    # And the scan finds the real citations, so it is reading the documents.
+    cited_anywhere = {
+        name
+        for doc in _live_documents()
+        for name in workflow_citations(doc.read_text(encoding="utf-8"))
+    }
+    assert "tests.yml" in cited_anywhere, (
+        "no live document cites tests.yml, so either the scan is reading "
+        "nothing or the documents have stopped naming the one workflow that "
+        "gates every push"
+    )

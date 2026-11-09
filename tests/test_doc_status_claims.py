@@ -1160,10 +1160,10 @@ PRI_PLAN = REPO / "docs/implementation_plan_2026-11-08_priority_defaults_and_cap
 # The batch's records. SST-M10 was recorded `done` against "the docs-sync
 # gate", which cannot produce that status: `tools/agents/check_docs_sync.py`
 # only asserts that *some* path under `docs/` changed alongside code, and
-# `.github/workflows/agent-docs-gate.yml` runs on `pull_request` only, while
+# `.github/workflows/agent-docs-gate.yml` ran on `pull_request` only, while
 # this repo pushes to `main` and opens no pull requests. So the criterion's
 # named evidence had never run. Found by the second cold pass, 2026-11-09;
-# `SST-A8` files the dead gate itself.
+# `SST-A8` filed the dead gate itself, and `SAG-A3` deleted it the same day.
 # `NOTES.md` is deliberately absent: it opens with a dated "Where main
 # stands" section that each batch rewrites with deletions (the PRIT batch's
 # edit was +22/-13), so an `SST-…` id there is expected to age out, and a
