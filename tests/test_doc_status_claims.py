@@ -391,7 +391,13 @@ def test_sstm9_every_promised_pri_adjacent_item_is_filed():
     promised = [f"PRI-A{n}" for n in range(1, len(numbered) + 1)]
 
     backlog = (REPO / "BACKLOG.md").read_text(encoding="utf-8")
-    unfiled = [name for name in promised if f"### {name}" not in backlog]
+    # The name must end the token: `### PRI-A3` as a substring is also present
+    # in `### PRI-A3x`, and a mutation that renamed the heading that way left
+    # this guard green.
+    unfiled = [
+        name for name in promised
+        if not re.search(rf"^### {name}\b", backlog, re.M)
+    ]
     assert not unfiled, (
         "the PRI plan and docs/DOCUMENTATION_INDEX.md both say these are filed "
         "in BACKLOG.md; they are not: " + ", ".join(unfiled))
