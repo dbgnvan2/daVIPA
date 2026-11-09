@@ -28,6 +28,9 @@ data/
 !themes/*.json
 # Bundled editorial config that ships with the package (not runtime/user data).
 !src/getmoredone/email_cleaning_rules.json
+# Editorial config read by the repo guards. Untracked, it is absent on CI, where
+# the guard that reads it raises rather than reporting a clean document.
+!tools/agents/retired_vocabulary.json
 .DS_Store
 
 # Ignore specific duplicate/temp files

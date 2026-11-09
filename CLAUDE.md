@@ -15,14 +15,15 @@ python run.py
 # Tests
 pytest                                          # All tests
 pytest -m "not meta"                            # App behaviour only (2439 tests)
-pytest -m meta                                  # Repo/infra assertions only (253 tests)
-# Both counts measured 2026-11-09 (after the MAW batch, whose own four tests
+pytest -m meta                                  # Repo/infra assertions only (256 tests)
+# Both counts measured 2026-11-09 (after the LDS batch, whose own three tests
 # are all in the meta figure; the app figure has not moved since the SAG
 # batch, where it moved with `c190b9f`) with
 # `-m <marker> --collect-only -q`, whose last line prints collected/deselected
 # — re-measure rather than trusting them. They had been 1691 and 212, stale by
 # 741 and 13, and 2432/225 earlier the same day; the meta figure was 243
-# before the SBN batch, 247 before the GSF one and 249 before this one. No test asserts either number,
+# before the SBN batch, 247 before the GSF one, 249 before the MAW one and 253
+# before this one. No test asserts either number,
 # which is why they drift; one that did would go red on every batch.
 pytest -v                                       # Verbose
 pytest tests/test_vps_integration.py -v        # Single file
@@ -122,7 +123,7 @@ is what stops a document describing a workflow this repo does not have.
 
 ### Naming a thing that no longer exists
 
-Four conventions, each adopted because a guard that reads prose cannot tell a
+Five conventions, each adopted because a guard that reads prose cannot tell a
 pointer from a history: a sentence that names a deleted thing the way a live
 one is named is indistinguishable from a dead pointer, and the guard is right
 to reject it.
@@ -146,6 +147,12 @@ to reject it.
   unbackticked `.github/` path and an extensionless one such as CODEOWNERS are
   still unread; `MAW-M3.1` holds `docs/` and reads five forms — backticked,
   with a line number, a heading, a markdown link, a list item.
+
+- **A filename proposed but not created** — a rename raised and not made, the
+  way `GSF-N1` raises renaming the master spec — is written without backticks
+  too. It is not a file, and the guard cannot tell a proposal from a dead
+  pointer. `GSF-M2.1` is the arm; `LDS-M3.1` is what brought
+  `docs/spec_coverage.md` into its reach.
 
 A deleted `.yml` workflow is the one case where dropping the path is enough,
 because no arm reads a bare `*.yml` name: `agent-docs-gate.yml` in backticks

@@ -1,6 +1,6 @@
 # Agent UI Regression Policy
 
-Use this document from `TOOL.md`, `CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, or similar repo instructions. It is written to prevent accidental UI removals, broken workflows, and expensive rework.
+Use this document from `CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, or similar repo instructions. (A TOOL.md was listed here until 2026-11-09 and has never been in this repo — `GSF-A4`, found by the GSF class measurement and closed by the LDS batch, which widened the scan to reach this document.) It is written to prevent accidental UI removals, broken workflows, and expensive rework.
 
 ## Purpose
 

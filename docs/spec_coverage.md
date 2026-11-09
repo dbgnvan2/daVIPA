@@ -1468,7 +1468,7 @@ deleted, two test files gain a guard each, and nine documents are repaired.
 | GSF-M2.1 | every live citation of the master spec names the file that exists, and the index has no entry for a root document the repo does not contain | 11 citations in 7 documents | `::test_gsfm21_no_document_cites_a_root_doc_that_does_not_exist` | done — including a `###` entry heading in `docs/DOCUMENTATION_INDEX.md`, which is why the guard has a heading arm |
 | GSF-M2.2 | the four exempted names are exempt for a stated reason, checked in both directions | `tests/test_repo_hygiene.py` (`ROOT_DOC_CITATION_EXEMPTIONS`) | same test | done — one reason covers all four (`~/.claude/standards/`, outside any repo); a name that starts resolving has to leave the list |
 | GSF-M1.3 | the set of documents scanned cannot be narrowed by hand, and covers every document this batch repaired | `tests/test_ci_contract.py` (`_tracked_root_markdown`, `DOCS_DIR_LIVE_DOCS`, `LIVE_DOCS`) | `::test_gsfm11_no_document_cites_a_workflow_that_does_not_exist` | done — added by the cold pass, which measured seven of the ten originally-listed names as deletable with both guards still green, and two repaired documents never in the set at all |
-| GSF-N1 | **not code-testable:** whether the file should instead be renamed to `daVIPA_MasterSpec_SQLite_v1.md`, the app's current name, which eleven documents assumed | — | human | not code-testable — a branding decision, raised and not taken. Residue: `GSF-N1` in `BACKLOG.md` |
+| GSF-N1 | **not code-testable:** whether the file should instead be renamed to daVIPA_MasterSpec_SQLite_v1.md — written without backticks because the rename was not made, so the name is still not a file — the app's current name, which eleven documents assumed | — | human | not code-testable — a branding decision, raised and not taken. Residue: `GSF-N1` in `BACKLOG.md` |
 
 ### Mutations
 
@@ -1680,3 +1680,170 @@ mediums and eight lows**.
 Both highs are corrections to claims rather than to code, and no guard changed
 behaviour except the non-greedy regex. A third pass is not run: the budget
 allows one after a high, and that was this one.
+
+## LDS — the live document set is derived, and retired vocabulary is guarded
+
+Plan: `docs/implementation_plan_2026-11-09_derived_live_document_set.md`.
+Handoff note: `docs/changes/2026-11-09-derived-live-document-set.md`.
+
+| ID | Criterion | Status | Evidence |
+|---|---|---|---|
+| LDS-M1.1 | The `docs/` half of the live set is derived from a stated path rule, with no hand-kept list of names | done | `tests/test_ci_contract.py` — `_derived_docs_dir_live_docs` is the rule as a pure function, `_docs_dir_live_docs` applies it to `git ls-files`, and `DOCS_DIR_LIVE_DOCS = tuple(_docs_dir_live_docs())` |
+| LDS-M1.2 | The rule is asserted over a listing written in the test, both directions per exclusion | done | `test_ldsm11_the_docs_half_of_the_live_set_is_derived`; mutations MA, MB, MC |
+| LDS-M1.3 | The live set covers every name the hand-kept tuple held, so widening cannot narrow | done | `FORMERLY_HAND_KEPT_DOCS` is asserted as a subset of the derived set; mutations MD, ME |
+| LDS-M3.1 | No live document in the widened set cites a bare document name that cannot be resolved | done | the existing `test_gsfm21_no_document_cites_a_root_doc_that_does_not_exist`, now over 41 documents rather than 17. It was red on four citations when the set widened; the four were `docs/AGENT_UI_REGRESSION_POLICY.md` (TOOL.md, `GSF-A4`) and the `GSF-N1` row below, both repaired, plus two `PROBE.md` mentions in the MAW batch's prose in this file, which are exempt with their reason rather than repaired — `PROBE.md` is a fixture label, not a file. A cold pass caught this row claiming all four as repairs, and claiming the two as this batch's prose when `git log -S'PROBE.md'` puts them in `fd68c28` |
+| LDS-M3.2 | A filename proposed but not created is a named form in the conventions | done | `CLAUDE.md`, the fifth bullet of "Naming a thing that no longer exists"; `test_ldsm32_the_conventions_name_every_form_a_guard_reads` asserts the bullet count against the section's own stated number and that every id in `PROSE_CITATION_GUARD_IDS` is named there; mutations MF, MG |
+| LDS-M4.1 | A live document using the vocabulary of a retired concept fails, with the vocabulary read from config | done | `tools/agents/retired_vocabulary.json`; `test_ldsm41_no_live_document_uses_retired_vocabulary`; mutations MH, MI |
+| LDS-M4.2 | The config is valid JSON, dated, with a reason and at least one phrase per concept | done | the shape assertions at the head of the same test, which run before the scan so a malformed concept cannot read zero phrases silently |
+| LDS-M4.3 | The scan is driven over text written in the test, case-insensitively | done | `retired_vocabulary_hits` takes concepts and `(label, text)` pairs; mutations MJ, MK, ML, MM, MN |
+| LDS-N1 | **Not code-testable:** whether the 4 prompt documents and the dated records deserve a weaker rule | filed | `LDS-A2` in `BACKLOG.md`; the user's call |
+
+### LDS-M2 was dropped, not deferred
+
+The plan's `LDS-M2` would have resolved a bare document name against the citing
+document's own directory before failing. Measured against both document sets,
+it changed no outcome: the existing guard's basename fallback already resolves
+every form this repo writes, and the arm would have been a second path to the
+same answer. The function's docstring records deleting one such redundancy
+already. It is dropped with the measurement rather than carried as a follow-up,
+because a follow-up implies work that is still owed.
+
+### Mutations
+
+Twenty, re-measured after the cold pass's fixes. All twenty red.
+
+| # | File | Mutation | Verdict |
+|---|---|---|---|
+| MA | `tests/test_ci_contract.py` | the derived set stops excluding dated records | red |
+| MB | `tests/test_ci_contract.py` | the derived set stops excluding prompts | red |
+| MC | `tests/test_ci_contract.py` | the derived set stops requiring one level under `docs/` | red |
+| MD | `tests/test_ci_contract.py` | `DOCS_DIR_LIVE_DOCS` goes back to the hand-kept tuple | red |
+| ME | `tests/test_ci_contract.py` | the derivation drops one name the tuple held | red |
+| MF | `CLAUDE.md` | the conventions section miscounts itself, as MAW's did | red |
+| MG | `CLAUDE.md` | a guard that reads prose is no longer named in the section | red |
+| MH | `docs/GEMINI.md` | the sentence two batches missed is put back | red |
+| MI | `tools/agents/retired_vocabulary.json` | a marker is added that exempts the real sentence | red |
+| MJ | `tests/test_repo_hygiene.py` | the vocabulary scan becomes case-sensitive | red |
+| MK | `tests/test_repo_hygiene.py` | the marker window becomes the whole document | red |
+| ML | `tests/test_repo_hygiene.py` | the window stops flattening hard-wrapped prose | red |
+| MM | `tests/test_repo_hygiene.py` | the window stops stripping inline code spans | red |
+| MN | `tools/agents/retired_vocabulary.json` | the past-tense reporting markers are removed | red |
+| MO | `tests/test_repo_hygiene.py` | the block window goes back to the flattened document | red |
+| MP | `tests/test_repo_hygiene.py` | a table row no longer bounds a block, in either regex | red |
+| MQ | `tools/agents/retired_vocabulary.json` | the present-tense blockers are removed | red |
+| MR | `tests/test_repo_hygiene.py` | a reporting verb exempts whatever precedes it | red |
+| MS | `tools/agents/retired_vocabulary.json` | a marker is added that ordinary prose contains | red |
+| MT | `.gitignore` | the config is untracked, as the blanket `*.json` rule left it | red |
+| MU | `tests/test_repo_hygiene.py` | a heading no longer ends its own block | red |
+
+MT was applied by hand (`git rm --cached`) rather than by the runner, which
+edits file contents. MP and ML were re-pointed after coming back green: MP's
+first form removed `|` from one of the two regexes that bound a table row, and
+ML's removed a flattening step that `prose_blocks` had made redundant by
+joining a block's lines itself. A mutation that a second mechanism covers
+measures nothing, so both were rewritten to defeat the behaviour rather than
+one expression of it.
+
+Every mutation was restored with the verbatim original and the restoration
+confirmed by sha256 before the next one was applied.
+
+**MH came back GREEN in the first round, and that is the finding of this
+batch.** It puts back the exact sentence `MAW-A3` was filed for —
+`Work is typically split between Code, Docs, and GitHub agents.` — into
+`docs/GEMINI.md`, and the guard passed. That quotation is in a code span
+because this guard reads prose: quoted text is a specimen, not a description,
+which is the same reason the window strips code spans. The retirement window was the paragraph, and the bullet
+below the reinserted sentence said "retired", so the window exempted the
+defect it was written to catch. A guard whose exemption is wider than the
+defect reports a clean document and has read nothing.
+
+The window is the sentence now, over text with inline code spans stripped (a
+quoted `git grep -i "docs agent"` is a command, not a description of current
+practice) and newlines flattened (hard-wrapped prose must be read as one
+sentence, not as four lines). MJ, MK, ML, MM and MN were written for the
+narrower window; all five fail. Two of the test's own fixtures had also been
+passing for the wrong reason, because they contained the word "retired", which
+is itself a marker — rewritten to name a concept that does not exist.
+
+The window had been the paragraph for a reason: the sentence window made the
+guard fail on three documents' honest history, `AGENTS.md` and `docs/GEMINI.md`
+among them. The repair was not to widen the window but to say what a retirement
+marker is, including the past-tense reporting verbs — "described", "said",
+"wrote" — that honest history uses and current practice does not.
+
+### The cold pass
+
+One pass, run over the whole staged diff with no narrative. **One high, four
+mediums, eleven lows.** The high is the important one, and it is the second
+time this guard's exemption window has been measured too wide.
+
+**High — the sentence window was not a sentence.** `prose_sentences` flattened
+the whole document and split on terminal punctuation. A markdown table row, a
+bullet and a heading end at a newline and carry no full stop, so each table
+became one "sentence" and one `retired` anywhere in it exempted every row.
+The cold pass drove the real config through the real logic and got the exact
+MH defect passing in three forms — as a bullet beside a marked bullet, as a
+table row, and under a heading reading "What was retired" — and measured the
+live scan at 11 raw phrase matches, 11 exemptions, 0 findings, with
+`docs/spec_coverage.md` exempted by markers rows away in the same flattened
+table. This is mutation MH again: the first build's window was the paragraph,
+the second was a sentence over flattened text, and both were wider than the
+defect. The window is now one markdown block, then one sentence inside it;
+a heading and a table row also end their own block, which a fourth form of the
+defect forced after the first fix (`prose_blocks`). MO, MP, MU cover it.
+
+The fixtures written for it came back green at first, and that was the
+fixtures' fault: every one ended in a full stop, so the sentence split
+separated them without the block boundary doing anything. They are
+unpunctuated now, which is how a table cell is actually written.
+
+**Medium — nothing bounded the marker list.** The markers are the guard's
+entire exemption surface, and the only assertion on them was mutation MI,
+which constrains a marker only if it occurs in the one fixture sentence. The
+cold pass added `"the "` as a marker and all eight fixture assertions stayed
+green while the guard would have exempted nearly every sentence in the repo.
+Bounded now: a marker must be at least 5 characters, must not occur in any of
+five ordinary current-tense sentences written in the test, and must not contain
+another marker (MS, and three dead `was/are/is deleted` entries removed).
+
+**Medium — three markers exempted present-tense prose.** `described`, `said`
+and `wrote` were markers so that honest history could report what a document
+said. They also exempt "The Docs agent **is** described in AGENTS.md and owns
+every document." Deleting them would have forced real history to be rewritten,
+so they are anchored instead: `sentence_is_history` reads them from
+`reporting_markers` and ignores an occurrence immediately preceded by
+`reporting_marker_blockers` (`is `, `are `, `being `, …). Both counterexamples
+are assertions now; MQ and MR cover the mechanism.
+
+**Medium — the config contradicted itself and the code.** `_comment` said the
+window was the paragraph while `_retirement_markers_comment` said the
+sentence, and three messages in the test still said "paragraph". The test
+asserts `_comment` is non-empty but cannot assert it is true, so this was
+invisible. All four corrected.
+
+**Medium — the LDS-M3.1 row above claimed four repairs where two are
+exemptions**, and attributed the two `PROBE.md` mentions to this batch when
+`git log -S'PROBE.md'` puts them in `fd68c28`. Corrected in the row.
+
+**Medium — two counts in `docs/DOCUMENTATION_INDEX.md` were stale inside the
+sentence this batch edited** (82 and 234, now 83 and 236, moved by this batch's
+own two new files). Re-measured with the definition written inline; a third
+figure that could not be reproduced is dropped rather than restated.
+
+**Lows fixed** — all in text or tests this batch wrote: the `>` count floor on
+the derived set (now a strict-superset assertion, the shape `CLAUDE.md`'s test
+rules require); a loop over `DOCS_DIR_LIVE_DOCS` in `test_gsfm11` that became
+tautological once both sides derived from the same function (deleted, with a
+comment saying where the check now lives); three `@pytest.mark.meta`
+decorators redundant under each file's module-level `pytestmark`; `LDS-A2`
+calling 50 dated documents "82 dated"; the handoff note omitting `.gitignore`;
+`allowed_in_comment` offering a field the test forbids (reconciled); and the
+plan's §3 numbering.
+
+**Lows filed, not fixed** — `LDS-A3` to `LDS-A6` in `BACKLOG.md`.
+
+A second cold pass is not run. The budget allows a further pass after a high,
+and the four code fixes the high produced are real new surface — but they are
+each covered by a mutation written after the fix, and the pass that found the
+high also read every count and claim in the prose. The honest statement is
+that the fixes are mutation-tested and not independently reviewed.

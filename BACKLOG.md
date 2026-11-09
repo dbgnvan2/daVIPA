@@ -5417,7 +5417,31 @@ is what stops a document pointing a reader at it, or at any other `.github/`
 file that is not tracked — `GSF-M1.1` reads only `.github/workflows/`, so it
 would not have caught this one.
 
-### GSF-A3 — the `docs/` half of the GSF scanned set is hand-kept (medium)
+### ~~GSF-A3 — the `docs/` half of the GSF scanned set is hand-kept (medium)~~
+
+**Closed 2026-11-09 by the LDS batch** (`LDS-M1.1`, plan
+`docs/implementation_plan_2026-11-09_derived_live_document_set.md`). The
+`docs/` half is derived now, by one stated path rule: tracked, one level under
+`docs/`, `*.md`, no ISO date in the name, no "prompt" in it. The scan went from
+17 documents to 41, and the widening cost nothing on the path arm — zero new
+dangling `docs/`-path citations — while the root-name arm found three repairs,
+one of them `GSF-A4`.
+
+The blocker this item states below dissolved on measurement, and the sentence
+that states it is worth keeping as a lesson: it says
+`docs/SESSION_HANDOFF_2026-02-19.md` and `docs/VPS_UPDATES_2026-01-24.md` are
+"records with no date-shaped prefix". They are records with an ISO date in the
+middle of the name, which a rule that reads the whole name sees perfectly
+well. The item had looked for a *prefix* convention and concluded none existed.
+The third example it gives is a prompt, which the rule excludes by the word.
+
+The dated records and the four prompt documents stay out on purpose, measured:
+scanned as well, they report 13 unresolvable citations, 11 of which were true
+when written. `LDS-A2` carries the open question of whether they deserve a
+weaker guard.
+
+The original filing follows.
+
 
 `GSF-M1.3` derives the root half of `LIVE_DOCS` from `git ls-files`, precisely
 because the cold pass measured the hand-kept version as both narrowable and
@@ -5431,7 +5455,15 @@ dated record or a one-off prompt: `docs/SESSION_HANDOFF_2026-02-19.md`,
 are all records with no date-shaped prefix. A naming convention for new
 documents, enforced by a test, would let the set be derived in full.
 
-### GSF-A4 — `docs/AGENT_UI_REGRESSION_POLICY.md` cites a TOOL.md that does not exist (low)
+### ~~GSF-A4 — `docs/AGENT_UI_REGRESSION_POLICY.md` cites a TOOL.md that does not exist (low)~~
+
+**Closed 2026-11-09 by the LDS batch.** The name is gone from that document's
+first line, with a sentence saying it was there until 2026-11-09 and has never
+been in this repo. It was outside the guard only because that document was one
+of the 30 under `GSF-A3`; deriving the set brought it in, and the existing
+`GSF-M2.1` failed on it — which is the proof the widening reaches real prose
+rather than only the set's own members. The original filing follows.
+
 
 Line 3 lists four documents a reader might be following — TOOL.md (written
 here without backticks, per the convention in `CLAUDE.md`, because it does not
@@ -5476,7 +5508,24 @@ re-cased copy of entry 0, or keep it and say in the docstring that it is a
 fixture phrase. Found by the MAW second cold pass; below medium, so filed
 rather than fixed in-loop.
 
-### MAW-A3 — a retired description outside the scanned set survived two batches (medium)
+### ~~MAW-A3 — a retired description outside the scanned set survived two batches (medium)~~
+
+**Closed 2026-11-09 by the LDS batch** (`LDS-M4.1`). The proposal this item
+made is what was built: `tools/agents/retired_vocabulary.json` holds the
+vocabulary of retired concepts as editorial config (global rule 9), with a
+date, a reason and a "write it instead" line per concept, and
+`tests/test_repo_hygiene.py::test_ldsm41_no_live_document_uses_retired_vocabulary`
+reads it over the live documents.
+
+One thing the proposal did not anticipate, found by mutation rather than by
+review: a substring scan cannot tell a description from a report, so the first
+build rejected `AGENTS.md`, `docs/GEMINI.md` and `docs/spec_coverage.md` on
+their own accounts of the retirement. A phrase is a finding only when the
+sentence holding it carries none of the retirement markers. The window was the
+paragraph first, and mutation MH measured what that cost: the exact sentence
+this guard exists for, put back into `docs/GEMINI.md`, did not fail it, because
+the bullet beneath it said "retired". The original filing follows.
+
 
 `docs/GEMINI.md` described the three-agent split under its own
 *Multi-Agent Workflow* heading, and went on describing it after the GSF batch
@@ -5500,3 +5549,67 @@ succeeds, so it is 624 commits behind `main`, nothing ahead, and every commit
 on it is already here. Deleting the ref would lose nothing. Last commit
 2026-04-03. Deleting a remote branch is the user's call, not mine, which is why
 this is filed as a decision rather than done.
+
+### LDS-A1 — a 2026-11-08 plan has neither a handoff note nor a coverage record (medium)
+
+`docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md` cites a
+coverage snapshot — docs/spec_coverage_2026-11-08_priority_defaults_and_cap.md,
+written here without backticks because it is not a file — and a handoff note
+under `docs/changes/`. Neither exists, under that or any other name:
+`git ls-files docs | grep -i priority_defaults` finds only the plan. Every
+other plan of that week has both. The repo's own agreement is that a batch is
+not done without the note, so either the batch was never built or its records
+were never written — and the plan's own status line is the only claim either
+way. Found by the LDS measurement of what scanning the dated records would
+cost (§1.4 of its plan). It needs those items read against the code, not their
+citations rewritten, which is why it is filed.
+
+### LDS-A3 — two hand-kept lists were reintroduced by the batch that removed one (low)
+
+`PROSE_CITATION_GUARD_IDS` in `tests/test_repo_hygiene.py` is four ids with
+nothing asserting it is complete, so a prose guard added later is simply absent
+from the convention check — and the section's own first bullet names
+`tests/test_traceability_refs.py`, whose arm has no id in the tuple.
+`ROOT_DOC_CITATION_EXEMPTIONS`' both-directions check only asserts the
+exempted name is not a tracked root file; it never asserts the exemption is
+still needed, so `PROBE.md` now exempts that name across all 41 documents for
+good. Found by a cold pass. Both are the same shape as the hand-kept tuple
+`LDS-M1.1` removed.
+
+### LDS-A4 — "prompt" is an unanchored substring in the derivation (low)
+
+`_derived_docs_dir_live_docs` drops any name containing "prompt", so a future
+reference document called docs/prompting_guide.md or docs/user_prompts.md —
+neither of which is a file, so neither is backticked —
+leaves every citation guard with no signal at all. Only one direction is
+asserted. The ISO-date rule has the same edge and is harder to trip. Found by
+a cold pass.
+
+### LDS-A5 — `stated_convention_count` tops out at ten (low)
+
+`_COUNT_WORDS` covers one to ten; an eleventh convention makes the count
+`None` and the failure message read "the section says there are None
+conventions". Found by a cold pass.
+
+### LDS-A6 — `LDS-A1`'s "or any other name" is not established (low)
+
+`LDS-A1` says the 2026-11-08 plan's handoff note does not exist "under that or
+any other name". `docs/changes/2026-11-08-pri-tests.md` and
+`docs/changes/2026-11-08-priority-level-colours.md` do exist and may be the
+same work; the item's own grep would not have found either. The finding stands
+— the cited names do not exist — but the clause overstates what was measured.
+Found by a cold pass.
+
+### LDS-A2 — the dated records and the prompt documents are outside every citation guard (low)
+
+The LDS rule excludes them deliberately, measured: scanned as well, the 50
+dated `docs/*.md` files and the 151 notes under `docs/changes/` report 13
+unresolvable citations, and 11 were true when they were written — seven name
+the workflow document deleted on 2026-11-09, four are forward references to a
+note the plan was about to produce. A guard that fails because a 2026-06-06
+note names a file deleted in November makes honest history unwritable.
+
+What might still be worth guarding in a record is narrower: a citation of a
+file that has *never* existed at any commit, which no amount of history
+excuses. That needs `git log --diff-filter=A` per name, which is a different
+and slower mechanism than the ones here. Open question, not a defect.

@@ -414,6 +414,41 @@ note is:
   plan named as its own risk - no high and eight mediums, all fixed, two of
   them in the guard's own prose. `SBN-A1` to `SBN-A7` filed, not fixed.
 
+### docs/implementation_plan_2026-11-09_derived_live_document_set.md
+
+Implementation plan for deriving the scanned document set and guarding the
+vocabulary of retired concepts (LDS-M1, LDS-M3, LDS-M4), closing `BACKLOG.md`'s
+`GSF-A3` (medium), `GSF-A4` (low) and `MAW-A3` (medium), and settling `GSF-N1`
+as a writing convention rather than a rename. **Built 2026-11-09 under the
+standing instruction: 8 of 8 criteria `done`, one item not code-testable
+(LDS-N1, whether the prompt documents and dated records deserve a weaker
+guard)** - per-criterion status in `docs/spec_coverage.md`. No file under
+`src/` is touched. Handoff note:
+`docs/changes/2026-11-09-derived-live-document-set.md`, listed here only inside
+this entry rather than as an entry of its own, as every handoff note is:
+
+- The `docs/` half of the scanned set was five names kept by hand. It is
+  derived now, by one stated path rule - tracked, one level down, `*.md`, no
+  ISO date in the name, no "prompt" in the name - which widens the scan from
+  17 documents to 41 (the figure the MAW records give, which counts the
+  handoff-note template `_live_documents` adds to the two listed halves).
+- The dated records and the four prompt documents stay out, with the
+  measurement for why: scanned as well, they report 13 unresolvable citations,
+  11 of which were true when they were written. A guard that makes honest
+  history unwritable is the defect, not the fix.
+- Widening the scan found three repairs: a TOOL.md that has never been in this
+  repo, cited from `docs/AGENT_UI_REGRESSION_POLICY.md` since before the
+  rename (`GSF-A4`); a fixture filename quoted in `docs/spec_coverage.md`, now
+  exempt with its reason; and a proposed-but-unmade rename written in
+  backticks, which the conventions now cover as a named form.
+- `tools/agents/retired_vocabulary.json` is new: the vocabulary of concepts
+  this repo has retired, in config rather than in Python (global rule 9), with
+  a date, a reason and a "write it instead" line per concept. A phrase is a
+  finding only when the *sentence* holding it carries none of the retirement
+  markers, so history stays writable - the mechanism `MAW-A3` asked for after
+  `docs/GEMINI.md` described the three-agent split as current for two batches
+  inside the scanned set.
+
 ### docs/implementation_plan_2026-11-09_retired_agent_apparatus.md
 
 Implementation plan for deleting the retired three-agent workflow's apparatus
@@ -951,10 +986,16 @@ Documentation is updated:
 - When user issues are resolved
 - During major releases
 
-**Current Status**: last index entry added 2026-11-09 (the MAW retired-agent-apparatus plan). This index is not enforced by any test (PLC-A5) and does not list every
-file under `docs/`: of the 82 Markdown files directly under `docs/`, 42 are not
-named in it anywhere and 48 have no entry of their own. `docs/` holds 234 files
-in all, so the gap over its subdirectories is wider still and uncounted. `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`
+**Current Status**: last index entry added 2026-11-09 (the LDS derived-live-document-set plan). This index is not enforced by any test (PLC-A5) and does not list every
+file under `docs/`: of the 83 Markdown files directly under `docs/`, 41 are not
+named in it anywhere. Measured 2026-11-09 as `git ls-files docs`, one level
+down, `*.md`, against a plain `grep -F` of each basename in this file — the
+definition is written out because the previous figures (82 and 42) were taken
+before this batch added two documents and were not re-measured when it did. A
+second figure, "have no entry of their own", is dropped rather than restated:
+it depended on an unstated definition of an entry and could not be reproduced.
+`docs/` holds 236 files in all, so the gap over its subdirectories is wider
+still and uncounted. `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`
 (PD-M14) is one of the 48 - named here, with no entry - found while adding the
 PDT entry and left for the batch that owns it, which is what PLC-A5 is about.
 

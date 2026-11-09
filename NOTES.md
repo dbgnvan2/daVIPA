@@ -2,6 +2,30 @@
 
 One batch at a time from here, per `CLAUDE.md`. What that leaves:
 
+- **The live document set is derived, and retired vocabulary is guarded**
+  (LDS batch, 2026-11-09, `GSF-A3`, `GSF-A4` and `MAW-A3`). The `docs/` half of
+  the scanned set was five names kept by hand; it is derived now, from one
+  stated path rule — tracked, one level under `docs/`, `*.md`, no ISO date in
+  the name, no "prompt" in it — and the scan went from 17 documents to 41.
+  Widening it is what found the rest: the existing citation guard went red on
+  four citations in prose nothing had been reading, one of them a pointer to
+  TOOL.md that has never resolved at any commit. Alongside it,
+  `tools/agents/retired_vocabulary.json` now holds the vocabulary of retired
+  concepts as editorial config, with a guard reading it over the live
+  documents — the thing no citation guard can see, and the reason
+  docs/GEMINI.md described the three-agent split as current for two batches
+  while sitting inside the scanned set. Three guards, fourteen mutations.
+  **One came back green**, and it is the one that mattered: it reinserted the
+  exact sentence the guard exists for, and passed, because the retirement
+  window was the paragraph and the bullet beneath the defect said "retired" —
+  an exemption wider than the defect. The window is the sentence now, over
+  text with code spans stripped and newlines flattened, and the markers name
+  the past-tense reporting verbs that honest history uses. `GSF-N1` is settled
+  as a fifth writing convention rather than a rename: a filename proposed and
+  not created is written without backticks, because a guard cannot tell a
+  proposal from a dead pointer. Marker counts re-measured: 256 meta / 2439
+  app. `LDS-A1` and `LDS-A2` filed; `GSF-A5` is the last of the GSF class
+  measurement's findings and is untouched.
 - **The retired three-agent apparatus is gone** (MAW batch, 2026-11-09,
   `GSF-A1`, `GSF-A2` and the 2026-08-20 filing of the same surface). `CLAUDE.md`
   and `AGENTS.md` had recorded the workflow as retired since 2026-11-08 while
