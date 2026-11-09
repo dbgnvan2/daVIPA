@@ -278,8 +278,12 @@ handoff note is `docs/changes/2026-11-08-plan-calendar-export.md`:
 ### docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md
 
 Implementation plan for the lowest-value priority floor on new items and the
-9999 cap on the calculated score (PRI-M1 - PRI-M3). **Awaiting approval; no
-implementation code written**:
+9999 cap on the calculated score (PRI-M1 - PRI-M3). **PRI-M1 and PRI-M2 are
+built and on `main` (`9420927`); PRI-M3 is not built.** This entry said
+"awaiting approval; no implementation code written" until 2026-11-08, which is
+the other half of `SSC-1`. The criteria shipped with no tests at all; those are
+being written against this plan in
+`docs/implementation_plan_2026-11-08_pri_tests.md`:
 
 - Why a new item is unscored today rather than lowest, and what that costs it
   in every `priority_score DESC` list
@@ -291,6 +295,25 @@ implementation code written**:
 - The column-width criterion written as a font measurement rather than as a
   number in prose
 - Four adjacent issues found and not fixed, to be filed as PRI-A1 to PRI-A4
+
+### docs/implementation_plan_2026-11-08_pri_tests.md
+
+Implementation plan for the fourteen tests PRI-M1 and PRI-M2 shipped without
+(`BACKLOG.md` item 2, and the spec-status half of `SSC-1`). **Proceeding
+without a separate approval round, on the user's standing instruction for this
+stretch**, which the plan records rather than assumes:
+
+- What is actually on `main`, measured before planning: PRI-M1 and PRI-M2
+  built, PRI-M3 not built, and not one of the spec's named test files present
+- Why PRI-M3 is filed rather than built here - a shared width constant threaded
+  through five list screens is a feature change against the aligned-column
+  contract, not a test gap
+- The spec's own criterion IDs used verbatim, each against the spec's own test
+  name, with the shape of each test and why that shape
+- The two tests whose subject is source text rather than behaviour (PRI-M2.5's
+  AST walk, PRI-M2.7's comment), and the exact-count rule they are written to
+- Why the three widget tests add no mapped window: `conftest.py` already
+  silences `grab_set` and withdraws every window on creation
 
 ### docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md
 

@@ -1,6 +1,18 @@
 # Implementation plan — a new item starts at the lowest priority, and the score is capped at 9999 (2026-11-08)
 
-Status: **awaiting approval.** No implementation code written.
+Status: **PRI-M1 and PRI-M2 are built and on `main`; PRI-M3 is not.**
+Corrected 2026-11-08: this line previously read "awaiting approval. No
+implementation code written", which was false from the moment `9420927`
+("feat(pri): priority defaults and the cap, as left on disk") landed. The
+implementation docstrings are in `src/getmoredone/models.py`, `db_manager.py`,
+`screens/item_editor.py` and `screens/inline_editors.py`; `grep -rn
+"SCORE_COLUMN\|score_column_width" src/` returns nothing, which is PRI-M3. The
+criteria below shipped without a single test; those are being written now
+against this file, in `docs/implementation_plan_2026-11-08_pri_tests.md`. The
+plan's body is left as it was written, because it is the record of what was
+decided; only this status line is corrected. `PRI-A1`-`PRI-A4`, which §9 below
+promises, are still filed nowhere - `SSC-1` in `BACKLOG.md` stays open for
+that.
 Source: user requirement, 2026-11-08 — "when creating a new action item the
 priority setting are the lowest value for each item. Max the calculated value
 at 9999 so the column width is 4 digits wide."
