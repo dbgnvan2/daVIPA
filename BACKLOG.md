@@ -189,25 +189,44 @@ recorded here rather than fixed: that session holds the files uncommitted and
 a second writer in this index is what `CLAUDE.md`'s "One build batch at a
 time" exists to prevent.
 
-### CE — `calendar_event_calendar_id` is committed as half a pair (high)
+### CE — `calendar_event_calendar_id` was half a pair — CLOSED by `9baea13`
 
-`f264cc3` exists to repair a commit that landed one half of a column/field
-pair, and it lands the same split again in the other direction. In the
-committed tree the name appears only in the schema, the migration and the
-dataclass field: `create_time_block` does not write it, `_row_to_time_block`
-does not read it, and `set_block_calendar_event_id` writes only the event id.
-With the field's documented semantics -- NULL means the default calendar -- a
-non-primary calendar can only ever be recorded as `primary`, which is the
-duplicate-events failure the column was added to prevent. Dormant until the
-uncommitted `db_manager.py` / `calendar_exporter.py` half lands.
+**Resolved. Recorded here because the finding was raised, not because it is
+outstanding.**
 
-Its traceability references point at nothing: the field names
-`tests/test_time_block_crud.py::test_cem12b_the_event_calendar_round_trips`
-and the migration names two `test_cem11*` tests, none of which exist in the
-committed tree, and the `Spec:` target
-`docs/implementation_plan_2026-11-08_plan_calendar_export.md` is untracked.
-`tests/test_traceability_refs.py` is red on `main` for this and for the plan
-and time-block batches' refs -- nine stale references across two tests.
+As reported, against `f264cc3` alone: that commit exists to repair an earlier
+one that landed half of a column/field pair, and it landed the same split
+again in the other direction. The name appeared only in the schema, the
+migration and the dataclass field -- `create_time_block` did not write it,
+`_row_to_time_block` did not read it, `set_block_calendar_event_id` wrote
+only the event id. With the field's documented semantics (NULL means the
+default calendar) a non-primary calendar could only ever be recorded as
+`primary`, which is the duplicate-events failure the column was added to
+prevent.
+
+`9baea13` landed the writer and closes it. Verified at HEAD, not taken on
+report:
+
+- `db_manager.py:1401,1409` -- `create_time_block` names and binds the column;
+- `db_manager.py:1496` -- `set_block_calendar_event_id` sets it, bound as
+  `calendar_id if event_id else None`, so clearing the id clears the calendar
+  with it and the "calendar without an id" state cannot be produced;
+- `db_manager.py:2795,2811` -- `_row_to_time_block` reads it back;
+- `calendar_exporter.py:280` -- the exporter consumes it;
+- the four tests its docstrings name now exist, in
+  `tests/test_time_block_crud.py`, `tests/test_calendar_export.py` and
+  `tests/test_time_block_schema.py`.
+
+**Correction to this entry as first written.** It said the CE traceability
+references point at nothing and that `tests/test_traceability_refs.py` is red
+on `main` partly because of them. At HEAD no CE reference fails. That test is
+still red -- two tests, nine stale references -- but every one belongs to the
+plan, time-block and priority batches: `src/getmoredone/models.py` names
+`tests/test_priority_floor_and_cap.py` and `tests/test_priority_floor_form.py`
+(neither file exists), and `docs/spec_coverage.md`,
+`src/getmoredone/screens/plan.py` and `src/getmoredone/time_block_layout.py`
+name seven `pdm*`/`tgm*` tests that do not exist. None of them is CE's and
+none is UPD-F's. Whoever pushes ships a red meta test.
 
 ### WTP — the pin test's message names a check it does not make (medium-low)
 

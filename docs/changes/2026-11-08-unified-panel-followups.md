@@ -251,16 +251,28 @@ In `BACKLOG.md` under "csdp sweep findings not fixed":
 
 In `BACKLOG.md` under "csdp sweep findings in other batches":
 
-- **CE** (high) -- `calendar_event_calendar_id` is committed as half a pair
-  again, the thing `f264cc3` exists to repair. Nothing writes or reads it, so
-  a non-primary calendar can only be recorded as `primary`, which is the
-  duplicate-events failure the column was added to prevent. Its traceability
-  references name four tests and one spec file that do not exist, and
-  `tests/test_traceability_refs.py` is **red on `main`** for this and for the
-  plan and time-block batches -- nine stale references across two tests.
+- **CE** (high, since **CLOSED** by `9baea13`) --
+  `calendar_event_calendar_id` was committed as half a pair again, the thing
+  `f264cc3` exists to repair: nothing wrote or read it, so a non-primary
+  calendar could only be recorded as `primary`, which is the duplicate-events
+  failure the column was added to prevent. `9baea13` landed the writer.
+  Re-checked at HEAD rather than taken on report: `create_time_block` binds
+  the column, `set_block_calendar_event_id` sets it as
+  `calendar_id if event_id else None`, `_row_to_time_block` reads it back,
+  the exporter consumes it, and the four tests its docstrings name exist.
 - **WTP** (medium-low) -- the pin test's failure message names a `BUILDERS`
-  check it does not make.
+  check it does not make. Still open; the session that owns it has it.
 
-Neither is mine to fix: both sit in files another session holds uncommitted,
-and a second writer in this index is what "One build batch at a time" exists
-to prevent.
+Neither was mine to fix: both sat in files another session held open, and a
+second writer in this index is what "One build batch at a time" exists to
+prevent. That session has since committed its work and this batch's three
+commits, and released the tree.
+
+**One claim in this note was wrong and is withdrawn.** It said
+`tests/test_traceability_refs.py` is red on `main` partly because of the CE
+references. At HEAD no CE reference fails. The test is still red -- two
+tests, nine stale references -- but every one belongs to the plan, time-block
+and priority batches: `models.py` names two `test_priority_floor_*` files
+that do not exist, and `docs/spec_coverage.md`, `screens/plan.py` and
+`time_block_layout.py` name seven `pdm*`/`tgm*` tests that do not exist. None
+is CE's and none is UPD-F's.
