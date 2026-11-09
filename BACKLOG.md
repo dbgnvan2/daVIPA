@@ -43,47 +43,94 @@ identical on Python 3.11, 3.12 and 3.13. Branch comparisons were made by
 checking each branch out in a separate worktree and running the files there,
 not by reading the diffs.
 
-### 1. Two branches hold finished work that is not on `main` — do this first
+### 1. UPD-F1 is merged; the plan-day branch is a design collision, not a merge
 
-| branch (full ref) | commits | what it holds |
+**This corrects what this section first said.** It claimed the eight plan-day
+failures needed no code because "the code exists" and "merging is the whole
+job". That was wrong, and wrong in the usual way: concluded from one true
+measurement — the eight tests pass at the branch tip — without checking
+whether the two sides could be combined at all. They cannot be combined
+mechanically.
+
+**Done: `refs/heads/claude/elegant-neumann-ab55c9` is merged** (UPD-F1,
+`AppSettings.save()` merging over the file instead of writing the whole
+object). One conflict, in `docs/spec_coverage.md`, where both sides had added
+a UPD-F1 section; resolved by keeping both. 108 tests pass across
+`tests/test_settings_merge_on_save.py` and `tests/test_unified_panel_design.py`.
+
+**Not done: `refs/heads/claude/plan-day-range-pdm13` (28 commits).** The merge
+was attempted and aborted, so `main` is untouched by it. It conflicts in **50
+hunks across 12 files** — 12 in `src/getmoredone/screens/plan.py`, 10 in
+`src/getmoredone/time_block_layout.py`, 13 in `tests/test_plan_screen.py`, 4
+in `src/getmoredone/db_manager.py`.
+
+The conflicts are not textual. **The same feature was built twice, to two
+different designs, by two batches that could not see each other:**
+
+| | `main` | the branch |
 |---|---|---|
-| `refs/heads/claude/plan-day-range-pdm13` | 28 | PD-M13/M14/M15 — the configured day and the drawn day split into two things — plus four cold review passes |
-| `refs/heads/claude/elegant-neumann-ab55c9` | 3 | UPD-F1 — `AppSettings.save()` writing only the fields this object changed |
+| spec | `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md` (PD-M14) | `docs/implementation_plan_2026-11-07_plan_day_range.md` (PD-M13) |
+| mechanism | the drawn day derived from the date's own blocks, `DayGrid.span` | `drawn_day_slots` |
+| what `plan.py` imports | `edge_limit_time`, `extended_span` | `drawn_day_slots` |
+| PD-M13 tests | 9 | 16 |
+| PD-M14 tests | 10 | 4 |
 
-**Eight of the twenty red tests already pass on the plan-day branch.** Run at
-`c8125af` (`tests/test_plan_screen.py tests/test_plan_settings.py`): 269
-passed, 17 skipped, nothing failed. Each of these eight is present in that run
-and fails on `main`:
+Both designs are complete on their own side: on `main` all 28 PD-M14 tests
+pass, and the eight red tests pass on the branch. The same test *names* exist
+on both sides with **different bodies** — `test_tgm31_an_outside_block_is_drawn`
+does not match between them.
 
-- `test_tgm31_an_outside_block_is_drawn`
-- `test_every_part_of_an_outside_row_starts_a_drag`
-- `test_the_outside_group_does_not_outlive_the_day_that_had_one`
-- `test_the_outside_group_scrolls_instead_of_growing_past_the_pane`
-- `test_the_outside_group_takes_no_room_on_a_day_without_one`
-- `test_pbm55_the_settings_reach_the_outside_group_on_screen`
-- `test_pdm54_extending_the_day_is_not_confirming_it`
-- `test_pdm54_an_already_confirmed_day_stays_confirmed`
+`main` holds the later design, and it is later because the instruction
+changed: PD-M14 exists to make the Day Settings hours "solely for starting a
+blank plan for the day", which is why a drop no longer writes them.
 
-`main` holds these tests because `5543476` ("the Plan day and time-grid tests
-as they stand") committed them out of the shared checkout while the
-implementation continued in the worktree. **Nothing needs writing to close
-them — the code exists.** Merging is the whole job.
+**Two of `main`'s own tests contradict each other.** Settle this first:
 
-Expect conflicts in `tests/test_plan_screen.py` and
-`tests/test_plan_settings.py`: the branch forked at `6d86791` and both sides
-have changed both files since. UPD-F1's three commits touch
-`src/getmoredone/app_settings.py`, which no session holds open any more.
+- `test_pdm141_a_drop_on_earlier_writes_no_settings` asserts
+  `screen.bounds.day_start == "08:00"` after a drop, with the failure message
+  "the screen took a new day". Its docstring says it *replaces*
+  `test_pdm52_a_drop_above_moves_day_start_back`.
+- `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day` asserts
+  `panel.bounds.day_start < started_at` — that the same drop *does* move it.
+  This is the one red test that no branch fixes.
 
-A merge needs the user's say-so and is not a session's to start on its own.
+`test_pdm131` therefore asserts a mechanism PD-M14 deliberately removed. The
+behaviour it protects is still wanted — it came from a real report, "I can't
+move an item into the early or late extended sections" — so it wants
+**rewriting against the drawn day**, not deleting. Repo rule case (b), the
+behaviour changed intentionally.
 
-### 2. `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day` — no implementation anywhere (medium)
+**The eight outside-group tests are not superseded — they are unimplemented**,
+which is a different thing. `screen._grid.outside` **exists** on `main`: the
+attribute resolves, there is no `AttributeError`, and it is simply never
+filled. `test_tgm31_an_outside_block_is_drawn` fails
+`assert [] == ['late afternoon']`. The branch fills it, on the older design.
 
-In `tests/test_plan_screen.py`. It is on `main` and fails there, and it does
-**not exist** on `refs/heads/claude/plan-day-range-pdm13`, so no merge will
-make it pass. Either the behaviour it names was never built, or it was built
-under a different name among PD-M13.15-13.20. Settle which **before** the merge
-in item 1, so that resolving a conflict in that file does not quietly delete
-the test or leave it red with no owner.
+Three routes. This wants a decision, not a session picking one:
+
+1. **Port** the branch's `outside` implementation onto `main`'s PD-M14 design,
+   using the branch as a reference rather than merging it. The eight tests
+   stay, `plan.py` and `time_block_layout.py` are written once against the
+   design that survives, and the 50 conflicts never have to be resolved.
+2. **Merge** and reconcile both designs by hand: 50 hunks across ~2,600 lines
+   of divergent tests, then delete whichever design loses.
+3. **Delete** the eight tests as committed before their implementation, and
+   file the outside group as unbuilt. Closes the red without building
+   anything, and gives up the branch's 28 commits.
+
+Route 1 is the recommendation: it keeps the design the later instruction asked
+for, keeps the tests, and avoids resolving a conflict whose two sides are both
+internally correct.
+
+Nothing on the branch is lost either way — it stays at
+`refs/heads/claude/plan-day-range-pdm13` (`c8125af`) as the reference for
+whichever route is taken.
+
+### 2. `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day` (medium)
+
+Covered in item 1: it contradicts `test_pdm141` on `main`, asserts the
+mechanism PD-M14 removed, and exists on no branch. Rewrite it against the
+drawn day. Do not merge anything expecting it to go green.
 
 ### 3. Seven tests measure the CI display rather than the code — WTP-A11 (medium)
 
