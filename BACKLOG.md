@@ -1,17 +1,22 @@
 # daVIPA Backlog
 
 Last Updated: 2026-11-08 (concurrent batches ended; one batch at a time
-from here, and what `main` needs to go green is the first section below -
-two unmerged branches first, one of which closes eight of the twenty red
-tests. Earlier the same day: UPD-F2, UPD-F3 and UPD-F4 built what the unified
+from here, and what `main` needs to go green is the first section below.
+**The earlier form of this line said two unmerged branches came first, one of
+them closing eight of the twenty red tests. That was wrong**: nothing needed
+merging, the nine failures were stale test vehicles, and the PDT batch closed
+ten of the twenty on `main` itself. Item 1 below carries the measurements. Earlier the same day: UPD-F2, UPD-F3 and UPD-F4 built what the unified
 panel design's on-screen walk asked for - the filter area a line of its own on
 every VSP tab, "Pick" over the checkbox column, and columns that rescale with
 the divider down to five characters - and added four adjacent issues as UPD-A10
 to UPD-A13: the heading a column at the five-character floor clips, the Week
 Actions right panel the fitter does not reach, two filter labels abbreviated on
 three tabs and written out on two, and this repo's documentation index having no
-test. UPD-F1, the one defect of the four, is NOT built - it must change
-`app_settings.py`, which the calendar-export batch holds open; WTP-M1 to WTP-M6 made a Weekly Tactic the parent of
+test. UPD-F1, the one defect of the four, **is built and on `main`** - merged at
+`2fac9b3`, `31816a0` being an ancestor of `main` and `app_settings.py` clean.
+(This line said it was not built, blocked on a file another batch held open;
+that was true when written and is not now. Adjacent to the PDT batch, found by
+its sweep, corrected rather than left to send a reader to rebuild it.) WTP-M1 to WTP-M6 made a Weekly Tactic the parent of
 the Action Items filed under it in every reader of parenthood, all 38 criteria
 built, and added one adjacent issue as WTP-A1 - the shipped-column width test
 that enumerates three of the five column sets by hand; UPD-M6 put APE Week
@@ -43,13 +48,21 @@ identical on Python 3.11, 3.12 and 3.13. Branch comparisons were made by
 checking each branch out in a separate worktree and running the files there,
 not by reading the diffs.
 
-**Updated 2026-11-09 by the PDT batch.** Eleven of the twenty are closed: the
-nine plan-day failures and `test_every_referenced_test_name_exists`, plus
-`test_pbm55_the_settings_reach_the_outside_group_on_screen`, which was counted
-in item 1's nine. What is left is item 2 (one real coverage gap, newly filed),
-item 3 and item 5 — nine CI-environment failures and the PRI tests nobody
-wrote. The numbers below are stated against the run that proves them, not
-assumed.
+**Updated 2026-11-08 by the PDT batch.** **Ten** of the twenty are closed: the
+nine plan-day failures and `test_every_referenced_test_name_exists`. (An
+earlier draft of this paragraph said eleven, by adding
+`test_pbm55_the_settings_reach_the_outside_group_on_screen` and then saying in
+the same sentence that it was already one of the nine. It is one of the nine.)
+
+**Ten are left:** the nine in items 3 and 5, and
+`test_every_referenced_test_file_exists`, which is item 2.
+
+These ten closures are **verified locally only** — five targeted test files,
+listed in the handoff note. There is no CI run for this range: `main` is ahead
+of `origin/main` as this is written, and the run cited above is the old one on
+`b6d6ddf`. The plan's own "Done means" asks for the CI count and that is **not
+met yet**; it is met when a run on this range is read, not when this paragraph
+says so.
 
 ### 1. CLOSED — the nine plan-day failures, by PDT, not by a merge
 
@@ -76,9 +89,14 @@ tighter Day End, which PD-M14.2 made unable to orphan anything, and three
 asserted the Day Settings write PD-M14.1 removed. Stale vehicles, not missing
 code.
 
-Closed by the PDT batch: `docs/implementation_plan_2026-11-09_plan_day_tests_follow_pd_m14.md`,
-handoff note `docs/changes/2026-11-09-plan-day-tests-follow-pd-m14.md`. Each
-test keeps every assertion it had; only the setup changed, and each rewrite was
+Closed by the PDT batch: `docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md`,
+handoff note `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`. Six of
+the nine keep every assertion they had and changed only their setup. **Three
+did lose or invert an assertion** — one withdrawn, one inverted, and in
+the third a changed expectation — each asserting a mechanism PD-M14
+withdrew: `test_pdm131` (`bounds.day_start < started_at` removed, `== "08:00"`
+put in its place), and the two `test_pdm54` tests (the `plan_day_start ==
+"07:30"` and `plan_day_end == "17:30"` preconditions). Each rewrite was
 mutation-proved.
 
 The branch's design is the one that caused both reported faults — Day Start
@@ -96,7 +114,7 @@ files, and **none of the five has ever existed**:
 
 | named in `models.py` | file | test |
 |---|---|---|
-| `calculate_priority_score`, `priority_score_for` | `tests/test_priority_floor_and_cap.py` | `test_prim22_every_factor_combination_is_capped` |
+| `calculate_priority_score`, `priority_score_from_factors` | `tests/test_priority_floor_and_cap.py` | `test_prim22_every_factor_combination_is_capped` |
 | the default-floor path | `tests/test_priority_floor_and_cap.py` | `test_prim12_a_new_item_is_never_unscored` |
 | the score label | `tests/test_priority_floor_form.py` | `test_prim26_a_capped_label_says_it_is_capped` |
 
@@ -123,8 +141,13 @@ worth designing; `23f0cc7` is the worked example for a single test.
 ### 4. PARTLY CLOSED — the traceability pair (low)
 
 `::test_every_referenced_test_name_exists` is **green** (PDT-M4.1, `2cd83a3`).
-Seven names from the PD-M14 rewrite were repointed at the tests that now cover
-them, one at a time rather than matched approximately. One of the seven,
+References left behind by the PD-M14 rewrite were repointed at the tests that
+now cover them, one at a time rather than matched approximately: **8 repointed
+and 1 dropped across 3 rows of `docs/spec_coverage.md`, and 3 `Tests:` lines
+across `src/getmoredone/screens/plan.py` and
+`src/getmoredone/time_block_layout.py`**. (`2cd83a3`'s subject says "seven",
+and the first two versions of this item said five and then seven; all three
+counted names in a hand-written list, not edits in the diff.) One of them,
 `edge_limit_time`, had no test under the name it claimed and none under any
 other; it now points at
 `tests/test_plan_screen.py::test_pdm146_both_ends_refuse_at_midnight_and_say_which`,
@@ -155,6 +178,88 @@ For completeness, so a future pass does not re-open them:
   untracked root drafts; fixed in `2285759` by moving them under `docs/`.
 - **CE-A22**, six commits that could not import `db_manager`, closed by the
   history rewrite recorded in that entry.
+
+## Sweep findings not fixed — PDT batch (2026-11-08)
+
+From the cold passes over `4ca7116..HEAD` — seven by the end of the batch.
+The medium and high findings were fixed in-loop, round by round; the items
+below are the ones that stayed below medium, which the repo's sweep budget
+keeps out of the fix loop on purpose. The handoff note records what each pass
+found.
+
+### PDT-A1 — `test_traceability_refs` never checks a bare `::name` continuation (medium-low)
+
+`tests/test_traceability_refs.py:48` matches references with
+`(tests/[\w/]+\.py)(?:::(\w+))?`, which **requires the file prefix**. A
+continuation written as `` `::test_name` `` — the usual way a second test is
+listed in `docs/spec_coverage.md` — is therefore never checked at all.
+
+Measured against the file as this batch leaves it: `docs/spec_coverage.md`
+holds **293** bare `::name` occurrences. 284 of them name a test, which is
+**273** distinct names; the other 9 are implementation symbols in the
+Implementation column, which is correct usage. Of those 273, **nine name a
+test that exists in no file under `tests/`** — matched exactly on
+`^\s*def <name>`, not by substring, which is the difference between nine and
+seven. PDT-M4.1 repointed eight references and dropped a ninth, across three
+rows of `docs/spec_coverage.md` — four of the eight in `2cd83a3`, the other
+four and the drop in the follow-up — plus three `Tests:` lines in `src/`.
+These nine names it did not touch:
+
+`test_pbm61_a_row_too_short_for_its_text_keeps_its_text`, `test_pdm13`,
+`test_pdm14_the_second_line_is_the_blocked_marker_alone`,
+`test_pdm52_a_drop_above_moves_day_start_back`,
+`test_pdm52_a_long_item_dropped_above_takes_the_day_back_far_enough`,
+`test_pdm53_a_drop_below_moves_day_end_forward`,
+`test_pdm56_a_refused_write_is_not_reported_as_a_longer_day`,
+`test_pdm56_a_refused_write_leaves_the_day_unchanged`, `test_updm41_`.
+
+Two of the nine are not misspellings but **truncations** — `test_pdm13` and
+`test_updm41_` are prefixes of real names. A substring check passes them, which
+is why a widened regex must anchor on the whole name.
+
+This is **P24 twice in the same file**: the comment at
+`tests/test_traceability_refs.py:43-47` records fixing exactly this class of
+blind spot for `Tests:`-label anchoring — "a guard whose unchecked input path
+is a silent pass" — and left the bare-name path unchecked. Widening the regex
+will turn the test red on all nine, so the fix is one change: widen it and
+settle them together.
+
+A tenth dead name, `test_pdm5_an_end_of_the_day_that_is_not_one_is_an_error`,
+is **not** in the list above, because PD-M5.8's row was edited to **drop** the
+reference rather than repoint it — so it is no longer in the file to be
+counted. It belongs here all the same. The branch
+itself is covered — `tests/test_time_block_layout.py::test_pdm141_an_end_of_the_day_that_is_not_one_is_an_error`
+asserts the `ValueError` for a direction that is neither end — so this is a
+dead reference that should have been repointed to that test, not a coverage
+gap. Repoint it; do not write a second test.
+
+### PDT-A2 — `test_pdm54`'s file assertion is aimed one criterion over (low)
+
+`tests/test_plan_settings.py` asserts `settings_file.read_text() == "{ not json"`.
+It can fail and it is not accidental — `AppSettings.load()` does not
+repair-write an unparseable file — but byte-identity is PD-M14.1 ("no save at
+all"), already held more precisely by
+`tests/test_plan_screen.py::test_pdm141_a_drop_on_earlier_never_calls_save`.
+PD-M5.4, the criterion the test is named for, would be satisfied by a save
+that persisted `plan_day_shape_unconfirmed: true`, and this assertion would
+fail on it. Harmless today, misleading to the next reader.
+
+### PDT-A3 — a `test_pdm131` assertion message overclaims what it checks (low)
+
+`tests/test_plan_screen.py` asserts `panel.bounds.day_start == "08:00"` with the
+message "PD-M14.1: the drop wrote Day Start". `self.bounds` is assigned only in
+`__init__` and `on_settings_saved`, and `refresh()` does not re-read it from
+settings, so the assertion detects an **in-memory** mutation only — it cannot
+detect a settings-file write, which the message implies. The real guards are
+`test_pdm141_a_drop_on_earlier_writes_no_settings` and
+`..._never_calls_save`. Reword the message to what it measures.
+
+### PDT-A4 — PD-M14's implementation plan is not in the documentation index (low)
+
+`docs/implementation_plan_2026-11-08_day_hours_are_a_template.md` has no entry
+of its own in `docs/DOCUMENTATION_INDEX.md`. It is named in that file's footer,
+which is where this gap is recorded, not an entry. Found while adding the PDT entry. Nothing
+enforces the index, which is PLC-A5.
 
 ## Adjacent issues — the unified panel walk's follow-ups (UPD-F, 2026-11-08)
 
@@ -348,14 +453,17 @@ report:
 
 **Correction to this entry as first written.** It said the CE traceability
 references point at nothing and that `tests/test_traceability_refs.py` is red
-on `main` partly because of them. At HEAD no CE reference fails. That test is
-still red -- two tests, nine stale references -- but every one belongs to the
-plan, time-block and priority batches: `src/getmoredone/models.py` names
-`tests/test_priority_floor_and_cap.py` and `tests/test_priority_floor_form.py`
-(neither file exists), and `docs/spec_coverage.md`,
-`src/getmoredone/screens/plan.py` and `src/getmoredone/time_block_layout.py`
-name seven `pdm*`/`tgm*` tests that do not exist. None of them is CE's and
-none is UPD-F's. Whoever pushes ships a red meta test.
+on `main` partly because of them. At HEAD no CE reference fails.
+
+**Updated 2026-11-08 by the PDT batch.** This paragraph said the file's two
+tests were red on nine stale references, seven of them `pdm*`/`tgm*` names in
+`docs/spec_coverage.md`, `plan.py` and `time_block_layout.py`. Those seven
+were repointed (PDT-M4.1, `2cd83a3` and the follow-ups), so
+`::test_every_referenced_test_name_exists` is **green** and only
+`::test_every_referenced_test_file_exists` is red, on the two
+`src/getmoredone/models.py` file references for PRI-M1/M2 -- item 2 above.
+Still none of it is CE's or UPD-F's, and whoever pushes still ships one red
+meta test.
 
 ### WTP — the pin test's message names a check it does not make (medium-low)
 

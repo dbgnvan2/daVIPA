@@ -1,9 +1,57 @@
 # Implementation plan — the plan-day tests follow PD-M14
 
-**Date:** 2026-11-09
-**Status:** awaiting approval
+**Date:** 2026-11-08
+**Status:** approved 2026-11-08 and built the same day — see **Outcome** below
+for the three places the build departed from this plan
 **Prefix:** PDT (plan-day tests)
 **Supersedes the merge of:** `refs/heads/claude/plan-day-range-pdm13` (preserved at `c8125af`)
+
+---
+
+## Outcome (written after the build, 2026-11-08)
+
+Built. Per-criterion status is in `docs/spec_coverage.md`; the handoff note is
+`docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`. **The plan's criteria are left in place** rather than
+rewritten to match what shipped, so that what was planned can be compared with
+what
+shipped. Three things below are now wrong, and are wrong here on purpose:
+
+1. **PDT-M1's "primary vehicle" was not the one used.** This plan says every
+   rewrite "gains a block at an index off the date". The shipped rewrites all
+   use **lunch over the box** (`DayBounds(lunch_start=...)`) instead. The
+   reason emerged while writing PDT-M1.1: `test_tgm31` asserts the
+   `on_settings_saved` status line ("N blocks no longer fit the day"), which
+   only a settings change produces. An off-the-date index would have forced
+   that assertion to be dropped. Lunch keeps it, and is the realistic user
+   path besides — `plan_settings_dialog.py` validates neither the lunch start
+   against the day's hours nor the lunch length beyond a day.
+2. **PDT-M4.2 says the two `models.py` file references are "two lines and it is
+   what keeps this meta test red, so it is fixed here".** It was not fixed. The
+   references name two test files and three tests for PRI-M1/M2 that have
+   **never existed** in any branch, so there was nothing to repoint. Closing it
+   means writing the three tests, which is the priority batch's work. Deleting
+   the `Tests:` lines would have greened the meta test while hiding the gap.
+   `spec_coverage.md` records PDT-M4.2 as `not done`, and it is now `BACKLOG.md`
+   item 2.
+3. **The "Done means" criterion is not met.** It asks for "CI on `main` down
+   from 20 failures to the nine CI-environment ones — a number stated in the
+   handoff note and checked against the run". No CI run covers this range yet,
+   so the handoff note states local targeted runs only, and the count of what
+   is left (**ten**, not nine: the nine plus
+   `test_every_referenced_test_file_exists`) is derived from local runs and
+   from reading the reference set, not from a CI run.
+
+Two corrections to this plan's own measurements, found by the cold sweep:
+
+- The table of public names lists `block_title` as `main`-only. That is
+  **right** — `git grep "def block_title"` finds it nowhere on the branch — but
+  it was challenged in review, so it is recorded as checked.
+- PDT-M4.1 said "five names", then "seven". Both were wrong. Counted from the
+  diff after the build: **8 references repointed and 1 dropped across 3 rows** of `docs/spec_coverage.md`, and **3 `Tests:` lines** across `src/getmoredone/screens/plan.py` and `src/getmoredone/time_block_layout.py`. The earlier numbers counted distinct
+  names in a hand-written list rather than edits in the diff, and the list
+  itself held six. `2cd83a3`'s subject still says "seven" and cannot be
+  reworded now that it has a child commit; `BACKLOG.md` item 4 records the
+  measured count and says so. Corrected in place.
 
 ---
 
@@ -37,7 +85,7 @@ and renumbered every date's blocks to compensate. Both reported faults — the
 day start ratcheting to 05:30, and blocks moving on other dates — were that one
 mechanism. Porting it back would reintroduce them.
 
-**So the work is not a port. It is bringing nine stale tests and seven stale
+**So the work is not a port. It is bringing nine stale tests and the stale
 docstring references up to the design that survived** — repo test rule case
 (b), the behaviour changed intentionally. It is the same route in substance
 (keep `main`'s design, make the tests fit), with no code to carry over.
@@ -143,12 +191,11 @@ guaranteed structurally: `extend_day_for` writes no settings at all.
   the pair is not read as the only thing standing between the user and the
   flag.
 
-### PDT-M4 — the seven stale docstring references
+### PDT-M4 — the stale docstring references
 
 Both meta tests are red on references the PD-M14 rewrite left behind.
 
-- **PDT-M4.1** — `test_every_referenced_test_name_exists` passes. The five
-  names to settle: `test_pdm52_a_drop_above_moves_day_start_back`
+- **PDT-M4.1** — `test_every_referenced_test_name_exists` passes. The six names to settle: `test_pdm52_a_drop_above_moves_day_start_back`
   (`plan.py`, withdrawn — point it at its replacement),
   `test_pdm146_each_end_names_the_time_it_stops_at` and
   `test_tgm31_blocks_outside_the_grid_are_surfaced` (`time_block_layout.py`),
@@ -172,7 +219,7 @@ Both meta tests are red on references the PD-M14 rewrite left behind.
   branch's disposition is stated.
 - **PDT-M5.2** — `docs/spec_coverage.md` gains the PDT rows and loses the three
   dead references from PDT-M4.1.
-- **PDT-M5.3** — `docs/changes/2026-11-09-plan-day-tests-follow-pd-m14.md`, from
+- **PDT-M5.3** — `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`, from
   `.agents/templates/handoff-note.md`.
 - **PDT-M5.4** — `docs/DOCUMENTATION_INDEX.md` lists this plan and the handoff
   note. Added **last**, after the rest, per the conflict-surface rule.
@@ -184,8 +231,10 @@ Both meta tests are red on references the PD-M14 rewrite left behind.
 - **PDT-N1 — the branch's disposition.** That `refs/heads/claude/plan-day-range-pdm13`
   is superseded rather than lost is a fact about a git ref, not about this
   working tree. No test can assert it. **Human review proposal:** the branch
-  stays unmerged and unpushed at `c8125af`, recorded in `BACKLOG.md` and in the
-  handoff note; deleting it is a separate decision I will not take.
+  stays unmerged at `c8125af`, recorded in `BACKLOG.md` and in the handoff
+  note; deleting it is a separate decision I will not take. It **is** pushed —
+  `refs/remotes/origin/claude/plan-day-range-pdm13` is at the same commit — so
+  nothing on it depends on this checkout surviving.
 - **PDT-N2 — that the rewritten tests still protect the original behaviour.**
   Each rewrite keeps its assertions and changes only its setup, which mutation
   testing proves can still fail, but "this is still the right thing to assert"
@@ -195,8 +244,9 @@ Both meta tests are red on references the PD-M14 rewrite left behind.
 
 ## Out of scope — adjacent issues found, not fixed
 
-`main` is red on **20** tests, not 9. The other **nine pass locally and fail
-only in CI**:
+`main` is red on **20** tests, not 9. Of the other nine, **eight pass locally
+and fail only in CI**; the ninth is skipped locally, as the paragraph after the
+list sets out:
 
 `test_t51_a_modal_drops_the_timers_always_on_top`,
 `test_t52_the_timer_is_topmost_again_afterwards`,
@@ -208,8 +258,11 @@ only in CI**:
 `test_pbm61_a_tall_row_keeps_its_two_lines_together`,
 `test_updm14_zero_width_body_is_a_noop`.
 
-Verified: all nine pass under
-`GETMOREDONE_NO_MAPPED_WINDOWS=1 pytest` locally. They are the
+Verified: **eight of the nine pass** under
+`GETMOREDONE_NO_MAPPED_WINDOWS=1 pytest` locally; the ninth,
+`test_pbm61_a_tall_row_keeps_its_two_lines_together`, takes the
+`mapped_windows` fixture, which is exactly what that variable skips, so it is
+skipped rather than passing. Seven of them are the
 always-on-top / window-geometry family, failing on a CI runner with no window
 manager — the same class as the `-topmost` skip added yesterday, which fixed
 one of its members. **A different batch, a different fix, and not touched

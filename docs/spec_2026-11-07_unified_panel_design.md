@@ -3,8 +3,10 @@
 Status: **approved 2026-11-07. UPD-M3, UPD-M1, UPD-M2, UPD-M4, UPD-M5 and
 UPD-M6 built. UPD-M7.1 done. §11 was walked on 2026-11-08: UPD-M7.2 was
 `partial` and UPD-M7.3 `not done`. The four follow-ups the walk produced were
-approved the same day; `UPD-F2`, `UPD-F3` and `UPD-F4` are built and
-`UPD-F1` — nothing surviving a relaunch — is not. M7.2 and M7.3 stay at
+approved the same day and **all four are built and on `main`**: `UPD-F2`,
+`UPD-F3` and `UPD-F4` the same day, and `UPD-F1` — nothing surviving a
+relaunch — on `refs/heads/claude/elegant-neumann-ab55c9`, merged at
+`2fac9b3`. M7.2 and M7.3 stay at
 `partial` and `not done` until §11 is walked again, steps 11 to 13
 included.** Per-criterion status is in §10; the follow-up plan is
 `docs/implementation_plan_2026-11-08_unified_panel_followups.md`.
@@ -817,7 +819,8 @@ root. UPD-M7.2 and UPD-M7.3 are the on-screen criteria and are open.
 |---|---|---|
 | M7.1 | `done` | `::test_updm71_screens_construct_withdrawn` builds all five rewritten screens and asserts that **no `Toplevel` was opened anywhere beneath the root** — a dialog at construction would be a modal thrown over whoever is using the machine, once per test that builds the screen. That count is the failable claim, and it is an exact zero walked to the bottom of each widget tree. The two assertions beside it — the root is withdrawn, the screen is unmapped — are stated in the test as what they are: `conftest.py` withdraws every window at construction and re-withdraws after any `deiconify`, so no change to a screen can turn them red, and `tests/test_tk_offscreen.py` is the guard on that patching rather than this test (P24). `::test_updm71_no_test_here_needs_a_mapped_window` counts the tests in this file that take the `mapped_windows` fixture from the AST: exact 0, so the number `test_ci_contract.py::test_the_documented_mapped_window_count_is_the_real_one` checks is the 22 it was before this plan. |
 | M7.2 | `partial` | walked 2026-11-08. Steps 1, 2, 5 and 6 pass. The six tabs do read as one design in header card, divider, row height and chip style — the two exceptions were the filter area, which was one line on Annual Plan Elements and two elsewhere (UPD-F2), and the blank heading over Week Assignment's checkbox column, which should read "Pick" (UPD-F3). **Both are built**; M7.2 stays `partial` until §11 steps 11 and 12 confirm it on screen, since what was walked is not what is now there. |
-| M7.3 | `not done` | walked 2026-11-08. Steps 8 and 9 pass: a column drag moves only its own column, in both panels, and the panels keep their own widths. **Step 10 fails** — nothing survives a relaunch (UPD-F1, **still not built**). Step 7's divider passes, with a request that the columns rescale with it (UPD-F4, **built**, to be confirmed by §11 step 13). |
+| M7.3 | `not done` | walked 2026-11-08. Steps 8 and 9 pass: a column drag moves only its own column, in both panels, and the panels keep their own widths. **Step 10 failed at the walk** — nothing survived a relaunch (UPD-F1, **built
+afterwards and merged at `2fac9b3`**; the step is owed a re-walk, not a fix). Step 7's divider passes, with a request that the columns rescale with it (UPD-F4, **built**, to be confirmed by §11 step 13). |
 
 **M7.2 and M7.3 are not written as tests, deliberately.** Both are about how
 six tabs *read* beside each other, and the thing that would make them
@@ -839,7 +842,7 @@ relaunch.
 
 ---
 
-### UPD-F1 to UPD-F4 — what the walk asked for — **F2/F3/F4 done, F1 not done**
+### UPD-F1 to UPD-F4 — what the walk asked for — **all four done**
 
 Approved 2026-11-08. The plan, with every criterion and the two corrections
 made to it against the code, is
@@ -847,7 +850,7 @@ made to it against the code, is
 
 | ID | Status | Where |
 |---|---|---|
-| UPD-F1 | `not done` | The defect: `AppSettings.save()` writes `asdict(self)`, the whole object, so a screen holding its own snapshot reverts every field another object changed since that snapshot loaded. Not built in this batch — `src/getmoredone/app_settings.py` carries the calendar-export batch's uncommitted hunk, and `CLAUDE.md`'s "One build batch at a time" rules out a second writer in this index. Proposed as its own worktree session. The evidence is in the plan's §2: the demo settings file holds populated widths for two prefixes and empty dicts for five. |
+| UPD-F1 | `done` | Built on `refs/heads/claude/elegant-neumann-ab55c9` (`31816a0`), merged at `2fac9b3`; `save()` now writes only the fields the object changed, with its `UPD-F1` docstrings at `src/getmoredone/app_settings.py:237`, `:253` and `:417`. The defect was: `AppSettings.save()` writes `asdict(self)`, the whole object, so a screen holding its own snapshot reverts every field another object changed since that snapshot loaded. Not built in this batch — `src/getmoredone/app_settings.py` carries the calendar-export batch's uncommitted hunk, and `CLAUDE.md`'s "One build batch at a time" rules out a second writer in this index. Proposed as its own worktree session. The evidence is in the plan's §2: the demo settings file holds populated widths for two prefixes and empty dicts for five. |
 | UPD-F2 | `done` | `self.filter_row`, a frame of its own at header row 2 on all five tabs, holding the three combos at its own row 0; the status line moved to row 3 on the four tabs that have one; Annual Plan Elements' title alone on row 0, its controls on row 1 and an empty frame one combo high on row 2. `::test_updf21_the_filters_are_on_their_own_row`, `::test_updf22_the_header_card_is_three_rows_deep`, `::test_updf23_every_tab_puts_its_filter_row_in_the_same_place`, `::test_updf24_the_tab_with_no_filters_is_the_same_depth`, `::test_updf25_the_status_line_moved_below_the_filters`. 7 of 7 mutations red. |
 | UPD-F2.6 | `not done` | On screen. §11 step 11. |
 | UPD-F3 | `done` | `ChipColumn("checkbox", "Pick", 34, …)`. The word measures 28px in the bold header font against a 34px column, so no width moved — `::test_updf32_the_pick_column_fits_its_heading_and_has_no_handle` asserts the measurement. Four panels share `APE_LEFT_COLUMNS`, not the three the plan said, and `::test_updf34_every_ape_left_panel_says_pick` pins the adopter list. 6 of 6 mutations red. |

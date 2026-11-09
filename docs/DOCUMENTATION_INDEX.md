@@ -163,7 +163,7 @@ Spec and implementation plan for one panel design across the VSP tabs
 (UPD-M1 - UPD-M7). **Approved 2026-11-07. UPD-M3, UPD-M1, UPD-M2, UPD-M4,
 UPD-M5 and UPD-M6 built; UPD-M7.1 done, UPD-M7.2 `partial` and UPD-M7.3 `not
 done`.** §11 was walked on 2026-11-08 and produced four follow-ups,
-`UPD-F1` - `UPD-F4`, in the plan below; three are built and the §11 walk is
+`UPD-F1` - `UPD-F4`, in the plan below; all four are built and the §11 walk is
 owed again, steps 4, 7 and the new 11 to 13 included (per-criterion status in
 the spec's §10, and the batch's handoff note is
 `docs/changes/2026-11-08-unified-panel-m7.md`):
@@ -185,9 +185,10 @@ the spec's §10, and the batch's handoff note is
 
 Spec and implementation plan for what the unified panel design's on-screen
 check found (UPD-F1 - UPD-F4). **Approved 2026-11-08. UPD-F2, UPD-F3 and
-UPD-F4 built the same day; UPD-F1 not built** -- it is the only defect of the
-four and the only one that must change `src/getmoredone/app_settings.py`,
-which the concurrent calendar-export batch holds uncommitted (per-criterion
+UPD-F4 built the same day, and UPD-F1 built after them and merged at
+`2fac9b3`** -- it was the only defect of the four and the only one that had to
+change `src/getmoredone/app_settings.py`, which a concurrent batch held
+uncommitted at the time, so it went to its own session (per-criterion
 status in `docs/spec_coverage.md`, and the batch's handoff note is
 `docs/changes/2026-11-08-unified-panel-followups.md`):
 
@@ -289,13 +290,15 @@ implementation code written**:
   number in prose
 - Four adjacent issues found and not fixed, to be filed as PRI-A1 to PRI-A4
 
-### docs/implementation_plan_2026-11-09_plan_day_tests_follow_pd_m14.md
+### docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md
 
 Implementation plan for bringing nine stale plan-day tests up to the PD-M14
-design (PDT-M1 - PDT-M5). **Approved 2026-11-09 and built the same day: 16 of
-17 criteria `done`, PDT-M4.2 `not done` with its reason** - per-criterion
-status in `docs/spec_coverage.md`, handoff note
-`docs/changes/2026-11-09-plan-day-tests-follow-pd-m14.md`:
+design (PDT-M1 - PDT-M5). **Approved 2026-11-08 and built the same day: 20 of
+21 criteria `done` - 12 by test, 8 by review, PDT-M4.2 `not done` with its
+reason** - per-criterion status in `docs/spec_coverage.md`. Handoff note:
+`docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`, which is listed
+here only inside this entry rather than as an entry of its own, as every
+handoff note is:
 
 - Why the brief it was written against - port `outside` from
   `refs/heads/claude/plan-day-range-pdm13` - had nothing to port: `outside` is
@@ -311,7 +314,9 @@ status in `docs/spec_coverage.md`, handoff note
   one branch, and why `test_pdm131` is rewritten rather than deleted
 - PDT-M1.3 flagged in advance as the one criterion that might need `src/` work,
   because it had never run against the holder it names; it did not
-- Two criteria flagged as not code-testable (PDT-N1, PDT-N2) with a
+- Two criteria flagged by the plan as not code-testable (PDT-N1, PDT-N2); seven
+of the 21 rows in `docs/spec_coverage.md` carry that marker, the other five
+being the PDT-M5 document criteria with a
   human-review proposal for each
 - Nine CI-environment failures listed as adjacent and not touched
 
@@ -704,9 +709,14 @@ Documentation is updated:
 - When user issues are resolved
 - During major releases
 
-**Current Status**: last index entry added 2026-11-09 (the PDT plan-day test
-plan). Known missing: `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`
-(PD-M14) is not listed here, found while adding the PDT entry and left for the
-batch that owns it - which is what PLC-A5 is about. This footer used to read "All documentation up to date as of 2026-01-24";
+**Current Status**: last index entry added 2026-11-08 (the PDT plan-day test
+plan). This index is not enforced by any test (PLC-A5) and does not list every
+file under `docs/`: of the 76 Markdown files directly under `docs/`, 43 are not
+named in it anywhere and 48 have no entry of their own. `docs/` holds 222 files
+in all, so the gap over its subdirectories is wider still and uncounted. `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`
+(PD-M14) is one of the 48 - named here, with no entry - found while adding the
+PDT entry and left for the batch that owns it, which is what PLC-A5 is about.
+
+This footer used to read "All documentation up to date as of 2026-01-24";
 nothing checks that claim - no test asserts every document is listed here, which
 is PLC-A5 in `BACKLOG.md` - so it is stated as a date, not as a guarantee.

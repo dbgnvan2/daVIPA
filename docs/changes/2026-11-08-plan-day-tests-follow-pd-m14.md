@@ -1,6 +1,6 @@
 # Handoff Note
 
-- Date: 2026-11-09
+- Date: 2026-11-08
 - Agent: Code
 - Topic: plan-day-tests-follow-pd-m14 (PDT)
 
@@ -22,9 +22,18 @@ unable to orphan one: the drawn day is derived from the date's own blocks
 span, so the day always stretches to cover what the date holds. Three asserted
 the Day Settings write PD-M14.1 withdrew.
 
-Each test keeps every assertion it had. Only the setup changed. This is repo
-test rule case **(b), the behaviour changed intentionally** — stated before any
-test was edited.
+Six of the nine keep every assertion they had and changed only their setup.
+**Three lost or inverted an assertion**, and in each case the one removed was of a
+mechanism PD-M14 withdrew:
+
+| test | removed | put in its place |
+|---|---|---|
+| `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day` | `panel.bounds.day_start < started_at` | `== "08:00"`, plus `slot_index == -1` and `start_time == "07:30"` |
+| `test_pdm54_extending_the_day_is_not_confirming_it` | `settings.plan_day_start == "07:30"` precondition | the block was written; the settings file is byte-identical |
+| `test_pdm54_an_already_confirmed_day_stays_confirmed` | `settings.plan_day_end == "17:30"` | `== "17:00"`, plus the block's box |
+
+This is repo test rule case **(b), the behaviour changed intentionally** —
+stated before any test was edited.
 
 ### What replaced each vehicle
 
@@ -50,17 +59,44 @@ test was edited.
   fix was needed.** This was flagged in the plan as the one criterion that
   might need `src/` work; it did not.
 
+The table above names the assertion each test was built around. Two of the
+three lost a second line as well: `test_pdm54_extending_the_day_is_not_confirming_it`
+also lost `json.loads(settings_file.read_text())["plan_day_shape_unconfirmed"]
+is True`, replaced by the parsed-object form plus a byte-identity check on the
+file; and `test_pdm131` also changed `"The day now runs"` to `"The day now
+shows"`, which is PDT-M2.3.
+
+**This batch counted the lost assertions as six, then five, and both were
+wrong, because "lost" was never defined.** So here is each of the six removed
+`assert` lines with what stands in its place, and no count:
+
+| removed | what replaced it | so it was |
+|---|---|---|
+| `panel.bounds.day_start < started_at` | `panel.bounds.day_start == "08:00"` | **inverted** — PD-M14 requires the drop *not* to move Day Start |
+| `settings.plan_day_start == "07:30"` | `[b.slot_index for b in placed] == [-1]` | **withdrawn** — the only one with nothing equivalent in its place; it asserted a settings write PD-M14 removed |
+| `settings.plan_day_end == "17:30"` | `settings.plan_day_end == "17:00"` | kept, expectation changed |
+| `json.loads(settings_file.read_text())["plan_day_shape_unconfirmed"] is True` | `settings_file.read_text() == "{ not json"`, with `settings.plan_day_shape_unconfirmed is True` untouched | kept, in another form |
+| `"The day now runs" in status` | `"The day now shows" in status` | kept, string changed (PDT-M2.3) |
+| `len(manager.get_time_blocks(SATURDAY)) == 1` | `len(blocks) == 1`, same message | rewritten, identical |
+
+The grep `git diff 4ca7116 -- tests/test_plan_settings.py
+tests/test_plan_screen.py | grep -E '^-.*assert'` prints those six lines. One
+assertion was withdrawn and one inverted; the other four survive.
+
 ## Files changed
 
 - `tests/test_plan_screen.py` — PDT-M1.1–M1.6, PDT-M2 (`a19a38a`)
 - `tests/test_plan_settings.py` — PDT-M3, both PD-M5.4 tests (`a19a38a`)
-- `src/getmoredone/screens/plan.py` — `virtual_under_pointer`'s `Tests:` line (`2cd83a3`)
+- `src/getmoredone/screens/plan.py` — `virtual_under_pointer`'s `Tests:` line
+  (`2cd83a3`), and the removal of a duplicate `Tests:` line that `2cd83a3`
+  itself introduced (found by the second cold pass; `53d480b`)
 - `src/getmoredone/time_block_layout.py` — `edge_limit_time` and `build_day_grid` `Tests:` lines, one broken line break (`2cd83a3`)
 - `src/getmoredone/screens/plan_blocks.py` — `build_outside_group`'s stale prose about Day End (`2cd83a3`)
-- `docs/spec_coverage.md` — three dead references, plus the PDT rows
+- `docs/spec_coverage.md` — 8 references repointed and 1 dropped, across 3
+  rows (TG-M3.1, PD-M5.5, PD-M5.8), plus the 21 PDT rows
 - `BACKLOG.md` — items 1, 2 and 4 rewritten
 - `NOTES.md` — where `main` stands
-- `docs/implementation_plan_2026-11-09_plan_day_tests_follow_pd_m14.md` — the plan (`11ec1dc`)
+- `docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md` — the plan (`11ec1dc`)
 - `docs/DOCUMENTATION_INDEX.md` — this note and the plan
 
 No `src/` behaviour changed in this batch. The three `src/` files hold
@@ -68,12 +104,25 @@ docstring text only.
 
 ## Verification
 
-- Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 nice -n 19 taskpolicy -b ./venv/bin/python -m pytest tests/test_plan_screen.py tests/test_plan_settings.py tests/test_time_grid.py tests/test_time_block_layout.py -q`
-- Result: **PASS** — 396 passed, 17 skipped
-- Command: `… -m pytest tests/test_traceability_refs.py -q`
-- Result: **FAIL, expected** — `test_every_referenced_test_name_exists` passes;
-  `test_every_referenced_test_file_exists` still red on the two `models.py`
-  references. See Risks.
+Run on the tree as this batch leaves it, **after** the four sweep passes and
+their fixes (seven cold passes in all). The earlier run recorded here
+covered **four** files, without
+`tests/test_traceability_refs.py`, and gave 396 passed / 17 skipped — 413
+cases, all accounted for. Folding the fifth file in adds its 3 cases, two of
+which pass and one of which is the pre-existing failure below: 416 cases,
+1 + 398 + 17. No test was added or removed between the two runs; the fixes
+added one assertion to `test_pbm55` and five reference edits to
+`docs/spec_coverage.md`.
+
+- Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 nice -n 19 taskpolicy -b ./venv/bin/python -m pytest tests/test_plan_screen.py tests/test_plan_settings.py tests/test_time_grid.py tests/test_time_block_layout.py tests/test_traceability_refs.py -q`
+- Result: **1 failed, 398 passed, 17 skipped.** The one failure is
+  `test_every_referenced_test_file_exists`, red on the two `models.py` file
+  references — the PRI gap, which predates this batch (`models.py` is in none
+  of its commits and the same `Tests:` lines are present at `4ca7116`).
+  `test_every_referenced_test_name_exists` passes. See Risks.
+- **No full-suite run and no CI run covers this range.** `main` is ahead of
+  `origin/main`, so the twenty-failure CI picture quoted elsewhere is from run
+  42550648188, before this batch.
 
 Mutation-proved, each restored byte-identical and confirmed so with
 `git diff --stat`:
@@ -102,9 +151,17 @@ The full suite was left to CI, per the repo's throttle rule.
   `test_alpha_still_passes_through_the_attributes_wrapper`,
   `test_raw_tkinter_windows_are_hidden_and_registered_too`,
   `test_pbm61_a_tall_row_keeps_its_two_lines_together`,
-  `test_updm14_zero_width_body_is_a_noop`. All nine **pass locally** under
-  `GETMOREDONE_NO_MAPPED_WINDOWS=1`; they need a window manager the CI runner
-  does not have. `BACKLOG.md` items 3 and 5.
+  `test_updm14_zero_width_body_is_a_noop`. **Eight pass locally** under
+  `GETMOREDONE_NO_MAPPED_WINDOWS=1`; seven of those are the always-on-top
+  family and need a window manager the CI runner does not have.
+  **The ninth, `test_pbm61_a_tall_row_keeps_its_two_lines_together`, does not
+  pass locally — it is *skipped*,** because it takes the `mapped_windows`
+  fixture that this very variable skips, so it cannot be reproduced on a
+  working machine at all (`BACKLOG.md` item 5 says so too). A skipped test is
+  not a passing test, and an earlier draft of this note called all nine
+  passing. `test_updm14_zero_width_body_is_a_noop` builds no window and its
+  cause is unidentified, so it is not the same family either. `BACKLOG.md`
+  items 3 and 5.
 - **`refs/heads/claude/plan-day-range-pdm13` is superseded, not merged.** It
   stays at `c8125af`. Its design is what caused both reported faults, so it
   must not be merged; deleting it is a decision nobody has taken. No test can

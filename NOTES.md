@@ -1,4 +1,4 @@
-## Where `main` stands (2026-11-09)
+## Where `main` stands (2026-11-08, end of day)
 
 One batch at a time from here, per `CLAUDE.md`. What that leaves:
 
@@ -8,14 +8,24 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   stays unmerged** at `c8125af`: it holds the earlier design of the plan day,
   the one whose shared-setting write caused both reported faults. It must not
   be merged. Whether to delete it is undecided.
-- **Eleven of the twenty red tests are closed** by the PDT batch — the nine
+- **Ten of the twenty red tests are closed** by the PDT batch — the nine
   plan-day failures and `test_every_referenced_test_name_exists`. They were
   stale test vehicles, not missing code: `outside` was implemented on `main`
-  at both layers the whole time. `docs/changes/2026-11-09-plan-day-tests-follow-pd-m14.md`.
-- **Nine failures are left, and they are one family:** the always-on-top and
-  window-geometry tests, which **pass locally** and fail on a CI runner with
-  no window manager. `BACKLOG.md` items 3 and 5. One shared precondition, not
-  nine fixes.
+  at both layers the whole time. `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`.
+  Verified locally on five targeted files; **no CI run covers this range yet**.
+- **Ten failures are left, in three groups,** not one:
+  - **Seven** always-on-top tests (`test_t51`, `test_t52`, `test_t56`,
+    `test_t57`, `test_wt_m6b6`, `test_alpha_still_passes_through_the_attributes_wrapper`,
+    `test_raw_tkinter_windows_are_hidden_and_registered_too`) pass locally and
+    need one shared precondition — `BACKLOG.md` WTP-A11.
+  - **Two that are not that family**, per WTP-A11's own text:
+    `test_pbm61_a_tall_row_keeps_its_two_lines_together` is **skipped**
+    locally, not passing, because `GETMOREDONE_NO_MAPPED_WINDOWS=1` skips it,
+    so it cannot be reproduced on a working machine at all; and
+    `test_updm14_zero_width_body_is_a_noop` builds no window and its cause is
+    still unidentified.
+  - **The traceability gap**, `test_every_referenced_test_file_exists`, is the
+    next bullet.
 - **One real coverage gap, newly filed.** PRI-M1/M2 shipped with `models.py`
   naming two test files and three tests that have never existed, so the
   priority cap, the floor and the "(capped)" label are unverified.
@@ -28,10 +38,11 @@ and are corrected in `BACKLOG.md` item 1 with the measurements.
 
 ## Recent Changes (2026-11-08)
 
-### What the walk asked for - UPD-F2, UPD-F3, UPD-F4 built; UPD-F1 not
+### What the walk asked for - UPD-F1 to UPD-F4 all built and on `main`
 
-The §11 walk happened. Three of its four items are built and the fourth, the
-only defect among them, is not.
+The §11 walk happened. All four of its items are built and on `main`: the
+three layout items here, and UPD-F1, the only defect among them, merged at
+`2fac9b3`.
 
 - ✅ **UPD-F2** - the three lineage filters moved off the controls row onto a
   row of their own on all five tabs, in a frame of their own at header row 2,
@@ -52,16 +63,22 @@ only defect among them, is not.
   resizable chip column's minimum dropped to the floor, from 60, 52 and 80.
   9 of 9 mutations red - one survived the first gate and the assertion was
   tightened to an exact panel fill.
-- ❌ **UPD-F1 is not on `main`.** It *was* built, after this was written, on
+- ✅ **UPD-F1 is on `main`.** It was built, after this was written, on
   `refs/heads/claude/elegant-neumann-ab55c9` (`31816a0`, "save() writes what
-  this object changed, not every field", plus its tests and note). That branch
-  is unmerged, so the defect below is still live for anyone running `main`.
+  this object changed, not every field", plus its tests and note), and that
+  branch is **merged**, at `2fac9b3`. `31816a0` is an ancestor of `main` and
+  the `UPD-F1` docstrings are at `src/getmoredone/app_settings.py:237`, `:253`
+  and `:417`, among six such references in that file. This bullet said the
+  branch was unmerged and the defect still
+  live; both were true when written and neither is now. The defect described
+  below is **fixed**, not live.
   `AppSettings.save()` writes the whole object, so
   a screen holding an older snapshot reverts fields another object changed -
-  which is why no width survives a relaunch. It must change
-  `src/getmoredone/app_settings.py`, which the calendar-export batch holds
-  uncommitted, so `CLAUDE.md`'s "One build batch at a time" rules it out
-  here. Proposed as its own worktree session.
+  which is why no width survived a relaunch. The fix changed
+  `src/getmoredone/app_settings.py`; when this was written that file was held
+  uncommitted by the calendar-export batch, so `CLAUDE.md`'s "One build batch
+  at a time" ruled it out here and it was proposed as its own worktree
+  session. That session ran, and its branch is merged. **Nothing to do.**
 - ⚠️ **None of the three has been seen running.** UPD-F2.6, UPD-F3.5 and
   UPD-F4.7 are `not done` and are steps 11, 12 and 13 of the spec's §11.
   Steps 4 and 7 were rewritten, so those two are owed again as well: what was

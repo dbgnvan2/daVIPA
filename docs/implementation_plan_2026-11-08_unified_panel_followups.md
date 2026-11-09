@@ -303,7 +303,10 @@ Each lands as its own commit pair (src, then tests), and the batch ends with
 `/csdp` — which is already owed over 42 unpushed commits before any of this.
 
 **What was actually built, 2026-11-08:** UPD-F3, then UPD-F2, then UPD-F4.
-**UPD-F1 was not built here.** `src/getmoredone/app_settings.py` still carries
+**UPD-F1 was not built here** -- it was built afterwards in its own session
+(`31816a0`) and is merged at `2fac9b3`, so the paragraph below describes the
+state at the time of this plan, not now. At the time,
+`src/getmoredone/app_settings.py` still carried
 the calendar-export batch's uncommitted hunk, and §9 below rules that out
 under `CLAUDE.md`'s "One build batch at a time". It was proposed as its own
 worktree session instead and is recorded `not done`.
