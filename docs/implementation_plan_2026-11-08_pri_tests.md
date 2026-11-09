@@ -115,7 +115,8 @@ added here. `PRI-A1`–`PRI-A4` stay unfiled and `SSC-1` stays open for that par
 3. PRI-M2.5's AST walk, last in that file: it is the one test whose subject is
    the source text, so it is written after the behavioural tests prove the
    behaviour it is guarding.
-4. `tests/test_priority_floor_form.py` — the three widget tests.
+4. `tests/test_priority_floor_form.py` — the widget tests. (Planned as three;
+   built as four, PRI-M1.7 taking two. The file's own table below lists both.)
 5. PRI-M2.7's comment correction.
 6. Mutation-prove each test, restoring the verbatim original.
 7. SSC-1's status correction, and the documentation index entry for this plan.

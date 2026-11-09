@@ -61,7 +61,7 @@ and **nine are left** — the nine in items 3 and 5, in two groups rather than
 three. Nothing red is a meta test any more. `NOTES.md` carries the same count;
 this section is the authoritative go-green list, so the two must agree.
 
-These ten closures are **verified locally only** — five targeted test files,
+These **eleven** closures are **verified locally only** — targeted test files,
 listed in the handoff note. There is no CI run for this range: `main` is ahead
 of `origin/main` as this is written, and the run cited above is the old one on
 `b6d6ddf`. The plan's own "Done means" asks for the CI count and that is **not
@@ -173,8 +173,8 @@ which is what asserts its limit reaches the message.
 `::test_every_referenced_test_file_exists` was **still red** on the two
 `models.py` references only, which was item 2. **Closed 2026-11-08 by the PRIT
 batch** — the two files were written (`750afe6`), not the docstrings deleted,
-which is what item 2 said the closure had to be. Both tests in that file are
-green.
+which is what item 2 said the closure had to be. All three tests in
+`tests/test_traceability_refs.py` are green.
 
 ### 5. Two tests fail only in CI (low)
 
@@ -781,8 +781,8 @@ were repointed (PDT-M4.1, `2cd83a3` and the follow-ups), so
 `::test_every_referenced_test_name_exists` went **green**, leaving only
 `::test_every_referenced_test_file_exists` red on the two
 `src/getmoredone/models.py` file references for PRI-M1/M2. **The PRIT batch
-closed that one too** (`750afe6`), so both tests in the file are green and a
-push no longer ships a red meta test. Still none of it was CE's or UPD-F's.
+closed that one too** (`750afe6`), so all three tests in the file are green
+and a push no longer ships a red meta test. Still none of it was CE's or UPD-F's.
 
 ### WTP — the pin test's message names a check it does not make (medium-low)
 
