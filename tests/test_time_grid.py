@@ -340,24 +340,82 @@ def test_an_empty_box_is_still_a_row():
     assert not grid.slots[4].is_empty
 
 
-def test_tgm31_blocks_outside_the_grid_are_surfaced():
+def test_tgm31_a_block_with_no_box_is_surfaced():
     """TG-M3.1 — **P2**: a block with no box is returned, never dropped.
 
-    Day End moving earlier is the ordinary way this happens. The day it stops
-    being drawn is the day the user loses planned work with nothing on screen
-    to say so.
+    Narrowed by PD-M14.2. A block past Day End used to come back here, because
+    the day was exactly the hours in Day Settings; now the day stretches to
+    cover what the date holds, so a slot index past the last box is **on** the
+    grid. What is left for this group is a block with no slot index at all,
+    and one whose index has left the date -- see the two tests below.
+    """
+    blocks = [
+        _block(30, slot_index=2, label="inside"),
+        _block(30, slot_index=None, label="never placed"),
+    ]
+
+    grid = build_day_grid(blocks, BOUNDS)
+
+    assert [b.label for b in grid.outside] == ["never placed"]
+    assert [b.label for b in grid.slots[2].starting] == ["inside"]
+
+
+def test_pdm142_a_block_past_the_last_box_is_drawn_rather_than_surfaced(
+):
+    """PD-M14.2 — the day is the hours you set, stretched to what is planned.
+
+    This is the behaviour a drop on **Later** writes, so the grid has to draw
+    it. Before PD-M14.2 the same block came back in ``outside``, which is why
+    dropping on Later appeared to do nothing even once it was writing.
     """
     blocks = [_block(30, slot_index=2, label="inside"), _block(30, slot_index=30, label="late")]
 
     grid = build_day_grid(blocks, BOUNDS)
 
-    assert [b.label for b in grid.outside] == ["late"]
-    assert [b.label for b in grid.slots[2].starting] == ["inside"]
+    assert grid.outside == [], "a block inside its own date was set aside"
+    assert grid.slots[-1].slot.index == 30, [s.slot.index for s in grid.slots[-3:]]
+    assert [b.label for b in grid.slots[-1].starting] == ["late"]
+    assert grid.slots[-1].slot.start_time == "23:00", grid.slots[-1].slot.start_time
 
 
-def test_a_block_whose_span_now_runs_past_the_day_is_surfaced_too():
-    """The subtler half: the box exists, the block no longer fits in what's left."""
-    grid = build_day_grid([_block(120, slot_index=17, label="too long")], BOUNDS)
+def test_pdm142_a_block_before_the_first_box_is_drawn_too():
+    """PD-M14.2 — and this is what a drop on **Earlier** writes.
+
+    The box is negative and its clock time is before Day Start. Nothing about
+    the hours in Day Settings has changed; the day on screen is longer because
+    the date holds something the hours do not cover.
+    """
+    grid = build_day_grid([_block(30, slot_index=-2, label="early")], BOUNDS)
+
+    assert grid.outside == []
+    assert grid.slots[0].slot.index == -2
+    assert grid.slots[0].slot.start_time == "07:00", grid.slots[0].slot.start_time
+    assert [b.label for b in grid.slots[0].starting] == ["early"]
+
+
+def test_pdm142_a_block_whose_index_leaves_the_date_is_still_surfaced():
+    """PD-M14.2 — the stretch stops at the date, so a corrupt row cannot run away.
+
+    Adversarial (P7): a slot index that looks like an ordinary integer and is
+    nothing of the kind. Without the limit the drawn day would stretch to
+    reach it -- a thousand boxes of empty rows for one bad row, which looks
+    like the screen hanging rather than like the one block it is about.
+    """
+    blocks = [
+        _block(30, slot_index=2, label="inside"),
+        _block(30, slot_index=400, label="off the date"),
+        _block(30, slot_index=-20, label="yesterday"),
+    ]
+
+    grid = build_day_grid(blocks, BOUNDS)
+
+    assert sorted(b.label for b in grid.outside) == ["off the date", "yesterday"]
+    assert len(grid.slots) == 18, "the day was stretched to reach a corrupt row"
+
+
+def test_pdm142_a_block_whose_span_runs_past_midnight_is_surfaced():
+    """The subtler half: the box is on the date, the block's length is not."""
+    grid = build_day_grid([_block(120, slot_index=31, label="too long")], BOUNDS)
 
     assert [b.label for b in grid.outside] == ["too long"]
 

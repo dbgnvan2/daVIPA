@@ -28,10 +28,12 @@ from src.getmoredone.time_block_layout import (
     FALLBACK_BLOCK_MINUTES,
     MAX_BLOCK_MINUTES,
     DayBounds,
+    DayExtension,
+    DaySpan,
     TimeFormatError,
     day_grid,
     default_minutes_for_block_type,
-    extended_day_bound,
+    extended_span,
     depth_bars,
     duration_for_item,
     format_hhmm,
@@ -40,6 +42,8 @@ from src.getmoredone.time_block_layout import (
     parse_clock_time,
     parse_hhmm,
     priority_band,
+    span_for_blocks,
+    template_span,
     times_for_slot,
     total_planned_minutes,
 )
@@ -425,50 +429,211 @@ def test_a_clock_time_within_the_day_is_read(text, minutes):
     assert parse_clock_time(text) == minutes
 
 
-# ================= PD-M5 — how far the day can be extended ==============
+# ========== PD-M14.1 — how far the drawn day can be extended =============
+#
+# These four replace the extended_day_bound tests of PD-M5.8. The limits they
+# assert are the same ones -- the first box of a date, and the last box that
+# ends at a storable time -- but they are now limits on where a block may go,
+# not on a Day Start or Day End the drop is no longer allowed to write.
 
 
-def test_pdm58_the_day_cannot_cross_midnight():
-    """PD-M5.8 — midnight is the floor and the ceiling, and it refuses rather than clamps.
+def test_pdm146_neither_end_can_leave_the_date():
+    """PD-M14.6 — the date is the floor and the ceiling, and it refuses rather than clamps.
 
-    A clamped bound would make fewer boxes than the item needs, so the block
+    A clamped day would make fewer boxes than the item needs, so the block
     would land somewhere other than the end that was dropped on -- or nowhere,
     with the day already lengthened for it.
     """
-    assert extended_day_bound(DayBounds(day_start="00:30"), DAY_EXTEND_EARLIER, 1) == "00:00"
-    assert extended_day_bound(DayBounds(day_start="00:30"), DAY_EXTEND_EARLIER, 2) is None
-    assert extended_day_bound(DayBounds(day_start="00:00"), DAY_EXTEND_EARLIER, 1) is None
+    early = DayBounds(day_start="00:30")
+    first = extended_span(template_span(early), early, DAY_EXTEND_EARLIER, 1)
+    assert first is not None
+    assert times_for_slot(first.slot_index, 30, early)[0] == "00:00"
+    assert extended_span(template_span(early), early, DAY_EXTEND_EARLIER, 2) is None
 
-    assert extended_day_bound(DayBounds(day_end="23:00"), DAY_EXTEND_LATER, 1) == "23:30"
-    assert extended_day_bound(DayBounds(day_end="23:00"), DAY_EXTEND_LATER, 2) is None
-    assert extended_day_bound(DayBounds(day_end="23:30"), DAY_EXTEND_LATER, 1) is None
+    midnight = DayBounds(day_start="00:00")
+    assert extended_span(template_span(midnight), midnight, DAY_EXTEND_EARLIER, 1) is None
+
+    late = DayBounds(day_end="23:00")
+    last = extended_span(template_span(late), late, DAY_EXTEND_LATER, 1)
+    assert last is not None
+    assert times_for_slot(last.slot_index, 30, late) == ("23:00", "23:30")
+    assert extended_span(template_span(late), late, DAY_EXTEND_LATER, 2) is None
+
+    full = DayBounds(day_end="23:30")
+    assert extended_span(template_span(full), full, DAY_EXTEND_LATER, 1) is None
 
 
-def test_pdm58_the_ceiling_is_the_last_bound_that_yields_a_whole_box():
-    """23:30, not 23:59: a box running 23:30--24:00 has no storable end time.
+def test_pdm146_the_ceiling_is_the_last_box_that_ends_at_a_real_time():
+    """23:30, not 24:00: a box running 23:30--24:00 has no storable end time.
 
     Written because "the day ends at midnight" and "the day's last box ends at
-    midnight" are different numbers, and picking the first would let the day be
-    extended to a bound that produces no new box at all -- the settings written
-    and the item with nowhere to go.
+    midnight" are different numbers, and picking the first would offer a box
+    whose end time the app refuses to read back.
     """
-    grown = extended_day_bound(DayBounds(day_end="23:00"), DAY_EXTEND_LATER, 1)
+    bounds = DayBounds(day_end="23:00")
+    grown = extended_span(template_span(bounds), bounds, DAY_EXTEND_LATER, 1)
 
-    assert grown == "23:30"
-    boxes = day_grid(DayBounds(day_start="23:00", day_end=grown))
-    assert [slot.start_time for slot in boxes] == ["23:00"], (
-        f"the bound the function offered makes these boxes: "
-        f"{[slot.start_time for slot in boxes]}"
+    assert grown is not None
+    boxes = day_grid(bounds, grown.span)
+    assert boxes[-1].start_time == "23:00", (
+        f"the span the function offered ends on these boxes: "
+        f"{[slot.start_time for slot in boxes[-3:]]}"
+    )
+    assert boxes[-1].end_time == "23:30"
+
+
+def test_pdm141_the_span_grows_at_the_end_that_was_dropped_on():
+    """A 90m item needs three boxes, so the drawn day grows by three at that end.
+
+    The hours in Day Settings are untouched -- the function is handed the day
+    and hands back a wider one, and it has no way to write a setting.
+    """
+    bounds = DayBounds()
+    drawn = template_span(bounds)
+
+    earlier = extended_span(drawn, bounds, DAY_EXTEND_EARLIER, 3)
+    assert earlier is not None
+    assert earlier.slot_index == drawn.first - 3
+    assert earlier.span == DaySpan(drawn.first - 3, drawn.last)
+    assert times_for_slot(earlier.slot_index, 90, bounds)[0] == "06:30"
+
+    later = extended_span(drawn, bounds, DAY_EXTEND_LATER, 3)
+    assert later is not None
+    assert later.slot_index == drawn.last + 1
+    assert later.span == DaySpan(drawn.first, drawn.last + 3)
+    assert times_for_slot(later.slot_index, 90, bounds)[1] == "18:30"
+
+
+def test_pdm141_an_end_of_the_day_that_is_not_one_is_an_error():
+    """Not silently treated as one end or the other: a typo would pick a day."""
+    with pytest.raises(ValueError):
+        extended_span(template_span(DayBounds()), DayBounds(), "sideways", 1)
+
+
+def test_pdm141_the_extension_carries_the_span_the_block_needs():
+    """The returned span holds the whole block, not only its first box.
+
+    An extension that widened by one box and placed a three-box block would
+    leave two boxes of it off the end of the grid -- drawn nowhere, and refused
+    by the very span the extension produced.
+    """
+    bounds = DayBounds()
+    grown = extended_span(template_span(bounds), bounds, DAY_EXTEND_LATER, 3)
+
+    assert grown is not None
+    assert grown.span.holds(grown.slot_index, 3)
+    assert isinstance(grown, DayExtension)
+
+
+# =====================================================================
+# PD-M14.2 -- the day is the hours you set, stretched to what is planned
+#
+# The hours in Day Settings are a template for a blank day and nothing else.
+# A block's slot index is counted from that template's Day Start and is
+# allowed to be negative, meaning a box before the hours begin. The drawn day
+# is derived from the blocks on the date, every read, so there is no second
+# copy of the day's shape that can disagree with them.
+
+
+def _spanned(minutes: int, slot_index=None, label="block") -> TimeBlock:
+    """A block with no clock times, because the span is read off the index."""
+    return TimeBlock(
+        block_date="2026-11-08",
+        start_time="",
+        end_time="",
+        planned_minutes=minutes,
+        label=label,
+        slot_index=slot_index,
     )
 
 
-def test_pdm5_the_bound_moves_by_the_whole_span():
-    """A 90m item needs three boxes, so the day moves an hour and a half."""
-    assert extended_day_bound(DayBounds(), DAY_EXTEND_EARLIER, 3) == "06:30"
-    assert extended_day_bound(DayBounds(), DAY_EXTEND_LATER, 3) == "18:30"
+def test_pdm142_the_template_span_is_the_hours_you_set():
+    """Index 0 is the first box of Day Start, and the last is the last whole box."""
+    span = template_span(DayBounds(day_start="09:00", day_end="17:00"))
+
+    assert (span.first, span.last) == (0, 15)
+    assert span.count == 16
+    # 16:45 cannot hold a whole box after 16:30, so the day stops at 16:00.
+    assert template_span(DayBounds(day_start="09:00", day_end="16:45")).last == 14
 
 
-def test_pdm5_an_end_of_the_day_that_is_not_one_is_an_error():
-    """Not silently treated as one end or the other: a typo would pick a day."""
-    with pytest.raises(ValueError):
-        extended_day_bound(DayBounds(), "sideways", 1)
+def test_pdm142_a_day_with_no_room_has_no_boxes():
+    """A Day End at or before Day Start is answered, not raised on."""
+    span = template_span(DayBounds(day_start="09:00", day_end="09:00"))
+
+    assert span.count == 0
+    assert not span.holds(0), "a day with no boxes accepted a block in box 0"
+    assert day_grid(DayBounds(day_start="09:00", day_end="09:00")) == []
+
+
+def test_pdm142_a_block_before_the_hours_widens_the_span():
+    """PD-M14.2 — the day stretches for what the date holds, at either end."""
+    bounds = DayBounds(day_start="09:00", day_end="17:00")
+
+    span = span_for_blocks([_spanned(30, slot_index=-2), _spanned(30, slot_index=17)], bounds)
+
+    assert (span.first, span.last) == (-2, 17)
+    boxes = day_grid(bounds, span)
+    assert boxes[0].start_time == "08:00"
+    assert boxes[-1].start_time == "17:30"
+
+
+def test_pdm142_nothing_outside_the_hours_leaves_the_span_alone():
+    """The common case: the span is the template, so the day is the hours."""
+    bounds = DayBounds(day_start="09:00", day_end="17:00")
+
+    span = span_for_blocks([_spanned(30, slot_index=0), _spanned(60, slot_index=14)], bounds)
+
+    assert span == template_span(bounds), (
+        "a day inside its own hours was drawn as something other than its hours"
+    )
+
+
+def test_pdm142_a_block_that_was_never_placed_does_not_widen_anything():
+    """A NULL slot index is "never placed", and it has no opinion about the day."""
+    bounds = DayBounds(day_start="09:00", day_end="17:00")
+
+    span = span_for_blocks([_spanned(30, slot_index=None)], bounds)
+
+    assert span == template_span(bounds)
+
+
+def test_pdm142_an_absurd_slot_index_does_not_stretch_the_day():
+    """Adversarial (P7): an index that reads as ordinary and is off the date.
+
+    The stretch stops at the date, because a day is one date. Without the
+    limit one corrupt row would draw a thousand empty boxes, which looks like
+    a hung screen rather than like the single bad row it is.
+    """
+    bounds = DayBounds(day_start="09:00", day_end="17:00")
+
+    span = span_for_blocks(
+        [_spanned(30, slot_index=400), _spanned(30, slot_index=-400)], bounds
+    )
+
+    assert span == template_span(bounds)
+
+
+def test_pdm142_a_negative_index_is_not_a_list_position():
+    """``position_of``, because ``grid[-1]`` is the end of the day, not its start.
+
+    This is the whole of what makes a signed index safe: Python would answer
+    ``grid[-2]`` with the second-to-last box of the day and raise nothing.
+    """
+    span = DaySpan(-2, 15)
+
+    assert span.position_of(-2) == 0
+    assert span.position_of(0) == 2
+    assert day_grid(DayBounds(day_start="09:00", day_end="17:00"), span)[
+        span.position_of(-1)
+    ].start_time == "08:30"
+
+
+def test_pdm142_the_span_says_what_it_holds_including_a_block_s_length():
+    """A 90m block in the last box does not fit, and the span says so."""
+    span = DaySpan(0, 15)
+
+    assert span.holds(15, 1)
+    assert not span.holds(15, 2), "a two-box block fitted into the last box"
+    assert not span.holds(-1, 1), "a box before the day was inside it"
+    assert span.holds(0, 16)
