@@ -159,20 +159,45 @@ did not fix is the thing that actually cost the most: **work that is finished
 and not on `main`.**
 
 Measured at the end of 2026-11-08, after the day's batches were pushed
-(`7469fc4..b6d6ddf`, CI run 42550648188):
+(`7469fc4..b6d6ddf`, CI run 42550648188). The measurement is left as it was
+taken; where an item has since been resolved, that is marked in it rather than
+edited out, because the argument is about what the day cost, not about the
+current state of those branches:
 
-- `main` was red on 20 tests. **Eight were already fixed** on
+- `main` was red on 20 tests. **Eight passed** on
   `refs/heads/claude/plan-day-range-pdm13`, a branch of 28 commits that was
   never merged. Run at that tip in a separate worktree, all eight pass; on
   `main`, all eight fail. `main` had been given the batch's *tests* — committed
-  from the shared checkout — while its *implementation* went on in the
-  worktree.
+  from the shared checkout — while the work they were written against went on
+  in the worktree.
+  **Corrected since, and this is the important one:** that was read as "the
+  fix is on the branch, merge it", and it was wrong. The PDT batch measured
+  `main` at `4ca7116` and found the implementation already there and green at
+  both layers; the eight tests passed on the branch because they reached their
+  subject through a mechanism — a drop writing the day's hours — that PD-M14
+  then withdrew on purpose, and that caused both of the faults the user
+  reported. **The branch must not be merged.** The eight were brought up to the
+  surviving design instead (`a19a38a`), which is repo test rule case (b).
+  `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md` has the
+  measurement. A test passing on a branch does not establish that the branch
+  holds a fix, and this section said it did.
 - A ninth, `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day`,
-  is on `main`, fails there, and exists on no branch. No merge will make it
-  pass.
-- `refs/heads/claude/elegant-neumann-ab55c9` holds UPD-F1 in three commits —
+  was on `main`, failed there, and existed on no branch. No merge would have
+  made it pass. **Resolved since:** `a19a38a` rewrote it to PD-M14's surviving
+  design rather than merging the branch, because the mechanism it reached its
+  subject through — a drop moving `bounds.day_start` — is what PD-M14.1
+  deliberately withdrew. `docs/spec_coverage.md` records PDT-M2.1 against it as
+  `done`. It was the clearest case for the point this section makes: a test red
+  on `main` for want of a branch, which turned out not to need the branch at
+  all.
+- `refs/heads/claude/elegant-neumann-ab55c9` held UPD-F1 in three commits —
   the `AppSettings.save()` fix that `NOTES.md` was still recording as "not
-  built". It was built, in a worktree, and is not on `main` either.
+  built". It was built, in a worktree, and was not on `main` either.
+  **Merged since**, at `2fac9b3`; `git merge-base --is-ancestor
+  refs/heads/claude/elegant-neumann-ab55c9 main` succeeds. Twelve places
+  across seven documents were still recording the defect as live after it was
+  fixed, and it took ten review passes to find them all — the same cost this
+  section is about, arriving as stale prose rather than as a red test.
 
 So the failure mode moved rather than disappeared: from one index being raced
 by four writers, to four branches each holding a piece, with `main` holding the

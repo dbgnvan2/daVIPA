@@ -155,6 +155,23 @@ standing elsewhere.
   was clearly not going to hold, so the `SSC` section now says to cite by
   quoted text and a grep for the three files this batch edits, and the
   remaining line cites there point only into files it does not touch.
+- **`CLAUDE.md` was corrected, on the user's authorization, and `SSC-3` is
+  closed.** The sweep filed it rather than fixing it because that file is the
+  project's own instructions, auto-loaded into every session; the user was
+  asked and said to fix it. Making the edit turned up a **third** false
+  sentence, and it is the one that mattered: the first bullet of "Why the
+  worktree exception was withdrawn" said eight of `main`'s twenty red tests
+  "were already fixed" on `refs/heads/claude/plan-day-range-pdm13`. Acted on,
+  that reads as "merge the branch" — which is what this batch was originally
+  asked to do, and which would reintroduce the mechanism that caused both
+  reported faults. The implementation was already on `main` at `4ca7116`; the
+  eight passed on the branch only because they reached their subject through
+  the design PD-M14 withdrew. That bullet now says they *passed* there, that
+  the branch must not be merged, and why a test passing on a branch does not
+  locate a fix. The measurement itself is left as it was taken, with each
+  resolved item marked inside it, because the section's argument is about what
+  that day cost. `CLAUDE.md` is now a file this batch edits, so `SSC-3`'s own
+  cites into it were converted to quoted text at the same time.
 - **Four wrong line cites inside those filings were corrected** rather than
   filed again — a filing whose cite points at the wrong line sends the next
   reader to a non-problem, so the cite is the filing's payload, not cosmetics.
@@ -176,6 +193,8 @@ standing elsewhere.
 - `BACKLOG.md` — items 1, 2 and 4 rewritten; `PDT-A1`–`PDT-A5` and `SSC-1`–`SSC-9` filed
 - `NOTES.md` — where `main` stands; the UPD-F1 and test-count corrections
 - `CHANGELOG.md` — UPD-F1's `[Unreleased]` entry corrected
+- `CLAUDE.md` — three false sentences in "Why the worktree exception was
+  withdrawn", corrected on the user's authorization (`SSC-3`)
 - `docs/spec_2026-11-07_unified_panel_design.md` — the M7.3 row's UPD-F1 status
 - `docs/implementation_plan_2026-11-08_unified_panel_followups.md` — the §7
   and §9 wrappers recording UPD-F1 as built

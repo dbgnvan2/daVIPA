@@ -220,23 +220,47 @@ implementation code written." The same file at `:336` — "all 40 criteria
 `done` … Nothing is `partial` and nothing is outstanding." The implementation
 is on `main` in `screens/weekly_items.py` and `screens/week_actions.py`.
 
-### SSC-3 — `CLAUDE.md` carries two claims the repo has since contradicted (high)
+### SSC-3 — `CLAUDE.md` carried claims the repo had since contradicted — CLOSED 2026-11-08
 
-Not fixed here for a second reason: this file is the project's own
-instructions, auto-loaded into every session, so changing it is the user's
-call, not a sweep's.
+**Closed: the user authorized the edit and it is made.** Filed rather than
+fixed in the sweep because this file is the project's own instructions,
+auto-loaded into every session, so changing it was the user's call and not a
+sweep's. Asked, answered, done.
 
-- `CLAUDE.md:173-175` — "`refs/heads/claude/elegant-neumann-ab55c9` holds
+Three sentences were corrected, not two — the third was found while making the
+edit, and is the one that mattered most. The measurement is left as it was
+taken, with each resolved item marked inside it, because the section's argument
+is about what 2026-11-08 cost and not about the current state of those
+branches:
+
+1. The first bullet said eight of `main`'s twenty red tests "**were already
+   fixed**" on `refs/heads/claude/plan-day-range-pdm13`. Read as "merge the
+   branch", which is what this batch was originally asked to do, that is
+   actively harmful: the implementation was already on `main` at `4ca7116`, and
+   those eight passed on the branch only because they reached their subject
+   through the mechanism PD-M14 withdrew — the one that caused both reported
+   faults. The bullet now says they *passed* there, says the branch must not be
+   merged, and says why a test passing on a branch does not locate a fix.
+2. The `elegant-neumann-ab55c9` bullet said UPD-F1 "is not on `main` either".
+   It is, merged at `2fac9b3`.
+3. The ninth-test bullet said `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day`
+   "is on `main`, fails there, and exists on no branch. No merge will make it
+   pass." `a19a38a` rewrote it to the surviving design; PDT-M2.1 is recorded
+   `done`.
+
+What was wrong, for the record:
+
+- `CLAUDE.md`, the `elegant-neumann` bullet — "`refs/heads/claude/elegant-neumann-ab55c9` held
   UPD-F1 in three commits … It was built, in a worktree, and is not on `main`
   either." It is on `main`:
   `git merge-base --is-ancestor refs/heads/claude/elegant-neumann-ab55c9 main`
   succeeds, merged at `2fac9b3`. `NOTES.md` and item 1 of this file both say
-  so. `docs/changes/2026-11-08-one-batch-at-a-time.md:62-63` records that batch
+  so. `docs/changes/2026-11-08-one-batch-at-a-time.md` records that batch
   writing this `CLAUDE.md` section with its measurements — it does not quote
-  this sentence, and `:64-65` records the parallel `NOTES.md` bullet being
+  this sentence, and records the parallel `NOTES.md` bullet being
   corrected to the same "not on `main`" wording — so this was a live edit of
   that batch, now gone stale.
-- `CLAUDE.md:170-172` — "A ninth,
+- `CLAUDE.md`, the ninth-test bullet — "A ninth,
   `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day`, is on
   `main`, fails there, and exists on no branch. No merge will make it pass."
   `a19a38a` rewrote that test to PD-M14's design and
