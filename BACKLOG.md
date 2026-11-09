@@ -191,10 +191,17 @@ reader to rebuild merged code.
 
 Ordered by what a reader would wrongly act on.
 
+**Cite by quoted text and a grep, not by line number, for any file this batch
+also edits** — this one, `docs/DOCUMENTATION_INDEX.md` and
+`docs/spec_coverage.md`. Three rounds running, a line cite written here was
+invalidated by a later hunk in the same file, once inside the very sentence
+that was correcting another cite. Line numbers into files the batch does not
+touch are stable and are kept.
+
 ### SSC-1 — the priority batch's plan says no code was written; the code is on `main` (high)
 
 `docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md:3` and
-`docs/DOCUMENTATION_INDEX.md:279` both say "awaiting approval; no
+`docs/DOCUMENTATION_INDEX.md` (`grep -n "awaiting approval; no" docs/DOCUMENTATION_INDEX.md`) both say "awaiting approval; no
 implementation code written". `9420927` ("feat(pri): priority defaults and the
 cap, as left on disk") is an ancestor of `main`, and the PRI-M1/PRI-M2
 implementation docstrings are in `src/getmoredone/models.py:85,399,429,451`,
@@ -203,7 +210,8 @@ implementation docstrings are in `src/getmoredone/models.py:85,399,429,451`,
 implemented, so the repo contradicts itself three ways.
 
 Related: `PRI-A1` to `PRI-A4`, which that plan promises and
-`docs/DOCUMENTATION_INDEX.md:291` repeats, appear nowhere in this file.
+`docs/DOCUMENTATION_INDEX.md` repeats (`grep -n 'PRI-A1 to PRI-A4'`), appear
+nowhere in this file.
 
 ### SSC-2 — the WTP spec's header contradicts its own status section (high)
 
@@ -258,8 +266,8 @@ the index — still holds, and is the part six other places route readers to
 
 ### SSC-6 — WTP's criterion count is given as 38, 40 and 41 (medium)
 
-This file's header paragraph (`BACKLOG.md:19-21`) says "all 38 criteria
-built" — item 3 is WTP-A11, not this;
+This file's header paragraph (`grep -n "38 criteria" BACKLOG.md`) says "all
+38 criteria built" — item 3 is WTP-A11, not this;
 `docs/spec_2026-11-08_weekly_tactic_as_parent.md:336` says 40, as does
 `docs/cycles/2026-11-08_wtp-widget-tests-qa-gate.md:125` ("Spec count 39 →
 40"); the spec's own `| WTP-Mx.y |` rows hold **41** distinct IDs. 40 is the
@@ -286,11 +294,13 @@ correct usage. Nothing checks that column —
 `UPD-A13` in this file files "no test enforces
 `docs/DOCUMENTATION_INDEX.md`'s completeness" at Priority: Medium, with the
 test design written out. `PLC-A5` files the same gap at low. Six places
-route the reader to `PLC-A5` for this gap — `docs/DOCUMENTATION_INDEX.md:27`,
-`:713`, `:718`, `:722`, `BACKLOG.md:393` and `docs/spec_coverage.md:994` — and
-none mentions `UPD-A13`, so a reader lands on
-the low item — whose first sentence is also stale, see SSC-5 — and never
-reaches the designed fix.
+route the reader to `PLC-A5` for this gap — four in
+`docs/DOCUMENTATION_INDEX.md`, one in this file and one in
+`docs/spec_coverage.md`; list them with
+`grep -rn 'PLC-A5' --include='*.md' --exclude-dir=.claude .` and discount the
+two that only record the filing. None of them mentions `UPD-A13`, so a reader
+lands on the low item — whose first sentence is also stale, see SSC-5 — and
+never reaches the designed fix.
 
 ### SSC-9 — the WTP spec says nothing is outstanding, then lists two `not done` (low)
 

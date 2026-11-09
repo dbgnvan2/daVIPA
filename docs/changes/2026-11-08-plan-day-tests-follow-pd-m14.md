@@ -136,16 +136,25 @@ standing elsewhere.
   prediction elsewhere in the same section. The authority is
   `docs/changes/2026-11-08-day-hours-are-a-template-wip.md`, which records
   PD-M14.4 under "Not started"; `grep -rn "def test_pdm144" tests/` returns
-  nothing, and `shift_all_slots` has no production caller. The section now
+  nothing, and `shift_all_slots` has no production caller. That wip note is
+  the authority for what was built, but two of its *other* claims have since
+  gone stale — it says TG-M6.4 and PD-M5.5 are withdrawn and still owed
+  `docs/spec_coverage.md` rows, and both are recorded `done` there, correctly.
+  It is a dated handoff note, so it is left as written. The section now
   carries one dated not-built note at its head, so the copies inside it are
   governed by a single statement, and the deletion list is corrected to the
   three tests that were deleted. This is the batch's own correction gone wrong:
   a cell fixed without reading the paragraph under it.
 - **The tenth pass caught a cite the ninth pass's own edits had moved.** SSC-8
-  listed `BACKLOG.md:386` for a line that this file's earlier hunks had pushed
-  to `:393`. A line cite written against the pre-edit file is the same defect
-  the cite corrections were for, so it is worth saying plainly: cites into a
-  file you are editing must be re-read after the edit, not before.
+  listed `BACKLOG.md:386` for a line that the same commit's earlier hunks in
+  `BACKLOG.md` had pushed to `:393`. A line cite written against the pre-edit file is the same defect
+  the cite corrections were for. It then happened a third time, in the next
+  round: that round's `docs/DOCUMENTATION_INDEX.md` hunk added two lines and
+  silently moved five cites in `BACKLOG.md`, three of them inside the sentence
+  where the second one had just been fixed. Re-reading cites after each edit
+  was clearly not going to hold, so the `SSC` section now says to cite by
+  quoted text and a grep for the three files this batch edits, and the
+  remaining line cites there point only into files it does not touch.
 - **Four wrong line cites inside those filings were corrected** rather than
   filed again — a filing whose cite points at the wrong line sends the next
   reader to a non-problem, so the cite is the filing's payload, not cosmetics.
@@ -170,10 +179,13 @@ standing elsewhere.
 - `docs/spec_2026-11-07_unified_panel_design.md` — the M7.3 row's UPD-F1 status
 - `docs/implementation_plan_2026-11-08_unified_panel_followups.md` — the §7
   and §9 wrappers recording UPD-F1 as built
-- `docs/implementation_plan_2026-11-06_plan_day_controls.md` — PD-M5.2 and
-  PD-M5.3 annotated as withdrawn by PD-M14, which that plan asked for
+- `docs/implementation_plan_2026-11-06_plan_day_controls.md` — PD-M5.2, PD-M5.3
+  and PD-M5.6 annotated as withdrawn by PD-M14, which that plan asked for;
+  PD-M5.5's deleted test name and the Earlier-drop paragraph marked
 - `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md` — the
-  TG-M6.4 prediction struck through; it was not what was built
+  TG-M6.4 prediction struck through; dated not-built notes at the head of the
+  PD-M14.4 section and the implementation order; the deletion list, the
+  PD-M5.5 row and a test name that never existed corrected
 - `docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md` — the plan (`11ec1dc`)
 - `docs/DOCUMENTATION_INDEX.md` — this note and the plan; the UPD-F1 entry,
   which was still present-tense

@@ -223,7 +223,7 @@ above, in one pass, on a weekday and on a Saturday.
 |---|---|---|
 | PD-M5.2 | A drop above the first box moves Day Start back | The drop no longer touches Day Start. The item still lands above the first box. |
 | PD-M5.3 | A drop below the last box moves Day End forward | The same, at the other end. |
-| PD-M5.5 | Blocks keep their clock times when the day grows | Still true, by a different mechanism: nothing is renumbered because nothing moves. the plan expected `shift_all_slots` to keep this criterion under PD-M14.4; since PD-M14.4 was not built, `shift_all_slots` has no production caller and the criterion holds without it. |
+| PD-M5.5 | Blocks keep their clock times when the day grows | Still true, by a different mechanism: nothing is renumbered because nothing moves. The plan expected `shift_all_slots` to keep this criterion under PD-M14.4; since PD-M14.4 was not built, `shift_all_slots` has no production caller and the criterion holds without it. |
 | TG-M6.4 | Saving Day Settings writes no blocks | ~~Reversed by PD-M14.4: it must renumber, or work already planned moves on the clock.~~ **Not what was built.** The box is stored relative to Day Start, so the clock times follow on read and nothing is renumbered — the same mechanism the PD-M5.5 row above describes. TG-M6.4 and TG-M6.4a stay `done` in `docs/spec_coverage.md`, and both named tests are live and green: `tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks` and `tests/test_time_block_crud.py::test_tgm64_a_day_start_change_writes_no_rows`. Neither was deleted: PD-M14.4 was not built, and the deletion list below is corrected to the three tests that were. *(Corrected 2026-11-08, ninth cold pass of the PDT batch.)* |
 
 **Three** tests assert the withdrawn behaviour and were deleted with it:
@@ -239,18 +239,33 @@ Neither happened: PD-M14.4 was not built (see the note at its head), the
 `tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks` is
 live at `:1569` asserting the criterion verbatim. Do not delete it.
 
-`::test_pdm53_a_drop_below_does_not_renumber_the_day` and
-`::test_pdm55_a_block_on_another_date_keeps_its_clock_time` keep their names and
-are strengthened: under PD-M14.1 they hold for both ends, not one.
+`::test_pdm53_a_drop_below_does_not_renumber_the_day` keeps its name and is
+strengthened: under PD-M14.1 it holds for both ends, not one. It is live at
+`tests/test_plan_screen.py:5508`.
+
+~~`::test_pdm55_a_block_on_another_date_keeps_its_clock_time`~~ was named here
+as a second. **No test of that name has ever existed** — `grep -rn
+"a_block_on_another_date" .` matches this plan line and nothing else. PD-M5.5's
+four live tests are in `tests/test_time_block_crud.py` under other names.
+*(Recorded 2026-11-08, eleventh cold pass.)*
 
 ## Implementation order
 
-1. PD-M14.2 — signed slot index and the drawn span. Nothing else can land first.
-2. PD-M14.1 — the drop path, which is what was reported.
-3. PD-M14.3 — Clear Day, which is free once 14.2 is in, plus its tests.
+> **Only items 1, 2 and PD-M14.6 were built.**
+> `docs/changes/2026-11-08-day-hours-are-a-template-wip.md` records PD-M14.3,
+> PD-M14.4, PD-M14.5, PD-M14.7 and PD-M14.8 under "Not started", and nothing
+> since has built them: `grep -rn "def test_pdm143\|def test_pdm145\|def
+> test_pdm147" tests/` returns nothing, `clear_day` in
+> `src/getmoredone/screens/plan.py` is still PD-M8's, and `first_free_slot`
+> still walks the drawn grid rather than `template_span`, which has no caller
+> in `plan.py`. *(Recorded 2026-11-08, eleventh cold pass of the PDT batch.)*
+
+1. PD-M14.2 — signed slot index and the drawn span. Nothing else can land first. **Built.**
+2. PD-M14.1 — the drop path, which is what was reported. **Built.**
+3. PD-M14.3 — Clear Day, which is free once 14.2 is in, plus its tests. **Not built.**
 4. PD-M14.4 — the settings path and TG-M6.4's reversal. **Not built.**
-5. PD-M14.5, PD-M14.6 — the two containment rules.
-6. PD-M14.7 — the repair, last, so it runs against finished code.
+5. PD-M14.5, PD-M14.6 — the two containment rules. **PD-M14.6 built; PD-M14.5 not.**
+6. PD-M14.7 — the repair, last, so it runs against finished code. **Not built.**
 
 ## Documents to update in the same change
 
