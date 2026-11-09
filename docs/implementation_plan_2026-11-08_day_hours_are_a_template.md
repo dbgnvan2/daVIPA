@@ -1,7 +1,15 @@
 # Implementation plan — the day's hours are a template (PD-M14)
 
 Date: 2026-11-08
-Status: **planned, not built — awaiting approval**
+Status: **built and on `main`, except PD-M14.4.** PD-M14 is the surviving
+plan-day design: the drawn day derives from the date's own blocks, and Day
+Settings hours are a template for a blank day.
+`docs/spec_coverage_2026-11-08_plan_calendar_export.md` heads its re-run
+"after PD-M14 landed". **PD-M14.4 was never built** —
+`db_manager.shift_all_slots` has no production caller — which the PDT batch
+measured and recorded. Corrected 2026-11-08 by the SST batch: this line read
+"planned, not built — awaiting approval" over the design the whole PDT batch
+was written against (`SSC-4`'s class).
 Screen: `src/getmoredone/screens/plan.py`, `src/getmoredone/time_block_layout.py`,
 `src/getmoredone/db_manager.py`
 Follows: `docs/implementation_plan_2026-11-06_plan_day_controls.md` (PD-M1 … PD-M13, shipped)

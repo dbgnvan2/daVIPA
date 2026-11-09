@@ -3,7 +3,12 @@
 **Date:** 2026-11-08
 **Area:** hierarchy readers (`db_manager`), Hierarchical screen, Item Editor,
 VSP weekly tactic delete/complete paths
-**Status:** awaiting approval. No implementation code written.
+**Status:** built and on `main`. The implementation is in
+`screens/weekly_items.py` and `screens/week_actions.py`; §6 below records
+all 41 criteria `done`, with two human-review items still outstanding.
+Corrected 2026-11-08: this line read "awaiting approval. No implementation
+code written" while the same file's §6 reported the work finished. Filed as
+`SSC-2`, closed by the SST batch.
 **Prefix for all IDs below:** `WTP`
 
 ---
@@ -58,7 +63,8 @@ deliberate, and defended in three places:
 
 One button still writes `parent_id` instead — `weekly_items.py:560`, the APE
 Week Assignment tab's *Add Action Item* — which is the open **AWA-A1**
-(`BACKLOG.md:85`). This spec does **not** fix AWA-A1; see §7.
+(`BACKLOG.md`, `grep -n "AWA-A1 -" BACKLOG.md`). This spec does **not** fix
+AWA-A1; see §7.
 
 ### 1.3 Every "parent" reader in the app reads `parent_id` only
 
@@ -333,9 +339,30 @@ Recorded 2026-11-08, after implementation. Commits: `e465f79` (this spec),
 then the screen work and its tests. Nothing is pushed. Every test named below
 is in `tests/test_weekly_tactic_parent.py` unless another file is given.
 
-**Summary: all 40 criteria `done`** — the 35 in §3, plus WTP-M1.7, the two
-extra cases WTP-M5.2 needed, WTP-M6.7 and WTP-M6.8. Nothing is `partial` and
-nothing is outstanding.
+**Summary: all 41 criteria `done`** — the 41 rows in §3, which is the same set
+of IDs as the table below (compared as sorted sets, not counted twice).
+Nothing is `partial`. **Two human-review items are outstanding**, both listed
+under "The two 'not code-testable' items" below.
+
+Corrected 2026-11-08 by the SST batch. This paragraph read "all 40 criteria
+`done` — the 35 in §3, plus WTP-M1.7, the two extra cases WTP-M5.2 needed,
+WTP-M6.7 and WTP-M6.8", and ended by denying that anything was outstanding.
+Both halves were wrong. (The denial is paraphrased rather than quoted here on
+purpose: `test_sstm4_the_wtp_spec_does_not_deny_its_own_outstanding_items`
+asserts the sentence is absent from this file, and a guard that cannot tell a
+claim from a quotation of it spends its failures on quotations.)
+§3 was amended to carry those additions, so it holds 41 and adding them again
+double-counts; and the two human-review items eight paragraphs below are
+outstanding. `BACKLOG.md` gave the same count as 38, so the repo held 38, 40
+and 41 at once (`SSC-6`, `SSC-9`). Re-measure the figure with:
+
+```
+grep -E '^\| *\*{0,2}WTP-M[0-9]' docs/spec_2026-11-08_weekly_tactic_as_parent.md \
+  | sed -E 's/^\| *\*{0,2}(WTP-M[0-9.]+[a-z]?)\*{0,2}.*/\1/' | sort -u | wc -l
+```
+
+`WTP-M1` to `WTP-M6` are section headings, not criteria; counting every
+`WTP-M…` string in the file gives 47 and is the wrong measurement.
 
 WTP-M6.7 was added *after* the batch was pushed. The independent Hermes
 `learning-qa-sweep` gate over `3f705b4..56c1dc0`
@@ -465,7 +492,8 @@ None is a prerequisite.
   `weekly_items.py:560` still writes `parent_id` for the APE Week Assignment
   tab's *Add Action Item*. WTP-M2.2 and WTP-M5.3 both cover that shape, so the
   parity work is correct with or without the fix. **Recommendation:** fix it
-  separately, as `BACKLOG.md:85` already proposes; folding it in here would mix
+  separately, as `AWA-A1` in `BACKLOG.md` already proposes (`grep -n
+  "AWA-A1 -" BACKLOG.md`); folding it in here would mix
   a storage fix into a reader change and make WTP-M2.2's test unable to fail.
 - **`view_parent_item` (`item_editor.py:1652`) is dead code.** It builds a
   second `ItemEditorDialog` on a parent id and no widget calls it. WTP-M4.3

@@ -325,7 +325,8 @@ Per the global rule on surrounding code:
 - **Over a dozen screens hold their own `AppSettings.load()`.** UPD-F1 fixes
   the consequence for all of them at the `save()` seam rather than editing
   each. No screen is changed, so none is left inconsistent.
-- **`CLAUDE.md:53` names the entry point `getmoredone.app.daVIPAApp`**; the
+- **`CLAUDE.md` names the entry point `getmoredone.app.daVIPAApp`** (`grep -n
+  daVIPAApp CLAUDE.md`); the
   class is `GetMoreDoneApp` (`src/getmoredone/app.py:22`). Not this plan's
   file. Already flagged in UPD-M6's and UPD-M7's handoff notes.
 - **UPD-A9** (five remaining copies of the filter triple and the category

@@ -1,6 +1,8 @@
 # Implementation Plan — Weekly Tactic Scheduling
 
-**Status:** Draft, awaiting approval. **No implementation code written.**
+**Status:** built and on `main`.
+`docs/spec_coverage_2026-08-18_weekly_tactic_scheduling.md` carries 83 rows
+marked `done`. Corrected 2026-11-08 by the SST batch (`SSC-4`'s class).
 **Date:** 2026-08-18
 **Spec:** `docs/spec_2026-08-18_weekly_tactic_scheduling.md` (v2, commit fd3afd5)
 **Kickoff:** `docs/changes/2026-08-18-weekly-tactic-scheduling-kickoff.md`

@@ -2,7 +2,8 @@
 
 **Date:** 2026-08-24
 **Spec:** `docs/spec_2026-08-23_dopamine_reward_protocol.md`
-**Status:** Awaiting approval — no implementation code written yet.
+**Status:** built and on `main`. `src/getmoredone/reward_protocol.py` is the
+implementation. Corrected 2026-11-08 by the SST batch (`SSC-4`).
 
 The spec numbers its sections but assigns no IDs. This plan adopts the spec's own
 section numbers verbatim, prefixed `RP`: `RP-2.1` is spec §2.1, `RP-4.5` is §4.5.
@@ -288,6 +289,13 @@ test raises between `yield` and `unlink`.
 
 ## 8. Stopping here
 
-No implementation code has been written. Awaiting approval — in particular on
-**D3** (commit a generated WAV, or drop the audio celebration) and on **A1**
-(whether to delete the dead mapper copies in this batch).
+**This section records where the plan stopped, before approval. It is history,
+not a status** — the work was approved and built, and
+`src/getmoredone/reward_protocol.py` is the implementation. Corrected
+2026-11-08 by the SST batch, which found the paragraph below still written in
+the present tense (`SSC-4`).
+
+As written on 2026-08-24: no implementation code had been written, and the plan
+was awaiting approval — in particular on **D3** (commit a generated WAV, or
+drop the audio celebration) and on **A1** (whether to delete the dead mapper
+copies in this batch).

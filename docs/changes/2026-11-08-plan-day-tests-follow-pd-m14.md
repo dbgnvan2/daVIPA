@@ -147,8 +147,11 @@ standing elsewhere.
   three tests that were deleted. This is the batch's own correction gone wrong:
   a cell fixed without reading the paragraph under it.
 - **The tenth pass caught a cite the ninth pass's own edits had moved.** SSC-8
-  listed `BACKLOG.md:386` for a line that the same commit's earlier hunks in
-  `BACKLOG.md` had pushed to `:393`. A line cite written against the pre-edit file is the same defect
+  listed one line of `BACKLOG.md` for a line that the same commit's earlier
+  hunks in `BACKLOG.md` had pushed seven lines down. (The two numbers are not
+  repeated here: `test_sstm8_the_chronic_documents_are_not_cited_by_line_number`
+  now fails on a line cite into this file, including one quoted inside a
+  record of a line cite.) A line cite written against the pre-edit file is the same defect
   the cite corrections were for. It then happened a third time, in the next
   round: that round's `docs/DOCUMENTATION_INDEX.md` hunk added two lines and
   silently moved five cites in `BACKLOG.md`, three of them inside the sentence

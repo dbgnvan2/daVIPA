@@ -1,6 +1,9 @@
 # Spec — a second, isolated demo installation
 
-**Status:** Draft v1, awaiting approval
+**Status:** built and on `main` — see
+`docs/spec_coverage_2026-11-05_demo_install.md`: 46 rows `done`, one `not
+done`. Corrected 2026-11-08 by the SST batch: this line read "Draft v1,
+awaiting approval".
 **Date:** 2026-11-05
 **Spec ID root:** `D`
 **Touches:** `src/getmoredone/paths.py`, `start.sh`, a new `start-demo.sh`,

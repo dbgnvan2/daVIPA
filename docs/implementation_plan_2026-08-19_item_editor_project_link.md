@@ -242,7 +242,9 @@ migration, no `requirements.txt` change.
 # Phase C — Create a Weekly Tactic from the editor
 
 Added 2026-08-19, after A and B shipped in `cfd7a66`.
-Status: **awaiting approval — no implementation code written.**
+Status: **built and on `main`.**
+`docs/spec_coverage_2026-08-19_item_editor_project_link.md` carries 33 rows
+marked `done`. Corrected 2026-11-08 by the SST batch (`SSC-4`).
 
 ## Goal
 

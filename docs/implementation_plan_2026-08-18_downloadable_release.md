@@ -1,7 +1,9 @@
 # Implementation Plan — Downloadable GitHub Release (v0.1.0)
 
 **Spec:** `docs/spec_2026-08-18_downloadable_release.md`
-**Status:** Awaiting approval. No implementation code written yet.
+**Status:** built and on `main`. `build_mac.sh` and `daVIPA.spec` are the
+packaging, `tests/test_release_docs.py` and `tests/test_release_licensing.py`
+the checks. Corrected 2026-11-08 by the SST batch (`SSC-4`'s class).
 **Date:** 2026-08-18
 
 ---

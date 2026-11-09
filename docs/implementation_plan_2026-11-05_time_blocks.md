@@ -1,6 +1,8 @@
 # Implementation plan — Time Blocks (2026-11-05)
 
-Status: **awaiting approval. No implementation code written.**
+Status: **built and on `main`.** `docs/spec_coverage.md` carries 28 `TB-M`
+rows, all `done`. Corrected 2026-11-08 by the SST batch: this line read
+"awaiting approval. No implementation code written" (`SSC-4`).
 Source: user requirements, 2026-11-05 ("The time block functionality doesn't
 seem to work", seven numbered requirements).
 
@@ -238,7 +240,8 @@ Found while reading. Listed, not swept up silently:
 - `load_backlog` caps at 50 with no notice (P2). Replaced by TB-M7.
 - `delete_time_block` has no confirmation, while other destructive paths in
   this app do ask. **Not in scope** → `BACKLOG.md`.
-- `BACKLOG.md:1083` "Calendar view for time blocks" overlaps requirement 6 but
+- `BACKLOG.md`'s "Calendar view for time blocks" (`grep -n "Calendar view for
+  time blocks" BACKLOG.md`) overlaps requirement 6 but
   is a wider feature. **Not in scope.**
 
 ## Documentation to update, in the same change

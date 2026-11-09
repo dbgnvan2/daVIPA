@@ -1,6 +1,9 @@
 # Implementation plan — Renaming must never break a link
 
-**Status:** Draft, awaiting approval. **No implementation code written.**
+**Status:** built and on `main`.
+`docs/spec_coverage_2026-08-19_rename_safe_links.md` records every one of
+the 35 `RN` criteria as collected against a real collection run. Corrected
+2026-11-08 by the SST batch (`SSC-4`'s class).
 **Date:** 2026-08-19
 **Spec:** `docs/spec_2026-08-19_rename_safe_links.md` (v1)
 **Spec ID root:** `RN` — every ID below is used verbatim.

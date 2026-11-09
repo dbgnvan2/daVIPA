@@ -91,7 +91,8 @@ the only open entry from this plan.
   commit here stages HEAD's blob plus only this batch's hunks, built and
   verified against HEAD rather than from the working file, and leaves the
   working tree as it was found.
-- `CLAUDE.md:53` says the entry point is `getmoredone.app.daVIPAApp`; the class
+- `CLAUDE.md` says the entry point is `getmoredone.app.daVIPAApp` (`grep -n
+  daVIPAApp CLAUDE.md`); the class
   is `GetMoreDoneApp` (`src/getmoredone/app.py:22`). Flagged, not fixed — it is
   not this plan's file.
 

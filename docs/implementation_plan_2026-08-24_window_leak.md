@@ -1,7 +1,10 @@
 # Implementation plan — Tk window leak in the test suite
 
 **Date:** 2026-08-24
-**Status:** Awaiting approval — no code changed yet.
+**Status:** built and on `main`. F1 to F3 are all fixed in `conftest.py`,
+which withdraws every window on creation, registers raw `tkinter` windows as
+well as the two `ctk` classes (F3), and destroys what a test leaves behind.
+Corrected 2026-11-08 by the SST batch (`SSC-4`'s class).
 
 ---
 

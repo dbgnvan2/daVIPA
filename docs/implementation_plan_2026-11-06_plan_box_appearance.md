@@ -302,5 +302,6 @@ confirm, and I will ask after it is on screen.
 - `tests/test_plan_screen.py:1126-1140` carries a comment block stating "**The
   bug does not reproduce.**" about this exact sliver. It is false — the bug is
   on screen now. The comment is corrected as part of PB-M2, not left.
-- `docs/spec_coverage.md:287-296` still says both human-review rows are
+- `docs/spec_coverage.md`'s two human-review rows (`grep -n "human review"
+  docs/spec_coverage.md`) still say both are
   outstanding and that the packaged app holds the lock. Both are stale.

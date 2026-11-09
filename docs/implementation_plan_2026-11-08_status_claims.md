@@ -65,8 +65,8 @@ implemented**:
 Two more documents match the grep and are **not** defects, so they are not in
 the table: `implementation_plan_2026-11-08_priority_defaults_and_cap.md:4` and
 `implementation_plan_2026-11-08_pri_tests.md:101` both quote the wrong claim in
-order to record that it was corrected, and `docs/DOCUMENTATION_INDEX.md:283`
-does the same.
+order to record that it was corrected, and `docs/DOCUMENTATION_INDEX.md` does
+the same (`grep -in "awaiting approval; no" docs/DOCUMENTATION_INDEX.md`).
 
 ### 1.2 The WTP criterion count (`SSC-6`)
 
@@ -89,7 +89,8 @@ measurement certifies 41.
 ### 1.3 The method that does not exist (`SSC-7`)
 
 `grep -rn "def _update_action_item" src/ tools/` prints **nothing**. The
-`RP-2.5` row in `docs/spec_coverage.md:69` names
+`RP-2.5` row in `docs/spec_coverage.md` (`grep -n '| RP-2.5 |'
+docs/spec_coverage.md`) names
 `db_manager.py::_update_action_item` in its Implementation column. Nothing
 checks that column: `tests/test_traceability_refs.py` reads `tests/…` paths
 only.

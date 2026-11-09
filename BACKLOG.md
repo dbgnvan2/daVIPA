@@ -17,8 +17,9 @@ test. UPD-F1, the one defect of the four, **is built and on `main`** - merged at
 (This line said it was not built, blocked on a file another batch held open;
 that was true when written and is not now. Adjacent to the PDT batch, found by
 its sweep, corrected rather than left to send a reader to rebuild it.) WTP-M1 to WTP-M6 made a Weekly Tactic the parent of
-the Action Items filed under it in every reader of parenthood, all 38 criteria
-built, and added one adjacent issue as WTP-A1 - the shipped-column width test
+the Action Items filed under it in every reader of parenthood, all 41 criteria
+built (this said 38; the spec's own criterion rows number 41, and the SST batch
+re-measured them — `SSC-6`), and added one adjacent issue as WTP-A1 - the shipped-column width test
 that enumerates three of the five column sets by hand; UPD-M6 put APE Week
 Actions on the shared divider
 and chip table, gave it the three lineage filters it never had, and moved the
@@ -378,16 +379,101 @@ grep -rnE '(BACKLOG\.md|docs/spec_coverage\.md|CLAUDE\.md|docs/DOCUMENTATION_IND
   --include='*.md' --exclude-dir=.claude .
 ```
 
-One is measurably dead already and predates this batch:
-`docs/implementation_plan_2026-11-05_time_blocks.md` cites `BACKLOG.md:1083`
-for "Calendar view for time blocks", which is now at `:3921` — a drift of
-nearly 2,900 lines, so that cite has been wrong for a long time. The others
-were spot-checked and still land near enough to follow.
+Three were measurably dead, and all three predate the batch that filed this:
 
-**Not fixed here**, per rule 10: they are outside this batch's file set, and
-rewriting eight other batches' plans in a plan-day test diff is the sweep this
-rule exists to prevent. The fix is the same one the `SSC` head note states —
-quote the text and give a grep — applied as each document is next touched.
+- `docs/implementation_plan_2026-11-05_time_blocks.md` cited a line for
+  "Calendar view for time blocks" that had drifted by nearly 3,000 lines.
+- two plans cited a line of `CLAUDE.md` for the mapped-window count; the blank
+  line above it had taken the number (`grep -n "build a real on-screen window"
+  CLAUDE.md`).
+- `docs/spec_2026-11-08_weekly_tactic_as_parent.md` cited a line of this file
+  for `AWA-A1`, which is some 1,600 lines away
+  (`grep -n "AWA-A1 -" BACKLOG.md`).
+
+**Closed 2026-11-08 by the SST batch**, which rewrote all twelve as quoted text
+plus the grep that finds it, and added
+`tests/test_doc_status_claims.py::test_sstm8_the_chronic_documents_are_not_cited_by_line_number`
+so a thirteenth fails a test instead of waiting for a sweep. The filing as it
+stood is kept above.
+
+The earlier judgement — **not fixed, per rule 10**, because the documents were
+outside the plan-day batch's file set — was right for that batch. Rewriting
+eight other batches' plans inside a plan-day test diff is the sweep rule 10
+exists to prevent; doing it in a batch whose whole subject is stale claims is
+not.
+
+## Adjacent issues — priority defaults and the cap (PRI, filed 2026-11-08)
+
+Promised by `docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md`'s
+"Adjacent issues found, not fixed", which ends "Each is filed in `BACKLOG.md`
+as PRI-A1 … PRI-A4 when this plan is approved", and repeated in
+`docs/DOCUMENTATION_INDEX.md`. The plan was approved and built; the four
+filings were never made, so two documents asserted the existence of items that
+were nowhere. Filed 2026-11-08 by the SST batch, which closed `SSC-1`'s second
+clause, and held to by
+`tests/test_doc_status_claims.py::test_sstm9_every_promised_pri_adjacent_item_is_filed`.
+
+**Two of the plan's four descriptions were wrong, and are corrected here**
+rather than copied. Measured at `79cd32d`.
+
+### PRI-A1 — `item.importance == 20 or item.urgency == 20`, by hand in five screens (medium)
+
+```
+grep -rn "importance == 20" src/getmoredone/screens/
+```
+
+Five screens: `today.py`, `all_items.py`, `completed.py`, `hierarchical.py`,
+`upcoming.py`. The literal `20` is P4, and
+`priority_levels.priority_level_for_item` already answers exactly this
+question. `PLC-A3` and `PLC-A6` are the same five copies reached from the
+colour side — `PLC-A6` measures the two inputs they already disagree on (an
+importance of `25`, and one stored as the string `"20"`). **One fix, filed
+three times**; whoever takes it should close all three.
+
+**Priority:** Medium
+**Effort:** Low
+
+### PRI-A2 — the score column's width is a magic number in five places (low)
+
+```
+grep -n "priority_score" src/getmoredone/screens/*.py
+```
+
+Five render sites, not the six the plan says: `width=60` in `today.py`,
+`completed.py`, `hierarchical.py` and `upcoming.py`, and `width=80` in
+`all_items.py`. The plan's sixth figure, `70`, is the Timer button in
+`today.py`, not a score column — that is the plan's error, not a width that has
+since moved.
+
+**Priority:** Low
+**Effort:** Low
+
+### PRI-A3 — All Items shows the bare score, the other four show `P:n` (low)
+
+`all_items.py` renders `str(item.priority_score)` in an 80px slot with a
+`"Priority"` column header; the other four render `f"P:{item.priority_score}"`
+in 60px with **no** header. The plan has this the wrong way round: it says
+"only `today.py` has a header to match", and `grep -rn '"Priority"'
+src/getmoredone/screens/` shows the header is `all_items.py`'s and nobody
+else's. So the one screen whose column is labelled is also the one that drops
+the `P:` prefix, which is the opposite of the reasoning the plan gives.
+
+With a four-digit score now possible, the 60px slot is the one to measure
+first: `PRI-M3` was specced for exactly this and is not built (`PRIT-N1`).
+
+**Priority:** Low
+**Effort:** Low
+
+### PRI-A4 — demo data bypasses the defaults and the floor (low — a note, not a defect)
+
+`src/getmoredone/demo_data.py` calls `create_action_item(..., apply_defaults=False)`
+at both of its two call sites and hard-codes its factors, so a demo database
+demonstrates neither Defaults nor the floor. Correct as designed; filed because
+it is why `python tools/create_demo_data.py` will not show this feature, which
+is worth knowing before anyone tests it that way.
+
+**Priority:** Low
+**Effort:** Low
 
 ## Sweep findings not fixed — PDT batch (2026-11-08)
 

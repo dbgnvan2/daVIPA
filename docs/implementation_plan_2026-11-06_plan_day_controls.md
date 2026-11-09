@@ -48,7 +48,8 @@ removed the priority number for.
 
 **Note on the mapped-window count:** PD-M1.4 and PD-M6.1 add on-screen tests.
 `tests/test_ci_contract.py::test_the_documented_mapped_window_count_is_the_real_one`
-asserts the count against `CLAUDE.md:22` and `conftest.py:644`; both have to be
+asserts the count against the comment in `CLAUDE.md` (`grep -n "build a real
+on-screen window" CLAUDE.md`) and against `conftest.py`; both have to be
 updated in the same commit or CI goes red.
 
 ---
@@ -764,7 +765,8 @@ screen, which is the reason this criterion is listed rather than assumed.
 - `docs/implementation_plan_2026-11-06_plan_box_appearance.md` — PB-M6.3
   amended by PD-M1.
 - `docs/changes/2026-11-06-plan-day-controls.md` — handoff note.
-- `CLAUDE.md:22` and `tests/conftest.py:644` — the mapped-window count, if
+- `CLAUDE.md`'s mapped-window comment (`grep -n "build a real on-screen
+  window" CLAUDE.md`) and `conftest.py` — the count, if
   PD-M1.4 and PD-M6.1 land as on-screen tests.
 
 ## Review

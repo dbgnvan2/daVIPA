@@ -1,6 +1,9 @@
 # Spec — Weekly Tactic Scheduling for Action Items
 
-**Status:** Draft v2, awaiting approval
+**Status:** built and on `main` — see
+`docs/spec_coverage_2026-08-18_weekly_tactic_scheduling.md`, 83 rows marked
+`done`. Corrected 2026-11-08 by the SST batch: this line read "Draft v2,
+awaiting approval".
 **Date:** 2026-08-18
 **Spec ID root:** `WT`
 **Supersedes:** v1 of this file (commits 39e0049, e853fa3).

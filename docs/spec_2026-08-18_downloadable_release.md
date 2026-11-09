@@ -1,6 +1,8 @@
 # Spec — Downloadable GitHub Release (GetMoreDone v0.1.0)
 
-**Status:** Draft, awaiting approval
+**Status:** built and on `main` — `build_mac.sh`, `daVIPA.spec`,
+`tests/test_release_docs.py`, `tests/test_release_licensing.py`. Corrected
+2026-11-08 by the SST batch: this line read "Draft, awaiting approval".
 **Date:** 2026-08-18
 **Spec ID root:** `R`
 **Supersedes:** nothing. Extends `docs/STANDALONE_BUILD.md`.

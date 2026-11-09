@@ -1,7 +1,9 @@
 # Implementation plan — clear the 2026-08-25 backlog + dated follow-up titles
 
 Date: 2026-08-25
-Status: **awaiting approval — no code written**
+Status: **built and on `main`.** B4's deletion of `NextStepsDialog` is
+asserted by `tests/test_timer_session_endings.py`. Corrected 2026-11-08 by
+the SST batch (`SSC-4`'s class).
 
 ## Scope question I need answered first
 

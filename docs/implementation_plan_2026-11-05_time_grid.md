@@ -1,8 +1,11 @@
 # Implementation plan — the Plan screen as a 30-minute grid
 
-Status: **awaiting approval**. No implementation code is written until this is
-approved (global planning rule: "Implement this" means "begin the planning
-step").
+Status: **built and on `main`.** `docs/spec_coverage.md` carries 36 `TG-M`
+rows, all `done`. Corrected 2026-11-08 by the SST batch: this line read
+"awaiting approval. No implementation code is written until this is
+approved (global planning rule: 'Implement this' means 'begin the planning
+step')" (`SSC-4`). That gate was passed and the work shipped; what follows is
+the plan as approved.
 
 Supersedes the day model in
 `docs/implementation_plan_2026-11-05_time_blocks.md` (TB-M1…TB-M12). That plan
