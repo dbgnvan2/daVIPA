@@ -2,7 +2,7 @@
 
 Purpose: make the displayed name a value rather than a literal repeated at
          every surface that shows it.
-Spec:    daVIPA_rebrand_prompt.md
+Spec:    docs/daVIPA_rebrand_prompt.md
 Tests:   tests/test_branding.py
 
 Three surfaces render the name to a person — the window title, the sidebar

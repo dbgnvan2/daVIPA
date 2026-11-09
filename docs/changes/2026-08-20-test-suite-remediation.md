@@ -6,7 +6,7 @@
 
 ## Summary
 
-All four tasks from `prompt-test-suite-remediation.md`, plus one fix for a
+All four tasks from `docs/prompt-test-suite-remediation.md`, plus one fix for a
 problem the user hit during the work (the suite putting windows on their
 screen). No `src/` behaviour changed; the only `src/` edit is a docstring-free
 refactor of `google_calendar`'s prints, committed earlier.

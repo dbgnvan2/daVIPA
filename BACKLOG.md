@@ -3162,7 +3162,7 @@ The fifth review round found **no defect reaching a user** — control flow was
 proven unchanged across all seven `_authenticate` paths and every release guard
 was mutation-proved still firing. These are the test-quality findings from the
 same pass, recorded rather than fixed in-loop. They are squarely in scope for
-the test-suite remediation batch (`prompt-test-suite-remediation.md`, task 4).
+the test-suite remediation batch (`docs/prompt-test-suite-remediation.md`, task 4).
 
 Each was demonstrated by a mutation, not argued for:
 

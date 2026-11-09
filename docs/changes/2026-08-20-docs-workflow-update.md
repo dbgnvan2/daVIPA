@@ -100,7 +100,7 @@ Two corrections to the prompt's assumptions:
 
 ## Next agent actions
 
-- The test-suite remediation batch (`prompt-test-suite-remediation.md`): the
+- The test-suite remediation batch (`docs/prompt-test-suite-remediation.md`): the
   `meta` marker, source-grep elimination, the live-data conftest guard, and the
   vacuous-test scan. Ten tests from Batch 3 are already recorded in
   `BACKLOG.md` as unable to fail; they belong in that batch's task 4.

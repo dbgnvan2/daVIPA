@@ -631,6 +631,37 @@ All documentation follows these standards:
 - Links to related documents
 - Last updated dates
 
+## Prompts and drafts (moved out of the repo root 2026-11-08)
+
+These four sat untracked at the repo root until they were committed in
+`2934e2d`, which turned `tests/test_repo_hygiene.py::test_rm7c_repo_root_doc_allowlist`
+red: that test allows a fixed set of root documents and these were not on it.
+They were moved here rather than added to the allowlist, whose entries are all
+structural (README, a `CLAUDE.md` the tool loads from the root), which a draft
+is not.
+
+### `docs/daVIPA - Get Started.md`
+
+The user-facing getting-started guide, 791 lines. Sits beside
+`docs/USER_GUIDE.md`, which is the same genre and was already here.
+
+### `docs/daVIPA_rebrand_prompt.md`
+
+The rebrand task brief, and the `Spec:` reference of
+`src/getmoredone/branding.py` and `tests/test_branding.py`. Both docstrings
+were updated to this path in the same commit as the move.
+
+### `docs/prompt-test-suite-remediation.md`
+
+The brief behind the 2026-08-20 test-suite remediation batch. Cited by
+`BACKLOG.md` and by two handoff notes under `docs/changes/`, all three updated
+with the move.
+
+### `docs/prompt-update-claude-md-and-learnings.md`
+
+The brief for folding the 2026-08-20 audit into `CLAUDE.md` and
+`learnings.md`. Nothing references it.
+
 ## Maintenance
 
 Documentation is updated:
