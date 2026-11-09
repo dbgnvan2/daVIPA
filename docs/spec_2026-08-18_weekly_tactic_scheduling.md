@@ -345,7 +345,7 @@ violations are repaired by WT-M7.B, not assumed absent. An item with no tactic
   rather than losing it to `duplicate_action_item`'s field-dropping constructor.
   - **WT-M5.C.1** — The follow-up carries `weekly_tactic_id`, `annual_plan_element_id` and
     `segment_description_id`, and its dates satisfy WT-INV1/2.
-    → `::test_wt_m5c1_followup_inherits_lineage_and_stays_in_range`
+    → `::test_wt_m5c1_create_followup_item_also_inherits`
 
 ### WT-M6 — Entry points
 

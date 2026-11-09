@@ -32,7 +32,7 @@ Suite: `./venv/bin/python -m pytest -q` → exit 0, 834 passed, 2 skipped.
 | WT-M1.D.2 | `tests/test_weekly_tactic_link_migration.py::test_wt_m1d2_parent_and_tactic_coexist` | done |
 | WT-M1.D.3 | `tests/test_weekly_tactic_link_migration.py::test_wt_m1d3_tactic_must_be_week_item` | done |
 | WT-M1.D.4 | `tests/test_weekly_tactic_link_migration.py::test_wt_m1d4_link_migration_idempotent` | done |
-| WT-M1.E.1 | `tests/test_weekly_tactic_link_migration.py::test_wt_m1e1_rollover_flag_added_default_zero` | done |
+| WT-M1.E.1 | `tests/test_weekly_tactic_schema.py::test_wt_m1e1_rollover_flag_added_default_zero` | done |
 | WT-M2.A.1 | `tests/test_week_numbering.py::test_wt_m2a1_rule_table_matches_spec` | done |
 | WT-M2.A.2 | `tests/test_week_numbering.py::test_wt_m2a2_unknown_rule_falls_back_to_iso` | done |
 | WT-M2.A.3 | `tests/test_week_numbering.py::test_wt_m2a3_helper_returns_year_and_week` | done |
@@ -81,15 +81,15 @@ Suite: `./venv/bin/python -m pytest -q` → exit 0, 834 passed, 2 skipped.
 | WT-M5.A.5 | `tests/test_weekly_tactic_completion.py::test_wt_m5a5_completion_across_year_boundary` | done |
 | WT-M5.A.6 | `tests/test_weekly_tactic_completion.py::test_wt_m5a6_completion_refile_records_history` | done |
 | WT-M5.B.1 | `tests/test_weekly_tactic_completion.py::test_wt_m5b1_reopen_keeps_completion_week_tactic` | done |
-| WT-M5.C.1 | `tests/test_weekly_tactic_completion.py::test_wt_m5c1_followup_inherits_lineage_and_stays_in_range` | done |
+| WT-M5.C.1 | `tests/test_weekly_tactic_completion.py::test_wt_m5c1_create_followup_item_also_inherits` | done |
 | WT-M6.A.1 | `tests/test_item_editor_weekly_tactic_ui.py::test_wt_m6a1_org_tab_never_queries_legacy_table` | done |
 | WT-M6.A.2 | `tests/test_item_editor_weekly_tactic_ui.py::test_wt_m6a2_org_tab_shows_current_tactic_or_none` | done |
 | WT-M6.A.3 | `tests/test_item_editor_weekly_tactic_ui.py::test_wt_m6a3_manual_stamp_edit_reaches_db_layer` | done |
 | WT-M6.A.4 | `tests/test_item_editor_weekly_tactic_ui.py::test_wt_m6a4_picker_can_reach_any_week` | done |
-| WT-M6.B.1 | `tests/test_weekly_tactic_surfaces.py::test_wt_m6b1_<surface>_refiles` — 7 test(s) | done |
+| WT-M6.B.1 | `tests/test_weekly_tactic_surfaces.py::test_wt_m6b1_every_date_surface_reaches_a_hooked_method`, and the six per-surface tests listed below it | done |
 | WT-M6.B.2 | `tests/test_weekly_tactic_surfaces.py::test_wt_m6b2_bulk_edit_respects_week_bounds` | done |
 | WT-M6.B.3 | `tests/test_weekly_tactic_surfaces.py::test_wt_m6b3_calendar_import_does_not_cascade` | done |
-| WT-M6.B.4 | `tests/test_weekly_tactic_surfaces.py::test_wt_m6b4_<surface>_completion_refiles` — 2 test(s) | done |
+| WT-M6.B.4 | `tests/test_weekly_tactic_surfaces.py::test_wt_m6b4_every_completion_surface_uses_the_hooked_call`, and the parametrised `test_wt_m6b4_completion_refiles` listed below it | done |
 | WT-M6.B.5 | `tests/test_weekly_tactic_surfaces.py::test_wt_m6b5_created_records_summarised_to_user` | done |
 | WT-M6.C.1 | `tests/test_project_board_dates_ui.py::test_wt_m6c1_project_dates_reach_db_layer` | done |
 | WT-M6.D.1 | `tests/test_settings_week_rule_ui.py::test_wt_m6d1_week_rule_setting_persists` | done |

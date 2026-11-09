@@ -220,6 +220,64 @@ the index-completeness test that `UPD-A13` and `PLC-A5` already cover.
 
 Under the budget this pass earns one more, because it produced a high.
 
+## The third cold pass, 2026-11-09
+
+Earned because the second produced a high, and run in a third family: **does
+the repository match reality, outside this batch's own records?** That is the
+batch's declared gap — `SST-N1` says no guard can prove a corrected status line
+is true. The pass audited the documents against `src/` and the coverage files.
+Two highs, two mediums, one medium-low, three lows. Every one re-measured here.
+It did not find a false correction: of the sixteen documents this batch
+corrected, every checkable evidence claim held. It found the ones the batch
+never looked at.
+
+**High — two documents whose work shipped months ago, in wordings no guard
+reads.** `docs/spec_2026-08-23_dopamine_reward_protocol.md` was headed "Draft
+for implementation" over `src/getmoredone/reward_protocol.py` and 41 `done`
+`RP-` rows — and this batch corrected that spec's *paired plan* twice without
+opening the spec. `docs/implementation_plan_2026-06-06.md` described all three
+of its built phases in the future tense under a `## Status` heading; it is the
+twin of the project-notes plan the first cold pass found. Both corrected, with
+their evidence named. Neither appears in `docs/DOCUMENTATION_INDEX.md`, which
+is how both stayed invisible.
+
+**Medium — two dead test references on `done` rows, and the guard that could
+not see them.** `docs/spec_coverage_2026-08-18_weekly_tactic_scheduling.md`
+cited a test name that has never existed in this repo, on a row marked `done`,
+and in two further documents; another row named the right test in the wrong
+file. That file is the evidence §1.1 cites for the WT work being built. They
+survived because `tests/test_traceability_refs.py`'s `SCANNED` held one
+coverage document, not the family — while this batch widened its *own*
+Implementation-column check to the whole family and left the Tests column
+where it was. `SCANNED` is now a glob; the two references are repointed; two
+rows that named a parametrised family through a `<surface>` placeholder now
+name a real test and point at the list below them.
+
+**Medium-low — three plans that recorded only how they were approved.**
+"approved; in progress" over 55 passing tests, and two "approved to implement"
+lines over built work. No deny-list of unbuilt phrasings reaches these, which
+is the argument for `SST-A3`.
+
+Lows: the register's comment gave the CIP criterion count as 57 where 42 rows
+exist; the demo-install evidence said 46 `done` where the status cells say 45
+`done`, 1 `not done` and one criterion verified by hand; and the index gap now
+carries its measurement — **26 of the 42 plan, spec and coverage documents are
+absent from `docs/DOCUMENTATION_INDEX.md`**, filed on `UPD-A13`.
+
+`SST-A1` is closed by this pass rather than deferred: the floor of 140 against
+784 references is replaced by membership per source, the same route used for
+the markdown walk, which needs no judgement about how often a red suite is
+acceptable. `SST-A3` is raised to high, with three passes' worth of evidence
+that lengthening the phrase list is not the fix.
+
+A note on method: mutation T failed to fail on the first attempt because the
+string it replaced occurred twice — in `SCANNED` and in the companion's own
+glob — so the mutation narrowed the guard and its check together. A mutation
+that changes two things proves nothing about either; it was re-run against the
+`SCANNED` line alone.
+
+Under the budget this pass earns one more, because it produced highs.
+
 ## Files changed
 
 Tests (committed separately from the documents, per the repo rule):

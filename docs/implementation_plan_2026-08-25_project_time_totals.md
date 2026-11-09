@@ -1,8 +1,13 @@
 # Implementation plan — session count and total time on the Project record
 
 Date: 2026-08-25
-Status: approved to implement without a second gate ("proceed to plan and then
-just implement it")
+Status: **built and on `main`.** `db_manager_project_boards.py` derives
+`session_count` and `total_minutes` (PT1) in SQL — `grep -n "AS session_count"
+src/getmoredone/db_manager_project_boards.py` — and
+`tests/test_project_time_totals.py` carries 13 tests. Approved to implement
+without a second gate ("proceed to plan and then just implement it"); the build
+status was added 2026-11-09 by the third cold pass over the SST batch, which
+found this line still recording only the approval
 
 ## What was asked
 

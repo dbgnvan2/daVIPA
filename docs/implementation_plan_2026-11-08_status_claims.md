@@ -68,7 +68,7 @@ implemented**:
 | `implementation_plan_2026-08-18_downloadable_release.md:4` | "Awaiting approval. No implementation code written yet." | `build_mac.sh`, `daVIPA.spec`, `tests/test_release_docs.py`, `tests/test_release_licensing.py` |
 | `spec_2026-08-18_downloadable_release.md:3` | "Draft, awaiting approval" | same |
 | `implementation_plan_2026-08-26_backlog_clearance.md:4` | "awaiting approval — no code written" | `tests/test_timer_session_endings.py:560` asserts B4's `NextStepsDialog` deletion |
-| `spec_2026-11-05_demo_install.md:3` | "Draft v1, awaiting approval" | `docs/spec_coverage_2026-11-05_demo_install.md`, 46 `done`, 1 `not done` |
+| `spec_2026-11-05_demo_install.md:3` | "Draft v1, awaiting approval" | `docs/spec_coverage_2026-11-05_demo_install.md`: 45 `done` (41 plain, 3 "prose, no test", 1 source-text guard), 1 `not done`, and 1 criterion verified by hand, whose row carries no `done`. **Corrected 2026-11-09 by the third cold pass**, which counted the status cells; this said 46 `done`, 1 `not done`, counting the hand-verified row as `done` |
 | `implementation_plan_2026-06-06_project_notes.md:152` | ready for approval, nothing written, M1 awaiting a sign-off | `docs/spec_coverage.md`'s first table is this plan's coverage: 25 `M…` rows, all `done`. **Added 2026-11-09 by the cold pass.** The grep above returned this line and the triage dropped it; it was then outside the guard as well, because the claim sits under a `## Status` heading rather than on a line starting "Status" |
 
 Two more documents match the grep and are **not** defects, so they are not in
@@ -76,6 +76,25 @@ the table: `implementation_plan_2026-11-08_priority_defaults_and_cap.md:4` and
 `implementation_plan_2026-11-08_pri_tests.md:101` both quote the wrong claim in
 order to record that it was corrected, and `docs/DOCUMENTATION_INDEX.md` does
 the same (`grep -in "awaiting approval; no" docs/DOCUMENTATION_INDEX.md`).
+
+### 1.1b Five more, in words the grep above does not match (2026-11-09)
+
+Found by the third cold pass, which audited the repository against the code
+instead of auditing this batch against itself. None of these five is matched by
+the grep in §1.1 or by the guard written from it, and all five are corrected:
+
+| document | the claim | evidence it is built |
+|---|---|---|
+| `spec_2026-08-23_dopamine_reward_protocol.md` | "Draft for implementation" | `src/getmoredone/reward_protocol.py`, and 41 `RP-` rows in `docs/spec_coverage.md`, every one `done`. The SST batch corrected this spec's **paired plan** twice and never looked at the spec |
+| `implementation_plan_2026-06-06.md` | ready for review; all three phases in the future tense | `db_manager.bulk_update_action_items`, the bulk-edit controls in `screens/project_boards.py`, and `tests/test_project_board_bulk_edit.py`. The twin of `implementation_plan_2026-06-06_project_notes.md`, found for the same reason |
+| `implementation_plan_2026-08-25_timer_session_endings.md` | "approved; in progress" | `tests/test_timer_session_endings.py`, 55 tests across T1–T7 and B0–B4 |
+| `implementation_plan_2026-08-25_project_time_totals.md` | approval only, no build state | `db_manager_project_boards.py` derives `session_count` and `total_minutes` in SQL; `tests/test_project_time_totals.py`, 13 tests |
+| `implementation_plan_2026-11-08_pri_tests.md` | approval only, no build state | `tests/test_priority_floor_and_cap.py`, 15 tests |
+
+The last three recorded only **how the plan was approved** and never acquired a
+build state. No deny-list of "not built" phrasings can reach those, which is
+why `SST-A3` — invert the check, require a recognised built form — was raised
+to high rather than patched again.
 
 ### 1.2 The WTP criterion count (`SSC-6`)
 

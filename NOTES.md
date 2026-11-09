@@ -15,7 +15,16 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   failure family, then found one high and five mediums — among them a criterion
   recorded `done` against the docs-sync gate, which runs only on
   `pull_request` and so has never run here (`SST-A8`). All six fixed.
-  `SST-A1` to `SST-A8` are filed, not fixed. See
+  A third pass then audited the repository against the code rather than the
+  batch against itself: it found no false correction, and two more documents
+  whose work had shipped months earlier in wordings no guard reads, plus two
+  dead test references on `done` rows that
+  `tests/test_traceability_refs.py` could not see because it scanned one
+  coverage document instead of the family. All fixed. `SST-A1` is closed — its
+  floor is replaced by membership per source — and `SST-A3` is raised to
+  **high**: three passes have each found documents the phrase list could not
+  see, and three plans record only how they were approved, which no deny-list
+  reaches. `SST-A2` to `SST-A8` filed, not fixed. See
   `docs/changes/2026-11-08-status-claims.md`.
 
 - **Both leftover branches are settled.**

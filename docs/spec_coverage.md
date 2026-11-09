@@ -1128,13 +1128,14 @@ is another reference, and the count is the point.)
 
 ### Mutations
 
-Eighteen, each restored with the verbatim original and confirmed
+Twenty, each restored with the verbatim original and confirmed
 byte-identical by sha256 rather than by `git diff` — two of the files were
 untracked when the first mutations ran, which is the state that made a
 `git checkout --` restore report success while restoring nothing in the PRIT
 batch. A to H were run as the guards were written, I to L on 2026-11-09 against
-the assertions the first cold pass changed, and M to R the same day against the
-assertions the second one changed.
+the assertions the first cold pass changed, M to R the same day against the
+assertions the second one changed, and S and T against
+`tests/test_traceability_refs.py`, which the third one changed.
 
 | | mutation | result |
 |---|---|---|
@@ -1155,6 +1156,8 @@ assertions the second one changed.
 | O | the index's WTP entry goes to "39 of 39" | 1 failed (SST-M3). Green before: `docs/DOCUMENTATION_INDEX.md` was in no guard's domain, and it was one of the three documents that disagreed in the original defect |
 | P | a line cite written as a bare basename plus a line number — no `docs/` prefix — added to `NOTES.md` (described, not written out: the widened pattern reads this file) | 1 failed (SST-M8). Green before: the pattern required the `docs/` prefix for three of the four chronic documents. No such cite existed, so the hole was latent |
 | Q | `NOTES.md` stops naming any `SST-…` id | 1 failed (SST-M10) — the guard that replaced "the docs-sync gate" |
+| S | a dead test name returns to a coverage sidecar | 1 failed (`test_every_referenced_test_name_exists`). Green before the third cold pass widened `SCANNED` to the whole `docs/spec_coverage*.md` family: two such names were live on rows marked `done`, one of them a test that has never existed |
+| T | `SCANNED`'s coverage entry narrows back to the single file | 1 failed (`test_this_guard_can_actually_fire`). The floor of 140 it replaced passed this. First attempt proved nothing — the string occurred twice, so the mutation narrowed the guard and its own check together; re-run against the `SCANNED` line alone |
 | R | the PRI plan names all four `PRI-A` items instead of its two endpoints | 1 **passed**, which is the point: SST-M9 asserted the set of names equalled the two endpoints, so the natural edit now that the four are filed turned it red with nothing wrong. It now checks that every name is inside the promised range |
 
 
@@ -1162,12 +1165,12 @@ G and H are the two guards that shipped unable to fail. Both were found by
 asking what the assertion would accept, not by running it, and both are the
 batch's own subject appearing in the batch's own tooling.
 
-**Ten of the eighteen were green when first run** against the assertion as it
+**Twelve of the twenty were green when first run** against the assertion as it
 then stood: G and H as shipped, I to L against the assertions the first cold
-pass had to change, M to P against the assertions the second one had to change.
-R is the opposite failure — an assertion red on a correct edit. That is eleven
-of eighteen mutations finding something, in a batch whose subject is claims
-nothing checks.
+pass had to change, M to P against the assertions the second one had to change,
+and S and T against the one the third one had to. R is the opposite failure —
+an assertion red on a correct edit. That is thirteen of twenty mutations
+finding something, in a batch whose subject is claims nothing checks.
 
 The pattern is not that the guards were careless; each was green when written,
 and each was written by someone who had just read the defect it was for. It is

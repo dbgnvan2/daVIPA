@@ -142,4 +142,17 @@
 
 ## Status
 
-**Ready for review and approval.** Once approved, Phase 1 (UI) will be implemented first, followed by Phase 2 (DB), then Phase 3 (testing).
+**Built and on `main`** — all three phases. Phase 2 is
+`db_manager.bulk_update_action_items` (`grep -n "def bulk_update_action_items"
+src/getmoredone/db_manager.py`); Phase 1 is the bulk-edit controls in
+`src/getmoredone/screens/project_boards.py`; Phase 3 is
+`tests/test_project_board_bulk_edit.py`.
+
+Corrected 2026-11-09 by the third cold pass over the SST batch. This section
+said the plan was ready for review and described all three phases in the
+future tense. It is the twin of
+`docs/implementation_plan_2026-06-06_project_notes.md`, which the first cold
+pass found for the same reason: the claim sits under a `## Status` heading, and
+the words it is written in are in no guard's phrase list. Neither document
+appears in `docs/DOCUMENTATION_INDEX.md`, which is how both stayed invisible
+(`UPD-A13`).

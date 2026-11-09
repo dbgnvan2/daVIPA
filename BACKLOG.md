@@ -445,7 +445,7 @@ not.
 
 Found while measuring for the SST batch, outside its scope, not fixed.
 
-### SST-A1 — a reference guard's floor is 18% of its domain (medium)
+### SST-A1 — a reference guard's floor is 18% of its domain — CLOSED 2026-11-09
 
 `tests/test_traceability_refs.py::test_this_guard_can_actually_fire` asserts
 `len(found) >= 140`, under a comment calling it "An exact floor, not 'more than
@@ -468,7 +468,21 @@ same choice is cheap there and expensive here. Options: an exact count, a
 band, or a per-scanned-file count so a narrowing in one file cannot be masked
 by growth in another.
 
-**Priority:** Medium
+**Closed 2026-11-09 by a fourth option that needs no judgement about redness:
+membership per source.** The floor is gone. The companion now requires every
+`docs/spec_coverage*.md` file to contribute at least one reference, plus
+`conftest.py` and something under `src/`, so narrowing any arm of the scan
+fails while adding references never does. One coverage document is exempt
+because it names its tests without a `tests/` path (`SST-A2`'s class), and the
+exemption is checked in both directions. Mutation T in
+`docs/spec_coverage.md`'s SST table: narrowing `SCANNED` back to the single
+coverage file fails the companion, where the floor of 140 passed.
+
+The same route replaced the floor of 200 that
+`tests/test_doc_status_claims.py` shipped with, so the two guards now agree on
+how they prove they can fire.
+
+**Priority:** Medium — closed
 **Effort:** Low
 
 ### SST-A2 — fourteen test references are written in a form no guard reads (low)
@@ -495,7 +509,7 @@ fourteenth would stop looking like a live pointer.
 **Priority:** Low
 **Effort:** Low
 
-### SST-A3 — the "not built" guard is a phrase list, so a new wording escapes it (medium)
+### SST-A3 — the "not built" guard is a phrase list, so a new wording escapes it (high)
 
 `tests/test_doc_status_claims.py`'s `_NOT_BUILT` is a fixed alternation: ten
 phrasings this repo has actually used, plus the nearest variants. A plan headed
@@ -509,13 +523,26 @@ Four phrases were added in response — `not started`, `no code exists`,
 `not yet implemented`, `not yet built` — which narrows the hole without
 closing it.
 
+**Raised to high 2026-11-09 by the third cold pass, which measured the cost.**
+The list missed two more documents whose work had shipped months earlier:
+`docs/spec_2026-08-23_dopamine_reward_protocol.md`, headed as a draft for
+implementation over `src/getmoredone/reward_protocol.py` and 41 `done` `RP-`
+rows, and `docs/implementation_plan_2026-06-06.md`, whose `## Status` described
+three built phases in the future tense. Both phrasings have now been added to
+the list, which is the same patch applied for the third time. Three further
+documents recorded only an approval state — "approved; in progress" over 55
+tests — and **no deny-list of unbuilt phrasings can reach those at all**.
+
+So the measured record of the deny-list is: three passes, each finding
+documents it could not see, each answered by lengthening it.
+
 The fix is not a longer list. It is to invert the check: a plan's status line
 must *match* one of a small set of recognised forms (built, superseded,
 registered as a draft), so an unrecognised sentence fails rather than passing.
-That is a convention imposed on 35 existing documents, which is why it was not
-done in-loop.
+That is a convention imposed on 35 existing documents, and it is the one piece
+of work in this family with a measured defect rate behind it.
 
-**Priority:** Medium
+**Priority:** High
 **Effort:** Medium
 
 ### SST-A4 — four of the seven guards have no companion proving they can fire (low)
@@ -963,7 +990,13 @@ to say `grep -rn DOCUMENTATION_INDEX tests/` returned nothing; the SST batch
 falsified that on 2026-11-08 — the grep now returns the eight lines in
 `tests/test_doc_status_claims.py`, none of which checks completeness. Corrected
 2026-11-09 by the second cold pass; the conclusion stands, its evidence did
-not.) The index is kept by hand - which is how it came to carry a
+not.) **Measured 2026-11-09 by the third cold pass: 26 of the 42
+`docs/implementation_plan_*.md`, `docs/spec_*.md` and `docs/spec_coverage_*.md`
+documents are absent from the index.** Two of the 26 were the stale status
+claims that pass found — a spec headed as a draft over a module that shipped in
+August, and a plan whose `## Status` described three built phases in the future
+tense. That is the mechanism: a document in no index is a document nobody
+re-reads. The index is kept by hand - which is how it came to carry a
 "Not approved" line for a plan that had been approved and built the same day,
 found while writing this batch's entry.
 

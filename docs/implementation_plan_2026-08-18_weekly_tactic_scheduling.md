@@ -496,7 +496,7 @@ Test paths are the spec's verbatim; `::` rows continue the file above them.
 | WT-M5.A.5 | `::test_wt_m5a5_completion_across_year_boundary` | 9 |
 | WT-M5.A.6 | `::test_wt_m5a6_completion_refile_records_history` | 9 |
 | WT-M5.B.1 | `::test_wt_m5b1_reopen_keeps_completion_week_tactic` | 9 |
-| WT-M5.C.1 | `::test_wt_m5c1_followup_inherits_lineage_and_stays_in_range` | 9 |
+| WT-M5.C.1 | `::test_wt_m5c1_create_followup_item_also_inherits` | 9 |
 
 ### WT-M6 — Entry points
 

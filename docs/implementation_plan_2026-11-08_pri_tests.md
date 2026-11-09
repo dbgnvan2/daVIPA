@@ -1,6 +1,10 @@
 # Implementation plan — the tests PRI-M1 and PRI-M2 shipped without (2026-11-08)
 
-Status: **proceeding without a separate approval round.** The user's standing
+Status: **built and on `main`** — `tests/test_priority_floor_and_cap.py`
+carries 15 tests including `test_prim11_…` and `test_prim12_…`. The build
+status was added 2026-11-09 by the third cold pass over the SST batch; this
+line recorded only how the plan was approved. Proceeding without a separate
+approval round: the user's standing
 instruction for this stretch was "proceed on your own recommendations as I'm
 going to be away ... you can then start on open items", given after the PDT
 batch's sweep. That is the authorization to pass the plan-approval gate the

@@ -1,7 +1,12 @@
 # Implementation plan — the timer window's three session endings
 
 Date: 2026-08-25
-Status: **approved; in progress.** Revised 2026-08-25 after the user tested the
+Status: **built and on `main`.** `tests/test_timer_session_endings.py` carries
+55 tests across T1 to T7 and B0 to B4, among them the B4 check that this
+repo's other records cite (`grep -n "def test_b41" tests/test_timer_session_endings.py`).
+Corrected 2026-11-09 by the third cold pass over the SST batch; it had said
+"approved; in progress" since August, which no guard reads as a claim about
+built work. Revised 2026-08-25 after the user tested the
 flow and after step 1 failed to reproduce T1 as written — see "What step 1
 actually found".
 

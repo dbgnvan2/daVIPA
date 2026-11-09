@@ -368,12 +368,14 @@ No file under `src/` is touched. Handoff note:
 `docs/changes/2026-11-08-status-claims.md`, which is listed here only inside
 this entry rather than as an entry of its own, as every handoff note is:
 
-- Two cold passes on 2026-11-09, in different failure families, found eleven
-  and six medium-or-higher defects in this batch, all confirmed by
-  re-measurement and all fixed. Ten of the eighteen mutations over
-  `tests/test_doc_status_claims.py` were green against the assertion as it then
-  stood. `SST-A3`–`SST-A8` filed, not fixed; `SST-A8` is the docs-sync gate,
-  which runs only on `pull_request` and so has never run here.
+- Three cold passes on 2026-11-09, in three failure families, found eleven,
+  six and eight defects in this batch, all confirmed by re-measurement and all
+  fixed. Twelve of the twenty mutations were green against the assertion as it
+  then stood. The third pass audited the repo against the code and found no
+  false correction, but two more stale status claims in wordings no guard
+  reads. `SST-A1` closed; `SST-A3` raised to high; `SST-A2`–`SST-A8` filed,
+  not fixed, `SST-A8` being the docs-sync gate, which runs only on
+  `pull_request` and so has never run here.
 - Seventeen stale lines in sixteen documents saying no implementation code was
   written, over work that is built — the oldest wrong since August, and one of
   them about PD-M14, the surviving plan-day design. `SSC-4` called its four "a
