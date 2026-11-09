@@ -13,11 +13,12 @@ REPOSITORY's documents, not on application behaviour, so they are marked
 ``meta`` like ``tests/test_traceability_refs.py`` — the marker is for the speed
 of ``-m "not meta"``, never for skipping.
 
-There are seven guards here and three companions proving a guard can fire
+There are thirteen guards here and three companions proving a guard can fire
 (P24), because a document guard that silently matches nothing is
-indistinguishable from a document that is correct. The four without a
-companion — SST-M4, SST-M7, SST-M9 and the second half of SST-M3 — each assert
-on a named anchor in a named file, so a guard that stopped finding its subject
+indistinguishable from a document that is correct. Ten of the thirteen have no
+companion. Four of those — SST-M4, SST-M7, SST-M9 and the second half of
+SST-M3 — each assert on a named anchor in a named file, so a guard that stopped
+finding its subject
 fails on the anchor rather than passing vacuously. That is weaker than a
 companion and is filed as `SST-A4`.
 """
@@ -176,11 +177,19 @@ def test_sstm2_the_register_guard_can_fire():
     assert not [name for name in names if not name.endswith(".md")], (
         "a non-markdown path reached the scan")
 
+    # The register's second direction reads the allow-list, not the deny-list.
+    # It asked `_claims_not_built` until the third cold pass found the double
+    # bind: a document headed "Status: Draft." classifies as `draft`, so
+    # SAG-M1.3 requires it to be registered, and registering it made THIS
+    # assertion red, because `_NOT_BUILT` does not accept "Draft." on its own.
+    # Two vocabularies, no document stating either, and the plainest draft
+    # status in the repo's own first step unable to satisfy both. Changed on
+    # purpose (test rule (b)); `test_sagm13` holds the same pair of directions.
     for name in sorted(DRAFTS_NOT_BUILT):
         assert (REPO / name).exists(), f"registered document is gone: {name}"
-        assert _claims_not_built(REPO / name), (
-            f"{name} is registered but its status line does not claim the work "
-            "is unwritten, so the register's second direction is inert")
+        assert registered_claim_is_unbuilt(REPO / name), (
+            f"{name} is registered but its status claim does not read as an "
+            "unbuilt form, so the register's second direction is inert")
 
     # The patterns, against text rather than against the tree.
     assert _STATUS_HEADING.match("## Status")
@@ -196,6 +205,608 @@ def test_sstm2_the_register_guard_can_fire():
     assert _NOT_BUILT.search("planned, not built — awaiting approval")
     assert _NOT_BUILT.search("Awaiting approval — no code changed yet.")
     assert not _NOT_BUILT.search("PRI-M1 and PRI-M2 are built and on `main`")
+
+
+# ------------------------------------------------------------------- SAG-M1
+#
+# The inversion. `_NOT_BUILT` above is a deny-list: it can only reject a
+# phrasing someone has already met. Three cold passes over the SST batch each
+# found documents it could not see, and each was answered by lengthening it —
+# the same patch three times, which is the measured record in `SST-A3`.
+#
+# This guard reads the other way round. A document's status claim must MATCH a
+# recognised form, so silence, an approval state, or a new way of writing "not
+# built" fails rather than passes. `SST-A3` put the cost at "a convention
+# imposed on 35 existing documents"; measured, it was six, and §1.1 of the
+# plan names them. (`_NOT_BUILT` holds twelve phrasings, not the ten the first
+# records of this batch said: the last two were added by the SST batch's own
+# third cold pass, which is the measured record the paragraph above is about.)
+#
+# What it still cannot do is judge whether a recognised claim is TRUE. SST-N1
+# said that of the deny-list and it is just as true here (SAG-N1). What changes
+# is the default.
+
+#: The words this repo uses to say the work exists. One vocabulary, read by
+#: `_BUILT_SHAPES` — the four shapes of the single form that claims the work
+#: exists — so "Implementation is complete" and "built" are the same claim
+#: rather than one recognised and one not. It was shared by three separate
+#: forms until the third cold pass made them one.
+#:
+#: `live` was in this list until the cold pass, 2026-11-09, which pointed out
+#: that "Live question, no answer yet" classifies as a built claim and that no
+#: document here has ever used the word. A vocabulary word that only an unusual
+#: sentence can reach is a hole, not a convenience.
+_BUILT = r"(?:built|implemented|shipped|complete|completed|done)"
+
+#: Each form is named, and the name appears in the failure message, so a
+#: document that fails says which forms it was measured against rather than
+#: printing one long alternation.
+#:
+#: **Order matters, and it is the unbuilt forms first.** `built` is the only
+#: form that does not have to match at position 0, so when it was tried first
+#: it shadowed the other three: "Draft — design complete, awaiting approval"
+#: and "Awaiting approval; the spec is complete" both classified as `built`,
+#: which is the opposite of what they say. Measured by the fourth cold pass,
+#: 2026-11-09, over the third pass's own fix.
+#:
+#: There were five forms before the third cold pass — `built`,
+#: `approved-and-built`, `partly-built` — one rule written three times, each
+#: with a prefix enumerating the punctuation an ID list may contain. The
+#: enumeration had been widened once and still rejected `&` and `:`, so it was
+#: replaced with a built word anywhere in the first sentence. That was too
+#: loose: the fourth pass measured "Spec complete, implementation not started."
+#: and "Design done, no code yet." as `built`, where the deny-list this guard
+#: replaces would have caught both. A guard that accepts a false claim in
+#: silence is worse than one that rejects a true claim loudly, so the form is
+#: anchored again — as a short list of *shapes*, each with a reason, rather
+#: than as a class of permitted characters:
+#:
+#:   (a) the claim leads with the state — "built and on `main`"
+#:   (b) only digits and punctuation come first — "2026-11-10 — built and on …"
+#:   (c) the built word is a predicate — "M1, M2 and M3 are built."
+#:   (d) an approval and a build in one sentence — "approved … and built."
+#:
+#: Nothing else is a built claim. "Spec complete, implementation not started."
+#: matches none of the four, so the unbuilt forms get it; "All criteria done."
+#: and "PD-M1 built, PD-M2 outstanding." match none either and fail loudly,
+#: which is the right direction — "All criteria are done." is (c).
+_BUILT_SHAPES = (
+    rf"{_BUILT}\b",                                   # (a)
+    rf"[^.!?a-zA-Z]*{_BUILT}\b",                       # (b)
+    rf"[^.!?]*\b(?:is|are|was|were)\s+{_BUILT}\b",    # (c)
+    rf"approved\b[^.!?]*\b{_BUILT}\b",               # (d)
+)
+
+_STATUS_FORMS = {
+    "superseded": re.compile(r"^(superseded|withdrawn|abandoned)\b", re.I),
+    # The two forms that do not claim the work exists. Both put a document in
+    # DRAFTS_NOT_BUILT, and the negation check below does not apply to them:
+    # "Not approved." is a negation by design, and the check is there to stop a
+    # negation inverting a *built* claim. It made `not approved` an unreachable
+    # alternative of this form until the third cold pass measured it.
+    "draft": re.compile(r"^(draft|planned|proposed|not approved)\b", re.I),
+    # The deny-list's own vocabulary, read the other way round: the twelve
+    # phrasings `_NOT_BUILT` accepts as a registerable claim are a recognised
+    # FORM, so the two guards cannot disagree about what an unbuilt status
+    # looks like. Ten of the twelve were in that state — legitimate under
+    # SST-M1 once registered, and red under SAG-M1.1 with no way to register
+    # out. Measured by the third cold pass, 2026-11-09.
+    #
+    # It reads the whole first sentence, which is what catches "Spec complete,
+    # implementation not started." now that it is tried before `built`.
+    "not-built": re.compile(rf"^[^.!?]*(?:{_NOT_BUILT.pattern})", re.I),
+    "built": re.compile("|".join(rf"^(?:{shape})" for shape in _BUILT_SHAPES),
+                        re.I),
+}
+
+#: The forms that do not claim the work exists. A document whose claim matches
+#: one of these belongs in `DRAFTS_NOT_BUILT`, and `SAG-M1.3` holds both
+#: directions.
+_UNBUILT_FORMS = ("draft", "not-built")
+
+#: A built word reached only after a negation is not a built claim.
+#: "Nothing is built yet" matches `partly-built` on its face, which would have
+#: made the inversion weaker than the deny-list it replaces for exactly the
+#: sentences SST-A3 is about.
+#:
+#: The negated words are enumerated rather than matched as a prefix. The first
+#: version had `un\w+` in this alternation and so rejected "approved **under**
+#: the standing instruction and built the same day" — two of this repo's own
+#: plans — along with any status mentioning the *unified* panel or an
+#: *unplanned* criterion. A pattern that broad fails on correct work, which is
+#: the tax this file's other guards were rewritten to stop paying.
+_NEGATION_WORDS = (r"not|no|nothing|none|never|without"
+                   r"|unbuilt|unimplemented|unstarted|unfinished|undone")
+_NEGATION = re.compile(rf"\b({_NEGATION_WORDS})\b", re.I)
+
+
+def registered_claim_is_unbuilt(path):
+    """Does this document's status claim read as work that is not written?
+
+    The register's contract, as one function, because two guards ask it —
+    `test_sstm2` and `SAG-M1.3` — and they asked it two different ways until
+    the third cold pass, 2026-11-09. `test_sstm2` asked `_claims_not_built`,
+    the deny-list; `SAG-M1.3` asked the allow-list. A document headed
+    "Status: Draft." answers yes to the second and no to the first, so it had
+    to be registered and could not be, and the repo's own first step is to
+    commit a plan in exactly that state.
+    """
+    return classify_status_claim(_status_claim(path)) in _UNBUILT_FORMS
+
+
+def _status_claim(path):
+    """The document's first status claim, or None.
+
+    "First" is the scope, and it is a decision rather than an oversight: every
+    stale claim the three cold passes found was in the document's leading
+    `**Status:**` line or the first line of its `## Status` section — the one a
+    reader reads for the current state. Later status lines keep `_NOT_BUILT` as
+    a tripwire, and the residue is filed as `SAG-A1`.
+    """
+    in_section = False
+    fenced = False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        # A fenced block is an example, not a claim. These documents quote
+        # status conventions and the handoff-note template, whose own `Status`
+        # field would otherwise be read as the document's claim — in either
+        # direction: a quoted "built" line hid a real draft, and a quoted "not
+        # built" line would demand that built work be registered. No real
+        # document has one today; found by the fourth cold pass, 2026-11-09,
+        # before one did.
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        if _STATUS_HEADING.match(line):
+            in_section = True
+            continue
+        if in_section and _ANY_HEADING.match(line):
+            in_section = False
+        if _STATUS_LINE.match(line):
+            return _strip_status_label(line)
+        if in_section and line.strip():
+            # A markdown table row is not a one-line claim. A `## Status`
+            # section that opens with a criterion/state table used to make the
+            # header row the claim, which matched no form; now the sentence
+            # below the table is found instead. A section that is *only* a
+            # table still has no claim, and fails with the message below
+            # saying so (fourth cold pass, 2026-11-09).
+            if line.lstrip().startswith("|"):
+                continue
+            return _strip_status_label(line)
+    return None
+
+
+def _strip_status_label(line):
+    """"**Status:** — _built and on `main`_." -> "built and on `main`.".
+
+    The separator and the emphasis have to come off as well as the label,
+    because every form is anchored at `^`. The first version removed `**` and
+    the label only, so "**Status** — built and on `main`." — the dash before
+    the state rather than after it, which is this repo's commonest status
+    style — matched no form at all. It was green only because the six documents
+    this batch edited happen to put the dash after the built word. Found cold,
+    2026-11-09.
+    """
+    # A leading list marker comes off first, or the label is not at `^` and
+    # nothing after this strips it: "- **Status:** Draft." kept its label and
+    # so matched no anchored form, which landed only on draft and superseded
+    # documents, because `built` had been left unanchored. Fourth cold pass.
+    text = re.sub(r"^[-*+\u2022]\s+", "", line.strip())
+    text = re.sub(r"^\*{0,2}status\*{0,2}\s*:?\s*", "", text, flags=re.I)
+    text = text.replace("**", "").replace("*", "")
+    return text.strip(" \t_:\u2013\u2014-").strip()
+
+
+#: A built word that is a question, or that the next word negates, is not a
+#: claim that the work exists: "Shipped? not yet." and "Done nothing yet."
+#: both matched the forms above until the cold pass measured them, 2026-11-09.
+_CANCELLED = re.compile(rf"^\s*(?:\?|\b(?:{_NEGATION_WORDS})\b)", re.I)
+
+
+def classify_status_claim(text):
+    """The form this claim matches, or None. Public so the tests can drive it.
+
+    A form matches when its pattern matches and — for the forms that claim the
+    work exists — nothing before the end of the match negates it and the match
+    is not immediately cancelled by a question mark or a negation. The two
+    unbuilt forms are exempt from both checks, because a negation is what they
+    are made of.
+
+    What this still cannot see is a built word used as an adjective —
+    "Complete rewrite proposed." classifies as `built`. Filed as `SAG-A8`
+    rather than guessed at: recognising that needs the word's part of speech,
+    and a guard that tried would spend its failures on grammar.
+    """
+    if not text:
+        return None
+    for name, pattern in _STATUS_FORMS.items():
+        match = pattern.match(text)
+        if not match:
+            continue
+        if name not in _UNBUILT_FORMS:
+            # A negation only matters where it can invert a claim that the
+            # work exists. Applying it to `draft` and `not-built` discarded
+            # the very words those forms are made of.
+            if _NEGATION.search(text[:match.end()]):
+                continue
+            if _CANCELLED.match(text[match.end():]):
+                continue
+        return name
+    return None
+
+
+def test_sagm11_every_status_claim_matches_a_recognised_form():
+    """SAG-M1.1 — an unrecognised status claim fails, including no claim."""
+    unrecognised = {}
+    for path in _status_documents():
+        name = str(path.relative_to(REPO))
+        claim = _status_claim(path)
+        if classify_status_claim(claim) is None:
+            unrecognised[name] = claim or "<no status claim at all>"
+
+    assert not unrecognised, (
+        "these documents' first status claim matches none of the recognised "
+        f"forms {sorted(_STATUS_FORMS)}. A plan or spec has to say what state "
+        "it is in, in a form a reader and this guard both recognise — lead "
+        "with the state, not with the approval, and give a sentence rather "
+        "than only a table:\n  "
+        + "\n  ".join(f"{name} — {claim[:110]}"
+                       for name, claim in sorted(unrecognised.items())))
+
+
+def test_sagm12_an_unrecognised_status_claim_is_rejected():
+    """SAG-M1.2 — the sentences a deny-list cannot reach.
+
+    These are the shapes the third cold pass measured on real documents, where
+    a deny-list of "not built" phrasings reaches none of them: a status that
+    records only an approval, a question, or silence.
+
+    The sentence SST-A3 was filed for — "Draft, implementation not scheduled.
+    No code exists yet." — is **not** here, and that is the point rather than
+    an omission: under the inversion it is recognised as a `draft` form, which
+    SAG-M1.3 then requires to be in `DRAFTS_NOT_BUILT`. The deny-list let it
+    pass with nothing recorded anywhere; the allow-list makes it a registration
+    or a failure.
+    """
+    for claim in (
+            "approved; in progress",
+            "approved to proceed",
+            "awaiting the user's decision",
+            "under discussion",
+            "Nothing is built yet.",
+            # Found cold, 2026-11-09: a built word the next word negates, and
+            # one that is a question. Both matched a form before the fix, and
+            # neither contains a phrase `_NOT_BUILT` can see, so they passed
+            # both guards — the exact class SAG-M1 exists to stop.
+            "Done nothing yet.",
+            "Shipped? not yet.",
+            "Completed? No.",
+            # "live" was in the vocabulary until the same pass.
+            "Live question, no answer yet.",
+            # Found by the fourth cold pass, 2026-11-09, as **false accepts**
+            # of the third pass's own fix: a built word whose subject is the
+            # spec, the design or the review, in a sentence that says the code
+            # does not exist. The deny-list this guard replaces caught the
+            # first of these; an unanchored built form did not, which made the
+            # inversion weaker than the list on the sentences SST-A3 is about.
+            "Design done, no code yet.",
+            "Planning complete, nothing written yet.",
+            "Review complete, implementation deferred.",
+            "Research complete. Implementation to follow.",
+            # These two were accepted by the third pass's form and are now
+            # rejected on purpose: neither is one of the four built shapes, and
+            # failing loudly is the right direction — "All criteria are done."
+            # is shape (c) and passes.
+            "All criteria done.",
+            "PD-M1 built, PD-M2 outstanding.",
+            "no code has been written for this",
+            "unimplemented",
+            "TBD",
+            "",
+    ):
+        assert classify_status_claim(claim) is None, (
+            f"{claim!r} was accepted as a recognised status form, so the "
+            "allow-list is as permissive as the deny-list it replaces")
+
+    for claim, expected in (
+            ("built and on `main`. `conftest.py` carries it.", "built"),
+            ("Built and on `main`.", "built"),
+            ("implemented 2026-11-07. Section 5 records the departures.", "built"),
+            # These were three separate forms — `built`, `approved-and-built`,
+            # `partly-built` — until the third cold pass collapsed them into
+            # one rule: a built word in the first sentence, un-negated. The
+            # expected names change here because the forms changed on purpose
+            # (test rule (b)), not because the test was made to pass.
+            ("approved and implemented (PB-M1 to PB-M5 approved 2026-11-06)",
+             "built"),
+            ("approved 2026-11-08 and built. M1-M5 implemented.", "built"),
+            ("PRI-M1 and PRI-M2 are built and on `main`; PRI-M3 is not.",
+             "built"),
+            ("superseded by PD-M13, which takes the modal off the drop path",
+             "superseded"),
+            ("draft, not approved, on the backlog.", "draft"),
+            # SST-A3's own sentence, recognised rather than ignored.
+            ("Draft, implementation not scheduled. No code exists yet.",
+             "draft"),
+            # An ID list is how this repo writes a partial state, and it
+            # writes them with commas, slashes, brackets and three dashes.
+            # Every one of these failed before the cold pass, which means the
+            # next batch's own status line would have failed.
+            ("M1, M2 and M3 are built.", "built"),
+            ("SAG-M1/M2 are built.", "built"),
+            ("PD-M1 \u2013 PD-M6 are shipped.", "built"),
+            ("All of M1 (the hard part) are built.", "built"),
+            # One vocabulary: these two were unrecognised while "built" was
+            # recognised, when each form carried its own word list.
+            ("Implementation is complete.", "built"),
+            ("Everything is done.", "built"),
+            # Measured by the third cold pass as claims the enumerated prefix
+            # rejected on correct work. `[^.!?]*` is a sentence rather than a
+            # list of punctuation, so these need no further patch.
+            ("All criteria are done.", "built"),
+            ("2026-11-10 \u2014 built and on `main`.", "built"),
+            ("SAG-M1 & SAG-M2 are built.", "built"),
+            ("`SAG-M1`: both halves are built.", "built"),
+            # The unbuilt forms are tried first, so a claim that leads with
+            # its state keeps it. All three of these classified as `built`
+            # while `built` was tried first and unanchored — the opposite of
+            # what they say (fourth cold pass).
+            ("Spec complete, implementation not started.", "not-built"),
+            ("Draft \u2014 design complete, awaiting approval", "draft"),
+            ("Awaiting approval; the spec is complete", "not-built"),
+            # `not approved` was an alternative of the `draft` form that the
+            # negation check discarded, so it could never match: a document
+            # headed "Status: Not approved." failed, and registering it did
+            # not help because SAG-M1.1 scans every document.
+            ("Not approved.", "draft"),
+            ("Draft.", "draft"),
+            # Every phrasing `_NOT_BUILT` accepts as a registerable claim is
+            # now a recognised form. Ten of the twelve were legitimate under
+            # SST-M1 and red under SAG-M1.1 with no way to register out.
+            ("Not yet implemented.", "not-built"),
+            ("No code written yet.", "not-built"),
+            ("Not built.", "not-built"),
+            ("Awaiting approval.", "not-built"),
+            ("CIP-M1 to CIP-M42: no code exists.", "not-built"),
+    ):
+        assert classify_status_claim(claim) == expected, (
+            f"{claim!r} was classified {classify_status_claim(claim)!r}, not "
+            f"{expected!r} — a form this repo actually uses must stay "
+            "recognised, or the guard's failures are about wording and not "
+            "about status")
+
+
+def test_sagm13_the_draft_register_holds_both_directions():
+    """SAG-M1.3 — a draft claim must be registered, and the reverse.
+
+    This is SST-M2's pair of directions, moved onto the allow-list: the "is it
+    a draft" half no longer asks a deny-list of phrasings.
+    """
+    drafts = set()
+    for path in _status_documents():
+        if registered_claim_is_unbuilt(path):
+            drafts.add(str(path.relative_to(REPO)))
+
+    unregistered = sorted(drafts - DRAFTS_NOT_BUILT)
+    assert not unregistered, (
+        "these documents' status claim is an unbuilt form and they are not in "
+        "DRAFTS_NOT_BUILT — either the work is built and the claim is stale, "
+        f"or the document belongs in the register: {unregistered}")
+
+    stale = sorted(DRAFTS_NOT_BUILT - drafts)
+    assert not stale, (
+        "these are registered as not built, and their status claim no longer "
+        f"reads as an unbuilt form. If they were built, drop them: {stale}")
+
+
+def test_sagm14_a_document_with_no_status_claim_fails(tmp_path):
+    """SAG-M1.4 — silence is the failure mode a deny-list cannot have.
+
+    `docs/implementation_plan_2026-06-22.md` carried no status line at all for
+    five months, and no phrase list can see a sentence that was never written.
+    """
+    silent = tmp_path / "implementation_plan_2026-01-01_silent.md"
+    silent.write_text(
+        "# Implementation plan — something\n\nDate: 2026-01-01\n\n"
+        "## Design\n\nIt does a thing.\n", encoding="utf-8")
+
+    assert _status_claim(silent) is None
+    assert classify_status_claim(_status_claim(silent)) is None
+
+    # And a status section whose first line is prose is not a claim either.
+    vague = tmp_path / "implementation_plan_2026-01-02_vague.md"
+    vague.write_text(
+        "# Implementation plan — something else\n\n## Status\n\n"
+        "This section explains how the work was scoped.\n", encoding="utf-8")
+    assert classify_status_claim(_status_claim(vague)) is None
+
+
+def test_sagm15_the_forms_reject_a_built_word_after_a_negation(tmp_path):
+    """SAG-M1.5 — the patterns, against text, in both directions.
+
+    The negation check is what keeps the `built` form from accepting "Nothing
+    is built yet", which would have made this guard weaker than the list it
+    replaces on precisely the sentences SST-A3 is about.
+    """
+    assert _NEGATION.search("Nothing is ")
+    assert _NEGATION.search("no code in ")
+    assert _NEGATION.search("unimplemented")
+    assert not _NEGATION.search("built and on ")
+    assert not _NEGATION.search("PRI-M1 and PRI-M2 are ")
+
+    # The cancellation check, which is the other half: a negation *after* the
+    # match, and a question mark.
+    assert _CANCELLED.match(" nothing yet")
+    assert _CANCELLED.match("? not yet")
+    assert not _CANCELLED.match(" and on `main`")
+    assert not _CANCELLED.match(", except PD-M12")
+
+    # The label stripper, which decides what the patterns see. The separator
+    # and the emphasis come off with the label: four spellings of this repo's
+    # own commonest status style failed before the cold pass measured them.
+    assert _strip_status_label("**Status:** **Built and on `main`.**") == (
+        "Built and on `main`.")
+    assert _strip_status_label("Status: built") == "built"
+    assert _strip_status_label("Status built 2026-11-09") == "built 2026-11-09"
+    for spelling in ("**Status** \u2014 built and on `main`.",
+                     "**Status:** \u2013 built and on `main`.",
+                     "Status: - built and on `main`.",
+                     "**Status:** _built and on `main`_."):
+        assert classify_status_claim(_strip_status_label(spelling)) == "built", (
+            f"{spelling!r} is a status claim this repo writes and it was not "
+            "recognised; the forms are anchored at ^, so whatever the label "
+            "leaves behind has to be stripped")
+
+    # The register's contract, over a document written here rather than one
+    # that happens to be registered: the plainest draft status this repo can
+    # write has to be registerable. The one real registered document says
+    # "draft, not approved, on the backlog. No code written yet.", which
+    # satisfies the deny-list and the allow-list both, so it cannot show the
+    # difference — and that is why the double bind survived three passes.
+    plain = tmp_path / "implementation_plan_2026-01-02_plain_draft.md"
+    plain.write_text("# Implementation plan — a thing\n\nStatus: Draft.\n",
+                     encoding="utf-8")
+    assert classify_status_claim(_status_claim(plain)) == "draft"
+    assert registered_claim_is_unbuilt(plain), (
+        "a document headed `Status: Draft.` has to be registerable: SAG-M1.3 "
+        "requires an unbuilt claim to be in DRAFTS_NOT_BUILT, so a register "
+        "that will not accept this one puts the author in a bind with no "
+        "status line that satisfies both guards")
+    assert not _claims_not_built(plain), (
+        "if the deny-list now accepts `Draft.` on its own, the bind this "
+        "assertion records is gone and the pair above can be simplified")
+
+    # The four built shapes, each reached by a claim of its own. A shape
+    # nobody can match is a dead branch, and the alternation is built from
+    # `_BUILT_SHAPES`, so a shape added without a sample is a red test.
+    for shape, sample in zip(_BUILT_SHAPES, (
+            "built and on `main`.",
+            "2026-11-10 \u2014 built and on `main`.",
+            "M1, M2 and M3 are built.",
+            "approved 2026-11-08 and built.")):
+        assert classify_status_claim(sample) == "built", (
+            f"no sample reaches the built shape {shape!r}")
+    assert len(_BUILT_SHAPES) == 4, (
+        "a built shape was added or removed; give it a sample in the loop "
+        "above rather than widening the count")
+
+    # The order of the forms, which is load-bearing: `built` is the only form
+    # that need not match at position 0, so trying it first shadowed the other
+    # three. These three sentences each lead with their state, and each
+    # classified as `built` until the fourth cold pass, 2026-11-09.
+    assert list(_STATUS_FORMS)[-1] == "built", (
+        "the `built` form has to be tried last: it is the only one that can "
+        "match away from position 0, so it shadows any form that follows it")
+    assert classify_status_claim("Draft \u2014 design complete, awaiting "
+                                 "approval") == "draft"
+    assert classify_status_claim("Awaiting approval; the spec is "
+                                 "complete") == "not-built"
+    assert classify_status_claim("Spec complete, implementation not "
+                                 "started.") == "not-built"
+
+    # A status line inside a fenced block is an example, not a claim, in both
+    # directions. These documents quote status conventions and the handoff-note
+    # template, whose own `Status` field would otherwise be read as the
+    # document's claim.
+    # A criterion/state table in a `## Status` section is not the claim: its
+    # header row was read as one and matched no form, so a document stating its
+    # status as a table went red with nothing wrong with it. The sentence below
+    # the table is found instead; a section that is only a table still has no
+    # claim, and the failure message says to give a sentence.
+    tabled = tmp_path / "implementation_plan_2026-01-06_tabled.md"
+    tabled.write_text(
+        "# Implementation plan \u2014 a thing\n\n## Status\n\n"
+        "| Criterion | State |\n|---|---|\n| M1 | built |\n\n"
+        "All criteria are built and on `main`.\n", encoding="utf-8")
+    assert classify_status_claim(_status_claim(tabled)) == "built", (
+        "a status section that opens with a table had its header row read as "
+        "the claim, so a document stating its status as a table fails")
+    only_table = tmp_path / "implementation_plan_2026-01-07_only_table.md"
+    only_table.write_text(
+        "# Implementation plan \u2014 a thing\n\n## Status\n\n"
+        "| Criterion | State |\n|---|---|\n| M1 | built |\n", encoding="utf-8")
+    assert _status_claim(only_table) is None, (
+        "a status section with no sentence in it has no claim, and saying so "
+        "is what makes the failure message's advice true")
+
+    quoting = tmp_path / "implementation_plan_2026-01-03_quoting.md"
+    quoting.write_text(
+        "# Implementation plan \u2014 a thing\n\n"
+        "The convention is:\n\n```markdown\n"
+        "**Status:** built and on `main`.\n```\n\n"
+        "**Status:** Draft, not approved.\n", encoding="utf-8")
+    assert _status_claim(quoting) == "Draft, not approved.", (
+        "a `Status` line inside a fenced example was read as the document's "
+        "own claim, so a quoted convention decides whether a real draft is "
+        "registered")
+    assert registered_claim_is_unbuilt(quoting)
+
+    # A list marker before the label. The label is stripped at `^`, so a
+    # bullet left it in place and every anchored form then missed — which
+    # landed only on draft and superseded documents, because `built` had been
+    # left unanchored by the same pass.
+    for bullet in ("- **Status:** Draft.", "* Status: superseded by PD-M13.",
+                   "+ **Status:** built and on `main`."):
+        assert classify_status_claim(_strip_status_label(bullet)) is not None, (
+            f"{bullet!r} is a status line this repo could write and the label "
+            "was not stripped, so no anchored form could match it")
+
+    # The limitation, asserted rather than left to be rediscovered: a built
+    # word used as an adjective still reads as a claim. `SAG-A8` is the filing;
+    # this assertion is what will go red when someone closes it, which is the
+    # only honest way to record a hole.
+    assert classify_status_claim("Complete rewrite proposed. No code yet.") == (
+        "built"), (
+        "if this now classifies as None, SAG-A8 has been closed — delete this "
+        "assertion and say so in the filing")
+
+    # Every form is reachable: a pattern nobody can match is a dead branch, and
+    # this asserts the dict's own keys rather than a count of them.
+    reached = {classify_status_claim(claim) for claim in (
+        "built and on `main`",
+        "approved 2026-11-08 and built",
+        "PRI-M1 is built",
+        "superseded by PD-M13",
+        "draft, not approved",
+        "no code exists yet",
+    )}
+    assert reached == set(_STATUS_FORMS), (
+        f"these forms were not reached by any sample: "
+        f"{sorted(set(_STATUS_FORMS) - reached)}")
+
+    # And every ALTERNATIVE inside the enumerated patterns is reachable, which
+    # the check above cannot see: it proves the four form *names* can be
+    # reached, and `not approved` was a dead alternative of `draft` for exactly
+    # that reason — the negation check discarded the match before it was
+    # returned. One word per alternative, taken from the patterns themselves,
+    # so adding an alternative that cannot match is a red test rather than a
+    # branch nobody notices (third cold pass, 2026-11-09).
+    # The alternatives are read out of the patterns, not retyped: a loop over
+    # a hardcoded list goes stale the moment a form gains an alternative, and
+    # mutation AW2 proved it — adding a fifth draft spelling left this green.
+    for name in ("superseded", "draft"):
+        parsed = re.fullmatch(
+            r"\^\((.+)\)\\b", _STATUS_FORMS[name].pattern)
+        assert parsed, (
+            f"the {name!r} form is no longer a bare alternation, so this loop "
+            "is reading nothing — rewrite it against the new shape rather "
+            "than deleting it")
+        for word in parsed.group(1).split("|"):
+            assert classify_status_claim(f"{word}.") == name, (
+                f"{word!r} is an alternative of the {name!r} form that nothing "
+                "can reach, so it is a dead branch")
+    for phrase in _NOT_BUILT.pattern.split("|"):
+        phrase = phrase.strip()
+        assert classify_status_claim(f"{phrase}.") in _UNBUILT_FORMS, (
+            f"{phrase!r} is a phrasing `_NOT_BUILT` accepts as a registerable "
+            "claim, and the allow-list does not recognise it — so a document "
+            "registered exactly as the register's own comment instructs would "
+            "be red under SAG-M1.1 with no way to register out. Either unbuilt "
+            "form satisfies the register: `not approved` is in both patterns "
+            "and `draft` is matched first, which is harmless because "
+            "SAG-M1.3 treats them alike")
 
 
 # ----------------------------------------------------------------- SST-M3/M4

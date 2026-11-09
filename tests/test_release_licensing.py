@@ -403,29 +403,53 @@ def test_bi2_the_docs_sync_gate_knows_about_both_dependency_files():
     tree = ast.parse(
         (REPO_ROOT / "tools/agents/check_docs_sync.py").read_text(encoding="utf-8")
     )
-    main = next(
-        (n for n in ast.walk(tree)
-         if isinstance(n, ast.FunctionDef) and n.name == "main"),
-        None,
+    # The decision moved out of main() into verdict() on 2026-11-09 (SAG-M2), so
+    # that the rule could be asserted without a git range. This assertion was
+    # over-specified — repo test rule (c): it pinned *where* the enumeration is
+    # read rather than that the deciding code reads it. It now asserts both
+    # halves of the same thing, which is stronger than the original: the
+    # function that decides reads the enumeration, and main() calls it.
+    functions = {
+        n.name: n for n in ast.walk(tree)
+        if isinstance(n, ast.FunctionDef)
+    }
+    assert "main" in functions, "check_docs_sync.py has no main()"
+    assert "verdict" in functions, (
+        "check_docs_sync.py has no verdict(); the docs-sync rule has to be a "
+        "function the suite can call, or it is back to running nowhere "
+        "(SST-A8)"
     )
-    assert main is not None, "check_docs_sync.py has no main()"
 
     reads_enumeration = any(
         isinstance(n, ast.Name) and n.id == "DEPENDENCY_FILES"
-        for n in ast.walk(main)
+        for n in ast.walk(functions["verdict"])
     )
     assert reads_enumeration, (
-        "main() never reads DEPENDENCY_FILES, so the enumeration is decoration "
-        "and the gate still keys on something else"
+        "verdict() never reads DEPENDENCY_FILES, so the enumeration is "
+        "decoration and the gate still keys on something else"
     )
 
+    calls_verdict = any(
+        isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+        and n.func.id == "verdict"
+        for n in ast.walk(functions["main"])
+    )
+    assert calls_verdict, (
+        "main() does not call verdict(), so the command line and the suite are "
+        "testing two different rules"
+    )
+
+    # Both functions now, for the same reason: a filename spelled inline in
+    # either of them is a second enumeration.
     hardcoded = sorted({
-        n.value for n in ast.walk(main)
+        n.value
+        for name in ("main", "verdict")
+        for n in ast.walk(functions[name])
         if isinstance(n, ast.Constant) and isinstance(n.value, str)
         and n.value.endswith(".txt")
     })
     assert not hardcoded, (
-        f"main() hardcodes dependency filenames {hardcoded} alongside "
+        f"the checker hardcodes dependency filenames {hardcoded} alongside "
         "DEPENDENCY_FILES. One enumeration, read in one place."
     )
 

@@ -254,6 +254,9 @@ def test_rm3a_tests_workflow_runs_on_push_and_pull_request():
 META_TEST_FILES = {
     "tests/test_ci_contract.py",
     "tests/test_doc_status_claims.py",
+    # SAG-M2: the docs-sync rule, which asserts on the repo's own
+    # documents and on tools/, not on application behaviour.
+    "tests/test_docs_sync_rule.py",
     "tests/test_release_licensing.py",
     "tests/test_packaging_filters.py",
     "tests/test_packaging_resources.py",
