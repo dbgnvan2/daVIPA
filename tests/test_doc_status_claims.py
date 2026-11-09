@@ -257,8 +257,8 @@ def test_sstm5_every_implementation_reference_resolves():
 def test_sstm5_that_guard_can_fire():
     found = list(_implementation_references())
     # Exact, for the same reason as the document count above.
-    assert len(found) == 185, (
-        f"{len(found)} implementation references found, expected 185 — the "
+    assert len(found) == 186, (
+        f"{len(found)} implementation references found, expected 186 — the "
         "pattern or the document set has changed; re-measure deliberately "
         "rather than lowering this")
     assert any(symbol.startswith("_") for _s, _t, symbol in found), (
