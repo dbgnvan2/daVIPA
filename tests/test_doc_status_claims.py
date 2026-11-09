@@ -1246,3 +1246,96 @@ def test_sstm9_every_promised_pri_adjacent_item_is_filed():
     assert not unfiled, (
         "the PRI plan and docs/DOCUMENTATION_INDEX.md both say these are filed "
         "in BACKLOG.md; they are not: " + ", ".join(unfiled))
+
+
+# Phrasings that offer a second concurrent build as something a reader may
+# do. `CLAUDE.md` withdrew that on 2026-11-08; `AGENTS.md` carried the first
+# of these until 2026-11-09.
+PERMISSIVE_BUILD_PHRASES = (
+    "two builds at once means",
+    "two worktrees with checked-disjoint",
+    "two builds at once is fine",
+)
+
+
+def permissive_build_phrases(text: str) -> list[str]:
+    """The phrases in ``text`` that permit a second concurrent build.
+
+    Extracted so the test can drive it over text written in the test: the scan
+    over `AGENTS.md` cannot fail once the sentence is rewritten, and a
+    mutation that emptied the phrase list left the test green.
+
+    Matched case-insensitively. A mutation that put the permissive sentence
+    back passed while this compared case-sensitively, because the sentence
+    began the line and so began with a capital.
+    """
+    lowered = text.lower()
+    return [phrase for phrase in PERMISSIVE_BUILD_PHRASES if phrase in lowered]
+
+
+def test_mawm41_agents_and_claude_agree_on_concurrent_builds():
+    """MAW-M4.1 — two documents may not disagree about the same rule.
+
+    Purpose: `AGENTS.md` must not permit what `CLAUDE.md` withdrew.
+    Spec:    docs/implementation_plan_2026-11-09_retired_agent_apparatus.md#maw-m41
+    Tests:   this test
+
+    `CLAUDE.md` withdrew the worktree exception on 2026-11-08 — "No second
+    build — not in a worktree either" — with the measurement that cost two
+    orphaned branches and nine red tests whose fix sat on the wrong side of a
+    merge. `AGENTS.md` went on saying "two builds at once means two worktrees
+    with checked-disjoint file sets", and pointed at `CLAUDE.md` for the
+    detail of the rule it contradicted. A reader following `AGENTS.md` would
+    start the second build the measurement is about.
+
+    This asserts the agreement rather than the wording: `CLAUDE.md` is the
+    document that carries the rule, so if the exception is ever reinstated
+    there, this test goes red and `AGENTS.md` has to be brought with it.
+    """
+    claude = (REPO / "CLAUDE.md").read_text(encoding="utf-8")
+    agents = (REPO / "AGENTS.md").read_text(encoding="utf-8")
+
+    withdrawn = "not in a worktree either" in claude
+    assert withdrawn, (
+        "CLAUDE.md no longer withdraws the worktree exception. If a second "
+        "concurrent build has been allowed again, say so in AGENTS.md too and "
+        "rewrite this test to assert the new agreement"
+    )
+
+    assert PERMISSIVE_BUILD_PHRASES, "the phrase list is empty; the scan would be vacuous"
+    # The scan, over text written here. Over AGENTS.md it cannot fail once the
+    # sentence is rewritten, which is why a mutation that emptied the phrase
+    # list was green until these three lines existed.
+    assert permissive_build_phrases(
+        "A session alongside a build is read-only; two builds at once means two "
+        "worktrees."
+    ) == ["two builds at once means"], (
+        "the permissive phrasing is no longer matched, so the scan is inert"
+    )
+    assert permissive_build_phrases(
+        "There is no second build, and no worktree exception."
+    ) == [], "the corrected sentence is being read as permissive"
+    assert permissive_build_phrases(
+        "Two builds at once is fine when each has its own worktree."
+    ) == ["two builds at once is fine"], (
+        "the scan is case-sensitive again, so a permissive sentence that "
+        "starts a line passes it"
+    )
+
+    permits = permissive_build_phrases(agents)
+    assert not permits, (
+        "AGENTS.md permits a second concurrent build, which CLAUDE.md "
+        f"withdrew on 2026-11-08: {permits}. One batch at a time, with no "
+        "exception — see CLAUDE.md, 'Why the worktree exception was "
+        "withdrawn'"
+    )
+    # And AGENTS.md has to carry the rule, not merely omit the exception: an
+    # empty section would pass the check above. Anchored to the heading,
+    # because AGENTS.md also names this rule in a cross-reference to
+    # CLAUDE.md — a mutation that renamed the heading passed while this
+    # matched the bare phrase anywhere in the file.
+    assert re.search(r"^#+ +One build batch at a time\s*$", agents, re.M), (
+        "AGENTS.md no longer has its own 'One build batch at a time' section, "
+        "so the check above passes on an absence — a pointer to CLAUDE.md is "
+        "not the rule being stated here"
+    )

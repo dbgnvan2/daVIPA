@@ -390,3 +390,310 @@ def test_gsfm21_no_document_cites_a_root_doc_that_does_not_exist():
         "no live document cites BACKLOG.md, so either the scan is reading "
         "nothing or the documents have stopped naming it"
     )
+
+
+# --------------------------------------------------------------------------
+# MAW-M1, MAW-M3 — the retired apparatus, and `docs/` paths that are not there
+# --------------------------------------------------------------------------
+
+# The root-doc arm above reads bare names only, by design: a path is a
+# different citation. This reads the `docs/` paths, which is the form the
+# retired three-agent workflow was cited by — `docs/MULTI_AGENT_WORKFLOW.md`,
+# named by the documentation index, BACKLOG.md and the GSF guards' own scanned
+# set. Deleting a document that four places point at is exactly the shape
+# `SAG-A7` was, arriving from the other direction.
+# Non-greedy on purpose. The character class has to admit a space, because
+# `docs/daVIPA - Get Started.md` is a real tracked document; greedy, that
+# space let one match span two paths, so a heading naming two documents
+# ("### docs/a.md and docs/b.md") was read as the single path
+# "docs/a.md and docs/b.md", which is tracked nowhere and would have failed
+# the guard on correct prose. Non-greedy stops at the first `.md`, so such a
+# line yields its first path only — a narrowing the unbounded arms accept in
+# exchange for having no false positive.
+_DOCS_PATH = r"docs/[\w./\- ]*?[\w\-]\.md"
+# Five forms, because this repo writes all five and a guard that reads one is
+# the shape it keeps getting bitten by. The heading arm is the one that
+# matters most: the deleted document's entry in `docs/DOCUMENTATION_INDEX.md`
+# was `### docs/MULTI_AGENT_WORKFLOW.md (NEW)`, which the backticked arm alone
+# does not see — and that index names 26 documents that way. `GSF-M2.1` has
+# the same arm one directory up, added for exactly the same reason, and a cold
+# pass caught this guard shipping without it.
+_DOCS_PATH_CITATIONS = (
+    re.compile(rf"`({_DOCS_PATH})`"),                       # backticked
+    re.compile(rf"`({_DOCS_PATH}):\d+`"),                   # with a line number
+    re.compile(rf"^#{{1,6}} +({_DOCS_PATH})", re.M),        # a heading
+    re.compile(rf"\]\(({_DOCS_PATH})\)"),                   # a markdown link
+    re.compile(rf"^\s*(?:[-*]|\u2192) +({_DOCS_PATH})\b", re.M),  # a list item
+)
+
+# Cited `docs/` paths that correctly do not exist. One reason covers both:
+# `BACKLOG.md` *proposes* writing them, in an item that is still open. Checked
+# in both directions below — a name that starts resolving has to leave this
+# list, or the list becomes the place a real defect hides.
+DOCS_PATH_CITATION_EXEMPTIONS = {
+    "docs/spec_glossary.md",
+    "docs/spec_template.md",
+}
+
+# The apparatus of the retired three-agent workflow (MAW-M1.2). The bootstrap
+# script created `codex/agent-code`, `codex/agent-docs` and
+# `codex/agent-github` plus a worktree on each; two of those three branches
+# were never created by anything else, and the third is 624 commits behind
+# `main` and an ancestor of it. The role prompts told an agent to commit to
+# them.
+RETIRED_AGENT_APPARATUS = (
+    "docs/MULTI_AGENT_WORKFLOW.md",
+    "tools/agents/setup_worktrees.sh",
+    ".agents/prompts/code-agent.md",
+    ".agents/prompts/docs-agent.md",
+    ".agents/prompts/github-agent.md",
+    ".github/pull_request_template.md",
+)
+
+
+def docs_path_citations(text: str) -> list[str]:
+    """The `docs/` paths a document points a reader at.
+
+    The trailing character class forbids a path ending in a separator or a
+    space, so a sentence naming the directory is not a citation. Each arm
+    anchors the path's left edge — a backtick, a heading's space, a link's
+    ``](``, a list marker — so an unbackticked mention in running prose is not
+    a pointer, which is what lets a deleted document be named honestly in the
+    past tense.
+    """
+    out = []
+    for pattern in _DOCS_PATH_CITATIONS:
+        out += [m.group(1) for m in pattern.finditer(text)]
+    return out
+
+
+def dangling_docs_path_citations(documents, tracked):
+    """Cited `docs/` paths that are not tracked, as ``label: path``.
+
+    ``documents`` is a sequence of ``(label, text)`` pairs. Extracted so the
+    test can drive it over a fixture: a mutation that skipped this comparison
+    entirely left the test green, because once every citation in the repo is
+    repaired there is nothing left for the repo scan to find.
+    """
+    return [
+        f"{label}: {cited}"
+        for label, text in documents
+        for cited in docs_path_citations(text)
+        if cited not in tracked and cited not in DOCS_PATH_CITATION_EXEMPTIONS
+    ]
+
+
+def present_apparatus(tracked):
+    """The retired apparatus paths present in ``tracked``, sorted.
+
+    Extracted for the same reason: ``assert not present`` over the real repo
+    cannot fail once the files are deleted, so the test drives this over a
+    fixture listing that does contain one.
+    """
+    return sorted(path for path in RETIRED_AGENT_APPARATUS if path in tracked)
+
+
+def test_mawm11_no_document_cites_a_docs_path_that_does_not_exist():
+    """MAW-M1.1, MAW-M3.1 — the other direction of `SAG-A7`.
+
+    Purpose: deleting a document must not leave the four places that point at
+             it saying it is there.
+    Spec:    docs/implementation_plan_2026-11-09_retired_agent_apparatus.md#maw-m31
+    Tests:   this test
+
+    `docs/MULTI_AGENT_WORKFLOW.md` was cited by `docs/DOCUMENTATION_INDEX.md`,
+    `BACKLOG.md` and the GSF guards' own `DOCS_DIR_LIVE_DOCS`. `GSF-M2.1` reads
+    bare root names and so would not have caught any of them.
+    """
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from test_ci_contract import _live_documents
+
+    tracked = {
+        line
+        for line in subprocess.run(
+            ["git", "ls-files", "docs"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.splitlines()
+        if line
+    }
+    assert tracked, "nothing tracked under docs/; the scan would be vacuous"
+
+    dangling = dangling_docs_path_citations(
+        [
+            (doc.relative_to(REPO_ROOT).as_posix(), doc.read_text(encoding="utf-8"))
+            for doc in _live_documents()
+        ],
+        tracked,
+    )
+    assert not dangling, (
+        "these documents point a reader at a docs/ path that does not "
+        "exist:\n  " + "\n  ".join(sorted(dangling))
+        + "\nName the file that is there, or add the path to "
+        "DOCS_PATH_CITATION_EXEMPTIONS with the reason it is not in this "
+        "repo. A document that has been deleted is named without backticks, "
+        "the way a dead root filename is — see CLAUDE.md, 'Naming a thing "
+        "that no longer exists'."
+    )
+
+    # The exemptions, both directions.
+    for path in sorted(DOCS_PATH_CITATION_EXEMPTIONS):
+        assert path not in tracked, (
+            f"{path} now exists, so it is no longer exempt — drop it from "
+            "DOCS_PATH_CITATION_EXEMPTIONS so its citations get checked"
+        )
+
+    # The scan itself, over text written here rather than over prose that
+    # could stop using the form.
+    assert docs_path_citations(
+        "4. Open/update PR per `docs/MULTI_AGENT_WORKFLOW.md`."
+    ) == ["docs/MULTI_AGENT_WORKFLOW.md"], "the citation form is no longer matched"
+    assert docs_path_citations("note: `docs/changes/2026-11-09-a-topic.md`") == [
+        "docs/changes/2026-11-09-a-topic.md"
+    ], "a path with a subdirectory is no longer matched"
+    assert docs_path_citations("`docs/daVIPA - Get Started.md` has it") == [
+        "docs/daVIPA - Get Started.md"
+    ], "a path containing a space is no longer matched, and one is tracked"
+    # Two paths on one unbounded line. The class has to admit a space for the
+    # document above, and greedy that space let one match span both paths and
+    # report "docs/USER_GUIDE.md and docs/ROADMAP.md", which is tracked
+    # nowhere — the guard failing on correct prose. Non-greedy reads the first
+    # path and stops. Found by a cold pass, latent rather than red, because no
+    # line in the repo writes two paths this way yet.
+    assert docs_path_citations("### docs/USER_GUIDE.md and docs/ROADMAP.md\n") == [
+        "docs/USER_GUIDE.md"
+    ], "a heading naming two documents is read as one path that does not exist"
+    assert docs_path_citations("- docs/USER_GUIDE.md and docs/ROADMAP.md\n") == [
+        "docs/USER_GUIDE.md"
+    ], "a list item naming two documents is read as one path that does not exist"
+    # The heading arm, which is how `docs/DOCUMENTATION_INDEX.md` names the 26
+    # documents it lists — and the form the deleted document's own entry used,
+    # so the backticked arm alone would not have caught it.
+    assert docs_path_citations(
+        "### docs/MULTI_AGENT_WORKFLOW.md (NEW)\n\nStarter guide.\n"
+    ) == ["docs/MULTI_AGENT_WORKFLOW.md"], (
+        "a document named in a heading is no longer read, so an index entry "
+        "for a file that does not exist would pass"
+    )
+    # A markdown link, which is the most followable pointer this repo writes.
+    assert docs_path_citations("see [the guide](docs/USER_GUIDE.md) first") == [
+        "docs/USER_GUIDE.md"
+    ], "a markdown-link citation is no longer read"
+    # A list item, with either marker this repo uses.
+    assert docs_path_citations("- docs/USER_GUIDE.md\n") == ["docs/USER_GUIDE.md"]
+    assert docs_path_citations("  \u2192 docs/USER_GUIDE.md\n") == ["docs/USER_GUIDE.md"]
+    # And a line-number suffix, which BACKLOG.md writes for non-chronic files.
+    # The plain backticked arm wants a closing backtick straight after `.md`,
+    # so this form is read by its own arm alone and reports the path once.
+    assert docs_path_citations("`docs/USER_GUIDE.md:42` has it") == [
+        "docs/USER_GUIDE.md"
+    ], "a path with a line number is no longer read"
+
+    # A directory, and an unbackticked mention, are not citations.
+    assert docs_path_citations("the records under `docs/changes/`") == []
+    assert docs_path_citations("see docs/USER_GUIDE.md for the rest") == []
+    # A bare root name is the other guard's domain, not this one's.
+    assert docs_path_citations("`CLAUDE.md` is the agreement") == []
+
+    # The comparison, over a document written here. The repo check above
+    # cannot fail once every citation is repaired, so a mutation that skipped
+    # the comparison altogether left it green until these two lines existed.
+    assert dangling_docs_path_citations(
+        [("PROBE.md", "see `docs/MULTI_AGENT_WORKFLOW.md` for the roles")],
+        tracked,
+    ) == ["PROBE.md: docs/MULTI_AGENT_WORKFLOW.md"], (
+        "a document citing a deleted docs/ path is not reported, so the scan "
+        "is inert"
+    )
+    assert dangling_docs_path_citations(
+        [("PROBE.md", "see `docs/USER_GUIDE.md` for the rest")], tracked
+    ) == [], "a docs/ path that exists is reported as dangling"
+    assert dangling_docs_path_citations(
+        [("PROBE.md", "`docs/spec_glossary.md` is not written yet")], tracked
+    ) == [], "an exempt path is reported as dangling"
+
+    # And it is reading the documents: the docs/ paths they really do cite.
+    cited = {
+        path
+        for doc in _live_documents()
+        for path in docs_path_citations(doc.read_text(encoding="utf-8"))
+    }
+    assert "docs/spec_coverage.md" in cited, (
+        "no live document cites docs/spec_coverage.md, so either the scan is "
+        "reading nothing or the documents have stopped naming the file every "
+        "batch records its criteria in"
+    )
+
+
+def test_mawm12_the_retired_agent_apparatus_is_absent():
+    """MAW-M1.2 — the apparatus, not just the document that described it.
+
+    Purpose: a retired workflow's runnable parts must not be left behind to
+             read as current.
+    Spec:    docs/implementation_plan_2026-11-09_retired_agent_apparatus.md#maw-m12
+    Tests:   this test
+
+    `tools/agents/setup_worktrees.sh` is the one that matters: it created two
+    branches nothing else ever created, put a worktree on each, and printed
+    "Open 3 agent sessions". `CLAUDE.md` and `AGENTS.md` had recorded the
+    workflow as retired since 2026-11-08 while all of this stayed executable.
+    """
+    tracked = {
+        line
+        for line in subprocess.run(
+            ["git", "ls-files"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.splitlines()
+        if line
+    }
+    assert tracked, "git ls-files returned nothing; the check would be vacuous"
+    assert "CLAUDE.md" in tracked, "the listing is not of this repo"
+
+    # The tuple's own contents, so that dropping an entry is deliberate: a
+    # mutation that removed the bootstrap script from it left this test green,
+    # because a list of things that must be absent cannot fail by shrinking.
+    assert set(RETIRED_AGENT_APPARATUS) == {
+        "docs/MULTI_AGENT_WORKFLOW.md",
+        "tools/agents/setup_worktrees.sh",
+        ".agents/prompts/code-agent.md",
+        ".agents/prompts/docs-agent.md",
+        ".agents/prompts/github-agent.md",
+        ".github/pull_request_template.md",
+    }, (
+        "RETIRED_AGENT_APPARATUS no longer names the six files the MAW batch "
+        "deleted. If one is being revived, say so in CLAUDE.md and AGENTS.md "
+        "first and change this assertion with it"
+    )
+
+    # The check itself, over a listing written here: over the real repo it
+    # cannot fail once the files are gone.
+    assert present_apparatus(
+        {"CLAUDE.md", "tools/agents/setup_worktrees.sh"}
+    ) == ["tools/agents/setup_worktrees.sh"], (
+        "an apparatus file present in the listing is not reported, so the "
+        "check is inert"
+    )
+    assert present_apparatus({"CLAUDE.md", ".agents/templates/handoff-note.md"}) == [], (
+        "a file that is not part of the retired apparatus is reported"
+    )
+
+    present = present_apparatus(tracked)
+    assert not present, (
+        "the retired three-agent workflow's apparatus is back:\n  "
+        + "\n  ".join(present)
+        + "\nThe workflow is retired in CLAUDE.md and AGENTS.md: there are no "
+        "per-role branches, and this repo opens no pull requests. If it is "
+        "being revived, those two documents are what say so first."
+    )
+    # The handoff template is not part of it and must stay: every batch uses it.
+    assert ".agents/templates/handoff-note.md" in tracked, (
+        "the handoff-note template is gone, and CLAUDE.md requires a handoff "
+        "note from every batch of work"
+    )

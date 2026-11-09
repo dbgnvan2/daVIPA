@@ -2024,7 +2024,6 @@ DOCS_DIR_LIVE_DOCS = (
     "docs/DOCUMENTATION_INDEX.md",
     "docs/USER_GUIDE.md",
     "docs/GEMINI.md",
-    "docs/MULTI_AGENT_WORKFLOW.md",
     "docs/action-timer-requirements.md",
     "docs/daVIPA - Get Started.md",
 )
@@ -2092,8 +2091,9 @@ def test_gsfm11_no_document_cites_a_workflow_that_does_not_exist(tmp_path):
     which this repo never opens, so it had never run; its rule moved into
     `tests/test_docs_sync_rule.py` when `SST-A8` closed. `AGENTS.md` went on
     calling it a merge gate, `CLAUDE.md` described it as still existing, and
-    `docs/MULTI_AGENT_WORKFLOW.md` told a reader which script it runs. Nothing
-    checked, because no test asserted which workflows the repo has — this file
+    the retired-workflow document told a reader which script it runs — that
+    document is itself gone now (`MAW-M1.1`). Nothing checked, because no test
+    asserted which workflows the repo has — this file
     names two of them individually and otherwise iterates over whatever the
     directory holds.
     """
@@ -2122,7 +2122,7 @@ def test_gsfm11_no_document_cites_a_workflow_that_does_not_exist(tmp_path):
             f"{required} is named as a live document but is not being "
             "scanned, so citations in it are checked by neither GSF guard"
         )
-    for described in ("CLAUDE.md", "AGENTS.md", "docs/MULTI_AGENT_WORKFLOW.md"):
+    for described in ("CLAUDE.md", "AGENTS.md"):
         assert described in scanned, (
             f"{described} is not being scanned, and it is one of the documents "
             "that described the deleted docs gate as an enforcement a reader "
@@ -2207,4 +2207,114 @@ def test_gsfm11_no_document_cites_a_workflow_that_does_not_exist(tmp_path):
         "no live document cites tests.yml, so either the scan is reading "
         "nothing or the documents have stopped naming the one workflow that "
         "gates every push"
+    )
+
+
+# --------------------------------------------------------------------------
+# MAW-M2.1 — a document may not cite a `.github/` file that is not there
+# --------------------------------------------------------------------------
+
+# The workflow arm above reads `.github/workflows/<name>.yml` only. This one
+# reads the rest of `.github/`, which is where `pull_request_template.md` sat:
+# a file whose only trigger is a pull request, in a repo whose standing
+# instruction is to open none, cited by a document that described the retired
+# three-agent workflow. A filename is required, so `CLAUDE.md`'s mention of
+# "the workflows under `.github/`" as a directory is not a citation.
+_GITHUB_FILE_CITATION = re.compile(r"`(\.github/[\w./-]*[\w-]\.[\w-]+)`")
+
+
+def github_file_citations(text: str) -> list[str]:
+    """The paths under `.github/` a document points a reader at.
+
+    Public so the fixture below can drive it over text of its own rather than
+    over prose that could stop using the form.
+    """
+    return [m.group(1) for m in _GITHUB_FILE_CITATION.finditer(text)]
+
+
+def dangling_github_citations(documents, tracked):
+    """Cited `.github/` paths that are not tracked, as ``label: path``.
+
+    ``documents`` is a sequence of ``(label, text)`` pairs, so the test can
+    drive this over a fixture as well as over the repo.
+    """
+    return [
+        f"{label}: {cited}"
+        for label, text in documents
+        for cited in github_file_citations(text)
+        if cited not in tracked
+    ]
+
+
+def test_mawm21_no_document_cites_a_github_file_that_does_not_exist(tmp_path):
+    """MAW-M2.1 — the shape `GSF-A2` was.
+
+    Purpose: a live document may not point a reader at a `.github/` file the
+             repo does not have.
+    Spec:    docs/implementation_plan_2026-11-09_retired_agent_apparatus.md#maw-m21
+    Tests:   this test
+
+    `.github/pull_request_template.md` was step 4 of the retired three-agent
+    workflow — "Open/update PR with …" — and this repo opens no pull requests,
+    so the template had no trigger. `GSF-M1.1` would not have caught its
+    deletion, because that arm reads only `.github/workflows/`.
+    """
+    tracked = {
+        line
+        for line in subprocess.run(
+            ["git", "ls-files", ".github"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.splitlines()
+        if line
+    }
+    assert tracked, "nothing tracked under .github; the scan would be vacuous"
+
+    dangling = dangling_github_citations(
+        [
+            (doc.relative_to(REPO_ROOT).as_posix(), doc.read_text(encoding="utf-8"))
+            for doc in _live_documents()
+        ],
+        tracked,
+    )
+    assert not dangling, (
+        "these documents point a reader at a `.github/` file that does not "
+        "exist:\n  " + "\n  ".join(sorted(dangling))
+        + "\nA deleted one is named without its path, the way a deleted "
+        "workflow is — see CLAUDE.md, 'Naming a thing that no longer exists'."
+    )
+
+    # The scan, over text written here: the repo check above cannot fail once
+    # the deletion has landed and every citation is repaired.
+    probe = tmp_path / "PROBE.md"
+    probe.write_text("Open/update PR with `.github/pull_request_template.md`.\n")
+    assert dangling_github_citations(
+        [("PROBE.md", probe.read_text())], tracked
+    ) == ["PROBE.md: .github/pull_request_template.md"], (
+        "a document citing a deleted .github/ file is not reported, so the "
+        "scan is inert"
+    )
+    assert dangling_github_citations(
+        [("PROBE.md", "see `.github/workflows/tests.yml`")], tracked
+    ) == [], "a .github/ file that exists is reported as dangling"
+    # A directory is not a file, so this stays out of the domain.
+    assert github_file_citations("the workflows under `.github/workflows/`") == []
+    assert github_file_citations("`.github/` holds the CI contract") == []
+    assert "pull_request_template.md" not in {p.rsplit("/", 1)[-1] for p in tracked}, (
+        "the pull request template is back. Its only trigger is a pull "
+        "request and this repo opens none — GSF-A2"
+    )
+
+    # And it is reading the documents: tests.yml is cited under this form too.
+    cited = {
+        name
+        for doc in _live_documents()
+        for name in github_file_citations(doc.read_text(encoding="utf-8"))
+    }
+    assert ".github/workflows/tests.yml" in cited, (
+        "no live document cites .github/workflows/tests.yml, so either this "
+        "scan is reading nothing or the documents have stopped naming the one "
+        "workflow that gates every push"
     )
