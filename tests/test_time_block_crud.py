@@ -646,3 +646,207 @@ def test_pdm55_every_date_is_renumbered_not_only_the_one_on_screen(manager):
         assert drawn == {
             DAY: {"today": "10:00"}, NEXT_DAY: {"tomorrow": "10:00"}
         }[date], (date, drawn)
+
+
+# --- CE-M1.2 / CE-M1.3 — the event id a block owns --------------------------
+
+def test_cem12_calendar_event_id_round_trips(manager):
+    """CE-M1.2 — the column is written by both writers and read back.
+
+    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+    Tests: this test
+    """
+    block_id = _add(manager, 30, "exported")
+
+    assert manager.get_time_block(block_id).calendar_event_id is None, (
+        "a block that has not been exported must read as not exported"
+    )
+
+    manager.set_block_calendar_event_id(block_id, "gcal-abc123")
+    assert manager.get_time_block(block_id).calendar_event_id == "gcal-abc123"
+
+    # It can be taken away again, for a block whose event is gone.
+    manager.set_block_calendar_event_id(block_id, None)
+    assert manager.get_time_block(block_id).calendar_event_id is None
+
+
+def test_cem12_a_row_without_the_column_still_reads(manager):
+    """CE-M1.2 — a projection that leaves the column out must not raise.
+
+    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+    Tests: this test
+
+    Behavioural stand-in for a row selected before the migration ran: a
+    `sqlite3.Row` that simply does not carry the key, which is exactly what
+    `_row_to_time_block` meets in that case.
+    """
+    _add(manager, 30, "narrow select")
+
+    row = manager.db.conn.execute(
+        """
+        SELECT id, item_id, block_date, start_time, end_time, planned_minutes,
+               label, block_type, slot_index, position, created_at, updated_at
+        FROM time_blocks
+        """
+    ).fetchone()
+
+    block = manager._row_to_time_block(row)
+
+    assert block.label == "narrow select"
+    assert block.calendar_event_id is None
+
+
+def test_cem13_recording_an_event_id_leaves_the_block_where_it_was(manager):
+    """CE-M1.3 — the narrow writer writes one column and moves nothing.
+
+    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
+    Tests: this test
+
+    The exporter reads a day, talks to Google, and comes back to write ids. A
+    writer that wrote whole blocks back would restore the boxes it read
+    minutes earlier -- so the day is moved *after* the read and before the
+    write, and the write must not undo it.
+    """
+    block = TimeBlock(
+        block_date=DAY,
+        start_time="",
+        end_time="",
+        planned_minutes=30,
+        label="moved after the read",
+    )
+    placed = manager.add_block_at(block, 0, BOUNDS)
+    stale = manager.get_time_block(placed.id)
+
+    moved = manager.place_block_at(placed.id, 4, BOUNDS)
+    assert moved.slot_index == 4
+
+    # The exporter is holding `stale`, which still says box 0.
+    assert stale.slot_index == 0
+    manager.set_block_calendar_event_id(stale.id, "gcal-xyz789")
+
+    after = manager.get_time_block(placed.id)
+    assert after.slot_index == 4, (
+        "recording an event id must not put the block back in the box the "
+        "exporter read"
+    )
+    assert after.start_time == moved.start_time
+    assert after.end_time == moved.end_time
+    assert after.position == moved.position
+    assert after.calendar_event_id == "gcal-xyz789"
+
+
+def test_cem13_an_edit_does_not_erase_the_event_id(manager):
+    """CE-M1.3 — ``update_time_block`` leaves the event id alone.
+
+    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
+    Tests: this test
+
+    The screen holds block objects it loaded when the day was drawn. Export
+    the day, then resize a block from that older object -- which still says
+    ``calendar_event_id is None``, because it predates the export -- and the
+    id must survive. An ``update_time_block`` that wrote this column would
+    erase it here, and the next export would create a second event for a
+    block that already had one.
+    """
+    block = TimeBlock(
+        block_date=DAY,
+        start_time="",
+        end_time="",
+        planned_minutes=30,
+        label="drawn before the export",
+    )
+    placed = manager.add_block_at(block, 0, BOUNDS)
+    as_the_screen_holds_it = manager.get_time_block(placed.id)
+
+    manager.set_block_calendar_event_id(placed.id, "gcal-already-exported")
+
+    as_the_screen_holds_it.planned_minutes = 45
+    manager.update_time_block(as_the_screen_holds_it)
+
+    after = manager.get_time_block(placed.id)
+    assert after.planned_minutes == 45, "the edit itself must still land"
+    assert after.calendar_event_id == "gcal-already-exported", (
+        "a resize from a block loaded before the export must not orphan the "
+        "event that export created"
+    )
+
+
+def test_cem13_recording_an_event_id_touches_one_block(manager):
+    """CE-M1.3 — and it writes to exactly the block it was given."""
+    first = _add(manager, 30, "first")
+    second = _add(manager, 30, "second")
+
+    manager.set_block_calendar_event_id(first, "gcal-only-the-first")
+
+    assert manager.get_time_block(first).calendar_event_id == "gcal-only-the-first"
+    assert manager.get_time_block(second).calendar_event_id is None
+
+
+def test_cem12b_the_event_calendar_round_trips(tmp_path):
+    """CE-M1.2 — the calendar is stored and read back with the id.
+
+    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+    Tests: this test
+
+    An id with no calendar is not usable: the export has to know where to look
+    for the event, and the export calendar is a setting the user can change.
+    """
+    manager = DatabaseManager(str(tmp_path / "blocks.db"))
+    try:
+        block = TimeBlock(
+            block_date="2026-11-09", start_time="08:00", end_time="08:30",
+            planned_minutes=30, label="Gym", block_type=BlockType.BREAK,
+            slot_index=0,
+            calendar_event_id="evt-a",
+            calendar_event_calendar_id="work@example.com",
+        )
+        manager.create_time_block(block)
+
+        stored = manager.get_time_blocks("2026-11-09")[0]
+
+        assert stored.calendar_event_id == "evt-a"
+        assert stored.calendar_event_calendar_id == "work@example.com"
+
+        assert manager.set_block_calendar_event_id(
+            block.id, "evt-b", "home@example.com"
+        )
+        moved = manager.get_time_blocks("2026-11-09")[0]
+
+        assert (moved.calendar_event_id, moved.calendar_event_calendar_id) == (
+            "evt-b", "home@example.com"
+        )
+    finally:
+        manager.close()
+
+
+def test_cem12c_clearing_the_id_clears_the_calendar_with_it(tmp_path):
+    """CE-M1.2 — a recorded calendar with no event is not a state we produce.
+
+    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+    Tests: this test
+
+    The sweep clears the id when it removes an event. A calendar left behind
+    would read as "this block has an event over there" for the rest of the
+    row's life (P6).
+
+    The clearing call passes a calendar as well as `None`, because that is the
+    only way this guard can be exercised: mutation proved the first version of
+    this test — which cleared with the argument defaulted — could not fail.
+    """
+    manager = DatabaseManager(str(tmp_path / "blocks.db"))
+    try:
+        block = TimeBlock(
+            block_date="2026-11-09", start_time="08:00", end_time="08:30",
+            planned_minutes=30, label="Gym", block_type=BlockType.BREAK,
+            slot_index=0,
+        )
+        manager.create_time_block(block)
+        manager.set_block_calendar_event_id(block.id, "evt-a", "work@example.com")
+
+        manager.set_block_calendar_event_id(block.id, None, "work@example.com")
+        cleared = manager.get_time_blocks("2026-11-09")[0]
+
+        assert cleared.calendar_event_id is None
+        assert cleared.calendar_event_calendar_id is None
+    finally:
+        manager.close()

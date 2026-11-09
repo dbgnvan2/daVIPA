@@ -533,3 +533,141 @@ def test_a_legacy_block_whose_own_box_is_full_keeps_its_null(tmp_path):
         assert [b.label for b in outside] == [f"crowd {MAX_BLOCKS_PER_SLOT}"]
     finally:
         manager.close()
+
+
+# --- CE-M1.1 — the column the Google Calendar export writes -----------------
+
+def test_cem11_migration_adds_calendar_event_id_idempotently(tmp_path):
+    """CE-M1.1 — the column arrives on an upgrading database, exactly once.
+
+    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
+    Tests: this test
+
+    The second `initialize_schema` is the point: a guard that checked the
+    columns as a block rather than one at a time would skip this one forever
+    on a database that already has `slot_index`, and the export would then
+    write an id into a column that is not there.
+    """
+    path = _legacy_db(tmp_path)
+
+    for _ in range(2):
+        db = Database(str(path))
+        db.initialize_schema()
+        db.close()
+
+    conn = sqlite3.connect(str(path))
+    try:
+        info = list(conn.execute("PRAGMA table_info(time_blocks)"))
+        legacy = conn.execute(
+            "SELECT calendar_event_id FROM time_blocks WHERE id = 'old-block'"
+        ).fetchone()
+    finally:
+        conn.close()
+
+    names = [row[1] for row in info]
+    assert names.count("calendar_event_id") == 1, (
+        "calendar_event_id should be added once, by whichever run finds it absent"
+    )
+
+    column = [row for row in info if row[1] == "calendar_event_id"][0]
+    assert column[2].upper() == "TEXT"
+    assert column[3] == 0, "a block that was never exported must be representable"
+    assert column[4] is None, (
+        "a default would back-fill every pre-export block with something that "
+        "reads as an event id"
+    )
+    assert legacy[0] is None, (
+        "a block from before the export existed has never been exported, and "
+        "must say so rather than claiming an event"
+    )
+
+
+def test_cem11a_a_fresh_database_declares_calendar_event_id_on_its_own(
+    tmp_path, monkeypatch
+):
+    """CE-M1.1 — the CREATE TABLE half, with the migrations switched off.
+
+    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
+    Tests: this test
+
+    Same reason as TB-M1.1a above: every other test here would pass with the
+    CREATE TABLE half missing, because the migration adds the column to a new
+    database as readily as to an old one.
+    """
+    monkeypatch.setattr(Database, "_run_migrations", lambda self, conn: None)
+
+    db = Database(str(tmp_path / "no_migrations.db"))
+    db.initialize_schema()
+    try:
+        names = [
+            row[1] for row in db.conn.execute("PRAGMA table_info(time_blocks)")
+        ]
+    finally:
+        db.close()
+
+    assert "calendar_event_id" in names, (
+        "calendar_event_id comes only from the migration; a fresh install "
+        "would export a day and have nowhere to record it"
+    )
+
+
+def test_cem11b_migration_adds_the_event_calendar_idempotently(tmp_path):
+    """CE-M1.1 — the calendar an event id belongs to, added exactly once.
+
+    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
+    Tests: this test
+
+    The second `initialize_schema` matters for the same reason as
+    `test_cem11`: this column is the second one in the same tuple, so a guard
+    written per-tuple rather than per-column would skip it on any database
+    that already has `calendar_event_id` — which is every database the first
+    version of the export ever wrote to.
+    """
+    path = _legacy_db(tmp_path)
+
+    for _ in range(2):
+        db = Database(str(path))
+        db.initialize_schema()
+        db.close()
+
+    conn = sqlite3.connect(str(path))
+    try:
+        info = list(conn.execute("PRAGMA table_info(time_blocks)"))
+        legacy = conn.execute(
+            "SELECT calendar_event_calendar_id FROM time_blocks WHERE id = 'old-block'"
+        ).fetchone()
+    finally:
+        conn.close()
+
+    names = [row[1] for row in info]
+    assert names.count("calendar_event_calendar_id") == 1
+
+    column = [row for row in info if row[1] == "calendar_event_calendar_id"][0]
+    assert column[2].upper() == "TEXT"
+    assert column[3] == 0, "a block that was never exported must be representable"
+    assert column[4] is None, (
+        "a default would claim a calendar for events that were never created"
+    )
+    assert legacy[0] is None
+
+
+def test_cem11c_a_fresh_database_declares_the_event_calendar_on_its_own(
+    tmp_path, monkeypatch
+):
+    """CE-M1.1 — the CREATE TABLE half of the same column.
+
+    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
+    Tests: this test
+    """
+    monkeypatch.setattr(Database, "_run_migrations", lambda self, conn: None)
+
+    db = Database(str(tmp_path / "no_migrations_calendar.db"))
+    db.initialize_schema()
+    try:
+        names = [
+            row[1] for row in db.conn.execute("PRAGMA table_info(time_blocks)")
+        ]
+    finally:
+        db.close()
+
+    assert "calendar_event_calendar_id" in names
