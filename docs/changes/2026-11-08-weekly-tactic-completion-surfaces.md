@@ -208,26 +208,65 @@ Toplevel parent — not for whether the modal is legible in front of it.
   assert it is still there. The guard is placed before its destroy precisely
   for that, and nothing checks it.
 
-## CI on the pushed commit (run 42537946699, `4475d23`)
+## CI on the pushed commits
 
-**11 failed, 2459 passed, 1 skipped** on each of Python 3.11, 3.12 and 3.13.
-Red, and none of it is this batch:
+Read off the run logs' own failure headers. An earlier version of this
+section reported this from a summary instead and got three things wrong; the
+correction is at the end, because the way it went wrong is reusable.
 
-- All 11 are Calendar Export tests — `test_cem11*` and `test_cem11b` in
-  `tests/test_time_block_schema.py`, `test_cem12*`, `test_cem12b` and
-  `test_cem13*` in `tests/test_time_block_crud.py`. They call
-  `set_block_calendar_event_id` with three arguments; the signature on `main`
-  takes two. The implementation that matches them is 73 added and 18 removed
-  lines of `db_manager.py` still uncommitted in this shared checkout, held by
-  the Calendar Export session, whose user told it to leave the tree
-  uncommitted. Landing it is that session's call, not this one's.
-- No WTP test failed. The 21 widget tests of WTP-M6.8 are in the 2459, and
-  `test_ci_contract.py` still passes, which is the check that would have gone
-  red had any of them taken the `mapped_windows` fixture and moved the
-  documented count off 22.
+| commit | run | result |
+|---|---|---|
+| `3f705b4` (before this batch) | 42422113176 | **8 failed**, 2228 passed, 1 skipped |
+| `e7e260a` | 42524460865 | **127 failed**, 2306 passed, 1 skipped |
+| `4475d23` | 42537946699 | **11 failed**, 2459 passed, 1 skipped |
+| `7469fc4` (origin/main) | 42538374520 | **11 failed**, 2459 passed, 1 skipped |
 
-For scale: the run before this one, on `e7e260a`, failed 312 tests. That was
-`8c65080` half-sweeping the Calendar Export batch — its tests and part of its
-schema without `TimeBlock.calendar_event_id`. `f264cc3` in this push landed the
-model field and the two columns, which is what took 312 down to 11. The
-remaining 11 are the other half of the same trap.
+Identical on each of Python 3.11, 3.12 and 3.13.
+
+Eight of the eleven were already red at `3f705b4`, before this batch existed:
+`test_alpha_still_passes_through_the_attributes_wrapper` and
+`test_raw_tkinter_windows_are_hidden_and_registered_too`
+(`tests/test_tk_offscreen.py`), `test_t51`, `test_t52`, `test_t56` and
+`test_t57` (`tests/test_timer_session_endings.py`),
+`test_wt_m6b6_a_notice_lowers_an_always_on_top_parent`
+(`tests/test_weekly_tactic_surfaces.py`), and
+`test_pbm61_a_tall_row_keeps_its_two_lines_together`
+(`tests/test_plan_screen.py`).
+
+The three that are new since `3f705b4`, of which **one is this batch's**:
+
+- `tests/test_weekly_tactic_completion_widgets.py::test_wtpw_the_prompt_survives_a_real_always_on_top_parent`
+  — **this batch's**, and fixed in `be1b4ee`. It asserted that the guard put
+  `-topmost` back on a real Toplevel parent. Honouring that property is a
+  window manager's job and a headless display has none, so the read-back is
+  off whatever the guard does. It now skips where the property does not take,
+  and keeps its assertions on a desktop.
+- `tests/test_traceability_refs.py::test_every_referenced_test_name_exists`
+  — stale `Tests:` references. Not this batch's: `models.py` names
+  `tests/test_priority_floor_and_cap.py` and
+  `tests/test_priority_floor_form.py`, neither of which exists, and the
+  `pdm*`/`tgm*` names in `docs/spec_coverage.md`, `screens/plan.py` and
+  `time_block_layout.py` are off by a generation.
+- `tests/test_unified_panel_design.py::test_updm14_zero_width_body_is_a_noop`
+  — the UPD batch's.
+
+**Adjacent, found here, not fixed.** Seven of the eight pre-existing
+failures fail for the cause this batch's one did: a CI display honours
+neither `-topmost` nor `-alpha`, so every test that sets a window attribute
+and reads it back measures the display. That is one cause behind seven tests
+across four files, none of them this batch's, and the fix is the same shape
+each time. Filed as WTP-A11 rather than swept into this batch.
+
+**How the earlier version of this section went wrong.** It said all 11 were
+Calendar Export tests (`test_cem11*`, `test_cem12*`, `test_cem13*`), that
+"No WTP test failed", and that the previous run failed 312. All three false:
+one of the 11 was this batch's, no `test_cem*` test failed at all, and the
+previous run failed 127. The `test_cem*` names were real strings in the log,
+but they came from inside `test_every_referenced_test_name_exists`'s own
+list of references it could not resolve — the output of the failing test,
+not the list of failing tests. The failure headers were never read. Reading a
+name out of a test's output and reporting it as a failing test is P6 in a new
+costume: a claim sourced from something adjacent to the artifact instead of
+from the artifact. The headers are `grep -oE "_{3,} [a-z_]+ _{3,}"` on
+`gh run view <id> --log-failed`, and the tally is `grep -oE "[0-9]+ failed"`
+on the same log.

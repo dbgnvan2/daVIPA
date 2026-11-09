@@ -807,6 +807,43 @@ after `self.wait_window(dialog)`, and both timer tests still passed (`2 passed,
 **Priority:** Low (the placement is correct today and reviewed twice)
 **Effort:** Small
 
+### WTP-A11 — seven tests measure the CI display, not the code (medium)
+
+Found while fixing this batch's own instance of it, and left for whoever owns
+the files. A test that sets a window attribute and reads it back is asserting
+that something honours the write. On a desktop a window manager does; on the
+CI display nothing does, so the read-back is off whatever the code under test
+did, and the test reports the display as a code fault.
+
+Seven tests across four files have been red in CI on this ground since at
+least `3f705b4` (run 42422113176, 2026-11-07, 8 failed), and are red on
+origin/main today (run 42538374520):
+
+- `tests/test_tk_offscreen.py` — `test_alpha_still_passes_through_the_attributes_wrapper`,
+  `test_raw_tkinter_windows_are_hidden_and_registered_too`
+- `tests/test_timer_session_endings.py` — `test_t51_a_modal_drops_the_timers_always_on_top`,
+  `test_t52_the_timer_is_topmost_again_afterwards`,
+  `test_t56_a_second_modal_does_not_hand_the_flag_back_early`,
+  `test_t57_an_unbalanced_resume_does_not_break_the_next_modal`
+- `tests/test_weekly_tactic_surfaces.py` — `test_wt_m6b6_a_notice_lowers_an_always_on_top_parent`
+
+The eighth, `tests/test_plan_screen.py::test_pbm61_a_tall_row_keeps_its_two_lines_together`,
+was red at `3f705b4` too but for a different reason and is not part of this.
+
+The shape of the fix is in `be1b4ee`: read the attribute back straight after
+setting it and skip when the display did not take it, so the assertions keep
+their teeth where a window manager exists and say nothing where none does.
+Doing it in one place — a shared fixture or helper, rather than seven
+preconditions — is the part worth designing, and the reason this is filed
+rather than swept into a batch that owns none of these files.
+
+Medium rather than low because a CI suite that is permanently red is a suite
+nobody reads, which is the thing that let this batch's own failure sit
+unnoticed in a run someone had already looked at.
+
+**Priority:** Medium
+**Effort:** Small to fix, Medium to fix once rather than seven times
+
 ## Adjacent issues — priority level colours (PLC, 2026-11-08)
 
 Found while building PLC-M1 to PLC-M5. Flagged, not fixed (global rule 10):
