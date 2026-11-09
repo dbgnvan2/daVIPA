@@ -328,11 +328,30 @@ def _four_operand_products(source: str, skip_functions=()):
     Widening the name list would only move the blind spot to the next set of
     names someone picks.
 
-    Measured instead: the three modules this guards contain **no** four-operand
-    product of any kind, so the strictest possible detector is also an
-    achievable one. The cost is stated rather than hidden -- an unrelated
-    four-way product added to one of these modules would fail this guard, and
-    the failure message says so.
+    Measured: the three modules contain **no** four-operand product of any
+    kind, so dropping the name filter costs no false positive today.
+
+    **What this still cannot see, which is the larger half.** It matches one
+    shape: a single expression whose top-level ``*`` chain flattens to exactly
+    four operands. The real scorer does not have that shape --
+    ``priority_score_from_factors`` accumulates in a loop -- so the most likely
+    way a second scorer appears, copying that function, is invisible here.
+    Measured on sample sources, none of these is detected: the loop verbatim;
+    ``reduce(mul, [i, u, s, v])``; ``math.prod([i, u, s, v])``; two halves
+    multiplied through intermediate variables; four ``*=`` statements; and
+    ``i * u * s / 1 * v``, because any ``/`` in the chain parses as a Div node
+    at the top and nothing reaches four operands.
+
+    So this is a tripwire for one shape, not a proof that one function scores.
+    **The guard that actually holds PRI-M2.5 is behavioural**:
+    ``tests/test_priority_floor_form.py::test_prim26_a_capped_label_says_it_is_capped``
+    drives both render sites and asserts the capped label at each, so a second
+    scorer that lost the cap fails there whatever shape it is written in. This
+    walk is the cheap structural check beside it.
+
+    The one cost that is a false positive: an unrelated four-way product added
+    to one of these three modules fails the guard, and the failure message says
+    what to do about it.
 
     Parsed rather than grepped, per the repo rule, and returns the list so the
     caller can assert an exact count instead of a floor. Walks the whole
@@ -345,11 +364,17 @@ def _four_operand_products(source: str, skip_functions=()):
         return [node]
 
     def describe(node):
+        """A label for a failure message, not an identity.
+
+        ``self.importance`` and a bare ``importance`` both describe as
+        ``importance``, and a call or subscript gives only its node type. The
+        line number beside it is what locates the expression.
+        """
         if isinstance(node, ast.Name):
             return node.id
         if isinstance(node, ast.Attribute):
-            return node.attr
-        return type(node).__name__
+            return f"...{node.attr}"
+        return f"<{type(node).__name__}>"
 
     tree = ast.parse(source)
 
@@ -420,10 +445,17 @@ def test_prim25_the_product_detector_finds_a_product(product, why):
 def test_prim25_the_product_detector_excuses_the_one_scorer():
     """And ``skip_functions`` excuses the whole of a named function's body.
 
-    The guard below excuses ``priority_score_from_factors``. If
-    ``skip_functions`` silently matched nothing, the guard would still pass
-    today -- that function accumulates in a loop and holds no four-way product
-    -- so nothing else in this file can tell whether the exclusion works.
+    **The guard below excuses nothing**, and this is the only caller that
+    passes ``skip_functions`` at all. The parameter is there because the
+    criterion is "one function multiplies the factors", which reads as though
+    that one function must be excused -- and it does not need to be, because
+    ``priority_score_from_factors`` accumulates in a loop and holds no
+    four-way product. Covered here so the parameter is not silently broken for
+    whoever first has a reason to use it.
+
+    It excuses a named function's whole subtree, which includes its decorators
+    and argument defaults and any function nested inside it, and it matches
+    every function of that name in the module rather than one.
     """
     sample = textwrap.dedent(
         """
@@ -454,17 +486,24 @@ def test_prim25_only_one_function_multiplies_the_factors():
     than writing the four-way product, so the expected count is zero
     everywhere, in that function included -- and the walk is excused nothing.
 
-    What this does and does not see is in ``_four_operand_products``: it
-    catches a product under **any** operand names, which is what the name-based
-    first version did not, and the price is that an unrelated four-way product
-    added to one of these three modules fails this test. That is the trade this
-    guard is written to -- the modules hold no four-operand product of any kind
-    today, so the strict form is achievable, and a false positive here is a
-    one-line read of the failure message rather than a silent hole.
+    What this does and does not see is in ``_four_operand_products``, and the
+    limits matter more than the coverage. It catches a product under **any**
+    operand names, which the name-based first version did not. It does **not**
+    catch a scorer written in any other shape -- a loop (which is how the real
+    one is written), ``reduce``, ``math.prod``, intermediate variables,
+    ``*=``, or any chain containing a ``/``. Nor does it look beyond these
+    three modules by name.
 
-    It is still three modules by name. A fourth module that grew its own copy
-    would not be seen; the honest widening is a list derived from the importers
-    of ``priority_score_from_factors``, which is not written.
+    So this is a structural tripwire, not a proof. The criterion is held by
+    ``tests/test_priority_floor_form.py::test_prim26_a_capped_label_says_it_is_capped``,
+    which drives both render sites and asserts the capped label at each: a
+    second scorer that dropped the cap fails there in whatever shape it was
+    written. This test adds the cheap check that no one pasted the obvious
+    four-way product.
+
+    The walk is excused nothing -- ``skip_functions`` exists for the helper's
+    own control test and is not used here, because the real scorer holds no
+    four-way product to excuse.
     """
     modules = [
         SRC / "models.py",
@@ -483,7 +522,10 @@ def test_prim25_only_one_function_multiplies_the_factors():
         "these places multiply four operands together rather than calling "
         f"priority_score_from_factors: {copies}. If one of them is not a "
         "priority score, this guard needs narrowing deliberately -- not "
-        "raising above an exact count of 0"
+        "raising above an exact count of 0. And note what a clean run here "
+        "does not prove: a scorer written as a loop, a reduce, a prod, through "
+        "intermediate variables, or with any / in the chain is not a "
+        "four-operand product and is invisible to this walk"
     )
 
 
