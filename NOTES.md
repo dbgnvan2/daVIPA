@@ -1,3 +1,22 @@
+## Where `main` stands (2026-11-08, end of day)
+
+Concurrent batches are finished as a way of working — one batch at a time from
+here, per `CLAUDE.md`. What that leaves:
+
+- **`main` is red on 20 tests** (CI run 42550648188 on `b6d6ddf`, identical on
+  Python 3.11, 3.12 and 3.13). The breakdown and what each needs is the first
+  section of `BACKLOG.md`.
+- **Two branches hold finished work that is not on `main`** and are the first
+  thing to deal with: `refs/heads/claude/plan-day-range-pdm13` (28 commits,
+  closes eight of the twenty red tests — verified by running them at its tip)
+  and `refs/heads/claude/elegant-neumann-ab55c9` (3 commits, UPD-F1).
+- **Nothing is uncommitted and nothing is unpushed.** The shared checkout is
+  clean and `main` matches `origin/main`.
+
+The one test that no branch fixes is
+`test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day`: it is on
+`main`, fails there, and exists on neither branch.
+
 ## Recent Changes (2026-11-08)
 
 ### What the walk asked for - UPD-F2, UPD-F3, UPD-F4 built; UPD-F1 not
@@ -24,7 +43,11 @@ only defect among them, is not.
   resizable chip column's minimum dropped to the floor, from 60, 52 and 80.
   9 of 9 mutations red - one survived the first gate and the assertion was
   tightened to an exact panel fill.
-- ❌ **UPD-F1 is not built.** `AppSettings.save()` writes the whole object, so
+- ❌ **UPD-F1 is not on `main`.** It *was* built, after this was written, on
+  `refs/heads/claude/elegant-neumann-ab55c9` (`31816a0`, "save() writes what
+  this object changed, not every field", plus its tests and note). That branch
+  is unmerged, so the defect below is still live for anyone running `main`.
+  `AppSettings.save()` writes the whole object, so
   a screen holding an older snapshot reverts fields another object changed -
   which is why no width survives a relaunch. It must change
   `src/getmoredone/app_settings.py`, which the calendar-export batch holds

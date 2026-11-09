@@ -134,11 +134,10 @@ So:
 - **A session that runs alongside a build is read-only.** Cold review passes,
   "where is X done" investigations, drafting a spec into a new file of its own.
   It commits nothing and stages nothing, so sharing the checkout is safe.
-- **Two builds at once means two worktrees**, and the file sets are checked for
-  overlap *before* either starts, not discovered mid-batch. Worktrees give each
-  session its own index, which ends the swept commits; they turn the nine files
-  above into merge conflicts instead, so disjointness is still the thing that
-  makes it work.
+- **No second build — not in a worktree either.** Two concurrent builds in two
+  worktrees used to be allowed here, with their file sets checked for overlap
+  before either started. Withdrawn 2026-11-08; see "Why the worktree exception
+  was withdrawn" below for what it cost.
 - **Keep a batch's doc work in its own new files** while the batch runs — its
   spec, its handoff note — and add the `BACKLOG.md`, `docs/USER_GUIDE.md` and
   `docs/DOCUMENTATION_INDEX.md` entries last, after the merge. Those three are
@@ -151,6 +150,40 @@ an index-based `git commit` will pick it up. Commit your own paths explicitly
 instead — `git commit -- <paths>`, or a filtered patch applied to a temporary
 `GIT_INDEX_FILE` when one file holds two sessions' hunks — and leave the index
 as you found it.
+
+### Why the worktree exception was withdrawn (2026-11-08)
+
+Worktrees did fix what they were adopted for. Each session got its own index,
+and after the move to them no commit carried another session's work. What they
+did not fix is the thing that actually cost the most: **work that is finished
+and not on `main`.**
+
+Measured at the end of 2026-11-08, after the day's batches were pushed
+(`7469fc4..b6d6ddf`, CI run 42550648188):
+
+- `main` was red on 20 tests. **Eight were already fixed** on
+  `refs/heads/claude/plan-day-range-pdm13`, a branch of 28 commits that was
+  never merged. Run at that tip in a separate worktree, all eight pass; on
+  `main`, all eight fail. `main` had been given the batch's *tests* — committed
+  from the shared checkout — while its *implementation* went on in the
+  worktree.
+- A ninth, `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day`,
+  is on `main`, fails there, and exists on no branch. No merge will make it
+  pass.
+- `refs/heads/claude/elegant-neumann-ab55c9` holds UPD-F1 in three commits —
+  the `AppSettings.save()` fix that `NOTES.md` was still recording as "not
+  built". It was built, in a worktree, and is not on `main` either.
+
+So the failure mode moved rather than disappeared: from one index being raced
+by four writers, to four branches each holding a piece, with `main` holding the
+tests for work it does not contain. That is worse than a conflict, because a
+conflict announces itself at the moment of merging, while a test red on `main`
+for want of a branch nobody remembers looks exactly like a bug.
+
+**One batch at a time, with no exception.** Finish it, sweep it, push it, and
+start the next only then. A batch that must wait costs hours; this day cost two
+orphaned branches, nine red tests with their fix on the wrong side of a merge,
+and a suite too red to read.
 
 ## Review sweeps
 

@@ -24,6 +24,12 @@ Agent handoff notes and implementation summaries:
 - Risks / known gaps
 - Follow-up guidance for subsequent agents
 
+Notes are not listed here individually (PLC-A5 covers that gap), with one
+exception worth finding without reading the directory:
+[`2026-11-08-one-batch-at-a-time.md`](changes/2026-11-08-one-batch-at-a-time.md)
+records the end of concurrent batches, the state `main` was left in, and the
+two unmerged branches.
+
 ### README.md (27KB)
 
 Main project documentation including:

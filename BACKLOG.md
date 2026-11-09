@@ -1,6 +1,9 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-08 (UPD-F2, UPD-F3 and UPD-F4 built what the unified
+Last Updated: 2026-11-08 (concurrent batches ended; one batch at a time
+from here, and what `main` needs to go green is the first section below -
+two unmerged branches first, one of which closes eight of the twenty red
+tests. Earlier the same day: UPD-F2, UPD-F3 and UPD-F4 built what the unified
 panel design's on-screen walk asked for - the filter area a line of its own on
 every VSP tab, "Pick" over the checkbox column, and columns that rescale with
 the divider down to five characters - and added four adjacent issues as UPD-A10
@@ -26,6 +29,109 @@ place below, UPD-A6's claim that UPD-M4 would empty the holdout lists is
 corrected there - `weekly_items.py` is the last copy and UPD-M5 rewrites it -
 and one adjacent issue is filed as UPD-A7, two dead index-based members in
 `annual_vision_segments.py`; UPD-M1 added two adjacent issues as UPD-A5 and UPD-A6 - a fifth copy of the splitter in Project Boards, whose clamp was already right where the four consolidated copies were wrong, and the holdout list UPD-M1.5 needs until UPD-M4 empties it; a third cold pass over the AWA re-sweep's fixes added AWA-S9 to AWA-S11, found no high, and showed that half of one low fixed in the previous round was not a defect; the cold re-sweep of the AWA fix commits added its four remaining lows as AWA-S5 to AWA-S8, with its one high, three mediums and one raised low fixed in-loop and one low fixed against the budget with its reason stated there; the AWA sweep's four below-medium findings added as AWA-S1 to AWA-S4, with its one high and five mediums fixed in-loop and AWA-A3 mostly closed by that fix; four adjacent issues from the APE Week Assignment / APE Week Actions batch added, two medium and two low, with a fifth fixed in that batch because it blocked verification; the four Plan / Day Plan faults reported from the running screen are addressed by PD-M11, pending the on-screen check; one adjacent issue from that batch added - the same remove-and-rebuild pattern on six other screens; the APE period-consistency re-sweep's two lows and one adjacent issue added, on top of that sweep's own two lows and two adjacent issues; the third cold pass's three test-quality findings remain, all low; six findings from the plan day-controls cold sweep remain, one of them medium-high; one adjacent issue from the plan day-controls batch remains; the cold sweep of the fix commits' five remain, after the PB-M6/PB-M7 sweep's three and the plan-box-appearance sweep's four; the seventh pass's four remain, the sixth pass's raised save-reporting entry is mostly cleared, the five earlier sections from this batch remain, and older sections from 08-24 and earlier remain)
+
+## What `main` needs, in order (2026-11-08)
+
+Written when concurrent batches stopped being the way of working and everything
+moved to one batch at a time (`CLAUDE.md`, "Why the worktree exception was
+withdrawn"). This is the whole of `main`'s red CI, what causes each part, and
+what closing it needs — so that none of it depends on a session still being
+open to remember it.
+
+Source: CI run 42550648188 on `b6d6ddf`, **20 failed, 2578 passed, 2 skipped**,
+identical on Python 3.11, 3.12 and 3.13. Branch comparisons were made by
+checking each branch out in a separate worktree and running the files there,
+not by reading the diffs.
+
+### 1. Two branches hold finished work that is not on `main` — do this first
+
+| branch (full ref) | commits | what it holds |
+|---|---|---|
+| `refs/heads/claude/plan-day-range-pdm13` | 28 | PD-M13/M14/M15 — the configured day and the drawn day split into two things — plus four cold review passes |
+| `refs/heads/claude/elegant-neumann-ab55c9` | 3 | UPD-F1 — `AppSettings.save()` writing only the fields this object changed |
+
+**Eight of the twenty red tests already pass on the plan-day branch.** Run at
+`c8125af` (`tests/test_plan_screen.py tests/test_plan_settings.py`): 269
+passed, 17 skipped, nothing failed. Each of these eight is present in that run
+and fails on `main`:
+
+- `test_tgm31_an_outside_block_is_drawn`
+- `test_every_part_of_an_outside_row_starts_a_drag`
+- `test_the_outside_group_does_not_outlive_the_day_that_had_one`
+- `test_the_outside_group_scrolls_instead_of_growing_past_the_pane`
+- `test_the_outside_group_takes_no_room_on_a_day_without_one`
+- `test_pbm55_the_settings_reach_the_outside_group_on_screen`
+- `test_pdm54_extending_the_day_is_not_confirming_it`
+- `test_pdm54_an_already_confirmed_day_stays_confirmed`
+
+`main` holds these tests because `5543476` ("the Plan day and time-grid tests
+as they stand") committed them out of the shared checkout while the
+implementation continued in the worktree. **Nothing needs writing to close
+them — the code exists.** Merging is the whole job.
+
+Expect conflicts in `tests/test_plan_screen.py` and
+`tests/test_plan_settings.py`: the branch forked at `6d86791` and both sides
+have changed both files since. UPD-F1's three commits touch
+`src/getmoredone/app_settings.py`, which no session holds open any more.
+
+A merge needs the user's say-so and is not a session's to start on its own.
+
+### 2. `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day` — no implementation anywhere (medium)
+
+In `tests/test_plan_screen.py`. It is on `main` and fails there, and it does
+**not exist** on `refs/heads/claude/plan-day-range-pdm13`, so no merge will
+make it pass. Either the behaviour it names was never built, or it was built
+under a different name among PD-M13.15-13.20. Settle which **before** the merge
+in item 1, so that resolving a conflict in that file does not quietly delete
+the test or leave it red with no owner.
+
+### 3. Seven tests measure the CI display rather than the code — WTP-A11 (medium)
+
+Filed in full as **WTP-A11** below, with the list and the shape of the fix. In
+short: a test that sets a window attribute and reads it back needs a window
+manager to honour the write, and the CI display has none. Red since at least
+`3f705b4` (2026-11-07). One shared precondition rather than seven is the part
+worth designing; `23f0cc7` is the worked example for a single test.
+
+### 4. Two traceability tests name things that do not exist (low)
+
+`tests/test_traceability_refs.py::test_every_referenced_test_file_exists` and
+`::test_every_referenced_test_name_exists`. Both are small and entirely
+mechanical — correct the docstring, or write the missing test:
+
+- `src/getmoredone/models.py` names `tests/test_priority_floor_and_cap.py` and
+  `tests/test_priority_floor_form.py`. Neither exists; the only priority test
+  file is `tests/test_priority_level_colors.py`.
+- `docs/spec_coverage.md`, `src/getmoredone/screens/plan.py` and
+  `src/getmoredone/time_block_layout.py` name `pdm5`, `pdm52`, `pdm58`,
+  `pdm146` and `tgm31` tests that are off by a generation from the ones that
+  exist.
+
+These belong to the priority and plan-day batches. Item 1's merge may change
+which names are right, so do them after it.
+
+### 5. Two tests fail only in CI (low)
+
+- `tests/test_plan_screen.py::test_pbm61_a_tall_row_keeps_its_two_lines_together`
+  — a mapped-window geometry test. It **cannot be reproduced on a working
+  machine**: it is one of the 22 that `GETMOREDONE_NO_MAPPED_WINDOWS=1` skips
+  because it needs a real on-screen window and takes keyboard focus. Red since
+  `3f705b4`.
+- `tests/test_unified_panel_design.py::test_updm14_zero_width_body_is_a_noop`
+  — **passes locally**, fails on all three Python versions in CI. The cause is
+  environmental and has not been identified.
+
+### What is already closed and needs nothing
+
+For completeness, so a future pass does not re-open them:
+
+- `test_wtpw_the_prompt_survives_a_real_always_on_top_parent` — was red for the
+  same cause as item 3; fixed in `23f0cc7` and confirmed skipping rather than
+  failing in run 42550648188.
+- `test_rm7c_repo_root_doc_allowlist` — went red when `2934e2d` committed four
+  untracked root drafts; fixed in `2285759` by moving them under `docs/`.
+- **CE-A22**, six commits that could not import `db_manager`, closed by the
+  history rewrite recorded in that entry.
 
 ## Adjacent issues — the unified panel walk's follow-ups (UPD-F, 2026-11-08)
 
