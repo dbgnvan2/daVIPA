@@ -142,8 +142,12 @@ No file under `src/` is touched.
   expected a dead alternative that was in fact reachable, AX did not move what
   it claimed to move, and BB came back **green** because the table fix had been
   written with no test. Listed with results in `docs/spec_coverage.md`.
-- The whole suite was not run locally, by standing instruction. CI runs it on
-  three Python versions on push.
+- The whole suite was not run locally, by standing instruction. CI ran it on
+  push: **run 42608198985 at `f1ff868` is green on 3.11, 3.12 and 3.13** —
+  `2672 passed, 10 skipped` on each. That total is the one check on this
+  batch's marker arithmetic that does not come from this batch: 2672 + 10
+  collected is **2682**, and the figures `CLAUDE.md` now carries, 2439 app and
+  243 meta, add to exactly that.
 
 ## Risks / Known gaps
 
