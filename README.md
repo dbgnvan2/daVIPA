@@ -717,7 +717,7 @@ GETMOREDONE_NO_MAPPED_WINDOWS=1 pytest
 
 ## Specification
 
-See `daVIPA_MasterSpec_SQLite_v1.md` for complete requirements and design decisions. Timer requirements are consolidated there.
+See `GetMoreDone_MasterSpec_SQLite_v1.md` for complete requirements and design decisions. Timer requirements are consolidated there.
 
 ## License
 

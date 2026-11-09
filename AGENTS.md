@@ -34,13 +34,22 @@ Minimum fields:
 
 If code behaviour, UI text, CLI flags, or dependencies changed, docs and the
 requirements files must be updated in the same change. Enforced by
-`.github/workflows/agent-docs-gate.yml`, which treats both
-`requirements.txt` and `requirements-dev.txt` as dependency files.
+`tests/test_docs_sync_rule.py`, which asserts
+`tools/agents/check_docs_sync.py::verdict` over fixtures, so the rule fails
+locally and in `tests.yml` before a push. Both `requirements.txt` and
+`requirements-dev.txt` count as dependency files. To apply it to real changes,
+run `./venv/bin/python tools/agents/check_docs_sync.py` by hand; a range it
+cannot read reports as *skipped*, not as a pass.
+
+This was the workflow `agent-docs-gate.yml` until 2026-11-09. That
+workflow triggered on `pull_request` only, this repo opens none, and so it had
+never run — `SAG-A3`.
 
 ## Merge gates
 
-- tests pass (`.github/workflows/tests.yml`)
-- docs sync gate passes (`.github/workflows/agent-docs-gate.yml`)
+- tests pass (`.github/workflows/tests.yml`), which runs the docs-sync rule's
+  decision function over fixtures with the rest of the suite — it does not
+  diff the change, so see the paragraph above for the command that does
 - UI regression coverage satisfied (per `docs/AGENT_UI_REGRESSION_POLICY.md`)
 
 ## UI Regression Guardrail

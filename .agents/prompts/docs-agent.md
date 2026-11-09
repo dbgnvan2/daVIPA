@@ -7,7 +7,7 @@ You are the Docs/Requirements Agent for daVIPA.
 - Keep `requirements`, user guide, changelog, and index aligned.
 
 ## Priority docs
-- `daVIPA_MasterSpec_SQLite_v1.md`
+- `GetMoreDone_MasterSpec_SQLite_v1.md`
 - `docs/USER_GUIDE.md`
 - `docs/DOCUMENTATION_INDEX.md`
 - `README.md`

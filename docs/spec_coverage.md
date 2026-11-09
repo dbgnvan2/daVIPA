@@ -1450,3 +1450,82 @@ mutations above still stand against the file as pushed.
 `2676 passed, 10 skipped` each, 2686 collected, which reconciles with the
 marker counts: 2439 app plus 247 meta, the meta figure having moved by this
 batch's four tests.
+
+
+## GSF — the gate that never ran, and the spec filename that does not exist (2026-11-09)
+
+Spec and plan: `docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md`.
+Note: `docs/changes/2026-11-09-dead-gate-and-dead-spec-name.md`.
+Closes `BACKLOG.md`'s `SAG-A3` (low) and `SAG-A7` (low).
+
+No file under `src/` is touched and none under `tools/`. One workflow is
+deleted, two test files gain a guard each, and nine documents are repaired.
+
+| Criterion | What it required | Implementation | Tests | Status |
+|---|---|---|---|---|
+| GSF-M1.1 | the pull-request-only docs gate deleted, and no live document describing it as an enforcement a reader gets | workflow deleted; `AGENTS.md`, `CLAUDE.md`, `docs/MULTI_AGENT_WORKFLOW.md`, `NOTES.md` corrected | `::test_gsfm11_no_document_cites_a_workflow_that_does_not_exist` | done — the four live claims corrected, eight path-carrying mentions rewritten to the path-free form, records under `docs/changes/`, `docs/spec_*` and `docs/implementation_plan_*` left as written |
+| GSF-M1.2 | the deletion cannot be undone silently: a document citing a `.github/workflows/<name>.yml` that is not there fails, proved against a fixture rather than against today's prose | `tests/test_ci_contract.py` (`_WORKFLOW_CITATION`, `workflow_citations`, `dangling_workflow_citations`) | same test, over a `tmp_path` `PROBE.md` | done — the helper takes `(label, text)` pairs precisely so the fixture can drive it; the repo scan alone is green once the repair lands |
+| GSF-M2.1 | every live citation of the master spec names the file that exists, and the index has no entry for a root document the repo does not contain | 11 citations in 7 documents | `::test_gsfm21_no_document_cites_a_root_doc_that_does_not_exist` | done — including a `###` entry heading in `docs/DOCUMENTATION_INDEX.md`, which is why the guard has a heading arm |
+| GSF-M2.2 | the four exempted names are exempt for a stated reason, checked in both directions | `tests/test_repo_hygiene.py` (`ROOT_DOC_CITATION_EXEMPTIONS`) | same test | done — one reason covers all four (`~/.claude/standards/`, outside any repo); a name that starts resolving has to leave the list |
+| GSF-M1.3 | the set of documents scanned cannot be narrowed by hand, and covers every document this batch repaired | `tests/test_ci_contract.py` (`_tracked_root_markdown`, `DOCS_DIR_LIVE_DOCS`, `LIVE_DOCS`) | `::test_gsfm11_no_document_cites_a_workflow_that_does_not_exist` | done — added by the cold pass, which measured seven of the ten originally-listed names as deletable with both guards still green, and two repaired documents never in the set at all |
+| GSF-N1 | **not code-testable:** whether the file should instead be renamed to `daVIPA_MasterSpec_SQLite_v1.md`, the app's current name, which eleven documents assumed | — | human | not code-testable — a branding decision, raised and not taken. Residue: `GSF-N1` in `BACKLOG.md` |
+
+### Mutations
+
+Two rounds. The first round discriminated on one of six, and the fixes it
+forced — the `(label, text)` extraction, the `LIVE_DOCS` existence and
+membership assertions, the heading-arm and shell-command fixtures — are what
+the second round measures. Every mutation was restored with the verbatim
+original and confirmed by sha256.
+
+| # | Mutation | Result |
+|---|---|---|
+| GA' | the workflow citation regex loses its `.github/workflows/` anchor | 1 failed |
+| GB' | `CLAUDE.md` and `AGENTS.md` cut out of `LIVE_DOCS` | 1 failed |
+| GC' | the dangling comparison removed from `dangling_workflow_citations` | 1 failed |
+| GG' | a `LIVE_DOCS` entry naming a document that does not exist | 1 failed |
+| GE' | an exemption added for a name that does exist | 1 failed |
+| GF' | the heading arm dropped from the root-doc scan | 1 failed |
+| GD' | the root-doc regex made path-blind | **GREEN** — and so was `GD2'`, which removed the `"/" in name` filter instead. `GD3'`, removing both together, fails. Two mechanisms for one rule means neither is observable: the redundant filter is deleted and the patterns are the mechanism. `GD''` and `GH''` (each pattern made path-blind, with the filter gone) both fail |
+| GI'' | the dotfile filter removed | 1 failed — after a fixture was added for the form, which no live document writes. It was green before that line existed |
+
+### The cold pass
+
+One cold pass, the batch's first, run on the full diff with the lens "can
+either guard pass while reading nothing, and does every rewritten sentence say
+something true". It produced **no high and four mediums**, so the sweep closes
+here by the budget's own rule. Each was confirmed by re-measurement before it
+was fixed:
+
+- **The scanned set was both narrowable and incomplete.** Seven of the ten
+  listed names could be deleted with both guards still green — the two
+  backstops survived because `AGENTS.md` cites `tests.yml` and `CLAUDE.md`
+  cites `BACKLOG.md` — and two of the seven documents this batch repaired,
+  `docs/action-timer-requirements.md` and the Get Started guide, were never in
+  the set, so `SAG-A7`'s defect could have returned to either unnoticed. Fixed
+  as `GSF-M1.3`: the root half is derived from `git ls-files`, the `docs/` half
+  is asserted name by name.
+- **`BACKLOG.md` cited a handoff note that did not exist** — this batch's own,
+  in both closure entries, which is the exact class the batch exists to close.
+  No guard covers it: the root-doc arm excludes anything with a directory part
+  by design. Fixed by writing the note.
+- **`docs/MULTI_AGENT_WORKFLOW.md` reinstated the false enforcement claim**
+  the batch had just removed from three other documents: it said the rule runs
+  with the suite on every push and then described it failing on an
+  undocumented change. What runs is `verdict` over fixtures; nothing diffs the
+  branch. The caveat `CLAUDE.md` and `AGENTS.md` both carry was absent, so a
+  reader concluded CI would catch them. Fixed in both that document and the
+  loose merge-gate bullet in `AGENTS.md`.
+- **Four lows in the batch's own new text**, fixed rather than filed because
+  they are errors in sentences this batch wrote: the plan said nine documents
+  where it enumerated seven, cited the wrong line for the `--base`/`--head`
+  driver, recorded §1.3's class size with no resolution rule beside it (now
+  restated with the rule, and re-measured at 55 occurrences / 25 distinct over
+  the 21 documents), and left the two adopted citation conventions discoverable
+  only by turning a test red (now in `CLAUDE.md`, under "Naming a thing that no
+  longer exists"). The re-measurement turned up one genuine defect of the same
+  class in `BACKLOG.md`, filed as `GSF-A5`.
+
+The fix for the first of those changed guard logic rather than prose, so it is
+new unreviewed surface; no high-severity finding means the budget allows no
+further pass, and it is recorded here rather than swept.

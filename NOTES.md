@@ -2,6 +2,20 @@
 
 One batch at a time from here, per `CLAUDE.md`. What that leaves:
 
+- **The two dead pointers are closed** (GSF batch, 2026-11-09, `SAG-A3` and
+  `SAG-A7`). agent-docs-gate.yml is deleted: it triggered on `pull_request`
+  only, this repo opens none, so it had never run, and the rule it carried has
+  been in the suite since `SAG-M2`. Eleven citations in seven documents named a
+  master-spec file that has never existed, among them the key-files table in
+  `CLAUDE.md` and a `###` entry heading in `docs/DOCUMENTATION_INDEX.md`; all
+  eleven name `GetMoreDone_MasterSpec_SQLite_v1.md` now. Two guards hold the
+  class, each proved against a fixture the test writes, because a repo-state
+  assertion cannot fail once the repo is clean. The cold pass measured the
+  first version of the scanned set as both narrowable — seven of ten names
+  deletable with both guards green — and incomplete, missing two documents the
+  batch itself repaired; the root half is derived from `git ls-files` now. The
+  three conventions for naming a thing that no longer exists are in `CLAUDE.md`.
+
 - **The nine open `SSC` filings are closed** (SST batch, 2026-11-08). Every
   status claim this repo made about itself that nothing checked: seventeen stale
   lines over built work, the WTP count (38/40/41 — it is 41), a coverage row
@@ -103,8 +117,8 @@ and are corrected in `BACKLOG.md` item 1 with the measurements.
   `tools/agents/check_docs_sync.py::verdict`, a pure function of changed paths
   asserted over fixtures, so the rule fails locally and in `tests.yml` before a
   push - not over a git range, because `tests.yml` checks out at depth 1 and a
-  test that asked would skip there. `.github/workflows/agent-docs-gate.yml`
-  itself still runs on nothing; deleting it is `SAG-A3`. The first cold pass
+  test that asked would skip there. The workflow `agent-docs-gate.yml`
+  itself ran on nothing and is deleted (`SAG-A3`, the GSF batch, same day). The first cold pass
   over this batch found two highs and three mediums, all in the batch's own test
   code, among them a guard that passed on the broken state and failed on the
   correct one. A third pass asked whether the batch is green anywhere but this

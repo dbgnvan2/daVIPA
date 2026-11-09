@@ -15,14 +15,14 @@ python run.py
 # Tests
 pytest                                          # All tests
 pytest -m "not meta"                            # App behaviour only (2439 tests)
-pytest -m meta                                  # Repo/infra assertions only (247 tests)
-# Both counts measured 2026-11-09 (after the SBN batch, whose own four tests
-# are all in the meta figure; the app figure has not moved since the SAG
+pytest -m meta                                  # Repo/infra assertions only (249 tests)
+# Both counts measured 2026-11-09 (after the GSF batch, whose own two tests
+# are both in the meta figure; the app figure has not moved since the SAG
 # batch, where it moved with `c190b9f`) with
 # `-m <marker> --collect-only -q`, whose last line prints collected/deselected
 # — re-measure rather than trusting them. They had been 1691 and 212, stale by
-# 741 and 13, and 2432/225 earlier the same day; the meta figure was 243 until
-# the SBN batch. No test asserts either number,
+# 741 and 13, and 2432/225 earlier the same day; the meta figure was 243
+# before the SBN batch and 247 before this one. No test asserts either number,
 # which is why they drift; one that did would go red on every batch.
 pytest -v                                       # Verbose
 pytest tests/test_vps_integration.py -v        # Single file
@@ -110,10 +110,32 @@ this repo has now been bitten by twice. To apply the rule to real changes, run
 it by hand: `./venv/bin/python tools/agents/check_docs_sync.py`. A range it
 cannot read is reported as *skipped*, not as a pass.
 
-`.github/workflows/agent-docs-gate.yml` still exists and still triggers on
-`pull_request` only, which this repo never produces, so the gate itself has
-never run here. Deleting it is `SAG-A3`. The rule treats both
-`requirements.txt` and `requirements-dev.txt` as dependency files.
+The workflow `agent-docs-gate.yml` is **deleted** as of 2026-11-09
+(`SAG-A3`). It triggered on `pull_request` only, which this repo never
+produces, so the gate had never run here — the rule it carried is the suite's
+now. The rule treats both `requirements.txt` and `requirements-dev.txt` as
+dependency files. `tests/test_ci_contract.py::test_gsfm11_no_document_cites_a_workflow_that_does_not_exist`
+is what stops a document describing a workflow this repo does not have.
+
+### Naming a thing that no longer exists
+
+Three conventions, each adopted because a guard that reads prose cannot tell a
+pointer from a history: a sentence that names a deleted thing the way a live
+one is named is indistinguishable from a dead pointer, and the guard is right
+to reject it.
+
+- **A retired test** is named in plain backticks with neither the `tests/`
+  path nor the leading `::` — `tests/test_traceability_refs.py` resolves both
+  of those forms against the suite.
+- **A deleted workflow** is named without its `.github/workflows/` path:
+  `agent-docs-gate.yml` alone. `GSF-M1.1` is the guard.
+- **A dead root filename quoted as a defect** — the way the closed `SAG-A7`
+  quotes the master-spec name that never existed — is written *without*
+  backticks. `GSF-M2.1` reads the backticked form only.
+
+Each guard's failure message says this too, but a convention a future author
+can only learn by turning a test red is a convention written in the wrong
+place.
 
 ### One build batch at a time
 
@@ -312,7 +334,7 @@ In tabular/dual-panel UIs, aligned columns are a design goal — matching column
 |---|---|
 | `codex.md` | Full file maintainability policy — read before any refactor |
 | `AGENTS.md` | Multi-agent workflow rules + theme system spec |
-| `daVIPA_MasterSpec_SQLite_v1.md` | Complete technical spec |
+| `GetMoreDone_MasterSpec_SQLite_v1.md` | Complete technical spec |
 | `docs/USER_GUIDE.md` | User documentation |
 | `BACKLOG.md` | Development priorities |
 | `NOTES.md` | Recent changes and known issues |

@@ -35,10 +35,29 @@ This creates:
 
 ## Docs gate behavior
 
-PR workflow `.github/workflows/agent-docs-gate.yml` runs `tools/agents/check_docs_sync.py`.
+The rule is `tools/agents/check_docs_sync.py`, asserted by
+`tests/test_docs_sync_rule.py` and so run with the suite on every push. It was
+a pull-request workflow, `agent-docs-gate.yml`, until
+2026-11-09; that workflow had never run, because this repo opens no pull
+requests (`SAG-A3`).
 
-The gate fails when:
-- code/dependency files changed (`src/`, `tools/`, `tests/`, or `requirements.txt`), and
+What the suite runs is `verdict`, the decision as a pure function of changed
+paths, over fixtures — **it does not diff your branch.** `tests.yml` checks out
+at depth 1 and has no `origin/main` to diff against, so a test that asked for
+the range would skip on CI. To apply the rule to a real change, run it by
+hand:
+
+```bash
+./venv/bin/python tools/agents/check_docs_sync.py
+```
+
+A range it cannot read is reported as *skipped*, not as a pass. So an
+undocumented change does not turn CI red; nothing but that command and the
+reviewer catches it.
+
+The rule's verdict is "fail" when:
+- code/dependency files changed (`src/`, `tools/`, `tests/`, `requirements.txt`
+  or `requirements-dev.txt`), and
 - no documentation update is present, or
 - no handoff note exists in `docs/changes/`
 

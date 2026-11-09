@@ -52,7 +52,7 @@ Current end-user documentation including:
 - Vision Strategy Plan hub, Annual Plan Elements, and APE assignment flow
 - List View terminology and current responsive-column behavior
 
-### daVIPA_MasterSpec_SQLite_v1.md (19KB)
+### GetMoreDone_MasterSpec_SQLite_v1.md (19KB)
 
 Complete specification including:
 
@@ -420,6 +420,40 @@ note is:
   plan named as its own risk - no high and eight mediums, all fixed, two of
   them in the guard's own prose. `SBN-A1` to `SBN-A7` filed, not fixed.
 
+### docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md
+
+Implementation plan for deleting the pull-request-only docs gate and repairing
+the master-spec filename that does not exist (GSF-M1 - GSF-M2), closing
+`BACKLOG.md`'s `SAG-A3` and `SAG-A7` (both low). **Approved under the standing
+instruction 2026-11-09 and built the same day: 5 of 5 criteria `done`, one item
+not code-testable (GSF-N1, whether the spec file should instead be renamed to
+the app's name)** - per-criterion status in `docs/spec_coverage.md`. No file
+under `src/` or `tools/` is touched. Handoff note:
+`docs/changes/2026-11-09-dead-gate-and-dead-spec-name.md`, which is listed here
+only inside this entry rather than as an entry of its own, as every handoff
+note is:
+
+- `agent-docs-gate.yml` triggered on `pull_request` only, which this repo never
+  opens, so the gate had never run here. It is deleted; the rule it carried has
+  been in the suite since `SAG-M2`. Four live documents described it as an
+  enforcement a reader gets and are corrected.
+- Eleven citations in seven documents named daVIPA_MasterSpec_SQLite_v1.md,
+  written here without backticks because it has never existed - including the key-files table in `CLAUDE.md` and,
+  in this index, a `###` entry heading, so the index had an entry for a file the
+  repo has never contained. All eleven name the file that is there.
+- Two guards hold the class now, each proved against a fixture the test writes
+  rather than against today's prose, because a repo-state assertion cannot fail
+  once the repo is clean.
+- Nine mutations, three green and all three recorded; two of the three were one
+  finding, a redundant path filter beside a path-blind regex where neither
+  mechanism was observable alone, and the redundant one is deleted.
+- One cold pass - no high, four mediums, all fixed. It measured seven of the
+  ten documents in the originally hand-kept scanned set as deletable with both
+  guards still green, and two documents this batch repaired as never in the set
+  at all; the root half is derived from `git ls-files` now (GSF-M1.3). It also
+  caught this batch citing a handoff note that did not yet exist.
+- `GSF-A1` to `GSF-A5` filed, not fixed. `GSF-N1` needs the user.
+
 ### docs/implementation_plan_2026-11-09_status_allow_list.md
 
 Implementation plan for inverting the status-claim guard into an allow-list and
@@ -450,7 +484,7 @@ this entry rather than as an entry of its own, as every handoff note is:
   highs and three mediums in the third pass's own fix, where the guard had
   become weaker than the deny-list it replaces.
 - `SAG-A1` to `SAG-A16` filed, not fixed; `SAG-A3` (deleting
-  `.github/workflows/agent-docs-gate.yml`) was left out deliberately.
+  `agent-docs-gate.yml`) was left out deliberately.
 
 ### docs/implementation_plan_2026-11-08_status_claims.md
 
@@ -544,7 +578,7 @@ completion question on all seven surfaces (WTP-M6.7) and its widget tests
 
 ### Requirements (Consolidated)
 
-All requirements are now maintained in `daVIPA_MasterSpec_SQLite_v1.md`. The timer-specific requirements document is retained only for archival reference.
+All requirements are now maintained in `GetMoreDone_MasterSpec_SQLite_v1.md`. The timer-specific requirements document is retained only for archival reference.
 
 ### docs/google-calendar-setup.md (13KB)
 
@@ -747,7 +781,7 @@ Verify authentication setup
 **Getting Started**
 
 - README.md
-- daVIPA_MasterSpec_SQLite_v1.md
+- GetMoreDone_MasterSpec_SQLite_v1.md
 
 **VPS Documentation**
 
@@ -780,7 +814,7 @@ Verify authentication setup
 Large (>10KB):
 
 - README.md (27KB)
-- daVIPA_MasterSpec_SQLite_v1.md (19KB)
+- GetMoreDone_MasterSpec_SQLite_v1.md (19KB)
 - docs/action-timer-requirements.md (19KB)
 - docs/EMAIL-AUTH-TROUBLESHOOTING.md (11KB)
 - docs/google-calendar-setup.md (13KB)
@@ -834,7 +868,7 @@ Small (<5KB):
 
 **Check feature backlog** → BACKLOG.md
 
-**Understand the system** → daVIPA_MasterSpec_SQLite_v1.md
+**Understand the system** → GetMoreDone_MasterSpec_SQLite_v1.md
 
 **Clear browser cache** → CLEAR_BROWSER_CACHE.md
 
@@ -891,7 +925,7 @@ Documentation is updated:
 - When user issues are resolved
 - During major releases
 
-**Current Status**: last index entry added 2026-11-09 (the SBN bare-name-citations plan). This index is not enforced by any test (PLC-A5) and does not list every
+**Current Status**: last index entry added 2026-11-09 (the GSF dead-gate-and-dead-spec-name plan). This index is not enforced by any test (PLC-A5) and does not list every
 file under `docs/`: of the 76 Markdown files directly under `docs/`, 43 are not
 named in it anywhere and 48 have no entry of their own. `docs/` holds 222 files
 in all, so the gap over its subdirectories is wider still and uncounted. `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`

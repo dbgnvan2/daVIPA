@@ -657,7 +657,7 @@ Filed 2026-11-09 by the cold pass over the SST batch.
 
 ### SST-A8 — the docs-sync gate runs only on pull requests, and this repo opens none (medium)
 
-`.github/workflows/agent-docs-gate.yml` triggers on `pull_request` only. This
+`agent-docs-gate.yml` triggered on `pull_request` only. This
 repo pushes to `main`; the standing instruction is no pull requests. So
 `tools/agents/check_docs_sync.py` has never run on the way work actually ships
 here, and the sentence in `CLAUDE.md` saying docs updates are "enforced by the
@@ -689,10 +689,10 @@ apply the rule to real changes, run
 `./venv/bin/python tools/agents/check_docs_sync.py` by hand; a range it cannot
 read is reported as *skipped*, never as a pass (`SAG-M2.3`).
 
-`.github/workflows/agent-docs-gate.yml` itself still triggers on
-`pull_request` only and so still runs on nothing. Deleting it is `SAG-A3`
-below — left out of this batch on purpose, because removing a workflow is not
-the same change as putting its rule in the suite.
+The workflow `agent-docs-gate.yml` itself was left in place by that
+batch, on purpose, because removing a workflow is not the same change as
+putting its rule in the suite. It is **deleted** as of 2026-11-09 by the GSF
+batch, which closed `SAG-A3`.
 
 **Priority:** Medium
 **Effort:** Medium
@@ -4926,7 +4926,7 @@ corrected by the second, which found the document.
 **Priority:** Low
 **Effort:** Small
 
-### SAG-A3 — delete `.github/workflows/agent-docs-gate.yml` (low)
+### ~~SAG-A3~~ — delete the `agent-docs-gate.yml` workflow (low) — **CLOSED 2026-11-09**
 
 It triggers on `pull_request` only, and the standing instruction for this repo
 is no pull requests, so it has never run here. Since `SST-A8`'s closure the rule
@@ -4937,6 +4937,21 @@ gets, and `CLAUDE.md` has to carry a paragraph explaining that.
 Left out of the SAG batch on purpose: removing a workflow is a different change
 from putting its rule in the suite, and doing both in one batch would have made
 the diff say two things at once.
+
+**Closed 2026-11-09 by the GSF batch**
+(`docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md`,
+`docs/changes/2026-11-09-dead-gate-and-dead-spec-name.md`). The file is gone,
+and the four live documents that described it as an enforcement a reader gets —
+`AGENTS.md` twice, `CLAUDE.md` and `docs/MULTI_AGENT_WORKFLOW.md` — now name
+the suite's `tests/test_docs_sync_rule.py` instead.
+`tests/test_ci_contract.py::test_gsfm11_no_document_cites_a_workflow_that_does_not_exist`
+holds the class: a live document may not point a reader at a
+`.github/workflows/<name>.yml` that is not there. A workflow that has been
+deleted is named **without** that path, the way a retired test is named without
+its `tests/` path, so it reads as history rather than as a pointer — which is
+why every mention of this one in `BACKLOG.md`, `NOTES.md`, `CLAUDE.md`,
+`AGENTS.md`, `docs/MULTI_AGENT_WORKFLOW.md` and
+`docs/DOCUMENTATION_INDEX.md` now reads `agent-docs-gate.yml` alone.
 
 **Priority:** Low
 **Effort:** Small
@@ -4995,16 +5010,30 @@ is that below-medium findings are not fixed in-loop.
 **Priority:** Low
 **Effort:** Small
 
-### SAG-A7 — `CLAUDE.md` names a master spec file that does not exist (low)
+### ~~SAG-A7~~ — `CLAUDE.md` names a master spec file that does not exist (low) — **CLOSED 2026-11-09**
 
-`CLAUDE.md`'s key-files table lists `daVIPA_MasterSpec_SQLite_v1.md`. The file
-in the repo root is `GetMoreDone_MasterSpec_SQLite_v1.md`, which is also the
-name `check_docs_sync.py`'s `DOC_FILES` uses. So the one pointer a reader is
-most likely to follow from `CLAUDE.md` is dead, and the rename it implies was
+`CLAUDE.md`'s key-files table listed daVIPA_MasterSpec_SQLite_v1.md — written
+without backticks, because it is not a pointer and
+`tests/test_repo_hygiene.py::test_gsfm21_no_document_cites_a_root_doc_that_does_not_exist`
+reads the backticked form. The file in the repo root is
+`GetMoreDone_MasterSpec_SQLite_v1.md`, which is also the name
+`check_docs_sync.py`'s `DOC_FILES` uses. So the one pointer a reader is
+most likely to follow from `CLAUDE.md` was dead, and the rename it implies was
 never done.
 
 Filed 2026-11-09 by the cold pass over the SAG batch. Out of scope for that
 batch, whose `CLAUDE.md` edit was confined to the docs-gate paragraph.
+
+**Closed 2026-11-09 by the GSF batch**
+(`docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md`,
+`docs/changes/2026-11-09-dead-gate-and-dead-spec-name.md`). It was not one
+citation but **eleven**, in seven documents, including a `###` entry in
+`docs/DOCUMENTATION_INDEX.md` — so the index listed a document this repo has
+never contained. All eleven now name the file that exists, and the guard above
+holds the class. What this does **not** settle is whether the file should
+instead be renamed to match the app's name, which eleven documents assumed had
+happened: that is `GSF-N1`, a branding decision, raised in the plan and not
+taken.
 
 **Priority:** Low
 **Effort:** Small
@@ -5334,3 +5363,62 @@ start — `)` never occurs and the one `.` case is excluded by `_TESTISH` anyway
 The `_FULL` mask was deleted in the same batch on exactly this ground, that it
 changed no outcome; these two alternatives were kept. Either drop them or add
 the fixture that exercises them.
+
+### GSF-A1 — `docs/MULTI_AGENT_WORKFLOW.md` describes a workflow this repo does not follow (medium)
+
+Found while correcting that document's docs-gate paragraph (GSF, 2026-11-09).
+Only that paragraph was in scope. The rest of the document still prescribes the
+retired three-agent workflow: a worktree per role, `AGENTS.md` ownership
+boundaries between Code, Docs and GitHub agents, and "Open/update PR with
+`.github/pull_request_template.md`". `CLAUDE.md` records that workflow as
+retired — `codex/agent-docs` and `codex/agent-github` never existed as
+branches — and this repo opens no pull requests. A reader following this
+document would set up a process nobody here uses. Either rewrite it to the
+single-branch, one-batch-at-a-time agreement that `CLAUDE.md` and `AGENTS.md`
+carry, or delete it and let those two be the agreement.
+
+### GSF-A2 — `.github/pull_request_template.md` is kept for PRs this repo never opens (low)
+
+Same class as the closed `SAG-A3`, one surface along: a file whose only trigger
+is a pull request, in a repo whose standing instruction is to open none. Unlike
+the workflow it is inert rather than misleading, which is why it is low. It is
+cited by `docs/MULTI_AGENT_WORKFLOW.md`, so `GSF-A1` and this should be settled
+together.
+
+### GSF-A3 — the `docs/` half of the GSF scanned set is hand-kept (medium)
+
+`GSF-M1.3` derives the root half of `LIVE_DOCS` from `git ls-files`, precisely
+because the cold pass measured the hand-kept version as both narrowable and
+incomplete. The `docs/` half is still a tuple, `DOCS_DIR_LIVE_DOCS`, with six
+names in it. Of the 36 Markdown files directly under `docs/` that are not dated
+records, 30 are outside both GSF guards, so a new live document there is
+unchecked until someone adds it — and nothing announces that. The blocker is
+that no path rule separates a live reference document under `docs/` from a
+dated record or a one-off prompt: `docs/SESSION_HANDOFF_2026-02-19.md`,
+`docs/prompt-test-suite-remediation.md` and `docs/VPS_UPDATES_2026-01-24.md`
+are all records with no date-shaped prefix. A naming convention for new
+documents, enforced by a test, would let the set be derived in full.
+
+### GSF-A4 — `docs/AGENT_UI_REGRESSION_POLICY.md` cites a TOOL.md that does not exist (low)
+
+Line 3 lists four documents a reader might be following — TOOL.md (written
+here without backticks, per the convention in `CLAUDE.md`, because it does not
+exist), `CLAUDE.md`, `GEMINI.md` and `AGENTS.md` — "or similar repo
+instructions". Three of the four exist; the first has never been in this
+repo. Pre-existing, found by the GSF class measurement,
+and outside the guard only because that document is one of the 32 under
+`GSF-A3`. Arguably a generic "or similar" list rather than a pointer, which is
+why it is low — but it is the same shape as the closed `SAG-A7`.
+
+### GSF-A5 — `BACKLOG.md` says a file under `src/getmoredone/screens/` defines a function, and no such file is tracked (medium)
+
+`grep -n 'reschedule_dialog.py' BACKLOG.md` finds two entries, one of which
+says in the present tense that `src/getmoredone/screens/reschedule_dialog.py`
+*defines* a function. `git ls-files` finds no file of that name anywhere, and
+none named `confirm_dialog.py` either, which a third entry also names. Found by
+the GSF class measurement, which counted 55 unresolvable path citations in the
+live documents and found this to be the one genuine defect among the 25
+distinct names. Either the file was renamed and these entries were not, or the
+entries describe work that was never built; the fix needs those items read
+rather than their citations rewritten, which is why it is filed and not
+repaired here.
