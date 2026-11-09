@@ -128,6 +128,18 @@ needs to account for why.
 
 ### PD-M14.4 — Changing the hours keeps planned work on its clock
 
+> **Not built.** `docs/changes/2026-11-08-day-hours-are-a-template-wip.md`
+> records PD-M14.4 under "Not started", and nothing since has built it:
+> `grep -rn "def test_pdm144" tests/` returns nothing, and
+> `grep -rn shift_all_slots src/` finds only the definition at
+> `db_manager.py:1658` and a docstring mention — no production caller. So the
+> reversal this section proposes did not happen: `on_settings_saved` still
+> writes no rows, TG-M6.4 and TG-M6.4a stay `done` in `docs/spec_coverage.md`,
+> and both their tests are live. Read the rest of this section as the proposal
+> it is, not as built behaviour — including the two `test_pdm144` names below,
+> which were never written. *(Recorded 2026-11-08, tenth cold pass of the PDT
+> batch, which found this section cited as though it had shipped.)*
+
 This is the reversal that makes PD-M14.1 safe, and it follows from the
 instruction: if the hours are only a template, moving the template cannot move
 work that is already planned. So `on_settings_saved` renumbers — this is
@@ -211,16 +223,21 @@ above, in one pass, on a weekday and on a Saturday.
 |---|---|---|
 | PD-M5.2 | A drop above the first box moves Day Start back | The drop no longer touches Day Start. The item still lands above the first box. |
 | PD-M5.3 | A drop below the last box moves Day End forward | The same, at the other end. |
-| PD-M5.5 | Blocks keep their clock times when the day grows | Still true, by a different mechanism: nothing is renumbered because nothing moves. `shift_all_slots` keeps this criterion under PD-M14.4. |
-| TG-M6.4 | Saving Day Settings writes no blocks | ~~Reversed by PD-M14.4: it must renumber, or work already planned moves on the clock.~~ **Not what was built.** The box is stored relative to Day Start, so the clock times follow on read and nothing is renumbered — the same mechanism the PD-M5.5 row above describes. TG-M6.4 and TG-M6.4a stay `done` in `docs/spec_coverage.md`, and both named tests are live and green: `tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks` and `tests/test_time_block_crud.py::test_tgm64_a_day_start_change_writes_no_rows`. They are **not** among the four tests deleted below. *(Corrected 2026-11-08, ninth cold pass of the PDT batch.)* |
+| PD-M5.5 | Blocks keep their clock times when the day grows | Still true, by a different mechanism: nothing is renumbered because nothing moves. the plan expected `shift_all_slots` to keep this criterion under PD-M14.4; since PD-M14.4 was not built, `shift_all_slots` has no production caller and the criterion holds without it. |
+| TG-M6.4 | Saving Day Settings writes no blocks | ~~Reversed by PD-M14.4: it must renumber, or work already planned moves on the clock.~~ **Not what was built.** The box is stored relative to Day Start, so the clock times follow on read and nothing is renumbered — the same mechanism the PD-M5.5 row above describes. TG-M6.4 and TG-M6.4a stay `done` in `docs/spec_coverage.md`, and both named tests are live and green: `tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks` and `tests/test_time_block_crud.py::test_tgm64_a_day_start_change_writes_no_rows`. Neither was deleted: PD-M14.4 was not built, and the deletion list below is corrected to the three tests that were. *(Corrected 2026-11-08, ninth cold pass of the PDT batch.)* |
 
-Four tests assert the withdrawn behaviour and are deleted with it:
+**Three** tests assert the withdrawn behaviour and were deleted with it:
 `::test_pdm52_a_drop_above_moves_day_start_back`,
-`::test_pdm52_a_long_item_dropped_above_takes_the_day_back_far_enough`,
-`::test_pdm53_a_drop_below_moves_day_end_forward`,
-`::test_tgm64_saving_settings_writes_no_blocks`. Three are replaced by the
-PD-M14 tests above; the fourth is replaced by `::test_pdm144_changing_the_hours_keeps_clock_times`,
-which asserts the opposite.
+`::test_pdm52_a_long_item_dropped_above_takes_the_day_back_far_enough` and
+`::test_pdm53_a_drop_below_moves_day_end_forward`. All three are replaced by
+the PD-M14 tests above.
+
+~~`::test_tgm64_saving_settings_writes_no_blocks`~~ was listed here as a
+fourth, to be replaced by `::test_pdm144_changing_the_hours_keeps_clock_times`.
+Neither happened: PD-M14.4 was not built (see the note at its head), the
+`test_pdm144` tests were never written, and
+`tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks` is
+live at `:1569` asserting the criterion verbatim. Do not delete it.
 
 `::test_pdm53_a_drop_below_does_not_renumber_the_day` and
 `::test_pdm55_a_block_on_another_date_keeps_its_clock_time` keep their names and
@@ -231,7 +248,7 @@ are strengthened: under PD-M14.1 they hold for both ends, not one.
 1. PD-M14.2 — signed slot index and the drawn span. Nothing else can land first.
 2. PD-M14.1 — the drop path, which is what was reported.
 3. PD-M14.3 — Clear Day, which is free once 14.2 is in, plus its tests.
-4. PD-M14.4 — the settings path and TG-M6.4's reversal.
+4. PD-M14.4 — the settings path and TG-M6.4's reversal. **Not built.**
 5. PD-M14.5, PD-M14.6 — the two containment rules.
 6. PD-M14.7 — the repair, last, so it runs against finished code.
 

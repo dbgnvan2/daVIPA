@@ -258,7 +258,7 @@ the index — still holds, and is the part six other places route readers to
 
 ### SSC-6 — WTP's criterion count is given as 38, 40 and 41 (medium)
 
-This file's header paragraph (`BACKLOG.md:20`) says "all 38 criteria
+This file's header paragraph (`BACKLOG.md:19-21`) says "all 38 criteria
 built" — item 3 is WTP-A11, not this;
 `docs/spec_2026-11-08_weekly_tactic_as_parent.md:336` says 40, as does
 `docs/cycles/2026-11-08_wtp-widget-tests-qa-gate.md:125` ("Spec count 39 →
@@ -287,7 +287,7 @@ correct usage. Nothing checks that column —
 `docs/DOCUMENTATION_INDEX.md`'s completeness" at Priority: Medium, with the
 test design written out. `PLC-A5` files the same gap at low. Six places
 route the reader to `PLC-A5` for this gap — `docs/DOCUMENTATION_INDEX.md:27`,
-`:713`, `:718`, `:722`, `BACKLOG.md:386` and `docs/spec_coverage.md:994` — and
+`:713`, `:718`, `:722`, `BACKLOG.md:393` and `docs/spec_coverage.md:994` — and
 none mentions `UPD-A13`, so a reader lands on
 the low item — whose first sentence is also stale, see SSC-5 — and never
 reaches the designed fix.

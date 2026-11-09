@@ -83,7 +83,7 @@ The grep `git diff 4ca7116 -- tests/test_plan_settings.py
 tests/test_plan_screen.py | grep -E '^-.*assert'` prints those six lines. One
 assertion was withdrawn and one inverted; the other four survive.
 
-### What the last two passes changed, and what they left
+### What the last three passes changed, and what they left
 
 Passes 8 and 9 stopped working from the diff and worked from the *statements*
 instead, grepping every duplicate of each claim. That is what caught the
@@ -124,10 +124,28 @@ standing elsewhere.
   implementation code written" over code that is on `main`, a spec whose
   header contradicts its own status section 330 lines below. Sweeping them
   into a plan-day test batch would produce an unreviewable diff, which is the
-  global rule 10 split. Two are high. `SSC-3` is left for the user: the two
+  global rule 10 split. Three are high — `SSC-1`, `SSC-2` and `SSC-3`.
+  `SSC-3` is left for the user: the two
   false sentences are in `CLAUDE.md`, which is auto-loaded into every session,
   so correcting the project's own instructions on a review finding is not a
   sweep's decision.
+- **PD-M14.4 was never built, and the plan reads as though it shipped.** The
+  ninth pass struck through one table cell of that prediction; the tenth found
+  the cell then pointed the reader at a list three lines below that still named
+  the live `test_tgm64` test as deleted, and three further copies of the
+  prediction elsewhere in the same section. The authority is
+  `docs/changes/2026-11-08-day-hours-are-a-template-wip.md`, which records
+  PD-M14.4 under "Not started"; `grep -rn "def test_pdm144" tests/` returns
+  nothing, and `shift_all_slots` has no production caller. The section now
+  carries one dated not-built note at its head, so the copies inside it are
+  governed by a single statement, and the deletion list is corrected to the
+  three tests that were deleted. This is the batch's own correction gone wrong:
+  a cell fixed without reading the paragraph under it.
+- **The tenth pass caught a cite the ninth pass's own edits had moved.** SSC-8
+  listed `BACKLOG.md:386` for a line that this file's earlier hunks had pushed
+  to `:393`. A line cite written against the pre-edit file is the same defect
+  the cite corrections were for, so it is worth saying plainly: cites into a
+  file you are editing must be re-read after the edit, not before.
 - **Four wrong line cites inside those filings were corrected** rather than
   filed again — a filing whose cite points at the wrong line sends the next
   reader to a non-problem, so the cite is the filing's payload, not cosmetics.
@@ -142,7 +160,10 @@ standing elsewhere.
 - `src/getmoredone/time_block_layout.py` — `edge_limit_time` and `build_day_grid` `Tests:` lines, one broken line break (`2cd83a3`)
 - `src/getmoredone/screens/plan_blocks.py` — `build_outside_group`'s stale prose about Day End (`2cd83a3`)
 - `docs/spec_coverage.md` — 8 references repointed and 1 dropped, across 3
-  rows (TG-M3.1, PD-M5.5, PD-M5.8), plus the 21 PDT rows
+  rows (TG-M3.1, PD-M5.5, PD-M5.8); the 21 PDT rows; the PD-M5.2, PD-M5.3 and
+  PD-M5.6 rows marked **withdrawn**; and the M7.3 row with the two UPD-F1
+  paragraphs under it
+- `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md` — this note
 - `BACKLOG.md` — items 1, 2 and 4 rewritten; `PDT-A1`–`PDT-A5` and `SSC-1`–`SSC-9` filed
 - `NOTES.md` — where `main` stands; the UPD-F1 and test-count corrections
 - `CHANGELOG.md` — UPD-F1's `[Unreleased]` entry corrected
@@ -154,7 +175,8 @@ standing elsewhere.
 - `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md` — the
   TG-M6.4 prediction struck through; it was not what was built
 - `docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md` — the plan (`11ec1dc`)
-- `docs/DOCUMENTATION_INDEX.md` — this note and the plan
+- `docs/DOCUMENTATION_INDEX.md` — this note and the plan; the UPD-F1 entry,
+  which was still present-tense
 
 No `src/` behaviour changed in this batch. The three `src/` files hold
 docstring text only.
@@ -162,7 +184,12 @@ docstring text only.
 ## Verification
 
 Run on the tree as this batch leaves it, **after** the sweep passes and their
-fixes (nine cold passes in all). The earlier run recorded here
+fixes (ten cold passes in all). **Re-run after the tenth pass**, which found
+this section claiming a result for a tree two rounds of document fixes had
+since changed — `docs/spec_coverage.md` is in `tests/test_traceability_refs.py`'s
+`SCANNED`, so a document edit can move these numbers. The figures below are
+from the re-run, on the tree this batch ends with, and are identical to the
+earlier run's. The earlier run recorded here
 covered **four** files, without
 `tests/test_traceability_refs.py`, and gave 396 passed / 17 skipped — 413
 cases, all accounted for. Folding the fifth file in adds its 3 cases, two of

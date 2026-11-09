@@ -192,9 +192,11 @@ uncommitted at the time, so it went to its own session (per-criterion
 status in `docs/spec_coverage.md`, and the batch's handoff note is
 `docs/changes/2026-11-08-unified-panel-followups.md`):
 
-- UPD-F1, the one defect: no column width or divider position survives a
-  relaunch, because `AppSettings.save()` writes the whole object and a screen
-  holding its own snapshot reverts what another screen wrote
+- UPD-F1, the one defect found at the walk: no column width or divider
+  position survived a relaunch, because `AppSettings.save()` wrote the whole
+  object and a screen holding its own snapshot reverted what another screen
+  wrote. **Built afterwards in its own session (`31816a0`) and merged at
+  `2fac9b3`**; the walk's step 10 is owed a re-walk, not a fix
 - UPD-F2: the filter area is three lines deep on every tab -- the three combos
   on a row of their own, and a blank row of the same depth on the one tab that
   has no filters
