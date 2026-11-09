@@ -1,7 +1,7 @@
 # Installing daVIPA
 
 daVIPA is a desktop app for macOS and Windows. Everything it stores stays
-on your own machine — there is no account, no server, and no telemetry.
+on your own machine — there is no account, no server in cloud.
 
 - [Download a build](#download-a-build) — the quickest route
 - [macOS: first launch](#macos-first-launch) — **required**, the build is unsigned
@@ -35,11 +35,7 @@ There is no Linux build. Linux is supported from source; see
 
 ## macOS: first launch
 
-**The build is not signed with an Apple Developer certificate**, so macOS blocks it
-the first time and may say the app "is damaged" or "cannot be opened because the
-developer cannot be verified". The app is not damaged — macOS attaches a quarantine
-flag to anything downloaded from a browser, and with no paid signing certificate
-there is nothing for it to check the app against.
+**The build is not signed with an Apple Developer certificate**, so macOS blocks it the first time and may say the app "is damaged" or "cannot be opened because the developer cannot be verified". The app is not damaged — macOS attaches a quarantine flag to anything downloaded from a browser, and with no paid signing certificate there is nothing for it to check the app against.
 
 Unpack the zip and drag `daVIPA.app` to your Applications folder, then use
 whichever of these suits you.
@@ -51,19 +47,13 @@ whichever of these suits you.
 3. Scroll down. There is a message naming daVIPA with an **Open Anyway** button.
 4. Click it, authenticate, and open the app again.
 
-The **Open Anyway** button only appears *after* a blocked launch attempt, and it
-disappears again after about an hour. If you do not see it, try opening the app once
-more and go straight back to Settings.
+The **Open Anyway** button only appears *after* a blocked launch attempt, and it disappears again after about an hour. If you do not see it, try opening the app once more and go straight back to Settings.
 
-> **Control-clicking the app and choosing Open no longer works.** That was the standard
-> trick for years, and Apple removed it in macOS 15 — an unsigned app can only be
-> approved through System Settings now. If you remember doing it that way, that is why
-> it stopped working.
+> **Control-clicking the app and choosing Open no longer works.** That was the standard trick for years, and Apple removed it in macOS 15 — an unsigned app can only be approved through System Settings now. If you remember doing it that way, that is why it stopped working.
 
 ### macOS 14 (Sonoma) and earlier — Control-click
 
-Control-click (or right-click) the app, choose **Open**, then **Open** again in the
-dialog that appears.
+Control-click (or right-click) the app, choose **Open**, then **Open** again in the dialog that appears.
 
 ### Any version — the one-line alternative
 
@@ -73,8 +63,7 @@ If you would rather not click through any of that, remove the quarantine flag di
 xattr -d com.apple.quarantine /Applications/daVIPA.app
 ```
 
-Then open the app normally. You need this once per download, so again after installing
-a new version.
+Then open the app normally. You need this once per download, so again after installing a new version.
 
 To check whether a copy is even flagged:
 
@@ -82,14 +71,11 @@ To check whether a copy is even flagged:
 xattr -p com.apple.quarantine /Applications/daVIPA.app
 ```
 
-No output means no quarantine — it will open with no ceremony. Note that this is why a
-build fetched with `curl` or `gh release download` often opens without any warning:
-those tools do not set the flag, only browsers do.
+No output means no quarantine — it will open with no ceremony. Note that this is why a build fetched with `curl` or `gh release download` often opens without any warning: those tools do not set the flag, only browsers do.
 
 ### If you would rather not run an unsigned binary at all
 
-Run from source instead — see below. There is no Gatekeeper involved, because there is
-no binary to check.
+Run from source instead — see below. There is no Gatekeeper involved, because there is no binary to check.
 
 > Builds can be signed and notarised, which removes all of the above and makes the app
 > open on a double-click. It needs a paid Apple Developer account; the release workflow
