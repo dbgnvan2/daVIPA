@@ -991,10 +991,13 @@ def build_outside_group(
     boxes, and a task that changes size depending on which of the three it is
     in reads as three different kinds of thing.
 
-    A block gets here when Day End moved earlier than its box, when its length
-    now runs past the last box, or when it has never been placed at all. The
-    day it stops being drawn is the day the user loses planned work with
-    nothing on screen to say so.
+    A block gets here when the lunch hour was moved over its box, when its
+    stored box is off the date, when its length now runs past the last box, or
+    when it has never been placed at all. Day End moving earlier is no longer
+    one of them: PD-M14.2 stretches the drawn day to cover the date's own
+    blocks, so tightening the hours cannot orphan one. The day a block stops
+    being drawn is the day the user loses planned work with nothing on screen
+    to say so.
     """
     palette = semantic_colors()
     ctk.CTkLabel(

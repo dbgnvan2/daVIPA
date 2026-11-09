@@ -2527,7 +2527,8 @@ class PlanScreen(ctk.CTkFrame):
 
         Purpose: PD-M5 -- the two boxes that are not slots.
         Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
-        Tests:   tests/test_plan_screen.py::test_pdm52_a_drop_above_moves_day_start_back
+        Tests:   tests/test_plan_screen.py::test_pdm114_a_drop_on_an_end_needs_no_pointer_in_the_scrolling_grid
+                 tests/test_plan_screen.py::test_pdm5_a_drop_in_the_day_but_on_no_box_still_does_nothing
                  tests/test_plan_screen.py::test_pdm114_a_drop_on_an_end_needs_no_pointer_in_the_scrolling_grid
 
         Read the same way as ``slot_under_pointer`` and only after it has

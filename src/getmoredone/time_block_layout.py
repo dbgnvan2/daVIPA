@@ -619,7 +619,7 @@ def edge_limit_time(edge: str) -> str:
              One function, so the two ends cannot drift apart or name a time
              the arithmetic does not actually enforce.
     Spec:    docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-6
-    Tests:   tests/test_time_block_layout.py::test_pdm146_each_end_names_the_time_it_stops_at
+    Tests:   tests/test_plan_screen.py::test_pdm146_both_ends_refuse_at_midnight_and_say_which
     """
     if edge == DAY_EXTEND_EARLIER:
         return format_hhmm(0)
@@ -864,7 +864,7 @@ def build_day_grid(
     Purpose: the single function the screen draws from, so what is on screen
              and what the arithmetic says are the same object.
     Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m3
-    Tests:   tests/test_time_grid.py::test_tgm31_blocks_outside_the_grid_are_surfaced
+    Tests:   tests/test_time_grid.py::test_tgm31_a_block_with_no_box_is_surfaced
 
     Without a ``span`` the day drawn is the hours in Day Settings stretched to
     cover this date's own blocks (PD-M14.2), so a block dropped before Day
@@ -872,8 +872,7 @@ def build_day_grid(
 
     A block whose slot no longer exists -- because its stored index is far
     outside the date, or because its length now spans past the last box -- is
-    **returned in
-    ``outside``, never dropped** (P2). The day it stops being drawn is the day
+    **returned in ``outside``, never dropped** (P2). The day it stops being drawn is the day
     the user loses work with nothing on screen to say so.
 
     A block whose boxes now include lunch goes to ``outside`` for the same
