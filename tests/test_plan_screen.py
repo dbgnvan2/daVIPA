@@ -627,11 +627,20 @@ def test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day(
         "asked for before the day's first box"
     )
     assert blocks[0].start_time == "07:30", (
-        f"the block starts at {blocks[0].start_time}, so the day on screen did "
-        "not grow earlier"
+        f"the block starts at {blocks[0].start_time}, not in the half hour "
+        "before the day's first box"
+    )
+    assert panel._grid.span.first == -1, (
+        f"the day on screen runs from box {panel._grid.span.first}, so it did "
+        "not grow earlier to cover the block -- this is the report's own "
+        "capability, and the stored columns above cannot see it"
+    )
+    assert settings.plan_day_start == "08:00", settings.plan_day_start
+    assert AppSettings.load().plan_day_start == "08:00", (
+        "PD-M14.1: the drop wrote Day Start to the settings file"
     )
     assert panel.bounds.day_start == "08:00", (
-        f"PD-M14.1: the drop wrote Day Start, now {panel.bounds.day_start}"
+        f"PD-M14.1: the screen took a new day start, now {panel.bounds.day_start}"
     )
     status = panel.status_label.cget("text")
     assert "The day now shows" in status, status
