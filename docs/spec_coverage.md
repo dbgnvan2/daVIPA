@@ -1847,3 +1847,12 @@ and the four code fixes the high produced are real new surface — but they are
 each covered by a mutation written after the fix, and the pass that found the
 high also read every count and claim in the prose. The honest statement is
 that the fixes are mutation-tested and not independently reviewed.
+
+### CI
+
+Run **42685705728** at `0f69d3e`, green on 3.11, 3.12 and 3.13:
+`2685 passed, 10 skipped`. That reconciles with the marker counts this batch
+re-measured — 256 meta + 2439 app = 2695 collected — so nothing in the derived
+set or the new guards behaves differently on a blank machine, which is the one
+thing a local run cannot establish for a guard that reads `git ls-files` and a
+config file the repo had been ignoring.

@@ -24,7 +24,12 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   as a fifth writing convention rather than a rename: a filename proposed and
   not created is written without backticks, because a guard cannot tell a
   proposal from a dead pointer. Marker counts re-measured: 256 meta / 2439
-  app. `LDS-A1` and `LDS-A2` filed; `GSF-A5` is the last of the GSF class
+  app, and CI run 42685705728 at `0f69d3e` is green on all three versions
+  (`2685 passed, 10 skipped`, which reconciles: 256 + 2439 = 2695). A cold
+  pass found the sentence window still too wide — a table, a bullet list and a
+  heading each flattened into one sentence, so one marker exempted the lot —
+  and the window is one markdown block now. `LDS-A1` to `LDS-A6` filed, four
+  of them from that pass; `GSF-A5` is the last of the GSF class
   measurement's findings and is untouched.
 - **The retired three-agent apparatus is gone** (MAW batch, 2026-11-09,
   `GSF-A1`, `GSF-A2` and the 2026-08-20 filing of the same surface). `CLAUDE.md`
