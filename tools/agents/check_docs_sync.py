@@ -36,28 +36,53 @@ def changed_files(base: str, head: str) -> Set[str]:
     return {line.strip() for line in out.splitlines() if line.strip()}
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--base", default=os.getenv("GITHUB_BASE_REF", "origin/main"))
-    parser.add_argument("--head", default=os.getenv("GITHUB_SHA", "HEAD"))
-    args = parser.parse_args()
+#: The outcome names ``verdict`` can return. They are the decision itself, so a
+#: test can assert WHICH outcome a set of paths produces rather than reading an
+#: exit code that collapses four of them into 0.
+NO_FILES = "no-files"
+NO_CODE = "no-code"
+PASS = "pass"
+MISSING_DOCS = "missing-docs"
+MISSING_HANDOFF = "missing-handoff"
 
-    try:
-        files = changed_files(args.base, args.head)
-    except RuntimeError as exc:
-        print(f"docs-sync check skipped: {exc}")
-        return 0
+#: Every outcome ``verdict`` can return, declared rather than inferred.
+#: `tests/test_docs_sync_rule.py` reads this and what `verdict` actually
+#: returns, and fails when they disagree — so adding an outcome here without a
+#: fixture, or returning one that is not here, is a red test. The first version
+#: of that guard built its own hardcoded list of five names and was therefore
+#: blind to a sixth in either direction: it passed on the broken state and
+#: failed on the correct one (found cold, 2026-11-09).
+OUTCOMES = (NO_FILES, NO_CODE, PASS, MISSING_DOCS, MISSING_HANDOFF)
 
+#: The outcomes that are not a failure. ``SKIPPED`` is deliberately absent:
+#: a range this tool could not read is not an outcome of the rule, it is the
+#: absence of an input, and ``main`` reports it as such.
+PASSING = (NO_FILES, NO_CODE, PASS)
+
+
+def verdict(files: Set[str]):
+    """The whole docs-sync decision, as a pure function of changed paths.
+
+    Purpose: SAG-M2.1 — the rule has to be assertable without a git range,
+             because `.github/workflows/tests.yml` checks out at depth 1 and so
+             has no `origin/main` to diff against. The gate it was written for
+             runs on `pull_request`, which this repo never produces, so until
+             this function existed the rule could not fail anywhere that runs.
+    Spec:    docs/implementation_plan_2026-11-09_status_allow_list.md#2-acceptance-criteria--tests
+    Tests:   tests/test_docs_sync_rule.py
+
+    Returns ``(code, messages)``: one of the names above, and the lines
+    ``main`` prints. ``code in PASSING`` is the decision; the exit code is
+    derived from it rather than being the decision itself.
+    """
     if not files:
-        print("docs-sync: no changed files")
-        return 0
+        return NO_FILES, ["docs-sync: no changed files"]
 
     code_changed = any(
         path.startswith(CODE_PREFIXES) or path in DEPENDENCY_FILES for path in files
     )
     if not code_changed:
-        print("docs-sync: no code/dependency changes detected")
-        return 0
+        return NO_CODE, ["docs-sync: no code/dependency changes detected"]
 
     docs_changed = any(
         path.startswith(DOC_PREFIXES)
@@ -68,19 +93,42 @@ def main() -> int:
     handoff_changed = any(path.startswith("docs/changes/") for path in files)
 
     if docs_changed and handoff_changed:
-        print("docs-sync: PASS (docs and handoff note present)")
+        return PASS, ["docs-sync: PASS (docs and handoff note present)"]
+
+    messages = [
+        "docs-sync: FAIL",
+        "Code/dependency changes detected but required docs artifacts are missing.",
+    ]
+    if not docs_changed:
+        messages.append(
+            "- Missing docs update (expected change in docs/, README.md, "
+            "CHANGELOG.md, or master spec)")
+    if not handoff_changed:
+        messages.append("- Missing handoff note in docs/changes/")
+    messages.append("Changed files:")
+    messages.extend(f"  - {path}" for path in sorted(files))
+    return (MISSING_DOCS if not docs_changed else MISSING_HANDOFF), messages
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base", default=os.getenv("GITHUB_BASE_REF", "origin/main"))
+    parser.add_argument("--head", default=os.getenv("GITHUB_SHA", "HEAD"))
+    args = parser.parse_args()
+
+    try:
+        files = changed_files(args.base, args.head)
+    except RuntimeError as exc:
+        # Not a verdict: the range could not be read, so the rule was never
+        # applied. Said in those words, because "skipped" printed next to a 0
+        # exit code is what let this check look like it was running.
+        print(f"docs-sync check skipped: {exc}")
         return 0
 
-    print("docs-sync: FAIL")
-    print("Code/dependency changes detected but required docs artifacts are missing.")
-    if not docs_changed:
-        print("- Missing docs update (expected change in docs/, README.md, CHANGELOG.md, or master spec)")
-    if not handoff_changed:
-        print("- Missing handoff note in docs/changes/")
-    print("Changed files:")
-    for path in sorted(files):
-        print(f"  - {path}")
-    return 1
+    code, messages = verdict(files)
+    for line in messages:
+        print(line)
+    return 0 if code in PASSING else 1
 
 
 if __name__ == "__main__":
