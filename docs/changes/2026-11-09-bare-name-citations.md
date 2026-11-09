@@ -77,7 +77,10 @@ of the SAG batch found and filed as `SAG-A17`. This batch closes it.
   closes by the budget's own rule. Two of the eight were in the guard's own
   prose, six were repairs whose sentences were false. All fixed; the fixes are
   prose and comments only, so no mutation needed re-running.
-- Not run: the full suite. CI runs it.
+- **CI run `42646001919` on `617b1a1` is green on 3.11, 3.12 and 3.13** —
+  `2676 passed, 10 skipped` on each, which is 2686 collected and reconciles
+  with the marker counts this batch re-measured: 2439 app plus 247 meta.
+- Not run locally: the full suite. CI runs it.
 
 ## Risks / Known gaps
 

@@ -1445,3 +1445,8 @@ re-measurement before it was fixed:
 
 The in-loop fixes are prose and comments only; no logic changed, so the
 mutations above still stand against the file as pushed.
+
+**CI run `42646001919` on `617b1a1` is green on all three Python versions** —
+`2676 passed, 10 skipped` each, 2686 collected, which reconciles with the
+marker counts: 2439 app plus 247 meta, the meta figure having moved by this
+batch's four tests.
