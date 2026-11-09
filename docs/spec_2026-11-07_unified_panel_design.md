@@ -1,8 +1,9 @@
 # Spec + implementation plan — one panel design across the VSP tabs
 
-Status: **approved 2026-11-07. UPD-M3, UPD-M1, UPD-M2, UPD-M4, UPD-M5 and
-UPD-M6 built. UPD-M7.1 done. §11 was walked on 2026-11-08: UPD-M7.2 was
-`partial` and UPD-M7.3 `not done`. The four follow-ups the walk produced were
+Status: **built and on `main`, except UPD-M7.2 and UPD-M7.3.** Approved
+2026-11-07. UPD-M3, UPD-M1, UPD-M2, UPD-M4, UPD-M5 and UPD-M6 built. UPD-M7.1
+done. §11 was walked on 2026-11-08: UPD-M7.2 was `partial` and UPD-M7.3
+`not done`. The four follow-ups the walk produced were
 approved the same day and **all four are built and on `main`**: `UPD-F2`,
 `UPD-F3` and `UPD-F4` the same day, and `UPD-F1` — nothing surviving a
 relaunch — on `refs/heads/claude/elegant-neumann-ab55c9`, merged at

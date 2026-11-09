@@ -1244,3 +1244,136 @@ than incidental.
 | AD | Z's mutation against CIG-M3.1's replacement assertion | 1 failed, 10 passed |
 | AE | `body.winfo_width = lambda: body_width` removed | 1 failed — the precondition, which is CIG-M2.2 |
 | AF | `require("-topmost")` deleted from WT-M6b.6 | 1 failed (the registry) |
+
+## SAG — the status guard as an allow-list, and the gate that never ran (2026-11-09)
+
+Spec and plan: `docs/implementation_plan_2026-11-09_status_allow_list.md`.
+Note: `docs/changes/2026-11-09-status-allow-list.md`.
+Closes `BACKLOG.md`'s `SST-A3` (high) and `SST-A8` (medium).
+
+No file under `src/` is touched. `tools/agents/check_docs_sync.py` is the one
+module changed, and the change is an extraction: the decision moved out of
+`main()` into a function the suite can call.
+
+| Criterion | What it required | Implementation | Tests | Status |
+|---|---|---|---|---|
+| SAG-M1.1 | a document's first status claim must **match** a recognised form; an unrecognised sentence fails | `tests/test_doc_status_claims.py` (`_STATUS_FORMS`, **four** named forms — `superseded`, `draft`, `not-built`, `built`, in that order — with `_BUILT_SHAPES`, `_NEGATION`, `_CANCELLED`, `registered_claim_is_unbuilt`, `classify_status_claim`) | `::test_sagm11_every_status_claim_matches_a_recognised_form` | done — and **rewritten twice by cold passes**. It was five forms: `built`, `approved-and-built` and `partly-built`, one rule written three times, each with a prefix enumerating the punctuation an ID list may contain; the enumeration had been widened once and still rejected `&` and `:`, so the third pass replaced the three with a built word anywhere in the first sentence. The fourth pass measured that as **two highs**: `"Spec complete, implementation not started."` and `"Design done, no code yet."` classified as `built`, which the deny-list this guard replaces would have caught, and an unanchored form tried first shadowed the three anchored ones, so `"Draft — design complete, awaiting approval"` was `built` as well. The form is anchored again, as four named shapes in `_BUILT_SHAPES` — leads with the state, digits and punctuation only before it, a predicate after `is/are/was/were`, or an approval and a build in one sentence — and the unbuilt forms are tried first. Nothing else is a built claim |
+| SAG-M1.2 | the sentences a deny-list cannot reach are rejected: an approval state, a question, silence, a built word the next word negates | same | `::test_sagm12_an_unrecognised_status_claim_is_rejected` — 19 rejected and 29 accepted (counted by AST over the test's two loops; it was 13 and 15 before the third and fourth cold passes added their measured cases), each a sentence this repo has written or would write | done |
+| SAG-M1.3 | an unbuilt claim must be registered, and a registered document whose claim became a built form must leave the register | `DRAFTS_NOT_BUILT`, unchanged, now read through `registered_claim_is_unbuilt` | `::test_sagm13_the_draft_register_holds_both_directions`, and `::test_sstm2_…`, which asked the **deny-list** the same question until the third cold pass found the double bind | done — a document headed `Status: Draft.` classified as `draft`, so `SAG-M1.3` required it to be registered, and registering it made `test_sstm2` red, because `_NOT_BUILT` does not accept "Draft." alone. Two vocabularies, neither written down, and the repo's own first step — commit the plan, wait for approval — unable to satisfy both. The register's contract is now one function both guards call |
+| SAG-M1.4 | a document with **no** status claim fails | `_status_claim` returning `None` | `::test_sagm14_a_document_with_no_status_claim_fails` | done — the failure mode no phrase list can have, and `docs/implementation_plan_2026-06-22.md` had it for five months |
+| SAG-M1.5 | the patterns asserted against text, in both directions, including the label stripper and the cancellation check | same | `::test_sagm15_the_forms_reject_a_built_word_after_a_negation` | done — it also asserts the **limitation**: "Complete rewrite proposed." still classifies as a built claim, and that assertion is what will go red when `SAG-A8` is closed |
+| SAG-M2.1 | the docs-sync decision is a pure function of changed paths, asserted over fixtures | `tools/agents/check_docs_sync.py::verdict` | `tests/test_docs_sync_rule.py::test_sagm21_the_docs_sync_rule_decides_on_paths_alone` (10 cases) | done |
+| SAG-M2.2 | `requirements-dev.txt` alone is a dependency change — the miss the tool's own comment records | same, reading `DEPENDENCY_FILES` | `::test_sagm22_a_dev_dependency_alone_is_a_code_change` (iterates the enumeration, so it cannot go stale against it) | done |
+| SAG-M2.3 | an unreadable git range is reported as **skipped**, not as a verdict | `main`, unchanged in behaviour and now explicit about why | `::test_sagm23_an_unavailable_range_is_skipped_not_passed` | done |
+| SAG-M2.4 | every outcome `verdict` can return has a fixture, and `verdict` returns the declared constants rather than inline strings | `OUTCOMES` in the tool; `_returned_outcome_names()` walks `verdict`'s return statements | `::test_sagm24_every_outcome_the_tool_can_return_has_a_fixture` | done — **and inverted on its first attempt.** It carried its own hardcoded list of five names and filtered the walk by it, so a sixth outcome was invisible to both sides: it passed with the sixth unfixtured and failed once the fixture was added. Found cold; mutations AO and AO2 are the two directions |
+| SAG-M3.1 | the six documents of the plan's §1.1 carry a claim one of the four forms recognises | the six documents | `SAG-M1.1` (which calls `classify_status_claim` on every document in the family, and asserts nothing else) | done — **narrowed from its first wording**, "each naming its evidence", which the second cold pass measured as neither tested nor true: `test_sagm11` asserts the form only, and two of the six name no module, test or section — `docs/implementation_plan_2026-08-19_backlog_clearance.md` gives dates, `docs/implementation_plan_2026-11-06_plan_day_controls.md` gives IDs and dates. The other four do name evidence because a claim is more useful that way, not because anything checks it; making that a criterion would need a guard, and there is none |
+| SAG-M3.2 | `docs/implementation_plan_2026-06-22.md`'s new status line is true | `screens/column_resize.py`, `drag_schedule_col_widths` in `app_settings.py` | `tests/test_column_resize.py::test_persist_round_trips_over_dirty_state`, `::test_legacy_title_scalar_is_honoured_when_dict_missing`, `::test_width_is_clamped_to_spec_bounds_on_load` (existing; they are the evidence the line names) | done — the modules were verified, but **the citation was wrong when first written**: it named two `tests/test_settings_merge_on_save.py` tests which iterate the five VSP panel prefixes and reach `drag_schedule_col_widths` nowhere (`grep -n drag_schedule tests/test_settings_merge_on_save.py` returns nothing). Found by the second cold pass; corrected in all four places. It is `SST-M5`'s own defect class — a row naming evidence that does not reach its subject — committed by the batch that exists to close it |
+
+| SAG-M4.1 | A citation **written as a path** — `tests/…py::name` — in a plan, spec or handoff note must resolve, not only one in a coverage row. The fifth cold pass's high was invisible to the traceability guard because the guard's scan stopped at `docs/spec_coverage*.md` | `tests/test_traceability_refs.py` (`SCANNED` gains `docs/implementation_plan_*.md`, `docs/spec_*.md` and `docs/changes/*.md`; the walk deduplicates, because two of those globs overlap) | `::test_every_referenced_test_name_exists`, `::test_every_referenced_test_file_exists`, and `::test_this_guard_can_actually_fire` for the membership of each new arm | done, **for the path form only.** Measured over `HEAD`: the widened scan brought **26** dead path-form references into view (25 distinct, in 17 documents), and the resolver below brought that to **14** (13 distinct, in 9 documents); 27 and 15 counting this batch's own plan, which is where the fifth pass's citation was. Every one is repaired here. The bare `::name` continuation form — about a third of the citations in these documents — is still outside the guard, and widening the scan widened that gap too: `SAG-A17` |
+| SAG-M4.2 | The resolver must accept the two citation forms these documents really use — a module constant or helper (`::GENERATED_AUDIO`, `::_make_screen`) and a spec-ID prefix of a family (`::test_wt_m6b1_`, `::test_cem444a`) — while still rejecting a truncation of a name that does not exist (`::test_updf13_`) | `_defined_names` and `_resolves` in the same file | `::test_this_guard_can_actually_fire`, which asserts both directions against this file itself rather than against a document that could stop using the form | done — a prefix must stop at a word boundary, which is what keeps the fifth pass's own citation failing |
+| SAG-M4.3 | The 15 dead path-form references are repaired honestly: a renamed test is re-cited, and one that no longer exists is named in plain backticks **without** its path, which is the convention this guard's docstring already stated | 11 documents, listed in the handoff note | `::test_every_referenced_test_name_exists` | done — three renames (`…_m1_through_m5` → `_m7`, `test_b51_messagebox_never_blocks_a_run` → `test_b51_a_messagebox_records_instead_of_blocking`, `test_pdm42_the_three_…` → `test_pdm42_break_buffer_and_lunch_…`), one wrong file (`test_settings_screen_has_project_notes_folder_field` lives in `tests/test_project_notes.py`, not in the separate file the plan intended), and the rest named without paths, in **10** documents. The first edit stripped the path from two files that do exist, on a reason that applied only to the third; the sixth cold pass measured that and it is corrected |
+
+### Not code-testable
+
+| | item | status |
+|---|---|---|
+| SAG-N1 | **That a recognised built claim is true.** Inverting the check does not change what `SST-N1` said: the guard proves the claim is a recognised form, not that the work exists. A document that says "built and on `main`" over nothing passes. | **not done**, as foreseen. What changed is the default — silence, an approval state, and an unrecognised sentence now fail. Per-document evidence is in the plan's §1.1. |
+
+### Test counts
+
+9 new tests over two files — 5 `SAG-M1` tests added to
+`tests/test_doc_status_claims.py` (16 tests in that file now) and the 4 of the
+new `tests/test_docs_sync_rule.py`. The four meta files this batch touches run
+`144 passed, 1 skipped` locally. Suite-wide, measured with
+`-m <marker> --collect-only -q` after the batch: **243 meta** and **2439 app**
+tests, against 225 and 2432 when the SST batch last measured them.
+**Only the meta figure moved with this batch** — every test here is in a
+meta-marked file, so the batch adds no app test; the app delta is `c190b9f`'s
+seven, already on `main`. `CLAUDE.md` carries the new figures and says so.
+
+### Mutations
+
+Thirty-one, each restored with the **verbatim** original and the restore
+confirmed by sha256. Seven cover the criteria; the rest cover the cold passes'
+own fixes — six for the first pass, five for the third, five for the fourth,
+five for the fifth, three for the sixth — which is the rule that every in-loop
+fix is in scope for the next pass. Two of
+those sixteen were worth more than the fourteen that went red first time: AX
+did not move what it claimed to move, and BB was green because a fix had been
+written without a test.
+
+One mutation was **wrong and is recorded as wrong**: AW2 added `never approved`
+to the `draft` form expecting a dead alternative, and left the guard green —
+correctly, because the draft form is exempt from the negation check now, so
+that alternative is reachable. AW3 is the mutation that does make the point.
+
+| | mutation | result |
+|---|---|---|
+| AG | the negation check removed from `classify_status_claim` | 1 failed — "Nothing is built yet" becomes a recognised built claim |
+| AH | SST's own plan back to "approved to proceed" over shipped work | 1 failed (`::test_sagm11_…`) — the document the inversion exists for |
+| AI | a missing status claim answered with `"built"` instead of `None` | 1 failed (`::test_sagm14_…`) |
+| AJ | the dependency enumeration back to the literal `"requirements.txt"` | 1 failed (`::test_sagm22_…`) |
+| AK | a code change with documents and no handoff note reported as a pass | 2 failed (`::test_sagm21_…`) |
+| AL | an unreadable range announced as `docs-sync: PASS` | 1 failed (`::test_sagm23_…`) |
+| AM | an outcome returned as an inline string rather than the constant | 1 failed (`::test_sagm24_…`) |
+| AN | `tests/test_docs_sync_rule.py` out of the CI contract's `META_TEST_FILES` | 1 failed (`tests/test_ci_contract.py::test_meta_marker_covers_exactly_the_repo_assertion_files`) — the cold pass's first finding, which had left the suite red on an unrelated guard |
+| AO | a sixth outcome in `OUTCOMES` with no fixture | 1 failed — what the inverted guard passed on |
+| AO2 | an outcome returned inline while `OUTCOMES` still declares the constant | 1 failed — the other direction of the same guard |
+| AP | the `partly-built` prefix narrowed back to word characters | 1 failed — "M1, M2 and M3 are built." is how this repo writes a partial state |
+| AQ | the label stripper's separator strip removed | 1 failed — four spellings of this repo's commonest status style |
+| AR | the cancellation check removed | 1 failed — "Done nothing yet." and "Shipped? not yet." |
+| AS | the built form's sentence prefix back to the enumerated punctuation class | 1 failed — "SAG-M1 & SAG-M2 are built." and three more claims correct work would write |
+| AT | the negation check applied to the unbuilt forms as well | 1 failed — it is what made `not approved` an alternative nothing could reach |
+| AU | the `not-built` form removed | 2 failed — the twelve phrasings the register accepts stop being recognised, which is the two guards disagreeing again |
+| AV2 | the register's contract back on the deny-list | 1 failed (`::test_sagm15_…`) — the double bind, over a document the test writes, because the one really registered document satisfies both vocabularies and so cannot show it |
+| AW3 | a dead alternative (`shipped`) added to the `draft` form | 1 failed — the per-alternative reachability loop, which reads the alternatives out of the pattern rather than a retyped list |
+| AX2 | the `built` form tried first, where it shadows the three anchored forms | 1 failed — the order assertion, and the three claims that lead with their state |
+| AY | the `built` form unanchored again (the third pass's own fix) | 1 failed — the fourth pass's two highs, as fixtures |
+| AZ | the fenced-block skip removed | 1 failed — a quoted status convention becomes the document's own claim |
+| BA | the list-marker strip removed | 1 failed — "- **Status:** Draft." keeps its label and matches no anchored form |
+| BB | the table-row skip removed | 1 failed — a criterion/state table's header row becomes the claim. This mutation was **GREEN on its first run**, because the table fix had been written with no test; the test above is what that green run bought |
+| BC | the traceability scan back to `("src", "tools", "conftest.py", "docs/spec_coverage*.md")` | 1 failed (`::test_this_guard_can_actually_fire`) — the state the guard was in when the fifth cold pass had to find a dead plan citation by hand |
+| BD | the prefix form without its word boundary | 1 failed — `test_every_referenced_test_nam` starts resolving, so the form would accept truncations of names that do not exist, which is the citation the fifth pass found |
+| BE | the resolver back to `test_*` functions and `Test*` classes only | 2 failed — the plans' `::GENERATED_AUDIO` and `::_make_screen` citations stop resolving, and the guard cries wolf on correct prose |
+| BF | the file walk's deduplication removed | 1 failed — `docs/spec_*.md` and `docs/spec_coverage*.md` overlap, so a reference is reported twice and two arms of the scan read as alive when one is |
+| BG | the fifth cold pass's own dead citation put back into this batch's plan | 1 failed (`::test_every_referenced_test_name_exists`) — **the mutation that matters**: it proves the widened scan catches the class, not just the instance it was written for |
+| BH | the prefix form's word boundary removed again, against the probe the test now writes | 1 failed — `BD` proved the same thing against the guard's own file, which the sixth cold pass showed an ordinary rename could silence |
+| BI | `_resolves` accepting every name | 1 failed — both citation checks would be inert, and nothing else in the file notices |
+| BJ | the class arm dropped from `_defined_names` | 2 failed — `::TestGroup` and a test defined inside a class stop resolving |
+
+### Cold passes
+
+Five, each in a different failure family, and the budget's rule — a further
+pass only if the previous produced a high — is what carried it that far. No
+pass was run for its own sake.
+
+| pass | family | findings | what it cost |
+|---|---|---|---|
+| 1 | test quality | 2 high | the new test file was outside `META_TEST_FILES`, which had left an unrelated guard red |
+| 2 | citation truth | 1 high, 4 medium, 5 low | `SAG-M3.2`'s status line named tests that reach its subject nowhere |
+| 3 | classifier coverage | 4 medium | ten of twelve registerable phrasings unrecognised; a dead alternative; a double bind |
+| 4 | the third pass's own fix | 2 high, 3 medium | four "spec complete, nothing written" claims classified as built, and an unanchored form shadowing three anchored ones |
+| 5 | records against artifacts | 1 high, 5 medium, 5 low | a half-corrected citation, six records saying "five forms" where the code has four, and three counts that were wrong |
+| 6 | the widened guard on real content | 3 medium, 4 low | the bare-name blind spot the widened scan tripled (`SAG-A17`), two live paths stripped on a reason that fitted a third file, and recorded counts that did not reconcile |
+
+The fifth pass's high is the one worth naming: the citation was wrong in a
+**plan**, and the repo's traceability guard could not see plans. The instance
+was fixed in the fourth place it appeared; the class is `SAG-M4`. That is the
+answer to the question this batch kept asking of other people's checks — a
+check that cannot fail on the thing it was written for — asked of its own.
+
+The sixth pass then asked it of `SAG-M4`, and the answer was the same one
+again: the widened guard reads the path form and not the bare `::name` form,
+so repairing every dead path in four document families left about fifty dead
+bare names beside them, two of them on the rows directly above one this batch
+repaired. Those two are fixed; the class is `SAG-A17`, and it is filed rather
+than built because resolving a bare name means deciding which file it belongs
+to, which is a design decision and not a widening. The pass produced no high,
+so the sweep closes here by the budget's own rule.
+
+It also found the sixth pass's most useful kind of finding — a guard whose
+sensor had been wired to itself. `::test_this_guard_can_actually_fire` probed
+the resolver against **its own file's** test names, so an ordinary rename in
+that file would have made two assertions falsely red and left the one
+assertion proving the mid-word rejection passing against a prefix that matched
+nothing. The probe is now a file the test writes.

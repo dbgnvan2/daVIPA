@@ -1,10 +1,18 @@
 # Implementation plan — the status claims no one checks (SST)
 
 **Date:** 2026-11-08
-**Status:** approved to proceed. The user's instruction for this session was
-"proceed on your own recommendations as I'm going to be away … you can then
-start on open items", which is the approval gate for this batch. Recorded here
-rather than assumed, because the global rule is to stop after the plan.
+**Status:** **built and on `main`** — 10 of 10 criteria `done`, SST-N1 not
+code-testable, per-criterion status in `docs/spec_coverage.md`'s SST section.
+Approved to proceed under the user's instruction for that session, "proceed on
+your own recommendations as I'm going to be away … you can then start on open
+items", recorded here rather than assumed because the global rule is to stop
+after the plan.
+
+This line said only "approved to proceed" until 2026-11-09, over a batch that
+had shipped the day before. It is the defect SST was built to catch, in SST's
+own plan, and the deny-list SST shipped could not see it: an approval state
+contains no phrase that says the work is unwritten. That is the measurement
+behind `SST-A3` and this correction is the SAG batch acting on it.
 
 **Closes:** `BACKLOG.md` `SSC-1` (its second clause), `SSC-2`, `SSC-4`,
 `SSC-5`, `SSC-6`, `SSC-7`, `SSC-8`, `SSC-9`, `SSC-10`. `SSC-3` was closed on

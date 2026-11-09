@@ -92,6 +92,54 @@ The claim that the plan-day branch "closes eight of the twenty red tests", and
 the claim before it that nothing needed writing to close them, were both wrong
 and are corrected in `BACKLOG.md` item 1 with the measurements.
 
+- **The status guard is an allow-list, and the docs-sync rule is in the suite**
+  (SAG batch, 2026-11-09). `SST-A3` and `SST-A8` are closed. The status guard
+  had been a list of twelve "not built" phrasings, lengthened by each of three
+  cold passes; a claim must now *match* one of four recognised forms, so an approval
+  state, a question, a new phrasing and **silence** fail by default. The cost
+  `SST-A3` put at "35 existing documents" was six, and the sixth was findable
+  only under the inversion: `docs/implementation_plan_2026-06-22.md` had carried
+  no status line for five months. The docs-sync decision is now
+  `tools/agents/check_docs_sync.py::verdict`, a pure function of changed paths
+  asserted over fixtures, so the rule fails locally and in `tests.yml` before a
+  push - not over a git range, because `tests.yml` checks out at depth 1 and a
+  test that asked would skip there. `.github/workflows/agent-docs-gate.yml`
+  itself still runs on nothing; deleting it is `SAG-A3`. The first cold pass
+  over this batch found two highs and three mediums, all in the batch's own test
+  code, among them a guard that passed on the broken state and failed on the
+  correct one. A third pass asked whether the batch is green anywhere but this
+  machine and whether the guards would reject correct *future* work: it found
+  nothing that makes CI red, and four mediums that were all the second kind -
+  an enumerated punctuation prefix that had already been patched once and still
+  rejected two spellings this repo writes, an alternative of the draft form
+  that the negation check made unreachable, ten of the twelve registerable
+  "not built" phrasings that the allow-list did not recognise, and a double
+  bind where `Status: Draft.` had to be registered and could not be. All four
+  fixed by making the three built forms one shape and the register's contract
+  one function. A fourth pass then reviewed that fix alone and found **two
+  highs in it**: a built word belonging to the spec or the review read as a
+  claim that the code exists ("Spec complete, implementation not started."),
+  which is a sentence the deny-list would have caught, and the one unanchored
+  form shadowed the three anchored ones, so a claim that leads with its state
+  was reclassified. The form is anchored again as four named shapes, the
+  unbuilt forms are tried first, and three mediums went with it - a status line
+  inside a fenced example, a list marker before the label, and a status section
+  opening with a table. That is the sweep budget's own warning measured twice
+  over: every fix was a cold pass's fix, and the fourth pass's five mutations
+  caught one that moved nothing and one that was green because a fix had been
+  written with no test. `SAG-A1`-`SAG-A16` filed, not fixed; `SAG-A8` is a hole the suite
+  passes over and `test_sagm15` asserts it, so closing the filing turns that
+  assertion red on purpose. One figure above is superseded, and
+  not by this batch: `CLAUDE.md`'s 225 meta / 2432 non-meta counts were right
+  when the SST batch re-measured them, and are now **243** and **2439**. The
+  meta delta is this batch's nine new test functions, all in meta-marked
+  files, which collect as eighteen tests because one is parametrised over ten
+  path fixtures;
+  the app delta is `c190b9f`'s seven, already on `main` before this batch, which
+  adds no app test at all. The attribution was wrong here and in three other
+  records until the second cold pass measured it.
+  See `docs/changes/2026-11-09-status-allow-list.md`.
+
 ## Recent Changes (2026-11-08)
 
 ### What the walk asked for - UPD-F1 to UPD-F4 all built and on `main`

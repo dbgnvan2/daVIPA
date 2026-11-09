@@ -156,7 +156,7 @@ New: `models.apply_priority_floor(item)`. Called from `create_action_item`.
 
 | ID | Acceptance criterion | Verified by |
 |---|---|---|
-| PRI-M3.1 | The widest text the column can now hold — `"P:9999"`, and `"9999"` in All Items — fits the label's width at **every** selectable row font size (10–24), measured with the real font. | `tests/test_priority_column_width.py::test_prim31_the_score_column_holds_four_digits_at_every_font_size` (`CTkFont.measure` on a withdrawn root — no mapped window, so the documented mapped-window count does not change) |
+| PRI-M3.1 | The widest text the column can now hold — `"P:9999"`, and `"9999"` in All Items — fits the label's width at **every** selectable row font size (10–24), measured with the real font. | a new `test_priority_column_width.py` under `tests/`, `::test_prim31_the_score_column_holds_four_digits_at_every_font_size` (planned; not written — `PRI-M3` is open) (`CTkFont.measure` on a withdrawn root — no mapped window, so the documented mapped-window count does not change) |
 | PRI-M3.2 | The row label and `today.py`'s header read their width from **one** place, so the header cannot drift from the column it labels (the repo's aligned-column contract). | `::test_prim32_the_header_and_the_row_use_one_width` |
 
 If PRI-M3.1 fails at the larger font sizes, the fix inside this batch is to

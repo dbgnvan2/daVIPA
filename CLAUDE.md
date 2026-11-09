@@ -14,12 +14,14 @@ python run.py
 
 # Tests
 pytest                                          # All tests
-pytest -m "not meta"                            # App behaviour only (2432 tests)
-pytest -m meta                                  # Repo/infra assertions only (225 tests)
-# Both counts measured 2026-11-09 with `-m <marker> --collect-only -q`, whose
-# last line prints collected/deselected — re-measure rather than trusting them.
-# They had been 1691 and 212, stale by 741 and 13. No test asserts either
-# number, which is why they drifted; one that did would go red on every batch.
+pytest -m "not meta"                            # App behaviour only (2439 tests)
+pytest -m meta                                  # Repo/infra assertions only (243 tests)
+# Both counts measured 2026-11-09 (after the SAG batch, whose own nine tests
+# are all in the meta figure; the app figure moved with `c190b9f`) with
+# `-m <marker> --collect-only -q`, whose last line prints collected/deselected
+# — re-measure rather than trusting them. They had been 1691 and 212, stale by
+# 741 and 13, and 2432/225 earlier the same day. No test asserts either number,
+# which is why they drift; one that did would go red on every batch.
 pytest -v                                       # Verbose
 pytest tests/test_vps_integration.py -v        # Single file
 pytest --cov=src/getmoredone                   # With coverage
@@ -93,15 +95,23 @@ See `AGENTS.md` for the full agreements.
 test/verification status, follow-ups.
 
 If code behavior, UI text, or dependencies changed → docs and the requirements
-files must be updated in the same change. **Not currently enforced anywhere
-that runs**: the docs sync gate
-(`.github/workflows/agent-docs-gate.yml`) triggers on `pull_request` only, and
-this repo pushes to `main` and opens no pull requests, so the gate has never
-run on the way work actually ships here. Run it by hand —
-`./venv/bin/python tools/agents/check_docs_sync.py` — until `SST-A8` moves the
-check into the test suite, where `tests.yml`'s own rule says it belongs. The
-gate, when it does run, treats both `requirements.txt`
-and `requirements-dev.txt` as dependency files.
+files must be updated in the same change. **The rule is in the test suite**, as
+of 2026-11-09 (`SAG-M2`, closing `SST-A8`):
+`tools/agents/check_docs_sync.py::verdict` is the decision as a pure function
+of changed paths, and `tests/test_docs_sync_rule.py` asserts every outcome it
+can return. So it fails locally and in `tests.yml` before a push.
+
+What the suite does **not** do is diff your branch: `verdict` is asserted over
+fixtures, because `tests.yml` checks out at depth 1 and has no `origin/main` to
+diff against, and a test that asked for the range would skip on CI — the shape
+this repo has now been bitten by twice. To apply the rule to real changes, run
+it by hand: `./venv/bin/python tools/agents/check_docs_sync.py`. A range it
+cannot read is reported as *skipped*, not as a pass.
+
+`.github/workflows/agent-docs-gate.yml` still exists and still triggers on
+`pull_request` only, which this repo never produces, so the gate itself has
+never run here. Deleting it is `SAG-A3`. The rule treats both
+`requirements.txt` and `requirements-dev.txt` as dependency files.
 
 ### One build batch at a time
 

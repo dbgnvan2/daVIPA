@@ -57,7 +57,7 @@ pytest collected it and found nothing (`rc=5` when run alone). Moved to
 |---|---|
 | Full suite | **526 passed, 2 skipped — exit 0** (+16 new) |
 | Every test file collected alone | **All pass** — was 2 errors before `conftest.py` |
-| The 4 relocated tests run standalone (`python tests/x.py`) | All OK — verified after restoring their path setup |
+| The 4 relocated tests run standalone (`python tests/<file>.py`) | All OK — verified after restoring their path setup |
 | `tools/diagnose_google_auth.py` imports standalone | OK (`main` present; not executed — it performs real Google auth) |
 | Stale `test_auth.py` references | Zero, outside the moved file's own docstring |
 | Shell scripts re-parse | `bash -n` clean on all four |

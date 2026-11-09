@@ -35,7 +35,7 @@ Measured on `main` at `67612d5`.
 | Row-click popup label | routes through the same function | `screens/inline_editors.py`, in `update_score` |
 | New-item form floor | `apply_defaults_to_form` sets each empty combobox to its scale's lowest | `screens/item_editor.py`, in the `PRI-M1.7` comment block |
 | **PRI-M3 (the four-digit column)** | **not built.** The `P:` labels are still literal `width=60` in five screens, with no shared width constant and no header-sharing | `grep -rn "SCORE_COLUMN\|score_column_width" src/` returns nothing |
-| **Every test the spec names** | **none exists.** No `tests/test_priority_floor_and_cap.py`, no `tests/test_priority_floor_form.py`, no `tests/test_priority_column_width.py` | `ls tests/ \| grep -i priority` |
+| **Every test the spec names** | **none exists.** No `tests/test_priority_floor_and_cap.py`, no `tests/test_priority_floor_form.py`, no `test_priority_column_width.py` under `tests/` — the first two were written later and exist now, which is why they keep their paths; the third does not exist, so it is named without one, which is the convention the traceability guard enforces. (The 2026-11-09 edit stripped all three paths and gave a reason that applied to one of them. Found by the sixth cold pass.) | `ls tests/ \| grep -i priority` |
 
 So PRI-M1 and PRI-M2 are implemented and unverified; PRI-M3 is neither.
 

@@ -1,6 +1,22 @@
 # Implementation Plan — Resizable columns on the Scheduler tab (Action Items list)
 
 Date: 2026-06-22
+Status: **built and on `main`.** `src/getmoredone/screens/column_resize.py`
+holds `ColumnResizer`; `screens/drag_schedule.py` builds one with
+`prefix="drag_schedule"` over the five Action Items columns, and
+`app_settings.py` carries `drag_schedule_col_widths`, so the widths persist
+across restarts as this plan's user decision required. Persistence is asserted
+by `tests/test_column_resize.py::test_persist_round_trips_over_dirty_state`,
+which round-trips a `drag_schedule_col_widths` entry over dirty prior-run state,
+with `::test_legacy_title_scalar_is_honoured_when_dict_missing` and
+`::test_width_is_clamped_to_spec_bounds_on_load` for the load side. (This
+citation was corrected 2026-11-09 the same day it was written: it first named
+two `tests/test_settings_merge_on_save.py` tests, which assert the five VSP
+panel prefixes and reach `drag_schedule` nowhere — found by a cold pass over
+the batch that added the line.) This line was
+added 2026-11-09 by the SAG batch: the document had carried no status claim at
+all since June, which is the failure mode no list of "not built" phrasings can
+see, and is why SAG-M1 requires a claim rather than forbidding a phrase.
 Target file: `src/getmoredone/screens/drag_schedule.py`
 Supporting file: `src/getmoredone/app_settings.py`
 

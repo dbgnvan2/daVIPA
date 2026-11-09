@@ -392,6 +392,38 @@ entry rather than as an entry of its own, as every handoff note is:
   eight known callers, so it cannot detect a *new* test written the way these
   seven were
 
+### docs/implementation_plan_2026-11-09_status_allow_list.md
+
+Implementation plan for inverting the status-claim guard into an allow-list and
+putting the docs-sync rule in the test suite (SAG-M1 - SAG-M3), closing
+`BACKLOG.md`'s `SST-A3` (high) and `SST-A8` (medium). **Approved under the
+standing instruction 2026-11-09 and built the same day: 11 of 11 criteria
+`done`, one item not code-testable (SAG-N1, that a recognised claim is true,
+carried forward from SST-N1 unchanged)** - per-criterion status in
+`docs/spec_coverage.md`. No file under `src/` is touched. Handoff note:
+`docs/changes/2026-11-09-status-allow-list.md`, which is listed here only inside
+this entry rather than as an entry of its own, as every handoff note is:
+
+- A status claim must now **match** one of four recognised forms, so an
+  approval state, a question, a new phrasing of "not built" and **silence** all
+  fail by default. The cost `SST-A3` put at "35 existing documents" was measured
+  at six, and the sixth - `docs/implementation_plan_2026-06-22.md`, with no
+  status line for five months - was findable only under the inversion.
+- The docs-sync decision is extracted into
+  `tools/agents/check_docs_sync.py::verdict`, a pure function of changed paths,
+  asserted over fixtures. It is not asserted over a git range on purpose:
+  `tests.yml` checks out at depth 1 and has no `origin/main`, so a test that
+  asked would skip on CI.
+- Twenty-three mutations, seven for the criteria and sixteen for the cold
+  passes' own fixes, plus one recorded as wrong. Four cold passes, each in a
+  different family: two highs in this batch's own test code; one high and four
+  mediums in the records rather than the code; four mediums where the guard
+  would reject correct future work, and nothing that makes CI red; then two
+  highs and three mediums in the third pass's own fix, where the guard had
+  become weaker than the deny-list it replaces.
+- `SAG-A1` to `SAG-A16` filed, not fixed; `SAG-A3` (deleting
+  `.github/workflows/agent-docs-gate.yml`) was left out deliberately.
+
 ### docs/implementation_plan_2026-11-08_status_claims.md
 
 Implementation plan for the nine open `SSC` filings — status claims this repo
@@ -831,7 +863,7 @@ Documentation is updated:
 - When user issues are resolved
 - During major releases
 
-**Current Status**: last index entry added 2026-11-09 (the CIG ci-green plan). This index is not enforced by any test (PLC-A5) and does not list every
+**Current Status**: last index entry added 2026-11-09 (the SAG status-allow-list plan). This index is not enforced by any test (PLC-A5) and does not list every
 file under `docs/`: of the 76 Markdown files directly under `docs/`, 43 are not
 named in it anywhere and 48 have no entry of their own. `docs/` holds 222 files
 in all, so the gap over its subdirectories is wider still and uncounted. `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`

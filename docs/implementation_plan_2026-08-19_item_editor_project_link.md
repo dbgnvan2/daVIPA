@@ -325,7 +325,7 @@ May with it.
 
 ## Acceptance criteria → tests
 
-New file `tests/test_item_editor_weekly_tactic_create.py`, `SimpleNamespace`
+New file `test_item_editor_weekly_tactic_create.py` under `tests/` (planned; no file of that name exists in the repo), `SimpleNamespace`
 stubs, same pattern as `tests/test_item_editor_weekly_tactic_ui.py`.
 
 | ID | Criterion | Verified by |

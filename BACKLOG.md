@@ -536,7 +536,7 @@ fourteenth would stop looking like a live pointer.
 
 ### SST-A3 — the "not built" guard is a phrase list, so a new wording escapes it (high)
 
-`tests/test_doc_status_claims.py`'s `_NOT_BUILT` is a fixed alternation: ten
+`tests/test_doc_status_claims.py`'s `_NOT_BUILT` is a fixed alternation: twelve
 phrasings this repo has actually used, plus the nearest variants. A plan headed
 "Draft, implementation not scheduled" passes it. The guard is therefore a
 tripwire, not a proof, and `SST-N1` already says it cannot judge whether a
@@ -566,6 +566,24 @@ must *match* one of a small set of recognised forms (built, superseded,
 registered as a draft), so an unrecognised sentence fails rather than passing.
 That is a convention imposed on 35 existing documents, and it is the one piece
 of work in this family with a measured defect rate behind it.
+
+**Closed 2026-11-09 by the SAG batch.** The check is inverted:
+`tests/test_doc_status_claims.py`'s `classify_status_claim` matches a status
+claim against four recognised forms, so an approval state, a question, a new
+phrasing of "not built" and **silence** all fail by default.
+`docs/implementation_plan_2026-11-09_status_allow_list.md` is the plan and
+`docs/spec_coverage.md`'s SAG section the per-criterion record.
+
+Two things this filing had wrong, both measured rather than argued:
+
+- The cost is **six** document edits, not 35. Thirty of the 36 documents in the
+  family already carry a claim one of the four forms recognises; the plan's §1.1
+  names the six that did not, and the sixth was found only because the inversion
+  made a *missing* claim fail — `docs/implementation_plan_2026-06-22.md` had no
+  status line at all, which is the failure mode no phrase list can have.
+- "`SST-N1` already says it cannot judge whether a replacement sentence is
+  true" stays true of the allow-list too, and is carried forward as `SAG-N1`
+  rather than closed. What changed is the default, not the judgement.
 
 **Priority:** High
 **Effort:** Medium
@@ -659,6 +677,22 @@ and takes `--base`/`--head`, and `tests/test_release_licensing.py` already
 imports the module, so the pieces are in place. Deciding what range a test
 should check — the push range is not knowable from inside a test run — is the
 judgement, which is why it was not done in-loop.
+
+**Closed 2026-11-09 by the SAG batch**, by answering that judgement the other
+way round. The decision is now a pure function of changed paths —
+`tools/agents/check_docs_sync.py::verdict` — and `tests/test_docs_sync_rule.py`
+asserts every outcome it can return over fixtures, so the rule fails locally and
+in `tests.yml` before a push. The test deliberately does **not** ask git for the
+push range: `tests.yml` checks out at depth 1 and has no `origin/main`, so a
+test that asked would skip on CI, which is the shape this filing is about. To
+apply the rule to real changes, run
+`./venv/bin/python tools/agents/check_docs_sync.py` by hand; a range it cannot
+read is reported as *skipped*, never as a pass (`SAG-M2.3`).
+
+`.github/workflows/agent-docs-gate.yml` itself still triggers on
+`pull_request` only and so still runs on nothing. Deleting it is `SAG-A3`
+below — left out of this batch on purpose, because removing a workflow is not
+the same change as putting its rule in the suite.
 
 **Priority:** Medium
 **Effort:** Medium
@@ -901,6 +935,14 @@ keeps out of the fix loop on purpose. The handoff note records what each pass
 found.
 
 ### PDT-A1 — `test_traceability_refs` never checks a bare `::name` continuation (medium-low)
+
+**2026-11-09: the domain of this item is now much wider than the text below
+describes.** `SAG-M4` widened that guard's scan from `docs/spec_coverage*.md`
+to the implementation-plan, spec and handoff-note families, so the bare-name
+blind spot now covers every citation in those documents too. The path form was
+repaired across all of them; the bare form was not, and could not be by the
+same guard. Filed as `SAG-A17`, which supersedes this item's scope and keeps
+its measurement method.
 
 `tests/test_traceability_refs.py:48` matches references with
 `(tests/[\w/]+\.py)(?:::(\w+))?`, which **requires the file prefix**. A
@@ -4846,6 +4888,291 @@ surface reachable only from a test inflates the WT-M6 coverage claim. Left alone
 in this change because it is out of scope for the weekly-tactic spec, and it was
 already like this before.
 
+### SAG-A1 — the status guard reads a document's first claim only (medium)
+
+`_status_claim` in `tests/test_doc_status_claims.py` returns the **first**
+`Status` line, or the first non-blank line of the first `## Status` section, and
+the forms are then matched against that one sentence. A document whose opening
+line says "built and on `main`" and whose later sections record three unbuilt
+milestones in their own status lines passes on the first and is never asked
+about the rest. This repo writes exactly that shape: a plan header claim plus
+per-milestone claims further down.
+
+Filed 2026-11-09 by the cold pass over the SAG batch. Not fixed in-loop because
+reading every claim changes what the guard is for — the register
+(`DRAFTS_NOT_BUILT`) is keyed by document, not by claim, so a document with one
+built and one draft claim has no representable state yet.
+
+**Priority:** Medium
+**Effort:** Medium
+
+### SAG-A2 — `_STATUS_LINE` matches any line that starts with "status" (low)
+
+The claim extractor finds a status line by looking for a line beginning with
+the word `status`, so a sentence like "Status reporting is handled by the
+sidebar" in a document's prose is taken as its status claim, classified, and
+very likely rejected. One document in the family already does:
+`docs/implementation_plan_2026-08-25_project_time_totals.md`'s prose line
+beginning "status was added 2026-11-09 by the third cold pass…". The batch is
+green not because no such line exists but because `_status_claim` returns the
+**first** match and that document's real claim comes earlier — which means this
+and `SAG-A1` are the same weakness seen from two sides, and the ordering is all
+that separates a correct document from a confusing red one.
+
+Filed 2026-11-09 by the first cold pass over the SAG batch; the reason given
+here was wrong ("no document currently starts a line that way") and was
+corrected by the second, which found the document.
+
+**Priority:** Low
+**Effort:** Small
+
+### SAG-A3 — delete `.github/workflows/agent-docs-gate.yml` (low)
+
+It triggers on `pull_request` only, and the standing instruction for this repo
+is no pull requests, so it has never run here. Since `SST-A8`'s closure the rule
+it was meant to enforce lives in `tests/test_docs_sync_rule.py`, where it fails
+before a push. The workflow is now a file that describes an enforcement nobody
+gets, and `CLAUDE.md` has to carry a paragraph explaining that.
+
+Left out of the SAG batch on purpose: removing a workflow is a different change
+from putting its rule in the suite, and doing both in one batch would have made
+the diff say two things at once.
+
+**Priority:** Low
+**Effort:** Small
+
+### SAG-A4 — one assertion couples an exit code to an outcome-name spelling (low)
+
+`tests/test_docs_sync_rule.py` decides which side of `gate.PASSING` an outcome
+should fall on by testing `expected.startswith(("pass", "no-"))` — that is, by
+the spelling of the fixture's own outcome name. Renaming an outcome's *value*
+silently changes which branch the assertion exercises rather than failing. A
+per-fixture expectation would be independent of the spelling.
+
+The gap is also wider than the title: **no test asserts `main`'s exit code at
+all.** `return 0 if code in PASSING else 1` is the line a CI step would act on,
+and only `verdict`'s outcome name is asserted.
+
+Filed 2026-11-09 by the first cold pass over the SAG batch, which described this
+as an assertion on `main`'s exit code; the second pass measured that there is no
+such assertion.
+
+**Priority:** Low
+**Effort:** Small
+
+### SAG-A5 — `run()` puts a literal backslash-n in its error message (low)
+
+`tools/agents/check_docs_sync.py::run` raises
+`RuntimeError(f"Command failed: {' '.join(cmd)}\\n{result.stderr}")` — an
+escaped backslash in a plain (non-raw) string, so the message carries the two
+characters `\n` instead of a newline and the git error runs on from the command
+line. It is the class `CLAUDE.md`'s "backslash sequences in embedded code
+strings" rule covers, arriving the other way round. The message is now read by
+`SAG-M2.3`'s skip line, so it is user-facing.
+
+**Priority:** Low
+**Effort:** Small
+
+### SAG-A6 — a dead `docs/changes/` clause in the docs check (low)
+
+`verdict` computes `docs_changed` as `path.startswith(DOC_PREFIXES) or path in
+DOC_FILES or path.startswith("docs/changes/")`. `DOC_PREFIXES` is `("docs/",)`,
+so the third clause can never be the one that matters: every
+`docs/changes/…` path already satisfies the first. A handoff note alone
+**does** satisfy the docs requirement, and `tests/test_docs_sync_rule.py`'s
+fixture `(("src/getmoredone/db_manager.py", "docs/changes/…md"), "pass")`
+asserts exactly that — so the clause is dead, and the behaviour it looks like it
+adds is the behaviour the rule already has. Whether that is the right rule is a
+separate question from whether the clause is reachable; this item is only about
+the clause.
+
+Filed 2026-11-09 by the first cold pass over the SAG batch, which said the
+fixtures prove a note alone does *not* satisfy the requirement; they prove the
+opposite, corrected by the second pass. Deleting the clause is a
+behaviour-preserving edit; it is filed rather than done because the batch's rule
+is that below-medium findings are not fixed in-loop.
+
+**Priority:** Low
+**Effort:** Small
+
+### SAG-A7 — `CLAUDE.md` names a master spec file that does not exist (low)
+
+`CLAUDE.md`'s key-files table lists `daVIPA_MasterSpec_SQLite_v1.md`. The file
+in the repo root is `GetMoreDone_MasterSpec_SQLite_v1.md`, which is also the
+name `check_docs_sync.py`'s `DOC_FILES` uses. So the one pointer a reader is
+most likely to follow from `CLAUDE.md` is dead, and the rename it implies was
+never done.
+
+Filed 2026-11-09 by the cold pass over the SAG batch. Out of scope for that
+batch, whose `CLAUDE.md` edit was confined to the docs-gate paragraph.
+
+**Priority:** Low
+**Effort:** Small
+
+### SAG-A8 — a built word used as an adjective still reads as a status claim (low)
+
+`classify_status_claim("Complete rewrite proposed. No code yet.")` returns
+`"built"`. `_BUILT` matches the word `complete` at the start of the claim, and
+`_CANCELLED` looks at what follows the match — ` rewrite proposed` — which
+carries no negation, so the sentence passes as a built claim. The same holds for
+any built word that can be read adjectivally: "Done deal, not scheduled."
+
+The residue of the cold pass's fifth finding, which closed the two cases this
+repo would actually write ("Done nothing yet.", "Shipped? not yet."). Fixing it
+properly needs part-of-speech knowledge the regex forms do not have; the
+plausible cheap fix is to require a sentence boundary or an auxiliary after the
+built word.
+
+`tests/test_doc_status_claims.py::test_sagm15_the_forms_reject_a_built_word_after_a_negation`
+**asserts this behaviour**, with a message saying so, so closing this item turns
+that assertion red on purpose — that is the filing's tripwire, and the only
+honest way to record a hole the suite currently passes over.
+
+**Priority:** Low
+**Effort:** Medium
+
+### SAG-A9 — three recognised vocabularies a future document may step outside (low)
+
+Measured by the third cold pass over the SAG batch, 2026-11-09, as claims that
+classify as `None` and would therefore go red on correct work:
+
+- `superseded` recognises `superseded|withdrawn|abandoned`. "Retired.",
+  "Obsolete — replaced by X.", "Rejected.", "On hold." and "Blocked on a
+  decision." do not match it.
+- An **approval-only** state has no recognised form: "Approved 2026-11-10.
+  Implementation starts next." fails. That one is deliberate and should stay —
+  an approval recorded over built work is the state `SST-A3` was raised to high
+  for, and the failure message tells the author to lead with the state — but it
+  means a genuinely just-approved plan has to say so as a draft or a not-built
+  claim, which no document states.
+- The family glob excludes only `spec_coverage*`, so a future reference
+  document named `docs/spec_template.md` or `docs/spec_glossary.md` would be
+  required to carry a status claim.
+
+The fix for the first is more alternatives, which is the patch this batch
+replaced; the better one is to decide whether "on hold" is a `not-built` claim
+and say so once. The third is a glob exclusion. None is urgent: no document is
+red today.
+
+**Priority:** Low
+**Effort:** Small
+
+### SAG-A10 — `test_sagm23` cannot tell an unreadable range from a missing git (low)
+
+`tests/test_docs_sync_rule.py` asserts that the tool's output contains
+"skipped" when the range cannot be read. It would also pass if git were absent
+or the working directory were not a repository, so the test does not establish
+that the *range* is what failed. Asserting on the message's command text as
+well would separate the two.
+
+Filed 2026-11-09 by the third cold pass over the SAG batch.
+
+**Priority:** Low
+**Effort:** Small
+
+### SAG-A11 — `run()` has no timeout on its subprocess (low, P5)
+
+`tools/agents/check_docs_sync.py::run` calls `subprocess.run` with no
+`timeout`, so a hung `git diff` hangs the check. `~/.claude/standards/learnings.md`
+P5 is the rule — timeout, retry, backoff on every external call — and the
+global rules say to fix a class rather than an instance, so the sibling calls in
+`tools/agents/` should be done in the same change.
+
+Adjacent, found 2026-11-09 by the third cold pass over the SAG batch and not
+changed by it (global rule 10). `SAG-A5` is the other defect in the same
+function.
+
+**Priority:** Low
+**Effort:** Small
+
+### SAG-A12 — the three built forms became one, and `test_sagm12` is the only record of them (low)
+
+The third cold pass collapsed `built`, `approved-and-built` and `partly-built`
+into one `built` form, because the three differed only in an enumerated prefix
+that had already been widened once and still rejected `&` and `:`. The named
+distinction is gone from the failure messages: a document is told it does not
+match `built`, where it used to be told which of the three shapes it missed.
+Nothing is broken by that, and the fixtures in
+`test_sagm12_an_unrecognised_status_claim_is_rejected` keep one example of each
+old shape, but if the failure messages turn out to be less useful in practice
+the sub-shapes can come back as named *examples* in the message rather than as
+separate patterns.
+
+Filed 2026-11-09 as the residue of the third cold pass's own fix.
+
+**Priority:** Low
+**Effort:** Small
+
+### SAG-A13 — `without` cancels a built claim (low)
+
+`_CANCELLED` fires on any `_NEGATION_WORDS` alternative immediately after the
+match, and `without` is one of them. Measured: `"Built without a migration."`,
+`"Shipped without the modal."` and `"Built no later than 2026-11-09."` all
+classify as `None`, so a true built claim is rejected. `without` belongs in the
+prefix check — "built without" is not the same as "without a build" — but not
+in the immediate-cancellation set.
+
+Filed 2026-11-09 by the fourth cold pass over the SAG batch. The fix is one
+alternation split into two; it is filed rather than done because the batch's
+rule is that below-medium findings are not fixed in-loop, and because the
+cancellation check has now been changed by two passes in a row.
+
+**Priority:** Low
+**Effort:** Small
+
+### SAG-A14 — three near-synonyms of `superseded`, and the word `cancelled` (low)
+
+`"Cancelled."`, `"Retired."`, `"Obsolete — replaced by SAG-M1."` and
+`"Largely superseded by PD-M13."` all classify as `None`. The first three are
+near-synonyms of the `superseded` form's own three words; the fourth fails only
+because the form requires position 0. Also measured as `None`: `"Approved and
+merged to `main`."`, `"Landed on `main` 2026-11-09."`, `"On hold."`,
+`"Deferred."`, `"In review."`
+
+This is the same decision as `SAG-A9` and should be taken with it: either the
+vocabularies grow, which is the patch this batch replaced, or the repo decides
+once what "on hold" and "deferred" are and writes it down. Note also that the
+module names a regex `_CANCELLED` for something else entirely, which will read
+badly if `cancelled` becomes a `superseded` alternative.
+
+Filed 2026-11-09 by the fourth cold pass over the SAG batch.
+
+**Priority:** Low
+**Effort:** Small
+
+### SAG-A15 — no reachability loop over `_BUILT` or `_NEGATION_WORDS` (low)
+
+`test_sagm15` reads the alternatives out of the `superseded` and `draft` forms
+and out of `_NOT_BUILT`, and asserts each one is reachable — but not out of
+`_BUILT` or `_NEGATION_WORDS`, which are the two alternations with a recorded
+bad entry. `live` was removed from `_BUILT` by a human reading it, not by a red
+test, and `un\w+` was removed from the negation words the same way. An
+unreachable or over-broad word added to either today goes unnoticed. All six
+built words and all eleven negation words do currently behave correctly,
+measured individually by the pass; `completed` is reachable and asserted
+nowhere.
+
+Filed 2026-11-09 by the fourth cold pass over the SAG batch.
+
+**Priority:** Low
+**Effort:** Small
+
+### SAG-A16 — the alternative-parsing loop gives a misleading message on a nested group (low)
+
+`test_sagm15` parses a form's alternatives with
+`re.fullmatch(r"\^\((.+)\)\\b", pattern)`. The greedy `(.+)` accepts a pattern
+containing a nested group, so `^(draft|planned|(?:re)?proposed|not approved)\b`
+parses and splits into four parts, one of which is `(?:re)?proposed`. The loop
+then reports that alternative as a dead branch, which is the wrong diagnosis —
+the right colour for the wrong reason. The `assert parsed` guard above it
+already tells the next author to rewrite the loop rather than delete it; this is
+about the message when the parse succeeds but means something else.
+
+Filed 2026-11-09 by the fourth cold pass over the SAG batch.
+
+**Priority:** Low
+**Effort:** Small
+
 ---
 
 ## Quick Add Template
@@ -4859,3 +5186,47 @@ already like this before.
 **Effort:** [Small/Medium/Large]
 **Notes:**
 ```
+
+### SAG-A17 — the bare `::name` citation form is outside the traceability guard, in four document families now (medium)
+
+`tests/test_traceability_refs.py`'s `_REF` requires the `tests/…py` prefix, so
+a continuation written as `` `::test_name` `` is never checked. That was
+`PDT-A1`, scoped to `docs/spec_coverage.md`. `SAG-M4` widened the scan to
+`docs/implementation_plan_*.md`, `docs/spec_*.md` and `docs/changes/*.md` and
+left the blind spot in place, so the batch that repaired every dead **path**
+in those families tripled the domain of the gap beside it.
+
+The sixth cold pass measured it on 2026-11-09: of the bare `::test_*`
+continuations in the scanned set, **69 resolve against no test file anywhere
+in `tests/`**, and 52 of those sit on a line carrying no retirement or
+"planned" marker — so they read as live evidence. The measurement goes stale
+the way `PDT-A1`'s did; its command is the one to re-run, with `^\s*def
+<name>` matched exactly and never by substring.
+
+Two instances are the argument for doing this rather than filing it again:
+`docs/implementation_plan_2026-11-05_time_blocks.md`'s TB-M2.2 and TB-M2.3
+were dead, and sit **directly above** TB-M3.1, which `SAG-M4.3` repaired —
+because TB-M3.1's name carried a path and theirs did not. Those two are now
+corrected by hand; the other fifty are not.
+
+The fix is not simply dropping the prefix requirement: a bare name has no file,
+so resolving one means either searching every file under `tests/` (which
+accepts a name defined anywhere, a weaker check than the path form) or reading
+the file from the nearest preceding path-form citation in the same document,
+which is what a human reader does. The second is the real convention and the
+harder change. Either way the rows carrying genuinely retired names have to be
+rewritten first, or the guard goes red on honest history.
+
+### SAG-A18 — `tests/` itself is outside the traceability scan, undocumented (low)
+
+`SCANNED` covers `src`, `tools`, `conftest.py` and four document globs, but not
+`tests/*.py`, which holds 118 path-form references of its own. The exclusion is
+load-bearing and deliberate — ten of those references are fictional fixtures
+(`tests/test_a.py`, `tests/test_thing.py`, and this guard's own comment citing
+`tests/test_column_resize.py::test_updf13_` as the example of a dead citation),
+so adding the arm would go red on the guard's own prose. Unlike
+`COVERAGE_WITHOUT_PATHS`, nothing says so: a reader sees four document families
+scanned and a test suite that is not. Either document the exclusion where
+`SCANNED` is defined, or add the arm with a named exemption for the fixtures.
+Measured by the sixth cold pass, which also confirmed all 118 resolve today
+except the deliberate fixtures.

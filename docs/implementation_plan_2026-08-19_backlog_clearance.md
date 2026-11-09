@@ -1,7 +1,8 @@
 # Implementation plan — Backlog clearance (2026-08-19)
 
-Status: Batch 1 complete (2026-08-19). Batch 2 complete (2026-08-19).
-Batch 3 complete (2026-08-20).
+Status: **built and on `main`** — batch 1 and batch 2 complete 2026-08-19,
+batch 3 complete 2026-08-20. (Reordered 2026-11-09 to lead with the state; the
+two dates are the ones this line has always carried.)
 Source: [`BACKLOG.md`](../BACKLOG.md) open items, plus the two decisions taken today.
 
 ## Decisions taken

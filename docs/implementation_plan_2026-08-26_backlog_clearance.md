@@ -117,7 +117,7 @@ suite-wide changes the behaviour of every test that reaches one.
 | B3.1 | `_cleanup_and_destroy` returns False when the window survives | `::test_b31_cleanup_reports_whether_it_closed` |
 | B3.2 | `continue_action` does not open the editor behind a live timer | `::test_b32_the_editor_waits_for_a_timer_that_did_not_close` |
 | B4.1 | `NextStepsDialog` no longer exists | `::test_b41_the_dead_dialog_is_gone` |
-| B5.1 | A `messagebox` call in a test records instead of displaying | `tests/test_tk_offscreen.py::test_b51_messagebox_never_blocks_a_run` |
+| B5.1 | A `messagebox` call in a test records instead of displaying | `tests/test_tk_offscreen.py::test_b51_a_messagebox_records_instead_of_blocking` |
 | B5.2 | A test raising inside a timer ending completes rather than hanging | `::test_b52_a_failing_ending_does_not_hang_the_run` |
 | B5.3 | The 15 tests that patch messagebox themselves still pass | full suite |
 

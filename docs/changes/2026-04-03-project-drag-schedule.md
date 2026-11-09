@@ -25,4 +25,4 @@ Added a new "Projects" tab to the `DragScheduleScreen` (Scheduler) to allow orga
 
 ## Verification Results
 - Ran `pytest tests/test_drag_schedule_support.py`: **PASSED**
-- Created and ran `tests/test_project_drag_linking.py` to verify exclusive linking and APE synchronization: **PASSED** (Test file removed after verification).
+- Created and ran `test_project_drag_linking.py` under `tests/` to verify exclusive linking and APE synchronization: **PASSED** (Test file removed after verification).

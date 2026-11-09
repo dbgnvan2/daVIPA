@@ -78,7 +78,7 @@ So today **Notes are invisible** in the panel — you have to click `Open Notes`
 | ID | Description | Test |
 |---|---|---|
 | **M6.A.1** | Every new method/function has a docstring with `Purpose:` / `Spec:` / `Tests:` referencing this file and the test name. | Manual review (cannot automate cheaply). Will be visible in the diff. |
-| **M6.A.2** | `docs/spec_coverage.md` is updated with a section for this plan: spec ID → impl location → test → status. | `tests/test_project_notes.py::test_spec_coverage_doc_mentions_m1_through_m5` — open `docs/spec_coverage.md`, assert each top-level ID (`M1.A.1`…`M5.A.2`) appears. |
+| **M6.A.2** | `docs/spec_coverage.md` is updated with a section for this plan: spec ID → impl location → test → status. | `tests/test_project_notes.py::test_spec_coverage_doc_mentions_m1_through_m7` — open `docs/spec_coverage.md`, assert each top-level ID appears — `M1.A.1`…`M7.A.7` as the test stands today, which is why it is no longer called `…_m1_through_m5`. |
 
 ## Implementation Order
 
@@ -120,7 +120,7 @@ Today, `obsidian_notes_subfolder` (in `app_settings.py`, default `"GetMoreDone"`
 | **M7.A.1** | `AppSettings` gains `project_notes_subfolder: str = "GetMoreDone/Projects"` (default mirrors the existing pattern but under a `Projects/` subdir). | `tests/test_project_notes.py::test_settings_has_project_notes_subfolder` — `AppSettings()`, assert default == `"GetMoreDone/Projects"`. |
 | **M7.A.2** | `AppSettings.get_project_notes_folder() -> Optional[Path]` mirrors `get_notes_folder()` but uses the project subfolder. | `tests/test_project_notes.py::test_get_project_notes_folder_returns_path` |
 | **M7.A.3** | `AppSettings.save()` / `load()` round-trip the new field (it's auto-handled by the dataclass JSON pattern; test confirms). | `tests/test_project_notes.py::test_settings_roundtrip_project_subfolder` — set, save, reload, assert. |
-| **M7.A.4** | Settings screen shows a new **"Project Notes Folder"** entry **below** the existing "Notes Subfolder" entry, with placeholder `"GetMoreDone/Projects"`. Wired to `self.project_notes_folder_var`; persisted on `save_settings()`. | `tests/test_project_notes_settings_ui.py::test_settings_screen_has_project_notes_folder_field` — render `SettingsScreen`, assert a `CTkEntry` exists whose `textvariable` is `project_notes_folder_var`. |
+| **M7.A.4** | Settings screen shows a new **"Project Notes Folder"** entry **below** the existing "Notes Subfolder" entry, with placeholder `"GetMoreDone/Projects"`. Wired to `self.project_notes_folder_var`; persisted on `save_settings()`. | `tests/test_project_notes.py::test_settings_screen_has_project_notes_folder_field` — render `SettingsScreen`, assert it has a `project_notes_folder_var` holding the seeded value, and that an edit survives a save and reload. (It asserts the variable and the round-trip, not that the widget is a `CTkEntry`.) |
 | **M7.A.5** | When `CreateNoteDialog` is invoked with `entity_type == "project_board"`, the resulting `.md` file is written to `<vault>/<project_notes_subfolder>/...` **not** `<vault>/<obsidian_notes_subfolder>/...`. | `tests/test_project_notes.py::test_create_note_for_project_writes_to_project_folder` — monkeypatch `obsidian_utils.create_obsidian_note` to capture the `subfolder` argument; invoke the dialog's `create_note()` with `entity_type='project_board'`; assert captured subfolder == project value. Also assert the non-project path (`action_item`) STILL uses the original `obsidian_notes_subfolder` — no regression. |
 | **M7.A.6** | If `project_notes_subfolder` is blank, the system falls back to `obsidian_notes_subfolder` (so existing users with no new setting don't break). | `tests/test_project_notes.py::test_blank_project_subfolder_falls_back` |
 | **M7.A.7** | The folder is created on first use (existing `create_obsidian_note` already does `notes_folder.mkdir(exist_ok=True)`; nothing new needed — just confirm in test). | `tests/test_project_notes.py::test_project_notes_folder_created_on_first_note` |
@@ -133,7 +133,7 @@ Today, `obsidian_notes_subfolder` (in `app_settings.py`, default `"GetMoreDone"`
 | `src/getmoredone/screens/settings.py` | Add "Project Notes Folder" entry in the Obsidian section, persist in `save_settings()`. |
 | `src/getmoredone/screens/item_editor_note_dialogs.py` | In `create_note()`, choose the subfolder based on `entity_type`. |
 | `tests/test_project_notes.py` | Add M7.A.* tests. |
-| `tests/test_project_notes_settings_ui.py` | New file — GUI test for the Settings field. |
+| `tests/test_project_notes.py` | GUI test for the Settings field. Planned as a new `test_project_notes_settings_ui.py`; no file of that name was ever created, and the test landed here. |
 
 ### Implementation order — updated
 

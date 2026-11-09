@@ -1,7 +1,8 @@
 # Spec + implementation plan — what the on-screen check found
 
-Status: **approved 2026-11-08. UPD-F1 built the same day (§2 carries its
-per-criterion statuses); UPD-F2, UPD-F3 and UPD-F4 are built elsewhere.**
+Status: **built and on `main`** — approved 2026-11-08, UPD-F1 built the same
+day (§2 carries its per-criterion statuses), and UPD-F2, UPD-F3 and UPD-F4
+built elsewhere. (Reordered 2026-11-09 to lead with the state.)
 IDs: `UPD-F1` … `UPD-F4`. Use them verbatim in commits, docstrings and test
 names. They continue `docs/spec_2026-11-07_unified_panel_design.md`, whose
 UPD-M7.2 and UPD-M7.3 are the criteria this work closes.
