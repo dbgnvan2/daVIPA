@@ -41,6 +41,31 @@ def missing_credentials_message() -> str:
     )
 
 
+def not_connected_message() -> str:
+    """The text shown when credentials are present but no token has been made.
+
+    Purpose: CE-M4.3 -- name the file that was checked, and say where the one
+             interactive connection can be made, because the export cannot
+             make it: the OAuth consent flow blocks on a browser and the
+             export runs on a worker thread.
+    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m43
+    Tests:   tests/test_plan_screen_calendar_export.py::test_cem434_an_unconnected_account_refuses_rather_than_opening_a_browser
+
+    A module-level function for the same reason as
+    ``missing_credentials_message`` above: a test asserting on a string it
+    builds itself is a tautology.
+    """
+    from .. import paths
+
+    expected = paths.google_auth_dir() / "token.pickle"
+    return (
+        "Google Calendar is set up but not connected yet.\n"
+        f"Expected: {expected}\n"
+        "Connect once from an item's Add to Calendar dialog, which can open "
+        "the browser, then export."
+    )
+
+
 class CalendarEventDialog(ctk.CTkToplevel):
     """Dialog for creating a Google Calendar event."""
 

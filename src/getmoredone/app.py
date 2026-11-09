@@ -19,6 +19,14 @@ from .utils.app_icon import set_app_icon
 from .vps_manager import VPSManager
 
 
+#: The size the main window opens at. A named constant rather than a literal
+#: because a screen's header has to fit inside it, and the test that checks
+#: one fits reads this rather than carrying a second copy of the number (P4).
+#: Tests: tests/test_plan_screen_calendar_export.py::test_cem441b_the_header_fits_the_window_it_opens_in
+DEFAULT_GEOMETRY = "1200x700"
+DEFAULT_WINDOW_WIDTH_PX = int(DEFAULT_GEOMETRY.split("x")[0])
+
+
 class GetMoreDoneApp(ctk.CTk):
     """Main application window."""
 
@@ -42,7 +50,7 @@ class GetMoreDoneApp(ctk.CTk):
         date_str = today.strftime("%B %d, %Y")
         mode_tag = "[PROD]" if getattr(sys, "frozen", False) else "[DEV]"
         self.title(branding.window_title(mode_tag, day_of_week, date_str))
-        self.geometry("1200x700")
+        self.geometry(DEFAULT_GEOMETRY)
 
         # Show the GMD brand check-mark icon instead of the default Python
         # launcher rocket (macOS Dock + Windows/Linux taskbar). Cosmetic and

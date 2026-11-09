@@ -207,6 +207,14 @@ class AppSettings:
     # -- read its docstring before changing either.
     plan_day_shape_unconfirmed: bool = False
 
+    # CE-M3.1 / D3 — which Google Calendar the Plan screen's export writes to.
+    # "primary" is the account's own calendar, which is what the three event
+    # methods used to hard-code. A field rather than a constant so a user who
+    # plans into a work calendar is not editing source to do it.
+    # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m31
+    # Tests: tests/test_plan_screen_calendar_export.py::test_cem443_the_configured_calendar_is_the_one_written_to
+    plan_export_calendar_id: str = "primary"
+
     # Email → Action Items (Gmail importer)
     gmail_import_enabled: bool = True
     gmail_import_trigger_label: str = "GMD"

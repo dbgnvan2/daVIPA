@@ -1391,14 +1391,15 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             INSERT INTO time_blocks (
                 id, item_id, block_date, start_time, end_time,
                 planned_minutes, label, block_type, slot_index, position,
-                calendar_event_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                calendar_event_id, calendar_event_calendar_id,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             block.id, block.item_id, block.block_date,
             block.start_time, block.end_time, block.planned_minutes,
             block.label, BlockType.normalize(block.block_type),
             block.slot_index, block.position,
-            block.calendar_event_id,
+            block.calendar_event_id, block.calendar_event_calendar_id,
             block.created_at, block.updated_at
         ))
         self.db.conn.commit()
@@ -1426,9 +1427,9 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         day is a different operation from editing one, and letting an edit
         silently relocate a block is how a day loses work nobody deleted.
 
-        ``calendar_event_id`` is deliberately not updated either, and for a
-        related reason: ``set_block_calendar_event_id`` is its only writer
-        (CE-M1.3). Every screen path here edits a block object the screen
+        ``calendar_event_id``, and the calendar it names, are deliberately not
+        updated either, and for a related reason:
+        ``set_block_calendar_event_id`` is their only writer (CE-M1.3). Every screen path here edits a block object the screen
         loaded earlier -- before an export, in the common case -- so writing
         this column from that object would set it back to ``None`` and orphan
         a real Google Calendar event on a resize.
@@ -1451,12 +1452,12 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         self.db.conn.commit()
 
     def set_block_calendar_event_id(
-        self, block_id: str, event_id: Optional[str]
-    ) -> None:
+        self, block_id: str, event_id: Optional[str], calendar_id: Optional[str] = None
+    ) -> bool:
         """Record which Google Calendar event a block owns.
 
-        Purpose: CE-M1.3 -- the only writer of ``calendar_event_id``, and it
-                 writes nothing else.
+        Purpose: CE-M1.3 -- the only writer of ``calendar_event_id`` and of
+                 the calendar it is on, and it writes nothing else.
         Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
         Tests:   tests/test_time_block_crud.py::test_cem13_recording_an_event_id_leaves_the_block_where_it_was
 
@@ -1467,16 +1468,37 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         restore the slot and position the exporter read minutes ago and move
         work nobody asked to move (P39 -- an operation whose output lands
         inside its own input).
+
+        The calendar is written with the id, never separately: an event id
+        means nothing without the calendar it is on, and the two kept apart
+        could disagree. Clearing the id clears the calendar with it, so a
+        ``calendar_event_calendar_id`` without an id is not a state this can
+        produce.
+
+        Returns whether a row was actually written. The block can be deleted
+        while the export is talking to Google -- it is a background thread and
+        the day is still clickable -- and an UPDATE matching no rows is not an
+        error to SQLite. Returning None made that case indistinguishable from
+        a recorded id, so the export counted a success for a block that no
+        longer existed and left the event it had just made behind (P6 -- a
+        status checked against the thing it claims).
         """
-        self.db.conn.execute(
+        cursor = self.db.conn.execute(
             """
             UPDATE time_blocks
-            SET calendar_event_id = ?, updated_at = ?
+            SET calendar_event_id = ?, calendar_event_calendar_id = ?,
+                updated_at = ?
             WHERE id = ?
             """,
-            (event_id, datetime.now().isoformat(), block_id),
+            (
+                event_id,
+                calendar_id if event_id else None,
+                datetime.now().isoformat(),
+                block_id,
+            ),
         )
         self.db.conn.commit()
+        return cursor.rowcount == 1
 
     def get_time_blocks(self, block_date: str) -> List[TimeBlock]:
         """Blocks for one date, in the order the day runs.
@@ -1571,9 +1593,23 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         )
 
     def _refuse_unless_it_fits(
-        self, block_date: str, slot_index: int, minutes: int, bounds, ignoring=None
+        self,
+        block_date: str,
+        slot_index: int,
+        minutes: int,
+        bounds,
+        ignoring=None,
+        day_span=None,
     ) -> None:
-        """Raise ``SlotRefusedError`` unless the grid allows this placement."""
+        """Raise ``SlotRefusedError`` unless the grid allows this placement.
+
+        ``day_span`` is for the one caller that is deliberately placing a block
+        outside the day as it is drawn now: a drop on Earlier or Later, which
+        is asking for the drawn day to be wider (PD-M14.1). Left out, the day
+        checked against is the one on screen -- the template's hours stretched
+        to this date's own blocks -- so an ordinary drop cannot land off the
+        grid by passing a span nobody drew.
+        """
         from .time_block_layout import SlotRefusedError, can_place, slots_for_minutes
 
         reason = can_place(
@@ -1582,11 +1618,14 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             slot_index,
             slots_for_minutes(minutes),
             ignoring=ignoring,
+            day_span=day_span,
         )
         if reason:
             raise SlotRefusedError(reason)
 
-    def add_block_at(self, block: TimeBlock, slot_index: int, bounds) -> TimeBlock:
+    def add_block_at(
+        self, block: TimeBlock, slot_index: int, bounds, day_span=None
+    ) -> TimeBlock:
         """Create a block in a particular box.
 
         Purpose: TG-M9 -- an item dropped on the 10:00 box becomes a block at
@@ -1598,7 +1637,11 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         day exactly as it was rather than rolling a write back.
         """
         self._refuse_unless_it_fits(
-            block.block_date, slot_index, block.planned_minutes, bounds
+            block.block_date,
+            slot_index,
+            block.planned_minutes,
+            bounds,
+            day_span=day_span,
         )
         with self.transaction():
             self._settle_block_on_slot(block, slot_index, bounds)
@@ -2741,6 +2784,10 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             calendar_event_id = row["calendar_event_id"]
         except (IndexError, KeyError):
             calendar_event_id = None
+        try:
+            event_calendar_id = row["calendar_event_calendar_id"]
+        except (IndexError, KeyError):
+            event_calendar_id = None
 
         return TimeBlock(
             id=row["id"],
@@ -2754,6 +2801,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             slot_index=slot_index,
             position=int(position or 0),
             calendar_event_id=calendar_event_id,
+            calendar_event_calendar_id=event_calendar_id,
             created_at=row["created_at"],
             updated_at=row["updated_at"]
         )
