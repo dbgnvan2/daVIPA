@@ -236,7 +236,7 @@ Eight of the eleven were already red at `3f705b4`, before this batch existed:
 The three that are new since `3f705b4`, of which **one is this batch's**:
 
 - `tests/test_weekly_tactic_completion_widgets.py::test_wtpw_the_prompt_survives_a_real_always_on_top_parent`
-  — **this batch's**, and fixed in `be1b4ee`. It asserted that the guard put
+  — **this batch's**, and fixed in `23f0cc7`. It asserted that the guard put
   `-topmost` back on a real Toplevel parent. Honouring that property is a
   window manager's job and a headless display has none, so the read-back is
   off whatever the guard does. It now skips where the property does not take,

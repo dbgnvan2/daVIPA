@@ -251,11 +251,11 @@ In `BACKLOG.md` under "csdp sweep findings not fixed":
 
 In `BACKLOG.md` under "csdp sweep findings in other batches":
 
-- **CE** (high, since **CLOSED** by `9baea13`) --
+- **CE** (high, since **CLOSED** by `a92f059`) --
   `calendar_event_calendar_id` was committed as half a pair again, the thing
   `f264cc3` exists to repair: nothing wrote or read it, so a non-primary
   calendar could only be recorded as `primary`, which is the duplicate-events
-  failure the column was added to prevent. `9baea13` landed the writer.
+  failure the column was added to prevent. `a92f059` landed the writer.
   Re-checked at HEAD rather than taken on report: `create_time_block` binds
   the column, `set_block_calendar_event_id` sets it as
   `calendar_id if event_id else None`, `_row_to_time_block` reads it back,

@@ -189,7 +189,7 @@ recorded here rather than fixed: that session holds the files uncommitted and
 a second writer in this index is what `CLAUDE.md`'s "One build batch at a
 time" exists to prevent.
 
-### CE — `calendar_event_calendar_id` was half a pair — CLOSED by `9baea13`
+### CE — `calendar_event_calendar_id` was half a pair — CLOSED by `a92f059`
 
 **Resolved. Recorded here because the finding was raised, not because it is
 outstanding.**
@@ -204,7 +204,7 @@ default calendar) a non-primary calendar could only ever be recorded as
 `primary`, which is the duplicate-events failure the column was added to
 prevent.
 
-`9baea13` landed the writer and closes it. Verified at HEAD, not taken on
+`a92f059` landed the writer and closes it. Verified at HEAD, not taken on
 report:
 
 - `db_manager.py:1401,1409` -- `create_time_block` names and binds the column;
@@ -559,22 +559,47 @@ event id and send that.
 **Priority:** Low
 **Effort:** Medium (needs the same product decision as CE-A17)
 
-### CE-A22 — six commits in this batch's history cannot import `db_manager` (low)
+### CE-A22 — six commits could not import `db_manager` — CLOSED by the rewrite below
 
 Found closing the batch out, not by a review pass. `db_manager.py` held three
-sessions' work that day, and `9baea13` carried the priority batch's
-`from .models import (..., apply_priority_floor)` hunk along with the calendar
-ones. `apply_priority_floor` only reaches `models.py` at `99d680a`, so every
-commit from `9baea13` to `5671510` dies at import: `ImportError: cannot import
-name 'apply_priority_floor'`. HEAD is unaffected and CI only ever sees HEAD, so
-the cost is `git bisect` across six commits, nothing else.
+sessions' work that day, and the calendar export commit carried the priority
+batch's `from .models import (..., apply_priority_floor)` hunk along with the
+calendar ones. `apply_priority_floor` only reached `models.py` six commits
+later, so every commit in between died at import: `ImportError: cannot import
+name 'apply_priority_floor'`. HEAD was unaffected and CI only ever sees HEAD,
+so the cost was `git bisect` across six commits, nothing else.
 
-Cheap to fix while nothing is pushed — move that one import-and-call hunk out of
-`9baea13` and into `99d680a`. The session that made the commits has been told
-and owns the decision; left alone, the range stays unbisectable.
+**Closed.** The cause was splitting a three-owner file by file rather than by
+hunk, which is the mistake, not the import. The import-and-call hunk was lifted
+out of the calendar export commit and re-added at the commit where `models.py`
+defines the function, and the range replayed. Every SHA in `origin/main..HEAD`
+changed as a result; nothing was pushed, so no published history moved.
 
-**Priority:** Low
-**Effort:** Low while unpushed, high once pushed
+Measured on both histories, by checking out each of the 18 commits and running
+`import src.getmoredone.db_manager`:
+
+| history | commits | cannot import |
+|---|---|---|
+| before (`7469fc4..eeecbd2`) | 18 | **6** |
+| after (`7469fc4..6520f89`) | 18 | **0** |
+
+The end tree is byte-identical to the one before the rewrite (`git diff` between
+the two tips is empty), so this changed history and nothing else. The old
+history is kept at `refs/backup/pre-bisect-rewrite` (`eeecbd2`), a ref under
+`refs/backup/` rather than a tag so it is never pushed.
+
+New SHAs for the four commits other documents cite: `a92f059` → `a92f059`,
+`2ae39fd` → `2ae39fd`, `9420927` → `9420927`, `23f0cc7` → `23f0cc7`. Every
+citation in `BACKLOG.md`, `docs/changes/2026-11-08-unified-panel-followups.md`
+and `docs/changes/2026-11-08-weekly-tactic-completion-surfaces.md` was updated
+in the same commit as this entry.
+
+**Any session holding one of the old SHAs should re-read it** — the old commits
+are unreachable from `main` and only `refs/backup/pre-bisect-rewrite` still
+names them.
+
+**Priority:** Closed
+**Effort:** Was low while unpushed, as the entry predicted
 
 ## Outstanding — the calendar export's manual checklist (CE, 2026-11-08)
 
@@ -830,7 +855,7 @@ origin/main today (run 42538374520):
 The eighth, `tests/test_plan_screen.py::test_pbm61_a_tall_row_keeps_its_two_lines_together`,
 was red at `3f705b4` too but for a different reason and is not part of this.
 
-The shape of the fix is in `be1b4ee`: read the attribute back straight after
+The shape of the fix is in `23f0cc7`: read the attribute back straight after
 setting it and skip when the display did not take it, so the assertions keep
 their teeth where a window manager exists and say nothing where none does.
 Doing it in one place — a shared fixture or helper, rather than seven
