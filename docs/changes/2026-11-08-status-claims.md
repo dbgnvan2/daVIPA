@@ -380,11 +380,142 @@ are untouched by this batch and were never in its scope.
   quotation of a broken reference, so widening the existing pattern would turn
   a correct historical record red.
 
+## The fourth cold pass, 2026-11-09
+
+Earned because the third produced highs, and run in a fourth family: **what do
+the new guards reject?** The first three passes all asked whether a guard can
+fail on the defect it names. This one asked the opposite — which legitimate
+future edit turns the suite red — because a guard whose only failure mode is
+"someone added a document" is a tax on every later batch, not a check. Two
+highs, three mediums, three medium-low, three lows. Every one re-measured here.
+
+**High — two exact counts that this repo's own process breaks.** SST-M2's
+companion asserted `len(documents) == 35` and SST-M5's asserted
+`len(found) == 186`. Measured over git history rather than argued: the scanned
+document count took **three** distinct values over the last 40 first-parent
+commits (it moved twice inside two days, and this batch moved it itself by
+adding its own plan), and the reference count took **four** over the last 30
+(175, 184, 185, 186), with 66 commits touching a `docs/spec_coverage*.md` in 30
+days. The global rule is "Plan before code… Commit it and wait for approval",
+so the commit that lands a plan would have turned the meta suite red, in CI's
+default run, with nothing wrong.
+
+This batch had already written the argument against itself twice. Its
+`CLAUDE.md` edit says of the suite's test counts: "No test asserts either
+number, which is why they drifted; one that did would go red on every batch."
+And it shipped the right pattern — membership per source — in two other
+companions in the same change, one of them with the comment "an exact count
+here would turn the suite red on every batch". `SST-A1`'s own closing note
+claimed "35 documents and 185 references move far less often than 784 docstring
+references do"; the history above says they do not. Both are now membership per
+source: the glob must still reach both document families, and five named
+coverage files must each contribute a reference. Narrowing either still fails
+(mutations V and W).
+
+**Medium — three assertions that only accept the all-done phrasing, or pin
+prose.** SST-M3 required the literal `all 41 criteria` in four documents.
+Adding a `WTP-M7` row makes the correct summary "41 of 42 criteria", which the
+guard rejected; all three positive checks now accept either form. One of the
+four documents was `docs/changes/2026-11-08-weekly-tactic-as-parent.md`, a
+dated handoff note — the same kind of record SST-M1 deliberately keeps out of
+the status scan, "because a handoff note records what was true on its date".
+Pinning a recounted figure there would require editing a dated record every
+time a criterion is added; the two assertions over it are dropped, with the
+reason in the test. And the `BACKLOG.md` check was anchored on a seven-word
+fragment of that file's header paragraph — one of the four chronic conflict
+surfaces `CLAUDE.md` names *because* every batch rewrites that region — so any
+rewording failed a test. It is anchored on the figure now.
+
+Writing the absence half of that check re-created this batch's own trap for the
+third time: `assert "all 40 criteria" not in backlog` went red immediately,
+because an `SSC` filing quotes that wrong claim verbatim as the thing it
+records. Absence over a whole file is red on a true record. The positive check
+alone closes the hole the second pass found, which existed because absence was
+the *only* assertion there.
+
+It then happened a fourth time, in this pass's own filing: `SST-A10` records
+that `_LINE_CITE` would match pasted `grep -n` output, and its first draft
+demonstrated the point by pasting some, which failed SST-M8. The filing now
+describes the shape instead and says why. That moves `SST-A10` from latent to
+demonstrated, and it is the fourth time in this batch that writing *about* a
+defect put the defect back inside a guard's domain.
+
+**Medium — SST-M10 pinned an `SST-…` id into `NOTES.md`**, whose opening
+"Where `main` stands" section each batch rewrites with deletions. The id is
+expected to age out, and the guard's message would then have said the batch "is
+no longer traceable", which is the wrong diagnosis. `NOTES.md` is out of
+`SST_RECORDS`, with the reason recorded there.
+
+**Below medium, filed not fixed:** `SST-A9` to `SST-A14` — SST-M9 derives its
+promise count from the thing it pins; `_LINE_CITE` forbids pasted `grep -n`
+output, which its own message recommends as evidence; a new plan needs two
+edits to the guard file with a red window between them; `_defined_names()`
+cannot resolve an indented constant, though four current references resolve
+only as constants; SST-M7 fails on the duplicate-collapse its own subject
+prescribes; and the markdown walk reaches `.pytest_cache/` and `licenses/`,
+with this repo's worktrees excluded only as a side effect of the `.claude`
+entry.
+
+Five mutations, U to Y, each restored with the verbatim original and verified by
+sha256. None was green: the loosened assertions still fail on the defect. That
+is the limit of mutation for this family — a false positive is not a mutation,
+it is a measurement over history, which is how both highs were established. X
+had to be re-run against §6 by offset, because the string it replaces occurs
+twice in the file.
+
+## The fifth cold pass, 2026-11-09 — the budget's stop
+
+Earned because the fourth produced highs, and run in a fifth family: **will
+this batch be green anywhere other than the machine that wrote it?** The work
+had only ever run here, under `GETMOREDONE_NO_MAPPED_WINDOWS=1`, and
+`.github/workflows/tests.yml` runs the whole suite — meta tests included, with
+no marker and without that variable — on a blank ubuntu runner for Python 3.11,
+3.12 and 3.13.
+
+**No finding at medium or higher. Under the sweep budget in `CLAUDE.md` that
+ends the sweep**, and this batch had five cold passes: figures, guards,
+repo-against-code, what the guards reject, and portability.
+
+What the pass established, by re-implementing each new assertion and running it
+against both the working tree and `HEAD` alone:
+
+- Every literal path in the new tests is tracked, with matching case, so none of
+  them is green on case-insensitive APFS and red on ext4. That covers
+  `DRAFTS_NOT_BUILT`, `COVERAGE_WITHOUT_PATHS`, `SST_RECORDS`, `CHRONIC`, and
+  the five coverage files SST-M5's companion names.
+- The new tests read nothing outside the repository root — in particular not
+  `~/.claude/standards`, which is a separate per-machine clone and absent in CI
+  — and take no dependency on a display, the network, Tk, a subprocess, the real
+  application database, locale, or glob ordering. Every read passes
+  `encoding="utf-8"`; every glob is `sorted()`.
+- The CI contract still holds: the new file carries the module-level `meta`
+  marker, so the exact-set assertion, the default-run collection check and the
+  marker-exclusion check all pass, and the mapped-window count of 22 is
+  unaffected.
+- The widened traceability scan resolves 986 references, all to tracked files
+  with matching case; SST-M5 resolves 186, none unresolved.
+- Pushing the commits with or without the uncommitted document edits is green
+  either way, which it checked rather than assumed.
+
+**One finding was refuted by measurement.** The pass read `CLAUDE.md`'s meta
+figure of 225 as stale by one, from the order of two commits. Re-measured here:
+`-m meta --collect-only -q` prints `225/2657 tests collected (2432
+deselected)`, and `-m "not meta"` prints `2432/2657`. Both documented figures
+are right as written; the AST delta the pass used cannot see parametrisation,
+and the 225 was taken after the eleventh test was added, not before.
+
+Four below-medium findings filed: `SST-A15` to `SST-A18`. The last is this
+batch's own subject in a file it never opened — a test docstring still calling
+the docs-sync gate a merge gate, which `CLAUDE.md` now contradicts.
+
 ## Next agent actions
 
-- A **third cold pass** is owed before the next batch, in a different failure
-  family again: the budget grants one more because the second pass produced a
-  high.
+- A **fifth cold pass** is owed before this batch is pushed, in a different
+  failure family again: the budget grants one more because the fourth pass
+  produced highs. Four families are used — are the figures true; are the guards
+  load-bearing; does the repo match the code; what do the guards reject. The
+  one that is unexamined and matters before a push is whether this batch is
+  green *on CI and on the other Mac*, rather than on the machine that wrote it.
 - `SST-A8` — the docs-sync gate runs only on pull requests, so it has never
   run here. It is the one filed item with a user-visible consequence: the rule
   it was supposed to enforce is currently enforced by hand.

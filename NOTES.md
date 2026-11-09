@@ -24,8 +24,16 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   floor is replaced by membership per source — and `SST-A3` is raised to
   **high**: three passes have each found documents the phrase list could not
   see, and three plans record only how they were approved, which no deny-list
-  reaches. `SST-A2` to `SST-A8` filed, not fixed. See
-  `docs/changes/2026-11-08-status-claims.md`.
+  reaches. A fourth pass asked what the new guards *reject*, and found two
+  exact counts that would have gone red on correct work: the scanned-document
+  count moved three times in 40 commits and the coverage-reference count four
+  times in 30, so both are now membership per source. A fifth pass asked whether
+  the batch is green anywhere but this machine — CI runs the meta tests on a
+  blank runner, three Python versions, without the mapped-window variable — and
+  **found nothing at medium or higher**, which is where the sweep budget stops.
+  It refuted one of its own findings: `CLAUDE.md`'s 225 meta / 2432 non-meta
+  figures are right as written, re-measured by collection. `SST-A2` to
+  `SST-A18` filed, not fixed. See `docs/changes/2026-11-08-status-claims.md`.
 
 - **Both leftover branches are settled.**
   `refs/heads/claude/elegant-neumann-ab55c9` (UPD-F1) is **merged** at

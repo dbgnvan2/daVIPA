@@ -482,6 +482,15 @@ The same route replaced the floor of 200 that
 `tests/test_doc_status_claims.py` shipped with, so the two guards now agree on
 how they prove they can fire.
 
+**The paragraph above that calls the two exact counts cheap was wrong, and they
+are gone too (2026-11-09, fourth cold pass).** Measured rather than argued: the
+scanned-document count took three distinct values over the last 40 first-parent
+commits, and the reference count four over the last 30 — a new plan document or
+a single new coverage row moved them, and committing a plan is the first step of
+every batch here. Both are membership per source now, by the same route as this
+filing. The judgement this filing described as the person's to make turned out
+not to be needed anywhere: no count in either guard is pinned.
+
 **Priority:** Medium — closed
 **Effort:** Low
 
@@ -637,6 +646,160 @@ judgement, which is why it was not done in-loop.
 
 **Priority:** Medium
 **Effort:** Medium
+
+### SST-A9 — SST-M9's promise count derives from the thing it pins (medium-low)
+
+`test_sstm9_every_promised_pri_adjacent_item_is_filed` reads the numbered items
+under the PRI plan's "Adjacent issues found, not fixed" and derives `promised`
+from how many it finds, then checks every `PRI-A\d+` mentioned falls inside that
+range. Filing a legitimate fifth adjacent issue widens the promise instead of
+failing, so the guard adapts to what it is meant to pin. The slice also runs to
+end of file, because that section is currently last — any appended section with
+a numbered bold list joins the count.
+
+Filed 2026-11-09 by the fourth cold pass over the SST batch.
+
+**Priority:** Medium-low
+**Effort:** Low
+
+### SST-A10 — `_LINE_CITE` forbids the evidence format its own message asks for (medium-low)
+
+`test_sstm8_the_chronic_documents_are_not_cited_by_line_number` tells the reader
+to "Quote the text and give the grep that finds it". `grep -n` prefixes each
+hit with the file name and the line number, separated by colons, which is
+exactly the shape `_LINE_CITE` matches — described here rather than written
+out, because writing one out fails the guard, as this filing did on its first
+draft. The scan covers the whole `docs/changes/` archive. So a future handoff note that pastes its
+measurement as grep output — the normal way this repo evidences a claim, and
+what this guard's own message recommends — is red. No such cite exists today,
+so the hole is latent. The fix is to exempt a line that is recognisably pasted
+grep output (a second `:` and a line of content after the number), not to widen
+the ban.
+
+Filed 2026-11-09 by the fourth cold pass over the SST batch.
+
+**Priority:** Medium-low
+**Effort:** Low
+
+### SST-A11 — a new plan needs two edits to the guard file, with a red window between (medium-low)
+
+`DRAFTS_NOT_BUILT` is documented as deliberate: adding a plan to the register is
+a step in writing one. The cost is that this repo's conventional new-plan status
+line matches `_NOT_BUILT` on two phrases, so the plan commit is red until the
+register is amended, and SST-M1's second direction (`stale`) is red again at
+build time until the entry is removed. Two edits to one test file per plan, and
+whoever forgets the first pushes a red suite. `SST-A3`'s allow-list inversion
+would remove the first of the two.
+
+Filed 2026-11-09 by the fourth cold pass over the SST batch.
+
+**Priority:** Medium-low
+**Effort:** Low
+
+### SST-A12 — `_defined_names()` cannot resolve an indented constant (low)
+
+Its third pattern is `^(\w+)\s*[:=]`, column 0 only. Four of the current
+implementation references resolve *only* through it — `CELEBRATION_TYPES`,
+`LEVEL_KEYS`, `PRIORITY_BANDS`, `_HEX_COLOR_RE` — so naming a constant is an
+established style here. A coverage row naming a class-level constant or a
+`models.py` dataclass field, both indented, is correct and unresolvable, and
+`test_sstm5_every_implementation_reference_resolves` fails on it. Walking the
+AST for assignment targets at any depth is the fix.
+
+Filed 2026-11-09 by the fourth cold pass over the SST batch.
+
+**Priority:** Low
+**Effort:** Low
+
+### SST-A13 — SST-M7 fails on the resolution its own subject prescribes (low)
+
+`test_sstm7_…` requires both `UPD-A13` and `PLC-A5` to exist and to mention each
+other. `PLC-A5` reads "Take `UPD-A13`; closing it closes this" — collapsing the
+duplicate filing is the designed outcome, and doing it makes the guard red.
+`_filing_body` also locates the body by searching back for `\n### ` from a
+`### 2026-11-08 - Type: Technical Debt` heading that occurs more than once, and
+the cross-reference it checks sits well below that anchor, so a new `###` filing
+inserted in the span truncates the body and fails. The guard should assert the
+*pair* is consistent — both present and cross-referenced, or exactly one
+present — rather than that both exist for ever.
+
+Filed 2026-11-09 by the fourth cold pass over the SST batch.
+
+**Priority:** Low
+**Effort:** Low
+
+### SST-A14 — the markdown walk reaches generated and vendored files (low)
+
+`_markdown_files()` excludes `{.git, venv, build, dist, .claude, node_modules}`.
+`.pytest_cache/README.md` (written by pytest, gitignored) and `licenses/README.md`
+are both inside the walk. Harmless today, since neither can contain a line cite.
+Worth recording: this repo's git worktrees live under `.claude/`, so two full
+copies of the repo's markdown are excluded only as a side effect of that one
+entry, which no comment mentions — relocating the worktree root puts them both
+into the SST-M8 scan. Asking git for the tracked file list is the fix.
+
+Filed 2026-11-09 by the fourth cold pass over the SST batch.
+
+**Priority:** Low
+**Effort:** Low
+
+### SST-A15 — the status scan reads the working tree, the register needs a commit (medium-low)
+
+`_status_documents()` globs the filesystem, while `DRAFTS_NOT_BUILT` can only be
+amended by a commit. An uncommitted draft spec whose status says the work is not
+built is therefore red on the machine holding the file and green on CI and the
+other Mac until the draft and its register entry are committed together. No
+instance exists today: all 42 on-disk status documents are tracked, none
+untracked, none ignored. Reading the tracked file list instead of the working
+tree would make the scan the same everywhere; it would also mean an uncommitted
+draft is unguarded, which is the trade to decide.
+
+Filed 2026-11-09 by the fifth cold pass over the SST batch.
+
+**Priority:** Medium-low
+**Effort:** Low
+
+### SST-A16 — `.pytest_cache/README.md` makes the markdown walk machine-dependent (low)
+
+The walk's skip set does not include `.pytest_cache`, so the scanned set is 245
+files on this machine and 244 on a fresh clone. Harmless in itself — pytest's
+own README holds no line cite — but it means a tool that drops a cited line into
+a cache or scratch directory is caught on one machine and not another. Same fix
+as `SST-A14`: ask git for the tracked list.
+
+Filed 2026-11-09 by the fifth cold pass over the SST batch.
+
+**Priority:** Low
+**Effort:** Low
+
+### SST-A17 — the docs-gate command this batch documented assumes a built venv (low)
+
+`CLAUDE.md` now says to run the docs-sync check by hand with the interpreter
+inside `./venv/`, which exists only after `start.sh` has built it. On a fresh
+clone on the other Mac the documented command fails with "no such file", though
+`tools/agents/check_docs_sync.py` itself needs nothing from the venv. Naming
+`python3` there, or saying the venv is a precondition, is the fix.
+
+Filed 2026-11-09 by the fifth cold pass over the SST batch.
+
+**Priority:** Low
+**Effort:** Low
+
+### SST-A18 — a test docstring still calls the docs-sync gate a merge gate (medium-low)
+
+`tests/test_release_licensing.py::test_bi2_the_docs_sync_gate_knows_about_both_dependency_files`
+opens by saying `CLAUDE.md` makes "dependencies changed -> docs updated" a merge
+gate. `CLAUDE.md` now says the opposite, because this batch measured it: the
+workflow triggers on `pull_request` only and this repo opens none, so the gate
+has never run here. The test's assertions are fine; its stated reason is a claim
+this repo makes about itself that is no longer true — this batch's own subject,
+found in a file the batch did not open. Rewording it belongs with `SST-A8`,
+which moves the check into the suite.
+
+Filed 2026-11-09 by the fifth cold pass over the SST batch.
+
+**Priority:** Medium-low
+**Effort:** Low
 
 ## Adjacent issues — priority defaults and the cap (PRI, filed 2026-11-08)
 

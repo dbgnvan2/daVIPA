@@ -368,12 +368,17 @@ No file under `src/` is touched. Handoff note:
 `docs/changes/2026-11-08-status-claims.md`, which is listed here only inside
 this entry rather than as an entry of its own, as every handoff note is:
 
-- Three cold passes on 2026-11-09, in three failure families, found eleven,
-  six and eight defects in this batch, all confirmed by re-measurement and all
-  fixed. Twelve of the twenty mutations were green against the assertion as it
-  then stood. The third pass audited the repo against the code and found no
-  false correction, but two more stale status claims in wordings no guard
-  reads. `SST-A1` closed; `SST-A3` raised to high; `SST-A2`–`SST-A8` filed,
+- Four cold passes on 2026-11-09, in four failure families, found eleven,
+  six, eight and eleven defects in this batch, all confirmed by re-measurement;
+  every medium-or-higher one fixed. Twelve of the twenty-five mutations were
+  green against the assertion as it then stood. The third pass audited the repo
+  against the code and found no false correction, but two more stale status
+  claims in wordings no guard reads. The fourth asked what the new guards
+  reject rather than accept, and replaced two exact counts that would have gone
+  red on correct work — a new plan document, or any new coverage row — with
+  membership per source. A fifth pass, on whether the batch is green away from
+  the machine that wrote it, found nothing at medium or higher and ended the
+  sweep. `SST-A1` closed; `SST-A3` raised to high; `SST-A2`–`SST-A18` filed,
   not fixed, `SST-A8` being the docs-sync gate, which runs only on
   `pull_request` and so has never run here.
 - Seventeen stale lines in sixteen documents saying no implementation code was

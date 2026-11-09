@@ -1159,21 +1159,32 @@ assertions the second one changed, and S and T against
 | S | a dead test name returns to a coverage sidecar | 1 failed (`test_every_referenced_test_name_exists`). Green before the third cold pass widened `SCANNED` to the whole `docs/spec_coverage*.md` family: two such names were live on rows marked `done`, one of them a test that has never existed |
 | T | `SCANNED`'s coverage entry narrows back to the single file | 1 failed (`test_this_guard_can_actually_fire`). The floor of 140 it replaced passed this. First attempt proved nothing — the string occurred twice, so the mutation narrowed the guard and its own check together; re-run against the `SCANNED` line alone |
 | R | the PRI plan names all four `PRI-A` items instead of its two endpoints | 1 **passed**, which is the point: SST-M9 asserted the set of names equalled the two endpoints, so the natural edit now that the four are filed turned it red with nothing wrong. It now checks that every name is inside the promised range |
+| U | `BACKLOG.md`'s WTP figure goes back to 40 | 1 failed (SST-M3). Still red after the fourth cold pass loosened the assertion from a seven-word prose fragment to the figure alone |
+| V | `_status_documents()` narrows to the plan family, dropping `docs/spec_*.md` | 1 failed (SST-M2's companion). The exact count of 35 it replaced also failed this; what the count *additionally* failed on was a new plan document, which is not a defect |
+| W | `_implementation_references()` narrows to `docs/spec_coverage.md` alone | 1 failed (SST-M5's companion). Same shape as V: the count of 186 caught this too, and also caught every new coverage row |
+| X | §6's summary goes back to "all 40 criteria" (the status line left correct) | 1 failed (SST-M3). First attempt skipped — the string occurs twice in the file — and re-run against the §6 slice by offset |
+| Y | the index's WTP entry goes to "41 of 39 criteria" | 1 failed (SST-M3), after the assertion was loosened to accept the `m of n` phrasing a part-built spec needs |
 
 
 G and H are the two guards that shipped unable to fail. Both were found by
 asking what the assertion would accept, not by running it, and both are the
 batch's own subject appearing in the batch's own tooling.
 
-**Twelve of the twenty were green when first run** against the assertion as it
+**Twelve of the twenty-five were green when first run** against the assertion as it
 then stood: G and H as shipped, I to L against the assertions the first cold
 pass had to change, M to P against the assertions the second one had to change,
 and S and T against the one the third one had to. R is the opposite failure —
-an assertion red on a correct edit. That is thirteen of twenty mutations
+an assertion red on a correct edit. U to Y found nothing new, which is what the
+fourth cold pass's family predicts: it looked for assertions that fire on
+*correct* future work, and a mutation cannot show that. Those were measured
+against git history instead — the document count took three values over the last
+40 first-parent commits, and the reference count four values over the last 30 —
+and U to Y exist to prove the loosened assertions still fail on the defect. That is thirteen of twenty-five mutations
 finding something, in a batch whose subject is claims nothing checks.
 
 The pattern is not that the guards were careless; each was green when written,
 and each was written by someone who had just read the defect it was for. It is
 that a guard is worth only the question "what would this accept?", and that
-question is answered badly by whoever wrote the assertion. Both cold passes
-found their defects by asking it, not by running anything.
+question is answered badly by whoever wrote the assertion. Every one of the four cold
+passes found its defects by asking it, not by running anything. The fourth
+added a second question: what would this *reject*?
