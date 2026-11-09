@@ -889,7 +889,7 @@ Spec: `docs/spec_2026-11-07_unified_panel_design.md` §10, §11.
 
 | ID | Status | Proof |
 |---|---|---|
-| UPD-F1 | `not done` | Not built. `src/getmoredone/app_settings.py` carries the calendar-export batch's uncommitted hunk and `CLAUDE.md` forbids a second writer in one index; proposed as its own worktree session. The defect stands: `AppSettings.save()` writes the whole object, so a screen holding an older snapshot reverts fields another object changed. |
+| UPD-F1 | `done` | Built on `refs/heads/claude/elegant-neumann-ab55c9` and merged into `main` 2026-11-08. `AppSettings.save()` merges over the file rather than writing the whole object, so a screen holding an older snapshot no longer reverts another object's fields. Criteria broken out in the UPD-F1 section below; UPD-F1.5 is still `not done`. Superseded text: "Not built. `src/getmoredone/app_settings.py` carries the calendar-export batch's uncommitted hunk and `CLAUDE.md` forbids a second writer in one index; proposed as its own worktree session. The defect stands: `AppSettings.save()` writes the whole object, so a screen holding an older snapshot reverts fields another object changed." |
 | UPD-F2.1 | `done` | `tests/test_unified_panel_design.py::test_updf21_the_filters_are_on_their_own_row` — every combo is a child of `screen.filter_row` and every header control sits above it, on all four tabs that filter. |
 | UPD-F2.2 | `done` | `::test_updf22_the_header_card_is_three_rows_deep` — title on row 0, filter row on row 2, on all five tabs. |
 | UPD-F2.3 | `done` | `::test_updf23_every_tab_puts_its_filter_row_in_the_same_place` — the five tabs' (title row, filter row) pairs collapse to one pair, `{(0, 2)}`. |
@@ -926,3 +926,30 @@ a pristine copy and compared back byte-for-byte:
 with its own `ColumnResizer`, not a `ChipTable`, so UPD-F4 does not fit its
 columns and no test claims it does. Nothing here exercises a real relaunch:
 UPD-F1 is why.
+## UPD-F1 — a width or divider position survives a relaunch (2026-11-08)
+
+Plan: [`docs/implementation_plan_2026-11-08_unified_panel_followups.md`](implementation_plan_2026-11-08_unified_panel_followups.md) §2
+
+| Spec ID | Description | Implementation | Test | Status |
+|---|---|---|---|---|
+| UPD-F1.1 | A second `AppSettings` object's `save()` does not revert a field the first wrote | `src/getmoredone/app_settings.py::save`, `::_merge_over_file` | `tests/test_settings_merge_on_save.py::test_updf11_a_second_settings_object_does_not_revert_the_first` | done |
+| UPD-F1.2 | A VSP tab's column width survives a `TodayScreen`-derived panel's save in the same session | `src/getmoredone/app_settings.py::_merge_over_file` | `tests/test_settings_merge_on_save.py::test_updf12_a_today_save_does_not_wipe_a_vsp_width` | done |
+| UPD-F1.3 | Every column width and split ratio on all five tabs is in the file afterwards | `src/getmoredone/app_settings.py::save` (unchanged `ColumnResizer._persist` / `SplitPanel._persist`) | `tests/test_settings_merge_on_save.py::test_updf13_all_five_tabs_persist_their_own_widths` | done |
+| UPD-F1.4 | A resizer reports the stored widths, not the spec defaults | `src/getmoredone/screens/column_resize.py::ColumnResizer._load_widths` (unchanged; this criterion pins it) | `tests/test_settings_merge_on_save.py::test_updf14_stored_widths_are_what_the_resizer_reports` | done |
+| UPD-F1.5 | P2 — a stored width outside its bounds is clamped **and** the clamp is surfaced | not built: the clamp is in `screens/column_resize.py`, outside this batch's file scope (UPD-F4 is building there) | `test_updf15_a_stored_width_outside_its_bounds_is_surfaced` — not written | **not done** |
+| UPD-F1.6 | P8 — a file holding another session's widths is merged with, not overwritten by, this object's values | `src/getmoredone/app_settings.py::_merge_over_file`, `::__setattr__` | `tests/test_settings_merge_on_save.py::test_updf16_a_file_with_foreign_widths_is_merged_not_replaced` | done |
+
+Three further tests in the same file are not criteria. They hold the lines the
+criteria lean on, and each exists because the mutation that breaks it left
+every criterion above green:
+`::test_a_setting_turned_back_to_its_default_still_persists` (the regression
+that sent the first build of this merge back — see §2's "What was actually
+built"), `::test_the_merge_does_not_put_an_unconfirmed_day_shape_back` and
+`::test_every_field_is_written_even_when_the_file_has_never_held_it`.
+
+Mutation gate: 8 mutations, each the verbatim original, one at a time, every
+file restored and sha256-compared. 8 red, no finding.
+
+UPD-F1 was **not** verified on screen. The app was not launched: a relaunch is
+what §11 step 10 walks, and it is the one thing no test can do. Step 10 should
+be re-walked once UPD-F2 to UPD-F4 are in.

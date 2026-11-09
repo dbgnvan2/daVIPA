@@ -1,6 +1,7 @@
 # Spec + implementation plan — what the on-screen check found
 
-Status: **not approved. Written 2026-11-08 from the §11 walk.**
+Status: **approved 2026-11-08. UPD-F1 built the same day (§2 carries its
+per-criterion statuses); UPD-F2, UPD-F3 and UPD-F4 are built elsewhere.**
 IDs: `UPD-F1` … `UPD-F4`. Use them verbatim in commits, docstrings and test
 names. They continue `docs/spec_2026-11-07_unified_panel_design.md`, whose
 UPD-M7.2 and UPD-M7.3 are the criteria this work closes.
@@ -80,14 +81,28 @@ fail before any fix (P10).
 
 ### Acceptance criteria
 
-| ID | Criterion | Test |
-|---|---|---|
-| UPD-F1.1 | Two `AppSettings` objects loaded from one file, each writing a *different* field, both survive: the second `save()` does not revert the first's field | `test_updf11_a_second_settings_object_does_not_revert_the_first` |
-| UPD-F1.2 | A width written by a VSP tab's resizer survives a `TodayScreen`-held object's `save()` in the same session | `test_updf12_a_today_save_does_not_wipe_a_vsp_width` |
-| UPD-F1.3 | Every column width and split ratio written on all five tabs is readable from the file afterwards — all five prefixes populated, none empty | `test_updf13_all_five_tabs_persist_their_own_widths` |
-| UPD-F1.4 | A resizer built from a settings object that holds stored widths reports those widths, not the spec defaults | `test_updf14_stored_widths_are_what_the_resizer_reports` |
-| UPD-F1.5 | **P2** — a stored width outside its column's bounds is clamped *and* the clamp is surfaced, not silently swallowed | `test_updf15_a_stored_width_outside_its_bounds_is_surfaced` |
-| UPD-F1.6 | **P8, dirty state** — a settings file containing another session's widths is merged with, not overwritten by, this object's defaults | `test_updf16_a_file_with_foreign_widths_is_merged_not_replaced` |
+| ID | Criterion | Test | Status |
+|---|---|---|---|
+| UPD-F1.1 | Two `AppSettings` objects loaded from one file, each writing a *different* field, both survive: the second `save()` does not revert the first's field | `tests/test_settings_merge_on_save.py::test_updf11_a_second_settings_object_does_not_revert_the_first` | `done` |
+| UPD-F1.2 | A width written by a VSP tab's resizer survives a `TodayScreen`-held object's `save()` in the same session | `tests/test_settings_merge_on_save.py::test_updf12_a_today_save_does_not_wipe_a_vsp_width` | `done` |
+| UPD-F1.3 | Every column width and split ratio written on all five tabs is readable from the file afterwards — all five prefixes populated, none empty | `tests/test_settings_merge_on_save.py::test_updf13_all_five_tabs_persist_their_own_widths` | `done` |
+| UPD-F1.4 | A resizer built from a settings object that holds stored widths reports those widths, not the spec defaults | `tests/test_settings_merge_on_save.py::test_updf14_stored_widths_are_what_the_resizer_reports` | `done` |
+| UPD-F1.5 | **P2** — a stored width outside its column's bounds is clamped *and* the clamp is surfaced, not silently swallowed | `test_updf15_a_stored_width_outside_its_bounds_is_surfaced` | **`not done`** — blocked, see below |
+| UPD-F1.6 | **P8, dirty state** — a settings file containing another session's widths is merged with, not overwritten by, this object's defaults | `tests/test_settings_merge_on_save.py::test_updf16_a_file_with_foreign_widths_is_merged_not_replaced` | `done` |
+
+**Built 2026-11-08** on `claude/elegant-neumann-ab55c9`, in a worktree of its
+own (§9's risk, taken as written). The hypothesis above was confirmed, not
+assumed: UPD-F1.1's test was written first and watched fail against the
+unmodified `save()`, on exactly the predicted assertion.
+
+**UPD-F1.5 is `not done`, and the reason is scope, not difficulty.** The clamp
+it asks to surface is in `ColumnResizer._load_widths`
+(`screens/column_resize.py`), which UPD-F4 is being built in and which the
+UPD-F1 batch was told not to touch. The change is about ten additive lines —
+record `stored` against `clamped` per column and log a warning naming the
+column, the stored width and the bound, the same shape as
+`SplitPanel._load_ratio`'s existing P2 warning. It belongs in the UPD-F4 batch
+or in one of its own. Nothing was half-built and no test pretends to cover it.
 
 ### Approach
 
@@ -105,6 +120,44 @@ Open question for approval: a merge means a field a user *clears* in one
 screen can be re-set by another screen's stale snapshot. Fields written by
 exactly one screen are unaffected. If that trade is not acceptable, the
 fallback is a per-field dirty set on `AppSettings`, which is a larger change.
+
+### What was actually built, and why it is the fallback
+
+The approach above was built as written, measured, and withdrawn. Recorded
+here rather than quietly changed.
+
+`asdict(self)` merged over the file is a **no-op**: `asdict` carries every
+field, so `{**on_disk, **asdict(self)}` is `asdict(self)`, and the file's value
+loses every time. The only reading of "a field this object never touched" that
+is available without tracking assignments is "a field still at its dataclass
+default" — and that is also the reading the trade-off above describes, since
+"clears" means "sets back to the default".
+
+Built that way, it broke
+`tests/test_list_view_setting.py::test_default_setting`.
+`default_columns_expanded` defaults to `False`, so a screen setting it back to
+`False` read as *untouched* and the `True` already on disk was kept. **One
+object, one save, no second screen and no stale snapshot: a setting turned off
+could not be saved at all.** That is not the trade this section asked approval
+for — it is strictly worse, and it would have shipped as "the toggle comes back
+on by itself".
+
+So the fallback this section names was built instead: a per-field record of
+what was assigned, via `__post_init__` and `__setattr__` on `AppSettings`.
+`load` forgets its own normalizers' assignments, and `save` snapshots the
+record before its own normalizers run, so a stale object claims nothing it was
+not asked to change. It is about the same size as the comparison it replaces,
+and correct in both directions — a field assigned to its own default still
+wins, a field never assigned never overwrites.
+
+The trade that remains is smaller than the one described: a value a stale
+object *assigns* can still revert a newer one. That is unchanged from before
+this fix, so nothing regressed.
+
+`plan_day_shape_unconfirmed` is exempt (`AppSettings.MERGE_EXEMPT_FIELDS`) and
+written from this object every time. Merging it would mean a file still saying
+"unconfirmed" putting that back over the confirmation Day Settings had just
+made, leaving the one dialog that can clear it unable to.
 
 ---
 

@@ -33,6 +33,15 @@ class AppSettings:
         "plan_day_end",
     )
 
+    # The fields ``save`` always writes from this object, never reads back from
+    # the file. Everything else is merged (see ``_merge_over_file``), and this
+    # one must not be: ``save`` makes the file parseable, which is the reason
+    # this flag has to outlive the write, and only the Day Settings dialog
+    # clears it. Merging it would mean a file still saying "unconfirmed" put
+    # that back over the confirmation the dialog had just made. Not a dataclass
+    # field, for the same reason as the two above.
+    MERGE_EXEMPT_FIELDS = ("plan_day_shape_unconfirmed",)
+
     obsidian_vault_path: Optional[str] = None
     obsidian_notes_subfolder: str = "GetMoreDone"
     # M7.A.1 — Separate subfolder for Project Notes so they don't mingle with
@@ -222,6 +231,65 @@ class AppSettings:
     gmail_import_interval_seconds: int = 300
     calendar_import_days_ahead: int = 14
 
+    def __post_init__(self):
+        """Start tracking assignments, with none recorded.
+
+        Purpose: UPD-F1 -- ``save`` has to know which fields this object was
+                 actually asked to change.
+        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
+        Tests:   tests/test_settings_merge_on_save.py::test_updf11_a_second_settings_object_does_not_revert_the_first
+
+        The generated ``__init__`` has just assigned every field, and none of
+        that is a choice anyone made -- so the set starts empty here rather
+        than in ``__setattr__``, which runs during that ``__init__``.
+        ``object.__setattr__`` because ``__setattr__`` below would otherwise
+        record ``_assigned`` as an assignment of its own.
+        """
+        object.__setattr__(self, "_assigned", set())
+
+    def __setattr__(self, name, value):
+        """Record every attribute written on this object.
+
+        Purpose: UPD-F1 -- the one thing that separates "set to this value" from
+                 "never had an opinion", which comparing against the dataclass
+                 default cannot do.
+        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
+        Tests:   tests/test_settings_merge_on_save.py::test_a_setting_turned_back_to_its_default_still_persists
+
+        ``__dict__.get`` rather than ``self._assigned``: this runs for all 80-odd
+        fields during ``__init__``, before ``__post_init__`` has made the set,
+        and an attribute lookup that raises on every one of them would be the
+        only exception this class throws in normal use.
+
+        A dict field mutated **in place** is not seen here. Nothing in the app
+        does that -- ``ColumnResizer._persist`` and ``SplitPanel._persist`` both
+        build a new value and ``setattr`` it -- and a caller that did would be
+        invisible to the merge, so it is stated rather than guarded.
+        """
+        assigned = self.__dict__.get("_assigned")
+        if assigned is not None:
+            assigned.add(name)
+        object.__setattr__(self, name, value)
+
+    def _assigned_names(self) -> set:
+        """The fields written on this object since it was loaded.
+
+        A set of its own for an object that somehow has none -- a copy, or an
+        instance built around ``__init__`` -- for which the honest answer is
+        "nothing is known to have changed", and the file wins.
+        """
+        return set(self.__dict__.get("_assigned") or ())
+
+    def _forget_assignments(self) -> None:
+        """Treat this object as freshly loaded: nothing changed yet.
+
+        ``load`` normalizes six fields after construction, which is this build
+        reading the file rather than a user choosing anything. Left recorded,
+        every object would claim those six and a stale snapshot would go on
+        reverting an appearance mode or a font size another screen had changed.
+        """
+        self.__dict__.get("_assigned", set()).clear()
+
     @classmethod
     def get_settings_path(cls) -> Path:
         """Get the path to the settings file (user-writable)."""
@@ -262,6 +330,9 @@ class AppSettings:
                 settings.plan_day_shape_unconfirmed = (
                     not cls._day_shape_was_confirmed(data, substituted)
                 )
+                # Everything above is the file being read, not a choice. From
+                # here on, an assignment is something a screen did.
+                settings._forget_assignments()
                 return settings
             except Exception as e:
                 print(f"Error loading settings: {e}")
@@ -318,8 +389,12 @@ class AppSettings:
     def save(self) -> bool:
         """Write settings to file. Returns whether the write succeeded.
 
-        Purpose: the one destructive step in this class.
+        Purpose: the one destructive step in this class, and the merge that
+                 keeps it from being destructive about fields it was not asked
+                 to change.
+        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
         Tests:   tests/test_plan_settings.py::test_an_unreadable_settings_file_is_kept_before_it_is_overwritten
+                 tests/test_settings_merge_on_save.py::test_updf11_a_second_settings_object_does_not_revert_the_first
 
         An unreadable file is **copied aside before it is overwritten.** When
         the file on disk exists but would not parse, every value in this object
@@ -339,16 +414,33 @@ class AppSettings:
         only thing that knows the answer. (P6: verify the artifact, do not
         trust a status field about it.)
 
+        The same fact decides what gets written. UPD-F1: this used to dump
+        ``asdict(self)`` -- every field -- so the last object to save put its
+        own snapshot of every *other* field back, and a column width a VSP tab
+        had stored minutes earlier was gone. APE Week Actions' right panel is a
+        ``TodayScreen`` subclass and ``screens/today.py`` loads its own object
+        unconditionally, so one column drag there reverted the widths five
+        other tabs had saved in the same session. So the write is a
+        read-modify-write: the file is re-read here and only the fields this
+        object was actually asked to change are merged **over** it by
+        ``_merge_over_file``, which repairs every screen holding its own
+        snapshot rather than only that one (P5).
+
         This does **not** touch ``plan_day_shape_unconfirmed``: writing the
         file makes it parseable, it does not make these values the user's, and
         that one has to survive both this process and the next. Only the Day
-        Settings dialog clears it.
+        Settings dialog clears it, which is why it is in
+        ``MERGE_EXEMPT_FIELDS`` and is written from this object every time.
 
         The return value is additive: callers that ignore it behave as before,
         and the ones that report success to the user should not.
         ``last_save_error`` carries which failure it was.
         """
         settings_path = self.get_settings_path()
+        # Snapshotted before the normalizers below, which assign to this object
+        # and would otherwise claim six fields on every save -- including on a
+        # stale object that never touched them.
+        assigned = self._assigned_names()
         self.last_save_error = None
         self.appearance_mode = self._normalize_appearance_mode(
             self.appearance_mode)
@@ -397,15 +489,94 @@ class AppSettings:
             except Exception:
                 pass
 
+        # Read before the open, never inside it. ``open(path, 'w')``
+        # truncates the moment it is evaluated, so reading in the ``json.dump``
+        # call read an empty file and the merge had nothing to keep -- the
+        # whole fix silently did nothing, and UPD-F1.1 still failed.
+        payload = self._merge_over_file(self._on_disk(settings_path), assigned)
+
         try:
             with open(settings_path, 'w') as f:
-                json.dump(asdict(self), f, indent=2)
+                json.dump(payload, f, indent=2)
         except Exception as e:
             print(f"Error saving settings: {e}")
             self.last_save_error = "Could not write the settings file — see the log"
             return False
 
         return True
+
+    @staticmethod
+    def _on_disk(settings_path: Path) -> dict:
+        """What the settings file holds right now, or ``{}``.
+
+        Purpose: UPD-F1 -- the "read" of ``save``'s read-modify-write.
+        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
+        Tests:   tests/test_settings_merge_on_save.py::test_updf16_a_file_with_foreign_widths_is_merged_not_replaced
+
+        ``{}`` for a file that is missing, unreadable, or holds something that
+        is not a JSON object. All three mean the same thing to the merge: there
+        is nothing on disk to keep, so every value is written from this object
+        -- which is exactly the recovery ``save`` already performs on an
+        unreadable file after copying it aside.
+        """
+        try:
+            with open(settings_path, 'r') as f:
+                data = json.load(f)
+        except Exception:
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def _merge_over_file(self, on_disk: dict, assigned: set) -> dict:
+        """This object's changes over what the file already holds.
+
+        Purpose: UPD-F1 -- a field this object was never asked to change keeps
+                 the value the file has, so two screens holding their own
+                 ``AppSettings`` no longer revert each other.
+        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
+        Tests:   tests/test_settings_merge_on_save.py::test_updf11_a_second_settings_object_does_not_revert_the_first
+                 tests/test_settings_merge_on_save.py::test_updf16_a_file_with_foreign_widths_is_merged_not_replaced
+
+        ``assigned`` is what ``__setattr__`` recorded, and a plain
+        ``{**on_disk, **asdict(self)}`` is what this replaces: ``asdict``
+        carries *every* field, so the file's value would lose every time, which
+        is the bug.
+
+        Comparing each value against its dataclass default instead was built
+        first and withdrawn: "still at the default" reads a field a screen has
+        deliberately set *to* its default as an untouched one, so turning any
+        setting off could never be saved -- by one object alone, with no second
+        object involved. ``tests/test_list_view_setting.py::test_default_setting``
+        caught it. The plan named the dirty set as the fallback if the trade it
+        described was not acceptable; the trade it described was not the one
+        that comparison actually makes.
+
+        A field is written when this object was asked to change it, when the
+        field is exempt, or when the file has no value for it at all -- that
+        last one so a merge never turns into a partial write and leaves the
+        file no longer describing the settings it is the record of.
+
+        Two consequences, both deliberate:
+
+        * **A dict field is merged by key**, not replaced, so a key the file
+          holds and this object's snapshot does not survives.
+          ``ColumnResizer._persist`` merges over *its* snapshot of the field,
+          and that snapshot is the thing that goes stale.
+        * **A key the file holds and this class does not is kept.** ``load``
+          filters unknown keys out, so a build without a field no longer
+          deletes it from the file on the first save.
+        """
+        merged = dict(on_disk)
+        for name, value in asdict(self).items():
+            if not (name in self.MERGE_EXEMPT_FIELDS
+                    or name in assigned
+                    or name not in on_disk):
+                continue
+            stored = on_disk.get(name)
+            if isinstance(value, dict) and isinstance(stored, dict):
+                merged[name] = {**stored, **value}
+            else:
+                merged[name] = value
+        return merged
 
     @staticmethod
     def _will_not_parse(settings_path: Path) -> bool:
