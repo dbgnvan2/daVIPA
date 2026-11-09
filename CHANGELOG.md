@@ -31,12 +31,13 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   dragging a column becomes the proportion the next resize shares the panel
   out by, so the *shape* of a panel survives a window of a different size.
 
-### Known gap
+### Known gap, since closed
 
-- **Column widths and divider positions still do not survive a relaunch.**
-  This is the defect the same walk found, and it is not fixed here: it needs a
-  change to `AppSettings.save()`, which another batch holds open. Until then,
-  the widths above are for as long as the app is running.
+- **Column widths and divider positions did not survive a relaunch.** This was
+  the defect the same walk found, and it was not fixed in this entry's batch:
+  it needed a change to `AppSettings.save()`, which another batch held open at
+  the time. It was built afterwards as UPD-F1 (`31816a0`) and merged at
+  `2fac9b3`, so the widths now persist.
 
 ### Added — the planned day exports to Google Calendar (2026-11-08)
 

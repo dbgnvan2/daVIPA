@@ -97,7 +97,7 @@ three layout items here, and UPD-F1, the only defect among them, merged at
 
 - ✅ **UPD-M7.1** - `tests/test_unified_panel_design.py` builds all five
   rewritten tabs and asserts no `Toplevel` is opened anywhere beneath the
-  root, and reads its own syntax tree to assert that exactly zero of its 81
+  root, and reads its own syntax tree to assert that exactly zero of its 98
   tests take the `mapped_windows` fixture. The 22 mapped-window tests
   `CLAUDE.md` documents are the 22 that were there before this plan.
 - ❌ **UPD-M7.2 and UPD-M7.3 are open and need you, not a test.** Whether the

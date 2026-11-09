@@ -179,6 +179,118 @@ For completeness, so a future pass does not re-open them:
 - **CE-A22**, six commits that could not import `db_manager`, closed by the
   history rewrite recorded in that entry.
 
+## Adjacent issues found, not fixed — stale status claims repo-wide (2026-11-08)
+
+The PDT batch's eighth cold pass was aimed at one failure mode: a status claim
+corrected in one place with its duplicate left standing. It found that mode is
+not confined to that batch. These are **outside PDT's scope and were not
+fixed**, per `~/.claude/CLAUDE.md` rule 10 — flag, rather than sweep into an
+unrelated diff or leave unrecorded. Each is a document claiming work is not
+done when the artifact shows it shipped, which is the class that sends a
+reader to rebuild merged code.
+
+Ordered by what a reader would wrongly act on.
+
+### SSC-1 — the priority batch's plan says no code was written; the code is on `main` (high)
+
+`docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md:3` and
+`docs/DOCUMENTATION_INDEX.md:279` both say "awaiting approval; no
+implementation code written". `9420927` ("feat(pri): priority defaults and the
+cap, as left on disk") is an ancestor of `main`, and the PRI-M1/PRI-M2
+implementation docstrings are in `src/getmoredone/models.py:85,399,429,451`,
+`db_manager.py:167`, `screens/item_editor.py:1287,1639` and
+`screens/inline_editors.py:202`. Item 2 of this file already says the code is
+implemented, so the repo contradicts itself three ways.
+
+Related: `PRI-A1` to `PRI-A4`, which that plan promises and
+`docs/DOCUMENTATION_INDEX.md:289` repeats, appear nowhere in this file.
+
+### SSC-2 — the WTP spec's header contradicts its own status section (high)
+
+`docs/spec_2026-11-08_weekly_tactic_as_parent.md:6` — "awaiting approval. No
+implementation code written." The same file at `:336` — "all 40 criteria
+`done` … Nothing is `partial` and nothing is outstanding." The implementation
+is on `main` in `screens/weekly_items.py` and `screens/week_actions.py`.
+
+### SSC-3 — `CLAUDE.md` carries two claims the repo has since contradicted (high)
+
+Not fixed here for a second reason: this file is the project's own
+instructions, auto-loaded into every session, so changing it is the user's
+call, not a sweep's.
+
+- `CLAUDE.md:173-175` — "`refs/heads/claude/elegant-neumann-ab55c9` holds
+  UPD-F1 in three commits … It was built, in a worktree, and is not on `main`
+  either." It is on `main`:
+  `git merge-base --is-ancestor refs/heads/claude/elegant-neumann-ab55c9 main`
+  succeeds, merged at `2fac9b3`. `NOTES.md` and item 1 of this file both say
+  so. `docs/changes/2026-11-08-one-batch-at-a-time.md:65` records that wording
+  as deliberate, so it is a live edit gone stale.
+- `CLAUDE.md:170-172` — "A ninth,
+  `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day`, is on
+  `main`, fails there, and exists on no branch. No merge will make it pass."
+  `a19a38a` rewrote that test to PD-M14's design and
+  `docs/spec_coverage.md` records PDT-M2.1 against it as `done`. The
+  surrounding section reads as a dated post-mortem but these sentences are
+  present-tense.
+
+### SSC-4 — four more plans head themselves "no implementation code written" (medium)
+
+`docs/implementation_plan_2026-11-05_time_blocks.md:3` and
+`docs/implementation_plan_2026-11-05_time_grid.md:3`, against
+`docs/spec_coverage.md`'s 19 `TB-M` rows marked `done` and all 36 `TG-M` rows
+marked `done`. Same shape, older and checked less closely:
+`docs/implementation_plan_2026-08-19_item_editor_project_link.md:245` and
+`docs/implementation_plan_2026-08-24_dopamine_reward_protocol.md:5,291`. Seven
+further `awaiting approval` plans were not checked at all, so treat this as a
+sample, not a list.
+
+### SSC-5 — `PLC-A5` quotes an index footer that no longer exists (medium)
+
+`PLC-A5` in this file says the index "ends \"**Current Status**: ✅ All
+documentation up to date as of 2026-01-24\", which has not been true for
+months". That footer was rewritten; `docs/DOCUMENTATION_INDEX.md` now records
+that it *used to* read that. The item's second clause — that no test enforces
+the index — still holds, and is the part four other places route readers to.
+
+### SSC-6 — WTP's criterion count is given as 38, 40 and 41 (medium)
+
+Item 3 of this file says "all 38 criteria built";
+`docs/spec_2026-11-08_weekly_tactic_as_parent.md:336` says 40, as does
+`docs/cycles/2026-11-08_wtp-widget-tests-qa-gate.md:125` ("Spec count 39 →
+40"); the spec's own `| WTP-Mx.y |` rows hold **41** distinct IDs. 40 is the
+later and twice-stated figure, but the spec's arithmetic for it ("the 35 in
+§3, plus …") does not reproduce either, so none of the three is certified
+here.
+
+### SSC-7 — `docs/spec_coverage.md` names a method that does not exist (low)
+
+The `RP-2.5` row's Implementation column names
+`db_manager.py::_update_action_item`. `db_manager.py` has
+`_write_new_action_item` and `update_action_item`; no method named
+`_update_action_item` exists in `src/` or `tools/`. A plain
+`grep -r _update_action_item src/` does print two lines, both
+`bulk_update_action_items`, which contains the name as a substring — so check
+with `grep -rn "def _update_action_item"`, which prints nothing. Same class as the
+`extended_day_bound` and `_DayNotWritten` rows PDT corrected, and it is the
+one exception to PDT-A1's statement that the nine non-test bare names are all
+correct usage. Nothing checks that column —
+`tests/test_traceability_refs.py` reads only `Tests:` references.
+
+### SSC-8 — one gap filed twice, at two severities, with no cross-reference (low)
+
+`UPD-A13` in this file files "no test enforces
+`docs/DOCUMENTATION_INDEX.md`'s completeness" at Priority: Medium, with the
+test design written out. `PLC-A5` files the same gap at low. Three places
+route the reader to `PLC-A5` and none mentions `UPD-A13`, so a reader lands on
+the low item — whose first sentence is also stale, see SSC-5 — and never
+reaches the designed fix.
+
+### SSC-9 — the WTP spec says nothing is outstanding, then lists two `not done` (low)
+
+`docs/spec_2026-11-08_weekly_tactic_as_parent.md:336` — "Nothing is `partial`
+and nothing is outstanding." The same file at `:428-437` — two "not
+code-testable" items, both `not done`, "as foreseen".
+
 ## Sweep findings not fixed — PDT batch (2026-11-08)
 
 From the cold passes over `4ca7116..HEAD` — seven by the end of the batch.
@@ -254,16 +366,17 @@ detect a settings-file write, which the message implies. The real guards are
 `test_pdm141_a_drop_on_earlier_writes_no_settings` and
 `..._never_calls_save`. Reword the message to what it measures.
 
-### PDT-A5 — a test count in two closed handoff notes has drifted (low)
+### PDT-A5 — a test count has drifted in a closed handoff note (low)
 
-`docs/changes/2026-11-08-unified-panel-m7.md:19` and `:49` say
+`docs/changes/2026-11-08-unified-panel-m7.md` says at `:19` and `:49` that
 `tests/test_unified_panel_design.py` holds **81** tests. It holds **98**
 (`grep -c '^def test_' tests/test_unified_panel_design.py`); `e44937a` and
 `4e16534` raised it, both before this batch. The guard itself asserts an empty
 list of fixture-takers, not a count, so nothing is broken and the notes were
 right when written. Left as written rather than rewritten, because a dated
 handoff note is a record of its own batch; the drift is filed here instead.
-Found by the seventh cold pass.
+`NOTES.md` carried the same count and **was** corrected, being a live
+document. Found by the seventh cold pass, the `NOTES.md` copy by the eighth.
 
 ### PDT-A4 — PD-M14's implementation plan is not in the documentation index (low)
 

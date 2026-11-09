@@ -360,7 +360,11 @@ Per the global rule on surrounding code:
 
 ## 9. Risk
 
-**This checkout has another batch building in it.** The calendar-export batch
+**This risk is spent — see §8: UPD-F1 was built in its own session (`31816a0`)
+and merged at `2fac9b3`. The paragraph below is the risk as it stood when this
+plan was written.**
+
+This checkout had another batch building in it. The calendar-export batch
 holds uncommitted hunks in `src/getmoredone/app_settings.py`, which UPD-F1
 must change. Per `CLAUDE.md`'s "One build batch at a time", UPD-F1 should not
 start until that batch is committed, or it needs its own worktree. The other
