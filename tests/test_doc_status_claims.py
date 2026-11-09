@@ -38,8 +38,13 @@ REPO = Path(__file__).resolve().parents[1]
 # guard checks BOTH directions, so a document that stays here after it is built
 # fails as loudly as one that was never corrected.
 #
-# ``docs/changes/`` is outside the scan on purpose: a handoff note records what
+# ``docs/changes/`` is outside this scan on purpose: a handoff note records what
 # was true on its date and is not a status anybody reads for the current state.
+# That exemption covers a claim that was true when written, not a figure that
+# was never true — which is why SST-M3 does reach into the WTP handoff note for
+# its criterion count. The second cold pass, 2026-11-09, read the two rules
+# against each other and asked which was wrong; this is the line that was
+# missing rather than a rule that was.
 DRAFTS_NOT_BUILT = {
     # CIP — Google Calendar into the Plan. 57 `CIP-M…` criteria, no coverage
     # rows anywhere, no module under src/. The spec's own status line says the
@@ -56,8 +61,11 @@ _STATUS_LINE = re.compile(r"^\*{0,2}status\b", re.I)
 # the cold pass over this batch, 2026-11-09.
 _STATUS_HEADING = re.compile(r"^#+\s*\**status\b", re.I)
 
-# How many non-blank lines under such a heading count as the status claim.
-_UNDER_HEADING = 2
+# A status section runs to the next heading of any level. It was a window of
+# the first two non-blank lines until the second cold pass, 2026-11-09, which
+# put a claim on the third line of a `## Status` section and watched the guard
+# pass — and a status section longer than two lines is the normal shape here.
+_ANY_HEADING = re.compile(r"^#{1,6} ")
 
 # A phrase list, and therefore a tripwire rather than a proof: a new way of
 # writing "not built" escapes it until it is added here. The phrases are the
@@ -91,8 +99,8 @@ def _status_documents():
 def _claims_not_built(path):
     """The document's status lines that say the work is not written.
 
-    A status line is one that begins with "Status", or one of the first two
-    non-blank lines under a `## Status` heading. Prose elsewhere in a plan,
+    A status line is one that begins with "Status", or any line in a section
+    under a `## Status` heading, to the next heading. Prose elsewhere in a plan,
     narrating the state of the work at some past moment, is not a status claim:
     the one instance of it in this repo — the dopamine plan's §8 — is corrected
     in place rather than policed here, because a guard that read every sentence
@@ -100,17 +108,15 @@ def _claims_not_built(path):
     """
     hits = []
     text = path.read_text(encoding="utf-8")
-    under_heading = 0
+    in_status_section = False
     for number, line in enumerate(text.splitlines(), 1):
         if _STATUS_HEADING.match(line):
-            under_heading = _UNDER_HEADING
+            in_status_section = True
             continue
-        is_claim_position = bool(_STATUS_LINE.match(line)) or (
-            under_heading and line.strip())
-        if is_claim_position and _NOT_BUILT.search(line):
+        if in_status_section and _ANY_HEADING.match(line):
+            in_status_section = False
+        if (_STATUS_LINE.match(line) or in_status_section) and _NOT_BUILT.search(line):
             hits.append((number, line.strip()))
-        if under_heading and line.strip():
-            under_heading -= 1
     return hits
 
 
@@ -157,8 +163,9 @@ def test_sstm2_the_register_guard_can_fire():
     assert _STATUS_HEADING.match("### **Status**")
     assert not _STATUS_HEADING.match("Status is discussed in §6")
     # A `## Status report` heading is in the domain on purpose: it is a status
-    # section, and a claim on its first two lines is a status claim.
+    # section, and a claim anywhere in it is a status claim.
     assert _STATUS_HEADING.match("## Status report")
+    assert _ANY_HEADING.match("## Next steps") and not _ANY_HEADING.match("#not")
     assert _STATUS_LINE.match("**Status:** Draft, awaiting approval")
     assert _STATUS_LINE.match("Status: **awaiting approval**")
     assert not _STATUS_LINE.match("The status of this is awaiting approval")
@@ -189,8 +196,13 @@ def _wtp_status_report(spec):
     anywhere in the file: the status line at the top states the count as well,
     which made a whole-file substring check unable to fail on §6 going stale.
     """
-    start = spec.index("## 6. Status report")
-    end = spec.index("## 7.", start)
+    heading = "## 6. Status report"
+    assert heading in spec, (
+        f"the WTP spec has no {heading!r} section — if §6 was renumbered or "
+        "renamed, this guard needs the new anchor, not deleting")
+    start = spec.index(heading)
+    end = spec.find("\n## ", start)
+    assert end != -1, "§6 is the last section; the slice would run to the end"
     return spec[start:end]
 
 
@@ -218,10 +230,27 @@ def test_sstm3_the_wtp_criterion_count_is_what_the_spec_lists():
         "40 while listing 41, and its arithmetic for 40 counted §3 as 35 after "
         "§3 had been amended to carry the additions")
 
+    # `BACKLOG.md`'s header paragraph, anchored on its own sentence rather
+    # than on the one historical wrong figure: the second cold pass set that
+    # sentence to 40 and watched this guard pass, because the only assertion
+    # here was that the string "all 38 criteria" was absent.
     backlog = (REPO / "BACKLOG.md").read_text(encoding="utf-8")
-    assert "all 38 criteria" not in backlog, (
-        "BACKLOG.md still says 'all 38 criteria' for WTP; the spec lists "
+    assert f"in every reader of parenthood, all {len(criteria)} criteria" in backlog, (
+        "BACKLOG.md's WTP sentence does not state the count the spec lists "
+        f"({len(criteria)}); it has said 38 and 40 while the rows said "
         f"{len(criteria)}")
+
+    # And `docs/DOCUMENTATION_INDEX.md`, the third document that disagreed in
+    # the original defect and was in no guard's domain until now.
+    index = (REPO / "docs/DOCUMENTATION_INDEX.md").read_text(encoding="utf-8")
+    entry_head = "### docs/spec_2026-11-08_weekly_tactic_as_parent.md"
+    assert entry_head in index, "the WTP entry is gone from the index"
+    start = index.index(entry_head)
+    end = index.find("\n### ", start + len(entry_head))
+    entry = index[start:end if end != -1 else len(index)]
+    assert f"{len(criteria)} of {len(criteria)} criteria" in entry, (
+        "the index's WTP entry does not state the count the spec lists "
+        f"({len(criteria)} of {len(criteria)})")
 
     # The batch's own handoff note stated the count too, and kept 38 after
     # every other document had been corrected.
@@ -404,9 +433,12 @@ def test_sstm7_the_two_filings_of_the_index_gap_cross_reference():
 # commit had already moved.
 CHRONIC = ("BACKLOG.md", "docs/spec_coverage.md", "CLAUDE.md",
            "docs/DOCUMENTATION_INDEX.md")
+# The basename, with any path prefix or none: this repo writes both
+# `docs/spec_coverage.md:69` and the bare `spec_coverage.md:69`. The second
+# cold pass wrote bare-basename cites into `NOTES.md` and watched the guard
+# pass; no such cite existed in the repo, so the hole was latent.
 _LINE_CITE = re.compile(
-    r"(?:BACKLOG\.md|docs/spec_coverage\.md|CLAUDE\.md"
-    r"|docs/DOCUMENTATION_INDEX\.md):[0-9]")
+    r"(?:BACKLOG|spec_coverage|CLAUDE|DOCUMENTATION_INDEX)\.md:[0-9]")
 
 
 def _markdown_files():
@@ -452,6 +484,8 @@ def test_sstm8_that_guard_can_fire():
         "no implementation plan in the walk")
     assert _LINE_CITE.search("see `BACKLOG.md:114` for the filing")
     assert _LINE_CITE.search("docs/spec_coverage.md:69 names it")
+    assert _LINE_CITE.search("spec_coverage.md:69 names it")
+    assert _LINE_CITE.search("see DOCUMENTATION_INDEX.md:402")
     assert not _LINE_CITE.search("see `BACKLOG.md` item 2")
     # A dated filename is not a line cite.
     assert not _LINE_CITE.search("docs/changes/2026-11-08-pri-tests.md")
@@ -460,6 +494,45 @@ def test_sstm8_that_guard_can_fire():
 # ------------------------------------------------------------------- SST-M9
 
 PRI_PLAN = REPO / "docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md"
+
+# ------------------------------------------------------------------ SST-M10
+
+# The batch's records. SST-M10 was recorded `done` against "the docs-sync
+# gate", which cannot produce that status: `tools/agents/check_docs_sync.py`
+# only asserts that *some* path under `docs/` changed alongside code, and
+# `.github/workflows/agent-docs-gate.yml` runs on `pull_request` only, while
+# this repo pushes to `main` and opens no pull requests. So the criterion's
+# named evidence had never run. Found by the second cold pass, 2026-11-09;
+# `SST-A8` files the dead gate itself.
+SST_RECORDS = (
+    "BACKLOG.md",
+    "NOTES.md",
+    "docs/DOCUMENTATION_INDEX.md",
+    "docs/spec_coverage.md",
+    "docs/implementation_plan_2026-11-08_status_claims.md",
+    "docs/changes/2026-11-08-status-claims.md",
+)
+_SST_ID = re.compile(r"\bSST-(?:M|A|N)[0-9]+\b")
+
+
+def test_sstm10_every_record_of_this_batch_exists_and_names_it():
+    """A weak guard, and weaker than the one it replaces claimed to be.
+
+    It proves each record exists and refers to the batch by at least one of its
+    own IDs. It cannot prove the record is accurate — `SST-N1` already says
+    that about status lines generally, and the two cold passes over this batch
+    found eleven and six defects in exactly that gap.
+    """
+    missing = [name for name in SST_RECORDS if not (REPO / name).exists()]
+    assert not missing, "these records of the SST batch are gone: " + ", ".join(missing)
+
+    silent = [
+        name for name in SST_RECORDS
+        if not _SST_ID.search((REPO / name).read_text(encoding="utf-8"))
+    ]
+    assert not silent, (
+        "these records name no `SST-…` criterion or adjacent issue, so the "
+        "batch is no longer traceable from them: " + ", ".join(silent))
 
 
 def test_sstm9_every_promised_pri_adjacent_item_is_filed():
@@ -476,16 +549,27 @@ def test_sstm9_every_promised_pri_adjacent_item_is_filed():
     # range rather than as four literals, and the four numbered entries under
     # its "Adjacent issues found, not fixed" heading are counted to confirm
     # the range's size.
-    endpoints = sorted(set(re.findall(r"PRI-A[0-9]+", plan)))
-    assert endpoints == ["PRI-A1", "PRI-A4"], (
-        f"the PRI plan now names {endpoints}; this guard was written for the "
-        "range PRI-A1 to PRI-A4")
-    section = plan[plan.index("## Adjacent issues found, not fixed"):]
+    section_head = "## Adjacent issues found, not fixed"
+    assert section_head in plan, (
+        f"the PRI plan has no {section_head!r} section, so the promise this "
+        "guard reads is gone — rewrite it, do not delete it")
+    section = plan[plan.index(section_head):]
     numbered = re.findall(r"^[0-9]+\. \*\*", section, re.M)
     assert len(numbered) == 4, (
         f"the plan lists {len(numbered)} adjacent issues under a promise to "
         "file four")
     promised = [f"PRI-A{n}" for n in range(1, len(numbered) + 1)]
+
+    # Every name the plan mentions has to be inside the range it promised. The
+    # previous form asserted that the set of names mentioned was exactly the
+    # two endpoints, so naming all four in the plan — the natural edit now that
+    # they are filed — turned this red with nothing wrong. Measured by the
+    # second cold pass, 2026-11-09.
+    mentioned = sorted(set(re.findall(r"PRI-A[0-9]+", plan)))
+    outside = [name for name in mentioned if name not in promised]
+    assert not outside, (
+        f"the PRI plan names {outside}, outside the {len(numbered)} it promises "
+        "to file under its adjacent-issues heading")
 
     backlog = (REPO / "BACKLOG.md").read_text(encoding="utf-8")
     # The name must end the token: `### PRI-A3` as a substring is also present
