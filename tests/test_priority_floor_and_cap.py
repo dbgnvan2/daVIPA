@@ -40,8 +40,6 @@ from src.getmoredone.time_block_layout import PRIORITY_BANDS
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "getmoredone"
 
-FACTOR_NAMES = frozenset({"importance", "urgency", "size", "value"})
-
 # The four factor fields, with the scale each one reads.
 SCALES = (
     ("importance", PriorityFactors.IMPORTANCE),
@@ -318,76 +316,155 @@ def test_prim24_the_stored_score_is_capped_on_create_and_on_update(manager):
     )
 
 
-def _four_factor_products(source: str, skip_functions=()):
-    """Every expression multiplying four factor-named operands together.
+def _four_operand_products(source: str, skip_functions=()):
+    """Every expression multiplying four operands together, anywhere.
+
+    Deliberately **not** filtered by operand name. The first version of this
+    helper matched only operands named ``importance``/``urgency``/``size``/
+    ``value``, which made it blind at the one site most likely to regress:
+    ``screens/inline_editors.py::update_score`` already binds its four factors
+    as ``i``, ``u``, ``s`` and ``v``, so a re-introduced ``i * u * s * v``
+    would have left the guard green at count 0 while a second scorer existed.
+    Widening the name list would only move the blind spot to the next set of
+    names someone picks.
+
+    Measured instead: the three modules this guards contain **no** four-operand
+    product of any kind, so the strictest possible detector is also an
+    achievable one. The cost is stated rather than hidden -- an unrelated
+    four-way product added to one of these modules would fail this guard, and
+    the failure message says so.
 
     Parsed rather than grepped, per the repo rule, and returns the list so the
-    caller can assert an exact count instead of a floor.
+    caller can assert an exact count instead of a floor. Walks the whole
+    module, not only function bodies, so a product at module or class level is
+    seen too.
     """
-    found = []
-
     def operands(node):
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
             return operands(node.left) + operands(node.right)
         return [node]
 
-    def identifier(node):
+    def describe(node):
         if isinstance(node, ast.Name):
             return node.id
         if isinstance(node, ast.Attribute):
             return node.attr
-        return None
+        return type(node).__name__
 
     tree = ast.parse(source)
+
+    # Every node inside a function this caller excuses, so the walk below can
+    # cover the whole module and still skip those bodies.
+    excused = set()
     for function in ast.walk(tree):
-        if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if (isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and function.name in skip_functions):
+            excused.update(id(node) for node in ast.walk(function))
+
+    found = []
+    for node in ast.walk(tree):
+        if id(node) in excused:
             continue
-        if function.name in skip_functions:
+        if not (isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult)):
             continue
-        for node in ast.walk(function):
-            if not (isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult)):
-                continue
-            parts = operands(node)
-            if len(parts) != 4:
-                continue
-            names = [identifier(part) for part in parts]
-            if all(name in FACTOR_NAMES for name in names):
-                found.append((function.name, node.lineno))
+        parts = operands(node)
+        if len(parts) == 4:
+            found.append((node.lineno, [describe(part) for part in parts]))
     return found
 
 
-def test_prim25_the_product_detector_finds_a_product():
-    """A positive control for the walk PRI-M2.5 uses.
+@pytest.mark.parametrize("product,why", [
+    ("self.importance * self.urgency * self.size * self.value",
+     "the field names, as models.py would write them"),
+    ("i * u * s * v",
+     "single letters, as inline_editors.update_score already names its factors"),
+    ("imp * urg * sz * val",
+     "any other names someone picks"),
+    ("PriorityFactors.IMPORTANCE[a] * b * c * d",
+     "a subscript among the operands"),
+])
+def test_prim25_the_product_detector_finds_a_product(product, why):
+    """A positive control for the walk PRI-M2.5 uses, at four namings.
 
     Without this, a detector that silently matched nothing would make
-    ``test_prim25_only_one_function_multiplies_the_factors`` pass for the
-    wrong reason -- the classic "looks right but is wrong" input (P7). The
-    count is exact, so a detector that matched the same product twice fails
-    here too.
+    ``test_prim25_only_one_function_multiplies_the_factors`` pass for the wrong
+    reason -- the classic "looks right but is wrong" input (P7).
+
+    The second case is the one that matters. An earlier version of the detector
+    filtered operands by name, so ``i * u * s * v`` -- which is exactly how
+    ``screens/inline_editors.py::update_score`` names its four factors today --
+    slipped past it, and the guard would have reported one scorer while a
+    second one existed at the render site PRI-M2 was written to protect.
+
+    The count is exact, so a detector that matched one product twice fails here
+    too, and the three-operand line proves it is not matching everything.
     """
     sample = textwrap.dedent(
-        """
+        f"""
         def a_second_copy(self):
-            return self.importance * self.urgency * self.size * self.value
+            return {product}
 
         def not_a_product(self):
-            return importance * urgency
+            return importance * urgency * size
         """
     )
 
-    found = _four_factor_products(sample)
+    found = _four_operand_products(sample)
 
-    assert [name for name, _line in found] == ["a_second_copy"], found
+    assert len(found) == 1, (
+        f"the detector found {len(found)} four-operand products in a sample "
+        f"holding one ({why}): {found}"
+    )
+
+
+def test_prim25_the_product_detector_excuses_the_one_scorer():
+    """And ``skip_functions`` excuses the whole of a named function's body.
+
+    The guard below excuses ``priority_score_from_factors``. If
+    ``skip_functions`` silently matched nothing, the guard would still pass
+    today -- that function accumulates in a loop and holds no four-way product
+    -- so nothing else in this file can tell whether the exclusion works.
+    """
+    sample = textwrap.dedent(
+        """
+        def priority_score_from_factors(i, u, s, v):
+            return i * u * s * v
+
+        def somewhere_else(i, u, s, v):
+            return i * u * s * v
+        """
+    )
+
+    assert len(_four_operand_products(sample)) == 2, "the control sample is wrong"
+
+    found = _four_operand_products(
+        sample, skip_functions=("priority_score_from_factors",)
+    )
+    assert len(found) == 1, (
+        f"excusing one function of two left {len(found)} products: {found}"
+    )
 
 
 def test_prim25_only_one_function_multiplies_the_factors():
-    """PRI-M2.5: no module multiplies the four factors itself.
+    """PRI-M2.5: no module multiplies four operands together itself.
 
     PRI-M2's whole purpose was collapsing three copies of this arithmetic into
     one, because a cap added to one copy and not its siblings is P5 by
     construction. ``priority_score_from_factors`` accumulates in a loop rather
     than writing the four-way product, so the expected count is zero
-    everywhere, in that function included.
+    everywhere, in that function included -- and the walk is excused nothing.
+
+    What this does and does not see is in ``_four_operand_products``: it
+    catches a product under **any** operand names, which is what the name-based
+    first version did not, and the price is that an unrelated four-way product
+    added to one of these three modules fails this test. That is the trade this
+    guard is written to -- the modules hold no four-operand product of any kind
+    today, so the strict form is achievable, and a false positive here is a
+    one-line read of the failure message rather than a silent hole.
+
+    It is still three modules by name. A fourth module that grew its own copy
+    would not be seen; the honest widening is a list derived from the importers
+    of ``priority_score_from_factors``, which is not written.
     """
     modules = [
         SRC / "models.py",
@@ -398,13 +475,15 @@ def test_prim25_only_one_function_multiplies_the_factors():
     copies = {}
     for path in modules:
         assert path.exists(), path
-        found = _four_factor_products(path.read_text())
+        found = _four_operand_products(path.read_text())
         if found:
             copies[path.name] = found
 
     assert copies == {}, (
-        "these places multiply the four factors themselves rather than calling "
-        f"priority_score_from_factors: {copies}"
+        "these places multiply four operands together rather than calling "
+        f"priority_score_from_factors: {copies}. If one of them is not a "
+        "priority score, this guard needs narrowing deliberately -- not "
+        "raising above an exact count of 0"
     )
 
 
