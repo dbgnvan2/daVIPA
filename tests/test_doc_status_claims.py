@@ -158,11 +158,23 @@ def test_sstm1_no_document_claims_unwritten_code_outside_the_register():
 def test_sstm2_the_register_guard_can_fire():
     """Guards the guard: it has to read real documents and real status lines."""
     documents = list(_status_documents())
-    # An exact count, not a floor: a floor is what let the reference guard in
-    # tests/test_traceability_refs.py keep passing while its domain shrank.
-    assert len(documents) == 35, (
-        f"{len(documents)} plan/spec documents scanned, expected 35 — if one "
-        "was added or removed, change this number deliberately")
+    names = {str(path.relative_to(REPO)) for path in documents}
+    # Membership per family, not a total. This asserted `== 35` until the
+    # fourth cold pass measured the total over the last 40 first-parent
+    # commits and found three distinct values, moving twice inside two days:
+    # the count rises with every plan document, and committing a plan is the
+    # first step of every batch here. Its only failure mode was "someone
+    # wrote a plan", which is the tax this repo's own CLAUDE.md note about
+    # the meta test counts warns against ("one that did would go red on
+    # every batch"). Narrowing the glob to one family, or dropping either
+    # anchor document, still fails.
+    for anchor in ("docs/implementation_plan_2026-11-08_status_claims.md",
+                   "docs/spec_2026-11-08_weekly_tactic_as_parent.md"):
+        assert anchor in names, (
+            f"{anchor} is not in the scanned set, so the glob no longer "
+            "reaches the document family it names")
+    assert not [name for name in names if not name.endswith(".md")], (
+        "a non-markdown path reached the scan")
 
     for name in sorted(DRAFTS_NOT_BUILT):
         assert (REPO / name).exists(), f"registered document is gone: {name}"
@@ -237,18 +249,33 @@ def test_sstm3_the_wtp_criterion_count_is_what_the_spec_lists():
     # so §6 could go back to 40 and this guard would stay green. Found by the
     # cold pass over this batch, 2026-11-09.
     summary = _wtp_status_report(spec)
-    assert f"all {len(criteria)} criteria" in summary, (
-        f"§6's summary does not say 'all {len(criteria)} criteria' — it said "
-        "40 while listing 41, and its arithmetic for 40 counted §3 as 35 after "
-        "§3 had been amended to carry the additions")
+    # Either phrasing: `all 41 criteria` while every row is done, or
+    # `40 of 41 criteria` once a new row is added and not yet built. The
+    # fourth cold pass found this accepted only the all-done form, so adding
+    # a `WTP-M7` row made the *correct* summary fail.
+    assert re.search(rf"(?:all|[0-9]+ of) {len(criteria)} criteria", summary), (
+        f"§6's summary does not state the count the rows list "
+        f"({len(criteria)}) — it said 40 while listing 41, and its arithmetic "
+        "for 40 counted §3 as 35 after §3 had been amended")
 
     # `BACKLOG.md`'s header paragraph, anchored on its own sentence rather
     # than on the one historical wrong figure: the second cold pass set that
     # sentence to 40 and watched this guard pass, because the only assertion
     # here was that the string "all 38 criteria" was absent.
+    # Anchored on the figure, not on the sentence around it. The seven-word
+    # prose fragment that used to anchor this sat in BACKLOG.md's header
+    # paragraph — one of the four chronic conflict surfaces this repo's
+    # CLAUDE.md names *because* every batch rewrites that region — so any
+    # rewording of it failed a test. No absence assertion goes with it: this
+    # file's `SSC` filings quote the wrong claims they record verbatim, so
+    # "all 40 criteria" is *correctly* present at the filing that recorded it,
+    # and an absence check over the whole file is red on a true record — the
+    # same trap that turned SST-M8 red twice in this batch. The positive check
+    # alone closes the pass-2 hole, which existed because absence of
+    # "all 38 criteria" was the only assertion here.
     backlog = (REPO / "BACKLOG.md").read_text(encoding="utf-8")
-    assert f"in every reader of parenthood, all {len(criteria)} criteria" in backlog, (
-        "BACKLOG.md's WTP sentence does not state the count the spec lists "
+    assert re.search(rf"(?:all|[0-9]+ of) {len(criteria)} criteria", backlog), (
+        "BACKLOG.md does not state the WTP count the spec lists "
         f"({len(criteria)}); it has said 38 and 40 while the rows said "
         f"{len(criteria)}")
 
@@ -260,19 +287,18 @@ def test_sstm3_the_wtp_criterion_count_is_what_the_spec_lists():
     start = index.index(entry_head)
     end = index.find("\n### ", start + len(entry_head))
     entry = index[start:end if end != -1 else len(index)]
-    assert f"{len(criteria)} of {len(criteria)} criteria" in entry, (
+    assert re.search(rf"(?:all|[0-9]+ of) {len(criteria)} criteria", entry), (
         "the index's WTP entry does not state the count the spec lists "
-        f"({len(criteria)} of {len(criteria)})")
+        f"({len(criteria)})")
 
     # The batch's own handoff note stated the count too, and kept 38 after
-    # every other document had been corrected.
-    note = (REPO / "docs/changes/2026-11-08-weekly-tactic-as-parent.md").read_text(
-        encoding="utf-8")
-    assert f"{len(criteria)} criteria" in note, (
-        "the WTP handoff note does not state the criterion count the spec "
-        f"lists ({len(criteria)})")
-    assert "38 criteria" not in note, (
-        "the WTP handoff note still states 38 criteria")
+    # every other document had been corrected. It is deliberately *not*
+    # asserted here: a dated handoff note records what was true on its date,
+    # which is the same reason SST-M1 keeps `docs/changes/` out of the status
+    # scan. Pinning a recounted figure into it would require editing a dated
+    # record to state a figure that was not true on its date, every time a
+    # criterion is added. The note was corrected to 41 in this batch
+    # (`git log -p -- docs/changes/2026-11-08-weekly-tactic-as-parent.md`).
 
 
 def test_sstm4_the_wtp_spec_does_not_deny_its_own_outstanding_items():
@@ -364,11 +390,22 @@ def test_sstm5_every_implementation_reference_resolves():
 
 def test_sstm5_that_guard_can_fire():
     found = list(_implementation_references())
-    # Exact, for the same reason as the document count above.
-    assert len(found) == 186, (
-        f"{len(found)} implementation references found, expected 186 — the "
-        "pattern or the document set has changed; re-measure deliberately "
-        "rather than lowering this")
+    # Membership per source, not a total. This asserted `== 186` until the
+    # fourth cold pass recomputed the figure with this module's own parser at
+    # each of the last 30 commits: 175, 184, 185, 186. Any batch that writes
+    # one coverage row naming `file.py::symbol` moved it, and 66 commits
+    # touched a `docs/spec_coverage*.md` in the last 30 days. Dropping a file
+    # from the glob, or narrowing the row pattern, still fails here.
+    contributing = {str(source) for source, _t, _s in found}
+    for name in ("docs/spec_coverage.md",
+                 "docs/spec_coverage_2026-08-19_item_editor_project_link.md",
+                 "docs/spec_coverage_2026-11-05_demo_install.md",
+                 "docs/spec_coverage_2026-11-08_plan_calendar_export.md",
+                 "docs/spec_coverage_2026-11-08_priority_level_colours.md"):
+        assert name in contributing, (
+            f"{name} contributed no implementation reference — either it is "
+            "outside the glob now, or its Implementation column has stopped "
+            "naming symbols")
     assert any(symbol.startswith("_") for _s, _t, symbol in found), (
         "no private symbol among the references, so the one defect this guard "
         "was written for would not have been in its domain")
@@ -516,9 +553,13 @@ PRI_PLAN = REPO / "docs/implementation_plan_2026-11-08_priority_defaults_and_cap
 # this repo pushes to `main` and opens no pull requests. So the criterion's
 # named evidence had never run. Found by the second cold pass, 2026-11-09;
 # `SST-A8` files the dead gate itself.
+# `NOTES.md` is deliberately absent: it opens with a dated "Where main
+# stands" section that each batch rewrites with deletions (the PRIT batch's
+# edit was +22/-13), so an `SST-…` id there is expected to age out, and a
+# guard over it would fire with the wrong diagnosis. Found by the fourth cold
+# pass, 2026-11-09.
 SST_RECORDS = (
     "BACKLOG.md",
-    "NOTES.md",
     "docs/DOCUMENTATION_INDEX.md",
     "docs/spec_coverage.md",
     "docs/implementation_plan_2026-11-08_status_claims.md",
