@@ -43,94 +43,74 @@ identical on Python 3.11, 3.12 and 3.13. Branch comparisons were made by
 checking each branch out in a separate worktree and running the files there,
 not by reading the diffs.
 
-### 1. UPD-F1 is merged; the plan-day branch is a design collision, not a merge
+**Updated 2026-11-09 by the PDT batch.** Eleven of the twenty are closed: the
+nine plan-day failures and `test_every_referenced_test_name_exists`, plus
+`test_pbm55_the_settings_reach_the_outside_group_on_screen`, which was counted
+in item 1's nine. What is left is item 2 (one real coverage gap, newly filed),
+item 3 and item 5 — nine CI-environment failures and the PRI tests nobody
+wrote. The numbers below are stated against the run that proves them, not
+assumed.
 
-**This corrects what this section first said.** It claimed the eight plan-day
-failures needed no code because "the code exists" and "merging is the whole
-job". That was wrong, and wrong in the usual way: concluded from one true
-measurement — the eight tests pass at the branch tip — without checking
-whether the two sides could be combined at all. They cannot be combined
-mechanically.
+### 1. CLOSED — the nine plan-day failures, by PDT, not by a merge
 
-**Done: `refs/heads/claude/elegant-neumann-ab55c9` is merged** (UPD-F1,
-`AppSettings.save()` merging over the file instead of writing the whole
-object). One conflict, in `docs/spec_coverage.md`, where both sides had added
-a UPD-F1 section; resolved by keeping both. 108 tests pass across
-`tests/test_settings_merge_on_save.py` and `tests/test_unified_panel_design.py`.
+`refs/heads/claude/elegant-neumann-ab55c9` (UPD-F1) is merged into `main` at
+`2fac9b3`. `refs/heads/claude/plan-day-range-pdm13` is **superseded and stays
+unmerged** at `c8125af`.
 
-**Not done: `refs/heads/claude/plan-day-range-pdm13` (28 commits).** The merge
-was attempted and aborted, so `main` is untouched by it. It conflicts in **50
-hunks across 12 files** — 12 in `src/getmoredone/screens/plan.py`, 10 in
-`src/getmoredone/time_block_layout.py`, 13 in `tests/test_plan_screen.py`, 4
-in `src/getmoredone/db_manager.py`.
+**What the previous two versions of this item got wrong.** The first said the
+eight plan-day tests needed no code because "the code exists — merging is the
+whole job". The second said they were "unimplemented, not superseded". Both
+were concluded from one measurement without checking the next one, and both
+were wrong. Measured on `main` at `4ca7116`:
 
-The conflicts are not textual. **The same feature was built twice, to two
-different designs, by two batches that could not see each other:**
+- `tests/test_time_grid.py` — 58 passed. `outside` is implemented at the
+  layout layer.
+- `plan.py` already has `outside_frame`, `build_outside_group`, the
+  `grid()`/`grid_remove()` pair, the P2 status and the scrollable holder.
+- `tests/test_plan_screen.py:2345` asserts `_grid.outside == ["never placed"]`
+  and passed the whole time.
 
-| | `main` | the branch |
+**There was nothing to port.** The nine tests reached their subject through a
+mechanism PD-M14 withdrew on purpose: six produced an outside block by saving a
+tighter Day End, which PD-M14.2 made unable to orphan anything, and three
+asserted the Day Settings write PD-M14.1 removed. Stale vehicles, not missing
+code.
+
+Closed by the PDT batch: `docs/implementation_plan_2026-11-09_plan_day_tests_follow_pd_m14.md`,
+handoff note `docs/changes/2026-11-09-plan-day-tests-follow-pd-m14.md`. Each
+test keeps every assertion it had; only the setup changed, and each rewrite was
+mutation-proved.
+
+The branch's design is the one that caused both reported faults — Day Start
+ratcheting to 05:30, and blocks renumbered on every other date — because
+`slot_index` counts from a setting shared by every date. **Do not merge it.**
+Deleting it is a separate decision nobody has taken.
+
+### 2. PRI-M1/M2 shipped without its tests (medium)
+
+The one real coverage gap on `main`, and the only thing still keeping
+`tests/test_traceability_refs.py::test_every_referenced_test_file_exists` red.
+
+`src/getmoredone/models.py` carries `Tests:` lines naming three tests in two
+files, and **none of the five has ever existed**:
+
+| named in `models.py` | file | test |
 |---|---|---|
-| spec | `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md` (PD-M14) | `docs/implementation_plan_2026-11-07_plan_day_range.md` (PD-M13) |
-| mechanism | the drawn day derived from the date's own blocks, `DayGrid.span` | `drawn_day_slots` |
-| what `plan.py` imports | `edge_limit_time`, `extended_span` | `drawn_day_slots` |
-| PD-M13 tests | 9 | 16 |
-| PD-M14 tests | 10 | 4 |
+| `calculate_priority_score`, `priority_score_for` | `tests/test_priority_floor_and_cap.py` | `test_prim22_every_factor_combination_is_capped` |
+| the default-floor path | `tests/test_priority_floor_and_cap.py` | `test_prim12_a_new_item_is_never_unscored` |
+| the score label | `tests/test_priority_floor_form.py` | `test_prim26_a_capped_label_says_it_is_capped` |
 
-Both designs are complete on their own side: on `main` all 28 PD-M14 tests
-pass, and the eight red tests pass on the branch. The same test *names* exist
-on both sides with **different bodies** — `test_tgm31_an_outside_block_is_drawn`
-does not match between them.
+The code is implemented and the spec exists
+(`docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md`, committed
+`62798ab`). What is missing is the tests, so the cap, the floor and the
+"(capped)" label are all unverified — and PRI-M2's own stated purpose is that
+three copies of the scoring arithmetic were collapsed into one, which is
+precisely the change a cap-boundary test exists to hold.
 
-`main` holds the later design, and it is later because the instruction
-changed: PD-M14 exists to make the Day Settings hours "solely for starting a
-blank plan for the day", which is why a drop no longer writes them.
-
-**Two of `main`'s own tests contradict each other.** Settle this first:
-
-- `test_pdm141_a_drop_on_earlier_writes_no_settings` asserts
-  `screen.bounds.day_start == "08:00"` after a drop, with the failure message
-  "the screen took a new day". Its docstring says it *replaces*
-  `test_pdm52_a_drop_above_moves_day_start_back`.
-- `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day` asserts
-  `panel.bounds.day_start < started_at` — that the same drop *does* move it.
-  This is the one red test that no branch fixes.
-
-`test_pdm131` therefore asserts a mechanism PD-M14 deliberately removed. The
-behaviour it protects is still wanted — it came from a real report, "I can't
-move an item into the early or late extended sections" — so it wants
-**rewriting against the drawn day**, not deleting. Repo rule case (b), the
-behaviour changed intentionally.
-
-**The eight outside-group tests are not superseded — they are unimplemented**,
-which is a different thing. `screen._grid.outside` **exists** on `main`: the
-attribute resolves, there is no `AttributeError`, and it is simply never
-filled. `test_tgm31_an_outside_block_is_drawn` fails
-`assert [] == ['late afternoon']`. The branch fills it, on the older design.
-
-Three routes. This wants a decision, not a session picking one:
-
-1. **Port** the branch's `outside` implementation onto `main`'s PD-M14 design,
-   using the branch as a reference rather than merging it. The eight tests
-   stay, `plan.py` and `time_block_layout.py` are written once against the
-   design that survives, and the 50 conflicts never have to be resolved.
-2. **Merge** and reconcile both designs by hand: 50 hunks across ~2,600 lines
-   of divergent tests, then delete whichever design loses.
-3. **Delete** the eight tests as committed before their implementation, and
-   file the outside group as unbuilt. Closes the red without building
-   anything, and gives up the branch's 28 commits.
-
-Route 1 is the recommendation: it keeps the design the later instruction asked
-for, keeps the tests, and avoids resolving a conflict whose two sides are both
-internally correct.
-
-Nothing on the branch is lost either way — it stays at
-`refs/heads/claude/plan-day-range-pdm13` (`c8125af`) as the reference for
-whichever route is taken.
-
-### 2. `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day` (medium)
-
-Covered in item 1: it contradicts `test_pdm141` on `main`, asserts the
-mechanism PD-M14 removed, and exists on no branch. Rewrite it against the
-drawn day. Do not merge anything expecting it to go green.
+**Not closeable by editing the docstrings.** Deleting the `Tests:` lines would
+turn the meta test green while making the gap invisible, which is the opposite
+of what that test is for. It needs the three tests written. Belongs to the
+priority batch.
 
 ### 3. Seven tests measure the CI display rather than the code — WTP-A11 (medium)
 
@@ -140,22 +120,18 @@ manager to honour the write, and the CI display has none. Red since at least
 `3f705b4` (2026-11-07). One shared precondition rather than seven is the part
 worth designing; `23f0cc7` is the worked example for a single test.
 
-### 4. Two traceability tests name things that do not exist (low)
+### 4. PARTLY CLOSED — the traceability pair (low)
 
-`tests/test_traceability_refs.py::test_every_referenced_test_file_exists` and
-`::test_every_referenced_test_name_exists`. Both are small and entirely
-mechanical — correct the docstring, or write the missing test:
+`::test_every_referenced_test_name_exists` is **green** (PDT-M4.1, `2cd83a3`).
+Seven names from the PD-M14 rewrite were repointed at the tests that now cover
+them, one at a time rather than matched approximately. One of the seven,
+`edge_limit_time`, had no test under the name it claimed and none under any
+other; it now points at
+`tests/test_plan_screen.py::test_pdm146_both_ends_refuse_at_midnight_and_say_which`,
+which is what asserts its limit reaches the message.
 
-- `src/getmoredone/models.py` names `tests/test_priority_floor_and_cap.py` and
-  `tests/test_priority_floor_form.py`. Neither exists; the only priority test
-  file is `tests/test_priority_level_colors.py`.
-- `docs/spec_coverage.md`, `src/getmoredone/screens/plan.py` and
-  `src/getmoredone/time_block_layout.py` name `pdm5`, `pdm52`, `pdm58`,
-  `pdm146` and `tgm31` tests that are off by a generation from the ones that
-  exist.
-
-These belong to the priority and plan-day batches. Item 1's merge may change
-which names are right, so do them after it.
+`::test_every_referenced_test_file_exists` is **still red**, on the two
+`models.py` references only. That is item 2, and it is not a docstring fix.
 
 ### 5. Two tests fail only in CI (low)
 

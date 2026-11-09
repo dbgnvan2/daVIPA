@@ -953,3 +953,34 @@ file restored and sha256-compared. 8 red, no finding.
 UPD-F1 was **not** verified on screen. The app was not launched: a relaunch is
 what §11 step 10 walks, and it is the one thing no test can do. Step 10 should
 be re-walked once UPD-F2 to UPD-F4 are in.
+
+---
+
+## PDT — the plan-day tests follow PD-M14 (2026-11-09)
+
+Plan: [`docs/implementation_plan_2026-11-09_plan_day_tests_follow_pd_m14.md`](implementation_plan_2026-11-09_plan_day_tests_follow_pd_m14.md)
+
+The brief was to port `outside` from `refs/heads/claude/plan-day-range-pdm13`.
+There was nothing to port: `outside` is implemented on `main` at both layers.
+The nine red tests reached their subject through mechanisms PD-M14 withdrew, so
+each keeps its assertions and changes only its vehicle (repo test rule case
+(b)). No `src/` behaviour changed in this batch.
+
+| Spec ID | Description | Implementation | Test | Status |
+|---|---|---|---|---|
+| PDT-M1.1 | An outside block is drawn, reached by lunch over its box instead of a tighter Day End | unchanged `src/getmoredone/time_block_layout.py::build_day_grid` (lunch branch) | `tests/test_plan_screen.py::test_tgm31_an_outside_block_is_drawn` | done |
+| PDT-M1.2 | Every descendant of an outside row starts a drag | unchanged `src/getmoredone/screens/plan.py` (PD-M13 binding walk) | `tests/test_plan_screen.py::test_every_part_of_an_outside_row_starts_a_drag` | done |
+| PDT-M1.3 | The screen passes `drag_schedule_box_height_px` through to the outside holder | `src/getmoredone/screens/plan_blocks.py::build_outside_group` (`height=chip_height`, unchanged) | `tests/test_plan_screen.py::test_pbm55_the_settings_reach_the_outside_group_on_screen` | done |
+| PDT-M1.4 | The group does not outlive the day that had one | unchanged `src/getmoredone/screens/plan.py::load_blocks` (the `else` branch) | `tests/test_plan_screen.py::test_the_outside_group_does_not_outlive_the_day_that_had_one` | done |
+| PDT-M1.5 | Eight outside blocks scroll rather than push the item list off the pane | unchanged `src/getmoredone/screens/plan.py` (`outside_frame` as `CTkScrollableFrame` at `OUTSIDE_GROUP_HEIGHT_PX`) | `tests/test_plan_screen.py::test_the_outside_group_scrolls_instead_of_growing_past_the_pane` | done |
+| PDT-M1.6 | The group takes no room on a day without one | unchanged `src/getmoredone/screens/plan.py::load_blocks` (`grid()` / `grid_remove()`) | `tests/test_plan_screen.py::test_the_outside_group_takes_no_room_on_a_day_without_one` | done |
+| PDT-M2.1 | A drop on an end of a non-work day asks nothing and writes the block | unchanged `src/getmoredone/screens/plan.py::extend_day_for`, `::_require_block_day` | `tests/test_plan_screen.py::test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day` | done |
+| PDT-M2.2 | The block lands at a negative box, earlier than the day start, at this date only | unchanged `src/getmoredone/time_block_layout.py::extended_span` | same test (`slot_index == -1`, `start_time == "07:30"`) | done |
+| PDT-M2.3 | The status names the day it now shows and that it is not a regular work day | unchanged `src/getmoredone/screens/plan.py::extend_day_for` status | same test | done |
+| PDT-M2.4 | The withdrawn `bounds.day_start` assertion is recorded as withdrawn, not silently dropped | — | the test's own docstring, naming `test_pdm141_a_drop_on_earlier_never_calls_save` as the guard | done |
+| PDT-M3.1 | Extending the day leaves `plan_day_shape_unconfirmed` alone, in both directions, with a precondition that can fail | unchanged `src/getmoredone/screens/plan.py::extend_day_for` (writes no settings) | `tests/test_plan_settings.py::test_pdm54_extending_the_day_is_not_confirming_it`, `::test_pdm54_an_already_confirmed_day_stays_confirmed` | done |
+| PDT-M3.2 | The settings file is not written at all by a drop | — | `tests/test_plan_settings.py::test_pdm54_extending_the_day_is_not_confirming_it` (the file is unchanged byte for byte) | done |
+| PDT-M4.1 | `test_every_referenced_test_name_exists` passes; seven stale references repointed | `src/getmoredone/screens/plan.py`, `src/getmoredone/time_block_layout.py`, this file | `tests/test_traceability_refs.py::test_every_referenced_test_name_exists` | done |
+| PDT-M4.2 | `test_every_referenced_test_file_exists` passes | **not done** — `src/getmoredone/models.py` names two test files and three tests for PRI-M1/M2 that have never existed. Closing it means writing them; deleting the `Tests:` lines would hide the gap. `BACKLOG.md` item 2. | `tests/test_traceability_refs.py::test_every_referenced_test_file_exists` — still red | **not done** |
+| PDT-N1 | `refs/heads/claude/plan-day-range-pdm13` is superseded, not merged or lost | a git ref at `c8125af` | **not code-testable** — recorded in `BACKLOG.md` item 1 and the handoff note | done (by review) |
+| PDT-N2 | Each rewrite still protects what the test it replaced protected | — | **not code-testable** — the old-vehicle/new-vehicle table in `docs/changes/2026-11-09-plan-day-tests-follow-pd-m14.md`, read by the cold sweep | done (by review) |

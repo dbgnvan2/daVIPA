@@ -1,21 +1,30 @@
-## Where `main` stands (2026-11-08, end of day)
+## Where `main` stands (2026-11-09)
 
-Concurrent batches are finished as a way of working — one batch at a time from
-here, per `CLAUDE.md`. What that leaves:
+One batch at a time from here, per `CLAUDE.md`. What that leaves:
 
-- **`main` is red on 20 tests** (CI run 42550648188 on `b6d6ddf`, identical on
-  Python 3.11, 3.12 and 3.13). The breakdown and what each needs is the first
-  section of `BACKLOG.md`.
-- **Two branches hold finished work that is not on `main`** and are the first
-  thing to deal with: `refs/heads/claude/plan-day-range-pdm13` (28 commits,
-  closes eight of the twenty red tests — verified by running them at its tip)
-  and `refs/heads/claude/elegant-neumann-ab55c9` (3 commits, UPD-F1).
-- **Nothing is uncommitted and nothing is unpushed.** The shared checkout is
-  clean and `main` matches `origin/main`.
+- **Both leftover branches are settled.**
+  `refs/heads/claude/elegant-neumann-ab55c9` (UPD-F1) is **merged** at
+  `2fac9b3`. `refs/heads/claude/plan-day-range-pdm13` is **superseded and
+  stays unmerged** at `c8125af`: it holds the earlier design of the plan day,
+  the one whose shared-setting write caused both reported faults. It must not
+  be merged. Whether to delete it is undecided.
+- **Eleven of the twenty red tests are closed** by the PDT batch — the nine
+  plan-day failures and `test_every_referenced_test_name_exists`. They were
+  stale test vehicles, not missing code: `outside` was implemented on `main`
+  at both layers the whole time. `docs/changes/2026-11-09-plan-day-tests-follow-pd-m14.md`.
+- **Nine failures are left, and they are one family:** the always-on-top and
+  window-geometry tests, which **pass locally** and fail on a CI runner with
+  no window manager. `BACKLOG.md` items 3 and 5. One shared precondition, not
+  nine fixes.
+- **One real coverage gap, newly filed.** PRI-M1/M2 shipped with `models.py`
+  naming two test files and three tests that have never existed, so the
+  priority cap, the floor and the "(capped)" label are unverified.
+  `test_every_referenced_test_file_exists` is red on exactly that and is not
+  closeable by editing docstrings. `BACKLOG.md` item 2.
 
-The one test that no branch fixes is
-`test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day`: it is on
-`main`, fails there, and exists on neither branch.
+The claim that the plan-day branch "closes eight of the twenty red tests", and
+the claim before it that nothing needed writing to close them, were both wrong
+and are corrected in `BACKLOG.md` item 1 with the measurements.
 
 ## Recent Changes (2026-11-08)
 

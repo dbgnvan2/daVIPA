@@ -289,6 +289,32 @@ implementation code written**:
   number in prose
 - Four adjacent issues found and not fixed, to be filed as PRI-A1 to PRI-A4
 
+### docs/implementation_plan_2026-11-09_plan_day_tests_follow_pd_m14.md
+
+Implementation plan for bringing nine stale plan-day tests up to the PD-M14
+design (PDT-M1 - PDT-M5). **Approved 2026-11-09 and built the same day: 16 of
+17 criteria `done`, PDT-M4.2 `not done` with its reason** - per-criterion
+status in `docs/spec_coverage.md`, handoff note
+`docs/changes/2026-11-09-plan-day-tests-follow-pd-m14.md`:
+
+- Why the brief it was written against - port `outside` from
+  `refs/heads/claude/plan-day-range-pdm13` - had nothing to port: `outside` is
+  implemented on `main` at both the layout layer and the screen, and a screen
+  test using the "never placed" vehicle passed throughout
+- The two public-name lists that show which side is the later design, and the
+  shared-setting write on the branch that caused both reported faults
+- The one cause behind six of the nine failures: PD-M14.2 derives the drawn day
+  from the date's own blocks, so a tighter Day End can no longer orphan one
+- The four routes to `outside` that still exist, each already green in
+  `tests/test_time_grid.py`, and which one each rewrite uses
+- `test_pdm131` and `test_pdm141` asserting opposite things about one call on
+  one branch, and why `test_pdm131` is rewritten rather than deleted
+- PDT-M1.3 flagged in advance as the one criterion that might need `src/` work,
+  because it had never run against the holder it names; it did not
+- Two criteria flagged as not code-testable (PDT-N1, PDT-N2) with a
+  human-review proposal for each
+- Nine CI-environment failures listed as adjacent and not touched
+
 ### docs/spec_2026-11-08_weekly_tactic_as_parent.md
 
 Spec and implementation plan for a Weekly Tactic acting as the parent of the
@@ -678,7 +704,9 @@ Documentation is updated:
 - When user issues are resolved
 - During major releases
 
-**Current Status**: last index entry added 2026-11-08 (the Plan day
-Google Calendar export plan). This footer used to read "All documentation up to date as of 2026-01-24";
+**Current Status**: last index entry added 2026-11-09 (the PDT plan-day test
+plan). Known missing: `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`
+(PD-M14) is not listed here, found while adding the PDT entry and left for the
+batch that owns it - which is what PLC-A5 is about. This footer used to read "All documentation up to date as of 2026-01-24";
 nothing checks that claim - no test asserts every document is listed here, which
 is PLC-A5 in `BACKLOG.md` - so it is stated as a date, not as a guarantee.
