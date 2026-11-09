@@ -11,11 +11,12 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   on 2026-11-09 found eleven medium-or-higher defects in that work, all
   confirmed by re-measurement and all fixed: four of them were guards or
   figures in the batch's own tooling that could not fail on the thing they
-  named, which is the batch's own subject. `SST-A3` to `SST-A7` are filed, not
-  fixed. See `docs/changes/2026-11-08-status-claims.md`.
-  `docs/changes/2026-11-08-status-claims.md`. Two adjacent issues filed, not
-  fixed: `SST-A1` (a reference guard whose floor is 18% of its domain) and
-  `SST-A2`.
+  named, which is the batch's own subject. A second cold pass, in a different
+  failure family, then found one high and five mediums — among them a criterion
+  recorded `done` against the docs-sync gate, which runs only on
+  `pull_request` and so has never run here (`SST-A8`). All six fixed.
+  `SST-A1` to `SST-A8` are filed, not fixed. See
+  `docs/changes/2026-11-08-status-claims.md`.
 
 - **Both leftover branches are settled.**
   `refs/heads/claude/elegant-neumann-ab55c9` (UPD-F1) is **merged** at

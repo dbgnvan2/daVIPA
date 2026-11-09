@@ -15,10 +15,10 @@ python run.py
 # Tests
 pytest                                          # All tests
 pytest -m "not meta"                            # App behaviour only (2432 tests)
-pytest -m meta                                  # Repo/infra assertions only (224 tests)
+pytest -m meta                                  # Repo/infra assertions only (225 tests)
 # Both counts measured 2026-11-09 with `-m <marker> --collect-only -q`, whose
 # last line prints collected/deselected — re-measure rather than trusting them.
-# They had been 1691 and 212, stale by 741 and 12. No test asserts either
+# They had been 1691 and 212, stale by 741 and 13. No test asserts either
 # number, which is why they drifted; one that did would go red on every batch.
 pytest -v                                       # Verbose
 pytest tests/test_vps_integration.py -v        # Single file
@@ -93,8 +93,14 @@ See `AGENTS.md` for the full agreements.
 test/verification status, follow-ups.
 
 If code behavior, UI text, or dependencies changed → docs and the requirements
-files must be updated in the same change. Enforced by the docs sync gate
-(`.github/workflows/agent-docs-gate.yml`), which treats both `requirements.txt`
+files must be updated in the same change. **Not currently enforced anywhere
+that runs**: the docs sync gate
+(`.github/workflows/agent-docs-gate.yml`) triggers on `pull_request` only, and
+this repo pushes to `main` and opens no pull requests, so the gate has never
+run on the way work actually ships here. Run it by hand —
+`./venv/bin/python tools/agents/check_docs_sync.py` — until `SST-A8` moves the
+check into the test suite, where `tests.yml`'s own rule says it belongs. The
+gate, when it does run, treats both `requirements.txt`
 and `requirements-dev.txt` as dependency files.
 
 ### One build batch at a time

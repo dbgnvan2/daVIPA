@@ -1089,7 +1089,7 @@ No file under `src/` is touched. Every row below is a document or a guard.
 | SST-M7 | `UPD-A13` and `PLC-A5` name each other | both filings in `BACKLOG.md` | `::test_sstm7_the_two_filings_of_the_index_gap_cross_reference` | done |
 | SST-M8 | no markdown cites the four chronic documents by line number | twelve cites in nine documents | `::test_sstm8_the_chronic_documents_are_not_cited_by_line_number`, `::test_sstm8_that_guard_can_fire` | done |
 | SST-M9 | `PRI-A1`–`PRI-A4` are filed | a new section in `BACKLOG.md`, with two of the plan's four descriptions corrected | `::test_sstm9_every_promised_pri_adjacent_item_is_filed` | done |
-| SST-M10 | the batch's records exist | this section, the note, the `BACKLOG.md` closure table, `NOTES.md`, `docs/DOCUMENTATION_INDEX.md` | the docs-sync gate | done |
+| SST-M10 | the batch's records exist | this section, the note, the `BACKLOG.md` closure table, `NOTES.md`, `docs/DOCUMENTATION_INDEX.md` | `::test_sstm10_every_record_of_this_batch_exists_and_names_it` | done |
 
 ### Not code-testable
 
@@ -1103,9 +1103,10 @@ Collect them rather than trusting this sentence: run the suite's collection
 over `tests/test_doc_status_claims.py` with `--collect-only -q` and read the
 last line.
 
-Ten tests: **seven guards and three companions** proving a guard can fire.
-Corrected 2026-11-09 by the cold pass, which counted them; this said six and
-four. The four guards without a companion — SST-M4, SST-M7, SST-M9 and the
+Eleven tests: **eight guards and three companions** proving a guard can fire.
+First corrected 2026-11-09 by the first cold pass, which counted them (this
+said six and four), then again by the second, which added SST-M10's guard. The
+five guards without a companion — SST-M4, SST-M7, SST-M9, SST-M10 and the
 second half of SST-M3 — each assert on a named anchor in a named file, so one
 that stopped finding its subject fails on the anchor rather than passing
 vacuously. That is weaker than a companion and is filed as `SST-A4`.
@@ -1127,12 +1128,13 @@ is another reference, and the count is the point.)
 
 ### Mutations
 
-Twelve, each restored with the verbatim original and confirmed byte-identical
-by sha256 rather than by `git diff` — two of the files were untracked when the
-first mutations ran, which is the state that made a `git checkout --` restore
-report success while restoring nothing in the PRIT batch. A to H were run as
-the guards were written; I to L on 2026-11-09, against the assertions the cold
-pass changed.
+Eighteen, each restored with the verbatim original and confirmed
+byte-identical by sha256 rather than by `git diff` — two of the files were
+untracked when the first mutations ran, which is the state that made a
+`git checkout --` restore report success while restoring nothing in the PRIT
+batch. A to H were run as the guards were written, I to L on 2026-11-09 against
+the assertions the first cold pass changed, and M to R the same day against the
+assertions the second one changed.
 
 | | mutation | result |
 |---|---|---|
@@ -1144,20 +1146,31 @@ pass changed.
 | F | a line cite returns to the time-blocks plan | 1 failed (SST-M8) |
 | G | `### PRI-A3` renamed to `### PRI-A3x` | **passed before the fix**, 1 failed after. SST-M9 matched the name as a substring of a longer heading |
 | H | `_filing_body` left taking its slice from the first mention of a name | **passed before the fix**, 1 failed after. The slice began at byte 0 and the guard asserted the whole file contains both names |
-
 | I | a `## Status` heading with "awaiting approval; no code written" on the line below it, in the time-grid plan | 1 failed (SST-M1). Before the cold pass widened the guard this was **green**: the claim did not begin the line |
 | J | §6's summary alone goes back to "all 40 criteria" | 1 failed (SST-M3). Before the cold pass this was **green**: the assertion was a whole-file substring, and the spec's corrected status line also states the count, so §6 could rot untouched |
 | K | the WTP handoff note alone goes back to 38 | 1 failed (SST-M3). Before the cold pass the note was not in any guard's domain, and it had kept 38 after every other document was corrected |
 | L | the markdown walk stops reaching `docs/changes/` | 1 failed (SST-M8's companion). Before the cold pass the companion asserted a floor of 200 against 245 files, so losing a whole directory was **green** |
+| M | a claim on the third non-blank line of a `## Status` section | 1 failed (SST-M1). Green until the second cold pass: the heading rule read a two-line window, and a status section longer than two lines is the normal shape here |
+| N | `BACKLOG.md`'s WTP sentence goes back to 40 | 1 failed (SST-M3). Green before: the only `BACKLOG.md` assertion was that the string "all 38 criteria" was absent, so every other wrong figure passed |
+| O | the index's WTP entry goes to "39 of 39" | 1 failed (SST-M3). Green before: `docs/DOCUMENTATION_INDEX.md` was in no guard's domain, and it was one of the three documents that disagreed in the original defect |
+| P | a line cite written as a bare basename plus a line number — no `docs/` prefix — added to `NOTES.md` (described, not written out: the widened pattern reads this file) | 1 failed (SST-M8). Green before: the pattern required the `docs/` prefix for three of the four chronic documents. No such cite existed, so the hole was latent |
+| Q | `NOTES.md` stops naming any `SST-…` id | 1 failed (SST-M10) — the guard that replaced "the docs-sync gate" |
+| R | the PRI plan names all four `PRI-A` items instead of its two endpoints | 1 **passed**, which is the point: SST-M9 asserted the set of names equalled the two endpoints, so the natural edit now that the four are filed turned it red with nothing wrong. It now checks that every name is inside the promised range |
+
 
 G and H are the two guards that shipped unable to fail. Both were found by
 asking what the assertion would accept, not by running it, and both are the
 batch's own subject appearing in the batch's own tooling.
 
-I to L are four more of the same kind, found by the cold pass: three
-assertions that could not fail on the thing they named, and one document the
-guard could not see. Together with G and H that is six, in a batch whose
-subject is claims nothing checks. The pattern is not that the guards were
-careless — each was green when written — but that a guard is only as good as
-the question "what would this accept?", and that question has to be asked by
-someone who did not write it.
+**Ten of the eighteen were green when first run** against the assertion as it
+then stood: G and H as shipped, I to L against the assertions the first cold
+pass had to change, M to P against the assertions the second one had to change.
+R is the opposite failure — an assertion red on a correct edit. That is eleven
+of eighteen mutations finding something, in a batch whose subject is claims
+nothing checks.
+
+The pattern is not that the guards were careless; each was green when written,
+and each was written by someone who had just read the defect it was for. It is
+that a guard is worth only the question "what would this accept?", and that
+question is answered badly by whoever wrote the assertion. Both cold passes
+found their defects by asking it, not by running anything.

@@ -388,11 +388,19 @@ test design written out. `PLC-A5` files the same gap at low. Six places
 route the reader to `PLC-A5` for this gap — four in
 `docs/DOCUMENTATION_INDEX.md`, one in this file and one in
 `docs/spec_coverage.md`; list them with
-`grep -rn 'PLC-A5' --include='*.md' --exclude-dir=.claude .`, which returns
-fourteen lines: six route the reader, and the other eight are the `PLC-A5`
-item itself, the two that only record the filing, and this item's own text. None of them mentions `UPD-A13`, so a reader
-lands on the low item — whose first sentence is also stale, see SSC-5 — and
-never reaches the designed fix.
+`grep -rn 'PLC-A5' --include='*.md' --exclude-dir=.claude .`. **The state at
+filing**, which is what the rest of this item describes: that grep returned
+fourteen lines, six of them routing the reader, and none of them mentioned
+`UPD-A13`, so a reader landed on the low item — whose first sentence was also
+stale, see SSC-5 — and never reached the designed fix.
+
+**Now**: both filings name each other, held by
+`tests/test_doc_status_claims.py::test_sstm7_the_two_filings_of_the_index_gap_cross_reference`,
+and the grep returns 26 lines rather than fourteen. The sentences above are
+left in the past tense rather than rewritten, because they are what the filing
+said; they were in the present tense until the second cold pass read them on
+2026-11-09 against the guard that closed this item and found them contradicting
+it.
 
 ### SSC-9 — the WTP spec says nothing is outstanding, then lists two `not done` — CLOSED 2026-11-08
 
@@ -575,6 +583,32 @@ the summary to agree with them — is what the guard should do.
 Filed 2026-11-09 by the cold pass over the SST batch.
 
 **Priority:** Low
+**Effort:** Medium
+
+### SST-A8 — the docs-sync gate runs only on pull requests, and this repo opens none (medium)
+
+`.github/workflows/agent-docs-gate.yml` triggers on `pull_request` only. This
+repo pushes to `main`; the standing instruction is no pull requests. So
+`tools/agents/check_docs_sync.py` has never run on the way work actually ships
+here, and the sentence in `CLAUDE.md` saying docs updates are "enforced by the
+docs sync gate" described an enforcement that cannot fire. Measured 2026-11-09
+by the second cold pass; `CLAUDE.md` now says so, and the SST batch's `SST-M10`
+no longer names the gate as its test.
+
+This is the class `.github/workflows/tests.yml`'s own header forbids: "No check
+lives only here. Every assertion belongs in the pytest suite so it can fail
+before a push." The gate is a check reachable from exactly one surface, and not
+the one anyone uses — the same shape as `P25` in
+`~/.claude/standards/learnings.md`.
+
+The fix is a test that runs the gate's logic over a range, so it fails locally
+and in `tests.yml` before a push: `check_docs_sync.py` already has a `main()`
+and takes `--base`/`--head`, and `tests/test_release_licensing.py` already
+imports the module, so the pieces are in place. Deciding what range a test
+should check — the push range is not knowable from inside a test run — is the
+judgement, which is why it was not done in-loop.
+
+**Priority:** Medium
 **Effort:** Medium
 
 ## Adjacent issues — priority defaults and the cap (PRI, filed 2026-11-08)
@@ -924,8 +958,12 @@ triple, and the wording should be settled once, there, rather than twice.
 **Title:** UPD-A13 - no test enforces docs/DOCUMENTATION_INDEX.md's completeness
 **Description:** The global rule in `~/.claude/CLAUDE.md` is that where a repo
 keeps a documentation index, every document is listed in it **and a test
-enforces that**. `grep -rn DOCUMENTATION_INDEX tests/` returns nothing, so
-this repo's index is kept entirely by hand - which is how it came to carry a
+enforces that**. No test checks the index for completeness. (This line used
+to say `grep -rn DOCUMENTATION_INDEX tests/` returned nothing; the SST batch
+falsified that on 2026-11-08 — the grep now returns the eight lines in
+`tests/test_doc_status_claims.py`, none of which checks completeness. Corrected
+2026-11-09 by the second cold pass; the conclusion stands, its evidence did
+not.) The index is kept by hand - which is how it came to carry a
 "Not approved" line for a plan that had been approved and built the same day,
 found while writing this batch's entry.
 

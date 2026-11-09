@@ -57,7 +57,7 @@ Added, in `tests/test_doc_status_claims.py`:
   continuation form the `RP-2.5` defect was written in;
 - a check that the **four chronic documents are not cited by line number**.
 
-Three of the seven have a companion proving they can fire; the other four
+Three of the eight have a companion proving they can fire; the other five
 assert on a named anchor in a named file, which is weaker, and is filed as
 `SST-A4`. Two of the counts are exact rather than floors (35 plan/spec
 documents, 186 implementation references). The markdown walk was checked by a
@@ -156,14 +156,77 @@ anyway, so it was corrected there. `SST-A3` and `SST-A4` are the structural
 halves of findings 5 and 11, filed because the in-loop fix narrows those holes
 without closing them.
 
-Under the budget this pass earns one more, because it produced highs: a second
-cold pass, in a different failure family.
+Under the budget this pass earned one more, because it produced highs. That
+second pass is recorded above.
+
+## The second cold pass, 2026-11-09
+
+Earned under the budget because the first produced highs, and run in a
+different failure family: not "is this figure true" but **"are these guards
+load-bearing, and does the batch obey the repo's own process rules"**. One high
+and five mediums, all re-measured here before any fix, all confirmed, all
+fixed. Six mutations, M to R in `docs/spec_coverage.md`'s table.
+
+**High — a criterion recorded `done` against evidence that cannot run.**
+`SST-M10`'s test was given as "the docs-sync gate".
+`tools/agents/check_docs_sync.py` only asserts that *some* path under `docs/`
+changed alongside code — it never reads the five records `SST-M10` names — and
+`.github/workflows/agent-docs-gate.yml` triggers on `pull_request`, which this
+repo never opens. So the gate has never run on the way work ships here, and the
+sentence in `CLAUDE.md` claiming docs updates are "enforced by the docs sync
+gate" described an enforcement that cannot fire. `CLAUDE.md` now says so and
+gives the by-hand command; `SST-M10` has a real guard, weak and labelled weak;
+the dead gate is filed as `SST-A8`. This is the batch's own defect family found
+in the batch's own acceptance criteria.
+
+Mediums:
+
+- **The status-heading rule read a two-line window.** A claim on the third line
+  of a `## Status` section passed — and a section longer than two lines is the
+  normal shape here. The rule now runs to the next heading (mutation M). The
+  hole was opened by the *first* cold pass's fix, which is the budget's reason
+  for saying every in-loop fix is in scope for the next pass.
+- **`SST-M3` policed one historical figure, not the count.** Its only
+  `BACKLOG.md` assertion was that the string "all 38 criteria" was absent, so
+  40 passed; and `docs/DOCUMENTATION_INDEX.md`, one of the three documents that
+  disagreed in the original defect, was in no guard's domain. Both are now
+  anchored on their own sentence and checked against the recount (mutations N
+  and O).
+- **`SST-M8`'s pattern required the `docs/` prefix** for three of the four
+  chronic documents, so the same cite written as a bare basename with a line
+  number escaped. Latent — no such cite existed — and now matched on the
+  basename with any prefix or none (mutation P). The example is described
+  rather than written out, because the widened pattern reads this file too.
+- **`SST-M9` went red on a correct edit.** It asserted that the set of
+  `PRI-A…` names in the plan equalled its two endpoints, so naming all four —
+  the natural edit now that they are filed — turned it red with nothing wrong.
+  It now checks that every name is inside the promised range (mutation R).
+- **Two claims this batch falsified and left standing.** `UPD-A13` cited
+  `grep -rn DOCUMENTATION_INDEX tests/` returning nothing; this batch's own
+  test file made that false while the conclusion stayed true. `SSC-8`'s closed
+  body said neither filing mentioned the other, which the guard that closed it
+  now asserts the opposite of, and gave a grep count of fourteen where 26 is
+  current. Both re-worded; `SSC-8`'s is marked as the state at filing rather
+  than rewritten.
+
+Also corrected: the rationale for excluding `docs/changes/` from `SST-M1` while
+`SST-M3` reaches into it. The distinction was never written down — a claim that
+was true when written is exempt, a figure that was never true is not — so the
+two rules read as contradicting each other.
+
+Four low findings are measurements of items already filed (`SST-A6`, `SST-A7`),
+a poor diagnostic when §6 is renumbered (now an assertion with a message), and
+the index-completeness test that `UPD-A13` and `PLC-A5` already cover.
+
+Under the budget this pass earns one more, because it produced a high.
 
 ## Files changed
 
 Tests (committed separately from the documents, per the repo rule):
 
-- `tests/test_doc_status_claims.py` — **new**, 10 tests
+- `tests/test_doc_status_claims.py` — **new**, 11 tests (8 guards, 3
+  companions). Collect the count rather than trusting this line:
+  `--collect-only -q` over the file prints it
 - `tests/test_ci_contract.py` — the new file added to `META_TEST_FILES`, which
   failed on its absence
 
@@ -261,9 +324,12 @@ are untouched by this batch and were never in its scope.
 
 ## Next agent actions
 
-- A **second cold pass** is owed before this batch is pushed, in a different
-  failure family from the first: the budget grants one more pass because the
-  first produced high-severity findings.
+- A **third cold pass** is owed before the next batch, in a different failure
+  family again: the budget grants one more because the second pass produced a
+  high.
+- `SST-A8` — the docs-sync gate runs only on pull requests, so it has never
+  run here. It is the one filed item with a user-visible consequence: the rule
+  it was supposed to enforce is currently enforced by hand.
 - Decide `SST-A1` and `SST-A3` together: both are about how a guard decides
   what it will accept, and both are judgements about how often a red suite is
   acceptable.

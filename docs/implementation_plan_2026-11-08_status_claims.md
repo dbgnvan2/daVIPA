@@ -126,7 +126,7 @@ grep -rnE '(BACKLOG\.md|docs/spec_coverage\.md|CLAUDE\.md|docs/DOCUMENTATION_IND
 | SST-M7 | `UPD-A13` and `PLC-A5` name each other, so a reader landing on either reaches the designed fix | `test_sstm7_the_two_filings_of_the_index_gap_cross_reference` |
 | SST-M8 | No markdown document cites `BACKLOG.md`, `docs/spec_coverage.md`, `CLAUDE.md` or `docs/DOCUMENTATION_INDEX.md` by line number | `test_sstm8_the_chronic_documents_are_not_cited_by_line_number` |
 | SST-M9 | `PRI-A1` to `PRI-A4`, which the PRI plan promises and the index repeats, exist in `BACKLOG.md` | `test_sstm9_every_promised_pri_adjacent_item_is_filed` |
-| SST-M10 | The batch's own records exist: `docs/spec_coverage.md` SST section, handoff note, `BACKLOG.md` closures, `NOTES.md`, `docs/DOCUMENTATION_INDEX.md` | the index's own entry, and the docs-sync gate |
+| SST-M10 | The batch's own records exist: `docs/spec_coverage.md` SST section, handoff note, `BACKLOG.md` closures, `NOTES.md`, `docs/DOCUMENTATION_INDEX.md` | `test_sstm10_every_record_of_this_batch_exists_and_names_it` — added 2026-11-09 by the second cold pass. This read "the index's own entry, and the docs-sync gate", which cannot produce a `done`: `tools/agents/check_docs_sync.py` only asserts that *some* path under `docs/` changed, and its workflow runs on `pull_request`, which this repo never opens (`SST-A8`) |
 
 ### Not code-testable
 
