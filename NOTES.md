@@ -8,12 +8,17 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   stays unmerged** at `c8125af`: it holds the earlier design of the plan day,
   the one whose shared-setting write caused both reported faults. It must not
   be merged. Whether to delete it is undecided.
-- **Ten of the twenty red tests are closed** by the PDT batch — the nine
-  plan-day failures and `test_every_referenced_test_name_exists`. They were
-  stale test vehicles, not missing code: `outside` was implemented on `main`
-  at both layers the whole time. `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`.
-  Verified locally on five targeted files; **no CI run covers this range yet**.
-- **Ten failures are left, in three groups,** not one:
+- **Eleven of the twenty red tests are closed.** Ten by the PDT batch — the
+  nine plan-day failures and `test_every_referenced_test_name_exists` — which
+  were stale test vehicles, not missing code: `outside` was implemented on
+  `main` at both layers the whole time
+  (`docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`). The eleventh,
+  `test_every_referenced_test_file_exists`, by the PRIT batch, which wrote the
+  31 tests PRI-M1 and PRI-M2 had shipped without
+  (`docs/changes/2026-11-08-pri-tests.md`). That also closes PDT-M4.2, the one
+  criterion the PDT batch recorded `not done`. Verified locally on targeted
+  files; **no CI run covers this range yet**.
+- **Nine failures are left, in two groups,** not three:
   - **Seven** always-on-top tests (`test_t51`, `test_t52`, `test_t56`,
     `test_t57`, `test_wt_m6b6`, `test_alpha_still_passes_through_the_attributes_wrapper`,
     `test_raw_tkinter_windows_are_hidden_and_registered_too`) pass locally and
@@ -25,13 +30,17 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
     so it cannot be reproduced on a working machine at all; and
     `test_updm14_zero_width_body_is_a_noop` builds no window and its cause is
     still unidentified.
-  - **The traceability gap**, `test_every_referenced_test_file_exists`, is the
-    next bullet.
-- **One real coverage gap, newly filed.** PRI-M1/M2 shipped with `models.py`
-  naming two test files and three tests that have never existed, so the
-  priority cap, the floor and the "(capped)" label are unverified.
-  `test_every_referenced_test_file_exists` is red on exactly that and is not
-  closeable by editing docstrings. `BACKLOG.md` item 2.
+- **The coverage gap is closed, and PRI-M3 is open in its place.** PRI-M1/M2
+  had shipped with `models.py` naming two test files and three tests that had
+  never existed, so the cap, the floor and the "(capped)" label were
+  unverified. Both files now exist, 31 tests, mutation-proved, and the meta
+  test is green — closed by writing the tests, not by editing the docstrings.
+  `BACKLOG.md` item 2. What the same measurement turned up: **PRI-M3, the
+  four-digit column, was never built at all**, so nothing yet proves `"P:9999"`
+  fits the score column at the larger selectable row font sizes, and five list
+  screens still carry their own width literals. Filed as `PRIT-N1`, medium, not
+  built — it is a feature change against the aligned-column contract, not a
+  test gap.
 
 The claim that the plan-day branch "closes eight of the twenty red tests", and
 the claim before it that nothing needed writing to close them, were both wrong

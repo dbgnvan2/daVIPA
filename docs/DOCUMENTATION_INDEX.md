@@ -298,7 +298,7 @@ being written against this plan in
 
 ### docs/implementation_plan_2026-11-08_pri_tests.md
 
-Implementation plan for the fourteen tests PRI-M1 and PRI-M2 shipped without
+Implementation plan for the tests PRI-M1 and PRI-M2 shipped without
 (`BACKLOG.md` item 2, and the spec-status half of `SSC-1`). **Proceeding
 without a separate approval round, on the user's standing instruction for this
 stretch**, which the plan records rather than assumes:
@@ -315,12 +315,22 @@ stretch**, which the plan records rather than assumes:
 - Why the three widget tests add no mapped window: `conftest.py` already
   silences `grab_set` and withdraws every window on creation
 
+**Built 2026-11-08: all 15 criteria `done`** - 14 by test, PRI-M2.7 by an
+existing test whose comment was corrected - per-criterion status in
+`docs/spec_coverage.md`. 31 tests, mutation-proved against six mutations.
+Handoff note: `docs/changes/2026-11-08-pri-tests.md`, listed here only inside
+this entry rather than as an entry of its own, as every handoff note is. The
+plan says "fourteen tests"; 31 is the collected count, the parametrized rows
+counted individually.
+
 ### docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md
 
 Implementation plan for bringing nine stale plan-day tests up to the PD-M14
 design (PDT-M1 - PDT-M5). **Approved 2026-11-08 and built the same day: 20 of
 21 criteria `done` - 12 by test, 8 by review, PDT-M4.2 `not done` with its
-reason** - per-criterion status in `docs/spec_coverage.md`. Handoff note:
+reason. PDT-M4.2 was closed later the same day by the PRIT batch, which wrote
+the two missing test files, so all 21 now read `done` - 13 by test, 8 by
+review** - per-criterion status in `docs/spec_coverage.md`. Handoff note:
 `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`, which is listed
 here only inside this entry rather than as an entry of its own, as every
 handoff note is:

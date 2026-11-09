@@ -104,9 +104,22 @@ ratcheting to 05:30, and blocks renumbered on every other date — because
 `slot_index` counts from a setting shared by every date. **Do not merge it.**
 Deleting it is a separate decision nobody has taken.
 
-### 2. PRI-M1/M2 shipped without its tests (medium)
+### 2. CLOSED 2026-11-08 — PRI-M1/M2 shipped without its tests (medium)
 
-The one real coverage gap on `main`, and the only thing still keeping
+**Closed by the PRIT batch**: `tests/test_priority_floor_and_cap.py` and
+`tests/test_priority_floor_form.py` exist, 31 tests, mutation-proved against
+six mutations (`750afe6`), and
+`tests/test_traceability_refs.py::test_every_referenced_test_file_exists` is
+**green**. PDT-M4.2, the one criterion that batch recorded `not done`, is
+closed with it. Plan and per-criterion status:
+`docs/implementation_plan_2026-11-08_pri_tests.md`,
+`docs/spec_coverage.md`'s PRIT section.
+
+It was closed the only way it could be — by writing the tests, not by deleting
+the `Tests:` lines, which would have turned the meta test green while making
+the gap invisible. What follows is the filing as it stood.
+
+The one real coverage gap on `main`, and the only thing that was still keeping
 `tests/test_traceability_refs.py::test_every_referenced_test_file_exists` red.
 
 `src/getmoredone/models.py` carries `Tests:` lines naming three tests in two
@@ -466,6 +479,37 @@ default, and would stay green for a regression that saved the file having
 changed `plan_day_end` alone. Reword both messages together; PDT-A3 was filed
 for one of them and the other was written afterwards, in the commit that was
 correcting the first.
+
+### PRIT-N1 — PRI-M3, the four-digit column, is not built (medium)
+
+`docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md`'s third
+criterion group. PRI-M1 and PRI-M2 are built and now tested; PRI-M3 is not
+built at all. `grep -rn "SCORE_COLUMN\|score_column_width" src/` returns
+nothing, and the `P:` labels are still literal `width=60` in five list screens
+(`today.py`, `upcoming.py`, `completed.py`, `hierarchical.py`, plus
+`all_items.py` at `width=80` for the bare number), with `today.py`'s header
+carrying its own `("Pri", 60)`.
+
+Two criteria:
+
+- **PRI-M3.1** — `"P:9999"` and `"9999"` fit the label at **every** selectable
+  row font size (`theme.LIST_ROW_FONT_SIZE`, 10–24), measured with the real
+  font via `CTkFont.measure` on a withdrawn root.
+- **PRI-M3.2** — the row label and `today.py`'s header read their width from
+  **one** place, so the header cannot drift from the column it labels. That is
+  the repo's aligned-column contract.
+
+Filed rather than built by the PRIT batch, whose subject was the missing tests.
+M3.2 is a feature change threading one constant through five screens, and
+scaling a test batch into a five-screen UI change is the user's decision.
+Nothing is broken by the delay: the column was already sized for four digits
+and the cap it serves is in place, so what PRI-M3.1 would add is the *proof*
+that the text fits at all eleven font sizes — which may well fail at the larger
+ones, and that is the finding it exists to produce.
+
+Not to be closed by writing M3.1's test alone against today's code: a passing
+measurement would leave M3.2's single source of truth unbuilt while reading as
+though M3 were done.
 
 ### PDT-A6 — `edge_limit_time` has no direct test (low)
 
