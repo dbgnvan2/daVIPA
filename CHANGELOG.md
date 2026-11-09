@@ -31,13 +31,110 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   dragging a column becomes the proportion the next resize shares the panel
   out by, so the *shape* of a panel survives a window of a different size.
 
-### Known gap — column widths still do not survive a relaunch (2026-11-08)
+### Known gap
 
-- This is the defect the same walk found and it is **not** fixed here: it needs
-  a change to `AppSettings.save()`, which writes the whole settings object and
-  so lets a screen holding an older snapshot revert what another screen wrote.
-  Another batch holds that file open. Until then, every width above is for as
-  long as the app is running.
+- **Column widths and divider positions still do not survive a relaunch.**
+  This is the defect the same walk found, and it is not fixed here: it needs a
+  change to `AppSettings.save()`, which another batch holds open. Until then,
+  the widths above are for as long as the app is running.
+
+### Added — the planned day exports to Google Calendar (2026-11-08)
+
+- **The Plan screen has a "⤴ Google Calendar" button** that writes the
+  selected day's time blocks out as timed events: items, buffers and breaks,
+  titled the way the block is titled on screen, and timed from **the box the
+  block is drawn in** — not from the clock columns stored with it, which are a
+  record of the day's hours as they were when the block was placed. Change Day
+  Start and the calendar gets the day the screen is showing. Blocks the day
+  draws under *Outside the day* — no box at all, or a box Day End has moved
+  past, or a box the lunch hour has been moved over — are skipped and counted
+  rather than guessed at, and lunch is not a block so nothing is written for
+  it.
+- **A second export of the same day updates it instead of duplicating it.**
+  Each block records the event it owns (`time_blocks.calendar_event_id`, added
+  by an idempotent migration) and each event carries the block's id in its own
+  private properties. A block that moved or changed length moves and changes
+  length on the calendar; a block that is gone takes its event with it; an
+  event deleted in Google Calendar by hand is re-created. An event without
+  daVIPA's marker is never updated or deleted — the user's real meetings are
+  untouched, including in the same hour.
+- **Every Google Calendar call is now timeout-bounded and retried.** 429 and
+  5xx are tried three times in all — one attempt and two retries — with
+  exponential backoff, 404 and 410 are
+  reported as "the event is gone" rather than as a failure, and anything else
+  fails with the operation named. This covers the event calls the app already
+  had, not only the new ones.
+- The status line reports the counts that did not happen as well as the ones
+  that did — *"3 of 5 block(s) exported to Google Calendar for 2026-11-12 — 2
+  new, 1 updated, 2 skipped (not on the grid)"* — one block failing is one
+  block failing, and the button comes back enabled either way.
+- **Changing the target calendar moves the events, instead of stranding
+  them.** Each block records which calendar its event is on
+  (`time_blocks.calendar_event_calendar_id`, a second idempotent migration), so
+  an export after a change to `plan_export_calendar_id` takes each event off
+  the old calendar and creates it on the new one — *"3 moved to this
+  calendar"*. Before this the id was looked for on a calendar it had never
+  existed on, and the original was unreachable by any later run.
+- **A background export can no longer stop to sign in.** The client the worker
+  builds is non-interactive: where signing in would open a browser and then
+  wait on a console, it reports *"Google Calendar needs you to sign in
+  again"* and re-enables the button. A token that exists but cannot be used —
+  revoked access, a changed password, a damaged file — used to get past the
+  prerequisite checks and wedge the button under "Exporting…" for the life of
+  the process.
+- **One export per day at a time, across screens.** Navigating away from Plan
+  and back builds a new screen, which used to be able to start a second export
+  of the same day; the two raced over the same rows. The second is now refused
+  with *"2026-11-12 is already being exported"*.
+- **A block deleted while its export is in flight takes its new event with
+  it,** and is counted — *"1 deleted while exporting"* — rather than reported
+  as exported with an event on the calendar that nothing names.
+- **Exported blocks use your calendar's own reminder setting.** They used to
+  arrive with a ten-minute popup each, and with "use default" switched off —
+  so a sixteen-block day was sixteen notifications, overriding whatever you had
+  set on the calendar itself. Meetings made from an item's *Add to Calendar*
+  dialog still get their popup; that is what it is for.
+- **A throttled export waits and tries again instead of reporting failure.**
+  Google reports a rate limit as a 403 with a reason, not only as a 429, and a
+  day-sized export is a burst of twenty-odd calls — so the one condition the
+  retry layer exists for was the one it did not recognise, and every block in
+  the burst was reported as FAILED.
+- **A retried create can no longer leave two events behind.** Each event is
+  created with an id the app chooses, so a request that reaches Google and
+  whose reply is lost is answered the second time with "that one already
+  exists" rather than with a duplicate. This fixes the same duplicate in the
+  meeting dialog, which had no way to clean up after itself.
+- **The export never removes an event marked for another day.** Copy an
+  exported event onto another date, or make one recurring, and Google carries
+  the app's private marker along with it; the sweep now checks the day on the
+  marker as well as the block it names.
+- Setup and the full rules are in `docs/google-calendar-setup.md`; the target
+  calendar is `plan_export_calendar_id` in app settings, default `primary`.
+- **A day you have cleared still gets cleaned up.** Exporting a day with no
+  blocks left on it removes the events that day had, and says so — *"No blocks
+  planned for 2026-11-12 — 2 removed"*. It used to refuse before looking,
+  which left those events on the calendar with no way to take them off.
+- **A wifi blip during an export is retried**, not reported as a failure: the
+  retry around every calendar call now covers timeouts, DNS failures and
+  connection resets as well as 429 and 5xx. A disk error from the same call is
+  still reported, not retried.
+
+### Changed — the Plan screen's status line has its own row (2026-11-08)
+
+- **The status line moved out of the Plan header**, from the top right to its
+  own full-width row under the day. The header's widgets all have fixed widths
+  and the status label was last in the queue for what was left, so with a
+  seventh control in there it was being squeezed to nothing on a default-sized
+  window — measured at 1203px of header inside 1200px of window. Every message
+  this screen shows is affected, not only the export's; none of them can be
+  squeezed out now.
+- The **⤴ Google Calendar** button is 150px rather than 160px, which is what
+  makes the header itself fit.
+- **The export refuses when Google has never been connected**, instead of
+  starting and then waiting for a browser consent that the worker thread
+  cannot show: "Google Calendar is set up but not connected yet", naming the
+  token file it looked for. Connecting once from an item's Add to Calendar
+  dialog is still what makes the export work.
 
 ### Changed — the one panel design is finished and is waiting to be looked at (2026-11-08)
 

@@ -218,12 +218,25 @@ handoff note is `docs/changes/2026-11-08-priority-level-colours.md`:
 - Why the control is a new tab rather than a third section on Appearance
 - Five adjacent issues found and not fixed, filed in `BACKLOG.md`
 
+### docs/spec_2026-11-08_calendar_into_the_plan.md
+
+Spec for the other direction: reading the connected calendars, showing their
+commitments on the Plan grid so a day is planned around what is already gone,
+and editing those commitments in place (CIP-M0 - CIP-M7). **Draft, not
+approved, no code written, on the backlog.** Phase 1 is the selected day;
+phase 2 is a seven-day planning view over the same cache. Holds the decision
+that a commitment is *not* a `time_blocks` row and the five reasons, the rule
+that keeps the export's own events from returning as constraints on the blocks
+that made them, why `calendar_importer.py` stays alongside it (an action item
+is *what*, a commitment is *when*), and the four scope decisions taken
+2026-11-08.
+
 ### docs/implementation_plan_2026-11-08_plan_calendar_export.md
 
 Implementation plan for exporting a planned day to Google Calendar
 (CE-M1 - CE-M5). **Approved 2026-11-08 and built the same day**;
-per-criterion status, the verification runs and seven deviations from this
-plan's wording are in
+per-criterion status, the verification runs, eighteen deviations from this
+plan's wording and the four cold review passes' thirty-eight findings are in
 `docs/spec_coverage_2026-11-08_plan_calendar_export.md`, and the batch's
 handoff note is `docs/changes/2026-11-08-plan-calendar-export.md`:
 
@@ -237,8 +250,38 @@ handoff note is `docs/changes/2026-11-08-plan-calendar-export.md`:
   404/410 as "the event is gone" rather than as a failure
 - Why the worker thread hands its result back by polling instead of calling
   `after()` — Tk is not thread-safe and `after` is not an exception
-- Four adjacent issues found and not fixed
-- The six-step manual checklist, which is the part no test can cover
+- Why a day with no blocks left still runs the export: refusing first made the
+  orphan sweep unreachable for the one day that needs it
+- Why a background export cannot be allowed to sign in: the consent flow opens
+  a browser and then waits on a console, so the client the worker builds raises
+  `AuthenticationRequired` instead
+- Why every exported time is derived from the block's box and not read from its
+  stored clock columns, which are a record of bounds that may have moved
+- Why a block's event id records the calendar it is on, and what changing the
+  export calendar does to events already there
+- Why one export per day is enforced outside the screen: navigating away and
+  back builds a new one
+- Four adjacent issues found while building, plus seventeen below-medium findings
+  from the three cold review passes — none fixed in the batch, all filed in
+  `BACKLOG.md` as CE-A1 to CE-A21
+- The manual checklist, which is the part no test can cover
+
+### docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md
+
+Implementation plan for the lowest-value priority floor on new items and the
+9999 cap on the calculated score (PRI-M1 - PRI-M3). **Awaiting approval; no
+implementation code written**:
+
+- Why a new item is unscored today rather than lowest, and what that costs it
+  in every `priority_score DESC` list
+- The counted cost of capping the stored score: 33 of 256 factor combinations
+  collapse onto one flat top tier, and the display-only alternative
+- The three copies of the product arithmetic, and the one function that
+  replaces them
+- Why the floor is a create-time rule that never back-fills an existing row
+- The column-width criterion written as a font measurement rather than as a
+  number in prose
+- Four adjacent issues found and not fixed, to be filed as PRI-A1 to PRI-A4
 
 ### docs/spec_2026-11-08_weekly_tactic_as_parent.md
 
@@ -521,10 +564,9 @@ Large (>10KB):
 - daVIPA_MasterSpec_SQLite_v1.md (19KB)
 - docs/action-timer-requirements.md (19KB)
 - docs/EMAIL-AUTH-TROUBLESHOOTING.md (11KB)
+- docs/google-calendar-setup.md (13KB)
 
 Medium (5-10KB):
-
-- docs/google-calendar-setup.md (8.7KB)
 - docs/VPS_UPDATES_2026-01-24.md (8.5KB)
 - docs/CLIENT_ID_MISMATCH_FIX.md (7.6KB)
 - CLEAR_BROWSER_CACHE.md (5.7KB)
@@ -599,4 +641,7 @@ Documentation is updated:
 - When user issues are resolved
 - During major releases
 
-**Current Status**: ✅ All documentation up to date as of 2026-01-24
+**Current Status**: last index entry added 2026-11-08 (the Plan day
+Google Calendar export plan). This footer used to read "All documentation up to date as of 2026-01-24";
+nothing checks that claim - no test asserts every document is listed here, which
+is PLC-A5 in `BACKLOG.md` - so it is stated as a date, not as a guarantee.

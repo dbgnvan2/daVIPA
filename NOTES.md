@@ -58,6 +58,106 @@ only defect among them, is not.
 - ⚠️ **Nothing in UPD-M1 through UPD-M6 has been seen running.** UPD-M4 changed
   the renderer, the splitter and the row drag of three tabs in one step.
 
+### Plan day → Google Calendar export - CE-M1..M4
+
+- ✅ **`src/getmoredone/calendar_exporter.py`** (new, GUI-free): decides what
+  the day's blocks should become (`build_export_plan`, pure), then sends it
+  (`export_day`). Opens its own `DatabaseManager` from a path, the way
+  `calendar_importer` does, because it runs on a worker thread.
+- ✅ **`time_blocks.calendar_event_id`** (TEXT) on fresh databases and by
+  idempotent migration. `create_time_block` and the new
+  `set_block_calendar_event_id` are the only writers; `update_time_block`
+  deliberately does **not** carry the column, because a screen edit uses a
+  block object loaded before the export and writing its `None` back would
+  orphan a live event.
+- ✅ **The orphan sweep is the only deleting code** and it keeps anything it
+  cannot account for: events with no daVIPA marker, and events whose marker
+  names a block this run did not confirm (failed or skipped). A failed
+  `list_day_events` is counted as a failure, never read as "nothing to remove".
+- ✅ **`google_calendar.py` hardened as a class (P5)**: `_with_retry` around
+  all four event calls, 30s transport timeout, 429/5xx retried with backoff,
+  404/410 raised as `CalendarEventMissing` so a hand-deleted event is
+  re-created rather than reported as broken.
+- ✅ **The button disables before anything fallible runs** and every refusal
+  re-enables it. The worker touches no widget — Tk is not thread-safe and that
+  includes `after()`; it leaves its result in an attribute and the Tk thread
+  collects it (`_poll_export`, 100ms).
+- ⚠️ **Mutation testing found two tests that could not fail** and both were
+  real: `update_time_block` writing the column (removed, as above), and a
+  `failed_block_ids` guard in the sweep that was dead code (removed).
+- ⚠️ **A leaked monkeypatch of `GoogleCalendarManager.__new__`** in the new UI
+  test broke four tests in other files: `monkeypatch` undoes a patch of an
+  *inherited* dunder by writing `object.__new__` into the class dict, after
+  which every real `GoogleCalendarManager(...)` raises `TypeError`. The test
+  patches `__init__` only now and asserts the invariant where it broke it.
+
+- ✅ **A cold review pass** (`learning-qa`, read-only) returned 11 findings:
+  1 high, 3 medium, 7 low. The four at medium or above are fixed here — the
+  empty-day refusal that made the orphan sweep unreachable, a `summary_line`
+  that discarded a run's deletions and failures, a retry that saw `HttpError`
+  only, and two Tk callbacks with no widget-liveness guard (P15). The seven low
+  findings are CE-A5 to CE-A11 in `BACKLOG.md`.
+- ✅ **A second cold pass**, in a different failure family (UI contract and
+  test quality), returned 7: 1 high, 4 medium, 2 low. The high was that the
+  Plan header asked for 1203px inside a 1200px window, so the status label —
+  packed last, fixed widths everywhere else — got zero width and was never
+  mapped: the export's only output channel, invisible at the default window
+  size. The status line now has its own row and the button is 150px. The
+  mediums were `has_credentials()` not meaning "connected" (the real client
+  authenticates in `__init__`, on the worker thread, blocking on a browser),
+  the thread start sitting outside the `try`, and two title tests that could
+  not fail. CE-A12 to CE-A15 hold the rest.
+- ✅ **A third cold pass**, in a third failure family (state, concurrency and
+  document accuracy), returned 10 and found the batch's worst defect: the
+  export read every block's time from its stored clock columns, which the
+  screen's own docstring calls "a record, not the truth". A block's box is
+  stored relative to Day Start, so moving Day Start re-times the day on screen
+  and leaves those columns behind — a day drawn from 10:00 was going onto other
+  people's calendars from 08:00. Times are now derived from the box with
+  `times_for_slot`, and "on the grid" is `build_day_grid(...).outside`, so the
+  blocks the day draws under *Outside the day* are the blocks the export skips.
+  Four more at medium or above are fixed with it: a non-interactive client
+  (below), one export per day keyed outside the screen instance, the calendar
+  an event id belongs to recorded in its own column, and
+  `set_block_calendar_event_id` reporting whether it wrote a row. CE-A16 holds
+  the one minor finding.
+- ✅ **A fourth cold pass**, on time correctness and the Google API contract,
+  returned ten: four medium, six low, nothing high — so the budget is closed.
+  The mediums: nothing asserted the `dateTime`/`timeZone` strings that actually
+  leave the machine (dropping the zone or reading minutes as hours left the
+  batch green); the retried `events().insert` could make a second event, which
+  the export's sweep hid and the meeting dialog did not; a 403 carrying a
+  rate-limit reason was reported as a hard failure for every block in a burst;
+  every exported block carried the meeting dialog's ten-minute popup and
+  overrode the user's own calendar setting; and the sweep deleted on the
+  strength of Google's date filter without re-checking the marker's date.
+  CE-A17 to CE-A21 hold the six lows, including the wall-clock/DST decision,
+  written down rather than changed.
+- ✅ **The set has been re-run** now that the other session's PD-M14 edit to
+  `screens/plan.py` has landed: 9 failed, 537 passed, 17 skipped. All 150 of
+  this batch's own tests pass. The nine red ones are PD-M14's — the
+  outside-group tests in `test_plan_screen.py` and the two
+  `test_pdm54_*` tests in `test_plan_settings.py` — in that session's
+  in-progress area, in files this batch does not touch. Left to them.
+- ⚠️ **The export's client cannot sign in.** `has_credentials()` and a token
+  file *existing* are not the same as a token that works: revoked access, a
+  changed password or a damaged pickle all reached `flow.run_local_server` and
+  then `input()` — both waiting forever — on the worker thread, leaving the
+  button disabled under "Exporting…" until the app was killed. Four documents
+  said this could not happen. `GoogleCalendarManager(allow_interactive=False)`
+  now raises `AuthenticationRequired` instead, and the worker reports it as
+  "sign in again". The calendar dialog, which has a main thread and a console,
+  still signs in normally.
+- ⚠️ **Watch the Plan header's width.** It is now 8px inside the default
+  window (1172 of 1180). `test_cem441b` fails if a widget is added or widened
+  past that, which is the point: the last widget packed is the one that
+  silently disappears.
+- ⚠️ **Tk finalizers are not thread-safe either.** The export worker was
+  intermittently wedging in `tkinter/font.py::__del__`: a garbage-collected Tk
+  font object, collected on the worker thread, calling into Tcl from off the Tk
+  thread, reached through `DatabaseManager.__init__`'s migrations. The screen
+  now runs `gc.collect()` on the Tk thread before starting the worker.
+
 ### APE Week Actions joins the one panel design - UPD-M6
 
 - ✅ **A draggable divider**, from `screens/split_panel.py`, where the body was

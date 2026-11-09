@@ -298,6 +298,67 @@ Header:
   cannot be stored cannot be entered.
 - **⚙ Day Settings** — What: Opens the Day Settings modal (below). Why: The
   hours of the day are what the grid is drawn from.
+- **⤴ Google Calendar** — What: Writes this day's blocks to Google Calendar as
+  timed events. Why: the day you planned is no use to the rest of your life
+  while it only exists in daVIPA; a planned day on the calendar is a day other
+  people can see you are busy.
+
+  Every block **on the grid** that has a length goes out — items, buffers and
+  breaks alike — titled the way the block is titled on screen, and timed from
+  **the box it is drawn in**, not from any time stored with it. That matters
+  because the grid moves: change *Day Start* and the whole day shifts on
+  screen, and what goes on the calendar is the time you can see, every time.
+
+  Blocks under *Outside the day* are skipped and counted — a block with no box
+  has no time the app knows, and putting work on your calendar at an hour
+  nobody chose is worse than leaving it off. *Outside the day* is exactly what
+  the day shows there, so a block that fell out because you moved *Day End*
+  earlier, or moved the lunch hour over it, is skipped too. Lunch is not a
+  block, so nothing is written for it.
+
+  **A second export of the same day does not duplicate it.** Each block
+  remembers the event it owns: a block you moved or resized moves and resizes
+  on the calendar, a block you deleted takes its event with it, and an event
+  you deleted in Google Calendar by hand comes back. Events daVIPA did not
+  create are never touched, so your real meetings are safe even in the same
+  hour. A block whose export failed keeps the event it had — nothing is removed
+  on the strength of a run that did not finish. A block you delete *while* an
+  export is running is not left behind either: the event it was given is taken
+  back off the calendar, and the status line counts it. Exporting a day you have
+  **cleared** is worth doing for that reason: there is nothing to send, but the
+  events that day had still come off the calendar — *"No blocks planned for
+  2026-11-12 — 2 removed"*.
+
+  The button disables itself while the export runs and the status line reports
+  every number, the ones that did not happen included — *"3 of 5 block(s)
+  exported to Google Calendar for 2026-11-12 — 2 new, 1 updated, 2 skipped
+  (not on the grid)"*. One block failing is one block failing: the rest of the
+  day still goes out and the run can be repeated. Without the Google
+  libraries, without credentials, **before you have connected your account
+  once**, or when the connection you had has stopped working — access revoked,
+  password changed — the button says so and comes back rather than staying
+  dead. Signing in has to happen where a browser can open, which is an item's
+  *Add to Calendar* dialog; the export runs in the background and will never
+  open one, so it stops and tells you instead of hanging.
+
+  One export per day runs at a time. Starting a second one of the same day —
+  from this window or another — is refused with *"2026-11-12 is already being
+  exported"* rather than run alongside the first.
+
+  Exported blocks carry **no reminder of their own** — they use whatever your
+  calendar is set to do, so a planned day does not become a day of popups. A
+  meeting made from an item's *Add to Calendar* dialog still gets its
+  ten-minute popup.
+
+  Setup is in `docs/google-calendar-setup.md`; the day goes to your primary
+  calendar unless `plan_export_calendar_id` names another. **If you change
+  that setting, the next export moves the events it had already made** — off
+  the old calendar, onto the new one, reported as *"3 moved to this
+  calendar"* — rather than leaving them stranded where nothing can find them
+  again.
+
+  The status line it writes to is the full-width line **under the day**, not in
+  the header: with seven controls up there the header had no room left for it.
 - **+ Break** / **+ Buffer** — What: Puts a 30-minute padding block in the first
   box that will hold it. Why: Real days are not back-to-back. These carry no
   item, so they are drawn in a neutral colour rather than a priority one — the
