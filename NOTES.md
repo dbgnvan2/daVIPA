@@ -25,7 +25,10 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   the guards resolve pointers and a description is not one — and the sentence
   six documents used to justify deleting rather than rewriting was false as
   written, the list in question having been repaired hours earlier rather than
-  left stale. `docs/spec_coverage.md` has both passes in full.
+  left stale. `docs/spec_coverage.md` has both passes in full. CI run
+  42674300190 at `fd68c28` is green on all three versions
+  (`2682 passed, 10 skipped`), which reconciles with the re-measured marker
+  counts: 253 meta + 2439 app = 2692 collected.
 
 - **The two dead pointers are closed** (GSF batch, 2026-11-09, `SAG-A3` and
   `SAG-A7`). agent-docs-gate.yml is deleted: it triggered on `pull_request`

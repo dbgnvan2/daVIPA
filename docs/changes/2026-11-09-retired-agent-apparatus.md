@@ -91,6 +91,10 @@ Three guards hold it now, and a fourth claim was corrected on the way:
   pass after a high, and that was it.
 - Marker counts re-measured after this batch's four tests: **253 meta / 2439
   app**, 2692 collected.
+- CI run **42674300190** at `fd68c28` is green on 3.11, 3.12 and 3.13:
+  `2682 passed, 10 skipped` on each. 2682 + 10 = 2692, which reconciles with
+  the two marker counts above, so neither figure in `CLAUDE.md` is stale as of
+  this batch.
 
 ## Risks / Known gaps
 
