@@ -3337,6 +3337,14 @@ def test_updf43_no_column_goes_below_five_characters():
     so it follows `CHAR_PX` if the list font ever changes, and against five
     times `CHAR_PX` as well, so the constant cannot quietly stop meaning five
     characters.
+
+    The panel width is chosen so the floor actually binds for some columns and
+    not for others, which is the only case that tests both halves of the
+    claim. At 251px: `available_width` spends 58, the two fixed columns
+    reserve 68, and 125px of budget against weights 135/155/125 puts the
+    narrowest column's share under 40. A width that left every share above
+    the floor -- 300px does -- would pass this test with `MIN_COLUMN_CHARS`
+    set to 1, which is how it read before the csdp sweep.
     """
     from src.getmoredone.screens.column_resize import (
         CHAR_PX, MIN_COLUMN_CHARS, min_column_width)
@@ -3348,12 +3356,18 @@ def test_updf43_no_column_goes_below_five_characters():
     try:
         table = screen.left_table
         resizable = [c.key for c in table.columns if c.resizable]
-        # Narrow enough that an even share would be well under the floor.
-        table.fit_to_panel(300)
-        for key in resizable:
-            assert table.width(key) >= min_column_width(), (
-                f"{key} is {table.width(key)}px, below the "
-                f"{min_column_width()}px floor")
+        table.fit_to_panel(251)
+        widths = {key: table.width(key) for key in resizable}
+
+        for key, width in widths.items():
+            assert width >= min_column_width(), (
+                f"{key} is {width}px, below the {min_column_width()}px floor")
+        assert min(widths.values()) == min_column_width(), (
+            f"no column reached the floor, so this panel width does not "
+            f"test it: {widths}")
+        assert max(widths.values()) > min_column_width(), (
+            f"every column is at the floor, so nothing absorbed the "
+            f"squeeze: {widths}")
     finally:
         root.destroy()
 
@@ -3369,6 +3383,12 @@ def test_updf44_a_panel_too_narrow_for_the_floor_surfaces_it(caplog):
 
     The number is checked, not just its truthiness: the shortfall is what
     tells a reader whether a panel is 4px or 400px too narrow.
+
+    The expected shortfall is the literal 188, not `len(resizable) *
+    min_column_width() + fixed_px`. Derived from the constants it is meant to
+    pin, this assertion moved with them: `MIN_COLUMN_CHARS = 1` left it green,
+    found by the csdp sweep's mutation. The two parts are asserted separately
+    so a reader can see where 188 comes from and a change to either is named.
     """
     from src.getmoredone.screens.chip_table import panel_fitter
     from src.getmoredone.screens.column_resize import min_column_width
@@ -3379,12 +3399,18 @@ def test_updf44_a_panel_too_narrow_for_the_floor_surfaces_it(caplog):
         resizable = [c.key for c in table.columns if c.resizable]
         fixed_px = sum(table.width(c.key) for c in table.columns
                        if not c.resizable)
-        floors = len(resizable) * min_column_width()
+
+        # Three resizable columns at the 40px floor, and 34px each of
+        # checkbox and index reserved out: 188px of column that one pixel of
+        # panel cannot seat.
+        assert (len(resizable), min_column_width(), fixed_px) == (3, 40, 68), (
+            f"the parts of 188 changed: {len(resizable)} resizable, "
+            f"{min_column_width()}px floor, {fixed_px}px fixed")
 
         # One pixel of panel: the floors cannot be seated at all.
         overflow = table.fit_to_panel(1)
-        assert overflow == floors + fixed_px, (
-            f"overflow {overflow} does not account for {len(resizable)} floors "
+        assert overflow == 188, (
+            f"overflow {overflow} does not account for three 40px floors "
             f"and {fixed_px}px of fixed columns")
         for key in resizable:
             assert table.width(key) == min_column_width(), (
@@ -3394,6 +3420,86 @@ def test_updf44_a_panel_too_narrow_for_the_floor_surfaces_it(caplog):
             panel_fitter(table)(1, 0)
         assert any("too narrow" in r.message for r in caplog.records), (
             f"nothing was logged: {[r.message for r in caplog.records]}")
+    finally:
+        root.destroy()
+
+
+def test_updf43b_the_floor_suspends_the_shape_it_does_not_destroy_it():
+    """UPD-F4.3 — a panel narrower than the floors gives the shape back after.
+
+    Purpose: UPD-F4.3/F4.6 — a stored width is the weight the next fit shares
+             by, so pinning every column to the floor in `_widths` would make
+             the squeeze permanent: the panel comes back wide and the columns
+             come back equal, with the 135/155/125 shape gone for good and
+             nothing logged about losing it.
+    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Tests:   tests/test_unified_panel_design.py::test_updf43b_the_floor_suspends_the_shape_it_does_not_destroy_it
+
+    Found by the csdp sweep's cold pass. Not reachable through the shipped
+    wiring -- `SplitPanel` holds both panels at `MIN_PANEL_WIDTH`, which is
+    wide enough for every column set's floors -- so this drives
+    `fit_to_panel` directly, as the overflow test does.
+
+    The second half covers the other way out of the floor: a width the user
+    sets by hand while the panel is floored is newer than the remembered
+    shape and must survive the restore.
+    """
+    from src.getmoredone.screens.column_resize import min_column_width
+
+    root, screen = _week_screen(left_rows=[_ape_row(1)])
+    try:
+        table = screen.left_table
+        resizable = [c.key for c in table.columns if c.resizable]
+
+        table.fit_to_panel(900)
+        before = {key: table.width(key) for key in resizable}
+        assert len(set(before.values())) > 1, (
+            f"the columns start out equal, so this test cannot tell a kept "
+            f"shape from a lost one: {before}")
+
+        assert table.fit_to_panel(1) == 188
+        floored = {key: table.width(key) for key in resizable}
+        assert set(floored.values()) == {min_column_width()}, (
+            f"the floor did not take hold: {floored}")
+
+        # Dragging a window narrow fires <Configure> many times, so the floor
+        # is entered again and again. The shape is remembered on the way in,
+        # once -- re-reading it here would remember the floors themselves and
+        # the restore below would have nothing to give back.
+        assert table.fit_to_panel(1) == 188
+        assert table.fit_to_panel(200) > 0
+
+        table.fit_to_panel(900)
+        after = {key: table.width(key) for key in resizable}
+        assert after == before, (
+            f"the shape did not come back after the squeeze: {before} -> "
+            f"{floored} -> {after}")
+    finally:
+        root.destroy()
+
+    root, screen = _week_screen(left_rows=[_ape_row(1)])
+    try:
+        table = screen.left_table
+        table.fit_to_panel(900)
+        remembered = table.width("segment")
+        table.fit_to_panel(1)
+        _resize(table, key="segment", delta=120)
+        dragged = table.width("segment")
+        assert dragged == min_column_width() + 120, (
+            f"the drag did not land: {dragged}px")
+        assert dragged < remembered, (
+            f"this drag has to leave segment narrower than the {remembered}px "
+            f"it is remembered at, or the next assertion proves nothing")
+
+        # The dragged width is segment's weight now, so a weight of 160
+        # against the 290 and 233 beside it gives it less than the 251 the
+        # remembered shape would have. Without the drop from `_pre_floor` it
+        # comes back at exactly `remembered`, which the first half shows.
+        table.fit_to_panel(900)
+        assert table.width("segment") < remembered, (
+            "the restore undid a drag made while the panel was floored: "
+            f"segment came back at {table.width('segment')}px, the "
+            f"remembered {remembered}px")
     finally:
         root.destroy()
 
