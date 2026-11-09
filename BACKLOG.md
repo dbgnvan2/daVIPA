@@ -559,6 +559,36 @@ event id and send that.
 **Priority:** Low
 **Effort:** Medium (needs the same product decision as CE-A17)
 
+### CE-A22 — six commits in this batch's history cannot import `db_manager` (low)
+
+Found closing the batch out, not by a review pass. `db_manager.py` held three
+sessions' work that day, and `9baea13` carried the priority batch's
+`from .models import (..., apply_priority_floor)` hunk along with the calendar
+ones. `apply_priority_floor` only reaches `models.py` at `99d680a`, so every
+commit from `9baea13` to `5671510` dies at import: `ImportError: cannot import
+name 'apply_priority_floor'`. HEAD is unaffected and CI only ever sees HEAD, so
+the cost is `git bisect` across six commits, nothing else.
+
+Cheap to fix while nothing is pushed — move that one import-and-call hunk out of
+`9baea13` and into `99d680a`. The session that made the commits has been told
+and owns the decision; left alone, the range stays unbisectable.
+
+**Priority:** Low
+**Effort:** Low while unpushed, high once pushed
+
+## Outstanding — the calendar export's manual checklist (CE, 2026-11-08)
+
+The six steps at the end of
+[`docs/implementation_plan_2026-11-08_plan_calendar_export.md`](docs/implementation_plan_2026-11-08_plan_calendar_export.md)
+are the part of CE-M1 - CE-M5 no test can cover: a real export, against a real
+Google account, seen on the real calendar. The batch's status report does not
+claim them as done and neither does this entry. They need the app driven by
+hand, so they sit here until someone walks them.
+
+**Priority:** Medium — the export is built, four cold passes deep and committed,
+but nobody has yet watched it write a real event.
+**Effort:** Low (one planned day, one account)
+
 ## Next feature — Google Calendar into the Plan (CIP, specced 2026-11-08)
 
 Spec: [`docs/spec_2026-11-08_calendar_into_the_plan.md`](docs/spec_2026-11-08_calendar_into_the_plan.md).
