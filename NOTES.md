@@ -1,6 +1,20 @@
-## Where `main` stands (2026-11-08, end of day)
+## Where `main` stands (2026-11-09)
+
+`main` is **green**: CI run 42721197588 at `f01c23f`, `2660 passed, 10
+skipped`, identical on Python 3.11, 3.12 and 3.13. The twenty red tests this
+section tracked through 2026-11-08 are all closed; `BACKLOG.md`'s go-green
+list is closed with them.
 
 One batch at a time from here, per `CLAUDE.md`. What that leaves:
+
+- **`BACKLOG.md` is trimmed to what is active** (2026-11-09, on the user's
+  instruction). 245 items became 74: 27 recorded their own closure, 116 were
+  review-sweep residue ("below medium", "cold pass", "deferred"), and 28 named
+  only identifiers or tests deleted with the prose guards that same day. All
+  of it is in `docs/unused-docs/backlog_archive_2026-11-09.md` with the reason
+  on each, and the running "Last Updated" narrative went with it. The four
+  finished prompt briefs are filed under `docs/unused-docs/` too, with
+  `branding.py`'s `Spec:` pointer repointed so traceability still resolves.
 
 - **Records are filed, not tested** (2026-11-09, on the user's instruction).
   194 record files — handoff notes, plans, coverage snapshots, dated status
@@ -43,7 +57,13 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   heading each flattened into one sentence, so one marker exempted the lot —
   and the window is one markdown block now. `LDS-A1` to `LDS-A6` filed, four
   of them from that pass; `GSF-A5` is the last of the GSF class
-  measurement's findings and is untouched.
+  measurement's findings and is untouched. **Superseded the same day**: the
+  guards this bullet describes — the sentence window, the markers, the
+  retired-vocabulary config and its guard — were deleted hours later under the
+  filing instruction (first bullet above), and the five writing conventions
+  went with them. The marker counts here, 256 meta, became 231. What is
+  written above is what was true at the LDS push, kept as the measurement
+  behind the decision rather than as a description of the repo.
 - **The retired three-agent apparatus is gone** (MAW batch, 2026-11-09,
   `GSF-A1`, `GSF-A2` and the 2026-08-20 filing of the same surface). `CLAUDE.md`
   and `AGENTS.md` had recorded the workflow as retired since 2026-11-08 while

@@ -12,50 +12,26 @@ One batch at a time in this checkout (`CLAUDE.md`). What is here is open work:
 adjacent issues from recent batches, screen reports, the carried-forward
 features, and the long-standing bugs, requests and user stories at the end.
 
-## What `main` needs, in order (2026-11-08)
+## `main` is green — what is left of the go-green list (2026-11-09)
 
-Written when concurrent batches stopped being the way of working and everything
-moved to one batch at a time (`CLAUDE.md`, "Why the worktree exception was
-withdrawn"). This is the whole of `main`'s red CI, what causes each part, and
-what closing it needs — so that none of it depends on a session still being
-open to remember it.
+Closed. CI run **42721197588** at `f01c23f` is green on Python 3.11, 3.12 and
+3.13: `2660 passed, 10 skipped`. The twenty failures this section tracked from
+run 42550648188 on `b6d6ddf` are all closed — eleven by the PDT and PRIT
+batches on 2026-11-08, the remaining nine on 2026-11-09 by WTP-A11 (seven
+tests that measured the CI display rather than the code) and by the two that
+failed only in CI.
 
-Source: CI run 42550648188 on `b6d6ddf`, **20 failed, 2578 passed, 2 skipped**,
-identical on Python 3.11, 3.12 and 3.13. Branch comparisons were made by
-checking each branch out in a separate worktree and running the files there,
-not by reading the diffs.
+The one item below is what did not close with them. The section's history —
+which batch closed which group, and the run that confirmed each — is filed in
+`docs/unused-docs/backlog_archive_2026-11-09.md`.
 
-**Updated 2026-11-08 by the PDT batch.** **Ten** of the twenty are closed: the
-nine plan-day failures and `test_every_referenced_test_name_exists`. (An
-earlier draft of this paragraph said eleven, by adding
-`test_pbm55_the_settings_reach_the_outside_group_on_screen` and then saying in
-the same sentence that it was already one of the nine. It is one of the nine.)
-
-**Updated again 2026-11-08 by the PRIT batch**, which closed the eleventh:
-`test_every_referenced_test_file_exists` is **green**, because the two test
-files `models.py` named were written. So **eleven of the twenty are closed**
-and **nine are left** — the nine in items 3 and 5, in two groups rather than
-three. Nothing red is a meta test any more. `NOTES.md` carries the same count;
-this section is the authoritative go-green list, so the two must agree.
-
-**CI confirms the eleven, 2026-11-08.** Run `42574256150` on `5eef83d`
-(started 2026-11-09T06:43Z, which is 2026-11-08 locally):
-**9 failed, 2635 passed, 2 skipped**, identical on 3.11, 3.12 and 3.13, and the
-nine are exactly the nine in items 3 and 5. Against run 42550648188's twenty on
-`b6d6ddf`, that is the eleven closed and nothing new red. The intermediate run
-`42571150206` on `67612d5` (the PDT batch's tip, before the PRIT push) was
-**10 failed, 2599 passed** — the ten being the nine plus
-`test_every_referenced_test_file_exists`, which is how the PDT batch's ten and
-the PRIT batch's eleventh are told apart on a machine that built neither. The
-plan's "Done means" asked for the CI count and it is **met**. Earlier drafts of
-this paragraph recorded the eleven as verified locally only; they were, until
-this run. Re-measure with:
+Re-measure a failure list with:
 
 ```
-gh run view 42574256150 --log-failed | grep -oE "_{3,} test_[a-z0-9_]+ _{3,}" | sed -E 's/_+ (test_[a-z0-9_]+) _+/\1/' | sort -u
+gh run view <run-id> --log-failed | grep -oE "_{3,} test_[a-z0-9_]+ _{3,}" | sed -E 's/_+ (test_[a-z0-9_]+) _+/\1/' | sort -u
 ```
 
-### 4. PARTLY CLOSED — the traceability pair (low)
+### The traceability pair — partly closed (low)
 
 `::test_every_referenced_test_name_exists` is **green** (PDT-M4.1, `2cd83a3`).
 References left behind by the PD-M14 rewrite were repointed at the tests that
