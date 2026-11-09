@@ -37,8 +37,24 @@ REPO = Path(__file__).resolve().parents[1]
 # scan until 2026-11-05, and the grid rebuild's pre-push sweep found eight rows
 # naming tests that had been deleted -- two of them still marked "done". The
 # guard could not see the one document most made of the references it checks.
-SCANNED = ("src", "tools", "conftest.py", "docs/spec_coverage.md")
+# 2026-11-09: the entry was ``docs/spec_coverage.md``, one file. The six
+# ``docs/spec_coverage_*.md`` sidecars were outside the scan, and they hold
+# most of this repo's criterion rows — 83 `done` for weekly-tactic scheduling
+# alone. The third cold pass over the SST batch resolved their references by
+# hand and found two dead ones, both on rows marked `done`, one naming a test
+# that has never existed. The SST batch had widened its own Implementation
+# column check to the whole family and left this one at the single file.
+SCANNED = ("src", "tools", "conftest.py", "docs/spec_coverage*.md")
 SKIP_DIRS = {"venv", ".git", "build", "dist", "__pycache__"}
+
+# Coverage documents that name their tests without a ``tests/`` path, so they
+# contribute no reference to this guard and cannot be required to. One file:
+# it was generated from a real collection run and lists bare test names in a
+# table of its own. `SST-A2` files the convention that would bring such names
+# into a guard's domain. The exemption is checked in both directions.
+COVERAGE_WITHOUT_PATHS = {
+    "docs/spec_coverage_2026-08-19_rename_safe_links.md",
+}
 
 # A reference is any tests/... path, wherever it appears. Anchoring on the
 # "Tests:" label matched only the first path on that line, so the 22 references
@@ -50,6 +66,9 @@ _REF = re.compile(r"(tests/[\w/]+\.py)(?:::(\w+))?")
 
 def _scanned_files():
     for entry in SCANNED:
+        if "*" in entry:
+            yield from sorted(REPO.glob(entry))
+            continue
         target = REPO / entry
         if target.is_file():
             yield target
@@ -107,19 +126,31 @@ def test_every_referenced_test_name_exists():
 def test_this_guard_can_actually_fire():
     """Guards the guard: the sweep has to be reading real references."""
     found = list(_references())
-    # An exact floor, not "more than 20": the first version was satisfied by
-    # 127 references as comfortably as by the 149 that exist, so narrowing the
-    # scan by 15% went unnoticed. If this number drops, the scan shrank.
-    assert len(found) >= 140, (
-        f"only {len(found)} references found — the scan or the pattern has "
-        "narrowed; it must cover every tests/... path under "
-        f"{SCANNED}")
+    # Membership per source, not a count. This asserted a floor of 140 where
+    # 784 references exist, so it would have tolerated losing most of its
+    # domain — filed as `SST-A1` on 2026-11-08 and replaced here on 2026-11-09,
+    # the same way `tests/test_doc_status_claims.py` replaced its own floor: an
+    # exact count goes red on every batch, because every batch adds criterion
+    # rows, and a band is a floor with better manners. What has to hold is that
+    # each arm of the scan is still being read.
     assert any(name for _src, _target, name in found), (
         "no reference carries a ::test_name, so the name check is inert")
-    assert any(str(src) == "docs/spec_coverage.md" for src, _t, _n in found), (
-        "docs/spec_coverage.md is not being scanned -- it is the document most "
-        "made of test references, and eight of them had gone stale unnoticed "
-        "while it sat outside this scan")
+    sources = {str(src) for src, _t, _n in found}
+    for coverage in sorted(REPO.glob("docs/spec_coverage*.md")):
+        name = str(coverage.relative_to(REPO))
+        if name in COVERAGE_WITHOUT_PATHS:
+            assert "tests/" not in coverage.read_text(encoding="utf-8"), (
+                f"{name} is exempted from the check below on the ground that "
+                "it names no test by path, and it now does — drop it from "
+                "COVERAGE_WITHOUT_PATHS so its references get checked")
+            continue
+        assert name in sources, (
+            f"{name} contributes no test reference — either it is outside the "
+            "scan, or its rows have stopped naming their tests. Eight stale "
+            "references hid in docs/spec_coverage.md while it sat outside this "
+            "scan, and two more in the sidecars while they did")
+    assert any(src.startswith("src/") for src in sources), (
+        "nothing under src/ is being scanned")
     assert any(str(src) == "conftest.py" for src, _t, _n in found), (
         "conftest.py is not being scanned — that is where the first broken "
         "reference this guard missed was living")

@@ -46,7 +46,7 @@ REPO = Path(__file__).resolve().parents[1]
 # against each other and asked which was wrong; this is the line that was
 # missing rather than a rule that was.
 DRAFTS_NOT_BUILT = {
-    # CIP — Google Calendar into the Plan. 57 `CIP-M…` criteria, no coverage
+    # CIP — Google Calendar into the Plan. 42 `CIP-M…` criterion rows, no coverage
     # rows anywhere, no module under src/. The spec's own status line says the
     # user will start a session for it later.
     "docs/spec_2026-11-08_calendar_into_the_plan.md",
@@ -69,10 +69,20 @@ _ANY_HEADING = re.compile(r"^#{1,6} ")
 
 # A phrase list, and therefore a tripwire rather than a proof: a new way of
 # writing "not built" escapes it until it is added here. The phrases are the
-# ones this repo has actually used, plus the four nearest variants. A guard that
+# ones this repo has actually used, plus the nearest variants. A guard that
 # tried to recognise the *meaning* would spend its failures on quotation, which
 # is why corrections in this repo paraphrase the sentence they replace instead
-# of quoting it. Filed as `SST-A3`.
+# of quoting it.
+#
+# `SST-A3` files the structural fix, and the third cold pass raised it to high
+# on evidence: the list missed two more documents whose work had shipped
+# months earlier — a spec headed "Draft for implementation" and a plan whose
+# `## Status` said it was ready for review. Both phrasings are below now,
+# which is the same patch as last time. A deny-list of phrasings cannot be
+# finished; the fix is to require a status line to *match* a recognised built /
+# superseded / registered-draft form, so an unrecognised sentence fails. Three
+# more documents recorded only an approval state ("approved; in progress") over
+# built work, and no deny-list reaches those at all.
 _NOT_BUILT = re.compile(
     r"awaiting approval"
     r"|not approved"
@@ -83,7 +93,9 @@ _NOT_BUILT = re.compile(
     r"|not started"
     r"|no code exists"
     r"|not yet implemented"
-    r"|not yet built",
+    r"|not yet built"
+    r"|draft for implementation"
+    r"|ready for review and approval",
     re.I,
 )
 
