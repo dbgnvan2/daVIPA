@@ -13,9 +13,13 @@ REPOSITORY's documents, not on application behaviour, so they are marked
 ``meta`` like ``tests/test_traceability_refs.py`` — the marker is for the speed
 of ``-m "not meta"``, never for skipping.
 
-Each guard here has a companion that proves it can fire (P24), because a
-document guard that silently matches nothing is indistinguishable from a
-document that is correct.
+There are seven guards here and three companions proving a guard can fire
+(P24), because a document guard that silently matches nothing is
+indistinguishable from a document that is correct. The four without a
+companion — SST-M4, SST-M7, SST-M9 and the second half of SST-M3 — each assert
+on a named anchor in a named file, so a guard that stopped finding its subject
+fails on the anchor rather than passing vacuously. That is weaker than a
+companion and is filed as `SST-A4`.
 """
 
 import re
@@ -44,13 +48,34 @@ DRAFTS_NOT_BUILT = {
 }
 
 _STATUS_LINE = re.compile(r"^\*{0,2}status\b", re.I)
+
+# A `## Status` heading with the claim on the line below it. The first version
+# of this guard read only lines beginning with "Status" and so could not see
+# `docs/implementation_plan_2026-06-06_project_notes.md`, whose `## Status`
+# section said the plan awaited a sign-off over work that had shipped. Found by
+# the cold pass over this batch, 2026-11-09.
+_STATUS_HEADING = re.compile(r"^#+\s*\**status\b", re.I)
+
+# How many non-blank lines under such a heading count as the status claim.
+_UNDER_HEADING = 2
+
+# A phrase list, and therefore a tripwire rather than a proof: a new way of
+# writing "not built" escapes it until it is added here. The phrases are the
+# ones this repo has actually used, plus the four nearest variants. A guard that
+# tried to recognise the *meaning* would spend its failures on quotation, which
+# is why corrections in this repo paraphrase the sentence they replace instead
+# of quoting it. Filed as `SST-A3`.
 _NOT_BUILT = re.compile(
     r"awaiting approval"
     r"|not approved"
     r"|no implementation code"
     r"|no code written"
     r"|no code changed"
-    r"|not built",
+    r"|not built"
+    r"|not started"
+    r"|no code exists"
+    r"|not yet implemented"
+    r"|not yet built",
     re.I,
 )
 
@@ -66,17 +91,26 @@ def _status_documents():
 def _claims_not_built(path):
     """The document's status lines that say the work is not written.
 
-    Only a status line counts. Prose elsewhere in a plan, narrating the state of
-    the work at some past moment, is not a status claim: the one instance of it
-    in this repo — the dopamine plan's §9 — is corrected in place rather than
-    policed here, because a guard that read every sentence about implementation
-    would spend its failures on quotation.
+    A status line is one that begins with "Status", or one of the first two
+    non-blank lines under a `## Status` heading. Prose elsewhere in a plan,
+    narrating the state of the work at some past moment, is not a status claim:
+    the one instance of it in this repo — the dopamine plan's §8 — is corrected
+    in place rather than policed here, because a guard that read every sentence
+    about implementation would spend its failures on quotation.
     """
     hits = []
     text = path.read_text(encoding="utf-8")
+    under_heading = 0
     for number, line in enumerate(text.splitlines(), 1):
-        if _STATUS_LINE.match(line) and _NOT_BUILT.search(line):
+        if _STATUS_HEADING.match(line):
+            under_heading = _UNDER_HEADING
+            continue
+        is_claim_position = bool(_STATUS_LINE.match(line)) or (
+            under_heading and line.strip())
+        if is_claim_position and _NOT_BUILT.search(line):
             hits.append((number, line.strip()))
+        if under_heading and line.strip():
+            under_heading -= 1
     return hits
 
 
@@ -119,6 +153,12 @@ def test_sstm2_the_register_guard_can_fire():
             "is unwritten, so the register's second direction is inert")
 
     # The patterns, against text rather than against the tree.
+    assert _STATUS_HEADING.match("## Status")
+    assert _STATUS_HEADING.match("### **Status**")
+    assert not _STATUS_HEADING.match("Status is discussed in §6")
+    # A `## Status report` heading is in the domain on purpose: it is a status
+    # section, and a claim on its first two lines is a status claim.
+    assert _STATUS_HEADING.match("## Status report")
     assert _STATUS_LINE.match("**Status:** Draft, awaiting approval")
     assert _STATUS_LINE.match("Status: **awaiting approval**")
     assert not _STATUS_LINE.match("The status of this is awaiting approval")
@@ -142,6 +182,18 @@ def _wtp_criteria():
     return found
 
 
+def _wtp_status_report(spec):
+    """§6's text alone, heading to next heading.
+
+    The figure has to be checked where the spec *summarises* its own state, not
+    anywhere in the file: the status line at the top states the count as well,
+    which made a whole-file substring check unable to fail on §6 going stale.
+    """
+    start = spec.index("## 6. Status report")
+    end = spec.index("## 7.", start)
+    return spec[start:end]
+
+
 def test_sstm3_the_wtp_criterion_count_is_what_the_spec_lists():
     """38, 40 and 41 were all in the repo at once; the rows say which is right.
 
@@ -156,15 +208,30 @@ def test_sstm3_the_wtp_criterion_count_is_what_the_spec_lists():
         "prose that states the count has to be re-measured against it")
 
     spec = WTP_SPEC.read_text(encoding="utf-8")
-    assert f"all {len(criteria)} criteria" in spec, (
-        f"the spec's summary does not say 'all {len(criteria)} criteria' — it "
-        "said 40 while listing 41, and its arithmetic for 40 counted §3 as 35 "
-        "after §3 had been amended to carry the additions")
+    # Scoped to §6's summary. The first version asserted the figure against the
+    # whole file, which the spec's own corrected status line also satisfies —
+    # so §6 could go back to 40 and this guard would stay green. Found by the
+    # cold pass over this batch, 2026-11-09.
+    summary = _wtp_status_report(spec)
+    assert f"all {len(criteria)} criteria" in summary, (
+        f"§6's summary does not say 'all {len(criteria)} criteria' — it said "
+        "40 while listing 41, and its arithmetic for 40 counted §3 as 35 after "
+        "§3 had been amended to carry the additions")
 
     backlog = (REPO / "BACKLOG.md").read_text(encoding="utf-8")
     assert "all 38 criteria" not in backlog, (
         "BACKLOG.md still says 'all 38 criteria' for WTP; the spec lists "
         f"{len(criteria)}")
+
+    # The batch's own handoff note stated the count too, and kept 38 after
+    # every other document had been corrected.
+    note = (REPO / "docs/changes/2026-11-08-weekly-tactic-as-parent.md").read_text(
+        encoding="utf-8")
+    assert f"{len(criteria)} criteria" in note, (
+        "the WTP handoff note does not state the criterion count the spec "
+        f"lists ({len(criteria)})")
+    assert "38 criteria" not in note, (
+        "the WTP handoff note still states 38 criteria")
 
 
 def test_sstm4_the_wtp_spec_does_not_deny_its_own_outstanding_items():
@@ -366,10 +433,23 @@ def test_sstm8_the_chronic_documents_are_not_cited_by_line_number():
 
 
 def test_sstm8_that_guard_can_fire():
-    scanned = list(_markdown_files())
-    assert len(scanned) >= 200, (
-        f"only {len(scanned)} markdown files scanned — the walk has narrowed")
-    assert any(p.name == "BACKLOG.md" for p in scanned)
+    scanned = {str(p.relative_to(REPO)) for p in _markdown_files()}
+    # Membership, not a count. A floor of 140 is what let the reference guard in
+    # tests/test_traceability_refs.py tolerate losing most of its domain
+    # (`SST-A1`), and an exact count here would turn the suite red on every
+    # batch, because every batch adds a handoff note. What the walk has to reach
+    # is the four chronic documents it polices and at least one file from each
+    # directory markdown lives in.
+    for name in CHRONIC:
+        assert name in scanned, f"the walk no longer reaches {name}"
+    assert "NOTES.md" in scanned
+    assert any(n.startswith("docs/changes/") for n in scanned), (
+        "no handoff note in the walk — docs/changes/ has dropped out")
+    assert any(n.startswith("docs/cycles/") for n in scanned), (
+        "no gate record in the walk — docs/cycles/ has dropped out")
+    assert any(
+        n.startswith("docs/implementation_plan_") for n in scanned), (
+        "no implementation plan in the walk")
     assert _LINE_CITE.search("see `BACKLOG.md:114` for the filing")
     assert _LINE_CITE.search("docs/spec_coverage.md:69 names it")
     assert not _LINE_CITE.search("see `BACKLOG.md` item 2")
@@ -383,10 +463,12 @@ PRI_PLAN = REPO / "docs/implementation_plan_2026-11-08_priority_defaults_and_cap
 
 
 def test_sstm9_every_promised_pri_adjacent_item_is_filed():
-    """The plan's §9 promises four filings; none of them existed.
+    """The plan's last section promises four filings; none of them existed.
 
-    The promise is in the plan and repeated in `docs/DOCUMENTATION_INDEX.md`,
-    so two documents asserted the existence of items that were nowhere.
+    The promise is under "Adjacent issues found, not fixed" — the plan's
+    sections are not numbered — and is repeated in
+    `docs/DOCUMENTATION_INDEX.md`, so two documents asserted the existence of
+    items that were nowhere.
     """
     plan = PRI_PLAN.read_text(encoding="utf-8")
     # The plan names the range by its endpoints — "`PRI-A1`-`PRI-A4`" and
