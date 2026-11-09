@@ -393,6 +393,11 @@ def test_wtpw_a_tactic_whose_children_are_all_done_is_not_questioned(
 # ------------------------------------------------ the modal's real parent ----
 
 
+# The strings Tk returns for a -topmost that is on: an int on some platforms,
+# a bool-ish word on others.
+_TOPMOST_ON = ("1", "True", "true")
+
+
 def test_wtpw_the_prompt_survives_a_real_always_on_top_parent(
         root, world, messageboxes):
     """Checklist step 10, as a test: a real Toplevel parent, -topmost set.
@@ -404,11 +409,23 @@ def test_wtpw_the_prompt_survives_a_real_always_on_top_parent(
     -topmost is read and written through tk.call rather than .attributes, past
     the patch conftest uses to keep always-on-top windows off the desktop --
     otherwise this would be measuring conftest.
+
+    Setting -topmost needs a window manager to honour it. A headless display
+    has none, so the property reads back off however the guard behaves, and
+    asserting the restore there measures the display rather than the code. The
+    precondition below skips in that case; the assertions keep their teeth on a
+    desktop, where this is the one test that drives a real parent.
     """
     vps, tactic, _children = world
     parent = ctk.CTkToplevel(root)
     parent.withdraw()
     parent.tk.call("wm", "attributes", parent._w, "-topmost", True)
+    if str(parent.tk.call(
+            "wm", "attributes", parent._w, "-topmost")) not in _TOPMOST_ON:
+        parent.destroy()
+        pytest.skip(
+            "this display does not honour -topmost (no window manager), so "
+            "the restore this test measures cannot be observed on it")
     try:
         answer = confirm_weekly_tactic_completion(
             vps.db_manager, tactic.id, parent)
@@ -417,7 +434,7 @@ def test_wtpw_the_prompt_survives_a_real_always_on_top_parent(
         assert [name for name, _t, _m in messageboxes] == ["askyesno"]
         restored = parent.tk.call(
             "wm", "attributes", parent._w, "-topmost")
-        assert str(restored) in ("1", "True", "true"), (
+        assert str(restored) in _TOPMOST_ON, (
             f"-topmost was not put back after the modal: {restored!r}"
         )
         assert parent.winfo_exists(), "the parent did not survive the modal"
@@ -472,9 +489,14 @@ def test_wtpw_the_screens_with_a_completion_control_are_pinned():
                     found.add(path.name)
 
     assert found == SCREENS_WITH_A_CONTROL, (
-        f"the screens offering a completion control changed: {found}. Every "
-        "one of them must appear in this file's BUILDERS, or its control ships "
-        "with nobody pressing it."
+        f"the screens offering a completion control changed: {found}, not "
+        f"{SCREENS_WITH_A_CONTROL}."
+    )
+    assert {f"{name}.py" for name in BUILDERS} == found, (
+        "a screen wires a completion control that this file does not build, or "
+        f"builds one that no longer wires it: BUILDERS has {sorted(BUILDERS)}, "
+        f"the screens have {sorted(found)}. A control missing from BUILDERS "
+        "ships with nobody pressing it."
     )
 
 
