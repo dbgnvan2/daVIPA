@@ -66,7 +66,7 @@ design". **There is nothing to port.** Measured on `main` at `4ca7116`:
   the `grid()`/`grid_remove()` pair, the P2 "N blocks no longer fit" status,
   and the scrollable holder at `OUTSIDE_GROUP_HEIGHT_PX` are all present
   (lines 607–613, 1050–1191, 935–947).
-- `tests/test_plan_screen.py:2345` asserts
+- `tests/test_plan_screen.py` asserts
   `[b.label for b in screen._grid.outside] == ["never placed"]` and **passes**
   today, so the screen path from a block to the group on screen works.
 
@@ -150,7 +150,7 @@ turn out to need `src/` work.** It will be reported either way.
 
 ### PDT-M2 — `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day`
 
-`tests/test_plan_screen.py:587`. It asserts `panel.bounds.day_start < started_at`
+`tests/test_plan_screen.py`, as `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day`. It asserted `panel.bounds.day_start < started_at`
 and `"The day now runs" in status`. PD-M14.1 withdrew the first (the hours are
 not written) and reworded the second to "The day now shows".
 
@@ -177,7 +177,7 @@ opposite things about the same call.
 
 ### PDT-M3 — the two PD-M5.4 tests
 
-`tests/test_plan_settings.py:784` and `:829`. Both fail on their **preconditions**
+`tests/test_plan_settings.py`, the two `test_pdm54_*` tests. Both fail on their **preconditions**
 (`plan_day_start == "07:30"`, `plan_day_end == "17:30"`) — the write PD-M14.1
 removed. Their subject, that `plan_day_shape_unconfirmed` is left alone, is now
 guaranteed structurally: `extend_day_for` writes no settings at all.

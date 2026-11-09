@@ -80,7 +80,7 @@ were wrong. Measured on `main` at `4ca7116`:
   layout layer.
 - `plan.py` already has `outside_frame`, `build_outside_group`, the
   `grid()`/`grid_remove()` pair, the P2 status and the scrollable holder.
-- `tests/test_plan_screen.py:2345` asserts `_grid.outside == ["never placed"]`
+- `tests/test_plan_screen.py` asserts `_grid.outside == ["never placed"]`
   and passed the whole time.
 
 **There was nothing to port.** The nine tests reached their subject through a
@@ -192,16 +192,20 @@ reader to rebuild merged code.
 Ordered by what a reader would wrongly act on.
 
 **Cite by quoted text and a grep, not by line number, for any file this batch
-also edits** — this one, `docs/DOCUMENTATION_INDEX.md` and
-`docs/spec_coverage.md`. Three rounds running, a line cite written here was
-invalidated by a later hunk in the same file, once inside the very sentence
-that was correcting another cite. Line numbers into files the batch does not
-touch are stable and are kept.
+also edits** — this one, `docs/DOCUMENTATION_INDEX.md`, `docs/spec_coverage.md`,
+`CLAUDE.md`, `tests/test_plan_screen.py` and `tests/test_plan_settings.py`.
+Four rounds running, a line cite went stale the moment a later hunk landed:
+once inside the very sentence that was correcting another cite, and once into a
+test file that the batch's own next commit shifted by nine lines. The first
+version of this rule named only the three document files and called the plans
+and specs stable — but plans cite into the test files, so that was the same
+mistake one level up. Line numbers into files the batch does not touch are
+stable and are kept.
 
 ### SSC-1 — the priority batch's plan says no code was written; the code is on `main` (high)
 
 `docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md:3` and
-`docs/DOCUMENTATION_INDEX.md` (`grep -n "awaiting approval; no" docs/DOCUMENTATION_INDEX.md`) both say "awaiting approval; no
+`docs/DOCUMENTATION_INDEX.md` (`grep -in "awaiting approval; no" docs/DOCUMENTATION_INDEX.md` — the index capitalises it) both say "awaiting approval; no
 implementation code written". `9420927` ("feat(pri): priority defaults and the
 cap, as left on disk") is an ancestor of `main`, and the PRI-M1/PRI-M2
 implementation docstrings are in `src/getmoredone/models.py:85,399,429,451`,
@@ -210,8 +214,9 @@ implementation docstrings are in `src/getmoredone/models.py:85,399,429,451`,
 implemented, so the repo contradicts itself three ways.
 
 Related: `PRI-A1` to `PRI-A4`, which that plan promises and
-`docs/DOCUMENTATION_INDEX.md` repeats (`grep -n 'PRI-A1 to PRI-A4'`), appear
-nowhere in this file.
+`docs/DOCUMENTATION_INDEX.md` repeats
+(`grep -n 'PRI-A1 to PRI-A4' docs/DOCUMENTATION_INDEX.md`), appear nowhere in
+this file.
 
 ### SSC-2 — the WTP spec's header contradicts its own status section (high)
 
@@ -321,8 +326,9 @@ test design written out. `PLC-A5` files the same gap at low. Six places
 route the reader to `PLC-A5` for this gap — four in
 `docs/DOCUMENTATION_INDEX.md`, one in this file and one in
 `docs/spec_coverage.md`; list them with
-`grep -rn 'PLC-A5' --include='*.md' --exclude-dir=.claude .` and discount the
-two that only record the filing. None of them mentions `UPD-A13`, so a reader
+`grep -rn 'PLC-A5' --include='*.md' --exclude-dir=.claude .`, which returns
+fourteen lines: six route the reader, and the other eight are the `PLC-A5`
+item itself, the two that only record the filing, and this item's own text. None of them mentions `UPD-A13`, so a reader
 lands on the low item — whose first sentence is also stale, see SSC-5 — and
 never reaches the designed fix.
 
@@ -332,9 +338,32 @@ never reaches the designed fix.
 and nothing is outstanding." The same file at `:428-437` — two "not
 code-testable" items, both `not done`, "as foreseen".
 
+### SSC-10 — eight documents cite `BACKLOG.md` and `docs/spec_coverage.md` by line number (low)
+
+The same class this batch wrote a rule about, in other batches' documents. The
+cites rot silently because no test reads them:
+
+```
+grep -rnE '(BACKLOG\.md|docs/spec_coverage\.md|CLAUDE\.md|docs/DOCUMENTATION_INDEX\.md):[0-9]' \
+  --include='*.md' --exclude-dir=.claude .
+```
+
+One is measurably dead already and predates this batch:
+`docs/implementation_plan_2026-11-05_time_blocks.md` cites `BACKLOG.md:1083`
+for "Calendar view for time blocks", which is now at `:3921` — a drift of
+nearly 2,900 lines, so that cite has been wrong for a long time. The others
+were spot-checked and still land near enough to follow.
+
+**Not fixed here**, per rule 10: they are outside this batch's file set, and
+rewriting eight other batches' plans in a plan-day test diff is the sweep this
+rule exists to prevent. The fix is the same one the `SSC` head note states —
+quote the text and give a grep — applied as each document is next touched.
+
 ## Sweep findings not fixed — PDT batch (2026-11-08)
 
-From the cold passes over `4ca7116..HEAD` — seven by the end of the batch.
+From the cold passes over `4ca7116..HEAD` — twelve by the end of the batch,
+the last two a test-quality pass and a criteria audit rather than another
+document sweep.
 The medium and high findings were fixed in-loop, round by round; the items
 below are the ones that stayed below medium, which the repo's sweep budget
 keeps out of the fix loop on purpose. The handoff note records what each pass
@@ -347,35 +376,55 @@ found.
 continuation written as `` `::test_name` `` — the usual way a second test is
 listed in `docs/spec_coverage.md` — is therefore never checked at all.
 
-Measured against the file as this batch leaves it: `docs/spec_coverage.md`
-holds **293** bare `::name` occurrences. 284 of them name a test, which is
-**273** distinct names; the other 9 are implementation symbols in the
-Implementation column, which is correct usage. Of those 273, **nine name a
-test that exists in no file under `tests/`** — matched exactly on
-`^\s*def <name>`, not by substring, which is the difference between nine and
-seven. PDT-M4.1 repointed eight references and dropped a ninth, across three
-rows of `docs/spec_coverage.md` — four of the eight in `2cd83a3`, the other
-four and the drop in the follow-up — plus three `Tests:` lines in `src/`.
-These nine names it did not touch:
+**No totals are given here, deliberately.** An earlier version of this item
+stated four of them, and every one went stale inside this same batch as later
+commits edited `docs/spec_coverage.md` — including the count of dead names,
+which fell when the PD-M5.2 and PD-M5.3 rows were marked withdrawn and their
+references removed. Measure them when you need them:
+
+```
+python - <<'EOF'
+import re, pathlib, subprocess
+doc = pathlib.Path("docs/spec_coverage.md").read_text()
+names = sorted({n for n in re.findall(r'`::(test_[A-Za-z0-9_]*)`', doc)})
+src = subprocess.run(["bash","-c","cat tests/*.py"],capture_output=True,text=True).stdout
+print([n for n in names if not re.search(r'^\s*def %s\b' % n, src, re.M)])
+EOF
+```
+
+Match on `^\s*def <name>` exactly, never by substring: two of the dead names
+are **truncations** of real ones, and a substring check passes them.
+
+PDT-M4.1 repointed eight references and dropped a ninth, across three rows of
+`docs/spec_coverage.md` — four of the eight in `2cd83a3`, the other four and
+the drop in the follow-up — plus three `Tests:` lines in `src/`. The names it
+did not touch, as the command above reports them on the tree this batch
+leaves:
 
 `test_pbm61_a_row_too_short_for_its_text_keeps_its_text`, `test_pdm13`,
 `test_pdm14_the_second_line_is_the_blocked_marker_alone`,
-`test_pdm52_a_drop_above_moves_day_start_back`,
-`test_pdm52_a_long_item_dropped_above_takes_the_day_back_far_enough`,
 `test_pdm53_a_drop_below_moves_day_end_forward`,
 `test_pdm56_a_refused_write_is_not_reported_as_a_longer_day`,
 `test_pdm56_a_refused_write_leaves_the_day_unchanged`, `test_updm41_`.
 
-Two of the nine are not misspellings but **truncations** — `test_pdm13` and
-`test_updm41_` are prefixes of real names. A substring check passes them, which
-is why a widened regex must anchor on the whole name.
+`test_pdm52_a_drop_above_moves_day_start_back` and
+`test_pdm52_a_long_item_dropped_above_takes_the_day_back_far_enough` were on
+this list and are no longer *in the file* to be counted: the PD-M5.2 row that
+named them was marked withdrawn by this batch. They are still dead names, and
+they are still named by
+`docs/implementation_plan_2026-11-06_plan_day_controls.md`, which no test
+scans.
+
+The two truncations are `test_pdm13` and `test_updm41_`, prefixes of real
+names. A substring check passes them, which is why a widened regex must anchor
+on the whole name.
 
 This is **P24 twice in the same file**: the comment at
 `tests/test_traceability_refs.py:43-47` records fixing exactly this class of
 blind spot for `Tests:`-label anchoring — "a guard whose unchecked input path
 is a silent pass" — and left the bare-name path unchecked. Widening the regex
-will turn the test red on all nine, so the fix is one change: widen it and
-settle them together.
+will turn the test red on every name the command above lists, so the fix is one
+change: widen it and settle them together.
 
 A tenth dead name, `test_pdm5_an_end_of_the_day_that_is_not_one_is_an_error`,
 is **not** in the list above, because PD-M5.8's row was edited to **drop** the

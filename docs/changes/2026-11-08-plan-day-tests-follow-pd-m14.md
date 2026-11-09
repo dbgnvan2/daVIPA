@@ -101,7 +101,7 @@ standing elsewhere.
 - **`docs/spec_coverage.md`'s PD-M5.3 cell overstated what was deleted.**
   `86a9a53` wrote "the named tests were deleted"; only one of the two was.
   `::test_pdm53_a_drop_below_does_not_renumber_the_day` is live at
-  `tests/test_plan_screen.py:5508` and was *strengthened* by PD-M14, which the
+  `tests/test_plan_screen.py` and was *strengthened* by PD-M14, which the
   withdrawing plan says in as many words. The same cell cited the
   earlier-direction guard for a bottom-box criterion; it now cites
   `::test_pdm141_a_drop_on_later_writes_no_settings`. A reader acting on the
@@ -118,17 +118,18 @@ standing elsewhere.
   TG-M6.4 and TG-M6.4a stay `done`. The prediction is struck through in place
   with the reason, because that table is cited by the PD-M5.2 and PD-M5.3
   withdrawals above and a reader checking one would have reached the other.
-- **Nine findings were filed, not fixed** — `SSC-1` to `SSC-9` in
+- **Ten findings were filed, not fixed at the time** — `SSC-1` to `SSC-10` in
   `BACKLOG.md`. They are the same failure shape in documents outside this
   batch's file set: plans that head themselves "awaiting approval, no
   implementation code written" over code that is on `main`, a spec whose
   header contradicts its own status section 330 lines below. Sweeping them
   into a plan-day test batch would produce an unreviewable diff, which is the
   global rule 10 split. Three are high — `SSC-1`, `SSC-2` and `SSC-3`.
-  `SSC-3` is left for the user: the two
-  false sentences are in `CLAUDE.md`, which is auto-loaded into every session,
-  so correcting the project's own instructions on a review finding is not a
-  sweep's decision.
+  `SSC-3` was left for the user, because its false sentences are in
+  `CLAUDE.md`, which is auto-loaded into every session, so correcting the
+  project's own instructions on a review finding is not a sweep's decision.
+  **It has since been closed** — the user authorized the edit, and the bullet
+  below records what the edit found. The other nine stand as filed.
 - **PD-M14.4 was never built, and the plan reads as though it shipped.** The
   ninth pass struck through one table cell of that prediction; the tenth found
   the cell then pointed the reader at a list three lines below that still named
@@ -185,12 +186,17 @@ standing elsewhere.
   itself introduced (found by the second cold pass; `53d480b`)
 - `src/getmoredone/time_block_layout.py` — `edge_limit_time` and `build_day_grid` `Tests:` lines, one broken line break (`2cd83a3`)
 - `src/getmoredone/screens/plan_blocks.py` — `build_outside_group`'s stale prose about Day End (`2cd83a3`)
-- `docs/spec_coverage.md` — 8 references repointed and 1 dropped, across 3
+- `docs/spec_coverage.md` — the PD-M5.5 implementation and status cells, the
+  three routing phrases that gave a count of dead names, and three PDT rows
+  whose wording claimed more than their test asserts; 8 references repointed
+  and 1 dropped, across 3
   rows (TG-M3.1, PD-M5.5, PD-M5.8); the 21 PDT rows; the PD-M5.2, PD-M5.3 and
   PD-M5.6 rows marked **withdrawn**; and the M7.3 row with the two UPD-F1
   paragraphs under it
 - `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md` — this note
-- `BACKLOG.md` — items 1, 2 and 4 rewritten; `PDT-A1`–`PDT-A5` and `SSC-1`–`SSC-9` filed
+- `BACKLOG.md` — items 1, 2 and 4 rewritten; `PDT-A1`–`PDT-A5` and `SSC-1`–`SSC-9`
+  filed; the `SSC` section's cite rule; `PDT-A1` rewritten to give the measuring
+  command instead of totals that went stale inside this batch
 - `NOTES.md` — where `main` stands; the UPD-F1 and test-count corrections
 - `CHANGELOG.md` — UPD-F1's `[Unreleased]` entry corrected
 - `CLAUDE.md` — three false sentences in "Why the worktree exception was

@@ -223,7 +223,7 @@ above, in one pass, on a weekday and on a Saturday.
 |---|---|---|
 | PD-M5.2 | A drop above the first box moves Day Start back | The drop no longer touches Day Start. The item still lands above the first box. |
 | PD-M5.3 | A drop below the last box moves Day End forward | The same, at the other end. |
-| PD-M5.5 | Blocks keep their clock times when the day grows | Still true, by a different mechanism: nothing is renumbered because nothing moves. The plan expected `shift_all_slots` to keep this criterion under PD-M14.4; since PD-M14.4 was not built, `shift_all_slots` has no production caller and the criterion holds without it. |
+| PD-M5.5 | Blocks keep their clock times when the day grows | **Not withdrawn** — it is in this table only because the plan expected PD-M14.4 to change how it is kept; `docs/spec_coverage.md` records it `done` and that is correct. Still true, by a different mechanism: nothing is renumbered because nothing moves. The plan expected `shift_all_slots` to keep this criterion under PD-M14.4; since PD-M14.4 was not built, `shift_all_slots` has no production caller and the criterion holds without it. |
 | TG-M6.4 | Saving Day Settings writes no blocks | ~~Reversed by PD-M14.4: it must renumber, or work already planned moves on the clock.~~ **Not what was built.** The box is stored relative to Day Start, so the clock times follow on read and nothing is renumbered — the same mechanism the PD-M5.5 row above describes. TG-M6.4 and TG-M6.4a stay `done` in `docs/spec_coverage.md`, and both named tests are live and green: `tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks` and `tests/test_time_block_crud.py::test_tgm64_a_day_start_change_writes_no_rows`. Neither was deleted: PD-M14.4 was not built, and the deletion list below is corrected to the three tests that were. *(Corrected 2026-11-08, ninth cold pass of the PDT batch.)* |
 
 **Three** tests assert the withdrawn behaviour and were deleted with it:
@@ -237,17 +237,26 @@ fourth, to be replaced by `::test_pdm144_changing_the_hours_keeps_clock_times`.
 Neither happened: PD-M14.4 was not built (see the note at its head), the
 `test_pdm144` tests were never written, and
 `tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks` is
-live at `:1569` asserting the criterion verbatim. Do not delete it.
+live in `tests/test_plan_screen.py` asserting the criterion verbatim — find
+it with `grep -n "def test_tgm64_saving_settings_writes_no_blocks"`. Do not
+delete it.
 
 `::test_pdm53_a_drop_below_does_not_renumber_the_day` keeps its name and is
-strengthened: under PD-M14.1 it holds for both ends, not one. It is live at
-`tests/test_plan_screen.py:5508`.
+strengthened: under PD-M14.1 it holds for both ends, not one. It is live in
+`tests/test_plan_screen.py` (`grep -n "def test_pdm53_a_drop_below_does_not_renumber" tests/test_plan_screen.py`).
 
 ~~`::test_pdm55_a_block_on_another_date_keeps_its_clock_time`~~ was named here
-as a second. **No test of that name has ever existed** — `grep -rn
-"a_block_on_another_date" .` matches this plan line and nothing else. PD-M5.5's
-four live tests are in `tests/test_time_block_crud.py` under other names.
-*(Recorded 2026-11-08, eleventh cold pass.)*
+as a second. **It is not on `main`.** It was there — `git log -S` on the name
+finds it added and later removed (`5543476`, `436264f`) — and it is still live
+on `refs/heads/claude/elegant-neumann-ab55c9` and two other refs, so a reader
+who greps the whole working tree will find the `def` in a worktree copy and
+conclude the reference is good. On `main` it is not: `grep -rn "def
+test_pdm55_a_block_on_another_date" tests/` returns nothing, and PD-M5.5's four
+live tests are in `tests/test_time_block_crud.py` under other names. Repoint it
+to one of those or drop it; do not restore the name.
+*(Recorded 2026-11-08; the eleventh pass wrote "never existed" here, which the
+twelfth corrected — the first version's own grep, run over the whole tree,
+returns the branch copies.)*
 
 ## Implementation order
 
@@ -269,7 +278,8 @@ four live tests are in `tests/test_time_block_crud.py` under other names.
 
 ## Documents to update in the same change
 
-`docs/spec_coverage.md` (PD-M14 rows; PD-M5.2, PD-M5.3, TG-M6.4 withdrawn),
+`docs/spec_coverage.md` (PD-M14 rows; PD-M5.2 and PD-M5.3 withdrawn — **not**
+TG-M6.4, whose reversal was never built: see the table above),
 `docs/implementation_plan_2026-11-06_plan_day_controls.md` (PD-M5 marked
 superseded in place), `docs/implementation_plan_2026-11-05_time_grid.md`
 (TG-M6.4), `docs/USER_GUIDE.md` (what Day Settings is for, and what the two ends
