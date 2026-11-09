@@ -123,7 +123,7 @@ def widget_contains_pointer(widget, x_root: int, y_root: int) -> bool:
              written out four times in drag_schedule.py and was about to be
              written a fifth and sixth time for the Plan screen's two drag
              surfaces (global rule 5 -- when you fix one, fix its siblings).
-    Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m8
+    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m8
     Tests:   tests/test_drag_schedule_support.py::test_widget_contains_pointer_uses_root_coordinates
 
     An unmapped widget is never a target. Neither is a destroyed one: a drag

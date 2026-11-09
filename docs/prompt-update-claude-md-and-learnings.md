@@ -6,13 +6,13 @@ Copy everything below this line into the coding agent.
 
 ## Context
 
-An external audit of this repo (2026-08-20) found: review sweeps ran to twelve passes without finding-count decay, a pass-10 fix introduced a high-severity regression caught at pass 11 (`2383cbd`), test churn ran 2:1 over src churn across the last 100 commits, 16 tests were incapable of failing (`3892159`, one opened the production DB), and `CLAUDE.md` still documents a three-agent branch workflow the latest handoff note (`docs/changes/2026-08-20-backlog-batch-3.md`) confirms is dormant (`codex/agent-docs` and `codex/agent-github` never existed as branches; `codex/agent-code` last touched 2026-04-03, 131 commits behind).
+An external audit of this repo (2026-08-20) found: review sweeps ran to twelve passes without finding-count decay, a pass-10 fix introduced a high-severity regression caught at pass 11 (`2383cbd`), test churn ran 2:1 over src churn across the last 100 commits, 16 tests were incapable of failing (`3892159`, one opened the production DB), and `CLAUDE.md` still documents a three-agent branch workflow the latest handoff note (`docs/unused-docs/changes/2026-08-20-backlog-batch-3.md`) confirms is dormant (`codex/agent-docs` and `codex/agent-github` never existed as branches; `codex/agent-code` last touched 2026-04-03, 131 commits behind).
 
 This is a docs-only task. Do not change src/ or tests/.
 
 ## Task 1 — CLAUDE.md
 
-1. **Retire the "Multi-agent workflow" section.** Replace with a short paragraph: work happens on `main` (or feature branches); the handoff-note requirement at `docs/changes/<yyyy-mm-dd>-<topic>.md` and the docs-sync rule (behavior/UI/dependency changes must update docs and requirements in the same PR) are retained. Make the matching correction in `AGENTS.md` or, if that file is now entirely about the dead workflow, replace its contents with a pointer to CLAUDE.md.
+1. **Retire the "Multi-agent workflow" section.** Replace with a short paragraph: work happens on `main` (or feature branches); the handoff-note requirement at `docs/unused-docs/changes/<yyyy-mm-dd>-<topic>.md` and the docs-sync rule (behavior/UI/dependency changes must update docs and requirements in the same PR) are retained. Make the matching correction in `AGENTS.md` or, if that file is now entirely about the dead workflow, replace its contents with a pointer to CLAUDE.md.
 2. **Add a "Review sweeps" section** with these rules:
    - Maximum 2 sweep passes per batch; a third only if the previous pass produced a high-severity finding.
    - Stop when a pass yields no finding of medium or higher severity.
@@ -41,4 +41,4 @@ Where an entry duplicates an existing learning, extend the existing entry instea
 ## Verification
 - `git diff` shows only CLAUDE.md, AGENTS.md, and the learnings file changed.
 - Cited commits (`3892159`, `2383cbd`, `eac201f`) exist and their messages support the claims — check with `git log -1 --format=%b <hash>` before writing.
-- Handoff note at `docs/changes/2026-08-20-docs-workflow-update.md`.
+- Handoff note at `docs/unused-docs/changes/2026-08-20-docs-workflow-update.md`.

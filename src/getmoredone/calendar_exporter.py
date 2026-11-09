@@ -2,7 +2,7 @@
 
 Purpose: push the Plan screen's time blocks for one date out as timed events,
          and do it again later without duplicating or orphaning anything.
-Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md
+Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md
 Tests:   tests/test_calendar_export.py
 
 **This module imports no GUI toolkit, and must not.** What gets exported, what
@@ -165,7 +165,7 @@ class ExportOutcome:
 
         Purpose: CE-M4.2 -- the counts the user needs, including the ones that
                  did not happen.
-        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
         Tests:   tests/test_calendar_export.py::test_cem422_the_summary_line_names_every_skip
 
         A day with no blocks left is not the same as a run that did nothing:
@@ -224,7 +224,7 @@ def build_export_plan(
     """Decide what the day's blocks should become, sending nothing.
 
     Purpose: CE-M2.1 -- the whole decision, testable without a client.
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m21
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m21
     Tests:   tests/test_calendar_export.py::test_cem212_every_placed_block_gets_one_entry
 
     A block with no box (``slot_index is None``) is **skipped, and counted**.
@@ -316,7 +316,7 @@ def _marker_date_of(event: Dict[str, Any]) -> Optional[str]:
 
     Purpose: CE-M2.6b -- the sweep deletes, and it must not delete on the
              strength of the date filter alone.
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests:   tests/test_calendar_export.py::test_cem266_an_event_marked_for_another_day_is_never_deleted
 
     The block id is already re-checked here rather than trusted to the query
@@ -355,7 +355,7 @@ def export_day(
     """Push one planned day to Google Calendar, idempotently.
 
     Purpose: CE-M2.4 -- the one entry point the UI calls.
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m24
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m24
     Tests:   tests/test_calendar_export.py::test_cem251_a_second_export_updates_and_creates_nothing
 
     ``client`` is injected and duck-typed (``create_event``, ``update_event``,
@@ -512,7 +512,7 @@ def _same_calendar(recorded: Optional[str], configured: str) -> bool:
     Purpose: CE-M2.5 -- ``None`` is the default calendar, not "no calendar":
              every row written before the calendar was recorded was written by
              an export that could only write to ``primary``.
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
     Tests:   tests/test_calendar_export.py::test_cem255b_a_row_from_before_the_column_is_read_as_the_default
     """
     return (recorded or DEFAULT_CALENDAR_ID) == (configured or DEFAULT_CALENDAR_ID)
@@ -565,7 +565,7 @@ def _sweep_orphans(
     """Remove the events of blocks that are no longer on the day.
 
     Purpose: CE-M2.6 -- the only part of this module that deletes anything.
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests:   tests/test_calendar_export.py::test_cem262_an_unmarked_event_is_never_deleted
 
     Four rules, in order, and every one of them is a decision not to delete

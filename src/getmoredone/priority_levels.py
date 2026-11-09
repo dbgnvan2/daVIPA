@@ -3,7 +3,7 @@
 Purpose: one place decides the three priority levels and the row tint each one
          takes, so the five list screens cannot drift apart and the user can
          recolour them from Settings.
-Spec:    docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m1
+Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m1
 Tests:   tests/test_priority_level_colors.py
 
 A **level** is a rule on the two factors the user sets by hand, importance and
@@ -173,7 +173,7 @@ def row_control_kwargs(fill: "RowFill") -> Dict[str, str]:
              checkbox border measures about 2.6:1 against the shipped green,
              under the 3:1 bar for a non-text control. PLC-M4.4 fixed the row
              text and left the controls behind.
-    Spec:    docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m4
     Tests:   tests/test_priority_level_colors.py::test_plcm49_controls_follow_a_level_fill
 
     Empty for every other fill, so a segment-coloured or completed row keeps
@@ -242,7 +242,7 @@ def row_fill(
 
     Purpose: PLC-M4 -- the one copy of a rule that was written out by hand in
              five screens, each with its own precedence chain around it.
-    Spec:    docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m4
     Tests:   tests/test_priority_level_colors.py::test_plcm41_a_row_takes_its_level_colour
 
     Precedence is the one the screens already had, unchanged: a VSP segment

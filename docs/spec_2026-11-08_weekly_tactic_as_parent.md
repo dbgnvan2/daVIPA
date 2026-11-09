@@ -366,7 +366,7 @@ grep -E '^\| *\*{0,2}WTP-M[0-9]' docs/spec_2026-11-08_weekly_tactic_as_parent.md
 
 WTP-M6.7 was added *after* the batch was pushed. The independent Hermes
 `learning-qa-sweep` gate over `3f705b4..56c1dc0`
-(`docs/cycles/2026-11-08_wtp-plc-upd-pd-qa-gate.md`) rejected the range on one
+(`docs/unused-docs/cycles/2026-11-08_wtp-plc-upd-pd-qa-gate.md`) rejected the range on one
 medium finding: WTP-M6.1's question existed only in `ItemEditorDialog`, so six
 other screens — the Today checkbox among them — completed a tactic with open
 children and asked nothing. That is the P25 shape, and WTP-M6.1 to WTP-M6.3
@@ -456,7 +456,7 @@ WTP there now is an adjacent issue found while building WTP-M6.4.
 
 - **That the tree reads as the user's plan** — **not done**, as foreseen. The
   human review proposal stands: it is the checklist in
-  `docs/changes/2026-11-08-weekly-tactic-as-parent.md`. Nobody has opened the
+  `docs/unused-docs/changes/2026-11-08-weekly-tactic-as-parent.md`. Nobody has opened the
   Hierarchical screen against the main database.
 - **WTP-M5.2's wording** — **not done**, as foreseen. The test asserts the
   count, the plural and "cannot be undone" are in the string. Whether
@@ -534,6 +534,6 @@ None is a prerequisite.
 | `tests/test_weekly_tactic_parent.py` | **new** — WTP-M1 … WTP-M6 |
 | `tests/test_vps_hub_crud.py` | **WTP-M5.6** — extended for both link shapes |
 | `docs/DOCUMENTATION_INDEX.md` | this spec, and the handoff note |
-| `docs/changes/2026-11-08-weekly-tactic-as-parent.md` | **new** — handoff note |
+| `docs/unused-docs/changes/2026-11-08-weekly-tactic-as-parent.md` | **new** — handoff note |
 
 Test changes are committed separately from `src/` changes.

@@ -23,25 +23,24 @@ holding the tests for code it did not contain. The rule, and what four
 concurrent batches cost that day, are in `CLAUDE.md` under *Working agreements
 → One build batch at a time* and *Why the worktree exception was withdrawn*.
 
-## Required handoff artifact
+## Handoff notes
 
-Every batch of work writes a handoff note at:
-- `docs/changes/<yyyy-mm-dd>-<topic>.md`
+A note is written when it carries something a commit message cannot, not once
+per batch. The conditions, and why the per-batch requirement was dropped on
+2026-11-09, are in `CLAUDE.md` under *Working agreements → Records are filed,
+not tested* — stated there and not restated here, because a second copy of a
+rule drifts from the first.
 
-Use template:
-- `.agents/templates/handoff-note.md`
-
-Minimum fields:
-- Summary of change
-- Files changed
-- Test/verification status
-- Follow-ups for the next session
+Where one is written: `docs/unused-docs/changes/<yyyy-mm-dd>-<topic>.md`,
+template `.agents/templates/handoff-note.md`, fields summary, files changed,
+test/verification status, follow-ups.
 
 ## Docs sync
 
 If code behaviour, UI text, CLI flags, or dependencies changed, docs and the
-requirements files must be updated in the same change. Enforced by
-`tests/test_docs_sync_rule.py`, which asserts
+requirements files must be updated in the same change. A file under
+`docs/unused-docs/` is not that change: filing history does not keep a
+document current. Enforced by `tests/test_docs_sync_rule.py`, which asserts
 `tools/agents/check_docs_sync.py::verdict` over fixtures, so the rule fails
 locally and in `tests.yml` before a push. Both `requirements.txt` and
 `requirements-dev.txt` count as dependency files. To apply it to real changes,

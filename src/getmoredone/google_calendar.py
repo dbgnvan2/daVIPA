@@ -37,7 +37,7 @@ DEFAULT_CALENDAR_ID = 'primary'
 #: Private means the people a calendar is shared with never see them, and we
 #: can read them again -- which is what lets a re-export find the events of
 #: blocks that have since been deleted.
-#: Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m33
+#: Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m33
 #: Tests: tests/test_google_calendar_export_calls.py::test_cem331_create_writes_the_block_marker
 BLOCK_ID_PROPERTY = 'gmd_block_id'
 BLOCK_DATE_PROPERTY = 'gmd_block_date'
@@ -98,7 +98,7 @@ class CalendarEventExists(Exception):
     Purpose: CE-M3.4b -- let a retried insert that carries its own id be told
              apart from every other refusal, so the first attempt's event is
              read back instead of a second one being created.
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests:   tests/test_google_calendar_export_calls.py::test_cem348_a_lost_insert_response_does_not_make_a_second_event
     """
 
@@ -108,7 +108,7 @@ class AuthenticationRequired(Exception):
 
     Purpose: CE-M4.4 / E3 -- make "cannot sign in here" a reportable outcome
              instead of a blocked thread.
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
     Tests:   tests/test_google_calendar_export_calls.py::test_cem346_a_non_interactive_client_refuses_instead_of_prompting
 
     Signing in runs ``flow.run_local_server`` -- a browser, a local HTTP
@@ -126,7 +126,7 @@ def _transport_errors() -> tuple:
              the failures the new 30s timeout creates reached the caller
              unretried. A wifi blip is the commonest transient in a desktop
              app and it is not an ``HttpError`` (P1, E5).
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests:   tests/test_google_calendar_export_calls.py::test_cem345_a_timeout_is_retried_then_succeeds
 
     Named rather than ``OSError``: every one of these is an ``OSError``, and
@@ -167,7 +167,7 @@ def _reasons_of(error) -> frozenset:
 
     Purpose: CE-M3.4b -- a 403 is only retryable for some reasons, and the
              reason lives in the response body, not in the status.
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests:   tests/test_google_calendar_export_calls.py::test_cem349_a_403_rate_limit_is_retried_then_succeeds
 
     Read defensively and never raised from: the body is googleapiclient's and
@@ -219,7 +219,7 @@ def _with_retry(description: str, call):
 
     Purpose: CE-M3.4 -- timeout, retry and backoff for every event call in
              this module, not just the newest one (P5).
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests:   tests/test_google_calendar_export_calls.py::test_cem341_a_503_is_retried_then_succeeds
 
     Raises ``CalendarEventMissing`` for a 404/410, ``RuntimeError`` for
@@ -265,7 +265,7 @@ def _new_event_id() -> str:
              otherwise be sent again and make a second event (P1 again, from
              the other side: a retry must not turn a transient failure into
              two events).
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests:   tests/test_google_calendar_export_calls.py::test_cem348_a_lost_insert_response_does_not_make_a_second_event
 
     Google's ids are base32hex: the characters ``a``-``v`` and ``0``-``9``,
@@ -485,7 +485,7 @@ class GoogleCalendarManager:
         """The API client, with a timeout on its transport.
 
         Purpose: CE-M3.4 / E1 -- no call in this module may hang forever.
-        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
         Tests:   tests/test_google_calendar_export_calls.py::test_cem344_the_transport_carries_a_timeout
 
         ``build`` takes either credentials or an http object, not both, so the
@@ -510,7 +510,7 @@ class GoogleCalendarManager:
         """Write the OAuth token to ``self.token_file``.
 
         Purpose: create the directory at the point a file is written to it.
-        Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-3
+        Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-3
         Tests:   tests/test_google_calendar_paths.py::test_bi3_saving_a_token_creates_its_parent_directory
 
         ``__init__`` used to create the default data directory whether or not
@@ -683,7 +683,7 @@ class GoogleCalendarManager:
         private marker the Plan export stamped on it: an update that built a
         fresh body would strip the marker, and the next export would see an
         event it could not recognise as its own.
-        Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m33
+        Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m33
         Tests: tests/test_google_calendar_export_calls.py::test_cem332_update_preserves_the_marker
 
         Raises:
@@ -748,7 +748,7 @@ class GoogleCalendarManager:
         """Every event this app exported for one date.
 
         Purpose: CE-M3.2 -- the read the orphan sweep needs.
-        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m32
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m32
         Tests:   tests/test_google_calendar_export_calls.py::test_cem321_two_pages_are_both_returned
 
         Selected by our own private marker rather than by a time window, and

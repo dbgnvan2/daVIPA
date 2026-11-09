@@ -109,7 +109,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         # six more cells in the header's grid: the two rows then size their
         # columns independently, so a 160px combo does not stretch the column
         # the Week Start combo sits in.
-        # Spec:  docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+        # Spec:  docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
         # Tests: tests/test_unified_panel_design.py::test_updf21_the_filters_are_on_their_own_row
         self.filter_row = ctk.CTkFrame(header, fg_color="transparent")
         self.filter_row.grid(row=2, column=0, columnspan=13, sticky="w",
@@ -586,7 +586,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         # third-choice lineage fallback that ``lineage_for_item`` never reaches
         # for these rows, because they carry both an Annual Plan Element and a
         # parent. It only ever fired for a legacy-shaped tactic title.
-        # Spec:  docs/implementation_plan_2026-08-19_backlog_clearance.md#bp6
+        # Spec:  docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp6
         # Tests: tests/test_weekly_items_title.py
         weekly = self.selected_weekly_item
         item = ActionItem(

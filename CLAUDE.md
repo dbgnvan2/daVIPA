@@ -15,16 +15,13 @@ python run.py
 # Tests
 pytest                                          # All tests
 pytest -m "not meta"                            # App behaviour only (2439 tests)
-pytest -m meta                                  # Repo/infra assertions only (256 tests)
-# Both counts measured 2026-11-09 (after the LDS batch, whose own three tests
-# are all in the meta figure; the app figure has not moved since the SAG
-# batch, where it moved with `c190b9f`) with
-# `-m <marker> --collect-only -q`, whose last line prints collected/deselected
-# — re-measure rather than trusting them. They had been 1691 and 212, stale by
-# 741 and 13, and 2432/225 earlier the same day; the meta figure was 243
-# before the SBN batch, 247 before the GSF one, 249 before the MAW one and 253
-# before this one. No test asserts either number,
-# which is why they drift; one that did would go red on every batch.
+pytest -m meta                                  # Repo/infra assertions only (231 tests)
+# Both counts measured 2026-11-09, after the prose guards were deleted, with
+# `-m <marker> --collect-only -q`, whose last line prints
+# collected/deselected — re-measure rather than trusting them. The meta figure
+# fell from 256 to 231 that day: `tests/test_doc_status_claims.py` and the five
+# citation and vocabulary guards went with the documents they were reading. No
+# test asserts either number, which is why they drift.
 pytest -v                                       # Verbose
 pytest tests/test_vps_integration.py -v        # Single file
 pytest --cov=src/getmoredone                   # With coverage
@@ -95,73 +92,63 @@ and `codex/agent-code` was last touched 2026-04-03; it is 624 commits behind
 forward).
 See `AGENTS.md` for the full agreements.
 
-**After every batch of work**, write a handoff note at
-`docs/changes/<yyyy-mm-dd>-<topic>.md` using template
-`.agents/templates/handoff-note.md`. Required fields: summary, files changed,
-test/verification status, follow-ups.
+### Records are filed, not tested (2026-11-09)
 
-If code behavior, UI text, or dependencies changed → docs and the requirements
-files must be updated in the same change. **The rule is in the test suite**, as
-of 2026-11-09 (`SAG-M2`, closing `SST-A8`):
-`tools/agents/check_docs_sync.py::verdict` is the decision as a pure function
-of changed paths, and `tests/test_docs_sync_rule.py` asserts every outcome it
-can return. So it fails locally and in `tests.yml` before a push.
+**A document is written to help the work, and filed when it is done.** It is
+not a thing the work exists to maintain.
 
-What the suite does **not** do is diff your branch: `verdict` is asserted over
-fixtures, because `tests.yml` checks out at depth 1 and has no `origin/main` to
-diff against, and a test that asked for the range would skip on CI — the shape
-this repo has now been bitten by twice. To apply the rule to real changes, run
-it by hand: `./venv/bin/python tools/agents/check_docs_sync.py`. A range it
-cannot read is reported as *skipped*, not as a pass.
+So:
+
+- **Write a handoff note only when it carries something a commit message
+  cannot**: a measurement behind a decision, follow-ups not already in
+  `BACKLOG.md`, a verification status that is not plainly green, or state the
+  next session needs. Otherwise the commit message is the record. The template
+  is `.agents/templates/handoff-note.md`; a note goes straight to
+  `docs/unused-docs/changes/<yyyy-mm-dd>-<topic>.md`.
+- **Write an implementation plan as a file only when the batch warrants one** —
+  more than about five criteria, user-visible behaviour, or work that outlives
+  a session. Planning before code is still required; becoming a file is not.
+- **Filed records are `docs/unused-docs/`.** Handoff notes, implementation
+  plans, coverage snapshots, dated status reports: 194 files moved there on
+  2026-11-09. They are kept for recovery and for history, and **no test reads
+  them**. A record says what was true on its date; a pointer in it to something
+  since deleted is history, not a defect.
+- **No guard reads prose.** The citation and vocabulary guards are deleted —
+  five of them, with their exemption tables and 2,500 lines of test code. What
+  survives is about code, not writing: `tests/test_repo_hygiene.py` (no stray
+  scripts, bundled resources tracked and valid),
+  `tests/test_traceability_refs.py` (a `Spec:`/`Tests:` pointer in code or in a
+  live spec resolves), `tests/test_ci_contract.py` (the workflow's versions and
+  secrets).
+
+What is left live under `docs/` is reference material someone reads *before*
+working: the user guide, the dated specs, the master spec, the documentation
+index. Plus the four at the root — `CLAUDE.md`, `AGENTS.md`, `BACKLOG.md`,
+`NOTES.md` — and `docs/spec_coverage.md`, the criteria-to-tests record.
+
+The measurement behind this change, which is itself now filed:
+docs/unused-docs/proposal_2026-11-09_slimmer_documentation_policy.md. The
+figures that mattered were 116 of 150 handoff notes never cited by any
+document, 251 Markdown files against 255 Python files, and 131 docs-only
+commits in November against 73 touching `src/`.
+
+If code behaviour, UI text, or dependencies changed → docs and the
+requirements files must be updated in the same change (global rule 13).
+`tools/agents/check_docs_sync.py::verdict` is that decision as a pure function
+of changed paths, asserted over fixtures by `tests/test_docs_sync_rule.py`, so
+it fails before a push. It no longer demands a handoff note — that requirement
+is what made a note mandatory per batch — and a file under
+`docs/unused-docs/` does not count as the documentation change, because filing
+history is not keeping a document current. The suite does not diff your
+branch: `tests.yml` checks out at depth 1 and has no `origin/main`. To apply
+the rule to real changes, run it by hand:
+`./venv/bin/python tools/agents/check_docs_sync.py`. A range it cannot read is
+reported as *skipped*, not as a pass. Both `requirements.txt` and
+`requirements-dev.txt` are dependency files.
 
 The workflow `agent-docs-gate.yml` is **deleted** as of 2026-11-09
 (`SAG-A3`). It triggered on `pull_request` only, which this repo never
-produces, so the gate had never run here — the rule it carried is the suite's
-now. The rule treats both `requirements.txt` and `requirements-dev.txt` as
-dependency files. `tests/test_ci_contract.py::test_gsfm11_no_document_cites_a_workflow_that_does_not_exist`
-is what stops a document describing a workflow this repo does not have.
-
-### Naming a thing that no longer exists
-
-Five conventions, each adopted because a guard that reads prose cannot tell a
-pointer from a history: a sentence that names a deleted thing the way a live
-one is named is indistinguishable from a dead pointer, and the guard is right
-to reject it.
-
-- **A retired test** is named in plain backticks with neither the `tests/`
-  path nor the leading `::` — `tests/test_traceability_refs.py` resolves both
-  of those forms against the suite.
-- **A deleted workflow** is named without its `.github/workflows/` path:
-  `agent-docs-gate.yml` alone. `GSF-M1.1` is the guard.
-- **A dead root filename quoted as a defect** — the way the closed `SAG-A7`
-  quotes the master-spec name that never existed — is written *without*
-  backticks. `GSF-M2.1` reads the backticked form only.
-- **Any deleted Markdown file** — wherever it lived — is named without
-  backticks, in running prose. Dropping the directory is not enough: a
-  backticked bare `*.md` name is what `GSF-M2.1` reads, so the deleted
-  pull_request_template.md fails in backticks whether or not the `.github/`
-  path is there — as this very bullet did, on its first draft. Unbackticked
-  prose is the one form no arm reads, which is what keeps honest history
-  writable. `MAW-M2.1` reaches past `workflows/` to the rest of `.github/`,
-  though only in the backticked form with a dotted extension, so an
-  unbackticked `.github/` path and an extensionless one such as CODEOWNERS are
-  still unread; `MAW-M3.1` holds `docs/` and reads five forms — backticked,
-  with a line number, a heading, a markdown link, a list item.
-
-- **A filename proposed but not created** — a rename raised and not made, the
-  way `GSF-N1` raises renaming the master spec — is written without backticks
-  too. It is not a file, and the guard cannot tell a proposal from a dead
-  pointer. `GSF-M2.1` is the arm; `LDS-M3.1` is what brought
-  `docs/spec_coverage.md` into its reach.
-
-A deleted `.yml` workflow is the one case where dropping the path is enough,
-because no arm reads a bare `*.yml` name: `agent-docs-gate.yml` in backticks
-is fine, and that is why the workflow convention — the second bullet above —
-reads as it does.
-
-Each guard's failure message says this too, but a convention a future author
-can only learn by turning a test red is a convention written in the wrong
-place.
+produces, so the gate had never run here.
 
 ### One build batch at a time
 
@@ -248,7 +235,7 @@ current state of those branches:
   then withdrew on purpose, and that caused both of the faults the user
   reported. **The branch must not be merged.** The eight were brought up to the
   surviving design instead (`a19a38a`), which is repo test rule case (b).
-  `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md` has the
+  `docs/unused-docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md` has the
   measurement. A test passing on a branch does not establish that the branch
   holds a fix, and this section said it did.
 - A ninth, `test_pdm131_a_drop_on_an_end_of_a_non_work_day_extends_the_day`,

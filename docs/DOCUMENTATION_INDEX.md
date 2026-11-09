@@ -15,7 +15,7 @@ Repository maintainability policy used during code review and refactoring:
 - Testability and dependency-load guidance
 - Default expectations for ongoing development work
 
-### `docs/changes/`
+### `docs/unused-docs/changes/`
 
 Agent handoff notes and implementation summaries:
 
@@ -93,7 +93,7 @@ note** with its template at `.agents/templates/handoff-note.md`.
 
 ## VSP (Vision Strategy Plan) Documentation
 
-### docs/VPS_UPDATES_2026-01-24.md (8.5KB) **NEW**
+### docs/unused-docs/VPS_UPDATES_2026-01-24.md (8.5KB) **NEW**
 
 Comprehensive change log for January 24, 2026 updates:
 
@@ -160,7 +160,7 @@ done`.** §11 was walked on 2026-11-08 and produced four follow-ups,
 `UPD-F1` - `UPD-F4`, in the plan below; all four are built and the §11 walk is
 owed again, steps 4, 7 and the new 11 to 13 included (per-criterion status in
 the spec's §10, and the batch's handoff note is
-`docs/changes/2026-11-08-unified-panel-m7.md`):
+`docs/unused-docs/changes/2026-11-08-unified-panel-m7.md`):
 
 - The feature matrix: which of the six tabs has panels, a divider, drag and
   resizable columns today, counted rather than assumed
@@ -175,7 +175,7 @@ the spec's §10, and the batch's handoff note is
   as walked on 2026-11-08, with steps 4 and 7 rewritten and steps 11 to 13
   added for what UPD-F2, UPD-F3 and UPD-F4 changed
 
-### docs/implementation_plan_2026-11-08_unified_panel_followups.md
+### docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md
 
 Spec and implementation plan for what the unified panel design's on-screen
 check found (UPD-F1 - UPD-F4). **Approved 2026-11-08. UPD-F2, UPD-F3 and
@@ -184,7 +184,7 @@ UPD-F4 built the same day, and UPD-F1 built after them and merged at
 change `src/getmoredone/app_settings.py`, which a concurrent batch held
 uncommitted at the time, so it went to its own session (per-criterion
 status in `docs/spec_coverage.md`, and the batch's handoff note is
-`docs/changes/2026-11-08-unified-panel-followups.md`):
+`docs/unused-docs/changes/2026-11-08-unified-panel-followups.md`):
 
 - UPD-F1, the one defect found at the walk: no column width or divider
   position survived a relaunch, because `AppSettings.save()` wrote the whole
@@ -203,12 +203,12 @@ status in `docs/spec_coverage.md`, and the batch's handoff note is
 - §6: the three criteria that cannot be made code-testable, now §11 steps 11,
   12 and 13 of the unified panel spec
 
-### docs/implementation_plan_2026-11-08_priority_level_colours.md
+### docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md
 
 Implementation plan for configurable priority level colours (PLC-M1 - PLC-M5).
 **Approved 2026-11-08 and built the same day**; per-criterion status in
-`docs/spec_coverage_2026-11-08_priority_level_colours.md`, and the batch's
-handoff note is `docs/changes/2026-11-08-priority-level-colours.md`:
+`docs/unused-docs/spec_coverage_2026-11-08_priority_level_colours.md`, and the batch's
+handoff note is `docs/unused-docs/changes/2026-11-08-priority-level-colours.md`:
 
 - The three levels — Any Critical; Any High, but no Critical; No high or
   critical — and that a level is a rule on Importance and Urgency, not a
@@ -234,14 +234,14 @@ that made them, why `calendar_importer.py` stays alongside it (an action item
 is *what*, a commitment is *when*), and the four scope decisions taken
 2026-11-08.
 
-### docs/implementation_plan_2026-11-08_plan_calendar_export.md
+### docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md
 
 Implementation plan for exporting a planned day to Google Calendar
 (CE-M1 - CE-M5). **Approved 2026-11-08 and built the same day**;
 per-criterion status, the verification runs, eighteen deviations from this
 plan's wording and the four cold review passes' thirty-eight findings are in
-`docs/spec_coverage_2026-11-08_plan_calendar_export.md`, and the batch's
-handoff note is `docs/changes/2026-11-08-plan-calendar-export.md`:
+`docs/unused-docs/spec_coverage_2026-11-08_plan_calendar_export.md`, and the batch's
+handoff note is `docs/unused-docs/changes/2026-11-08-plan-calendar-export.md`:
 
 - What the Plan screen's "⤴ Google Calendar" button exports, and the three
   named, counted reasons a block is skipped rather than guessed at
@@ -269,7 +269,7 @@ handoff note is `docs/changes/2026-11-08-plan-calendar-export.md`:
   `BACKLOG.md` as CE-A1 to CE-A21
 - The manual checklist, which is the part no test can cover
 
-### docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md
+### docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md
 
 Implementation plan for the lowest-value priority floor on new items and the
 9999 cap on the calculated score (PRI-M1 - PRI-M3). **PRI-M1 and PRI-M2 are
@@ -277,7 +277,7 @@ built and on `main` (`9420927`); PRI-M3 is not built.** This entry said
 "awaiting approval; no implementation code written" until 2026-11-08, which is
 the other half of `SSC-1`. The criteria shipped with no tests at all; those are
 being written against this plan in
-`docs/implementation_plan_2026-11-08_pri_tests.md`:
+`docs/unused-docs/implementation_plan_2026-11-08_pri_tests.md`:
 
 - Why a new item is unscored today rather than lowest, and what that costs it
   in every `priority_score DESC` list
@@ -293,7 +293,7 @@ being written against this plan in
   four descriptions were wrong and are corrected in the filings rather than
   copied
 
-### docs/implementation_plan_2026-11-08_pri_tests.md
+### docs/unused-docs/implementation_plan_2026-11-08_pri_tests.md
 
 Implementation plan for the tests PRI-M1 and PRI-M2 shipped without
 (`BACKLOG.md` item 2, and the spec-status half of `SSC-1`). **Proceeding
@@ -315,12 +315,12 @@ stretch**, which the plan records rather than assumes:
 **Built 2026-11-08: all 15 criteria `done`** - 14 by test, PRI-M2.7 by an
 existing test whose comment was corrected - per-criterion status in
 `docs/spec_coverage.md`. 35 tests, mutation-proved against eight mutations.
-Handoff note: `docs/changes/2026-11-08-pri-tests.md`, listed here only inside
+Handoff note: `docs/unused-docs/changes/2026-11-08-pri-tests.md`, listed here only inside
 this entry rather than as an entry of its own, as every handoff note is. The
 plan says "fourteen tests"; 35 is the collected count, the parametrized rows
 counted individually.
 
-### docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md
+### docs/unused-docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md
 
 Implementation plan for bringing nine stale plan-day tests up to the PD-M14
 design (PDT-M1 - PDT-M5). **Approved 2026-11-08 and built the same day: 20 of
@@ -328,7 +328,7 @@ design (PDT-M1 - PDT-M5). **Approved 2026-11-08 and built the same day: 20 of
 reason. PDT-M4.2 was closed later the same day by the PRIT batch, which wrote
 the two missing test files, so all 21 now read `done` - 13 by test, 8 by
 review** - per-criterion status in `docs/spec_coverage.md`. Handoff note:
-`docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`, which is listed
+`docs/unused-docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`, which is listed
 here only inside this entry rather than as an entry of its own, as every
 handoff note is:
 
@@ -352,14 +352,14 @@ being the PDT-M5 document criteria with a
   human-review proposal for each
 - Nine CI-environment failures listed as adjacent and not touched
 
-### docs/implementation_plan_2026-11-09_ci_green.md
+### docs/unused-docs/implementation_plan_2026-11-09_ci_green.md
 
 Implementation plan for the nine tests CI has been red on since 2026-11-07
 (CIG-M1 - CIG-M4). **Approved 2026-11-09 and built the same day: 10 of 10
 criteria `done`, one item not code-testable (CIG-N1, that CI is green, closed
 by a run id and nothing else)** - per-criterion status in
 `docs/spec_coverage.md`. No file under `src/` is touched. Handoff note:
-`docs/changes/2026-11-09-ci-green.md`, which is listed here only inside this
+`docs/unused-docs/changes/2026-11-09-ci-green.md`, which is listed here only inside this
 entry rather than as an entry of its own, as every handoff note is:
 
 - Seven of the nine set a window attribute and read it back, which needs a
@@ -386,7 +386,7 @@ entry rather than as an entry of its own, as every handoff note is:
   eight known callers, so it cannot detect a *new* test written the way these
   seven were
 
-### docs/implementation_plan_2026-11-09_bare_name_citations.md
+### docs/unused-docs/implementation_plan_2026-11-09_bare_name_citations.md
 
 Implementation plan for bringing the bare `::name` citation form into the
 traceability guard (SBN-M1 - SBN-M2), closing `BACKLOG.md`'s `SAG-A17`
@@ -394,7 +394,7 @@ traceability guard (SBN-M1 - SBN-M2), closing `BACKLOG.md`'s `SAG-A17`
 same day: 6 of 6 criteria `done`, one item not code-testable (SBN-N1, that a
 resolving bare name is the right test for its row)** - per-criterion status in
 `docs/spec_coverage.md`. No file under `src/` or `tools/` is touched. Handoff
-note: `docs/changes/2026-11-09-bare-name-citations.md`, which is listed here
+note: `docs/unused-docs/changes/2026-11-09-bare-name-citations.md`, which is listed here
 only inside this entry rather than as an entry of its own, as every handoff
 note is:
 
@@ -414,7 +414,7 @@ note is:
   plan named as its own risk - no high and eight mediums, all fixed, two of
   them in the guard's own prose. `SBN-A1` to `SBN-A7` filed, not fixed.
 
-### docs/implementation_plan_2026-11-09_derived_live_document_set.md
+### docs/unused-docs/implementation_plan_2026-11-09_derived_live_document_set.md
 
 Implementation plan for deriving the scanned document set and guarding the
 vocabulary of retired concepts (LDS-M1, LDS-M3, LDS-M4), closing `BACKLOG.md`'s
@@ -424,7 +424,7 @@ standing instruction: 8 of 8 criteria `done`, one item not code-testable
 (LDS-N1, whether the prompt documents and dated records deserve a weaker
 guard)** - per-criterion status in `docs/spec_coverage.md`. No file under
 `src/` is touched. Handoff note:
-`docs/changes/2026-11-09-derived-live-document-set.md`, listed here only inside
+`docs/unused-docs/changes/2026-11-09-derived-live-document-set.md`, listed here only inside
 this entry rather than as an entry of its own, as every handoff note is:
 
 - The `docs/` half of the scanned set was five names kept by hand. It is
@@ -449,7 +449,7 @@ this entry rather than as an entry of its own, as every handoff note is:
   `docs/GEMINI.md` described the three-agent split as current for two batches
   inside the scanned set.
 
-### docs/implementation_plan_2026-11-09_retired_agent_apparatus.md
+### docs/unused-docs/implementation_plan_2026-11-09_retired_agent_apparatus.md
 
 Implementation plan for deleting the retired three-agent workflow's apparatus
 (MAW-M1 - MAW-M4), closing `BACKLOG.md`'s `GSF-A1` (medium), `GSF-A2` (low)
@@ -458,7 +458,7 @@ instruction 2026-11-09 and built the same day: 5 of 5 criteria `done`, one item
 not code-testable (MAW-N1, whether the remote `codex/agent-code` should be
 deleted)** - per-criterion status in `docs/spec_coverage.md`. No file under
 `src/` is touched. Handoff note:
-`docs/changes/2026-11-09-retired-agent-apparatus.md`, which is listed here only
+`docs/unused-docs/changes/2026-11-09-retired-agent-apparatus.md`, which is listed here only
 inside this entry rather than as an entry of its own, as every handoff note is:
 
 - Six files deleted: the workflow document, the worktree bootstrap script that
@@ -481,7 +481,7 @@ inside this entry rather than as an entry of its own, as every handoff note is:
   as "131 commits" measured 624 and an ancestor of `main`; and the handoff note
   claimed two records that did not yet exist.
 
-### docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md
+### docs/unused-docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md
 
 Implementation plan for deleting the pull-request-only docs gate and repairing
 the master-spec filename that does not exist (GSF-M1 - GSF-M2), closing
@@ -490,7 +490,7 @@ instruction 2026-11-09 and built the same day: 5 of 5 criteria `done`, one item
 not code-testable (GSF-N1, whether the spec file should instead be renamed to
 the app's name)** - per-criterion status in `docs/spec_coverage.md`. No file
 under `src/` or `tools/` is touched. Handoff note:
-`docs/changes/2026-11-09-dead-gate-and-dead-spec-name.md`, which is listed here
+`docs/unused-docs/changes/2026-11-09-dead-gate-and-dead-spec-name.md`, which is listed here
 only inside this entry rather than as an entry of its own, as every handoff
 note is:
 
@@ -515,7 +515,7 @@ note is:
   caught this batch citing a handoff note that did not yet exist.
 - `GSF-A1` to `GSF-A5` filed, not fixed. `GSF-N1` needs the user.
 
-### docs/implementation_plan_2026-11-09_status_allow_list.md
+### docs/unused-docs/implementation_plan_2026-11-09_status_allow_list.md
 
 Implementation plan for inverting the status-claim guard into an allow-list and
 putting the docs-sync rule in the test suite (SAG-M1 - SAG-M3), closing
@@ -524,13 +524,13 @@ standing instruction 2026-11-09 and built the same day: 11 of 11 criteria
 `done`, one item not code-testable (SAG-N1, that a recognised claim is true,
 carried forward from SST-N1 unchanged)** - per-criterion status in
 `docs/spec_coverage.md`. No file under `src/` is touched. Handoff note:
-`docs/changes/2026-11-09-status-allow-list.md`, which is listed here only inside
+`docs/unused-docs/changes/2026-11-09-status-allow-list.md`, which is listed here only inside
 this entry rather than as an entry of its own, as every handoff note is:
 
 - A status claim must now **match** one of four recognised forms, so an
   approval state, a question, a new phrasing of "not built" and **silence** all
   fail by default. The cost `SST-A3` put at "35 existing documents" was measured
-  at six, and the sixth - `docs/implementation_plan_2026-06-22.md`, with no
+  at six, and the sixth - `docs/unused-docs/implementation_plan_2026-06-22.md`, with no
   status line for five months - was findable only under the inversion.
 - The docs-sync decision is extracted into
   `tools/agents/check_docs_sync.py::verdict`, a pure function of changed paths,
@@ -547,14 +547,14 @@ this entry rather than as an entry of its own, as every handoff note is:
 - `SAG-A1` to `SAG-A16` filed, not fixed; `SAG-A3` (deleting
   `agent-docs-gate.yml`) was left out deliberately.
 
-### docs/implementation_plan_2026-11-08_status_claims.md
+### docs/unused-docs/implementation_plan_2026-11-08_status_claims.md
 
 Implementation plan for the nine open `SSC` filings — status claims this repo
 makes about itself that nothing checks (SST-M1 - SST-M10). **Approved
 2026-11-08 and built the same day: 10 of 10 criteria `done`, one item flagged
 not code-testable (SST-N1)** — per-criterion status in `docs/spec_coverage.md`.
 No file under `src/` is touched. Handoff note:
-`docs/changes/2026-11-08-status-claims.md`, which is listed here only inside
+`docs/unused-docs/changes/2026-11-08-status-claims.md`, which is listed here only inside
 this entry rather than as an entry of its own, as every handoff note is:
 
 - Four cold passes on 2026-11-09, in four failure families, found eleven,
@@ -603,12 +603,12 @@ two human-review items outstanding** - per-criterion status in the spec's §6.
 This entry and the spec both said 40 and `BACKLOG.md` said 38; the spec's own
 criterion rows number 41, re-measured 2026-11-08 by the SST batch (`SSC-6`),
 and the spec denied the two outstanding items in the same sentence (`SSC-9`). Three handoff notes:
-`docs/changes/2026-11-08-weekly-tactic-as-parent.md` for the original batch,
-`docs/changes/2026-11-08-weekly-tactic-completion-surfaces.md` for the
+`docs/unused-docs/changes/2026-11-08-weekly-tactic-as-parent.md` for the original batch,
+`docs/unused-docs/changes/2026-11-08-weekly-tactic-completion-surfaces.md` for the
 completion question on all seven surfaces (WTP-M6.7) and its widget tests
 (WTP-M6.8), and the independent gate's reports in
-`docs/cycles/2026-11-08_wtp-plc-upd-pd-qa-gate.md` and
-`docs/cycles/2026-11-08_wtp-widget-tests-qa-gate.md`:
+`docs/unused-docs/cycles/2026-11-08_wtp-plc-upd-pd-qa-gate.md` and
+`docs/unused-docs/cycles/2026-11-08_wtp-widget-tests-qa-gate.md`:
 
 - Why the tactic is made a parent in the readers rather than in storage: the
   launch migration nulls `parent_id` for week parents, so writing it would be
@@ -846,7 +846,7 @@ Verify authentication setup
 
 **VPS Documentation**
 
-- docs/VPS_UPDATES_2026-01-24.md
+- docs/unused-docs/VPS_UPDATES_2026-01-24.md
 - docs/VPS_TESTING_SUMMARY.md
 - docs/DOCUMENTATION_UPDATE_SUMMARY.md
 
@@ -881,7 +881,7 @@ Large (>10KB):
 - docs/google-calendar-setup.md (13KB)
 
 Medium (5-10KB):
-- docs/VPS_UPDATES_2026-01-24.md (8.5KB)
+- docs/unused-docs/VPS_UPDATES_2026-01-24.md (8.5KB)
 - docs/CLIENT_ID_MISMATCH_FIX.md (7.6KB)
 - CLEAR_BROWSER_CACHE.md (5.7KB)
 
@@ -899,7 +899,7 @@ Small (<5KB):
 
 **NEW Documentation**
 
-1. docs/VPS_UPDATES_2026-01-24.md - Comprehensive VPS change log
+1. docs/unused-docs/VPS_UPDATES_2026-01-24.md - Comprehensive VPS change log
 2. docs/VPS_TESTING_SUMMARY.md - Complete test documentation
 3. docs/DOCUMENTATION_UPDATE_SUMMARY.md - Documentation update summary
 
@@ -921,7 +921,7 @@ Small (<5KB):
 
 **Set up Google Calendar** → docs/google-calendar-setup.md
 
-**Understand VPS updates** → docs/VPS_UPDATES_2026-01-24.md
+**Understand VPS updates** → docs/unused-docs/VPS_UPDATES_2026-01-24.md
 
 **Run tests** → docs/VPS_TESTING_SUMMARY.md or README.md (Testing section)
 
@@ -968,7 +968,7 @@ were updated to this path in the same commit as the move.
 ### `docs/prompt-test-suite-remediation.md`
 
 The brief behind the 2026-08-20 test-suite remediation batch. Cited by
-`BACKLOG.md` and by two handoff notes under `docs/changes/`, all three updated
+`BACKLOG.md` and by two handoff notes under `docs/unused-docs/changes/`, all three updated
 with the move.
 
 ### `docs/prompt-update-claude-md-and-learnings.md`
@@ -986,18 +986,14 @@ Documentation is updated:
 - When user issues are resolved
 - During major releases
 
-**Current Status**: last index entry added 2026-11-09 (the LDS derived-live-document-set plan). This index is not enforced by any test (PLC-A5) and does not list every
-file under `docs/`: of the 83 Markdown files directly under `docs/`, 41 are not
-named in it anywhere. Measured 2026-11-09 as `git ls-files docs`, one level
-down, `*.md`, against a plain `grep -F` of each basename in this file — the
-definition is written out because the previous figures (82 and 42) were taken
-before this batch added two documents and were not re-measured when it did. A
-second figure, "have no entry of their own", is dropped rather than restated:
-it depended on an unstated definition of an entry and could not be reproduced.
-`docs/` holds 236 files in all, so the gap over its subdirectories is wider
-still and uncounted. `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`
-(PD-M14) is one of the 48 - named here, with no entry - found while adding the
-PDT entry and left for the batch that owns it, which is what PLC-A5 is about.
+**Current Status**: on 2026-11-09 the per-batch records were filed under
+`docs/unused-docs/` — 194 files: handoff notes, implementation plans,
+coverage snapshots and dated status reports. No test reads them. This index
+lists them still, because finding a record is what an index is for, but the
+live reference set under `docs/` is now 43 Markdown files at depth 1 out of
+237 files in `docs/` in all. The prose guards that used to check this
+index's own citations are deleted; see `CLAUDE.md`, *Records are filed, not
+tested*.
 
 This footer used to read "All documentation up to date as of 2026-01-24";
 nothing checks that claim - no test asserts every document is listed here, which

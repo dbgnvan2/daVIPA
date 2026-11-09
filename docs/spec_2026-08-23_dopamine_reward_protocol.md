@@ -7,7 +7,7 @@ the module; `docs/spec_coverage.md` carries 41 `RP-` rows, every one `done`
 Corrected 2026-11-09 by the third cold pass over the SST batch. This said
 "Draft for implementation" — over a module that shipped in August. The SST
 batch corrected this spec's paired plan
-(`docs/implementation_plan_2026-08-24_dopamine_reward_protocol.md`) twice and
+(`docs/unused-docs/implementation_plan_2026-08-24_dopamine_reward_protocol.md`) twice and
 never looked at the spec, because neither the grep it triaged with nor the
 guard it wrote matches that wording
 **Scope:** daVIPA timer + action items + project boards

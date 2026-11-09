@@ -60,7 +60,7 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         # row 1, which is where every other tab in the hub puts them. They
         # were on the title's row, so this tab was two lines shallower than
         # its neighbours and the body jumped when you moved between them.
-        # Spec:  docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+        # Spec:  docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
         # Tests: tests/test_unified_panel_design.py::test_updf24_the_tab_with_no_filters_is_the_same_depth
         ctk.CTkLabel(header, text="Annual Plan Elements", font=ctk.CTkFont(size=22, weight="bold")).grid(
             row=0, column=0, columnspan=6, padx=8, pady=(8, 6), sticky="w"

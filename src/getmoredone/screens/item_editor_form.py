@@ -5,7 +5,7 @@ Purpose: BP3 — ``save_item`` and ``save_item_if_needed`` both create a new
          drifted twice in a single session (the Project link, then the order in
          which the Annual Plan Element is written), so whichever button the user
          happened to press decided what got stored.
-Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#bp3
+Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp3
 Tests:   tests/test_item_editor_new_item_builder.py
 
 Everything both paths share lives here: the field assembly, the new-item-only

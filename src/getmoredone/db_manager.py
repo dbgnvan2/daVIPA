@@ -1380,7 +1380,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
                  uses, because a block that is not on a box is not yet on the
                  day -- it is drawn under "Outside the day" until one is
                  chosen for it.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
         Tests:   tests/test_time_block_crud.py::test_tbm21_update_persists_duration
 
         A block whose ``position`` is still 0 -- the dataclass default -- is
@@ -1427,7 +1427,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         Purpose: TB-M2 -- the write this module did not have. Without it no
                  block could be resized, retyped, relabelled or reordered after
                  creation, which made requirements 4 and 6 unbuildable.
-        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m2
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m2
         Tests:   tests/test_time_block_crud.py::test_tbm21_update_persists_duration
 
         ``block_date`` is deliberately *not* updated: moving a block to another
@@ -1440,7 +1440,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         loaded earlier -- before an export, in the common case -- so writing
         this column from that object would set it back to ``None`` and orphan
         a real Google Calendar event on a resize.
-        Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
+        Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
         Tests: tests/test_time_block_crud.py::test_cem13_an_edit_does_not_erase_the_event_id
         """
         block.updated_at = datetime.now().isoformat()
@@ -1465,7 +1465,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
 
         Purpose: CE-M1.3 -- the only writer of ``calendar_event_id`` and of
                  the calendar it is on, and it writes nothing else.
-        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
         Tests:   tests/test_time_block_crud.py::test_cem13_recording_an_event_id_leaves_the_block_where_it_was
 
         Deliberately not ``update_time_block``. The exporter reads a day,
@@ -1517,7 +1517,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         in the order their old clock times give them until
         ``adopt_legacy_day`` places them.
 
-        Spec:  docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+        Spec:  docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
         Tests: tests/test_time_block_crud.py::test_tgm61_two_blocks_share_a_slot
         """
         rows = self.db.conn.execute(
@@ -1536,7 +1536,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
     # Every write is "put this block in that box". The clock times are
     # derived from the box and written alongside in the same transaction, so
     # a row never exists claiming a time its box does not give it.
-    # Spec: docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+    # Spec: docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
     # =================================================================
 
     def get_time_block(self, block_id: str) -> Optional[TimeBlock]:
@@ -1637,7 +1637,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
 
         Purpose: TG-M9 -- an item dropped on the 10:00 box becomes a block at
                  the 10:00 box, not one appended to the end of the day.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
         Tests:   tests/test_time_block_crud.py::test_tgm61_two_blocks_share_a_slot
 
         The fit is checked before anything is written, so a refusal leaves the
@@ -1664,7 +1664,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
                  on the grid while its stored ``start_time`` still says
                  otherwise, so the day on screen and the day in the row
                  disagree and neither is marked wrong.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
         Tests:   tests/test_time_block_crud.py::test_pdm55_blocks_keep_their_times_when_the_day_grows
 
         Every date, not the one being looked at. ``plan_day_start`` is a single
@@ -1697,7 +1697,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         """Move an existing block to another box.
 
         Purpose: TG-M11 -- dragging a block up or down the day.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
         Tests:   tests/test_time_block_crud.py::test_tgm62_a_failed_move_writes_nothing
 
         The block does not count against the room in the box it is moving to
@@ -1721,7 +1721,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         """Change a block's length, keeping it where it is.
 
         Purpose: TG-M11 -- the right-click menu's lengths.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
         Tests:   tests/test_time_block_crud.py::test_tgm112_a_resize_that_does_not_fit_is_refused
 
         A length that would not fit from where the block sits is refused and
@@ -1753,7 +1753,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
 
         Purpose: TG-M5 -- the days already in the database, mapped onto the
                  grid the first time that day is opened.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
         Tests:   tests/test_time_block_schema.py::test_tgm51_existing_times_map_to_slots
 
         Done here rather than in the schema migration because a stored 09:30
@@ -1839,7 +1839,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         """Action items whose start date *is* this date.
 
         Purpose: TB-M7 -- requirement 2, the list the planner blocks from.
-        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m2
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m2
         Tests:   tests/test_time_block_crud.py::test_tbm24_start_date_filter_is_exact
 
         Exactly this date, not "on or before" -- the user's decision. The
@@ -2724,7 +2724,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         """Convert database row to ProjectBoardLink.
 
         Purpose: Row hydration including the per-link `status` introduced in M1.
-        Spec:    docs/implementation_plan_2026-06-06_project_notes.md#M1.A.4
+        Spec:    docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M1.A.4
         Tests:   tests/test_project_notes.py::test_link_status_roundtrip
         NOTE:    This method shadows DBManagerProjectBoardsMixin's version of
                  the same name via Python MRO. Both must be kept in sync.
@@ -2759,7 +2759,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         migration ran, or by a query that does not project those columns, must
         not blow up here.
 
-        Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
+        Spec:  docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
         Tests: tests/test_time_block_schema.py::test_tbm13_pre_migration_row_reads_with_defaults
         """
         try:
@@ -2785,7 +2785,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         # CE-M1.2 -- read defensively for the same reason as the three above:
         # a row selected before the migration ran, or by a query that does not
         # project this column, must not raise here.
-        # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+        # Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
         # Tests: tests/test_time_block_crud.py::test_cem12_a_row_without_the_column_still_reads
         try:
             calendar_event_id = row["calendar_event_id"]

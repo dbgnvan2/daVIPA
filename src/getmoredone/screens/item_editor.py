@@ -244,7 +244,7 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
         # through the "Set Project" / "Set Wk Tactic" buttons, so the fields
         # here are read-only labels; only the original-week stamp is typed.
         # These used to live on the Organization tab.
-        # Spec:  docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl9
+        # Spec:  docs/unused-docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl9
         # Tests: tests/test_item_editor_layout.py
         plan_frame = ctk.CTkFrame(left_col)
         plan_frame.grid(row=row_l, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 8))
@@ -426,7 +426,7 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
         # Set Project. Cancel must exist on every path the dialog can take, so
         # on a new item (no Timer) it pairs with Save + New, and on a completed
         # item (no Timer either) it stands alone.
-        # Spec:  docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl10
+        # Spec:  docs/unused-docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl10
         # Tests: tests/test_item_editor_layout.py::test_pl10_button_pairs_share_a_row
         s_frame = ctk.CTkFrame(btn_container, fg_color="transparent")
         s_frame.pack(fill="x", pady=5)
@@ -621,7 +621,7 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
         # sit here. They now live in the Action Plan block in the left column,
         # beside the Project, so the whole "where does this item sit in the
         # plan" picture is visible without opening a tab.
-        # Spec:  docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl8
+        # Spec:  docs/unused-docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl8
         # Tests: tests/test_item_editor_layout.py::test_pl8_org_tab_has_no_weekly_widgets
 
     NO_TACTIC_TEXT = "(none)"
@@ -651,7 +651,7 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
 
         Purpose: PL2/PL4.2 — remember what the dialog opened with, so save only
                  touches the link when the user actually changed it.
-        Spec:    docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl2
+        Spec:    docs/unused-docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl2
         Tests:   tests/test_item_editor_project_link.py::test_pl2_action_plan_shows_current_project
         """
         if not self.item_id:
@@ -668,7 +668,7 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
     def refresh_project_display(self):
         """Show the Project the item is filed under, or an explicit "(none)".
 
-        Spec:  docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl2
+        Spec:  docs/unused-docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl2
         Tests: tests/test_item_editor_project_link.py::test_pl2_1_unlinked_item_shows_none
         """
         board_id = self._selected_project_id
@@ -1417,7 +1417,7 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
                  link, which the constructor drops. (It has never gone through
                  ``duplicate_action_item``, which this said until 2026-08-19
                  and which now has no caller in ``src/`` at all.)
-        Spec:    docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl11
+        Spec:    docs/unused-docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl11
         Tests:   tests/test_item_editor.py::test_pl11_followup_saves_first
 
         Saves first — that guard existed only on the old Duplicate path, so a

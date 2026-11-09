@@ -155,7 +155,7 @@ class CreateNoteDialog(ctk.CTkToplevel):
             # M7.A.5 — Project notes go to the configured Project Notes Folder
             # (falls back to obsidian_notes_subfolder when blank). Other entity
             # types continue to use obsidian_notes_subfolder.
-            # Spec: docs/implementation_plan_2026-06-06_project_notes.md#M7.A.5
+            # Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M7.A.5
             # Tests: tests/test_project_notes.py::TestM7Settings::test_create_note_for_project_writes_to_project_folder
             if self.entity_type == "project_board":
                 target_subfolder = settings.get_project_notes_subfolder_or_default()

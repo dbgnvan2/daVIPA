@@ -3,7 +3,7 @@
 Purpose: PL1/PL5 — let the item editor file an Action Item under a Project,
          clear that link, or create a brand-new Project without leaving the
          editor.
-Spec:    docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl1
+Spec:    docs/unused-docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl1
 Tests:   tests/test_item_editor_project_link.py
 """
 

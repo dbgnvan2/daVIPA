@@ -292,7 +292,7 @@ class SettingsScreen(
 
         # M7.A.4 — Project Notes Folder (separate folder for Project Notes;
         # blank falls back to Notes Subfolder above).
-        # Spec: docs/implementation_plan_2026-06-06_project_notes.md#M7.A.4
+        # Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M7.A.4
         ctk.CTkLabel(section, text="Project Notes Folder:").grid(
             row=3, column=0, sticky="w", padx=10, pady=5)
         self.project_notes_folder_var = ctk.StringVar(
@@ -345,7 +345,7 @@ class SettingsScreen(
     def save_obsidian_settings(self):
         """Save Obsidian settings.
 
-        Spec: docs/implementation_plan_2026-06-06_project_notes.md#M7.A.4
+        Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M7.A.4
         Tests: tests/test_project_notes.py::TestM7Settings::test_settings_roundtrip_project_subfolder
         """
         self.settings.obsidian_vault_path = self.vault_path_var.get().strip() or None

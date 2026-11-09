@@ -1,6 +1,6 @@
 # Spec Coverage — Project Notes feature (2026-06-06)
 
-Plan: [`docs/implementation_plan_2026-06-06_project_notes.md`](implementation_plan_2026-06-06_project_notes.md)
+Plan: [`docs/unused-docs/implementation_plan_2026-06-06_project_notes.md`](implementation_plan_2026-06-06_project_notes.md)
 
 | Spec ID | Description | Implementation | Test | Status |
 |---|---|---|---|---|
@@ -51,7 +51,7 @@ Per CLAUDE.md §8 — flagged here for follow-up but **not** changed in this PR:
 # Spec Coverage — Reward-Contingent Task Chunking (2026-08-24)
 
 Spec: [`docs/spec_2026-08-23_dopamine_reward_protocol.md`](spec_2026-08-23_dopamine_reward_protocol.md)
-Plan: [`docs/implementation_plan_2026-08-24_dopamine_reward_protocol.md`](implementation_plan_2026-08-24_dopamine_reward_protocol.md)
+Plan: [`docs/unused-docs/implementation_plan_2026-08-24_dopamine_reward_protocol.md`](implementation_plan_2026-08-24_dopamine_reward_protocol.md)
 
 The spec numbers its sections but assigns no IDs, so these are the spec's own
 section numbers prefixed `RP`: `RP-2.1` is spec §2.1.
@@ -110,7 +110,7 @@ section numbers prefixed `RP`: `RP-2.1` is spec §2.1.
 
 # Spec Coverage — Time blocks, the Plan screen rebuild (2026-11-05)
 
-Plan: [`docs/implementation_plan_2026-11-05_time_blocks.md`](implementation_plan_2026-11-05_time_blocks.md)
+Plan: [`docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md`](implementation_plan_2026-11-05_time_blocks.md)
 
 Every row's test was mutation-proved: the line it names deleted or inverted,
 the test confirmed red, the verbatim original restored.
@@ -233,7 +233,7 @@ high-severity finding, the budget in `CLAUDE.md` ends the sweep there.
 
 # Spec Coverage — the Plan screen as a 30-minute grid (2026-11-05)
 
-Plan: [`docs/implementation_plan_2026-11-05_time_grid.md`](implementation_plan_2026-11-05_time_grid.md)
+Plan: [`docs/unused-docs/implementation_plan_2026-11-05_time_grid.md`](implementation_plan_2026-11-05_time_grid.md)
 
 This replaces the **order** model recorded in the section above, which never
 shipped: a planned day was a list whose clock times were re-derived on every
@@ -302,7 +302,7 @@ the test confirmed red, the verbatim original restored. 27 mutations, 27 reds.
   bars. TG-M8.1 and TG-M8.2 passed throughout, because a title laid out below
   the box it is clipped to is still full-width and still `winfo_ismapped()`.
   Cause and fix in
-  `docs/implementation_plan_2026-11-06_plan_box_appearance.md` (PB-M2); the
+  `docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md` (PB-M2); the
   gap in the two tests is closed by PB-M2.1, which measures the title's
   position inside the box rather than its width.
 - **Does a drag feel right** — still outstanding, and now overtaken: PB-M5
@@ -364,7 +364,7 @@ app and `./start.sh`.
 
 # Spec Coverage — Plan box appearance (2026-11-06)
 
-Plan: [`docs/implementation_plan_2026-11-06_plan_box_appearance.md`](implementation_plan_2026-11-06_plan_box_appearance.md)
+Plan: [`docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md`](implementation_plan_2026-11-06_plan_box_appearance.md)
 
 Seven changes asked for against the running demo: five after the first
 walkthrough, two more after those five were on screen. All tests are in
@@ -438,11 +438,11 @@ walkthrough, two more after those five were on screen. All tests are in
 | PD-M3.8 | Not offered on a non-working day — the `_require_block_day` refusal | `src/getmoredone/screens/plan.py` (autoload_day) | `::test_pdm38_autoload_refuses_a_non_working_day` | done |
 | PD-M3.9 | A day with no items says so, not "no room" | `src/getmoredone/screens/plan.py` (autoload_day) | `::test_pdm3_autoload_on_an_empty_list_says_so` | done — unplanned: two different facts about the day, and one sentence for both would hide which one it is |
 | PD-M5.1 | A virtual box is drawn above the first slot and below the last, every redraw, on an empty day too | `src/getmoredone/screens/plan_blocks.py` (build_virtual_slot_row), `plan.py` (load_blocks) | `::test_pdm51_a_virtual_box_sits_at_each_end`, `::test_pdm51_the_virtual_boxes_survive_a_redraw_with_blocks_on_the_day`, `::test_pdm51_a_virtual_box_says_which_end_it_is`, `::test_pdm51_a_virtual_box_is_not_a_slot` | done |
-| PD-M5.2 | A drop on the top box moves Day Start back by the item's span and blocks it there | **withdrawn** — PD-M14 made the day's hours a template, so a drop on the top box no longer touches the bound; the plan's withdrawn-criteria table names this row (`docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`) | the named tests were deleted with the criterion and are among the dead bare names `BACKLOG.md` PDT-A1 lists. What holds now is asserted by `tests/test_plan_screen.py::test_pdm141_a_drop_on_earlier_writes_no_settings` | **withdrawn** |
-| PD-M5.3 | A drop on the bottom box moves Day End forward by the span and blocks it there | **withdrawn** — PD-M14 made the day's hours a template, so a drop on the last box no longer touches the bound; the plan's withdrawn-criteria table names this row (`docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`) | **one** of the two tests named here was deleted with the criterion — `test_pdm53_a_drop_below_moves_day_end_forward`, one of the dead bare names `BACKLOG.md` PDT-A1 lists. `tests/test_plan_screen.py::test_pdm53_a_drop_below_does_not_renumber_the_day` is **live and strengthened**, not deleted: do not remove it. What holds now for this end is asserted by `tests/test_plan_screen.py::test_pdm141_a_drop_on_later_writes_no_settings` | **withdrawn** |
+| PD-M5.2 | A drop on the top box moves Day Start back by the item's span and blocks it there | **withdrawn** — PD-M14 made the day's hours a template, so a drop on the top box no longer touches the bound; the plan's withdrawn-criteria table names this row (`docs/unused-docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`) | the named tests were deleted with the criterion and are among the dead bare names `BACKLOG.md` PDT-A1 lists. What holds now is asserted by `tests/test_plan_screen.py::test_pdm141_a_drop_on_earlier_writes_no_settings` | **withdrawn** |
+| PD-M5.3 | A drop on the bottom box moves Day End forward by the span and blocks it there | **withdrawn** — PD-M14 made the day's hours a template, so a drop on the last box no longer touches the bound; the plan's withdrawn-criteria table names this row (`docs/unused-docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`) | **one** of the two tests named here was deleted with the criterion — `test_pdm53_a_drop_below_moves_day_end_forward`, one of the dead bare names `BACKLOG.md` PDT-A1 lists. `tests/test_plan_screen.py::test_pdm53_a_drop_below_does_not_renumber_the_day` is **live and strengthened**, not deleted: do not remove it. What holds now for this end is asserted by `tests/test_plan_screen.py::test_pdm141_a_drop_on_later_writes_no_settings` | **withdrawn** |
 | PD-M5.4 | Extending does **not** clear `plan_day_shape_unconfirmed`, and does not raise it either | `src/getmoredone/screens/plan.py` (extend_day_for — by not touching the flag; `AppSettings.save` does not write it) | `tests/test_plan_settings.py::test_pdm54_extending_the_day_is_not_confirming_it`, `::test_pdm54_an_already_confirmed_day_stays_confirmed` | done — the first version snapshotted the flag and restored it on the failure path; the mutation gate showed that line could never change anything, because no path here sets it, so it was removed rather than left as a line no test can fail on |
 | PD-M5.5 | Every existing block keeps its clock time when either bound moves | `screens/plan.py` (extend_day_for) — **not** `db_manager.py` (shift_all_slots), which this row used to name: under PD-M14.1 nothing is renumbered because nothing moves, and `shift_all_slots` has no production caller (PD-M14.4, which would have called it, was not built) | `tests/test_time_block_crud.py::test_pdm55_blocks_keep_their_times_when_the_day_grows`, `::test_pdm55_a_shift_of_zero_writes_nothing`, `::test_pdm55_a_block_outside_the_grid_is_not_given_a_box`, `::test_pdm55_every_date_is_renumbered_not_only_the_one_on_screen`, and `tests/test_plan_screen.py::test_pdm141_existing_blocks_keep_their_box_and_their_time`, `tests/test_plan_screen.py::test_pdm141_a_drop_leaves_every_other_date_alone` | done — in `test_time_block_crud.py` rather than `test_time_block_layout.py` as planned, because keeping the time turned out to need a *write*, not arithmetic: a block is stored by its box index, so moving Day Start back without renumbering slides the whole day earlier. The cold sweep then found that "every existing block" was being read as "every block on the date dropped on": Day Start is a single setting, so the renumber had to cover every date, and the test that asserted otherwise had pinned the defect. **That reasoning was PD-M5's and is no longer how the criterion is kept.** Under PD-M14.1 a drop writes one block and no hours, so nothing moves and nothing is renumbered; the criterion holds without a renumber at all. The four `::test_pdm55_*` tests above still exercise `shift_all_slots` directly and are green, but they are now unit tests of a function no production path calls — PD-M14.4, which would have called it, was not built. The two `::test_pdm141_*` tests are what hold this criterion on the live path |
-| PD-M5.6 | A refused settings write leaves the day, the grid and the app as they were, and says so (P41) | **withdrawn** — `extend_day_for` no longer refuses a write, and `_DayNotWritten` was deleted with `extended_day_bound` when PD-M14 made the day's hours a template; see `docs/changes/2026-11-08-day-hours-are-a-template-wip.md` | both named tests (`test_pdm56_a_refused_write_leaves_the_day_unchanged`, `test_pdm56_a_refused_write_is_not_reported_as_a_longer_day`) were deleted with the criterion; they are two of the dead bare names `BACKLOG.md` PDT-A1 lists | **withdrawn** |
+| PD-M5.6 | A refused settings write leaves the day, the grid and the app as they were, and says so (P41) | **withdrawn** — `extend_day_for` no longer refuses a write, and `_DayNotWritten` was deleted with `extended_day_bound` when PD-M14 made the day's hours a template; see `docs/unused-docs/changes/2026-11-08-day-hours-are-a-template-wip.md` | both named tests (`test_pdm56_a_refused_write_leaves_the_day_unchanged`, `test_pdm56_a_refused_write_is_not_reported_as_a_longer_day`) were deleted with the criterion; they are two of the dead bare names `BACKLOG.md` PDT-A1 lists | **withdrawn** |
 | PD-M5.7 | The virtual boxes are not droppable for a *block* drag — a block cannot invent a half hour | `src/getmoredone/screens/plan.py` (on_drag_release) | `::test_pdm57_a_block_drag_onto_a_virtual_box_is_refused` | done |
 | PD-M5.8 | Midnight is the floor and the ceiling: the day cannot be extended past either | `src/getmoredone/time_block_layout.py` (`extended_span`, which replaced the PD-M5 `extended_day_bound`; `LAST_DAY_END_MINUTES`) | `tests/test_time_block_layout.py::test_pdm146_neither_end_can_leave_the_date`, `tests/test_time_block_layout.py::test_pdm146_the_ceiling_is_the_last_box_that_ends_at_a_real_time`, `tests/test_time_block_layout.py::test_pdm141_the_span_grows_at_the_end_that_was_dropped_on`, and `tests/test_plan_screen.py::test_pdm146_both_ends_refuse_at_midnight_and_say_which` | done — the ceiling is a Day End of **23:30**, not 24:00: a box running 23:30–24:00 would need a Day End that is not a time of day. Refused rather than clamped, because a clamped bound makes fewer boxes than the item needs |
 | PD-M5.9 | A real box always wins over a virtual one, so a box flush against the Earlier box still gets its own drops | `src/getmoredone/screens/plan.py` (on_drag_release — the order of the branches) | `::test_pdm5_a_real_box_wins_over_a_virtual_one` | done — unplanned. The first version computed the edge only when no box had matched, which made the two guards mutually exclusive by construction: the precedence could not be got wrong, so this test could not fail. Both are now read and the branch order is the whole of the rule |
@@ -862,7 +862,7 @@ restored and sha256-compared. 20 red, no finding.
 | M7.2 | `partial` | walked 2026-11-08. The six tabs read as one design in header card, divider, row height and chip style. Two exceptions: the filter area's depth differs on Annual Plan Elements (UPD-F2), and Week Assignment's checkbox column should be headed "Pick" (UPD-F3). |
 | M7.3 | `not done` | walked 2026-11-08. A column drag moves only its own column, in both panels, on every tab — but **no width or divider position survived the walk's relaunch** (UPD-F1, **built afterwards and merged at `2fac9b3`**; the step is owed a re-walk, not a fix). The divider itself passes, with a request that the columns rescale with it (UPD-F4). |
 
-**Walked on 2026-11-08.** Steps 1, 2, 5, 6, 8 and 9 pass. Step 3 passes except the filter area, step 4 asks for a "Pick" heading, step 7 passes and asks for the columns to rescale with the divider, and **step 10 failed at the walk: no width or divider position survived a relaunch** (UPD-F1, built afterwards and merged at `2fac9b3`; owed a re-walk). The four items are `docs/implementation_plan_2026-11-08_unified_panel_followups.md` (UPD-F1 to UPD-F4).
+**Walked on 2026-11-08.** Steps 1, 2, 5, 6, 8 and 9 pass. Step 3 passes except the filter area, step 4 asks for a "Pick" heading, step 7 passes and asks for the columns to rescale with the divider, and **step 10 failed at the walk: no width or divider position survived a relaunch** (UPD-F1, built afterwards and merged at `2fac9b3`; owed a re-walk). The four items are `docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md` (UPD-F1 to UPD-F4).
 
 M7.2 and M7.3 are deliberately not tests: both are about how six tabs read
 beside each other at a real window size with real data, and about whether a
@@ -880,7 +880,7 @@ table above. UPD-M4's renderer, splitter and row drag across three tabs have
 now been looked at and the drag behaviour holds — what does not is
 persistence, on every tab, which was `UPD-F1` — built afterwards and merged
 at `2fac9b3`, so this is owed a re-walk rather than a fix — in
-`docs/implementation_plan_2026-11-08_unified_panel_followups.md`. Every test
+`docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md`. Every test
 above still builds its screen on a withdrawn root, which is why a relaunch
 was the one thing none of them could check.
 
@@ -888,7 +888,7 @@ was the one thing none of them could check.
 
 ## UPD-F1 to UPD-F4 — the on-screen walk's four items (2026-11-08)
 
-Plan: `docs/implementation_plan_2026-11-08_unified_panel_followups.md`.
+Plan: `docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md`.
 Spec: `docs/spec_2026-11-07_unified_panel_design.md` §10, §11.
 
 | ID | Status | Proof |
@@ -932,7 +932,7 @@ columns and no test claims it does. Nothing here exercises a real relaunch:
 UPD-F1 is why.
 ## UPD-F1 — a width or divider position survives a relaunch (2026-11-08)
 
-Plan: [`docs/implementation_plan_2026-11-08_unified_panel_followups.md`](implementation_plan_2026-11-08_unified_panel_followups.md) §2
+Plan: [`docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md`](implementation_plan_2026-11-08_unified_panel_followups.md) §2
 
 | Spec ID | Description | Implementation | Test | Status |
 |---|---|---|---|---|
@@ -962,7 +962,7 @@ be re-walked once UPD-F2 to UPD-F4 are in.
 
 ## PDT — the plan-day tests follow PD-M14 (2026-11-08)
 
-Plan: [`docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md`](implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md)
+Plan: [`docs/unused-docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md`](implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md)
 
 The brief was to port `outside` from `refs/heads/claude/plan-day-range-pdm13`.
 There was nothing to port: `outside` is implemented on `main` at both layers.
@@ -972,7 +972,7 @@ assertion they had. **Three do not**: `test_pdm131` lost
 `bounds.day_start < started_at` and both `test_pdm54` tests lost a withdrawn
 `plan_day_start` / `plan_day_end` precondition, because PD-M14 withdrew the
 behaviour those lines asserted. The three are tabulated in
-`docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`. No `src/` behaviour
+`docs/unused-docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`. No `src/` behaviour
 changed in this batch.
 
 | Spec ID | Description | Implementation | Test | Status |
@@ -993,16 +993,16 @@ changed in this batch.
 | PDT-M4.2 | `test_every_referenced_test_file_exists` passes | **CLOSED 2026-11-08 by the PRIT batch**, the way it had to be: `src/getmoredone/models.py` named two test files and three tests for PRI-M1/M2 that had never existed, and the two files were written (`750afe6`) rather than the `Tests:` lines deleted. It was recorded `not done` in this batch because closing it was another batch's work, not because it was unclosable. | `tests/test_traceability_refs.py::test_every_referenced_test_file_exists` — green | done |
 | PDT-M5.1 | `BACKLOG.md`'s "What `main` needs" section is rewritten to the real state | — | **not code-testable** — `BACKLOG.md` items 1, 2 and 4 | done (by review) |
 | PDT-M5.2 | `docs/spec_coverage.md` gains the PDT rows and loses the dead references | — | **not code-testable** for the rows; the references are held by `tests/test_traceability_refs.py::test_every_referenced_test_name_exists` | done (by review) |
-| PDT-M5.3 | The handoff note exists, from the template, with its required fields | — | **not code-testable** — `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md` | done (by review) |
+| PDT-M5.3 | The handoff note exists, from the template, with its required fields | — | **not code-testable** — `docs/unused-docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md` | done (by review) |
 | PDT-M5.4 | `docs/DOCUMENTATION_INDEX.md` lists this plan and the handoff note | — | **not code-testable**, and nothing enforces the index (PLC-A5). The note is listed inside the plan's entry rather than as an entry of its own, as every handoff note is | done (by review) |
 | PDT-M5.5 | `NOTES.md`'s "Where `main` stands" is updated to the real red count | — | **not code-testable** — `NOTES.md`. It read ten closed / ten left in three groups when this criterion was met; the PRIT batch closed the eleventh and rewrote it to eleven closed / nine left in two groups (`f3937d3`). The criterion is "updated to the real count", so it stays `done` against the current file rather than against that snapshot | done (by review) |
 | PDT-N1 | `refs/heads/claude/plan-day-range-pdm13` is superseded, not merged or lost | a git ref at `c8125af` | **not code-testable** — recorded in `BACKLOG.md` item 1 and the handoff note | done (by review) |
-| PDT-N2 | Each rewrite still protects what the test it replaced protected | — | **not code-testable** — the old-vehicle/new-vehicle table in `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`, read by the cold sweep | done (by review) |
+| PDT-N2 | Each rewrite still protects what the test it replaced protected | — | **not code-testable** — the old-vehicle/new-vehicle table in `docs/unused-docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`, read by the cold sweep | done (by review) |
 
 ## PRIT — the tests PRI-M1 and PRI-M2 shipped without (2026-11-08)
 
-Plan: [`docs/implementation_plan_2026-11-08_pri_tests.md`](implementation_plan_2026-11-08_pri_tests.md)
-Spec: [`docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md`](implementation_plan_2026-11-08_priority_defaults_and_cap.md)
+Plan: [`docs/unused-docs/implementation_plan_2026-11-08_pri_tests.md`](implementation_plan_2026-11-08_pri_tests.md)
+Spec: [`docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md`](implementation_plan_2026-11-08_priority_defaults_and_cap.md)
 
 The criterion IDs are the spec's own, verbatim. The implementation was already
 on `main` (`9420927`) with no test of any kind, so every row below is a test
@@ -1075,8 +1075,8 @@ because the harness's report was wrong, not because the restore was.
 
 ## SST — the status claims no one checks (2026-11-08)
 
-Spec and plan: `docs/implementation_plan_2026-11-08_status_claims.md`.
-Note: `docs/changes/2026-11-08-status-claims.md`.
+Spec and plan: `docs/unused-docs/implementation_plan_2026-11-08_status_claims.md`.
+Note: `docs/unused-docs/changes/2026-11-08-status-claims.md`.
 Closes `BACKLOG.md`'s `SSC-1` (second clause) through `SSC-10`, nine filings.
 
 No file under `src/` is touched. Every row below is a document or a guard.
@@ -1153,7 +1153,7 @@ assertions the second one changed, and S and T against
 | I | a `## Status` heading with "awaiting approval; no code written" on the line below it, in the time-grid plan | 1 failed (SST-M1). Before the cold pass widened the guard this was **green**: the claim did not begin the line |
 | J | §6's summary alone goes back to "all 40 criteria" | 1 failed (SST-M3). Before the cold pass this was **green**: the assertion was a whole-file substring, and the spec's corrected status line also states the count, so §6 could rot untouched |
 | K | the WTP handoff note alone goes back to 38 | 1 failed (SST-M3). Before the cold pass the note was not in any guard's domain, and it had kept 38 after every other document was corrected |
-| L | the markdown walk stops reaching `docs/changes/` | 1 failed (SST-M8's companion). Before the cold pass the companion asserted a floor of 200 against 245 files, so losing a whole directory was **green** |
+| L | the markdown walk stops reaching `docs/unused-docs/changes/` | 1 failed (SST-M8's companion). Before the cold pass the companion asserted a floor of 200 against 245 files, so losing a whole directory was **green** |
 | M | a claim on the third non-blank line of a `## Status` section | 1 failed (SST-M1). Green until the second cold pass: the heading rule read a two-line window, and a status section longer than two lines is the normal shape here |
 | N | `BACKLOG.md`'s WTP sentence goes back to 40 | 1 failed (SST-M3). Green before: the only `BACKLOG.md` assertion was that the string "all 38 criteria" was absent, so every other wrong figure passed |
 | O | the index's WTP entry goes to "39 of 39" | 1 failed (SST-M3). Green before: `docs/DOCUMENTATION_INDEX.md` was in no guard's domain, and it was one of the three documents that disagreed in the original defect |
@@ -1194,8 +1194,8 @@ added a second question: what would this *reject*?
 
 ## CIG — the nine tests CI has been red on (2026-11-09)
 
-Spec and plan: `docs/implementation_plan_2026-11-09_ci_green.md`.
-Note: `docs/changes/2026-11-09-ci-green.md`.
+Spec and plan: `docs/unused-docs/implementation_plan_2026-11-09_ci_green.md`.
+Note: `docs/unused-docs/changes/2026-11-09-ci-green.md`.
 Closes `BACKLOG.md`'s `WTP-A11`, its item 3 and its item 5.
 
 No file under `src/` is touched. Every row below is a test or a document.
@@ -1220,7 +1220,7 @@ nine names as run 42574953009 at `a2c3124`: the SST batch changed none of them.
 
 | | item | status |
 |---|---|---|
-| CIG-N1 | **That CI is green.** No test can assert the state of a GitHub run from inside the suite. | **done** — run 42592428542 at `abf0125`: 2654 passed, 10 skipped on each of 3.11, 3.12 and 3.13. The first green run of this workflow since at least `3f705b4`. Recorded by run id in `docs/changes/2026-11-09-ci-green.md`, which is the only place it can be. |
+| CIG-N1 | **That CI is green.** No test can assert the state of a GitHub run from inside the suite. | **done** — run 42592428542 at `abf0125`: 2654 passed, 10 skipped on each of 3.11, 3.12 and 3.13. The first green run of this workflow since at least `3f705b4`. Recorded by run id in `docs/unused-docs/changes/2026-11-09-ci-green.md`, which is the only place it can be. |
 
 ### Test counts
 
@@ -1247,8 +1247,8 @@ than incidental.
 
 ## SAG — the status guard as an allow-list, and the gate that never ran (2026-11-09)
 
-Spec and plan: `docs/implementation_plan_2026-11-09_status_allow_list.md`.
-Note: `docs/changes/2026-11-09-status-allow-list.md`.
+Spec and plan: `docs/unused-docs/implementation_plan_2026-11-09_status_allow_list.md`.
+Note: `docs/unused-docs/changes/2026-11-09-status-allow-list.md`.
 Closes `BACKLOG.md`'s `SST-A3` (high) and `SST-A8` (medium).
 
 No file under `src/` is touched. `tools/agents/check_docs_sync.py` is the one
@@ -1260,16 +1260,16 @@ module changed, and the change is an extraction: the decision moved out of
 | SAG-M1.1 | a document's first status claim must **match** a recognised form; an unrecognised sentence fails | `tests/test_doc_status_claims.py` (`_STATUS_FORMS`, **four** named forms — `superseded`, `draft`, `not-built`, `built`, in that order — with `_BUILT_SHAPES`, `_NEGATION`, `_CANCELLED`, `registered_claim_is_unbuilt`, `classify_status_claim`) | `::test_sagm11_every_status_claim_matches_a_recognised_form` | done — and **rewritten twice by cold passes**. It was five forms: `built`, `approved-and-built` and `partly-built`, one rule written three times, each with a prefix enumerating the punctuation an ID list may contain; the enumeration had been widened once and still rejected `&` and `:`, so the third pass replaced the three with a built word anywhere in the first sentence. The fourth pass measured that as **two highs**: `"Spec complete, implementation not started."` and `"Design done, no code yet."` classified as `built`, which the deny-list this guard replaces would have caught, and an unanchored form tried first shadowed the three anchored ones, so `"Draft — design complete, awaiting approval"` was `built` as well. The form is anchored again, as four named shapes in `_BUILT_SHAPES` — leads with the state, digits and punctuation only before it, a predicate after `is/are/was/were`, or an approval and a build in one sentence — and the unbuilt forms are tried first. Nothing else is a built claim |
 | SAG-M1.2 | the sentences a deny-list cannot reach are rejected: an approval state, a question, silence, a built word the next word negates | same | `::test_sagm12_an_unrecognised_status_claim_is_rejected` — 19 rejected and 29 accepted (counted by AST over the test's two loops; it was 13 and 15 before the third and fourth cold passes added their measured cases), each a sentence this repo has written or would write | done |
 | SAG-M1.3 | an unbuilt claim must be registered, and a registered document whose claim became a built form must leave the register | `DRAFTS_NOT_BUILT`, unchanged, now read through `registered_claim_is_unbuilt` | `::test_sagm13_the_draft_register_holds_both_directions`, and `::test_sstm2_…`, which asked the **deny-list** the same question until the third cold pass found the double bind | done — a document headed `Status: Draft.` classified as `draft`, so `SAG-M1.3` required it to be registered, and registering it made `test_sstm2` red, because `_NOT_BUILT` does not accept "Draft." alone. Two vocabularies, neither written down, and the repo's own first step — commit the plan, wait for approval — unable to satisfy both. The register's contract is now one function both guards call |
-| SAG-M1.4 | a document with **no** status claim fails | `_status_claim` returning `None` | `::test_sagm14_a_document_with_no_status_claim_fails` | done — the failure mode no phrase list can have, and `docs/implementation_plan_2026-06-22.md` had it for five months |
+| SAG-M1.4 | a document with **no** status claim fails | `_status_claim` returning `None` | `::test_sagm14_a_document_with_no_status_claim_fails` | done — the failure mode no phrase list can have, and `docs/unused-docs/implementation_plan_2026-06-22.md` had it for five months |
 | SAG-M1.5 | the patterns asserted against text, in both directions, including the label stripper and the cancellation check | same | `::test_sagm15_the_forms_reject_a_built_word_after_a_negation` | done — it also asserts the **limitation**: "Complete rewrite proposed." still classifies as a built claim, and that assertion is what will go red when `SAG-A8` is closed |
 | SAG-M2.1 | the docs-sync decision is a pure function of changed paths, asserted over fixtures | `tools/agents/check_docs_sync.py::verdict` | `tests/test_docs_sync_rule.py::test_sagm21_the_docs_sync_rule_decides_on_paths_alone` (10 cases) | done |
 | SAG-M2.2 | `requirements-dev.txt` alone is a dependency change — the miss the tool's own comment records | same, reading `DEPENDENCY_FILES` | `::test_sagm22_a_dev_dependency_alone_is_a_code_change` (iterates the enumeration, so it cannot go stale against it) | done |
 | SAG-M2.3 | an unreadable git range is reported as **skipped**, not as a verdict | `main`, unchanged in behaviour and now explicit about why | `::test_sagm23_an_unavailable_range_is_skipped_not_passed` | done |
 | SAG-M2.4 | every outcome `verdict` can return has a fixture, and `verdict` returns the declared constants rather than inline strings | `OUTCOMES` in the tool; `_returned_outcome_names()` walks `verdict`'s return statements | `::test_sagm24_every_outcome_the_tool_can_return_has_a_fixture` | done — **and inverted on its first attempt.** It carried its own hardcoded list of five names and filtered the walk by it, so a sixth outcome was invisible to both sides: it passed with the sixth unfixtured and failed once the fixture was added. Found cold; mutations AO and AO2 are the two directions |
-| SAG-M3.1 | the six documents of the plan's §1.1 carry a claim one of the four forms recognises | the six documents | `SAG-M1.1` (which calls `classify_status_claim` on every document in the family, and asserts nothing else) | done — **narrowed from its first wording**, "each naming its evidence", which the second cold pass measured as neither tested nor true: `test_sagm11` asserts the form only, and two of the six name no module, test or section — `docs/implementation_plan_2026-08-19_backlog_clearance.md` gives dates, `docs/implementation_plan_2026-11-06_plan_day_controls.md` gives IDs and dates. The other four do name evidence because a claim is more useful that way, not because anything checks it; making that a criterion would need a guard, and there is none |
-| SAG-M3.2 | `docs/implementation_plan_2026-06-22.md`'s new status line is true | `screens/column_resize.py`, `drag_schedule_col_widths` in `app_settings.py` | `tests/test_column_resize.py::test_persist_round_trips_over_dirty_state`, `::test_legacy_title_scalar_is_honoured_when_dict_missing`, `::test_width_is_clamped_to_spec_bounds_on_load` (existing; they are the evidence the line names) | done — the modules were verified, but **the citation was wrong when first written**: it named two `tests/test_settings_merge_on_save.py` tests which iterate the five VSP panel prefixes and reach `drag_schedule_col_widths` nowhere (`grep -n drag_schedule tests/test_settings_merge_on_save.py` returns nothing). Found by the second cold pass; corrected in all four places. It is `SST-M5`'s own defect class — a row naming evidence that does not reach its subject — committed by the batch that exists to close it |
+| SAG-M3.1 | the six documents of the plan's §1.1 carry a claim one of the four forms recognises | the six documents | `SAG-M1.1` (which calls `classify_status_claim` on every document in the family, and asserts nothing else) | done — **narrowed from its first wording**, "each naming its evidence", which the second cold pass measured as neither tested nor true: `test_sagm11` asserts the form only, and two of the six name no module, test or section — `docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md` gives dates, `docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md` gives IDs and dates. The other four do name evidence because a claim is more useful that way, not because anything checks it; making that a criterion would need a guard, and there is none |
+| SAG-M3.2 | `docs/unused-docs/implementation_plan_2026-06-22.md`'s new status line is true | `screens/column_resize.py`, `drag_schedule_col_widths` in `app_settings.py` | `tests/test_column_resize.py::test_persist_round_trips_over_dirty_state`, `::test_legacy_title_scalar_is_honoured_when_dict_missing`, `::test_width_is_clamped_to_spec_bounds_on_load` (existing; they are the evidence the line names) | done — the modules were verified, but **the citation was wrong when first written**: it named two `tests/test_settings_merge_on_save.py` tests which iterate the five VSP panel prefixes and reach `drag_schedule_col_widths` nowhere (`grep -n drag_schedule tests/test_settings_merge_on_save.py` returns nothing). Found by the second cold pass; corrected in all four places. It is `SST-M5`'s own defect class — a row naming evidence that does not reach its subject — committed by the batch that exists to close it |
 
-| SAG-M4.1 | A citation **written as a path** — `tests/…py::name` — in a plan, spec or handoff note must resolve, not only one in a coverage row. The fifth cold pass's high was invisible to the traceability guard because the guard's scan stopped at `docs/spec_coverage*.md` | `tests/test_traceability_refs.py` (`SCANNED` gains `docs/implementation_plan_*.md`, `docs/spec_*.md` and `docs/changes/*.md`; the walk deduplicates, because two of those globs overlap) | `::test_every_referenced_test_name_exists`, `::test_every_referenced_test_file_exists`, and `::test_this_guard_can_actually_fire` for the membership of each new arm | done, **for the path form only.** Measured over `HEAD`: the widened scan brought **26** dead path-form references into view (25 distinct, in 17 documents), and the resolver below brought that to **14** (13 distinct, in 9 documents); 27 and 15 counting this batch's own plan, which is where the fifth pass's citation was. Every one is repaired here. The bare `::name` continuation form — about a third of the citations in these documents — is still outside the guard, and widening the scan widened that gap too: `SAG-A17` |
+| SAG-M4.1 | A citation **written as a path** — `tests/…py::name` — in a plan, spec or handoff note must resolve, not only one in a coverage row. The fifth cold pass's high was invisible to the traceability guard because the guard's scan stopped at `docs/spec_coverage*.md` | `tests/test_traceability_refs.py` (`SCANNED` gains `docs/unused-docs/implementation_plan_*.md`, `docs/spec_*.md` and `docs/unused-docs/changes/*.md`; the walk deduplicates, because two of those globs overlap) | `::test_every_referenced_test_name_exists`, `::test_every_referenced_test_file_exists`, and `::test_this_guard_can_actually_fire` for the membership of each new arm | done, **for the path form only.** Measured over `HEAD`: the widened scan brought **26** dead path-form references into view (25 distinct, in 17 documents), and the resolver below brought that to **14** (13 distinct, in 9 documents); 27 and 15 counting this batch's own plan, which is where the fifth pass's citation was. Every one is repaired here. The bare `::name` continuation form — about a third of the citations in these documents — is still outside the guard, and widening the scan widened that gap too: `SAG-A17` |
 | SAG-M4.2 | The resolver must accept the two citation forms these documents really use — a module constant or helper (`::GENERATED_AUDIO`, `::_make_screen`) and a spec-ID prefix of a family (`::test_wt_m6b1_`, `::test_cem444a`) — while still rejecting a truncation of a name that does not exist (`::test_updf13_`) | `_defined_names` and `_resolves` in the same file | `::test_this_guard_can_actually_fire`, which asserts both directions against this file itself rather than against a document that could stop using the form | done — a prefix must stop at a word boundary, which is what keeps the fifth pass's own citation failing |
 | SAG-M4.3 | The 15 dead path-form references are repaired honestly: a renamed test is re-cited, and one that no longer exists is named in plain backticks **without** its path, which is the convention this guard's docstring already stated | 11 documents, listed in the handoff note | `::test_every_referenced_test_name_exists` | done — three renames (`…_m1_through_m5` → `_m7`, `test_b51_messagebox_never_blocks_a_run` → `test_b51_a_messagebox_records_instead_of_blocking`, `test_pdm42_the_three_…` → `test_pdm42_break_buffer_and_lunch_…`), one wrong file (`test_settings_screen_has_project_notes_folder_field` lives in `tests/test_project_notes.py`, not in the separate file the plan intended), and the rest named without paths, in **10** documents. The first edit stripped the path from two files that do exist, on a reason that applied only to the third; the sixth cold pass measured that and it is corrected |
 
@@ -1380,8 +1380,8 @@ nothing. The probe is now a file the test writes.
 
 ## SBN — the bare `::name` citation form brought into the guard (2026-11-09)
 
-Spec and plan: `docs/implementation_plan_2026-11-09_bare_name_citations.md`.
-Note: `docs/changes/2026-11-09-bare-name-citations.md`.
+Spec and plan: `docs/unused-docs/implementation_plan_2026-11-09_bare_name_citations.md`.
+Note: `docs/unused-docs/changes/2026-11-09-bare-name-citations.md`.
 Closes `BACKLOG.md`'s `SAG-A17` (medium), and with it the scope note on
 `PDT-A1`.
 
@@ -1427,7 +1427,7 @@ re-measurement before it was fixed:
 - Two in the guard's own prose. The module docstring still told a future author
   that a retired test is named "without the `tests/` path" — which the new arm
   makes red — and the `COVERAGE_WITHOUT_PATHS` comment claimed the bare arm had
-  brought `docs/spec_coverage_2026-08-19_rename_safe_links.md` into the domain
+  brought `docs/unused-docs/spec_coverage_2026-08-19_rename_safe_links.md` into the domain
   and credited `SST-A2`. That file contains one `::` in the whole document, in
   a line of prose, so it is outside both arms; and `SST-A2` is a third form.
 - Six where a repair's own sentence was false. CE-M2.2 described an assertion
@@ -1454,8 +1454,8 @@ batch's four tests.
 
 ## GSF — the gate that never ran, and the spec filename that does not exist (2026-11-09)
 
-Spec and plan: `docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md`.
-Note: `docs/changes/2026-11-09-dead-gate-and-dead-spec-name.md`.
+Spec and plan: `docs/unused-docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md`.
+Note: `docs/unused-docs/changes/2026-11-09-dead-gate-and-dead-spec-name.md`.
 Closes `BACKLOG.md`'s `SAG-A3` (low) and `SAG-A7` (low).
 
 No file under `src/` is touched and none under `tools/`. One workflow is
@@ -1463,7 +1463,7 @@ deleted, two test files gain a guard each, and nine documents are repaired.
 
 | Criterion | What it required | Implementation | Tests | Status |
 |---|---|---|---|---|
-| GSF-M1.1 | the pull-request-only docs gate deleted, and no live document describing it as an enforcement a reader gets | workflow deleted; `AGENTS.md`, `CLAUDE.md`, docs/MULTI_AGENT_WORKFLOW.md, `NOTES.md` corrected | `::test_gsfm11_no_document_cites_a_workflow_that_does_not_exist` | done — the four live claims corrected, eight path-carrying mentions rewritten to the path-free form, records under `docs/changes/`, `docs/spec_*` and `docs/implementation_plan_*` left as written |
+| GSF-M1.1 | the pull-request-only docs gate deleted, and no live document describing it as an enforcement a reader gets | workflow deleted; `AGENTS.md`, `CLAUDE.md`, docs/MULTI_AGENT_WORKFLOW.md, `NOTES.md` corrected | `::test_gsfm11_no_document_cites_a_workflow_that_does_not_exist` | done — the four live claims corrected, eight path-carrying mentions rewritten to the path-free form, records under `docs/unused-docs/changes/`, `docs/spec_*` and `docs/unused-docs/implementation_plan_*` left as written |
 | GSF-M1.2 | the deletion cannot be undone silently: a document citing a `.github/workflows/<name>.yml` that is not there fails, proved against a fixture rather than against today's prose | `tests/test_ci_contract.py` (`_WORKFLOW_CITATION`, `workflow_citations`, `dangling_workflow_citations`) | same test, over a `tmp_path` `PROBE.md` | done — the helper takes `(label, text)` pairs precisely so the fixture can drive it; the repo scan alone is green once the repair lands |
 | GSF-M2.1 | every live citation of the master spec names the file that exists, and the index has no entry for a root document the repo does not contain | 11 citations in 7 documents | `::test_gsfm21_no_document_cites_a_root_doc_that_does_not_exist` | done — including a `###` entry heading in `docs/DOCUMENTATION_INDEX.md`, which is why the guard has a heading arm |
 | GSF-M2.2 | the four exempted names are exempt for a stated reason, checked in both directions | `tests/test_repo_hygiene.py` (`ROOT_DOC_CITATION_EXEMPTIONS`) | same test | done — one reason covers all four (`~/.claude/standards/`, outside any repo); a name that starts resolving has to leave the list |
@@ -1540,8 +1540,8 @@ assess: a depth-1 CI checkout collects both guards with the cross-module
 
 ## MAW — the retired three-agent apparatus (2026-11-09)
 
-Spec and plan: `docs/implementation_plan_2026-11-09_retired_agent_apparatus.md`.
-Note: `docs/changes/2026-11-09-retired-agent-apparatus.md`.
+Spec and plan: `docs/unused-docs/implementation_plan_2026-11-09_retired_agent_apparatus.md`.
+Note: `docs/unused-docs/changes/2026-11-09-retired-agent-apparatus.md`.
 Closes `BACKLOG.md`'s `GSF-A1` (medium), `GSF-A2` (low), and the 2026-08-20
 filing "The retired multi-agent workflow is still described in four places" —
 the third filing of one surface in three months.
@@ -1683,8 +1683,8 @@ allows one after a high, and that was this one.
 
 ## LDS — the live document set is derived, and retired vocabulary is guarded
 
-Plan: `docs/implementation_plan_2026-11-09_derived_live_document_set.md`.
-Handoff note: `docs/changes/2026-11-09-derived-live-document-set.md`.
+Plan: `docs/unused-docs/implementation_plan_2026-11-09_derived_live_document_set.md`.
+Handoff note: `docs/unused-docs/changes/2026-11-09-derived-live-document-set.md`.
 
 | ID | Criterion | Status | Evidence |
 |---|---|---|---|
@@ -1856,3 +1856,13 @@ re-measured — 256 meta + 2439 app = 2695 collected — so nothing in the deriv
 set or the new guards behaves differently on a blank machine, which is the one
 thing a local run cannot establish for a guard that reads `git ls-files` and a
 config file the repo had been ignoring.
+
+---
+
+**2026-11-09, after this record was written.** The guards named above as
+evidence for the GSF, MAW and LDS criteria are deleted, along with
+`tests/test_doc_status_claims.py` and the retired-vocabulary config. They read
+the prose of this repo's own records, and records are filed now rather than
+tested — `CLAUDE.md`, *Working agreements → Records are filed, not tested*.
+The rows above are kept as what verified each criterion on its date. They are
+history, not a current pointer; the criteria themselves were met.

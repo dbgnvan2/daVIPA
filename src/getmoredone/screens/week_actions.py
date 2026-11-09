@@ -284,7 +284,7 @@ class WeekActionsScreen(ctk.CTkFrame):
         # than six more cells in the header's grid: the two rows then size
         # their columns independently, so a 150px combo does not stretch the
         # column the Week Start combo sits in.
-        # Spec:  docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+        # Spec:  docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
         # Tests: tests/test_unified_panel_design.py::test_updf21_the_filters_are_on_their_own_row
         self.filter_row = ctk.CTkFrame(header, fg_color="transparent")
         self.filter_row.grid(row=2, column=0, columnspan=6, sticky="w",

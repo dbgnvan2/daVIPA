@@ -3,7 +3,7 @@
 Purpose: Show the daVIPA brand icon for the running app instead
          of the default Python launcher rocket in the macOS Dock (and the OS
          taskbar on Windows/Linux).
-Spec:    docs/changes/2026-08-06-app-dock-icon.md
+Spec:    docs/unused-docs/changes/2026-08-06-app-dock-icon.md
 Tests:   tests/test_app_icon.py
 
 Why the rocket appears: when a plain ``python`` process runs a Tk GUI, macOS

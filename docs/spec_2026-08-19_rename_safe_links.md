@@ -1,7 +1,7 @@
 # Spec — Renaming must never break a link
 
 **Status:** built and on `main` — see
-`docs/spec_coverage_2026-08-19_rename_safe_links.md`. Corrected 2026-11-08
+`docs/unused-docs/spec_coverage_2026-08-19_rename_safe_links.md`. Corrected 2026-11-08
 by the SST batch: this line read "Draft v1, awaiting approval".
 **Date:** 2026-08-19
 **Spec ID root:** `RN`

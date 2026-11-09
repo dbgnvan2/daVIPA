@@ -2,7 +2,7 @@
 
 Purpose: PLC-M3 — let the user set the row tint for each of the three priority
          levels (Any Critical; Any High, but no Critical; No high or critical).
-Spec:    docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m3
+Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m3
 Tests:   tests/test_priority_level_colors.py
 
 Its own module, following ``settings_integrations.py``: ``settings.py`` is

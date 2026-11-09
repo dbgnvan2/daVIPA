@@ -175,7 +175,7 @@ month docstring's claim is corrected along with the code.
 7. Tests, written highest-risk first per the fix→test map below.
 8. Docs: this file added to `docs/DOCUMENTATION_INDEX.md`, `docs/USER_GUIDE.md`
    APE Weekly / APE Month sections, `NOTES.md`, and the handoff note at
-   `docs/changes/2026-11-07-ape-period-consistency.md`.
+   `docs/unused-docs/changes/2026-11-07-ape-period-consistency.md`.
 
 ### Fix→test map (highest impact first)
 

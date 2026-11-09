@@ -42,7 +42,7 @@ def normalize_hex_color(value: object) -> "Optional[str]":
              entry, reaches Tk, and Tk raises on a value it does not recognise.
              A raised ``TclError`` inside a row build takes the whole list
              screen down, so a bad value has to be caught before it gets there.
-    Spec:    docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m2
     Tests:   tests/test_priority_level_colors.py::test_plcm25_a_malformed_stored_colour_falls_back_to_the_default
 
     Returns rather than raises, unlike ``_normalize_hex``: every caller here has

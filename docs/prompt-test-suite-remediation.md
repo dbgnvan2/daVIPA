@@ -35,4 +35,4 @@ Scan all 90 test files for tests that cannot fail: bare `return` of a bool, no `
 ## Verification
 - `pytest` fully green; `pytest -m "not meta"` green and measurably faster — record both runtimes in the handoff note.
 - Run the suite twice with `pytest -p randomly` (or `--randomly-seed=last` alternate seeds) if pytest-randomly is available in dev deps; any order-dependent failure is a finding.
-- Handoff note at `docs/changes/2026-08-20-test-suite-remediation.md` per the template: counts of tests marked `meta`, source-grep assertions replaced vs retained (with reason), vacuous tests fixed vs deleted.
+- Handoff note at `docs/unused-docs/changes/2026-08-20-test-suite-remediation.md` per the template: counts of tests marked `meta`, source-grep assertions replaced vs retained (with reason), vacuous tests fixed vs deleted.

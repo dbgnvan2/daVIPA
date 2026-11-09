@@ -150,7 +150,7 @@ behind the always-on-top timer and took every click. The +1 day shift went with
 it — a follow-up continues the same work and keeps the same dates. The step
 that completed the current action item went too: the button completes the timer
 record, not the task. See
-docs/implementation_plan_2026-08-25_timer_session_endings.md.
+docs/unused-docs/implementation_plan_2026-08-25_timer_session_endings.md.
 
 **Acceptance Criteria**:
 

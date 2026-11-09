@@ -3,7 +3,7 @@
 Purpose: let the user set the shape of a time-blocking day -- when it starts,
          when lunch is and how long, when it ends, and which weekdays accept
          blocks at all.
-Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m5
+Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m5
 Tests:   tests/test_plan_screen.py::test_tbm51_settings_modal_writes_day_settings
 
 A tabbed shell holding one Day tab, rather than a flat panel: these five

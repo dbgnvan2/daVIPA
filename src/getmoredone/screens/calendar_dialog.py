@@ -18,7 +18,7 @@ def missing_credentials_message() -> str:
     """The text shown when Google credentials are absent.
 
     Purpose: name the path that was actually checked, not a hardcoded one.
-    Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-3
+    Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-3
     Tests:   tests/test_google_calendar_paths.py::test_bi3_the_dialog_message_names_the_path_that_was_checked
 
     A module-level function rather than an inline f-string so a test has
@@ -48,7 +48,7 @@ def not_connected_message() -> str:
              interactive connection can be made, because the export cannot
              make it: the OAuth consent flow blocks on a browser and the
              export runs on a worker thread.
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m43
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m43
     Tests:   tests/test_plan_screen_calendar_export.py::test_cem434_an_unconnected_account_refuses_rather_than_opening_a_browser
 
     A module-level function for the same reason as

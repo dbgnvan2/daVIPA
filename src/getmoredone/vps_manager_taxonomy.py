@@ -16,7 +16,7 @@ class VisionElementHasDependentsError(Exception):
     Purpose: Force the user to delete or reassign child items before deleting a
              Vision Element, instead of cascading away annual records / failing
              with a raw RESTRICT foreign-key error on attached project boards.
-    Spec:    docs/changes/2026-06-15-project-ape-linking.md
+    Spec:    docs/unused-docs/changes/2026-06-15-project-ape-linking.md
     Tests:   tests/test_vps_hub_crud.py::test_delete_vision_element_blocked_when_children_exist
     """
 
@@ -719,7 +719,7 @@ class VPSTaxonomyMixin:
 
         Purpose: List the annual records, projects, and linked action items that
                  must be removed/reassigned before a Vision Element can be deleted.
-        Spec:    docs/changes/2026-06-15-project-ape-linking.md
+        Spec:    docs/unused-docs/changes/2026-06-15-project-ape-linking.md
         Tests:   tests/test_vps_hub_crud.py::test_delete_vision_element_blocked_when_children_exist
         """
         years = [

@@ -231,7 +231,7 @@ def find_duplicate_weekly_tactics(
     Week items with no APE are skipped: SQLite treats NULLs as distinct, so
     they could not be deduped by key anyway (WT-M1.C.4 stops new ones).
 
-    Spec:  docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
+    Spec:  docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
     Tests: tests/test_weekly_tactic_dedupe.py::test_bc2_a_tactic_that_could_not_snap_is_still_deduped
     """
     cal = calendar or week_calendar.WeekCalendar.from_settings()

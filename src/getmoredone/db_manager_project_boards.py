@@ -295,7 +295,7 @@ class DBManagerProjectBoardsMixin:
                  place in the plan in between — and the Projects screen's own
                  "Unlink" button never did that, so the two paths disagreed
                  about what unlinking means.
-        Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
+        Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
         Tests:   tests/test_project_multi_link.py::test_unlinking_keeps_the_plan_element
 
         Filing under a project still stamps that project's Annual Plan Element
@@ -348,7 +348,7 @@ class DBManagerProjectBoardsMixin:
                  used to land with no project at all, because both copy paths
                  build the new row through a constructor that never mentions
                  project_board_items.
-        Spec:    docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl12
+        Spec:    docs/unused-docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl12
         Tests:   tests/test_item_editor_project_link.py::test_pl12_followup_inherits_project_link
 
         Exactly **one** link is copied — the source's first. Sweep F2: copying
@@ -475,7 +475,7 @@ class DBManagerProjectBoardsMixin:
                  reported rather than cleaned up behind the user's back: an
                  exclusive re-link deletes the extras, so a silent migration
                  would destroy data nobody was asked about (P2).
-        Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#bp2
+        Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp2
         Tests:   tests/test_project_multi_link.py
 
         Returns one dict per item: ``id``, ``title`` and ``board_count``.
@@ -517,7 +517,7 @@ class DBManagerProjectBoardsMixin:
         Purpose: BP5 — capped, because the Scheduler renders a fixed number of
                  rows from this list and the uncapped query loaded the whole
                  table to build them.
-        Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#bp5
+        Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp5
         Tests:   tests/test_db_project_drag.py::test_bp5_unlinked_items_are_capped_and_the_drop_is_countable
 
         ``limit=None`` restores the uncapped behaviour. What the cap dropped is
@@ -615,7 +615,7 @@ class DBManagerProjectBoardsMixin:
 
         Purpose: BP5 — the Scheduler wanted the number, not the rows, and was
                  calling ``len(get_unlinked_action_items(...))`` to get it.
-        Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#bp5
+        Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp5
         Tests:   tests/test_db_project_drag.py::test_bp5_count_matches_the_uncapped_list
         """
         query = "SELECT COUNT(*) AS n" + self._UNLINKED_FROM
@@ -629,7 +629,7 @@ class DBManagerProjectBoardsMixin:
 
         Purpose: Persist a new project-board link (a Project Note), including
                  its initial status.
-        Spec:    docs/implementation_plan_2026-06-06_project_notes.md#M1.A.4
+        Spec:    docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M1.A.4
         Tests:   tests/test_project_notes.py::test_link_status_roundtrip
         """
         self.db.conn.execute("""
@@ -649,7 +649,7 @@ class DBManagerProjectBoardsMixin:
                  True so existing callers (Open Notes dialog, count display)
                  don't change behavior; the new UI passes False when the shared
                  Show Completed toggle is off.
-        Spec:    docs/implementation_plan_2026-06-06_project_notes.md#M2.A.3
+        Spec:    docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M2.A.3
         Tests:   tests/test_project_notes.py::test_get_links_filters_by_status
                  tests/test_project_notes.py::test_link_status_roundtrip
         """
@@ -671,7 +671,7 @@ class DBManagerProjectBoardsMixin:
         """Mark a project-board link (Project Note) as completed.
 
         Purpose: Status change handler for the Project Notes list.
-        Spec:    docs/implementation_plan_2026-06-06_project_notes.md#M2.A.1
+        Spec:    docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M2.A.1
         Tests:   tests/test_project_notes.py::test_complete_project_note
         Returns: True if a row was updated, False if link_id was unknown.
         """
@@ -686,7 +686,7 @@ class DBManagerProjectBoardsMixin:
         """Mark a project-board link (Project Note) as open.
 
         Purpose: Inverse of complete_project_note — used by the Reopen button.
-        Spec:    docs/implementation_plan_2026-06-06_project_notes.md#M2.A.2
+        Spec:    docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M2.A.2
         Tests:   tests/test_project_notes.py::test_reopen_project_note
         Returns: True if a row was updated, False if link_id was unknown.
         """

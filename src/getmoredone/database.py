@@ -287,7 +287,7 @@ class Database:
         # not here -- mapping a stored 09:30 to a box needs the user's Day
         # Start, which this module knows nothing about and should not.
         # DatabaseManager.adopt_legacy_day does it, on the first load of a day.
-        # Spec:  docs/implementation_plan_2026-11-05_time_grid.md#tg-m4
+        # Spec:  docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m4
         # Tests: tests/test_time_block_schema.py::test_tgm41_migration_adds_slot_index_idempotently
         conn.execute("""
             CREATE TABLE IF NOT EXISTS time_blocks (
@@ -420,7 +420,7 @@ class Database:
 
         # M1.A.2 — project_board_links includes a `status` column (open/completed)
         # so a linked Obsidian note carries a per-project status.
-        # Spec: docs/implementation_plan_2026-06-06_project_notes.md#M1.A.2
+        # Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M1.A.2
         # Tests: tests/test_project_notes.py::test_project_board_links_table_has_status_column
         conn.execute("""
             CREATE TABLE IF NOT EXISTS project_board_links (
@@ -725,7 +725,7 @@ class Database:
         cursor = conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'project_board_links'")
         if not cursor.fetchone():
             # First-time create on an upgrading DB — include `status` from day one.
-            # Spec: docs/implementation_plan_2026-06-06_project_notes.md#M1.A.3
+            # Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M1.A.3
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS project_board_links (
                     id                     TEXT PRIMARY KEY,
@@ -741,7 +741,7 @@ class Database:
             # M1.A.3 — Existing project_board_links from an older DB might not
             # have the `status` column yet. Add it idempotently with default 'open'
             # so existing rows are non-null.
-            # Spec: docs/implementation_plan_2026-06-06_project_notes.md#M1.A.3
+            # Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M1.A.3
             # Tests: tests/test_project_notes.py::test_migration_adds_status_to_existing_db
             cursor = conn.execute("PRAGMA table_info(project_board_links)")
             link_columns = [row[1] for row in cursor.fetchall()]
@@ -775,7 +775,7 @@ class Database:
         # slot_index takes no default, for the reason given with the CREATE
         # TABLE above, so SQLite back-fills it with NULL and every legacy row
         # arrives honestly marked as not yet placed.
-        # Spec:  docs/implementation_plan_2026-11-05_time_grid.md#tg-m4
+        # Spec:  docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m4
         # Tests: tests/test_time_block_schema.py::test_tgm41_migration_adds_slot_index_idempotently
         time_block_columns = [
             row[1] for row in conn.execute("PRAGMA table_info(time_blocks)").fetchall()
@@ -795,14 +795,14 @@ class Database:
             # correctly, knows nothing about. DatabaseManager.adopt_legacy_day
             # does it per day, with the real bounds, the first time that day
             # is opened.
-            # Spec:  docs/implementation_plan_2026-11-05_time_grid.md#tg-m4
+            # Spec:  docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m4
             # Tests: tests/test_time_block_schema.py::test_tgm41_migration_adds_slot_index_idempotently
             ('slot_index', 'INTEGER'),
             # CE-M1.1 -- the Google Calendar event this block owns. NULLable
             # with no default on purpose: NULL means "never exported", which
             # is a different fact from holding an id, and a back-filled empty
             # string would read as an event that exists and can be updated.
-            # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
+            # Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
             # Tests: tests/test_time_block_schema.py::test_cem11_migration_adds_calendar_event_id_idempotently
             ('calendar_event_id', 'TEXT'),
             # CE-M1.1 -- which calendar that event id is on. An id is only
@@ -816,7 +816,7 @@ class Database:
             # NULLable, and NULL is read as the default calendar: rows written
             # before this column existed were all written by an export whose
             # only possible target was ``primary``.
-            # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
+            # Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
             # Tests: tests/test_time_block_schema.py::test_cem11b_migration_adds_the_event_calendar_idempotently
             ('calendar_event_calendar_id', 'TEXT'),
         ):

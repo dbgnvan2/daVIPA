@@ -230,7 +230,7 @@ class ChipTable:
 
         Purpose: UPD-F4.1 — the panel's width, less what the layout spends on
                  padding, is what the columns have to share.
-        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
         Tests:   tests/test_unified_panel_design.py::test_updf41_a_divider_move_rescales_every_resizable_column
 
         Returns the pixels by which the columns overrun the panel, zero
@@ -399,7 +399,7 @@ def panel_fitter(left_table: Optional["ChipTable"] = None,
     Purpose: UPD-F4.1 — one fitter for the five two-panel tabs, so moving the
              divider widens or narrows the columns of whichever panel grew or
              shrank rather than leaving empty space beside the last column.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
     Tests:   tests/test_unified_panel_design.py::test_updf41_the_divider_is_wired_to_both_panels
 
     Either table may be None: APE Week Actions' right panel is a `TodayScreen`

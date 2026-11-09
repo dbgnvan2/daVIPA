@@ -1,7 +1,7 @@
 # Spec — a second, isolated demo installation
 
 **Status:** built and on `main` — see
-`docs/spec_coverage_2026-11-05_demo_install.md`: 46 rows `done`, one `not
+`docs/unused-docs/spec_coverage_2026-11-05_demo_install.md`: 46 rows `done`, one `not
 done`. Corrected 2026-11-08 by the SST batch: this line read "Draft v1,
 awaiting approval".
 **Date:** 2026-11-05

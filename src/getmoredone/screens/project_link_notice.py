@@ -5,7 +5,7 @@ Purpose: BP1/BP2 — an Action Item belongs to exactly one Project. Three
          the Projects screen's "link existing items" dialog) and they must all
          say the same thing before deleting links the user did not choose to
          delete (P2 — never silently drop).
-Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
+Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
 Tests:   tests/test_project_multi_link.py
 
 The messages live here rather than in a dialog class so a test can read the
@@ -233,7 +233,7 @@ def items_losing_links(db_manager, item_ids: Iterable[str],
     Purpose: sweep F1 — the Projects dialog asked before deleting links and the
              Scheduler's drag-drop did not, so the same destructive write was
              guarded on one surface and silent on the other (P5).
-    Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
+    Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
     Tests:   tests/test_project_multi_link.py::test_f1_dragging_onto_a_project_asks_before_unfiling
 
     Clearing (``target_board_id is None``) destroys more than the link:

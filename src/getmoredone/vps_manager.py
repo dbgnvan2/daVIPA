@@ -38,7 +38,7 @@ class ActionItemsAttachedError(Exception):
              row ``update_action_item`` then refuses to save — a value no
              supported path can create, written by a supported path — and for
              an ordinary item silently detached it from the plan.
-    Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
+    Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
     Tests:   tests/test_vps_hub_crud.py::test_delete_annual_records_is_refused_while_action_items_remain
     """
 
@@ -59,7 +59,7 @@ class ProjectBoardsAttachedError(Exception):
 
     Purpose: Prevent the APE-delete cascade from silently destroying multiple
              project boards now that several projects may share one APE.
-    Spec:    docs/changes/2026-06-15-project-ape-linking.md
+    Spec:    docs/unused-docs/changes/2026-06-15-project-ape-linking.md
     Tests:   tests/test_vps_hub_crud.py::test_delete_annual_record_blocked_when_extra_projects_attached
     """
 
@@ -190,7 +190,7 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
         """Return project boards linked to an APE, with their linked-item counts.
 
         Purpose: Surface which projects would be lost if the APE were deleted.
-        Spec:    docs/changes/2026-06-15-project-ape-linking.md
+        Spec:    docs/unused-docs/changes/2026-06-15-project-ape-linking.md
         Tests:   tests/test_vps_hub_crud.py::test_delete_annual_record_blocked_when_extra_projects_attached
         """
         rows = self.db.conn.execute(

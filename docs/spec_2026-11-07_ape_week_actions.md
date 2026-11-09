@@ -276,7 +276,7 @@ Each step is committable on its own and leaves the suite green.
 7. **AWA-M1 — the rename.** Last, deliberately: it is one string in each of two
    files and touches nothing else, so it cannot be blamed for a failure in
    steps 1-6.
-8. **Docs.** Handoff note at `docs/changes/2026-11-07-ape-week-actions.md` from
+8. **Docs.** Handoff note at `docs/unused-docs/changes/2026-11-07-ape-week-actions.md` from
    `.agents/templates/handoff-note.md`; this spec listed in
    `docs/DOCUMENTATION_INDEX.md`; `docs/USER_GUIDE.md` for the new tab and the
    renamed one; `NOTES.md`; `docs/spec_coverage.md`.

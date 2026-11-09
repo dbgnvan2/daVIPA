@@ -413,7 +413,7 @@ class LinkProjectActionItemsDialog(ctk.CTkToplevel):
         Purpose: an Action Item belongs to exactly one Project. This dialog was
                  the last additive surface; the Scheduler and the item editor
                  already relink exclusively.
-        Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
+        Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
         Tests:   tests/test_project_multi_link.py::test_bp1_linking_moves_an_item_between_boards
 
         An item that sits on other boards loses those links, so it is asked
@@ -673,7 +673,7 @@ class NoteActionChooserDialog(ctk.CTkToplevel):
     Purpose: Ask the user whether they want to create a new Obsidian note or
              link an existing one to the project. Both branches delegate to
              the same CreateNoteDialog / LinkNoteDialog used by Action Items.
-    Spec:    docs/implementation_plan_2026-06-06.md (paper-icon-enhancement)
+    Spec:    docs/unused-docs/implementation_plan_2026-06-06.md (paper-icon-enhancement)
     Tests:   tests/test_project_note_chooser.py::test_choice_is_create
              tests/test_project_note_chooser.py::test_choice_is_link
              tests/test_project_note_chooser.py::test_cancel_returns_none
@@ -811,7 +811,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
         # Notes list and the Action Items list. Default OFF per user direction
         # ("Clicking on a Project will display all the OPEN Project Notes and
         # Action Items").
-        # Spec: docs/implementation_plan_2026-06-06_project_notes.md#M4.A.1
+        # Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M4.A.1
         self.show_completed_items_var = ctk.BooleanVar(value=False)
 
         # Load Edit Icon
@@ -1414,7 +1414,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
         # M4.A.1 — Shared "Show Completed" toggle above BOTH the Project Notes
         # section and the Action Items section. Toggling refreshes both lists
         # via _render_detail.
-        # Spec: docs/implementation_plan_2026-06-06_project_notes.md#M4.A.1, M4.A.2
+        # Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M4.A.1, M4.A.2
         shared_filter = ctk.CTkFrame(self.items_frame, fg_color="transparent")
         shared_filter.grid(row=1, column=0, sticky="ew", padx=2, pady=(0, 4))
         shared_filter.grid_columnconfigure(0, weight=1)
@@ -1762,7 +1762,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
         """Prompt the user to create a new or link an existing Obsidian note.
 
         Purpose: Handler for the 📄 icon on a project tile.
-        Spec:    docs/implementation_plan_2026-06-06.md (paper-icon-enhancement)
+        Spec:    docs/unused-docs/implementation_plan_2026-06-06.md (paper-icon-enhancement)
         Tests:   tests/test_project_note_chooser.py::test_handler_dispatches_to_create_note
                  tests/test_project_note_chooser.py::test_handler_dispatches_to_link_note
                  tests/test_project_note_chooser.py::test_handler_does_nothing_on_cancel
@@ -1852,7 +1852,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
         Purpose: M3 — show Project Notes as a first-class list above Action Items,
                  each row with status + Open/Complete-or-Reopen/Unlink controls.
                  No checkbox, no priority, no dates (per user clarification).
-        Spec:    docs/implementation_plan_2026-06-06_project_notes.md#M3
+        Spec:    docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M3
         Tests:   tests/test_project_notes.py::TestM3UI::test_project_notes_header_rendered
                  tests/test_project_notes.py::TestM3UI::test_project_note_row_has_status_buttons_no_checkbox
                  tests/test_project_notes.py::TestM3UI::test_complete_button_updates_status
@@ -1929,7 +1929,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
     def _render_project_note_row(self, link):
         """Render one Project Note row: label, status pill, Open/Complete-or-Reopen/Unlink.
 
-        Spec:    docs/implementation_plan_2026-06-06_project_notes.md#M3.A.2
+        Spec:    docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M3.A.2
         Tests:   tests/test_project_notes.py::TestM3UI::test_project_note_row_has_status_buttons_no_checkbox
         """
         row = ctk.CTkFrame(self.notes_links_frame, fg_color="transparent")
@@ -1996,7 +1996,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
     def _on_complete_project_note(self, link_id: str):
         """Mark a Project Note completed and refresh the section.
 
-        Spec: docs/implementation_plan_2026-06-06_project_notes.md#M3.A.3
+        Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M3.A.3
         Tests: tests/test_project_notes.py::TestM3UI::test_complete_button_updates_status
         """
         self.db_manager.complete_project_note(link_id)
@@ -2005,7 +2005,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
     def _on_reopen_project_note(self, link_id: str):
         """Mark a Project Note open (reverse of complete) and refresh the section.
 
-        Spec: docs/implementation_plan_2026-06-06_project_notes.md#M3.A.3
+        Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M3.A.3
         Tests: tests/test_project_notes.py::TestM3UI::test_reopen_button_updates_status
         """
         self.db_manager.reopen_project_note(link_id)

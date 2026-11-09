@@ -3,7 +3,7 @@
 Purpose: render one draggable action item, and one time block, with the
          priority band as an accent, depth as a three-bar stack, and a height
          that tracks the block's length.
-Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m12
+Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m12
 Tests:   tests/test_plan_screen.py
 
 Every colour here comes from theme.py. The project rule is no hard-coded hex
@@ -121,7 +121,7 @@ def chip_column_minsizes(title_width: int = SLOT_TITLE_WIDTH_PX):
 
     Purpose: PD-M1.1 -- a day box and an item row are the same four columns,
              so there is one place that says what those columns are.
-    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m1
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m1
     Tests:   tests/test_plan_screen.py::test_pdm11_the_item_row_uses_the_chips_column_order
 
     Both renderers configure their columns from here, and PD-M2's clamp adds
@@ -274,7 +274,7 @@ def item_row_height(span: int, box_height: int = SLOT_CHIP_HEIGHT_PX) -> int:
 
     Purpose: PB-M6.1 -- an item row is the size of the space it will take, so
              the day's room for it is visible before the drag.
-    Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m6
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m6
     Tests:   tests/test_plan_screen.py::test_pbm61_an_item_row_is_the_height_the_day_would_give_it
 
     ``span`` boxes of ``slot_row_height(1, box_height)``, plus the
@@ -316,7 +316,7 @@ def build_item_row(
 
     Purpose: PD-M1 -- an item is drawn as the thing it is about to become: a
              task in a box, at the size of the space it will take.
-    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m1
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m1
     Tests:   tests/test_plan_screen.py::test_pdm11_the_item_row_uses_the_chips_column_order
              tests/test_plan_screen.py::test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it
              tests/test_plan_screen.py::test_pdm16_the_depth_bars_are_justified_like_the_text_on_the_line
@@ -461,7 +461,7 @@ def _block_title(block: TimeBlock, item: Optional[ActionItem]) -> str:
     replaced at the call sites: this is the name the rest of this module and
     its tests already use, and two implementations of "what is this block
     called" is the drift the move exists to prevent.
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m22
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m22
     Tests: tests/test_plan_screen_calendar_export.py::test_cem221a_an_event_is_titled_what_the_day_draws_on_the_block
     """
     return block_title(block, item)
@@ -478,7 +478,7 @@ def _block_title(block: TimeBlock, item: Optional[ActionItem]) -> str:
 # in it or not. An empty 09:00 between two filled boxes is a legitimate day,
 # not a state to pack away, so the empty boxes are the point rather than
 # something to hide.
-# Spec: docs/implementation_plan_2026-11-05_time_grid.md#tg-m7
+# Spec: docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m7
 # =====================================================================
 
 #: The time column's width. Fixed, so every row's titles start at the same x
@@ -538,7 +538,7 @@ def slot_row_height(chips: int, chip_height: int = SLOT_CHIP_HEIGHT_PX) -> int:
     """How tall a box holding this many task chips is drawn.
 
     Purpose: PB-M5 -- box height follows the Drag Schedule box-height setting.
-    Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m5
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m5
     Tests:   tests/test_plan_screen.py::test_pbm51_box_height_follows_the_setting
 
     Named rather than inlined because two tests and the renderer all need the
@@ -564,7 +564,7 @@ def build_slot_row(
 
     Purpose: TG-M7/TG-M10 -- the fixed grid, including the boxes holding more
              than one task.
-    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m7
+    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m7
     Tests:   tests/test_plan_screen.py::test_tgm71_every_slot_is_drawn
 
     A box drawn for a lunch half hour says so and takes no tasks. A box that a
@@ -669,7 +669,7 @@ def item_is_complete(item: Optional[ActionItem]) -> bool:
 
     Purpose: PD-M6 -- one answer for the mark, rather than a status string
              compared four ways.
-    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m6
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m6
     Tests:   tests/test_plan_screen.py::test_pdm61_a_completed_task_shows_a_check_left_of_the_time
 
     Case-folded and stripped: the column is user-editable through the item
@@ -686,7 +686,7 @@ def slot_is_complete(grid_slot, items_by_id: Dict[str, ActionItem]) -> bool:
 
     Purpose: PD-M6 -- the check sits beside the box's time, so it is the
              box's claim about itself.
-    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m6
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m6
     Tests:   tests/test_plan_screen.py::test_pdm63_a_box_with_one_task_still_open_shows_no_check
 
     **All**, not any. A box holding a finished task beside an unfinished one
@@ -713,7 +713,7 @@ def slot_is_padding(grid_slot) -> bool:
 
     Purpose: PD-M4 -- break, buffer and lunch are one kind of thing, so they
              are drawn as one kind of thing.
-    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m4
     Tests:   tests/test_plan_screen.py::test_pdm42_a_padding_box_is_drawn_like_the_lunch_box
 
     PD-M4 gave the three one stripe colour and stopped there, which left the
@@ -737,7 +737,7 @@ def _build_lunch_chip(parent, row: int) -> ctk.CTkFrame:
     """The lunch box's own row: the padding stripe, and the word.
 
     Purpose: PD-M4 -- break, buffer and lunch are one colour.
-    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m4
     Tests:   tests/test_plan_screen.py::test_pdm42_break_buffer_and_lunch_render_in_the_shared_colour
 
     A lunch half hour is a property of the day rather than a block, so it had
@@ -906,7 +906,7 @@ def build_virtual_slot_row(
     Purpose: "leave a virtual block for these two areas so there is something
              to drop into". A drop needs a rectangle; without one the gesture
              is aiming at the gap between the grid and the pane's edge.
-    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
     Tests:   tests/test_plan_screen.py::test_pdm51_a_virtual_box_sits_at_each_end
 
     Drawn like a half hour and dimmed, in the same columns, so it reads as part
@@ -982,7 +982,7 @@ def build_outside_group(
     """Blocks no box can hold, drawn beneath the item list rather than dropped.
 
     Purpose: TG-M3 -- surface, never silently drop (P2).
-    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m3
+    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m3
     Tests:   tests/test_plan_screen.py::test_tgm31_an_outside_block_is_drawn
              tests/test_plan_screen.py::test_pbm55_an_outside_block_is_sized_like_one_in_a_box
 

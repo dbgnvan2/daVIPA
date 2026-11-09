@@ -2,6 +2,19 @@
 
 One batch at a time from here, per `CLAUDE.md`. What that leaves:
 
+- **Records are filed, not tested** (2026-11-09, on the user's instruction).
+  194 record files — handoff notes, plans, coverage snapshots, dated status
+  reports — moved to `docs/unused-docs/`, kept for recovery and read by no
+  test. The guards that read prose are deleted with them: the five citation
+  and vocabulary guards, `tests/test_doc_status_claims.py`, and the
+  document-set machinery that fed them, about 2,500 lines of test code.
+  `check_docs_sync.py` no longer demands a handoff note, so a note is written
+  when it carries something a commit message cannot. What still holds: code
+  and live specs resolve their `Spec:`/`Tests:` pointers, a code change needs a
+  documentation change (rule 13), and filing a record does not count as one.
+  Marker counts 231 meta / 2439 app — the app figure unmoved, which is how we
+  know no application behaviour was touched. The measurement that preceded it
+  is filed as docs/unused-docs/proposal_2026-11-09_slimmer_documentation_policy.md.
 - **The live document set is derived, and retired vocabulary is guarded**
   (LDS batch, 2026-11-09, `GSF-A3`, `GSF-A4` and `MAW-A3`). The `docs/` half of
   the scanned set was five names kept by hand; it is derived now, from one
@@ -106,7 +119,7 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   **found nothing at medium or higher**, which is where the sweep budget stops.
   It refuted one of its own findings: `CLAUDE.md`'s 225 meta / 2432 non-meta
   figures are right as written, re-measured by collection. `SST-A2` to
-  `SST-A18` filed, not fixed. See `docs/changes/2026-11-08-status-claims.md`.
+  `SST-A18` filed, not fixed. See `docs/unused-docs/changes/2026-11-08-status-claims.md`.
 
 - **Both leftover branches are settled.**
   `refs/heads/claude/elegant-neumann-ab55c9` (UPD-F1) is **merged** at
@@ -118,10 +131,10 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   nine plan-day failures and `test_every_referenced_test_name_exists` — which
   were stale test vehicles, not missing code: `outside` was implemented on
   `main` at both layers the whole time
-  (`docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`). The eleventh,
+  (`docs/unused-docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`). The eleventh,
   `test_every_referenced_test_file_exists`, by the PRIT batch, which wrote the
   35 tests PRI-M1 and PRI-M2 had shipped without
-  (`docs/changes/2026-11-08-pri-tests.md`). That also closes PDT-M4.2, the one
+  (`docs/unused-docs/changes/2026-11-08-pri-tests.md`). That also closes PDT-M4.2, the one
   criterion the PDT batch recorded `not done`. **Confirmed by CI run
   `42574256150` on `5eef83d`: 9 failed, 2635 passed, 2 skipped, the same on
   3.11, 3.12 and 3.13** — twenty down to nine, with no new failure. The
@@ -131,7 +144,7 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   section). Seven now skip with a reason from one shared precondition,
   `tests/display_capabilities.py`; two were rewritten to measure the code
   rather than the display. The claim that CI is **green** is not made here: it
-  is closed by a run id in `docs/changes/2026-11-09-ci-green.md` and by nothing
+  is closed by a run id in `docs/unused-docs/changes/2026-11-09-ci-green.md` and by nothing
   else: **run 42592428542 at `abf0125`, green on all three Python versions,
   2654 passed and 10 skipped on each**. It is the first green run of this
   workflow since at least `3f705b4`. Two of this item's own statements were falsified while fixing it —
@@ -171,7 +184,7 @@ and are corrected in `BACKLOG.md` item 1 with the measurements.
   cold passes; a claim must now *match* one of four recognised forms, so an approval
   state, a question, a new phrasing and **silence** fail by default. The cost
   `SST-A3` put at "35 existing documents" was six, and the sixth was findable
-  only under the inversion: `docs/implementation_plan_2026-06-22.md` had carried
+  only under the inversion: `docs/unused-docs/implementation_plan_2026-06-22.md` had carried
   no status line for five months. The docs-sync decision is now
   `tools/agents/check_docs_sync.py::verdict`, a pure function of changed paths
   asserted over fixtures, so the rule fails locally and in `tests.yml` before a
@@ -211,7 +224,7 @@ and are corrected in `BACKLOG.md` item 1 with the measurements.
   the app delta is `c190b9f`'s seven, already on `main` before this batch, which
   adds no app test at all. The attribution was wrong here and in three other
   records until the second cold pass measured it.
-  See `docs/changes/2026-11-09-status-allow-list.md`.
+  See `docs/unused-docs/changes/2026-11-09-status-allow-list.md`.
 
 - **The bare `::name` citation form is checked** (SBN batch, 2026-11-09).
   `SAG-A17` is closed. The traceability guard read a citation written as a path
@@ -244,7 +257,7 @@ and are corrected in `BACKLOG.md` item 1 with the measurements.
   `42646001919` on `617b1a1` is green on 3.11, 3.12 and 3.13** —
   `2676 passed, 10 skipped` each, which is the 2686 those two figures add
   up to.
-  See `docs/changes/2026-11-09-bare-name-citations.md`.
+  See `docs/unused-docs/changes/2026-11-09-bare-name-citations.md`.
 
 ## Recent Changes (2026-11-08)
 
@@ -492,7 +505,7 @@ three layout items here, and UPD-F1, the only defect among them, merged at
   none of them building a window; PLC-M4.1, M4.4 and M4.7 mutation-proved.
 - ⚠️ **Not checked on screen.** Whether the green *reads* right is the one
   thing no test covers; the checklist is in
-  `docs/changes/2026-11-08-priority-level-colours.md`.
+  `docs/unused-docs/changes/2026-11-08-priority-level-colours.md`.
 - ⚠️ **The red `P:` chip is unchanged**, by the user's choice, so a green
   critical row sits beside a red chip. Logged as PLC-A3.
 
@@ -1015,7 +1028,7 @@ three layout items here, and UPD-F1, the only defect among them, merged at
 - ✅ **New setting: Project Notes Folder** — Settings → Obsidian Integration now has a "Project Notes Folder" entry (default `GetMoreDone/Projects`). New project notes land here instead of the generic Notes Subfolder. Blank value falls back to the generic Notes Subfolder so users who don't set it don't break.
 - ✅ **30 new automated tests** in `tests/test_project_notes.py` plus updates to existing tests. Full suite: 328 passed, 1 skipped.
 - 📄 Spec coverage table: [`docs/spec_coverage.md`](docs/spec_coverage.md).
-- 📄 Plan: [`docs/implementation_plan_2026-06-06_project_notes.md`](docs/implementation_plan_2026-06-06_project_notes.md).
+- 📄 Plan: [`docs/unused-docs/implementation_plan_2026-06-06_project_notes.md`](docs/unused-docs/implementation_plan_2026-06-06_project_notes.md).
 - ⚠️ Known follow-ups, not fixed in this change (documented in `docs/spec_coverage.md`):
   - Duplicate `_row_to_project_board_link` / `_row_to_project_board` methods in `db_manager.py` shadow the mixin's via Python MRO — both are now in sync but the duplication is a latent footgun.
   - `open_note_picker` (toolbar "Open Notes" dialog) is now functionally redundant with the in-panel list.

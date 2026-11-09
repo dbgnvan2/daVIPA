@@ -44,7 +44,7 @@ All documentation and tests have been updated to reflect the VPS (Visionary Plan
   - Code coverage metrics
   - Future testing considerations
 
-### 5. docs/VPS_UPDATES_2026-01-24.md (NEW)
+### 5. docs/unused-docs/VPS_UPDATES_2026-01-24.md (NEW)
 
 - ✅ Created detailed change log including:
   - Summary of all changes
@@ -98,7 +98,7 @@ Status: ✅ ALL TESTS PASSING
 ## Files Created
 
 1. `docs/VPS_TESTING_SUMMARY.md` - Comprehensive test documentation
-2. `docs/VPS_UPDATES_2026-01-24.md` - Detailed change log
+2. `docs/unused-docs/VPS_UPDATES_2026-01-24.md` - Detailed change log
 3. `src/getmoredone/screens/vps_segment_editor.py` - Segment editor dialog (created earlier)
 
 ## Files Modified

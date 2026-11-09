@@ -203,7 +203,7 @@ def google_auth_dir() -> Path:
 
     Purpose: give every site that resolves a default Google-auth path one rule,
              so a check and the constructor can never look in different places.
-    Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-3
+    Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-3
     Tests:   tests/test_google_calendar_paths.py::test_bi3_auth_dir_is_the_legacy_dot_directory
 
     Always ``~/.getmoredone``. This is a *shared* location by design, not just

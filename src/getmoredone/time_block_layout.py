@@ -4,7 +4,7 @@ Purpose: turn an ordered list of blocks plus a day's bounds into clock times,
          and answer the small questions the planner asks about an item (how
          long a block for it should be, how deep it is, which band its
          priority falls in, whether a date may hold blocks at all).
-Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m3
+Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m3
 Tests:   tests/test_time_block_layout.py
 
 **This module imports no GUI toolkit, and must not.** Correct packing is
@@ -112,7 +112,7 @@ def parse_hhmm(value: Optional[str], *, default: Optional[str] = None) -> int:
 def parse_clock_time(value: Optional[str], *, default: Optional[str] = None) -> int:
     """Minutes past midnight for a time that has to be a time *of day*.
 
-    Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
+    Spec:  docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
     Tests: tests/test_time_block_layout.py::test_a_clock_time_past_midnight_is_refused
 
     ``parse_hhmm`` deliberately accepts an hour past 23, because
@@ -152,7 +152,7 @@ def format_hhmm(minutes: int) -> str:
 class DayBounds:
     """The shape of a planning day: when it starts, when lunch is, when it ends.
 
-    Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
+    Spec:  docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
     Tests: tests/test_time_grid.py::test_tgm11_grid_covers_the_day_in_half_hours
 
     Frozen, and built through ``from_settings``, so a screen cannot drift the
@@ -289,7 +289,7 @@ def duration_for_item(item: Optional[ActionItem], default_minutes: int = FALLBAC
 def clamp_block_minutes(minutes: int) -> int:
     """A block length brought inside the day-long ceiling.
 
-    Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m8
+    Spec:  docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m8
     Tests: tests/test_time_block_layout.py::test_a_work_block_longer_than_a_day_is_capped
 
     The ceiling is enforced here rather than at the one dialog that asks a
@@ -406,7 +406,7 @@ def default_minutes_for_block_type(block_type: str, settings=None) -> int:
 # 09:00 between two filled slots is a day someone planned that way, not a
 # state to be packed away.
 #
-# Spec: docs/implementation_plan_2026-11-05_time_grid.md#m1
+# Spec: docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#m1
 # =========================================================================
 
 SLOT_MINUTES = 30
@@ -479,7 +479,7 @@ class DaySpan:
              of the settings file. Nothing about it is stored, which is why it
              cannot go stale (P6) and why taking the blocks away restores the
              hours with no code at all (PD-M14.3).
-    Spec:    docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-2
     Tests:   tests/test_time_block_layout.py::test_pdm142_the_template_span_is_the_hours_you_set
              tests/test_time_block_layout.py::test_pdm142_a_block_before_the_hours_widens_the_span
 
@@ -522,7 +522,7 @@ def template_span(bounds: DayBounds) -> DaySpan:
 
     Purpose: PD-M14.5 -- what AutoLoad and the break button are allowed to
              fill. Only a drag onto one of the two ends goes outside it.
-    Spec:    docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-5
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-5
     Tests:   tests/test_time_block_layout.py::test_pdm142_the_template_span_is_the_hours_you_set
     """
     room = bounds.day_end_minutes - bounds.day_start_minutes
@@ -553,7 +553,7 @@ def span_for_blocks(blocks: Iterable[TimeBlock], bounds: DayBounds) -> DaySpan:
     Purpose: PD-M14.2 -- the day on screen. Derived on every read from the
              blocks themselves, so there is no second copy of the day's shape
              to disagree with them.
-    Spec:    docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-2
     Tests:   tests/test_time_block_layout.py::test_pdm142_a_block_before_the_hours_widens_the_span
              tests/test_time_block_layout.py::test_pdm142_an_absurd_slot_index_does_not_stretch_the_day
     """
@@ -574,7 +574,7 @@ def day_grid(bounds: DayBounds, span: Optional[DaySpan] = None) -> List[Slot]:
 
     Purpose: the set of boxes a day offers, which is the thing items are
              dropped onto.
-    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m1
+    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m1
     Tests:   tests/test_time_grid.py::test_tgm11_grid_covers_the_day_in_half_hours
 
     Without a ``span`` this is the hours in Day Settings: a slot that would run
@@ -621,7 +621,7 @@ def edge_limit_time(edge: str) -> str:
              whole half hour), so the refusal has to name which one it hit.
              One function, so the two ends cannot drift apart or name a time
              the arithmetic does not actually enforce.
-    Spec:    docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-6
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-6
     Tests:   tests/test_plan_screen.py::test_pdm146_both_ends_refuse_at_midnight_and_say_which
     """
     if edge == DAY_EXTEND_EARLIER:
@@ -651,7 +651,7 @@ def extended_span(
              change (this replaces ``extended_day_bound``, which did exactly
              that and ratcheted the hours outward with nothing to put them
              back).
-    Spec:    docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-1
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-1
     Tests:   tests/test_time_block_layout.py::test_pdm141_the_span_grows_at_the_end_that_was_dropped_on
              tests/test_time_block_layout.py::test_pdm146_neither_end_can_leave_the_date
 
@@ -681,7 +681,7 @@ def slots_for_minutes(minutes: Optional[int]) -> int:
     Purpose: 45 minutes takes two boxes. The item keeps its own 45; the grid it
              occupies is 60, and the screen shows both because they are
              different facts.
-    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m2
     Tests:   tests/test_time_grid.py::test_tgm21_odd_lengths_round_up
 
     Never zero: a block with a nonsense length still has to be somewhere, and a
@@ -696,7 +696,7 @@ def spare_minutes_in_last_slot(block: TimeBlock) -> int:
     """Minutes of the block's last box that the block itself does not use.
 
     Purpose: TG-M2 -- the 45-in-two-boxes case, said out loud.
-    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m2
     Tests:   tests/test_time_grid.py::test_the_spare_minutes_of_the_last_box_are_what_the_task_leaves
 
     A 45-minute task occupies two boxes and ends at 09:45, so 15 minutes of
@@ -735,7 +735,7 @@ def can_place(
 
     Purpose: one answer for every write path, so a drop, a move and a resize
              cannot disagree about what the day allows.
-    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m2
     Tests:   tests/test_time_grid.py::test_tgm23_each_refusal_has_its_own_reason
 
     Returns a ``SlotRefusal`` value rather than raising: a refusal here is an
@@ -806,7 +806,7 @@ def times_for_slot(slot_index: int, minutes: int, bounds: DayBounds) -> Tuple[st
     Purpose: the derived ``start_time``/``end_time`` written with every slot
              change, so the row stays readable in sqlite and the
              ``end == start + planned_minutes`` invariant stays checkable.
-    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
     Tests:   tests/test_time_block_crud.py::test_tgm63_every_row_says_start_plus_duration
 
     The end is the start plus the block's **own** length, not the end of the
@@ -866,7 +866,7 @@ def build_day_grid(
 
     Purpose: the single function the screen draws from, so what is on screen
              and what the arithmetic says are the same object.
-    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m3
+    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m3
     Tests:   tests/test_time_grid.py::test_tgm31_a_block_with_no_box_is_surfaced
 
     Without a ``span`` the day drawn is the hours in Day Settings stretched to
@@ -939,7 +939,7 @@ def block_title(block: TimeBlock, item: Optional[ActionItem]) -> str:
 
     Purpose: CE-M2.2 -- one answer, used by the screen that draws the block
              and by the export that names its calendar event.
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m22
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m22
     Tests:   tests/test_calendar_export.py::test_cem221_every_branch_of_the_title_rule_names_a_block,
              tests/test_plan_screen_calendar_export.py::test_cem221a_an_event_is_titled_what_the_day_draws_on_the_block
 
@@ -970,7 +970,7 @@ def slot_index_for_time(
     """The slot a stored clock time falls in, for the migration.
 
     Purpose: map the days already in the database onto the grid.
-    Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
+    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
     Tests:   tests/test_time_block_schema.py::test_tgm51_existing_times_map_to_slots
 
     ``None`` for a time that cannot be read, and -- for the migration, which

@@ -142,7 +142,7 @@ class ColumnResizer:
                  difference to its resizable columns in proportion to the
                  widths they already have, never below the five-character
                  floor, with the fixed columns reserved out first.
-        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
         Tests:   tests/test_unified_panel_design.py::test_updf41_a_divider_move_rescales_every_resizable_column
 
         A column's stored width is treated as a weight rather than a pixel

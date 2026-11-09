@@ -12,9 +12,9 @@ look at the next 7 days for this. (Today Action Items, 7 days for planning)."*
 Four scope decisions were taken the same day and are recorded in §8.
 
 Related, and read before writing this:
-[`docs/implementation_plan_2026-11-08_plan_calendar_export.md`](implementation_plan_2026-11-08_plan_calendar_export.md)
+[`docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md`](implementation_plan_2026-11-08_plan_calendar_export.md)
 (the other direction, built 2026-11-08) and
-[`docs/spec_coverage_2026-11-08_plan_calendar_export.md`](spec_coverage_2026-11-08_plan_calendar_export.md).
+[`docs/unused-docs/spec_coverage_2026-11-08_plan_calendar_export.md`](spec_coverage_2026-11-08_plan_calendar_export.md).
 Several rules below exist only because of what that batch established.
 
 ---

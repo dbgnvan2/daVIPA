@@ -2,7 +2,7 @@
 
 Purpose: pick a day, see the action items that start on it, drag them into a
          packed day of blocks, and rearrange, resize or pad that day.
-Spec:    docs/implementation_plan_2026-11-05_time_blocks.md
+Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md
 Tests:   tests/test_plan_screen.py
 
 The model, stated once because every method here assumes it: **a planned day
@@ -166,7 +166,7 @@ def _claim_export(db_path, block_date) -> bool:
     """Take the one export slot for a day, or report that it is taken.
 
     Purpose: CE-M4.4 -- one export per day per database, across screens.
-    Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
     Tests:   tests/test_plan_screen_calendar_export.py::test_cem444c_a_second_screen_cannot_export_the_same_day
 
     Test-and-add under the lock, because the test and the add have to be one
@@ -214,7 +214,7 @@ UNKNOWN_REFUSAL = "That block cannot go there"
 #: How often the Tk thread looks for the calendar export worker's result.
 #: Short enough that the status line does not feel stuck, long enough that a
 #: slow export is not a hundred idle callbacks a second.
-#: Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+#: Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
 EXPORT_POLL_INTERVAL_MS = 100
 
 
@@ -394,7 +394,7 @@ class PlanScreen(ctk.CTkFrame):
 
         Purpose: PB-M5 -- the Day Plan boxes are sized by the Drag Schedule
                  box-height setting rather than by a constant.
-        Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m5
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m5
         Tests:   tests/test_plan_screen.py::test_pbm52_the_setting_reaches_the_rendered_box
                  tests/test_plan_screen.py::test_pbm56_a_box_height_below_one_line_of_text_is_raised
 
@@ -417,7 +417,7 @@ class PlanScreen(ctk.CTkFrame):
 
         Purpose: PB-M5 -- one title width across the two screens that show a
                  task as a row, so the columns line up between them.
-        Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m5
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m5
         Tests:   tests/test_plan_screen.py::test_pbm54_the_title_column_follows_the_drag_schedule_width
         """
         return self._positive_setting(
@@ -490,7 +490,7 @@ class PlanScreen(ctk.CTkFrame):
 
         # CE-M4.1 -- secondary, not primary: AutoLoad is this screen's one
         # primary action and the theme rule allows exactly one.
-        # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
+        # Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
         # Tests: tests/test_plan_screen_calendar_export.py::test_cem441_the_header_holds_the_export_button_wired_to_the_export
         self.btn_export_calendar = ctk.CTkButton(
             header,
@@ -548,7 +548,7 @@ class PlanScreen(ctk.CTkFrame):
         self.btn_clear_day.pack(side="right", padx=4)
 
         # CE-M4.1 -- the status line is NOT in the header.
-        # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
+        # Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
         # Tests: tests/test_plan_screen_calendar_export.py::test_cem441b_the_header_fits_the_window_it_opens_in
         #
         # Every other widget in this header is packed with a fixed width, and
@@ -620,7 +620,7 @@ class PlanScreen(ctk.CTkFrame):
         """The narrowest the items column may be dragged to, in pixels.
 
         Purpose: PD-M2.2 -- neither pane can be dragged shut.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m2
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m2
         Tests:   tests/test_plan_screen.py::test_pdm22_the_items_pane_cannot_be_dragged_shut
 
         What one item row asks for, plus the frame, padding and scrollbar
@@ -636,7 +636,7 @@ class PlanScreen(ctk.CTkFrame):
         """The narrowest the day pane may be left, in pixels.
 
         Purpose: PD-M2.2 -- the other end of the same clamp.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m2
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m2
         Tests:   tests/test_plan_screen.py::test_pdm22_the_day_pane_cannot_be_dragged_shut
 
         One day row: the completion check, the time, and the same four columns
@@ -721,7 +721,7 @@ class PlanScreen(ctk.CTkFrame):
 
         Purpose: PD-M2 -- "the dividing line vertical between the two areas
                  should slide right and left to resize the two areas."
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m2
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m2
         Tests:   tests/test_plan_screen.py::test_pdm21_dragging_the_grip_changes_the_items_column
                  tests/test_plan_screen.py::test_pdm28_the_grip_is_the_whole_gap_between_the_panes
 
@@ -875,7 +875,7 @@ class PlanScreen(ctk.CTkFrame):
                  pointer moved over the window. Moving a block, resizing one
                  or deleting one wrote the day correctly and looked like a
                  gesture that had done nothing.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m10
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m10
         Tests:   tests/test_plan_screen.py::test_pdm101_rebuilding_the_day_pane_flushes_the_redraw
 
         ``update_idletasks`` and not ``update``. Idle tasks are Tk's geometry
@@ -925,7 +925,7 @@ class PlanScreen(ctk.CTkFrame):
                  stored clock time to go stale, nothing to re-pack, and no
                  transaction that can leave one day's times derived from one
                  set of bounds and another's from a different set.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
         Tests:   tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks
 
         The stored ``start_time``/``end_time`` columns are still written when a
@@ -1025,7 +1025,7 @@ class PlanScreen(ctk.CTkFrame):
         """Draw the day as its grid of half hours.
 
         Purpose: TG-M7 -- every box from Day Start to Day End, filled or not.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m7
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m7
         Tests:   tests/test_plan_screen.py::test_tgm71_every_slot_is_drawn
                  tests/test_plan_screen.py::test_pdm111_a_rebuild_leaves_the_day_pane_in_the_grid
 
@@ -1216,7 +1216,7 @@ class PlanScreen(ctk.CTkFrame):
                  becomes a lie. A 45-minute task occupies 60 minutes of the
                  day and plans 45 of them; a summary reporting one number
                  would have to pick which of those to be wrong about.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m12
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m12
         Tests:   tests/test_plan_screen.py::test_tgm121_the_summary_separates_occupied_from_planned
         """
         parts = [
@@ -1286,7 +1286,7 @@ class PlanScreen(ctk.CTkFrame):
         """TG-M9 — make a block for this item on the box it was dropped on.
 
         Purpose: the half hour the user chose, not the end of the day.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m9
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m9
         Tests:   tests/test_plan_screen.py::test_tgm91_a_drop_lands_on_the_slot_under_the_pointer
 
         With no ``slot_index`` it takes the first box that will hold it.
@@ -1342,7 +1342,7 @@ class PlanScreen(ctk.CTkFrame):
         """The Google Calendar client this screen exports with.
 
         Purpose: CE-M4.5 -- the seam that keeps every UI test off the network.
-        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m45
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m45
         Tests:   tests/test_plan_screen_calendar_export.py::test_cem451_the_screen_uses_its_injected_client_factory
 
         A method rather than a client held on the screen: constructing
@@ -1371,7 +1371,7 @@ class PlanScreen(ctk.CTkFrame):
         """Push this day's blocks to Google Calendar, on a worker thread.
 
         Purpose: CE-M4.1/4.2/4.3 -- the button's whole behaviour.
-        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
         Tests:   tests/test_plan_screen_calendar_export.py::test_cem411_the_button_disables_before_the_work_starts
 
         Order matters here. The button is disabled *before* anything slow or
@@ -1563,7 +1563,7 @@ class PlanScreen(ctk.CTkFrame):
         """Collect the worker's result, or come back later.
 
         Purpose: CE-M4.2 -- the hand-off from the worker to the status line.
-        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
         Tests:   tests/test_plan_screen_calendar_export.py::test_cem421_the_status_line_reports_the_real_counts,
                  ::test_cem425_a_result_that_lands_between_the_two_reads_is_not_called_a_failure
         """
@@ -1601,7 +1601,7 @@ class PlanScreen(ctk.CTkFrame):
         """The status line, from the counts rather than from having finished.
 
         Purpose: CE-M4.2 -- a run that failed says so (P24).
-        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
         Tests:   tests/test_plan_screen_calendar_export.py::test_cem422_a_failing_export_sets_an_error_status
         """
         self._export_running = False
@@ -1631,7 +1631,7 @@ class PlanScreen(ctk.CTkFrame):
 
         Purpose: CE-M4.2 / P15 -- the export reports from a Tk callback that
                  outlives the screen when the user navigates away mid-run.
-        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
         Tests:   tests/test_plan_screen_calendar_export.py::test_cem423_a_screen_that_is_gone_is_not_written_to
 
         ``app.clear_content`` destroys the screen on every navigation, and Tk
@@ -1650,7 +1650,7 @@ class PlanScreen(ctk.CTkFrame):
 
         Purpose: CE-M4.2 / P15 -- the queued callback must not outlive what it
                  writes to.
-        Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
         Tests:   tests/test_plan_screen_calendar_export.py::test_cem424_destroying_the_screen_cancels_the_poll
 
         The worker is a daemon thread and is left to finish: whatever it has
@@ -1671,7 +1671,7 @@ class PlanScreen(ctk.CTkFrame):
 
         Purpose: fill the day from the item list in one click, one item after
                  another, at the earliest box that holds each.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m3
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m3
         Tests:   tests/test_plan_screen.py::test_pdm31_autoload_fills_in_list_order
 
         Purely additive. It never moves, resizes or deletes a block that is
@@ -1803,7 +1803,7 @@ class PlanScreen(ctk.CTkFrame):
 
         Purpose: the reverse of AutoLoad. One click that empties the day of
                  tasks, so a plan can be thrown away and redone.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m8
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m8
         Tests:   tests/test_plan_screen.py::test_pdm8_clear_day_removes_every_item_block
                  tests/test_plan_screen.py::test_pdm8_clear_day_leaves_breaks_and_buffers
                  tests/test_plan_screen.py::test_pdm8_answering_no_removes_nothing
@@ -1895,7 +1895,7 @@ class PlanScreen(ctk.CTkFrame):
         """The earliest box in today's grid with nothing in it at all.
 
         Purpose: PD-M3 -- "one after another", for AutoLoad.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m3
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m3
         Tests:   tests/test_plan_screen.py::test_pdm31_autoload_fills_in_list_order
 
         Not ``first_free_slot``, which is the earliest box that is not *full*.
@@ -1946,7 +1946,7 @@ class PlanScreen(ctk.CTkFrame):
 
         Purpose: PD-M7 -- a day outside the working week is a warning, not a
                  wall.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m7
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m7
         Tests:   tests/test_plan_screen.py::test_pdm131_a_drop_on_a_non_work_day_asks_nothing_and_writes
                  tests/test_plan_screen.py::test_pdm132_a_button_still_asks_on_a_non_work_day
                  tests/test_plan_screen.py::test_pdm7_a_work_day_says_nothing
@@ -2038,7 +2038,7 @@ class PlanScreen(ctk.CTkFrame):
                  this the gesture's own success ("Blocked 30m for X at 09:00")
                  is written over the warning, and the warning is the half that
                  was not obvious. Surfaced, not dropped (P2).
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m13
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m13
         Tests:   tests/test_plan_screen.py::test_pdm131_a_drop_on_a_non_work_day_asks_nothing_and_writes
                  tests/test_plan_screen.py::test_pdm133_the_note_belongs_to_the_gesture
 
@@ -2117,7 +2117,7 @@ class PlanScreen(ctk.CTkFrame):
         Purpose: a length that will not fit from where the block sits is
                  refused. The block is not slid to a box where it would fit:
                  that answers a question the user did not ask.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m11
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m11
         Tests:   tests/test_time_block_crud.py::test_tgm112_a_resize_that_does_not_fit_is_refused
 
         The in-memory ``block`` is deliberately not mutated before the write:
@@ -2217,7 +2217,7 @@ class PlanScreen(ctk.CTkFrame):
                  hiding was not on screen either, and the name of whatever was
                  clicked sat beside the pointer until something else repainted
                  the screen.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m10
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m10
         Tests:   tests/test_plan_screen.py::test_pdm103_a_press_without_motion_shows_no_drag_label
 
         A press with no motion is not a drag, so it gets no label at all. The
@@ -2253,7 +2253,7 @@ class PlanScreen(ctk.CTkFrame):
         """The canvas the day's grid scrolls inside, or ``None``.
 
         Purpose: PD-M11.5 -- autoscrolling the day means scrolling that canvas.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m11
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m11
         Tests:   tests/test_plan_screen.py::test_pdm115_the_day_canvas_is_the_scroll_frames_master
 
         A ``CTkScrollableFrame`` is the frame the rows are gridded into, and
@@ -2271,7 +2271,7 @@ class PlanScreen(ctk.CTkFrame):
 
         Purpose: PD-M11.5 -- "the Day Plan window should scroll as I drag an
                  item up or down to an area not shown".
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m11
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m11
         Tests:   tests/test_plan_screen.py::test_pdm115_the_pointer_at_the_bottom_edge_scrolls_down
 
         The viewport's own edges, not the pane's: the strip at each end of the
@@ -2327,7 +2327,7 @@ class PlanScreen(ctk.CTkFrame):
         Purpose: PD-M11.5 -- its own clock. A pointer held still at the bottom
                  of the pane delivers no motion events, so a scroll driven by
                  motion alone would stop exactly when it is wanted most.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m11
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m11
         Tests:   tests/test_plan_screen.py::test_pdm116_a_tick_outside_the_edge_zone_stops_the_scroll
 
         Rescheduling is the last thing it does, so the loop ends by not
@@ -2444,7 +2444,7 @@ class PlanScreen(ctk.CTkFrame):
         Purpose: PD-M10.5 -- a release that lands on nothing writes nothing and
                  redraws nothing, so without the flush here the label stayed
                  visible until some later event repainted the screen.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m10
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m10
         Tests:   tests/test_plan_screen.py::test_pdm105_ending_a_drag_hides_the_label_and_flushes
 
         Flushing from inside the ButtonRelease handler is safe here and only
@@ -2470,7 +2470,7 @@ class PlanScreen(ctk.CTkFrame):
                  real fresh install unless the loader says so -- and says so in
                  a field that goes to disk, since the first save from any
                  screen writes those defaults out as ordinary settings.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
         Tests:   tests/test_plan_screen.py::test_adoption_does_not_run_on_a_guessed_day_start
         """
         if self.settings is None:
@@ -2485,7 +2485,7 @@ class PlanScreen(ctk.CTkFrame):
                  which is a wiring mistake and nothing the user can act on;
                  this one is a day shape they can confirm in a dialog, so this
                  is the one worth telling them about.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
         Tests:   tests/test_plan_screen.py::test_no_settings_object_is_not_reported_as_an_unconfirmed_day
         """
         if self.settings is None:
@@ -2501,7 +2501,7 @@ class PlanScreen(ctk.CTkFrame):
         """The box the pointer is inside, or ``None``.
 
         Purpose: TG-M9 -- the drop target is a half hour, not the pane.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m9
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m9
         Tests:   tests/test_plan_screen.py::test_tgm91_a_drop_lands_on_the_slot_under_the_pointer
 
         Each box's own rectangle, not a midpoint rule: a box is a place, so a
@@ -2526,7 +2526,7 @@ class PlanScreen(ctk.CTkFrame):
         """Which end of the day the pointer is over, or ``None``.
 
         Purpose: PD-M5 -- the two boxes that are not slots.
-        Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
+        Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m5
         Tests:   tests/test_plan_screen.py::test_pdm114_a_drop_on_an_end_needs_no_pointer_in_the_scrolling_grid
                  tests/test_plan_screen.py::test_pdm5_a_drop_in_the_day_but_on_no_box_still_does_nothing
 
@@ -2553,7 +2553,7 @@ class PlanScreen(ctk.CTkFrame):
                  dropped above the first block or below the last" (PD-M5),
                  rewritten to the instruction that the hours in Day Settings
                  "are solely for starting a blank plan for the day".
-        Spec:    docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-1
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_day_hours_are_a_template.md#pd-m14-1
         Tests:   tests/test_plan_screen.py::test_pdm141_a_drop_on_earlier_writes_no_settings
 
         One block, in one transaction, and nothing else. Not ``plan_day_start``,
@@ -2649,7 +2649,7 @@ class PlanScreen(ctk.CTkFrame):
     def move_block_to_slot(self, block_id: str, slot_index: int):
         """TG-M11 — put a dragged block on the box it was dropped on.
 
-        Spec:  docs/implementation_plan_2026-11-05_time_grid.md#tg-m11
+        Spec:  docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m11
         Tests: tests/test_plan_screen.py::test_tgm111_a_real_drag_moves_a_block_between_slots
 
         A refusal is reported and nothing is written. Moving the block to some

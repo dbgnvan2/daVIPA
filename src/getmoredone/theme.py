@@ -257,7 +257,7 @@ def priority_band_colors() -> Dict[str, str]:
     """TB-M12 — one accent colour per priority band, light and dark.
 
     Purpose: colour a block by the priority of the item behind it.
-    Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m12
+    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m12
     Tests:   tests/test_time_block_colors.py::test_tbm122_band_colors_meet_contrast_in_both_themes
 
     The band a score falls in is decided by ``time_block_layout.priority_band``,
@@ -302,7 +302,7 @@ def priority_stripe_colors() -> Dict[str, str]:
 
     Purpose: a visible priority bar, without weakening the colours that have
              to sit behind a label.
-    Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m1
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m1
     Tests:   tests/test_time_block_colors.py::test_pbm12_stripe_colors_meet_the_non_text_contrast_bar
 
     A second table rather than an edit of ``priority_band_colors`` because the
@@ -333,7 +333,7 @@ def priority_fill_colors() -> Dict[str, str]:
 
     Purpose: carry priority as the shading of the task itself, not only as a
              6px bar at its edge.
-    Spec:    docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m4
     Tests:   tests/test_plan_screen.py::test_pbm41_a_chips_title_is_coloured_for_the_shade_behind_it
 
     A tint and not the accent. The project rule allows a colour as a chip or
@@ -365,7 +365,7 @@ def priority_level_fill_colors() -> Dict[str, str]:
     """PLC-M2 — the default row tint for each of the three priority *levels*.
 
     Purpose: the one place the shipped level colours are written down.
-    Spec:    docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m2
     Tests:   tests/test_priority_level_colors.py::test_plcm22_settings_defaults_match_the_theme_table
 
     A *level* is a rule on importance and urgency, not a band on

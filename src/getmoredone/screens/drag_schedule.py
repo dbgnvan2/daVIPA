@@ -509,7 +509,7 @@ class DragScheduleScreen(ctk.CTkFrame):
 
         Purpose: BP5 — the unlinked query is capped, so a partial list must not
                  be presented as the whole one (P9).
-        Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#bp5
+        Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp5
         Tests:   tests/test_db_project_drag.py::test_bp5_the_box_says_showing_n_of_m_when_capped
         """
         shown = getattr(self, "unlinked_shown", None)
@@ -541,7 +541,7 @@ class DragScheduleScreen(ctk.CTkFrame):
                  silently dropped matching items while the box announced
                  "showing 500 of 525" — a number describing a different set
                  than the one on screen (P9/P3).
-        Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#bp5
+        Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp5
         Tests:   tests/test_db_project_drag.py::test_f3_a_segment_filtered_view_searches_past_the_default_cap
 
         ``who_filter`` is applied in the query so the cap and the count describe
@@ -1414,7 +1414,7 @@ class DragScheduleScreen(ctk.CTkFrame):
                  the other (P5). Dropping onto "No Project" is the worse of the
                  two: ``clear_item_project_links`` also nulls the item's
                  Annual Plan Element.
-        Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
+        Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
         Tests:   tests/test_project_multi_link.py::test_f1_dragging_onto_a_project_asks_before_unfiling
 
         One question per drag, not one per item, and nothing is written unless

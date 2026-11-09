@@ -46,7 +46,7 @@ class AppSettings:
     obsidian_notes_subfolder: str = "GetMoreDone"
     # M7.A.1 — Separate subfolder for Project Notes so they don't mingle with
     # action-item notes. Blank value falls back to obsidian_notes_subfolder.
-    # Spec: docs/implementation_plan_2026-06-06_project_notes.md#M7.A.1
+    # Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M7.A.1
     project_notes_subfolder: str = "GetMoreDone/Projects"
     # Default green checkmark, can be customized to image path or emoji
     completion_icon: str = "✓"
@@ -184,7 +184,7 @@ class AppSettings:
     # Plan screen — the shape of a time-blocking day (TB-M4).
     # The planner derives every block's clock time from the day's order plus
     # these four values, so they are the day's definition, not decoration.
-    # Spec:  docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
+    # Spec:  docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
     # Tests: tests/test_plan_settings.py::test_tbm43_day_settings_round_trip
     plan_day_start: str = "08:00"
     plan_lunch_start: str = "12:00"
@@ -220,7 +220,7 @@ class AppSettings:
     # "primary" is the account's own calendar, which is what the three event
     # methods used to hard-code. A field rather than a constant so a user who
     # plans into a work calendar is not editing source to do it.
-    # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m31
+    # Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m31
     # Tests: tests/test_plan_screen_calendar_export.py::test_cem443_the_configured_calendar_is_the_one_written_to
     plan_export_calendar_id: str = "primary"
 
@@ -236,7 +236,7 @@ class AppSettings:
 
         Purpose: UPD-F1 -- ``save`` has to know which fields this object was
                  actually asked to change.
-        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
         Tests:   tests/test_settings_merge_on_save.py::test_updf11_a_second_settings_object_does_not_revert_the_first
 
         The generated ``__init__`` has just assigned every field, and none of
@@ -253,7 +253,7 @@ class AppSettings:
         Purpose: UPD-F1 -- the one thing that separates "set to this value" from
                  "never had an opinion", which comparing against the dataclass
                  default cannot do.
-        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
         Tests:   tests/test_settings_merge_on_save.py::test_a_setting_turned_back_to_its_default_still_persists
 
         ``__dict__.get`` rather than ``self._assigned``: this runs for all 80-odd
@@ -356,7 +356,7 @@ class AppSettings:
 
         Purpose: TG-M5 -- the single question the irreversible grid adoption
                  is gated on.
-        Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m5
         Tests:   tests/test_plan_settings.py::test_a_settings_file_from_before_day_settings_is_not_a_confirmed_day
 
         Confirmed means the file *says so*: ``plan_day_shape_unconfirmed``
@@ -392,7 +392,7 @@ class AppSettings:
         Purpose: the one destructive step in this class, and the merge that
                  keeps it from being destructive about fields it was not asked
                  to change.
-        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
         Tests:   tests/test_plan_settings.py::test_an_unreadable_settings_file_is_kept_before_it_is_overwritten
                  tests/test_settings_merge_on_save.py::test_updf11_a_second_settings_object_does_not_revert_the_first
 
@@ -510,7 +510,7 @@ class AppSettings:
         """What the settings file holds right now, or ``{}``.
 
         Purpose: UPD-F1 -- the "read" of ``save``'s read-modify-write.
-        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
         Tests:   tests/test_settings_merge_on_save.py::test_updf16_a_file_with_foreign_widths_is_merged_not_replaced
 
         ``{}`` for a file that is missing, unreadable, or holds something that
@@ -532,7 +532,7 @@ class AppSettings:
         Purpose: UPD-F1 -- a field this object was never asked to change keeps
                  the value the file has, so two screens holding their own
                  ``AppSettings`` no longer revert each other.
-        Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
         Tests:   tests/test_settings_merge_on_save.py::test_updf11_a_second_settings_object_does_not_revert_the_first
                  tests/test_settings_merge_on_save.py::test_updf16_a_file_with_foreign_widths_is_merged_not_replaced
 
@@ -613,7 +613,7 @@ class AppSettings:
         Purpose: a hand-edited or corrupt settings file must not stop the app
                  from starting, and must not hand the packing arithmetic a time
                  it cannot read.
-        Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
+        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
         Tests:   tests/test_plan_settings.py::test_tbm41_bad_time_falls_back_to_default
 
         Applied on both load and save, like every other normalizer here: a
@@ -778,7 +778,7 @@ class AppSettings:
                  If project_notes_subfolder is blank, falls back to the
                  generic obsidian_notes_subfolder so users who haven't
                  configured the new setting still get sane behavior.
-        Spec:    docs/implementation_plan_2026-06-06_project_notes.md#M7.A.2
+        Spec:    docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M7.A.2
         Tests:   tests/test_project_notes.py::TestM7Settings::test_get_project_notes_folder_returns_path
                  tests/test_project_notes.py::TestM7Settings::test_blank_project_subfolder_falls_back
         """
@@ -797,7 +797,7 @@ class AppSettings:
                  obsidian_notes_subfolder if the project setting is blank.
                  Separate from get_project_notes_folder() because
                  create_obsidian_note takes the subfolder *string*, not a Path.
-        Spec:    docs/implementation_plan_2026-06-06_project_notes.md#M7.A.5
+        Spec:    docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M7.A.5
         Tests:   tests/test_project_notes.py::TestM7Settings::test_blank_project_subfolder_falls_back
         """
         return (self.project_notes_subfolder or "").strip() or self.obsidian_notes_subfolder

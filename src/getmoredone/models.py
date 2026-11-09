@@ -85,7 +85,7 @@ class ActionItem:
         Purpose: PRI-M2.5 -- the score is computed in exactly one place, so the
                  stored number, the Item Editor's label and the row-click popup
                  cannot disagree about it or about the cap.
-        Spec:    docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md#pri-m2
+        Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md#pri-m2
         Tests:   tests/test_priority_floor_and_cap.py::test_prim22_every_factor_combination_is_capped
 
         Returns 0 when any factor is 0 or None. That is *unscored*, not
@@ -181,7 +181,7 @@ class ProjectBoardLink:
     Purpose: Models an Obsidian note linked to a project board, with a
              per-link Status so the same Obsidian doc linked to two projects
              can have independent statuses.
-    Spec:    docs/implementation_plan_2026-06-06_project_notes.md#M1.A.1
+    Spec:    docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M1.A.1
     Tests:   tests/test_project_notes.py::test_project_board_link_has_status_field
     """
 
@@ -237,7 +237,7 @@ class TimeBlock:
 
     Purpose: one slot in a planned day -- an action item, or the buffer/break
              padding between them.
-    Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
+    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
     Tests:   tests/test_time_block_schema.py::test_tbm12_block_type_and_position_round_trip
 
     ``start_time``/``end_time`` are *derived* values, not user input. The truth
@@ -277,14 +277,14 @@ class TimeBlock:
     # ``set_block_calendar_event_id``, and by nothing else:
     # ``update_time_block`` leaves the column alone so an edit made from a
     # block the screen loaded before an export cannot erase the id.
-    # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+    # Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
     # Tests: tests/test_time_block_crud.py::test_cem12_calendar_event_id_round_trips
     calendar_event_id: Optional[str] = None
 
     # CE-M1.2 -- the calendar ``calendar_event_id`` lives on. None means the
     # default calendar, which is the only one the first version of the export
     # could write to. Same writers as the field above.
-    # Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+    # Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
     # Tests: tests/test_time_block_crud.py::test_cem12b_the_event_calendar_round_trips
     calendar_event_calendar_id: Optional[str] = None
 
@@ -400,7 +400,7 @@ def priority_score_from_factors(
              Three copies of this arithmetic existed (the model, the Item
              Editor's live label, the row-click popup's label); a cap added to
              one of them and not its siblings is P5 by construction.
-    Spec:    docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md#pri-m2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md#pri-m2
     Tests:   tests/test_priority_floor_and_cap.py::test_prim22_every_factor_combination_is_capped
 
     A missing or zero factor returns 0 -- unscored, which is a different
@@ -430,7 +430,7 @@ def priority_score_label(
              the number beside it, so the label has to say it is capped. Both
              editors read this one function rather than formatting their own,
              for the same reason the scoring is one function.
-    Spec:    docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md#pri-m2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md#pri-m2
     Tests:   tests/test_priority_floor_form.py::test_prim26_a_capped_label_says_it_is_capped
     """
     numbers = [importance or 0, urgency or 0, size or 0, value or 0]
@@ -453,7 +453,7 @@ def apply_priority_floor(item: ActionItem) -> None:
              Defaults configured was stored unscored: ``priority_score`` 0,
              which sorts below every scored item in every list and draws in the
              unscored grey rather than the low band.
-    Spec:    docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md#pri-m1
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md#pri-m1
     Tests:   tests/test_priority_floor_and_cap.py::test_prim12_a_new_item_is_never_unscored
 
     Create-time only (D3). Nothing calls this on update, so a row that is
@@ -473,7 +473,7 @@ class BlockType:
 
     Purpose: name the three kinds in one place so the screen, the layout
              function and the database agree on the strings.
-    Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
+    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
     Tests:   tests/test_time_block_schema.py::test_tbm12_block_type_and_position_round_trip
 
     ITEM blocks carry an ``item_id`` and are coloured by that item's priority.

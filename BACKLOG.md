@@ -104,8 +104,8 @@ tighter Day End, which PD-M14.2 made unable to orphan anything, and three
 asserted the Day Settings write PD-M14.1 removed. Stale vehicles, not missing
 code.
 
-Closed by the PDT batch: `docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md`,
-handoff note `docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`. Six of
+Closed by the PDT batch: `docs/unused-docs/implementation_plan_2026-11-08_plan_day_tests_follow_pd_m14.md`,
+handoff note `docs/unused-docs/changes/2026-11-08-plan-day-tests-follow-pd-m14.md`. Six of
 the nine keep every assertion they had and changed only their setup. **Three
 did lose or invert an assertion** — one withdrawn, one inverted, and in
 the third a changed expectation — each asserting a mechanism PD-M14
@@ -127,7 +127,7 @@ eight mutations (`750afe6` and the cold pass's follow-up), and
 `tests/test_traceability_refs.py::test_every_referenced_test_file_exists` is
 **green**. PDT-M4.2, the one criterion that batch recorded `not done`, is
 closed with it. Plan and per-criterion status:
-`docs/implementation_plan_2026-11-08_pri_tests.md`,
+`docs/unused-docs/implementation_plan_2026-11-08_pri_tests.md`,
 `docs/spec_coverage.md`'s PRIT section.
 
 It was closed the only way it could be — by writing the tests, not by deleting
@@ -147,7 +147,7 @@ files, and **none of the five has ever existed**:
 | the score label | `tests/test_priority_floor_form.py` | `test_prim26_a_capped_label_says_it_is_capped` |
 
 The code is implemented and the spec exists
-(`docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md`, committed
+(`docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md`, committed
 `62798ab`). What is missing is the tests, so the cap, the floor and the
 "(capped)" label are all unverified — and PRI-M2's own stated purpose is that
 three copies of the scoring arithmetic were collapsed into one, which is
@@ -258,8 +258,8 @@ What closed them, and what now holds them:
 | `SSC-10` | twelve cites in nine documents, rewritten as quoted text plus a grep | `test_sstm8_the_chronic_documents_are_not_cited_by_line_number` |
 
 All in `tests/test_doc_status_claims.py`. Plan:
-`docs/implementation_plan_2026-11-08_status_claims.md`; note:
-`docs/changes/2026-11-08-status-claims.md`; per-criterion status: the SST
+`docs/unused-docs/implementation_plan_2026-11-08_status_claims.md`; note:
+`docs/unused-docs/changes/2026-11-08-status-claims.md`; per-criterion status: the SST
 section of `docs/spec_coverage.md`.
 
 **The guards are the point, not the corrections.** Every one of these nine was
@@ -282,7 +282,7 @@ stable and are kept.
 
 ### SSC-1 — the priority batch's plan says no code was written; the code is on `main` — CLOSED 2026-11-08
 
-`docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md:3` and
+`docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md:3` and
 `docs/DOCUMENTATION_INDEX.md` (`grep -in "awaiting approval; no" docs/DOCUMENTATION_INDEX.md` — the index capitalises it) both say "awaiting approval; no
 implementation code written". `9420927` ("feat(pri): priority defaults and the
 cap, as left on disk") is an ancestor of `main`, and the PRI-M1/PRI-M2
@@ -338,7 +338,7 @@ What was wrong, for the record:
   either." It is on `main`:
   `git merge-base --is-ancestor refs/heads/claude/elegant-neumann-ab55c9 main`
   succeeds, merged at `2fac9b3`. `NOTES.md` and item 1 of this file both say
-  so. `docs/changes/2026-11-08-one-batch-at-a-time.md` records that batch
+  so. `docs/unused-docs/changes/2026-11-08-one-batch-at-a-time.md` records that batch
   writing this `CLAUDE.md` section with its measurements — it does not quote
   this sentence, and records the parallel `NOTES.md` bullet being
   corrected to the same "not on `main`" wording — so this was a live edit of
@@ -353,12 +353,12 @@ What was wrong, for the record:
 
 ### SSC-4 — four more plans head themselves "no implementation code written" — CLOSED 2026-11-08
 
-`docs/implementation_plan_2026-11-05_time_blocks.md:3` and
-`docs/implementation_plan_2026-11-05_time_grid.md:3`, against
+`docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md:3` and
+`docs/unused-docs/implementation_plan_2026-11-05_time_grid.md:3`, against
 `docs/spec_coverage.md`'s 19 `TB-M` rows marked `done` and all 36 `TG-M` rows
 marked `done`. Same shape, older and checked less closely:
-`docs/implementation_plan_2026-08-19_item_editor_project_link.md:245` and
-`docs/implementation_plan_2026-08-24_dopamine_reward_protocol.md:5,291`. Seven
+`docs/unused-docs/implementation_plan_2026-08-19_item_editor_project_link.md:245` and
+`docs/unused-docs/implementation_plan_2026-08-24_dopamine_reward_protocol.md:5,291`. Seven
 further `awaiting approval` plans were not checked at all, so treat this as a
 sample, not a list.
 
@@ -376,7 +376,7 @@ the index — still holds, and is the part six other places route readers to
 This file's header paragraph (`grep -n "38 criteria" BACKLOG.md`) says "all
 38 criteria built" — item 3 is WTP-A11, not this;
 `docs/spec_2026-11-08_weekly_tactic_as_parent.md:336` says 40, as does
-`docs/cycles/2026-11-08_wtp-widget-tests-qa-gate.md:125` ("Spec count 39 →
+`docs/unused-docs/cycles/2026-11-08_wtp-widget-tests-qa-gate.md:125` ("Spec count 39 →
 40"); the spec's own `| WTP-Mx.y |` rows hold **41** distinct IDs. 40 is the
 later and twice-stated figure, but the spec's arithmetic for it ("the 35 in
 §3, plus …") does not reproduce either, so none of the three is certified
@@ -436,7 +436,7 @@ grep -rnE '(BACKLOG\.md|docs/spec_coverage\.md|CLAUDE\.md|docs/DOCUMENTATION_IND
 
 Three were measurably dead, and all three predate the batch that filed this:
 
-- `docs/implementation_plan_2026-11-05_time_blocks.md` cited a line for
+- `docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md` cited a line for
   "Calendar view for time blocks" that had drifted by nearly 3,000 lines.
 - two plans cited a line of `CLAUDE.md` for the mapped-window count; the blank
   line above it had taken the number (`grep -n "build a real on-screen window"
@@ -521,7 +521,7 @@ of the fourteen is checked, and `tests/test_doc_status_claims.py` leaves bare
 Resolved by hand: thirteen point at tests that exist. The fourteenth,
 `test_time_block_layout.py::test_pdm58_the_day_cannot_cross_midnight`, does
 not — and it is a deliberate quotation, inside
-`docs/spec_coverage_2026-11-08_plan_calendar_export.md`'s record of which
+`docs/unused-docs/spec_coverage_2026-11-08_plan_calendar_export.md`'s record of which
 references were failing at the time. So widening the existing pattern to accept
 the bare form would turn a correct historical record red, which is why it was
 not widened here.
@@ -552,7 +552,7 @@ closing it.
 The list missed two more documents whose work had shipped months earlier:
 `docs/spec_2026-08-23_dopamine_reward_protocol.md`, headed as a draft for
 implementation over `src/getmoredone/reward_protocol.py` and 41 `done` `RP-`
-rows, and `docs/implementation_plan_2026-06-06.md`, whose `## Status` described
+rows, and `docs/unused-docs/implementation_plan_2026-06-06.md`, whose `## Status` described
 three built phases in the future tense. Both phrasings have now been added to
 the list, which is the same patch applied for the third time. Three further
 documents recorded only an approval state — "approved; in progress" over 55
@@ -571,7 +571,7 @@ of work in this family with a measured defect rate behind it.
 `tests/test_doc_status_claims.py`'s `classify_status_claim` matches a status
 claim against four recognised forms, so an approval state, a question, a new
 phrasing of "not built" and **silence** all fail by default.
-`docs/implementation_plan_2026-11-09_status_allow_list.md` is the plan and
+`docs/unused-docs/implementation_plan_2026-11-09_status_allow_list.md` is the plan and
 `docs/spec_coverage.md`'s SAG section the per-criterion record.
 
 Two things this filing had wrong, both measured rather than argued:
@@ -579,7 +579,7 @@ Two things this filing had wrong, both measured rather than argued:
 - The cost is **six** document edits, not 35. Thirty of the 36 documents in the
   family already carry a claim one of the four forms recognises; the plan's §1.1
   names the six that did not, and the sixth was found only because the inversion
-  made a *missing* claim fail — `docs/implementation_plan_2026-06-22.md` had no
+  made a *missing* claim fail — `docs/unused-docs/implementation_plan_2026-06-22.md` had no
   status line at all, which is the failure mode no phrase list can have.
 - "`SST-N1` already says it cannot judge whether a replacement sentence is
   true" stays true of the allow-list too, and is carried forward as `SAG-N1`
@@ -719,7 +719,7 @@ to "Quote the text and give the grep that finds it". `grep -n` prefixes each
 hit with the file name and the line number, separated by colons, which is
 exactly the shape `_LINE_CITE` matches — described here rather than written
 out, because writing one out fails the guard, as this filing did on its first
-draft. The scan covers the whole `docs/changes/` archive. So a future handoff note that pastes its
+draft. The scan covers the whole `docs/unused-docs/changes/` archive. So a future handoff note that pastes its
 measurement as grep output — the normal way this repo evidences a claim, and
 what this guard's own message recommends — is red. No such cite exists today,
 so the hole is latent. The fix is to exempt a line that is recognisably pasted
@@ -853,7 +853,7 @@ Filed 2026-11-09 by the fifth cold pass over the SST batch.
 
 ## Adjacent issues — priority defaults and the cap (PRI, filed 2026-11-08)
 
-Promised by `docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md`'s
+Promised by `docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md`'s
 "Adjacent issues found, not fixed", which ends "Each is filed in `BACKLOG.md`
 as PRI-A1 … PRI-A4 when this plan is approved", and repeated in
 `docs/DOCUMENTATION_INDEX.md`. The plan was approved and built; the four
@@ -985,7 +985,7 @@ leaves:
 this list and are no longer *in the file* to be counted: the PD-M5.2 row that
 named them was marked withdrawn by this batch. They are still dead names, and
 they are still named by
-`docs/implementation_plan_2026-11-06_plan_day_controls.md`, which no test
+`docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md`, which no test
 scans.
 
 The two truncations are `test_pdm13` and `test_updm41_`, prefixes of real
@@ -1063,7 +1063,7 @@ directly would make it self-evident rather than inferred.
 
 ### PRIT-N1 — PRI-M3, the four-digit column, is not built (medium)
 
-`docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md`'s third
+`docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md`'s third
 criterion group. PRI-M1 and PRI-M2 are built and now tested; PRI-M3 is not
 built at all. `grep -rn "SCORE_COLUMN\|score_column_width" src/` returns
 nothing, and the `P:` labels are still literal `width=60` in five list screens
@@ -1116,7 +1116,7 @@ separately: the reword and the de-duplication are one edit.
 
 ### PDT-A5 — a test count has drifted in a closed handoff note (low)
 
-`docs/changes/2026-11-08-unified-panel-m7.md` says at `:19` and `:49` that
+`docs/unused-docs/changes/2026-11-08-unified-panel-m7.md` says at `:19` and `:49` that
 `tests/test_unified_panel_design.py` holds **81** tests. It holds **98**
 (`grep -c '^def test_' tests/test_unified_panel_design.py`); `e44937a` and
 `4e16534` raised it, both before this batch. The guard itself asserts an empty
@@ -1128,7 +1128,7 @@ document. Found by the seventh cold pass, the `NOTES.md` copy by the eighth.
 
 ### PDT-A4 — PD-M14's implementation plan is not in the documentation index (low)
 
-`docs/implementation_plan_2026-11-08_day_hours_are_a_template.md` has no entry
+`docs/unused-docs/implementation_plan_2026-11-08_day_hours_are_a_template.md` has no entry
 of its own in `docs/DOCUMENTATION_INDEX.md`. It is named in that file's footer,
 which is where this gap is recorded, not an entry. Found while adding the PDT entry. Nothing
 enforces the index, which is PLC-A5.
@@ -1212,7 +1212,7 @@ falsified that on 2026-11-08 — the grep now returns the eight lines in
 `tests/test_doc_status_claims.py`, none of which checks completeness. Corrected
 2026-11-09 by the second cold pass; the conclusion stands, its evidence did
 not.) **Measured 2026-11-09 by the third cold pass: 26 of the 42
-`docs/implementation_plan_*.md`, `docs/spec_*.md` and `docs/spec_coverage_*.md`
+`docs/unused-docs/implementation_plan_*.md`, `docs/spec_*.md` and `docs/unused-docs/spec_coverage_*.md`
 documents are absent from the index.** Two of the 26 were the stale status
 claims that pass found — a spec headed as a draft over a module that shipped in
 August, and a plan whose `## Status` described three built phases in the future
@@ -1221,7 +1221,7 @@ re-reads. The index is kept by hand - which is how it came to carry a
 "Not approved" line for a plan that had been approved and built the same day,
 found while writing this batch's entry.
 
-The test is small: walk `docs/*.md` plus `docs/changes/*.md`, read the
+The test is small: walk `docs/*.md` plus `docs/unused-docs/changes/*.md`, read the
 `### <path>` headings out of the index, and assert the two sets match, with an
 explicit allow-list for anything deliberately unlisted. It was not written
 inside this batch because the batch's own entry is one of the things it would
@@ -1714,8 +1714,8 @@ history is kept at `refs/backup/pre-bisect-rewrite` (`eeecbd2`), a ref under
 
 New SHAs for the four commits other documents cite: `a92f059` → `a92f059`,
 `2ae39fd` → `2ae39fd`, `9420927` → `9420927`, `23f0cc7` → `23f0cc7`. Every
-citation in `BACKLOG.md`, `docs/changes/2026-11-08-unified-panel-followups.md`
-and `docs/changes/2026-11-08-weekly-tactic-completion-surfaces.md` was updated
+citation in `BACKLOG.md`, `docs/unused-docs/changes/2026-11-08-unified-panel-followups.md`
+and `docs/unused-docs/changes/2026-11-08-weekly-tactic-completion-surfaces.md` was updated
 in the same commit as this entry.
 
 **Any session holding one of the old SHAs should re-read it** — the old commits
@@ -1728,7 +1728,7 @@ names them.
 ## Outstanding — the calendar export's manual checklist (CE, 2026-11-08)
 
 The six steps at the end of
-[`docs/implementation_plan_2026-11-08_plan_calendar_export.md`](docs/implementation_plan_2026-11-08_plan_calendar_export.md)
+[`docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md`](docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md)
 are the part of CE-M1 - CE-M5 no test can cover: a real export, against a real
 Google account, seen on the real calendar. The batch's status report does not
 claim them as done and neither does this entry. They need the app driven by
@@ -1788,7 +1788,7 @@ rewrite that wants its own pass rather than riding along with a feature.
 ## Below-medium findings — WTP completion surfaces (2026-11-08)
 
 From the Hermes `learning-qa-sweep` gate over `3f705b4..56c1dc0`
-(`docs/cycles/2026-11-08_wtp-plc-upd-pd-qa-gate.md`) and from fixing its one
+(`docs/unused-docs/cycles/2026-11-08_wtp-plc-upd-pd-qa-gate.md`) and from fixing its one
 medium finding. The gate's F1 was fixed in-loop; everything here is below
 medium, so it is filed rather than fixed.
 
@@ -1869,7 +1869,7 @@ expected dict keyed by path relative to that root.
 ### WTP-A7 — `item_editor.py` imports the guard inside the function (low)
 
 From the re-gate, and already recorded in
-`docs/changes/2026-11-08-weekly-tactic-completion-surfaces.md`.
+`docs/unused-docs/changes/2026-11-08-weekly-tactic-completion-surfaces.md`.
 `_confirm_tactic_completion` does `from .week_collision_notice import
 confirm_weekly_tactic_completion` in the function body, although the module
 already imports that same module at the top. The reason is not a cycle: the
@@ -2807,7 +2807,7 @@ investigated**: the descriptions below are the report, not a diagnosis. Nothing
 here has been reproduced, read in the code, or confirmed against a running app
 by this session.
 
-**All four are addressed by PD-M11** (`docs/implementation_plan_2026-11-06_plan_day_controls.md`),
+**All four are addressed by PD-M11** (`docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md`),
 on 2026-11-07, pending the on-screen check that is PD-M11.8. The first three
 turned out to be one cause and not the one PD-M10 treated: the panes were
 rebuilt by lifting the scroll frame out of the grid, which unmaps the canvas
@@ -2953,7 +2953,7 @@ screen afterwards, which is the actual cost.
 **Description:** `docs/DOCUMENTATION_INDEX.md` names
 `docs/spec_2026-11-07_ape_period_consistency.md` and
 `docs/spec_2026-11-07_ape_week_actions.md` individually, and covers handoff
-notes with one generic `docs/changes/` entry. The seventeen
+notes with one generic `docs/unused-docs/changes/` entry. The seventeen
 `implementation_plan_*.md` files, the other seven `spec_*.md` files and the five
 `spec_coverage*.md` files are not listed anywhere in it, including
 `implementation_plan_2026-11-06_plan_day_controls.md`, which is the plan of
@@ -4437,8 +4437,8 @@ of scope: the workflow document, the three role prompts under
 `codex/agent-{code,docs,github}`.
 
 **Closed 2026-11-09 by the MAW batch**
-(`docs/implementation_plan_2026-11-09_retired_agent_apparatus.md`,
-`docs/changes/2026-11-09-retired-agent-apparatus.md`). All five are deleted,
+(`docs/unused-docs/implementation_plan_2026-11-09_retired_agent_apparatus.md`,
+`docs/unused-docs/changes/2026-11-09-retired-agent-apparatus.md`). All five are deleted,
 together with pull_request_template.md — named here without backticks
 because it no longer exists, per the convention in `CLAUDE.md` — which was
 filed separately as `GSF-A2`.
@@ -4570,7 +4570,7 @@ Release is created, which is the intended behaviour rather than a regression.
 
 Surfaced while adding "Set Project" to the item editor, deferred as decisions
 rather than oversights. Batch 2 of
-[`docs/implementation_plan_2026-08-19_backlog_clearance.md`](docs/implementation_plan_2026-08-19_backlog_clearance.md)
+[`docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md`](docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md)
 took each decision and closed it. Kept here as the record of what was decided.
 
 - ~~**Two surfaces disagree about how many projects an item may have.**~~
@@ -4927,7 +4927,7 @@ The claim extractor finds a status line by looking for a line beginning with
 the word `status`, so a sentence like "Status reporting is handled by the
 sidebar" in a document's prose is taken as its status claim, classified, and
 very likely rejected. One document in the family already does:
-`docs/implementation_plan_2026-08-25_project_time_totals.md`'s prose line
+`docs/unused-docs/implementation_plan_2026-08-25_project_time_totals.md`'s prose line
 beginning "status was added 2026-11-09 by the third cold pass…". The batch is
 green not because no such line exists but because `_status_claim` returns the
 **first** match and that document's real claim comes earlier — which means this
@@ -4954,8 +4954,8 @@ from putting its rule in the suite, and doing both in one batch would have made
 the diff say two things at once.
 
 **Closed 2026-11-09 by the GSF batch**
-(`docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md`,
-`docs/changes/2026-11-09-dead-gate-and-dead-spec-name.md`). The file is gone,
+(`docs/unused-docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md`,
+`docs/unused-docs/changes/2026-11-09-dead-gate-and-dead-spec-name.md`). The file is gone,
 and the four live documents that described it as an enforcement a reader gets —
 `AGENTS.md` twice, `CLAUDE.md` and the retired-workflow document (deleted the
 same day by the MAW batch) — now name the suite's
@@ -5004,14 +5004,14 @@ strings" rule covers, arriving the other way round. The message is now read by
 **Priority:** Low
 **Effort:** Small
 
-### SAG-A6 — a dead `docs/changes/` clause in the docs check (low)
+### SAG-A6 — a dead `docs/unused-docs/changes/` clause in the docs check (low)
 
 `verdict` computes `docs_changed` as `path.startswith(DOC_PREFIXES) or path in
-DOC_FILES or path.startswith("docs/changes/")`. `DOC_PREFIXES` is `("docs/",)`,
+DOC_FILES or path.startswith("docs/unused-docs/changes/")`. `DOC_PREFIXES` is `("docs/",)`,
 so the third clause can never be the one that matters: every
-`docs/changes/…` path already satisfies the first. A handoff note alone
+`docs/unused-docs/changes/…` path already satisfies the first. A handoff note alone
 **does** satisfy the docs requirement, and `tests/test_docs_sync_rule.py`'s
-fixture `(("src/getmoredone/db_manager.py", "docs/changes/…md"), "pass")`
+fixture `(("src/getmoredone/db_manager.py", "docs/unused-docs/changes/…md"), "pass")`
 asserts exactly that — so the clause is dead, and the behaviour it looks like it
 adds is the behaviour the rule already has. Whether that is the right rule is a
 separate question from whether the clause is reachable; this item is only about
@@ -5041,8 +5041,8 @@ Filed 2026-11-09 by the cold pass over the SAG batch. Out of scope for that
 batch, whose `CLAUDE.md` edit was confined to the docs-gate paragraph.
 
 **Closed 2026-11-09 by the GSF batch**
-(`docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md`,
-`docs/changes/2026-11-09-dead-gate-and-dead-spec-name.md`). It was not one
+(`docs/unused-docs/implementation_plan_2026-11-09_dead_gate_and_dead_spec_name.md`,
+`docs/unused-docs/changes/2026-11-09-dead-gate-and-dead-spec-name.md`). It was not one
 citation but **eleven**, in seven documents, including a `###` entry in
 `docs/DOCUMENTATION_INDEX.md` — so the index listed a document this repo has
 never contained. All eleven now name the file that exists, and the guard above
@@ -5237,7 +5237,7 @@ Filed 2026-11-09 by the fourth cold pass over the SAG batch.
 `tests/test_traceability_refs.py`'s `_REF` requires the `tests/…py` prefix, so
 a continuation written as `` `::test_name` `` is never checked. That was
 `PDT-A1`, scoped to `docs/spec_coverage.md`. `SAG-M4` widened the scan to
-`docs/implementation_plan_*.md`, `docs/spec_*.md` and `docs/changes/*.md` and
+`docs/unused-docs/implementation_plan_*.md`, `docs/spec_*.md` and `docs/unused-docs/changes/*.md` and
 left the blind spot in place, so the batch that repaired every dead **path**
 in those families tripled the domain of the gap beside it.
 
@@ -5249,7 +5249,7 @@ the way `PDT-A1`'s did; its command is the one to re-run, with `^\s*def
 <name>` matched exactly and never by substring.
 
 Two instances are the argument for doing this rather than filing it again:
-`docs/implementation_plan_2026-11-05_time_blocks.md`'s TB-M2.2 and TB-M2.3
+`docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md`'s TB-M2.2 and TB-M2.3
 were dead, and sit **directly above** TB-M3.1, which `SAG-M4.3` repaired —
 because TB-M3.1's name carried a path and theirs did not. Those two are now
 corrected by hand; the other fifty are not.
@@ -5263,8 +5263,8 @@ harder change. Either way the rows carrying genuinely retired names have to be
 rewritten first, or the guard goes red on honest history.
 
 **Closed by the SBN batch, 2026-11-09**
-(`docs/implementation_plan_2026-11-09_bare_name_citations.md`,
-`docs/changes/2026-11-09-bare-name-citations.md`). The arm resolves a bare name
+(`docs/unused-docs/implementation_plan_2026-11-09_bare_name_citations.md`,
+`docs/unused-docs/changes/2026-11-09-bare-name-citations.md`). The arm resolves a bare name
 against every name defined anywhere under `tests/`; the recommendation above —
 read the file from the nearest preceding path citation — was measured and
 rejected, because carried across lines and reset at headings it puts the anchor
@@ -5301,7 +5301,7 @@ the bare arm's, and the guard was green on it.
 
 Not fixed because the anchoring rule was measured and rejected: see the closed
 `SAG-A17` above and §1.2 of
-`docs/implementation_plan_2026-11-09_bare_name_citations.md`. The honest
+`docs/unused-docs/implementation_plan_2026-11-09_bare_name_citations.md`. The honest
 options are a per-document convention (declare the file a table's bare names
 belong to, in the document) or leaving it as the weaker check it is. The first
 is a documentation change across 34 documents, not a guard change.
@@ -5319,7 +5319,7 @@ to add is that resolver over the bare form, in all four families.
 
 ### SBN-A3 — PD-M14.4 and PD-M14.7 have no automated test, under any name (medium)
 
-Found by repairing `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`:
+Found by repairing `docs/unused-docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`:
 ten of its criteria name tests that were never written. Measured per criterion
 after the cold pass corrected an over-broad first claim:
 
@@ -5350,7 +5350,7 @@ made for the resolver probe.
 
 ### SBN-A5 — T5.3's raising-handler case is not covered (low)
 
-`docs/implementation_plan_2026-08-25_timer_session_endings.md`'s T5.3 is
+`docs/unused-docs/implementation_plan_2026-08-25_timer_session_endings.md`'s T5.3 is
 "topmost restored even when the modal's handler **raises**". The test that
 carries `T5.3` asserts the other half (a parent that was not topmost is left
 alone), and no test in `tests/test_timer_session_endings.py` raises inside a
@@ -5363,7 +5363,7 @@ to zero.
 
 ### SBN-A6 — the plan's §1.2 measurement is not reproducible from the repo (low)
 
-`docs/implementation_plan_2026-11-09_bare_name_citations.md`'s anchoring table
+`docs/unused-docs/implementation_plan_2026-11-09_bare_name_citations.md`'s anchoring table
 (206/257/390, 754/356/283, 814/556/23) is the measurement that rejected
 `SAG-A17`'s recommended fix, and it was taken with a scratch script that is not
 committed. The rule it chose instead is asserted by tests; the argument for
@@ -5392,8 +5392,8 @@ requests, so a reader following the document would have set up a process nobody
 here uses.
 
 **Closed 2026-11-09 by the MAW batch**
-(`docs/implementation_plan_2026-11-09_retired_agent_apparatus.md`,
-`docs/changes/2026-11-09-retired-agent-apparatus.md`). The document is
+(`docs/unused-docs/implementation_plan_2026-11-09_retired_agent_apparatus.md`,
+`docs/unused-docs/changes/2026-11-09-retired-agent-apparatus.md`). The document is
 **deleted** rather than rewritten, with the measurement for why: of its 70
 lines, 35 described the retired workflow and the other 35 were a third copy of
 rules `CLAUDE.md` and `AGENTS.md` each already carry in full. Three copies is
@@ -5420,7 +5420,7 @@ would not have caught this one.
 ### ~~GSF-A3 — the `docs/` half of the GSF scanned set is hand-kept (medium)~~
 
 **Closed 2026-11-09 by the LDS batch** (`LDS-M1.1`, plan
-`docs/implementation_plan_2026-11-09_derived_live_document_set.md`). The
+`docs/unused-docs/implementation_plan_2026-11-09_derived_live_document_set.md`). The
 `docs/` half is derived now, by one stated path rule: tracked, one level under
 `docs/`, `*.md`, no ISO date in the name, no "prompt" in it. The scan went from
 17 documents to 41, and the widening cost nothing on the path arm — zero new
@@ -5429,7 +5429,7 @@ one of them `GSF-A4`.
 
 The blocker this item states below dissolved on measurement, and the sentence
 that states it is worth keeping as a lesson: it says
-`docs/SESSION_HANDOFF_2026-02-19.md` and `docs/VPS_UPDATES_2026-01-24.md` are
+`docs/unused-docs/SESSION_HANDOFF_2026-02-19.md` and `docs/unused-docs/VPS_UPDATES_2026-01-24.md` are
 "records with no date-shaped prefix". They are records with an ISO date in the
 middle of the name, which a rule that reads the whole name sees perfectly
 well. The item had looked for a *prefix* convention and concluded none existed.
@@ -5450,8 +5450,8 @@ names in it. Of the 36 Markdown files directly under `docs/` that are not dated
 records, 30 are outside both GSF guards, so a new live document there is
 unchecked until someone adds it — and nothing announces that. The blocker is
 that no path rule separates a live reference document under `docs/` from a
-dated record or a one-off prompt: `docs/SESSION_HANDOFF_2026-02-19.md`,
-`docs/prompt-test-suite-remediation.md` and `docs/VPS_UPDATES_2026-01-24.md`
+dated record or a one-off prompt: `docs/unused-docs/SESSION_HANDOFF_2026-02-19.md`,
+`docs/prompt-test-suite-remediation.md` and `docs/unused-docs/VPS_UPDATES_2026-01-24.md`
 are all records with no date-shaped prefix. A naming convention for new
 documents, enforced by a test, would let the set be derived in full.
 
@@ -5552,10 +5552,10 @@ this is filed as a decision rather than done.
 
 ### LDS-A1 — a 2026-11-08 plan has neither a handoff note nor a coverage record (medium)
 
-`docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md` cites a
-coverage snapshot — docs/spec_coverage_2026-11-08_priority_defaults_and_cap.md,
+`docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md` cites a
+coverage snapshot — docs/unused-docs/spec_coverage_2026-11-08_priority_defaults_and_cap.md,
 written here without backticks because it is not a file — and a handoff note
-under `docs/changes/`. Neither exists, under that or any other name:
+under `docs/unused-docs/changes/`. Neither exists, under that or any other name:
 `git ls-files docs | grep -i priority_defaults` finds only the plan. Every
 other plan of that week has both. The repo's own agreement is that a batch is
 not done without the note, so either the batch was never built or its records
@@ -5564,7 +5564,9 @@ way. Found by the LDS measurement of what scanning the dated records would
 cost (§1.4 of its plan). It needs those items read against the code, not their
 citations rewritten, which is why it is filed.
 
-### LDS-A3 — two hand-kept lists were reintroduced by the batch that removed one (low)
+### ~~ LDS-A3 — two hand-kept lists were reintroduced by the batch that removed one (low)~~
+
+**Closed 2026-11-09:** moot. The guard this was filed against is deleted — records are filed, not tested.
 
 `PROSE_CITATION_GUARD_IDS` in `tests/test_repo_hygiene.py` is four ids with
 nothing asserting it is complete, so a prose guard added later is simply absent
@@ -5576,7 +5578,9 @@ still needed, so `PROBE.md` now exempts that name across all 41 documents for
 good. Found by a cold pass. Both are the same shape as the hand-kept tuple
 `LDS-M1.1` removed.
 
-### LDS-A4 — "prompt" is an unanchored substring in the derivation (low)
+### ~~ LDS-A4 — "prompt" is an unanchored substring in the derivation (low)~~
+
+**Closed 2026-11-09:** moot. The guard this was filed against is deleted — records are filed, not tested.
 
 `_derived_docs_dir_live_docs` drops any name containing "prompt", so a future
 reference document called docs/prompting_guide.md or docs/user_prompts.md —
@@ -5585,17 +5589,21 @@ leaves every citation guard with no signal at all. Only one direction is
 asserted. The ISO-date rule has the same edge and is harder to trip. Found by
 a cold pass.
 
-### LDS-A5 — `stated_convention_count` tops out at ten (low)
+### ~~ LDS-A5 — `stated_convention_count` tops out at ten (low)~~
+
+**Closed 2026-11-09:** moot. The guard this was filed against is deleted — records are filed, not tested.
 
 `_COUNT_WORDS` covers one to ten; an eleventh convention makes the count
 `None` and the failure message read "the section says there are None
 conventions". Found by a cold pass.
 
-### LDS-A6 — `LDS-A1`'s "or any other name" is not established (low)
+### ~~ LDS-A6 — `LDS-A1`'s "or any other name" is not established (low)~~
+
+**Closed 2026-11-09:** moot. The guard this was filed against is deleted — records are filed, not tested.
 
 `LDS-A1` says the 2026-11-08 plan's handoff note does not exist "under that or
-any other name". `docs/changes/2026-11-08-pri-tests.md` and
-`docs/changes/2026-11-08-priority-level-colours.md` do exist and may be the
+any other name". `docs/unused-docs/changes/2026-11-08-pri-tests.md` and
+`docs/unused-docs/changes/2026-11-08-priority-level-colours.md` do exist and may be the
 same work; the item's own grep would not have found either. The finding stands
 — the cited names do not exist — but the clause overstates what was measured.
 Found by a cold pass.
@@ -5603,7 +5611,7 @@ Found by a cold pass.
 ### LDS-A2 — the dated records and the prompt documents are outside every citation guard (low)
 
 The LDS rule excludes them deliberately, measured: scanned as well, the 50
-dated `docs/*.md` files and the 151 notes under `docs/changes/` report 13
+dated `docs/*.md` files and the 151 notes under `docs/unused-docs/changes/` report 13
 unresolvable citations, and 11 were true when they were written — seven name
 the workflow document deleted on 2026-11-09, four are forward references to a
 note the plan was about to produce. A guard that fails because a 2026-06-06

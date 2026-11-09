@@ -10,7 +10,7 @@ relaunch — on `refs/heads/claude/elegant-neumann-ab55c9`, merged at
 `2fac9b3`. M7.2 and M7.3 stay at
 `partial` and `not done` until §11 is walked again, steps 11 to 13
 included.** Per-criterion status is in §10; the follow-up plan is
-`docs/implementation_plan_2026-11-08_unified_panel_followups.md`.
+`docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md`.
 IDs: `UPD-M1` … `UPD-M7`, then `UPD-F1` … `UPD-F4`. Use them verbatim in
 commits, docstrings and test names.
 
@@ -837,7 +837,7 @@ Every test in `tests/test_unified_panel_design.py` still builds its screen on
 a withdrawn root, which is what keeps a full run off the user's screen and is
 why none of them could answer M7.2 or M7.3 in the first place. What the walk
 found is four items, `UPD-F1` to `UPD-F4`, in
-`docs/implementation_plan_2026-11-08_unified_panel_followups.md`; the one
+`docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md`; the one
 defect among them is that no column width or divider position survives a
 relaunch.
 
@@ -847,7 +847,7 @@ relaunch.
 
 Approved 2026-11-08. The plan, with every criterion and the two corrections
 made to it against the code, is
-`docs/implementation_plan_2026-11-08_unified_panel_followups.md`.
+`docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md`.
 
 | ID | Status | Where |
 |---|---|---|
