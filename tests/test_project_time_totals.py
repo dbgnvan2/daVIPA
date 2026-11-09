@@ -4,7 +4,7 @@ Purpose: PT1-PT3 — how many timer sessions a project has absorbed and how long
          they came to. Both derived from work_logs rather than stored, because a
          counter column is a status field that can disagree with the rows it
          summarises (P6).
-Spec:    docs/implementation_plan_2026-08-25_project_time_totals.md#acceptance-criteria
+Spec:    docs/unused-docs/implementation_plan_2026-08-25_project_time_totals.md#acceptance-criteria
 Tests:   this file
 
 ProjectBoard.savor_count is a different quantity — completed deliverables, used

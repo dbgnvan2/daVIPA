@@ -1,6 +1,6 @@
 """PL8–PL10 — the Action Item editor layout rework.
 
-Spec: docs/implementation_plan_2026-08-19_item_editor_project_link.md
+Spec: docs/unused-docs/implementation_plan_2026-08-19_item_editor_project_link.md
 
 Driven through a real dialog against a mocked DatabaseManager, because the
 claims here are about *where* controls sit — a stub cannot answer that. Grid

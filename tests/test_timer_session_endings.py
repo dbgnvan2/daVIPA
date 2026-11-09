@@ -5,7 +5,7 @@ Purpose: T1 — "Save Related - Close Timer" wrote its work log and left the
          stubs CompletionNoteDialog out, and the modal is the *only* thing that
          differs between Save Related (which failed to close) and Cancel (which
          closed), so the defect had no way to fail a test.
-Spec:    docs/implementation_plan_2026-08-25_timer_session_endings.md#acceptance-criteria
+Spec:    docs/unused-docs/implementation_plan_2026-08-25_timer_session_endings.md#acceptance-criteria
 Tests:   this file
 
 These build real TimerWindows on a real DatabaseManager, withdrawn like every

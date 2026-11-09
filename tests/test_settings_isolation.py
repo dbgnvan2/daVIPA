@@ -10,7 +10,7 @@ the same copy the fixture patched — and passed while the *other* module object
 So it asserts both class objects now, and it exercises the session hooks in a
 nested pytest run rather than trusting that they work.
 
-Spec: docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
+Spec: docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
 """
 
 import importlib

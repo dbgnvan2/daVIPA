@@ -2,7 +2,7 @@
 
 Purpose: hold update_time_block, the slot-aware writes, and the
          exact-start-date item query to their stated behaviour.
-Spec:    docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
 Tests:   this file
 
 **The reorder and repack tests that used to be most of this file are gone**,
@@ -653,7 +653,7 @@ def test_pdm55_every_date_is_renumbered_not_only_the_one_on_screen(manager):
 def test_cem12_calendar_event_id_round_trips(manager):
     """CE-M1.2 — the column is written by both writers and read back.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
     Tests: this test
     """
     block_id = _add(manager, 30, "exported")
@@ -673,7 +673,7 @@ def test_cem12_calendar_event_id_round_trips(manager):
 def test_cem12_a_row_without_the_column_still_reads(manager):
     """CE-M1.2 — a projection that leaves the column out must not raise.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
     Tests: this test
 
     Behavioural stand-in for a row selected before the migration ran: a
@@ -699,7 +699,7 @@ def test_cem12_a_row_without_the_column_still_reads(manager):
 def test_cem13_recording_an_event_id_leaves_the_block_where_it_was(manager):
     """CE-M1.3 — the narrow writer writes one column and moves nothing.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
     Tests: this test
 
     The exporter reads a day, talks to Google, and comes back to write ids. A
@@ -738,7 +738,7 @@ def test_cem13_recording_an_event_id_leaves_the_block_where_it_was(manager):
 def test_cem13_an_edit_does_not_erase_the_event_id(manager):
     """CE-M1.3 — ``update_time_block`` leaves the event id alone.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
     Tests: this test
 
     The screen holds block objects it loaded when the day was drawn. Export
@@ -785,7 +785,7 @@ def test_cem13_recording_an_event_id_touches_one_block(manager):
 def test_cem12b_the_event_calendar_round_trips(tmp_path):
     """CE-M1.2 — the calendar is stored and read back with the id.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
     Tests: this test
 
     An id with no calendar is not usable: the export has to know where to look
@@ -822,7 +822,7 @@ def test_cem12b_the_event_calendar_round_trips(tmp_path):
 def test_cem12c_clearing_the_id_clears_the_calendar_with_it(tmp_path):
     """CE-M1.2 — a recorded calendar with no event is not a state we produce.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m12
     Tests: this test
 
     The sweep clears the id when it removes an event. A calendar left behind

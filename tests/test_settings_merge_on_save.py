@@ -3,7 +3,7 @@
 Purpose: prove ``AppSettings.save`` no longer reverts a field another object
          changed, so a width or split ratio written on one tab is still in the
          file after a different screen's object saves.
-Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
+Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#2-upd-f1
 Tests:   this file
 
 Every test here points ``get_settings_path`` at ``tmp_path``. The default

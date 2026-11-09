@@ -691,7 +691,7 @@ def test_pl11_1_followup_aborts_on_save_failure(monkeypatch):
 
     This guard used to live on the removed Duplicate button only; the merged
     path is the one that has to carry it now.
-    Spec: docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl11
+    Spec: docs/unused-docs/implementation_plan_2026-08-19_item_editor_project_link.md#pl11
     """
     import src.getmoredone.screens.item_editor as ie
     real = ie.ItemEditorDialog.create_followup

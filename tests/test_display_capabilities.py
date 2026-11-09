@@ -4,7 +4,7 @@ Purpose: CIG-M1 — one shared precondition for every test that sets a window
          attribute and reads it back, so a display with no window manager
          produces a skip with a reason rather than a failure that looks like a
          bug in the application.
-Spec:    docs/implementation_plan_2026-11-09_ci_green.md#2-acceptance-criteria--tests
+Spec:    docs/unused-docs/implementation_plan_2026-11-09_ci_green.md#2-acceptance-criteria--tests
 Tests:   this file
 """
 

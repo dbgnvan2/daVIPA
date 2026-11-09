@@ -1,7 +1,7 @@
 """The AST helpers must be able to say no — and must not say yes to prose.
 
 Purpose: prove tests/source_asserts.py is not a no-op that passes on anything.
-Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md
+Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md
 Tests:   this file
 
 Every converted assertion in the suite reads ``assert calls_attribute(...)``.

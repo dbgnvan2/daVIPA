@@ -2832,7 +2832,7 @@ def test_updf31_the_checkbox_column_is_headed_pick():
     """UPD-F3.1 — the first header cell on Week Assignment's left panel reads Pick.
 
     Purpose: the heading the user asked for is the one the header renders.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#4-upd-f3
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#4-upd-f3
     Tests:   this test
 
     Asserted on the rendered header rather than on `APE_LEFT_COLUMNS`, because
@@ -2853,7 +2853,7 @@ def test_updf32_the_pick_column_fits_its_heading_and_has_no_handle():
     """UPD-F3.2 — Pick fits the column it is declared in, and cannot be dragged.
 
     Purpose: the heading is not clipped, and the column stays fixed-width.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#4-upd-f3
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#4-upd-f3
     Tests:   this test
 
     Measured in the header's own font rather than compared against a number
@@ -2895,7 +2895,7 @@ def test_updf33_the_checkbox_still_toggles_in_the_same_column():
     """UPD-F3.3 — naming the column left the checkbox and its wiring alone.
 
     Purpose: the only thing UPD-F3 changed is a word.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#4-upd-f3
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#4-upd-f3
     Tests:   this test
 
     The widget is driven, not its `BooleanVar`: setting the variable directly
@@ -2923,7 +2923,7 @@ def test_updf34_every_ape_left_panel_says_pick():
     """UPD-F3.4 — all four panels built from APE_LEFT_COLUMNS, not three.
 
     Purpose: the heading is the same on every panel that shares the set.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#4-upd-f3
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#4-upd-f3
     Tests:   this test
 
     The plan said three panels share `APE_LEFT_COLUMNS`. Four do — Annual Plan
@@ -3003,7 +3003,7 @@ def test_updf21_the_filters_are_on_their_own_row(tmp_path):
 
     Purpose: UPD-F2.1 — the filters are on a line of their own, not sharing
              the controls row, on every tab that has them.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
     Tests:   tests/test_unified_panel_design.py::test_updf21_the_filters_are_on_their_own_row
 
     Asserted against the rendered widgets' real grid placement, so the claim
@@ -3039,7 +3039,7 @@ def test_updf22_the_header_card_is_three_rows_deep(tmp_path):
     """UPD-F2.2 — title, then controls, then filters: three rows, in that order.
 
     Purpose: UPD-F2.2 — the depth the user counted is three lines.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
     Tests:   tests/test_unified_panel_design.py::test_updf22_the_header_card_is_three_rows_deep
 
     The title is found by its font size rather than its text, so the
@@ -3063,7 +3063,7 @@ def test_updf23_every_tab_puts_its_filter_row_in_the_same_place(tmp_path):
     """UPD-F2.3 — one assertion over the set, so no tab can drift on its own.
 
     Purpose: UPD-F2.3 — the depth is the same on all five tabs.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
     Tests:   tests/test_unified_panel_design.py::test_updf23_every_tab_puts_its_filter_row_in_the_same_place
 
     The five tabs are collected into one set of (title row, filter row)
@@ -3092,7 +3092,7 @@ def test_updf24_the_tab_with_no_filters_is_the_same_depth(tmp_path):
 
     Purpose: UPD-F2.4 — the blank line the user asked for, one combo deep, so
              the body of this tab starts where the body of the others does.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
     Tests:   tests/test_unified_panel_design.py::test_updf24_the_tab_with_no_filters_is_the_same_depth
 
     The height is asserted against the same constant the filtered tabs' own
@@ -3132,7 +3132,7 @@ def test_updf25_the_status_line_moved_below_the_filters(tmp_path):
     Purpose: UPD-F2.5 — nothing in the header card changed but where the rows
              sit: the same controls in the same order, and the status line
              below the filters rather than beside them.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#3-upd-f2
     Tests:   tests/test_unified_panel_design.py::test_updf25_the_status_line_moved_below_the_filters
 
     Week Assignment had its status label on the controls row at column 12 and
@@ -3188,7 +3188,7 @@ def test_updf41_a_divider_move_rescales_every_resizable_column():
 
     Purpose: UPD-F4.1 — moving the divider rescales every resizable column in
              proportion to its stored width.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
     Tests:   tests/test_unified_panel_design.py::test_updf41_a_divider_move_rescales_every_resizable_column
 
     Proportion, not equal shares: a user who has made Segment twice the width
@@ -3240,7 +3240,7 @@ def test_updf41_the_divider_is_wired_to_both_panels():
     Purpose: UPD-F4.1 — the wiring, which the fit itself cannot show: a
              correct `fit_to_panel` that nothing calls is the behaviour the
              user reported.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
     Tests:   tests/test_unified_panel_design.py::test_updf41_the_divider_is_wired_to_both_panels
 
     Driven through a stand-in body rather than a real one: a withdrawn root
@@ -3326,7 +3326,7 @@ def test_updf42_a_fixed_column_keeps_its_width_when_the_panel_moves():
 
     Purpose: UPD-F4.2 — a fixed column holds a checkbox or a pair of buttons,
              whose size does not depend on how wide the panel is.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
     Tests:   tests/test_unified_panel_design.py::test_updf42_a_fixed_column_keeps_its_width_when_the_panel_moves
 
     Both directions: a panel twice as wide and one half as wide. A fit that
@@ -3352,7 +3352,7 @@ def test_updf43_no_column_goes_below_five_characters():
 
     Purpose: UPD-F4.3 — the width the user named: "down to 5 character
              widths", and no narrower.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
     Tests:   tests/test_unified_panel_design.py::test_updf43_no_column_goes_below_five_characters
 
     The floor is asserted against `min_column_width()` rather than against 40,
@@ -3400,7 +3400,7 @@ def test_updf44_a_panel_too_narrow_for_the_floor_surfaces_it(caplog):
     Purpose: UPD-F4.4 — the adversarial case. A fit that returned a negative
              or zero width here would look like it had worked, and the panel
              would render columns of nothing with no record of why.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
     Tests:   tests/test_unified_panel_design.py::test_updf44_a_panel_too_narrow_for_the_floor_surfaces_it
 
     The number is checked, not just its truthiness: the shortfall is what
@@ -3454,7 +3454,7 @@ def test_updf43b_the_floor_suspends_the_shape_it_does_not_destroy_it():
              the squeeze permanent: the panel comes back wide and the columns
              come back equal, with the 135/155/125 shape gone for good and
              nothing logged about losing it.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
     Tests:   tests/test_unified_panel_design.py::test_updf43b_the_floor_suspends_the_shape_it_does_not_destroy_it
 
     Found by the csdp sweep's cold pass. Not reachable through the shipped
@@ -3532,7 +3532,7 @@ def test_updf45_a_drag_still_moves_only_its_own_column():
     Purpose: UPD-F4.5 — UPD-F4 adds a second writer to the same widths, and
              the failure to guard against is a fit running on the back of a
              drag and undoing it.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
     Tests:   tests/test_unified_panel_design.py::test_updf45_a_drag_still_moves_only_its_own_column
 
     The drag is taken after a fit, so the widths it starts from are fitted
@@ -3565,7 +3565,7 @@ def test_updf46_stored_widths_survive_a_different_window_size():
     Purpose: UPD-F4.6 — step 10 of the walk asked for the sizing to come
              back; step 7 asked for it to follow the divider. Both hold only
              if the stored number is read as a weight.
-    Spec:    docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-08_unified_panel_followups.md#5-upd-f4
     Tests:   tests/test_unified_panel_design.py::test_updf46_stored_widths_survive_a_different_window_size
 
     The second build is the relaunch, at a panel 300px wider than the one the

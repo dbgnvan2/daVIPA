@@ -14,7 +14,7 @@ the source text for a name that no longer existed.
 Rewritten to assert, and to exercise behaviour rather than grep source wherever
 that is cheap.
 
-Spec: docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
+Spec: docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
 """
 
 import inspect

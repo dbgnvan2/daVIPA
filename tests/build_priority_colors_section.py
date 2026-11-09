@@ -4,7 +4,7 @@ Purpose: PLC-M3 -- every other test of this section calls the mixin's handlers
          against stand-ins, so none of them would catch a bad ``grid`` call, a
          widget option CustomTkinter rejects, or a ``fg_color`` Tk will not
          take. Those only show when the user opens Settings.
-Spec:    docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m3
+Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m3
 Tests:   tests/test_priority_level_colors.py::test_plcm3_the_section_builds_on_real_widgets
 
 Run in a **subprocess** by that test, for the reason

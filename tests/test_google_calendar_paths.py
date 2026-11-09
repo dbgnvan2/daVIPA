@@ -3,7 +3,7 @@
 Purpose: constructing the manager must read its arguments before it touches the
          filesystem, and the three sites that resolve a default path must all
          resolve to the same one.
-Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-3
+Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-3
 Tests:   this file
 
 BI3. ``__init__`` used to run::

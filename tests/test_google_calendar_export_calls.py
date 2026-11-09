@@ -2,7 +2,7 @@
 
 Purpose: hold the four event calls to one calendar id, one marker, one retry
          rule and one timeout.
-Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#m3
+Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#m3
 Tests:   this file
 
 **Nothing here authenticates and nothing here reaches the network.** The
@@ -141,7 +141,7 @@ def no_real_sleeping(monkeypatch):
 def test_cem311_the_calendar_id_reaches_every_call():
     """CE-M3.1 — create, read, update, delete and list all honour it.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m31
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m31
     Tests: this test
 
     All five in one test on purpose: the bug this prevents is one call left
@@ -180,7 +180,7 @@ def test_cem311a_the_default_calendar_is_still_primary():
 def test_cem321_two_pages_are_both_returned():
     """CE-M3.2 — a single page is not a complete answer (E6).
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m32
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m32
     Tests: this test
 
     A sweep that read one page would leave the rest of the day's orphans on
@@ -200,7 +200,7 @@ def test_cem321_two_pages_are_both_returned():
 def test_cem322_only_our_own_marked_events_are_requested():
     """CE-M3.2 — the query asks for this app's events for that date, and single ones.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m32
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m32
     Tests: this test
 
     Selected by the marker rather than a time window: the marker carries the
@@ -222,7 +222,7 @@ def test_cem322_only_our_own_marked_events_are_requested():
 def test_cem331_create_writes_the_block_marker():
     """CE-M3.3 — and writes it private, where a calendar's viewers cannot see it.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m33
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m33
     Tests: this test
     """
     service = FakeService()
@@ -254,7 +254,7 @@ def test_cem331a_an_event_with_no_marker_asked_for_carries_none():
 def test_cem332_update_preserves_the_marker():
     """CE-M3.3 — an update must not strip the marker off an event it edits.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m33
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m33
     Tests: this test
 
     If it did, the next export would list the day, fail to recognise its own
@@ -282,7 +282,7 @@ def test_cem332_update_preserves_the_marker():
 def test_cem341_a_503_is_retried_then_succeeds(no_real_sleeping):
     """CE-M3.4 — a transient failure gets another go, with backoff (E5, P1).
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests: this test
     """
     service = FakeService(errors={"insert": [_http_error(503), None]})
@@ -299,7 +299,7 @@ def test_cem341_a_503_is_retried_then_succeeds(no_real_sleeping):
 def test_cem342_a_404_is_not_retried_and_says_the_event_is_gone(no_real_sleeping):
     """CE-M3.4 — 404 is an answer, not a hiccup.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests: this test
 
     The distinct exception is what lets the exporter re-create an event the
@@ -347,7 +347,7 @@ def test_cem342b_a_retryable_status_that_runs_out_is_reported(no_real_sleeping):
 def test_cem345_a_timeout_is_retried_then_succeeds(no_real_sleeping):
     """CE-M3.4 — the failure the timeout itself creates is retried (E5, P1).
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests: this test
 
     Found by a cold review pass: the helper caught `HttpError` and nothing
@@ -400,7 +400,7 @@ def test_cem345b_a_disk_error_is_not_mistaken_for_a_network_one(no_real_sleeping
 def test_cem343_every_event_call_goes_through_the_retry_helper():
     """CE-M3.4 — all of them, by count, not a floor.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests: this test
 
     Read off the AST rather than the text, and asserted as an exact set: the
@@ -452,7 +452,7 @@ def test_cem343_every_event_call_goes_through_the_retry_helper():
 def test_cem344_the_transport_carries_a_timeout(monkeypatch):
     """CE-M3.4 / E1 — the service is built on an http with a timeout.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests: this test
 
     Without it a background export can hang forever, which in this app means
@@ -516,7 +516,7 @@ def auth_paths(tmp_path, monkeypatch):
 def test_cem346_a_non_interactive_client_refuses_instead_of_prompting(auth_paths):
     """CE-M4.4 / E3 — a token that is present but unusable must not open a browser.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
     Tests: this test
 
     Found by a cold review pass, as a blocker. The Plan screen refuses the
@@ -539,7 +539,7 @@ def test_cem346_a_non_interactive_client_refuses_instead_of_prompting(auth_paths
 def test_cem346a_an_interactive_client_still_signs_in(auth_paths):
     """CE-M4.4 / E3 — the flag is what decides, not a missing code path.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
     Tests: this test
 
     The paired test. `test_cem346` would also pass if the sign-in branch were
@@ -560,7 +560,7 @@ def test_cem346a_an_interactive_client_still_signs_in(auth_paths):
 def test_cem347_the_insert_body_carries_the_wall_clock_times_and_a_real_zone():
     """CE-M3.4b — the one place a block becomes an instant on a calendar.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests: this test
 
     Everything above this asserts `ExportEntry.start`, which is a datetime the
@@ -592,7 +592,7 @@ def test_cem347_the_insert_body_carries_the_wall_clock_times_and_a_real_zone():
 def test_cem347a_the_update_body_carries_them_too():
     """CE-M3.4b — a moved block is re-timed by the same three strings.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests: this test
     """
     service = FakeService(stored={"id": "evt-1", "summary": "was"})
@@ -617,7 +617,7 @@ def test_cem347a_the_update_body_carries_them_too():
 def test_cem35_the_caller_decides_the_reminders():
     """CE-M3.5 — the ten-minute popup is a default, not a law.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m35
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m35
     Tests: this test
 
     The meeting dialog has always wanted a popup and still gets one. The Plan
@@ -646,7 +646,7 @@ def test_cem35_the_caller_decides_the_reminders():
 def test_cem348_a_lost_insert_response_does_not_make_a_second_event():
     """CE-M3.4b — a retried insert must not leave two events behind.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests: this test
 
     The sequence this guards: the insert reaches Google, Google writes the
@@ -677,7 +677,7 @@ def test_cem348_a_lost_insert_response_does_not_make_a_second_event():
 def test_cem348a_the_insert_carries_one_id_across_its_retries():
     """CE-M3.4b — the same id on every attempt, or the guard is worthless.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests: this test
 
     A body rebuilt per attempt would carry a fresh id each time, and Google
@@ -696,7 +696,7 @@ def test_cem348a_the_insert_carries_one_id_across_its_retries():
 def test_cem348b_two_creates_do_not_share_an_id():
     """CE-M3.4b — one id per insert, not one per process.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests: this test
 
     A constant id would make the *second* block of a day a 409, and the
@@ -715,7 +715,7 @@ def test_cem348b_two_creates_do_not_share_an_id():
 def test_cem349_a_403_rate_limit_is_retried_then_succeeds(no_real_sleeping):
     """CE-M3.4b — a throttled call does not always arrive as a 429.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests: this test
 
     The Calendar API reports per-user rate limits as a 403 with a reason. A
@@ -738,7 +738,7 @@ def test_cem349_a_403_rate_limit_is_retried_then_succeeds(no_real_sleeping):
 def test_cem349a_a_403_that_is_a_real_refusal_is_not_retried():
     """CE-M3.4b — "no" is still "no", and retrying it only costs the user time.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests: this test
     """
     service = FakeService(errors={"insert": [_http_error(403, reason="forbidden")]})
@@ -753,7 +753,7 @@ def test_cem349a_a_403_that_is_a_real_refusal_is_not_retried():
 def test_cem349b_an_unreadable_error_body_leaves_the_status_to_decide():
     """CE-M3.4b — reading the reason must not become a way to fail.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m34
     Tests: this test
 
     The body is googleapiclient's, and an error page from a proxy is not JSON

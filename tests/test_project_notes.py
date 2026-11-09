@@ -1,6 +1,6 @@
 """Tests for the Project Notes feature.
 
-Spec: docs/implementation_plan_2026-06-06_project_notes.md
+Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md
 
 GUI tests skip cleanly when customtkinter / a display is unavailable.
 Run under the project venv:

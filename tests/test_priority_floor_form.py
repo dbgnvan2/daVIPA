@@ -1,7 +1,7 @@
 """PRI-M1.7, PRI-M1.8 and PRI-M2.6 — what the two priority editors show.
 
-Spec: docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md
-Plan: docs/implementation_plan_2026-11-08_pri_tests.md
+Spec: docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md
+Plan: docs/unused-docs/implementation_plan_2026-11-08_pri_tests.md
 
 The model-side tests live in ``tests/test_priority_floor_and_cap.py``. These
 three are about the screen, because two of the criteria are only about the

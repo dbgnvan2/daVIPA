@@ -2,7 +2,7 @@
 
 Purpose: hold the level rule, the settings that colour it, the Settings tab
          that edits them, and the fill the five list screens draw.
-Spec:    docs/implementation_plan_2026-11-08_priority_level_colours.md
+Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md
 Tests:   this file
 
 Before this batch the rule ``item.importance == 20 or item.urgency == 20`` was

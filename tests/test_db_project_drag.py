@@ -131,7 +131,7 @@ def _seed_unlinked(db_mgr, count: int, prefix: str = "Unlinked") -> list[str]:
 def test_bp5_unlinked_items_are_capped_and_the_drop_is_countable(db_manager):
     """The Scheduler's list is capped; the count query still sees everything.
 
-    Spec: docs/implementation_plan_2026-08-19_backlog_clearance.md#bp5
+    Spec: docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp5
 
     Real-scale: the default cap is 500, so the fixture has to exceed it or the
     cap never fires and the test proves nothing (P9).

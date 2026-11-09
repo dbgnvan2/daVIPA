@@ -16,7 +16,7 @@ Purpose: a test that sets ``-topmost`` or ``-alpha`` on a window that is
          different is that they map their window first (they take the
          ``mapped_windows`` fixture). `CIG-A2` is the proper fix for the two
          that skip: map them too, and assert there as well.
-Spec:    docs/implementation_plan_2026-11-09_ci_green.md#2-acceptance-criteria--tests (CIG-M1)
+Spec:    docs/unused-docs/implementation_plan_2026-11-09_ci_green.md#2-acceptance-criteria--tests (CIG-M1)
 Tests:   tests/test_display_capabilities.py
 
 The probe builds a real window and asks the display, rather than reading

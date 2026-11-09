@@ -1,6 +1,6 @@
 """The editor must not report success for a row that no longer exists.
 
-Spec: docs/implementation_plan_2026-08-19_backlog_clearance.md#bp3
+Spec: docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp3
 
 `ItemEditorDialog.__init__` does `self.item = db_manager.get_action_item(item_id)`
 and leaves `item_id` set when that returns None — the row was deleted from a

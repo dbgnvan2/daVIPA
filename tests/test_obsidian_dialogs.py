@@ -10,7 +10,7 @@ migrations, the Weekly Tactic dedupe (which deletes rows) and the invariant
 repair (which moves dates). A test suite must never touch production data.
 Every database here is a temporary one.
 
-Spec: docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
+Spec: docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
 """
 
 import inspect

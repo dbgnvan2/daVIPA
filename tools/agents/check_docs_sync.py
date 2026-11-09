@@ -17,6 +17,11 @@ CODE_PREFIXES = ("src/", "tools/", "tests/")
 # reported "no code/dependency changes detected".
 DEPENDENCY_FILES = ("requirements.txt", "requirements-dev.txt")
 DOC_PREFIXES = ("docs/",)
+
+#: Filed records — handoff notes, plans, coverage snapshots, anything dated.
+#: They are history, so writing one does not keep a document current, and a
+#: code change cannot be excused by adding one.
+FILED_PREFIX = "docs/unused-docs/"
 DOC_FILES = {
     "README.md",
     "CHANGELOG.md",
@@ -43,7 +48,6 @@ NO_FILES = "no-files"
 NO_CODE = "no-code"
 PASS = "pass"
 MISSING_DOCS = "missing-docs"
-MISSING_HANDOFF = "missing-handoff"
 
 #: Every outcome ``verdict`` can return, declared rather than inferred.
 #: `tests/test_docs_sync_rule.py` reads this and what `verdict` actually
@@ -52,7 +56,13 @@ MISSING_HANDOFF = "missing-handoff"
 #: of that guard built its own hardcoded list of five names and was therefore
 #: blind to a sixth in either direction: it passed on the broken state and
 #: failed on the correct one (found cold, 2026-11-09).
-OUTCOMES = (NO_FILES, NO_CODE, PASS, MISSING_DOCS, MISSING_HANDOFF)
+#: ``MISSING_HANDOFF`` was a sixth outcome until 2026-11-09: a code change
+#: without a file under the handoff-note directory failed here, which is what
+#: made a note mandatory for every batch. Removed on the user's instruction —
+#: a note is written when it carries something a commit message cannot, not
+#: once per batch. Rule 13 is still enforced: a code change needs a
+#: documentation change.
+OUTCOMES = (NO_FILES, NO_CODE, PASS, MISSING_DOCS)
 
 #: The outcomes that are not a failure. ``SKIPPED`` is deliberately absent:
 #: a range this tool could not read is not an outcome of the rule, it is the
@@ -68,7 +78,7 @@ def verdict(files: Set[str]):
              has no `origin/main` to diff against. The gate it was written for
              runs on `pull_request`, which this repo never produces, so until
              this function existed the rule could not fail anywhere that runs.
-    Spec:    docs/implementation_plan_2026-11-09_status_allow_list.md#2-acceptance-criteria--tests
+    Spec:    docs/unused-docs/implementation_plan_2026-11-09_status_allow_list.md#2-acceptance-criteria--tests
     Tests:   tests/test_docs_sync_rule.py
 
     Returns ``(code, messages)``: one of the names above, and the lines
@@ -85,29 +95,22 @@ def verdict(files: Set[str]):
         return NO_CODE, ["docs-sync: no code/dependency changes detected"]
 
     docs_changed = any(
-        path.startswith(DOC_PREFIXES)
+        (path.startswith(DOC_PREFIXES) and not path.startswith(FILED_PREFIX))
         or path in DOC_FILES
-        or path.startswith("docs/changes/")
         for path in files
     )
-    handoff_changed = any(path.startswith("docs/changes/") for path in files)
 
-    if docs_changed and handoff_changed:
-        return PASS, ["docs-sync: PASS (docs and handoff note present)"]
+    if docs_changed:
+        return PASS, ["docs-sync: PASS (documentation changed with the code)"]
 
     messages = [
         "docs-sync: FAIL",
-        "Code/dependency changes detected but required docs artifacts are missing.",
+        "Code/dependency changes detected but no documentation change.",
+        "- Expected a change in docs/, README.md, CHANGELOG.md, or the master spec",
+        "Changed files:",
     ]
-    if not docs_changed:
-        messages.append(
-            "- Missing docs update (expected change in docs/, README.md, "
-            "CHANGELOG.md, or master spec)")
-    if not handoff_changed:
-        messages.append("- Missing handoff note in docs/changes/")
-    messages.append("Changed files:")
     messages.extend(f"  - {path}" for path in sorted(files))
-    return (MISSING_DOCS if not docs_changed else MISSING_HANDOFF), messages
+    return MISSING_DOCS, messages
 
 
 def main() -> int:

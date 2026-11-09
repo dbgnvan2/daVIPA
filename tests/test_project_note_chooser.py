@@ -1,6 +1,6 @@
 """Tests for the project-tile note chooser (📄 icon → Create / Link dialog).
 
-Spec:    docs/implementation_plan_2026-06-06.md (paper-icon-enhancement)
+Spec:    docs/unused-docs/implementation_plan_2026-06-06.md (paper-icon-enhancement)
 GUI tests skip cleanly when customtkinter / a display is unavailable.
 Run under the project venv:
     ./venv/bin/python -m pytest tests/test_project_note_chooser.py -v

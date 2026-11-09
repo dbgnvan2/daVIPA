@@ -3,7 +3,7 @@
 Purpose: prove block_type and position exist in both halves of the schema (the
          CREATE TABLE and the migration), survive a round trip, and that a row
          written before the migration still reads.
-Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
+Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m1
 Tests:   this file
 
 A planned day is an *order*, not a set of appointments, so `position` is the
@@ -540,7 +540,7 @@ def test_a_legacy_block_whose_own_box_is_full_keeps_its_null(tmp_path):
 def test_cem11_migration_adds_calendar_event_id_idempotently(tmp_path):
     """CE-M1.1 — the column arrives on an upgrading database, exactly once.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
     Tests: this test
 
     The second `initialize_schema` is the point: a guard that checked the
@@ -587,7 +587,7 @@ def test_cem11a_a_fresh_database_declares_calendar_event_id_on_its_own(
 ):
     """CE-M1.1 — the CREATE TABLE half, with the migrations switched off.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
     Tests: this test
 
     Same reason as TB-M1.1a above: every other test here would pass with the
@@ -614,7 +614,7 @@ def test_cem11a_a_fresh_database_declares_calendar_event_id_on_its_own(
 def test_cem11b_migration_adds_the_event_calendar_idempotently(tmp_path):
     """CE-M1.1 — the calendar an event id belongs to, added exactly once.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
     Tests: this test
 
     The second `initialize_schema` matters for the same reason as
@@ -656,7 +656,7 @@ def test_cem11c_a_fresh_database_declares_the_event_calendar_on_its_own(
 ):
     """CE-M1.1 — the CREATE TABLE half of the same column.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m11
     Tests: this test
     """
     monkeypatch.setattr(Database, "_run_migrations", lambda self, conn: None)

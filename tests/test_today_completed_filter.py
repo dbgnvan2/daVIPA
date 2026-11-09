@@ -7,7 +7,7 @@ today's)" as an open bug. It is not open: both paths in
 read off the source, then pinned here — the entry survived because nothing
 asserted the behaviour either way.
 
-Spec: docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
+Spec: docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
 """
 
 from datetime import date, datetime, timedelta

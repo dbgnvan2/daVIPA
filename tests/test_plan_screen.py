@@ -2,7 +2,7 @@
 
 Purpose: prove each control does the thing it claims, against real widgets and
          a real database, rather than merely being rendered.
-Spec:    docs/implementation_plan_2026-11-05_time_blocks.md
+Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md
 Tests:   this file
 
 Real Tk, because a control that is drawn and not connected is exactly the
@@ -1862,7 +1862,7 @@ def test_pdm42_break_buffer_and_lunch_render_in_the_shared_colour(root):
     """PD-M4.2 — the table reaching the screen, for all three kinds.
 
     Purpose: PD-M4 -- one colour for the time that is not work.
-    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m4
 
     A lunch box carried no stripe at all, so "the same colour as a break" had
     nowhere to be: the only thing it coloured was its own row fill, which is
@@ -1937,7 +1937,7 @@ def test_pdm61_a_completed_task_shows_a_check_left_of_the_time(root):
 
     Purpose: PD-M6 -- a completed task is marked where the day is read, at
              the start of the row.
-    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m6
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m6
 
     Left of the time, as a grid column rather than as a glance: a check that
     rendered after the time would still satisfy "the box has a check".

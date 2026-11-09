@@ -10,7 +10,7 @@ The two fixes these guard:
   * the New Vision crash — `CTkMessageBox` replaced with tkinter's `messagebox`
   * segment selection on the planning screen — `selected_segments`
 
-Spec: docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
+Spec: docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
 """
 
 import inspect  # noqa: F401  (kept: other tests in this file still use it)

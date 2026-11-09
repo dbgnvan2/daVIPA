@@ -3,7 +3,7 @@
 Purpose: prove the fixed grid a planned day is drawn on -- which boxes exist,
          how many a block occupies, where a block may be placed, and what
          happens to a block the grid can no longer hold.
-Spec:    docs/implementation_plan_2026-11-05_time_grid.md#m1
+Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#m1
 Tests:   this file
 
 None of this needs a display. The grid is arithmetic, and arithmetic should be

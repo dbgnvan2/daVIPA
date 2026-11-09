@@ -1,6 +1,6 @@
 """BP4 — code retired because nothing in the app called it.
 
-Spec: docs/implementation_plan_2026-08-19_backlog_clearance.md#bp4
+Spec: docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp4
 
 ``complete_and_create`` and ``RescheduleDialog`` each had no caller in ``src/``.
 Both had been kept alive by their own tests, which is how an unreachable path

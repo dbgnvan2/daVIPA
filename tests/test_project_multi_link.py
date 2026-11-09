@@ -1,6 +1,6 @@
 """BP1/BP2 — an Action Item belongs to exactly one Project.
 
-Spec: docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
+Spec: docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp1
 
 The Projects screen's "link existing items" dialog was the last additive
 surface. Making it exclusive means it can now *delete* links, so the tests here

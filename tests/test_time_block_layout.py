@@ -3,7 +3,7 @@
 Purpose: hold the item-to-duration rules, the time parsing, the depth bars,
          the priority bands, the weekday gate and the length ceiling to their
          stated behaviour.
-Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m3
+Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m3
 Tests:   this file
 
 These are pure functions on purpose. Day arithmetic should not need a window to

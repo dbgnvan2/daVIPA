@@ -1,7 +1,7 @@
 """The docs-sync rule, asserted where it can fail before a push.
 
 Purpose: SAG-M2 — `tools/agents/check_docs_sync.py` is the check that says a
-         code change must carry a documentation change and a handoff note. It
+         code change must carry a documentation change. It
          existed only inside `.github/workflows/agent-docs-gate.yml`, which
          triggered on `pull_request`, and this repo's standing instruction is
          to open none. So the rule had never run on the way work ships here,
@@ -21,7 +21,7 @@ Purpose: SAG-M2 — `tools/agents/check_docs_sync.py` is the check that says a
          `SST-A8` said was missing: a test that asked git for the real range
          would skip on CI, because `tests.yml` checks out at depth 1 and has no
          `origin/main` to diff against.
-Spec:    docs/implementation_plan_2026-11-09_status_allow_list.md#2-acceptance-criteria--tests
+Spec:    docs/unused-docs/implementation_plan_2026-11-09_status_allow_list.md#2-acceptance-criteria--tests
 Tests:   this file
 """
 
@@ -57,26 +57,27 @@ def _gate():
 #: made or could make in one commit; the expected outcome is the name `verdict`
 #: returns, not an exit code, because four distinct outcomes share exit code 0.
 CASES = [
-    # The shape this batch itself has: code, docs and a handoff note.
-    (("tools/agents/check_docs_sync.py",
-      "docs/implementation_plan_2026-11-09_status_allow_list.md",
-      "docs/changes/2026-11-09-status-allow-list.md"), "pass"),
-    # Code and documents, and no note. The note is the thing this repo's
-    # working agreement asks for after every batch, so it is asserted apart
-    # from the documents and not folded into them.
-    (("src/getmoredone/db_manager.py", "docs/USER_GUIDE.md"), "missing-handoff"),
-    # Code and a note, no other document.
-    (("src/getmoredone/db_manager.py", "docs/changes/2026-11-09-x.md"), "pass"),
+    # Code with a document beside it.
+    (("tools/agents/check_docs_sync.py", "docs/USER_GUIDE.md"), "pass"),
+    # Code and a document and nothing else is a PASS. Until 2026-11-09 this
+    # was `missing-handoff`: a file under the handoff-note directory was
+    # required too, which is what made a note mandatory per batch. The note is
+    # now written when it carries something a commit message cannot.
+    (("src/getmoredone/db_manager.py", "docs/USER_GUIDE.md"), "pass"),
+    # A filed record is not a documentation change: docs/unused-docs/ is
+    # outside DOC_PREFIXES, so a code change cannot be excused by writing one.
+    (("src/getmoredone/db_manager.py",
+      "docs/unused-docs/changes/2026-11-09-x.md"), "missing-docs"),
     # Code alone.
     (("src/getmoredone/db_manager.py",), "missing-docs"),
-    # Tests count as code: a test-only change still gets a note here.
+    # Tests count as code: a test-only change still needs a document.
     (("tests/test_db_manager.py",), "missing-docs"),
     # Documents alone are not a code change.
     (("docs/USER_GUIDE.md", "README.md"), "no-code"),
     # Nothing at all.
     ((), "no-files"),
     # A dependency file is a code change even with no src/ path — SAG-M2.2.
-    (("requirements.txt", "docs/USER_GUIDE.md"), "missing-handoff"),
+    (("requirements.txt", "docs/USER_GUIDE.md"), "pass"),
     (("requirements-dev.txt",), "missing-docs"),
     # A path under neither tree: the repo root's own documents are in DOC_FILES,
     # but a root script is not code by this rule, which is worth pinning rather

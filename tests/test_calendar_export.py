@@ -3,7 +3,7 @@
 Purpose: hold the exporter to what it claims — the same titles the screen
          draws, the same day twice without duplicates, and exactly one kind of
          event it is allowed to delete.
-Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md
+Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md
 Tests:   this file
 
 **No test here reaches the network.** The client is injected and duck-typed,
@@ -176,7 +176,7 @@ def _item(manager, title, **kwargs):
 def test_cem261_an_event_for_a_deleted_block_is_removed(manager):
     """CE-M2.6 — the block is gone, so its event goes with it.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests: this test
     """
     kept = _block(manager, 0, label="still planned", block_type=BlockType.BREAK)
@@ -198,7 +198,7 @@ def test_cem261_an_event_for_a_deleted_block_is_removed(manager):
 def test_cem262_an_unmarked_event_is_never_deleted(manager):
     """CE-M2.6 — a real meeting is not ours to remove, however much it looks like ours.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests: this test
 
     Adversarial (P7): the meeting is on the exported day, at the exported
@@ -226,7 +226,7 @@ def test_cem262_an_unmarked_event_is_never_deleted(manager):
 def test_cem266_an_event_marked_for_another_day_is_never_deleted(manager):
     """CE-M2.6b — our marker, another day's date: not this run's to remove.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests: this test
 
     Adversarial (P7): by every other rule in the sweep this event *is* an
@@ -255,7 +255,7 @@ def test_cem266_an_event_marked_for_another_day_is_never_deleted(manager):
 def test_cem266a_an_event_with_our_marker_and_no_date_is_still_swept(manager):
     """CE-M2.6b — the date check is a guard, not a blanket pardon.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests: this test
 
     An event carrying a block id of ours but no date at all is still the real
@@ -279,7 +279,7 @@ def test_cem266a_an_event_with_our_marker_and_no_date_is_still_swept(manager):
 def test_cem266b_an_event_whose_properties_are_not_a_dict_is_ignored(manager):
     """CE-M2.6b — a response shape Google never promised must not raise.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests: this test
 
     `extendedProperties` is read off a response, and a response is data, not a
@@ -305,7 +305,7 @@ def test_cem266b_an_event_whose_properties_are_not_a_dict_is_ignored(manager):
 def test_cem35_an_exported_block_inherits_the_user_s_own_reminders(manager):
     """CE-M3.5 — a day of blocks is not a day of meetings.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m35
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m35
     Tests: this test
 
     The literal is asserted rather than the constant: a test that compared the
@@ -323,7 +323,7 @@ def test_cem35_an_exported_block_inherits_the_user_s_own_reminders(manager):
 def test_cem263_a_failed_block_keeps_its_event(manager):
     """CE-M2.6 — a 500 on a block's update must not escalate into a delete.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests: this test
 
     The block is still on the day; the export simply could not reach it this
@@ -372,7 +372,7 @@ def test_cem264_a_duplicate_event_for_a_live_block_is_removed(manager):
 def test_cem266_a_block_the_export_skipped_keeps_its_event(manager):
     """CE-M2.6 — the sweep removes nothing for a block it did not touch.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests: this test
 
     The block is still on the day, and was exported before; this run skips it
@@ -402,7 +402,7 @@ def test_cem266_a_block_the_export_skipped_keeps_its_event(manager):
 def test_cem265_a_sweep_that_cannot_list_is_reported_not_assumed_empty(manager):
     """CE-M2.6 — a failed list is a failure, not "nothing to remove".
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests: this test
     """
     _block(manager, 0, label="tea", block_type=BlockType.BREAK)
@@ -423,7 +423,7 @@ def test_cem265_a_sweep_that_cannot_list_is_reported_not_assumed_empty(manager):
 def test_cem211_an_unplaced_block_is_skipped_and_counted(manager):
     """CE-M2.1 — a block with no box has no honest time, and says so.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m21
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m21
     Tests: this test
     """
     placed = _block(manager, 0, label="on the grid", block_type=BlockType.BUFFER)
@@ -486,7 +486,7 @@ def test_cem214_a_block_with_no_length_is_skipped_and_counted(manager):
 def test_cem215_an_unreadable_stored_clock_time_no_longer_stops_a_block(manager):
     """CE-M2.1 / CE-M2.3 — the box decides, so the stored column cannot break it.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m23
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m23
     Tests: this test
 
     This asserted the opposite until a cold review pass: the export read
@@ -516,7 +516,7 @@ def test_cem215_an_unreadable_stored_clock_time_no_longer_stops_a_block(manager)
 def test_cem215a_a_day_that_cannot_be_parsed_counts_every_block(manager):
     """CE-M2.1 — an unusable date is not an empty day.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m21
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m21
     Tests: this test
 
     The entries list coming back empty would read as "nothing to export" and
@@ -536,7 +536,7 @@ def test_cem215a_a_day_that_cannot_be_parsed_counts_every_block(manager):
 def test_cem216_a_block_the_day_draws_outside_the_grid_is_not_exported(manager):
     """CE-M2.1 — "on the grid" is the grid the user sees, bounds and all.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m21
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m21
     Tests: this test
 
     Found by a cold review pass. The check was `slot_index is not None`, which
@@ -563,7 +563,7 @@ def test_cem216_a_block_the_day_draws_outside_the_grid_is_not_exported(manager):
 def test_cem216a_a_block_under_the_lunch_hour_is_not_exported(manager):
     """CE-M2.1 — the other way `build_day_grid` puts a block outside the day.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m21
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m21
     Tests: this test
 
     Reachable by moving lunch over work already planned, which is why
@@ -589,7 +589,7 @@ def test_cem216a_a_block_under_the_lunch_hour_is_not_exported(manager):
 def test_cem221_every_branch_of_the_title_rule_names_a_block(manager):
     """CE-M2.2 — one rule, five branches, asserted against literals.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m22
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m22
     Tests: this test
 
     Five cases, because each is a different branch of ``block_title``: an item
@@ -642,7 +642,7 @@ def test_cem221_every_branch_of_the_title_rule_names_a_block(manager):
 def test_cem231_a_0930_block_exports_at_0930_local(manager):
     """CE-M2.3 — the event starts when the day says it starts.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m23
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m23
     Tests: this test
 
     Box 3 under an 08:00 day start is 09:30. Asserted as a datetime on the
@@ -678,7 +678,7 @@ def test_cem232_the_items_next_step_travels_with_the_event(manager):
 def test_cem241_export_day_uses_the_client_it_was_given(manager):
     """CE-M2.4 — the seam exists, and the real manager is never constructed.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m24
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m24
     Tests: this test
     """
     import src.getmoredone.google_calendar as google_calendar
@@ -722,7 +722,7 @@ def test_cem242_the_calendar_id_is_passed_to_every_call(manager):
 def test_cem251_a_second_export_updates_and_creates_nothing(manager):
     """CE-M2.5 — the whole point of recording the event id.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
     Tests: this test
     """
     item_id = _item(manager, "Inbox zero")
@@ -786,7 +786,7 @@ def test_cem253_an_event_deleted_in_google_is_made_again(manager):
 def test_cem271_a_failed_block_does_not_stop_the_rest(manager):
     """CE-M2.7 — one block's failure is one block's failure.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m27
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m27
     Tests: this test
     """
     first = _item(manager, "First")
@@ -809,7 +809,7 @@ def test_cem271_a_failed_block_does_not_stop_the_rest(manager):
 def test_cem272_a_failed_create_leaves_the_block_unexported(manager):
     """CE-M2.7 — an id is written from the response, never from the attempt.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m27
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m27
     Tests: this test
     """
     item_id = _item(manager, "Will fail")
@@ -846,7 +846,7 @@ def test_cem273_a_create_that_returns_no_id_is_a_failure(manager):
 def test_cem281_an_empty_day_reports_nothing_to_export(manager):
     """CE-M2.8 — and sends nothing at all.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m28
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m28
     Tests: this test
     """
     client = FakeCalendar()
@@ -862,7 +862,7 @@ def test_cem281_an_empty_day_reports_nothing_to_export(manager):
 def test_cem283_a_cleared_day_still_removes_the_events_it_had(manager):
     """CE-M2.8 — a cancelled plan is the case the sweep exists for.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m28
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m28
     Tests: this test
 
     Found by a cold review pass: the screen refused to run the export at all
@@ -913,7 +913,7 @@ def test_cem282_a_day_exports_only_its_own_blocks(manager):
 def test_cem422_the_summary_line_names_every_skip():
     """CE-M4.2 — the status line the screen shows is honest about all of it.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
     Tests: this test
 
     Built from an outcome directly: this is a statement about the sentence,
@@ -945,7 +945,7 @@ def test_cem422a_a_failure_is_named_in_the_summary_line():
 def test_cem264_a_block_deleted_mid_export_takes_its_new_event_with_it(manager):
     """CE-M2.6 — nothing points at the event, so the event goes.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests: this test
 
     Found by a cold review pass. The export is a background thread and the
@@ -983,7 +983,7 @@ def test_cem264_a_block_deleted_mid_export_takes_its_new_event_with_it(manager):
 def test_cem264a_a_block_deleted_after_its_update_has_its_event_swept(manager):
     """CE-M2.6 — the sweep reads the day as it is now, not as it was.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests: this test
 
     The update path writes nothing to the database, so there is no rowcount to
@@ -1015,7 +1015,7 @@ def test_cem264a_a_block_deleted_after_its_update_has_its_event_swept(manager):
 def test_cem264b_a_failure_to_take_the_event_back_is_reported(manager):
     """CE-M2.6 — and not swallowed, because the event is now unreachable.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests: this test
 
     P1/P2: the delete can fail transiently, and the user has to be told --
@@ -1044,7 +1044,7 @@ def test_cem264b_a_failure_to_take_the_event_back_is_reported(manager):
 def test_cem13a_recording_an_id_for_a_block_that_is_gone_says_so(manager):
     """CE-M1.3 — the setter reports whether it wrote anything.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m13
     Tests: this test
 
     An UPDATE matching no rows is not an error to SQLite, so the exporter had
@@ -1063,7 +1063,7 @@ def test_cem13a_recording_an_id_for_a_block_that_is_gone_says_so(manager):
 def test_cem255_changing_the_export_calendar_moves_the_event(manager):
     """CE-M2.5 — off the old calendar, onto the configured one.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
     Tests: this test
 
     Found by a cold review pass. An event id means nothing except against the
@@ -1098,7 +1098,7 @@ def test_cem255_changing_the_export_calendar_moves_the_event(manager):
 def test_cem255a_the_move_is_not_made_when_the_calendar_is_the_same(manager):
     """CE-M2.5 — the ordinary re-export still updates in place.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
     Tests: this test
 
     The paired test: a move that fired on every export would delete and
@@ -1122,7 +1122,7 @@ def test_cem255a_the_move_is_not_made_when_the_calendar_is_the_same(manager):
 def test_cem255b_a_row_from_before_the_column_is_read_as_the_default(manager):
     """CE-M2.5 — NULL is the default calendar, not an unknown one.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
     Tests: this test
 
     Dirty state (P8): rows written by the first version of the export hold an
@@ -1152,7 +1152,7 @@ def test_cem255b_a_row_from_before_the_column_is_read_as_the_default(manager):
 def test_cem255c_an_event_already_gone_from_the_old_calendar_still_moves(manager):
     """CE-M2.5 — a 404 on the old calendar is the end state we wanted.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
     Tests: this test
 
     P1: the event having been deleted in Google by hand is not a failure of
@@ -1177,7 +1177,7 @@ def test_cem255c_an_event_already_gone_from_the_old_calendar_still_moves(manager
 def test_cem255d_a_move_that_cannot_delete_keeps_the_old_id(manager):
     """CE-M2.5 — a transient failure leaves the block exactly as it was.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m25
     Tests: this test
 
     P1: a 503 on the old calendar must not lose the id, or the old event

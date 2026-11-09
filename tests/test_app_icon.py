@@ -1,6 +1,6 @@
 """Tests for the GMD app-icon setup (replaces the Python launcher rocket).
 
-Spec: docs/changes/2026-08-06-app-dock-icon.md
+Spec: docs/unused-docs/changes/2026-08-06-app-dock-icon.md
 """
 
 import os

@@ -1,6 +1,6 @@
 """PL1–PL7, PL12 — filing an Action Item under a Project from the item editor.
 
-Spec: docs/implementation_plan_2026-08-19_item_editor_project_link.md
+Spec: docs/unused-docs/implementation_plan_2026-08-19_item_editor_project_link.md
 
 The dialog methods are driven with SimpleNamespace stubs (the pattern used by
 tests/test_project_board_dates_ui.py), against a **real** DatabaseManager, so a

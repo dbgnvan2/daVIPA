@@ -232,7 +232,7 @@ def _forbid_resolving_the_real_database():
     """Fail the test that reaches for the real database, at the moment it does.
 
     Purpose: turn a silent write to production data into an immediate error.
-    Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md
+    Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md
     Tests:   tests/test_live_data_guard.py
 
     ``GETMOREDONE_DB`` (set in ``pytest_sessionstart``) already redirects the
@@ -304,7 +304,7 @@ def _isolate_user_settings(tmp_path_factory):
              longer has would be destroyed by a test. One of those tests
              (``test_list_view_setting``) flips a value with no try/finally, so
              a failing assert left the real setting flipped.
-    Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
+    Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#batch-1
     Tests:   tests/test_settings_isolation.py
 
     Session-scoped and autouse, the same shape as the log fixture below: this

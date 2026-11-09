@@ -1,6 +1,6 @@
 """BP3 — one builder assembles a new Action Item, whichever button saves it.
 
-Spec: docs/implementation_plan_2026-08-19_backlog_clearance.md#bp3
+Spec: docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp3
 
 ``save_item`` (the Save button) and ``save_item_if_needed`` ("Create Note",
 "Link Note", the calendar dialog) both insert a brand-new row. They used to

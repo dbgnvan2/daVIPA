@@ -1,7 +1,7 @@
 """No test in this suite may be incapable of failing.
 
 Purpose: keep the suite honest about its own coverage.
-Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md
+Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md
 Tests:   this file
 
 A test that returns a bool, has no check in its body, or asserts a literal is

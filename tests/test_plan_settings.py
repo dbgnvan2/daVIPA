@@ -3,7 +3,7 @@
 Purpose: prove the four day values and the seven weekday flags are coerced on
          load and on save, and that a hand-edited settings file cannot stop the
          app from starting.
-Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
+Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m4
 Tests:   this file
 
 Every test here points ``get_settings_path`` at ``tmp_path``. The default

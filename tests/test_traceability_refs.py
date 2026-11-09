@@ -43,7 +43,7 @@ REPO = Path(__file__).resolve().parents[1]
 # naming tests that had been deleted -- two of them still marked "done". The
 # guard could not see the one document most made of the references it checks.
 # 2026-11-09: the entry was ``docs/spec_coverage.md``, one file. The six
-# ``docs/spec_coverage_*.md`` sidecars were outside the scan, and they hold
+# ``docs/unused-docs/spec_coverage_*.md`` sidecars were outside the scan, and they hold
 # most of this repo's criterion rows — 83 `done` for weekly-tactic scheduling
 # alone. The third cold pass over the SST batch resolved their references by
 # hand and found two dead ones, both on rows marked `done`, one naming a test
@@ -51,7 +51,7 @@ REPO = Path(__file__).resolve().parents[1]
 # column check to the whole family and left this one at the single file.
 # 2026-11-09, second entry of the day: the scan stopped at the coverage family,
 # so a dead citation in a *plan* was outside it. The fifth cold pass over the
-# SAG batch found one by hand — `docs/implementation_plan_2026-06-22.md`'s new
+# SAG batch found one by hand — `docs/unused-docs/implementation_plan_2026-06-22.md`'s new
 # status line named `tests/test_column_resize.py::test_updf13_…`, two test
 # names carried over from the citation it was correcting, against a file that
 # has neither. A guard that reads the coverage rows and not the plans is a
@@ -59,17 +59,25 @@ REPO = Path(__file__).resolve().parents[1]
 # the plan, spec and handoff-note families brought 27 dead references into
 # view, 18 of them after the resolver below was taught the two citation forms
 # these documents actually use.
+# The filed records under `docs/unused-docs/` are deliberately absent. They
+# were in this scan as `implementation_plan_*`, `changes/*` and the coverage
+# sidecars until 2026-11-09, when they were filed away on the user's
+# instruction: a record says what was true on its date, and a pointer in it to
+# a test that has since been deleted is history, not a defect. What is left is
+# code (`src`, `tools`, `conftest.py`) and the live specs — the places where a
+# dangling `Tests:` pointer misleads someone reading to make a change.
 SCANNED = (
     "src",
     "tools",
     "conftest.py",
-    # Subsumed by `docs/spec_*.md` below, and kept because the entry is what
-    # the docstring and `COVERAGE_WITHOUT_PATHS` refer to. Listed first, so
-    # the deduplicating walk attributes those files to it.
-    "docs/spec_coverage*.md",
-    "docs/implementation_plan_*.md",
-    "docs/spec_*.md",
-    "docs/changes/*.md",
+    # `docs/spec_coverage.md` is out of the scan with the filed records, and
+    # for the same reason: its sections are per-batch history, and a row that
+    # names a test deleted two batches later is an accurate record of what
+    # verified that criterion at the time. The live specs stay, because a
+    # dangling `Tests:` pointer in one of those misleads the next change.
+    # `spec_2*` and not `spec_*`: the latter also matched
+    # `docs/spec_coverage.md`, which is the per-batch record and is out.
+    "docs/spec_2*.md",
 )
 SKIP_DIRS = {"venv", ".git", "build", "dist", "__pycache__"}
 
@@ -84,9 +92,7 @@ SKIP_DIRS = {"venv", ".git", "build", "dist", "__pycache__"}
 # comment said the bare arm had brought the file into the domain and credited
 # `SST-A2`, which is a third form — the basename ``test_x.py::name``, still
 # unread and still open. Both claims were false; found by the cold pass.)
-COVERAGE_WITHOUT_PATHS = {
-    "docs/spec_coverage_2026-08-19_rename_safe_links.md",
-}
+COVERAGE_WITHOUT_PATHS: set[str] = set()
 
 # A reference is any tests/... path, wherever it appears. Anchoring on the
 # "Tests:" label matched only the first path on that line, so the 22 references
@@ -202,7 +208,7 @@ def _defined_names(path):
     Test functions and the classes that group them — ``::TestM3UI`` points at
     a class of tests, which is a perfectly good pointer for a reviewer to
     follow — and, since 2026-11-09, the helpers and module constants too. The
-    plan and handoff families cite those: `docs/implementation_plan_2026-08-24_window_leak.md`
+    plan and handoff families cite those: `docs/unused-docs/implementation_plan_2026-08-24_window_leak.md`
     names ``::_make_screen`` in five documents' worth of fixture plumbing, and
     `docs/spec_2026-08-18_downloadable_release.md` names ``::GENERATED_AUDIO``.
     Each of those pointers resolves to a real line a reviewer can read, so
@@ -331,33 +337,10 @@ def test_this_guard_can_actually_fire(tmp_path):
     assert any(name for _src, _target, name in found), (
         "no reference carries a ::test_name, so the name check is inert")
     sources = {str(src) for src, _t, _n in found}
-    for coverage in sorted(REPO.glob("docs/spec_coverage*.md")):
-        name = str(coverage.relative_to(REPO))
-        if name in COVERAGE_WITHOUT_PATHS:
-            assert "tests/" not in coverage.read_text(encoding="utf-8"), (
-                f"{name} is exempted from the check below on the ground that "
-                "it names no test by path, and it now does — drop it from "
-                "COVERAGE_WITHOUT_PATHS so its references get checked")
-            continue
-        assert name in sources, (
-            f"{name} contributes no test reference — either it is outside the "
-            "scan, or its rows have stopped naming their tests. Eight stale "
-            "references hid in docs/spec_coverage.md while it sat outside this "
-            "scan, and two more in the sidecars while they did")
     assert any(src.startswith("src/") for src in sources), (
         "nothing under src/ is being scanned")
-    # One per document family added on 2026-11-09. Membership, not a count:
-    # a count goes red on every batch that writes a plan.
-    for family, label in (
-            ("docs/implementation_plan_", "the implementation-plan family"),
-            ("docs/changes/", "the handoff-note family"),
-    ):
-        assert any(src.startswith(family) for src in sources), (
-            f"no reference comes from {label} — either it is outside the "
-            "scan, or those documents have stopped citing their tests. The "
-            "plans were outside this scan until 2026-11-09, and the fifth "
-            "cold pass over the SAG batch had to find a dead citation in one "
-            "of them by hand")
+    # The plan and handoff families were asserted here until 2026-11-09, when
+    # both were filed away. What is left to guard is code and the live specs.
     assert any(src.startswith("docs/spec_2") for src in sources), (
         "no reference comes from a dated spec document — the docs/spec_*.md "
         "arm of the scan is reading nothing")
@@ -426,12 +409,12 @@ def test_this_guard_can_actually_fire(tmp_path):
     # it hides the narrowing it was written to catch. What has to hold is that
     # each family still yields bare citations — bare_names() going inert would
     # otherwise be a silent pass over a third of this repo's test citations.
+    # Three families were asserted here until 2026-11-09 — the coverage
+    # record, the plans and the handoff notes. All three are per-batch history
+    # and are out of this scan now; the dated specs are what remain.
     bare_sources = {src for src, _n in bare}
     for family, label in (
-            ("docs/spec_coverage", "the coverage family"),
-            ("docs/implementation_plan_", "the implementation-plan family"),
             ("docs/spec_2", "the dated specs"),
-            ("docs/changes/", "the handoff notes"),
     ):
         assert any(src.startswith(family) for src in bare_sources), (
             f"no bare ::name citation is being found in {label}")

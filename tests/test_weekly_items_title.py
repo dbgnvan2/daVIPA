@@ -1,6 +1,6 @@
 """BP6 — a related Action Item is titled what the user typed.
 
-Spec: docs/implementation_plan_2026-08-19_backlog_clearance.md#bp6
+Spec: docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp6
 
 The Weekly Items screen used to compose ``<tactic context> - <title>``. No
 screen has offered a Context field for some time, and ``lineage_for_item``

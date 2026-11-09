@@ -2,7 +2,7 @@
 
 Purpose: prove the control exists on the screen the user actually uses, that
          it refuses clearly, and that it reports the real counts.
-Spec:    docs/implementation_plan_2026-11-08_plan_calendar_export.md#m4
+Spec:    docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#m4
 Tests:   this file
 
 Real Tk, and a real database, for the reason the rest of this screen's tests
@@ -214,7 +214,7 @@ def _drawn_texts(widget):
 def test_cem221a_an_event_is_titled_what_the_day_draws_on_the_block(screen, manager):
     """CE-M2.2 — the contract between the screen and the export, behaviourally.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m22
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m22
     Tests: this test
 
     The headless test of this in `tests/test_calendar_export.py` compares the
@@ -258,7 +258,7 @@ def test_cem221a_an_event_is_titled_what_the_day_draws_on_the_block(screen, mana
 def test_cem411_the_button_disables_before_the_work_starts(screen, manager, monkeypatch):
     """CE-M4.1 — disabled before anything slow or fallible runs.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
     Tests: this test
 
     Asserted from inside the first thing the handler calls after disabling the
@@ -299,7 +299,7 @@ def test_cem413_the_result_is_collected_by_a_callback_the_tk_thread_scheduled(
 ):
     """CE-M4.1 — the worker never touches a widget, including through `after`.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
     Tests: this test
 
     Tk is not thread-safe and `after` is no exception: scheduling from the
@@ -364,7 +364,7 @@ def test_cem413a_pending_tk_finalizers_run_before_the_worker_starts(
 ):
     """CE-M4.1 — the collection happens on the thread that owns Tk.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
     Tests: this test
 
     A CustomTkinter widget makes a ``tkinter.font.Font``, and a destroyed
@@ -442,7 +442,7 @@ def test_cem412a_a_second_click_while_running_does_nothing(screen, manager):
 def test_cem421_the_status_line_reports_the_real_counts(screen, manager, root):
     """CE-M4.2 — the counts come from the outcome, not from a hopeful string.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
     Tests: this test
     """
     _block(manager, 0, label="Reading")
@@ -458,7 +458,7 @@ def test_cem421_the_status_line_reports_the_real_counts(screen, manager, root):
 def test_cem422_a_failing_export_sets_an_error_status(root, manager, settings):
     """CE-M4.2 — a run that failed every block has finished, and is not a success.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
     Tests: this test
     """
     panel = PlanScreen(root, manager, _App(settings))
@@ -507,7 +507,7 @@ def test_cem422a_an_exception_from_the_client_is_reported_not_swallowed(
 def test_cem423_a_screen_that_is_gone_is_not_written_to(screen, monkeypatch):
     """CE-M4.2 / P15 — navigating away mid-export must not raise in a callback.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
     Tests: this test
 
     `clear_content` destroys the screen on every navigation, and the outcome
@@ -541,7 +541,7 @@ def test_cem425_a_result_that_lands_between_the_two_reads_is_not_called_a_failur
 ):
     """CE-M4.2 / P1 — a transient read of `None` is not a terminal failure.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
     Tests: this test
 
     The worker sets `_export_result` and then exits, so there is a window
@@ -576,7 +576,7 @@ def test_cem425_a_result_that_lands_between_the_two_reads_is_not_called_a_failur
 def test_cem424_destroying_the_screen_cancels_the_poll(screen, monkeypatch):
     """CE-M4.2 / P15 — the queued callback does not outlive its widgets.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m42
     Tests: this test
 
     Tk does not cancel a widget's `after` jobs when the widget is destroyed.
@@ -597,7 +597,7 @@ def test_cem431_missing_credentials_refuses_with_the_setup_message(
 ):
     """CE-M4.3 — the message names the path that was checked.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m43
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m43
     Tests: this test
     """
     from src.getmoredone.screens.calendar_dialog import missing_credentials_message
@@ -633,7 +633,7 @@ def test_cem434_an_unconnected_account_refuses_rather_than_opening_a_browser(
 ):
     """CE-M4.3 — credentials present, no token: refuse before the thread.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m43
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m43
     Tests: this test
 
     Found by a cold review pass. ``has_credentials`` only tests that
@@ -668,7 +668,7 @@ def test_cem435_a_worker_that_cannot_be_started_gives_the_button_back(
 ):
     """CE-M4.3 — the guard covers the whole method, not the checks only.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m43
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m43
     Tests: this test
 
     Found by a cold review pass: six statements, `threading.Thread(...).start()`
@@ -701,7 +701,7 @@ def test_cem435_a_worker_that_cannot_be_started_gives_the_button_back(
 def test_cem433_an_empty_day_runs_the_export_and_says_nothing_was_there(screen):
     """CE-M4.3 — the empty day is reported by the exporter, not refused.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m43
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m43
     Tests: this test
 
     This asserted the opposite until a cold review pass: the screen used to
@@ -724,7 +724,7 @@ def test_cem433_an_empty_day_runs_the_export_and_says_nothing_was_there(screen):
 def test_cem433a_clearing_a_day_takes_its_events_off_the_calendar(screen):
     """CE-M4.3 / CE-M2.6 — the case the old refusal made unreachable.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m26
     Tests: this test
 
     Export a day, then clear it, then export again: the events have to go.
@@ -748,7 +748,7 @@ def test_cem433a_clearing_a_day_takes_its_events_off_the_calendar(screen):
 def test_cem441_the_header_holds_the_export_button_wired_to_the_export(screen):
     """CE-M4.4 — it is in the header, and its command is the export.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
     Tests: this test
 
     Both halves matter: a button wired to nothing and a working export no
@@ -772,7 +772,7 @@ def test_cem441_the_header_holds_the_export_button_wired_to_the_export(screen):
 def test_cem441b_the_header_fits_the_window_it_opens_in(screen, root):
     """CE-M4.4 — a seventh button in the header must not squeeze a widget out.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
     Tests: this test
 
     Found by a cold review pass, and confirmed by measurement: with the status
@@ -831,7 +831,7 @@ def test_cem441a_the_export_button_is_not_a_second_primary(screen):
 def test_cem442_the_exported_date_is_the_selected_date(screen, manager, root):
     """CE-M4.4 — the day on screen, not today.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
     Tests: this test
 
     The screen's date is a picker the user moves. An export that read
@@ -854,7 +854,7 @@ def test_cem443_the_configured_calendar_is_the_one_written_to(
 ):
     """CE-M4.4 / D3 — the setting reaches the client, not just the file.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m31
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m31
     Tests: this test
     """
     settings.plan_export_calendar_id = "work@example.com"
@@ -895,7 +895,7 @@ def test_cem443a_a_blank_calendar_setting_falls_back_to_primary(
 def test_cem451_the_screen_uses_its_injected_client_factory(screen, manager, root):
     """CE-M4.5 — and so never builds the authenticating one in a test.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m45
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m45
     Tests: this test
     """
     built = []
@@ -979,7 +979,7 @@ def test_cem453_the_status_line_is_built_from_the_outcome_object(screen):
 def test_cem441c_the_exported_time_is_the_box_the_screen_draws(screen, manager):
     """CE-M4.4 — the day's shape goes to the worker with the day.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
     Tests: this test
 
     Found by a cold review pass. A block's box is stored relative to Day
@@ -1014,7 +1014,7 @@ def test_cem441c_the_exported_time_is_the_box_the_screen_draws(screen, manager):
 def test_cem444a_the_screens_own_client_is_built_non_interactively(screen, monkeypatch):
     """CE-M4.4 — the flag reaches the constructor the export actually uses.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
     Tests: this test
 
     `__init__` is replaced, not `__new__`: patching `__new__` writes
@@ -1046,7 +1046,7 @@ def test_cem444a_the_screens_own_client_is_built_non_interactively(screen, monke
 def test_cem444b_a_client_that_needs_sign_in_reports_it_and_re_enables(screen, manager):
     """CE-M4.4 — the refusal the non-interactive client raises reaches the user.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
     Tests: this test
 
     The screen's token check passes here — a token file exists, per the
@@ -1077,7 +1077,7 @@ def test_cem444b_a_client_that_needs_sign_in_reports_it_and_re_enables(screen, m
 def test_cem444c_a_second_screen_cannot_export_the_same_day(root, manager, settings):
     """CE-M4.4 — the in-flight marker outlives the screen that set it.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
     Tests: this test
 
     Found by a cold review pass. `_export_running` is an attribute of one
@@ -1150,7 +1150,7 @@ def test_cem444c_a_second_screen_cannot_export_the_same_day(root, manager, setti
 def test_cem444d_a_failed_export_gives_the_day_back(screen, manager):
     """CE-M4.4 — the slot is released on failure, not only on success.
 
-    Spec:  docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m44
     Tests: this test
 
     A slot leaked by a failing export refuses every later export of that day

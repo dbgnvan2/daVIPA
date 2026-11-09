@@ -2,7 +2,7 @@
 
 Purpose: hold every band and block-type accent to a contrast minimum in both
          themes, and keep the Plan screen's modules free of inline hex.
-Spec:    docs/implementation_plan_2026-11-05_time_blocks.md#tb-m12
+Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m12
 Tests:   this file
 
 The theme rule this enforces is not a style preference: a colour written inline
@@ -136,7 +136,7 @@ def test_pdm41_padding_and_lunch_share_one_colour(restore_appearance):
 
     Purpose: PD-M4 -- three kinds of time that are not work, told apart by
              their words rather than by three colours.
-    Spec:    docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m4
+    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m4
 
     Buffer and lunch already shared the neutral; a break was the theme's cyan,
     which read as a kind of work rather than a gap in it. An exact count of

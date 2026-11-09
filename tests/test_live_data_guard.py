@@ -2,7 +2,7 @@
 
 Purpose: prove the three layers of isolation actually fire, rather than
          assuming them.
-Spec:    docs/implementation_plan_2026-08-19_backlog_clearance.md
+Spec:    docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md
 Tests:   this file
 
 The incident (`3892159`): ``test_obsidian_dialogs.py::test_database`` called

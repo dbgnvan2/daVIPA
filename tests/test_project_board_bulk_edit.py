@@ -328,7 +328,7 @@ class TestShowCompletedToggle:
     def test_default_hides_completed(self, gui_screen_mixed):
         """Default state hides completed items (M4 changed default to OFF).
 
-        Spec: docs/implementation_plan_2026-06-06_project_notes.md#M4.A.1
+        Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M4.A.1
         """
         screen, open_ids, completed_ids, _root = gui_screen_mixed
         assert screen.show_completed_items_var.get() is False

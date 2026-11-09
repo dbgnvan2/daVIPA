@@ -2,7 +2,7 @@
 
 Purpose: a name is a label, never the thing that holds two rows together.
 Spec:    docs/spec_2026-08-19_rename_safe_links.md
-Plan:    docs/implementation_plan_2026-08-19_rename_safe_links.md
+Plan:    docs/unused-docs/implementation_plan_2026-08-19_rename_safe_links.md
 Tests:   this file
 
 RN-M2.D is the whole spec as one test and is written **first**, red. It fails
@@ -294,7 +294,7 @@ def test_rn_m2d_no_rename_breaks_any_link(tmp_path, level):
     """RN-M2.D. Rename at each of six levels; every link must still resolve.
 
     Spec:  docs/spec_2026-08-19_rename_safe_links.md#rn-m2d
-    Plan:  docs/implementation_plan_2026-08-19_rename_safe_links.md (step 1)
+    Plan:  docs/unused-docs/implementation_plan_2026-08-19_rename_safe_links.md (step 1)
 
     Each level gets its own database, so one level's breakage cannot mask or
     cause another's. Snapshots are taken by id before the rename and compared
@@ -563,7 +563,7 @@ def test_rn_m1d_migration_on_populated_db_run_two(tmp_path):
 def test_rn_migration_runs_once_per_launch(tmp_path):
     """Two managers share one Database; the migration must run once.
 
-    Plan: docs/implementation_plan_2026-08-19_rename_safe_links.md §4
+    Plan: docs/unused-docs/implementation_plan_2026-08-19_rename_safe_links.md §4
 
     The weekly-tactic migration ran twice per launch for exactly this reason,
     doubling its repair history and overwriting the first (real) report with a
@@ -1112,7 +1112,7 @@ def test_rn_m2c_segment_join_survives_a_rename(tmp_path):
 def test_rn_no_duplicate_initiative_after_rename(tmp_path):
     """RN-F4's second half: a rename must not make the next assignment duplicate.
 
-    Plan: docs/implementation_plan_2026-08-19_rename_safe_links.md §4
+    Plan: docs/unused-docs/implementation_plan_2026-08-19_rename_safe_links.md §4
 
     The spec covers the broken link. This covers the duplicate it caused —
     reproduced before the fix as `annual_initiatives: 2, quarter_initiatives: 2`.
@@ -1151,7 +1151,7 @@ def test_rn_project_and_tactic_links_are_id_based(tmp_path):
     """RN-F5 says these are already safe. Asserted, so a future refactor to
     name-matching fails here rather than in a user's data.
 
-    Plan: docs/implementation_plan_2026-08-19_rename_safe_links.md §4
+    Plan: docs/unused-docs/implementation_plan_2026-08-19_rename_safe_links.md §4
     """
     vps = make_vps(tmp_path, name="f5.db")
     try:

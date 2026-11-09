@@ -1,7 +1,7 @@
 """PRI-M1 and PRI-M2 — the create-time priority floor, and the 9999 cap.
 
-Spec: docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md
-Plan: docs/implementation_plan_2026-11-08_pri_tests.md
+Spec: docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md
+Plan: docs/unused-docs/implementation_plan_2026-11-08_pri_tests.md
 
 Both criteria groups shipped on `main` with no test of any kind (`BACKLOG.md`
 item 2). The three things that most need holding, in the order they would be
