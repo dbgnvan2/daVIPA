@@ -309,7 +309,8 @@ state at the time of this plan, not now. At the time,
 `src/getmoredone/app_settings.py` still carried
 the calendar-export batch's uncommitted hunk, and §9 below rules that out
 under `CLAUDE.md`'s "One build batch at a time". It was proposed as its own
-worktree session instead and is recorded `not done`.
+worktree session instead, and was recorded `not done` here until that session
+built it.
 
 ---
 

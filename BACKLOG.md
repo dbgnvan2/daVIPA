@@ -254,6 +254,17 @@ detect a settings-file write, which the message implies. The real guards are
 `test_pdm141_a_drop_on_earlier_writes_no_settings` and
 `..._never_calls_save`. Reword the message to what it measures.
 
+### PDT-A5 — a test count in two closed handoff notes has drifted (low)
+
+`docs/changes/2026-11-08-unified-panel-m7.md:19` and `:49` say
+`tests/test_unified_panel_design.py` holds **81** tests. It holds **98**
+(`grep -c '^def test_' tests/test_unified_panel_design.py`); `e44937a` and
+`4e16534` raised it, both before this batch. The guard itself asserts an empty
+list of fixture-takers, not a count, so nothing is broken and the notes were
+right when written. Left as written rather than rewritten, because a dated
+handoff note is a record of its own batch; the drift is filed here instead.
+Found by the seventh cold pass.
+
 ### PDT-A4 — PD-M14's implementation plan is not in the documentation index (low)
 
 `docs/implementation_plan_2026-11-08_day_hours_are_a_template.md` has no entry
@@ -419,9 +430,9 @@ remaining copies of the filter triple.
 
 The sweep covered the whole unpushed range, which holds four batches. Two
 findings are in code another session is still working in, so they are
-recorded here rather than fixed: that session holds the files uncommitted and
-a second writer in this index is what `CLAUDE.md`'s "One build batch at a
-time" exists to prevent.
+recorded here rather than fixed: that session held the files uncommitted at
+the time, and a second writer in this index is what `CLAUDE.md`'s "One build
+batch at a time" exists to prevent. Those batches have since ended.
 
 ### CE — `calendar_event_calendar_id` was half a pair — CLOSED by `a92f059`
 

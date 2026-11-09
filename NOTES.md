@@ -18,7 +18,8 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
     `test_t57`, `test_wt_m6b6`, `test_alpha_still_passes_through_the_attributes_wrapper`,
     `test_raw_tkinter_windows_are_hidden_and_registered_too`) pass locally and
     need one shared precondition — `BACKLOG.md` WTP-A11.
-  - **Two that are not that family**, per WTP-A11's own text:
+  - **Two that are not that family.** WTP-A11's own text excludes
+    `test_pbm61`; the second exclusion is `BACKLOG.md` item 5's:
     `test_pbm61_a_tall_row_keeps_its_two_lines_together` is **skipped**
     locally, not passing, because `GETMOREDONE_NO_MAPPED_WINDOWS=1` skips it,
     so it cannot be reproduced on a working machine at all; and
@@ -80,7 +81,8 @@ three layout items here, and UPD-F1, the only defect among them, merged at
   at a time" ruled it out here and it was proposed as its own worktree
   session. That session ran, and its branch is merged. **Nothing to do.**
 - ⚠️ **None of the three has been seen running.** UPD-F2.6, UPD-F3.5 and
-  UPD-F4.7 are `not done` and are steps 11, 12 and 13 of the spec's §11.
+  UPD-F4.7 are `not done` and are steps 11, 11 and 13 of the spec's §11
+  (F2.6 and F3.5 share step 11; step 12 carries no UPD-F criterion).
   Steps 4 and 7 were rewritten, so those two are owed again as well: what was
   walked on 2026-11-08 is not what is there now.
 - ⚠️ **A column at the five-character floor clips its own heading.**
