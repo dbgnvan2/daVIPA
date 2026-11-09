@@ -169,6 +169,297 @@ change to it.
 **Priority:** Low
 **Effort:** Medium
 
+## Cold review findings — Plan day calendar export (CE, 2026-11-08)
+
+A cold review pass (`learning-qa`, read-only, no implementation context) over
+the CE diff returned eleven findings: one high and three medium, all four fixed
+in the batch, and the seven below. (Two further cold passes followed; their
+entries are CE-A12 to CE-A16.) Per the sweep budget in `CLAUDE.md`,
+below-medium findings are filed rather than fixed in-loop. (A fourth pass —
+time correctness and the Google API contract — followed; its entries are
+CE-A17 to CE-A21.)
+
+### CE-A5 — `_poll_export` reads the result before it tests the thread — **FIXED**
+
+Filed as low on the first pass, on the reading that the window costs one extra
+100ms poll and nothing else. The second cold pass showed the consequence is
+worse: the worker sets `_export_result` and *then* exits, so a result landing
+between the read and the `is_alive()` check reports "The Google Calendar
+export stopped without reporting a result" over an export that had just
+succeeded (P1 — a transient read as terminal). Fixed in the batch: the poller
+re-reads the attribute after the liveness check and only then gives up.
+Proved by
+`tests/test_plan_screen_calendar_export.py::test_cem425_a_result_that_lands_between_the_two_reads_is_not_called_a_failure`.
+
+### CE-A6 — the orphan sweep makes a second machine destructive (low)
+
+The database is per-machine (`~/Library/Application Support/GetMoreDone/`),
+and `calendar_exporter`'s module docstring claims the block-id marker makes a
+re-export work "from any machine the user plans on". It does the opposite for
+deletions: exporting the same day from a second machine, whose database has
+none of those blocks, sweeps the first machine's events off the calendar as
+orphans. The marker makes *updating* machine-independent and *deleting*
+machine-dependent. Fix is a scope decision, not a patch: either the sweep
+only deletes events whose block id this database has ever known, or the
+docstring stops claiming it.
+
+**Priority:** Low
+**Effort:** Medium
+
+### CE-A7 — `singleEvents=True` expands a user's own recurrence (low)
+
+`list_day_events` passes `singleEvents=True`, so a recurring event the user
+created from an exported event — or a recurrence Google expanded — comes back
+as several instances carrying the same `gmd_block_id`. The sweep keeps the one
+instance this run confirmed and deletes the rest as duplicates. Only reachable
+if the user makes a repeat out of an exported event, which is why it is low,
+but it deletes real calendar entries when it happens.
+
+**Priority:** Low
+**Effort:** Medium
+
+### CE-A8 — `_get_local_timezone` falls back to UTC without saying so (low)
+
+A machine whose timezone cannot be read exports every block at the wrong time
+with no warning anywhere. Honest-failure rule: the fallback should be counted
+and named in the status line, the way the three skip reasons already are.
+
+**Priority:** Low
+**Effort:** Low
+
+### CE-A9 — `ExportOutcome.ok` docstring and implementation disagree (low)
+
+*Stated backwards when first filed, and corrected by the third cold pass.* The
+**docstring** says `ok` is derived from `failed` *and from whether anything was
+sent*; the **property** is `self.failed == 0` and nothing else. So a run that
+sent nothing at all reports `ok`. Nothing reads it on a path where the
+difference shows, so this is a correctness-of-documentation finding rather than
+a behaviour one (P6 in miniature).
+
+The docstring has since been changed to describe what the property does. What
+is still open — and what this entry is for — is which of the two meanings the
+export should have.
+
+**Priority:** Low
+**Effort:** Low
+
+### CE-A10 — `calendar_importer` and `gmail_importer` are still unhardened (low)
+
+`google_calendar.py` was hardened as a class in this batch (P5): timeout,
+retry, backoff on all four event calls. Its siblings were not —
+`calendar_importer.py:110-118` and `gmail_importer.py:156-271` still call
+Google with no timeout and no retry. The P5 rule says fix the siblings in the
+same change; these were left because they are read paths with their own
+failure reporting and no part of this feature calls them.
+
+**Priority:** Low
+**Effort:** Medium
+
+### CE-A11 — `plan_export_calendar_id` has no UI and `primary` is written three times (low)
+
+The setting exists in `AppSettings` and is read by the export, but no control
+writes it, so `primary` is the only value the app itself can produce — *not*
+the only reachable one, as this entry first claimed: `AppSettings.load` reads
+the settings file, which can be edited by hand, and the export honours whatever
+it finds there. (The third cold pass corrected this, and the calendar an event
+id belongs to is now recorded precisely because that value can change.)
+`'primary'` is also
+spelled literally in `google_calendar.DEFAULT_CALENDAR_ID`, in
+`calendar_exporter.DEFAULT_CALENDAR_ID`, and again in
+`screens/plan.py::_positive_calendar_id` (P4). Either
+give the setting a control in Settings, or collapse the three constants to
+one.
+
+**Priority:** Low
+**Effort:** Low
+
+## Second cold review pass — Plan day calendar export (CE, 2026-11-08)
+
+A second cold pass over the same diff, in a different failure family (UI
+contract and test quality) as the sweep budget requires after a high-severity
+finding. Seven findings: 1 high, 4 medium, 2 low. The high and all four
+mediums are fixed in the batch, as is CE-A5 above, which this pass re-rated.
+The two below are what is left.
+
+### CE-A12 — the export button's `⤴` glyph has no font fallback guarantee on Windows (low)
+
+U+2934 (Supplemental Arrows-B) is frequently absent from Windows default UI
+fonts and renders as a box. The repo ships `start.bat` and documents a Windows
+database path, so Windows is supported; the header's other glyph, `⚙`
+(U+2699), is widely present. One wrong character on a labelled button, so the
+consequence is cosmetic, and there is no test convention here for glyph
+coverage. Measured as present on this Mac (the label asks for 118px inside a
+150px button, so the glyph renders).
+
+**Priority:** Low
+**Effort:** Low
+
+### CE-A13 — the day half of the orphan sweep's filter is never checked locally (low)
+
+`_sweep_orphans` re-checks `BLOCK_ID_PROPERTY` on every event it gets back but
+never `BLOCK_DATE_PROPERTY`, so "this event belongs to the day being exported"
+rests entirely on the server-side `privateExtendedProperty` filter.
+`FakeCalendar.list_day_events` in `tests/test_calendar_export.py` ignores the
+`block_date` it is given and returns everything it holds — the permissive
+direction, so it weakens no existing assertion, but it means no test can
+express "the sweep only sees this day". Unreachable today: nothing changes a
+block's `block_date` (no `SET block_date` anywhere), so no event's marker can
+name a day other than the one it is listed under. It becomes live the day a
+block can be moved between days, which is also when CE's update path would
+need to rewrite the marker.
+
+**Priority:** Low
+**Effort:** Low
+
+### CE-A14 — three test-hygiene items in the CE files (low)
+
+None of these is a defect in the code under test.
+
+- `test_cem441a_the_export_button_is_not_a_second_primary` asserts only that
+  the button's `fg_color` differs from AutoLoad's; it would also pass for the
+  `danger` style. `== button_style("secondary")["fg_color"]` says what is meant.
+- `tests/test_google_calendar_export_calls.py` patches the stdlib `time.sleep`
+  process-wide (`gc.time` is the module, not a module-local alias). Restored by
+  `monkeypatch`, and the daemon export threads the UI file leaves behind use
+  fakes that never sleep, so nothing leaks in practice.
+- The `_export` helper in `tests/test_plan_screen_calendar_export.py` calls
+  `_poll_export()` directly while the real `after` job is still pending and
+  `_export_poll_id` still holds its id. Harmless under `update_idletasks`
+  (Tk timers do not fire), but a future test in that file calling
+  `root.update()` would get a spurious "stopped without reporting a result".
+
+**Priority:** Low
+**Effort:** Low
+
+### CE-A15 — `destroy()` cancels the export poll but not the autoscroll job (low)
+
+The `destroy` override added for CE-M4.2 cancels `_export_poll_id`. The
+screen's other pending `after`, `_autoscroll_job`, is not cancelled there — the
+same class of leak the override exists for. Pre-existing and narrow (ending a
+drag stops the autoscroll, and navigation ends the drag first), but the two
+belong in one place.
+
+**Priority:** Low
+**Effort:** Low
+
+### CE-A16 — every export opens a second `DatabaseManager` and discards its report (low)
+
+Found by the third cold pass. `export_day` with a `db_path` constructs a
+`DatabaseManager`, which runs `initialize_schema` — every migration and every
+repair — on the worker thread, and whatever that returns is thrown away. It is
+the same work the app did at launch, so in practice it finds nothing to do, but
+a repair that *did* run would run unreported, on a background thread, while the
+user is looking at a status line about Google Calendar.
+
+The connection itself has to be opened there: SQLite connections belong to the
+thread that made them. What does not have to happen there is the schema work.
+
+**Priority:** Low
+**Effort:** Medium
+
+### CE-A17 — an event's length is wall-clock, and a DST day is not 24 hours (low)
+
+Found by the fourth cold pass. `end = start + timedelta(minutes=n)` is naive
+wall-clock addition, and both ends are then labelled with the machine's IANA
+zone. On a fall-back date a 120-minute block starting at 00:30 goes out as
+00:30-02:30 local, which in `America/New_York` on 2026-11-01 is three real
+hours; on a spring-forward date a start of 02:30 is a local time that does not
+exist and Google resolves it on its own.
+
+Filed rather than fixed, with the reasoning written down so the next pass does
+not re-find it as a defect: **the grid is wall-clock, so sending wall-clock is
+what makes the calendar agree with the screen.** A block drawn at 00:30-02:30
+should read 00:30-02:30 on the calendar, whatever the elapsed hours are. The
+genuinely wrong case is the start inside a skipped hour, and deciding what the
+*screen* should show for an hour that does not exist is a Plan-screen question,
+not an exporter one. Reachable only from a day whose bounds reach into the small
+hours.
+
+**Priority:** Low
+**Effort:** Medium (needs a product decision first)
+
+### CE-A18 — `list_day_events` pagination has no page ceiling (low)
+
+Found by the fourth cold pass. The loop exits only when a response omits
+`nextPageToken`; a server returning the same token, or endlessly rotating ones,
+loops forever, three retries per iteration, on the export's worker thread —
+behind the disabled button that `REQUEST_TIMEOUT_SECONDS` and
+`AuthenticationRequired` were added to protect. No test can catch it as written
+(`FakeEvents.list` pops from a list, so a loop raises `IndexError` instead of
+hanging). A page ceiling, a repeated-token break, and a reported truncation.
+
+**Priority:** Low
+**Effort:** Low
+
+### CE-A19 — the sweep's per-event body has no per-event guard (low)
+
+Found by the fourth cold pass. `_sweep_orphans` guards the `list_day_events`
+call but not the loop over what it returns, unlike the per-entry loop above it.
+A SQLite error on `get_time_block` would escape `export_day` and take the whole
+`ExportOutcome` with it — including the creates and updates that had already
+succeeded — so the screen would report an exception instead of the counts.
+
+The malformed-response half of this was fixed in-loop (CE-M2.6b reads
+`extendedProperties` defensively now); what is filed is the general per-event
+`try`, counting into `outcome.failed` the way the entry loop does.
+
+**Priority:** Low
+**Effort:** Low
+
+### CE-A20 — a certificate failure is retried as though it were a wifi blip (low)
+
+Found by the fourth cold pass. `_transport_errors` names `ssl.SSLError`, and
+`ssl.SSLCertVerificationError` is a subclass of it, so a permanent TLS failure
+— a TLS-inspecting proxy, a skewed clock — costs three attempts and 3s of
+backoff per call and is then reported as "after 3 attempts" rather than as the
+certificate error it is. `httplib2.HttpLib2Error` covers permanent faults such
+as `RedirectLimit` for the same reason. The helper's own docstring says the set
+is named so that permanent `OSError`s stay out of it; for these members it is
+not met.
+
+**Priority:** Low
+**Effort:** Low
+
+### CE-A21 — the planned zone is the machine's zone at send time (low)
+
+Found by the fourth cold pass. A block records no timezone, so the same
+unchanged day exported from `America/New_York` and then from `Europe/London`
+produces two different instants: every event moves five hours while the Plan
+grid looks identical before and after.
+
+Arguably right — "09:00 means 09:00 wherever you are" is the same wall-clock
+reading as CE-A17 — but nothing records the decision and no test pins it. Either
+pin it with a test and a line in the user guide, or store the zone beside the
+event id and send that.
+
+**Priority:** Low
+**Effort:** Medium (needs the same product decision as CE-A17)
+
+## Next feature — Google Calendar into the Plan (CIP, specced 2026-11-08)
+
+Spec: [`docs/spec_2026-11-08_calendar_into_the_plan.md`](docs/spec_2026-11-08_calendar_into_the_plan.md).
+**Not started, and not to be started from the session that wrote the spec.**
+
+Read the connected calendars, show each day's commitments on the Plan grid so
+the day is planned around the hours that are already gone, and let a commitment
+the user owns be moved, resized, retitled or deleted from inside the day plan.
+Phase 1 is the selected day; phase 2 is a seven-day planning view over the same
+cache. `calendar_importer.py` stays: an action item is *what* has to be done, a
+commitment is *when* something is already decided, and the work a meeting
+causes usually needs a block before that meeting.
+
+Two things the plan step has to settle, both recorded in the spec:
+
+- **It wants to be two batches.** The read half (CIP-M1 to M3, M5) is
+  self-contained and provable with a fake client. The editing half (CIP-M4)
+  writes to other people's calendars and deletes events, so it should get its
+  own review sweeps rather than riding along with the plumbing.
+- **It cannot start while PD-M14 is in flight.** CIP-M3.3 and CIP-M3.7 extend
+  exactly the `time_block_layout.py` surface that batch is changing.
+
+**Priority:** Next feature
+**Effort:** High (two batches)
+
 ## Adjacent issue — weekly tactic as parent (WTP, 2026-11-08)
 
 Found while building WTP-M6.4. Flagged, not fixed (global rule 10).

@@ -11,6 +11,7 @@ daVIPA can create Google Calendar events directly from action items, making it e
 - 📝 Pre-fill event with action item details
 - 🔄 Events appear as links in the item editor
 - ✅ **Meeting tracking** - automatically marks items as meetings with scheduled time
+- ⤴ **Export a planned day** - push the Plan screen's time blocks for one date out as timed events, and re-export the same day without duplicating anything
 
 ## Configuration Directory
 
@@ -141,6 +142,88 @@ A `token.pickle` file will be created in `~/.getmoredone/` to save your authoriz
 - **Delete**: Delete from Google Calendar directly
 - **Remove Link**: Click the 🗑️ button next to the link in daVIPA
 
+### Exporting a Planned Day
+
+The Plan screen's **"⤴ Google Calendar"** button (in the header, between
+**⚙ Day Settings** and **+ Break**) writes the day you are looking at to your
+calendar as timed events.
+
+1. Open the **Plan** screen and pick the date.
+2. Build the day: item blocks, buffers and breaks, placed on the grid.
+3. Click **"⤴ Google Calendar"**.
+
+The button disables itself while the export runs and the status line reports
+the result, for example:
+
+```
+3 of 5 block(s) exported to Google Calendar for 2026-11-12 — 2 new, 1 updated, 2 skipped (not on the grid)
+```
+
+**What is exported**
+
+- Every block placed on the grid that has a length: item blocks, buffers and
+  breaks alike.
+- The event title is the title the Plan screen draws on the block — the action
+  item's title for an item block, the block's own label (or "Buffer" / "Break")
+  otherwise.
+- The event description is the item's **Next action** when it has one,
+  followed by the line `Planned in daVIPA.`
+- Times are the block's own start time and planned minutes, in your local
+  timezone.
+
+**What is not exported, and why**
+
+- **Blocks not on the grid.** Anything under "Outside the day" has no box, so
+  the app does not know when it happens. Writing it at whatever clock string
+  its row carries would put work on your calendar at a time nobody chose.
+  These are counted in the status line as "skipped (not on the grid)".
+- **Blocks with no length** ("skipped (no length)") and blocks whose stored
+  time cannot be read ("skipped (unreadable time)").
+- **Lunch.** Lunch is a gap in the grid rather than a time block, so there is
+  nothing to write. Block it out in Google Calendar directly if you want it
+  there.
+- **The rest of the Plan screen.** Only time blocks for the selected date are
+  exported — not the week, not the item list, nothing from Vision/Strategy/Plan.
+
+**What a second export of the same day does**
+
+Nothing is duplicated. Each block records the id of the event it owns, and
+every event daVIPA writes also carries that block's id in its own private
+properties. On a re-export:
+
+- a block whose event still exists has that event **updated** in place, so a
+  block you moved or resized moves and resizes on the calendar;
+- a block whose event you deleted by hand in Google Calendar is
+  **re-created** ("1 re-created");
+- an event whose block you have since deleted in daVIPA is **removed**
+  ("1 removed");
+- an event **without** daVIPA's marker is never touched. Your real meetings
+  are safe, including ones in the same hour.
+
+A block that failed or was skipped keeps its event: nothing is removed on the
+strength of a run that did not confirm what the day holds.
+
+Exporting a day you have **cleared** is worth doing for this reason: with no
+blocks left there is nothing to send, but the events that day had still need
+taking off the calendar, and the export says so — *"No blocks planned for
+2026-11-12 — 2 removed"*. A day that never had anything exported reads
+*"Nothing to export"* instead.
+
+**Which calendar**
+
+Your primary calendar, unless `plan_export_calendar_id` in the app settings
+names another one. There is no control for it yet — it is read from the
+settings file.
+
+If you change it, the next export **moves** the events it had already made:
+each block records the calendar its event is on, so the export takes the event
+off the old calendar before creating it on the new one, and says so — *"3 of 3
+block(s) exported … 3 moved to this calendar"*. Blocks you had never exported
+are simply created on the new calendar. If a move cannot complete — the old
+calendar is unreachable, say — that block is reported as failed and keeps its
+old event, so running the export again finishes the job rather than leaving two
+events for one block.
+
 ## Troubleshooting
 
 ### "Google Calendar libraries not installed"
@@ -165,6 +248,21 @@ pip install -r requirements.txt
 ./start.sh  # Linux/Mac
 start.bat   # Windows
 ```
+
+### "Google Calendar is set up but not connected yet"
+
+The export says this when `credentials.json` is in place but
+`~/.getmoredone/token.pickle` is not — the file written the first time you
+authorise daVIPA in a browser.
+
+**Solution**: connect once from an item's **Add to Calendar** dialog (open an
+item, Add to Calendar), which can open the browser and complete Google's
+consent screen. Then export the day.
+
+The export refuses rather than doing this itself on purpose: it runs on a
+background thread so the app stays usable, and the consent flow waits on a
+browser window with no time limit. Started from there it would leave the Plan
+screen's button disabled with no way back.
 
 ### "Google Calendar credentials not found"
 
@@ -210,6 +308,29 @@ If you still see incorrect times:
 3. Check if `tzlocal` is installed: `pip show tzlocal`
 4. If issue persists, check the terminal for timezone detection warnings
 
+### Plan export says "Google Calendar needs you to sign in again"
+
+The token file is there but cannot be used: access was revoked in your Google
+account, the password changed, or the file is damaged. Signing in needs a
+browser, and the export runs in the background where it cannot open one — so it
+stops and says this rather than hanging. Use **Connect Google Calendar** from
+the calendar dialog, which can open a browser, and then export again.
+
+### Plan export says "2026-11-12 is already being exported"
+
+An export of that day is still running — in this window or another one. One
+export per day at a time, because two at once would race over the same events.
+Wait for the status line to report, then click again.
+
+### Plan export says "FAILED"
+
+The status line names the first failure. One block failing is one block
+failing — the rest of the day still goes out, and the export can be run again.
+Transient Google errors (rate limits, 5xx) are already tried three times in
+all — the first attempt and two retries, with backoff — before they are
+reported, so a reported failure is a real one:
+check the message, fix what it names, and click the button again.
+
 ## Security Notes
 
 - **credentials.json**: Contains OAuth client credentials, keep private
@@ -237,8 +358,12 @@ This ensures calendar events appear at the correct time in Google Calendar, rega
 
 ## Privacy
 
-- daVIPA only accesses your primary Google Calendar
+- daVIPA accesses one calendar: your primary one, or the one
+  `plan_export_calendar_id` names in app settings if you have set it. The
+  OAuth scope it asks for covers your whole calendar account, which is what
+  Google offers; the app only ever reads and writes the one calendar
 - It only creates/reads events you explicitly create through the app
+- A Plan export only ever updates or removes events daVIPA itself created, identified by a private property on the event; events it did not create are never modified or deleted
 - No data is sent to external servers (direct Google API connection)
 - Authorization tokens are stored locally on your machine
 
@@ -250,6 +375,17 @@ This ensures calendar events appear at the correct time in Google Calendar, rega
 - **Storage**: SQLite (links, meeting data), Local files (credentials/tokens)
 - **Link Type**: `google_calendar` (stored in `item_links` table)
 - **Timezone**: Auto-detected using `tzlocal` library
+- **Plan export**: `src/getmoredone/calendar_exporter.py` (GUI-free), driven from `screens/plan.py`
+  - `time_blocks.calendar_event_id` (TEXT) holds the event a block owns
+  - Event markers: `extendedProperties.private.gmd_block_id` and `gmd_block_date`
+  - Re-export finds the day's own events with `privateExtendedProperty=gmd_block_date=<date>`
+  - Target calendar: `plan_export_calendar_id` in app settings (default `primary`)
+  - Every Google call is timeout-bounded and retries 429/500/502/503/504 — and
+    a 403 whose body gives a rate-limit reason — with exponential backoff
+  - Each event is created with an id the app chooses, so a retried create
+    cannot leave a second event behind
+  - Exported blocks ask for your calendar's own reminder setting rather than
+    carrying a popup of their own
 - **Meeting Tracking**:
   - `is_meeting` flag in `action_items` table (INTEGER, 0 or 1)
   - `meeting_start_time` in `action_items` table (TEXT, ISO datetime format)
