@@ -1888,7 +1888,8 @@ them already, asked at a different moment than either.
 | PF-M2.3 | A different item still lands on that box | `plan.py::block_item` | `::test_pfm23_a_different_item_still_lands` |
 | PF-M2.4 | Breaks and buffers stay repeatable | `plan.py::_blocked_today` (item blocks only) | `::test_pfm24_a_break_is_not_an_item_to_refuse` |
 | PF-M3.1 | A child lands directly after its parent | `plan.py::_linked_block_in_slot`, `db_manager.py::add_block_at(after_block_id=)`, `::_move_behind` | `::test_pfm31_a_child_lands_after_its_parent` |
-| PF-M3.2 | Weekly Tactic siblings order the same way | same | `::test_pfm32_weekly_tactic_siblings_keep_their_order` |
+| PF-M3.2 | A Weekly Tactic sibling is not a link | `plan.py::_linked_block_in_slot` (parent/child only) | `::test_pfm32_a_weekly_tactic_sibling_is_not_a_link` |
+| PF-M3.5 | A continuation whose parent is in another box lands at the top | `plan.py::_continues_a_block`, `db_manager.py::add_block_at(at_top=)` | `::test_pfm35_a_continuation_lands_on_top` |
 | PF-M3.3 | An unlinked drop joins the end of the box | same | `::test_pfm33_an_unlinked_drop_joins_the_end` |
 | PF-M3.4 | A link with no partner in the box is no rule | `plan.py::_linked_block_in_slot` | `::test_pfm34_a_link_with_no_block_in_the_box_is_no_rule` |
 | PF-M4.1 | The header is two rows, controls split as asked | `plan.py::create_header` | `tests/test_plan_screen_pf_header.py::test_pfm41_the_header_is_two_rows` |
@@ -1898,3 +1899,5 @@ them already, asked at a different moment than either.
 | PF-M5.1 | Every button shares a weighted, uniform column group | `plan.py::create_header` | `tests/test_plan_screen_pf_header.py::test_pfm51_the_buttons_share_one_column_group` |
 | PF-M5.2 | Widening the window widens all four equally | `plan.py::create_header` | `::test_pfm52_widening_the_window_keeps_them_equal` (mapped window) |
 | PF-M5.3 | The tools row fits the narrowest window | `plan.py::create_header` | `::test_pfm53_the_buttons_fit_the_narrowest_window` |
+| PF-M6.1 | A box above Day Start, left by an Earlier drop, accepts a later drop | `plan.py::block_item` (`day_span=self._grid.span`) | `::test_pfm61_a_box_the_day_grew_into_accepts_a_drop` |
+| PF-M6.2 | A box past Day End accepts a later drop | same | `::test_pfm62_a_box_the_day_grew_into_at_the_end_accepts_a_drop` |

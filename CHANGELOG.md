@@ -30,10 +30,15 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   09:00 — drag that block to move it"*. Nothing refused this before: the grid
   refused a *box* with four blocks in it, not an item that was already planned,
   so the same item could be blocked twice on two free boxes.
-- **A follow-on lands behind the work it follows.** When the dropped item is
-  the parent or the child of a block already in that box, or a step of the same
-  Weekly Tactic, it takes the position directly after that block rather than
-  the end of the box. An unlinked drop is unchanged.
+- **A follow-on lands with the work it follows.** A child dropped on the box
+  holding its parent sits directly behind it. A continuation whose parent is in
+  another box goes to the **top** of the box it is dropped on, rather than under
+  everything already there. A Weekly Tactic is a container for steps that need
+  not follow one another, so its siblings get no ordering rule.
+- **A box the day grew into accepts a drop.** Extending the day on **Earlier**
+  or **Later** draws half hours outside Day Settings' hours; dropping an item on
+  one of them was refused as "outside the day" while the box was on screen. The
+  fit check reads the day as drawn now, so every box you can see takes work.
 
 ### Changed — what the VSP tabs' on-screen walk asked for (2026-11-08)
 

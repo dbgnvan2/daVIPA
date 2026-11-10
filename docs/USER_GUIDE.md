@@ -493,11 +493,13 @@ Items pane (left):
   was the passive version of the same fact; this is the version that answers a
   drag.
 
-  **A follow-on lands behind the work it follows.** When the item you drop is
-  linked to a block already in that box — one is the other's parent, or the two
-  are steps of the same Weekly Tactic — it takes the place directly after that
-  block rather than the end of the box. An unlinked drop still joins the end,
-  which is what it always did.
+  **A follow-on lands with the work it follows.** When the item you drop is the
+  child of a block already in that box — or the parent of one — it takes the
+  place directly after that block rather than the end of the box. A
+  **continuation** whose parent is in an earlier box goes to the *top* of the box
+  you drop it on, so work that carries on from the box above reads in that order.
+  A Weekly Tactic is a container, not a chain: its steps get no ordering rule.
+  Everything else joins the end, which is what it always did.
 
 - **The day scrolls itself while you drag** — What: Hold a dragged item or
   block near the top or bottom edge of the day pane and the day scrolls that

@@ -108,29 +108,74 @@ that is read rather than dragged.
 | PF-M2.4 | A break and a buffer are still repeatable: the guard reads item blocks | `::test_pfm24_a_break_is_not_an_item_to_refuse` |
 | PF-M2.5 | A drop on **Earlier** or **Later** refuses a second block too | `::test_pfm25_a_drop_on_an_end_also_refuses_a_second_block` |
 
-## PF-M3 — A dropped item lands after the block it is linked to
+## PF-M3 — A dropped item lands with the block it is linked to
 
 **Asked:** "When I drag an item onto a block, put it after a linked item if one
 is already in the block."
 
-Two items are **linked** here when either is the other's `parent_id`, or when
-both carry the same non-empty `weekly_tactic_id`. That is the reading of
-"linked" this building uses; the schema has no item-to-item link other than
-those two (`item_links` points at notes, files and URLs). If the walk shows a
-different relation meant, this is the module to correct.
+**Second report, from the walk:** "a linked item (continuation from previous
+block) should stay at the top of the block — it seems to go to the bottom."
 
-When the dropped item's linked partner already has a block in the target box,
-the new block takes the position directly after it instead of the end of the
-box. A box orders its blocks by `position` (`_settle_block_on_slot`), and an
-ordinary drop joins the end — which is right for an unlinked item and wrong for
-a follow-on.
+**Third report:** "just ignore weekly tactics."
+
+Two items are **linked** here when either is the other's `parent_id`. That was
+not the first reading: the module shipped treating a shared `weekly_tactic_id`
+as a link too, on the guess that the tactic was the relation meant. It is not —
+a tactic is a container for steps that need not follow one another, and the
+ordering it produced reordered the middle of a box on gestures that had nothing
+to do with order. The rule is the parent/child pair and nothing else;
+`item_links` points at notes, files and URLs, so it cannot be the relation.
+
+Where the new block goes:
+
+- **Partner in the target box** — directly behind it, not at the end.
+- **Partner elsewhere on the day, and this item is its child** — at the **top**
+  of the box it was dropped on. A continuation carries on from the box above,
+  so the end of the box is the wrong place for it.
+- **No partner, no parent** — the end of the box, as before.
+
+A box orders its blocks by `position` (`_settle_block_on_slot`), so "top" is
+position 1 with the rest moved down one, and both cases go through one
+`_insert_at` in `db_manager` rather than two shifting writes.
 
 | ID | Criterion | Verified by |
 |---|---|---|
 | PF-M3.1 | A child dropped on the box holding its parent sits directly after it | `tests/test_plan_screen.py::test_pfm31_a_child_lands_after_its_parent` |
-| PF-M3.2 | Two items of one Weekly Tactic order the same way | `::test_pfm32_weekly_tactic_siblings_keep_their_order` |
+| PF-M3.2 | A Weekly Tactic sibling is not a link: it joins the end | `::test_pfm32_a_weekly_tactic_sibling_is_not_a_link` |
 | PF-M3.3 | An unlinked drop still joins the end of the box | `::test_pfm33_an_unlinked_drop_joins_the_end` |
-| PF-M3.4 | A linked item dropped on a box with no partner is unaffected | `::test_pfm34_a_link_with_no_block_in_the_box_is_no_rule` |
+| PF-M3.4 | A child dropped on a box its parent is not in is unaffected by that | `::test_pfm34_a_link_with_no_block_in_the_box_is_no_rule` |
+| PF-M3.5 | A continuation whose parent is in another box lands at the top of this one | `::test_pfm35_a_continuation_lands_on_top` |
+
+## PF-M6 — A box the day grew into accepts a drop
+
+**Reported:** "dragging and dropping on the morning area is now broken", and
+"dragging to the bottom to lengthen the day doesn't work either".
+
+The morning one is real and was reproduced: `block_item` passed no `day_span`
+to `add_block_at`, so the fit check read **Day Settings' hours** while the user
+was looking at a box outside them. Extend the day earlier — which the walk's
+step 2 did — and the box above Day Start is on screen, is drawn, takes a drag,
+and is refused as *"That is outside the day — Day Settings sets its hours"*.
+The same is true at the evening end.
+
+The write now passes the drawn day (`self._grid.span`), which is what
+`extend_day_for` already did, and `_drop_refusal` reads the same span so the
+pre-check cannot refuse what the write would accept.
+
+This bug predates PF and is not a regression: the same call refused the same
+box before the change. It became visible because the walk lengthened the day.
+
+The evening half of the report was not reproduced: a drop on **Later** writes on
+a work day and on a non-work day alike, before and after this change. What the
+evening end does *not* accept is a drop that misses the **Later** strip while
+still inside the day pane — that reports `Drop an item on a half-hour box`, and
+whether that is what was seen is a question for the next walk.
+
+| ID | Criterion | Verified by |
+|---|---|---|
+| PF-M6.1 | A box above Day Start, left by an Earlier drop, accepts a later drop | `tests/test_plan_screen.py::test_pfm61_a_box_the_day_grew_into_accepts_a_drop` |
+| PF-M6.2 | A box past Day End, left by a Later drop, accepts a later drop | `::test_pfm62_a_box_the_day_grew_into_at_the_end_accepts_a_drop` |
+| PF-M6.3 | The pre-check and the write read the same span | covered by PF-M6.1: the refusal came from the write path |
 
 ## PF-M4 — The header is two rows
 
