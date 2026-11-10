@@ -552,7 +552,7 @@ def test_a_weekend_accepts_blocks_once_it_is_checked(root, manager, settings):
 def test_pdm131_a_drop_on_a_non_work_day_asks_nothing_and_writes(
     root, manager, settings, messageboxes
 ):
-    """PD-M13.1 — a drop never asks, and it never does nothing.
+    """PD-M13.1 — the write never asks, and it never does nothing.
 
     Reported twice from the running screen, 2026-11-07. ``messagebox.askyesno``
     raises ``_tkinter.TclError`` with no message when it is called from the
@@ -562,10 +562,15 @@ def test_pdm131_a_drop_on_a_non_work_day_asks_nothing_and_writes(
     not become visible from there and the grab was up with nothing able to
     take it.
 
-    No modal survives that moment on this platform, so there is none. The
-    block is written -- the weekday list describes a normal week, it is not a
-    lock on the calendar -- and the status line carries the warning, which is
-    the one place on this screen that cannot fail to appear.
+    No modal survives that moment on this platform, so the write path carries
+    none. The block is written -- the weekday list describes a normal week, it
+    is not a lock on the calendar -- and the status line carries the warning,
+    which is the one place on this screen that cannot fail to appear.
+
+    PF-M1 put the question back at the *gesture*: ``on_drag_release`` asks
+    before it schedules this call, so by the time this method runs the answer
+    is already in ``_work_anyway``. This test drives the write directly and is
+    what proves the write itself still asks nothing.
     """
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = SATURDAY
@@ -6183,3 +6188,277 @@ def test_pdm117_ending_a_drag_cancels_the_scroll(screen, manager, monkeypatch):
     # fire into the next test's screen.
     monkeypatch.undo()
     screen.after_cancel(job)
+
+
+# ================= PF — what the 2026-11-10 walk found ====================
+
+
+def _drop_on_box(screen, monkeypatch, item, slot_index=0):
+    """Send an item onto a box through the release handler, as a drag does."""
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    _pointer_on(screen, monkeypatch, frames[slot_index])
+    screen.start_item_drag(None, item)
+    screen.on_drag_release(None)
+    screen.update_idletasks()
+
+
+def test_pfm11_the_drop_asks_on_a_non_work_day(
+    root, manager, settings, monkeypatch
+):
+    """PF-M1 — the question the buttons ask, asked by a single item's drop.
+
+    Found by the walk: AutoLoad asked on a Saturday, a dragged item did not.
+    PD-M13 took the question off this path because two modal attempts failed
+    here, but what failed was a modal in the *idle callback* the write is
+    deferred to. The handler that reads the pointer is a ButtonRelease, and
+    that is where the question is asked now.
+    """
+    asked = []
+    monkeypatch.setattr(
+        "tkinter.messagebox.askyesno",
+        lambda *a, **k: asked.append((a[0], a[1])) or True,
+    )
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    item = _item(manager, "weekend work", SATURDAY)
+
+    _drop_on_box(panel, monkeypatch, item)
+
+    assert len(asked) == 1, f"the drop asked {len(asked)} times: {asked}"
+    title, message = asked[0]
+    assert "work day" in title.lower(), title
+    assert SATURDAY in message, message
+    assert "Schedule anyway?" in message, message
+    assert len(manager.get_time_blocks(SATURDAY)) == 1, (
+        "the user said to schedule it and nothing was written"
+    )
+
+
+def test_pfm12_declining_the_drop_writes_nothing(
+    root, manager, settings, messageboxes, monkeypatch
+):
+    """PF-M1.2 — no means no, and the reason stays where it always was.
+
+    The suite's own stub answers no, so this is the declining path with
+    nothing patched: no block, and the sentence that names the days the week
+    actually allows.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    item = _item(manager, "weekend work", SATURDAY)
+
+    _drop_on_box(panel, monkeypatch, item)
+
+    assert [name for name, _, _ in messageboxes] == ["askyesno"], messageboxes
+    assert manager.get_time_blocks(SATURDAY) == [], "declining still wrote a block"
+    status = panel.status_label.cget("text")
+    assert "not a block day" in status, status
+    assert "Mon, Tue, Wed, Thu, Fri" in status, status
+
+
+def test_pfm13_the_drop_asks_once_per_date(root, manager, settings, monkeypatch):
+    """PF-M1.3 — one decision about the day, not one per drag.
+
+    The answer is held for the sitting, so the second item dragged onto the
+    same Saturday does not ask again.
+    """
+    asked = []
+    monkeypatch.setattr(
+        "tkinter.messagebox.askyesno", lambda *a, **k: asked.append(1) or True
+    )
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    first = _item(manager, "first", SATURDAY)
+    second = _item(manager, "second", SATURDAY)
+
+    _drop_on_box(panel, monkeypatch, first, 0)
+    _drop_on_box(panel, monkeypatch, second, 2)
+
+    assert len(asked) == 1, f"two drops on one Saturday asked {len(asked)} times"
+    assert len(manager.get_time_blocks(SATURDAY)) == 2, (
+        "the second drop was refused on a day already allowed"
+    )
+
+
+def test_pfm14_a_work_day_drop_never_asks(screen, manager, messageboxes, monkeypatch):
+    """PF-M1.4 — the ordinary day is silent, as it was."""
+    item = _item(manager, "Draft the proposal")
+    screen.refresh()
+
+    _drop_on_box(screen, monkeypatch, item)
+
+    assert messageboxes == [], f"a work day's drop asked something: {messageboxes}"
+    assert len(manager.get_time_blocks(THURSDAY)) == 1
+
+
+def test_pfm15_a_question_that_raises_still_schedules(
+    root, manager, settings, monkeypatch
+):
+    """PF-M1.5 — a dialog that cannot be shown must not eat the drop.
+
+    That is the failure PD-M12 reported: the exception left the Tk callback
+    and neither write path got past its first statement. The fallback is the
+    one the buttons already have.
+    """
+    def explode(*_args, **_kwargs):
+        raise tk.TclError()
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", explode)
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    item = _item(manager, "weekend work", SATURDAY)
+
+    _drop_on_box(panel, monkeypatch, item)
+
+    assert len(manager.get_time_blocks(SATURDAY)) == 1, (
+        "a question that raised swallowed the drop"
+    )
+    assert "not a regular work day" in panel.status_label.cget("text"), (
+        panel.status_label.cget("text")
+    )
+
+
+def test_pfm21_a_second_drop_of_the_same_item_writes_nothing(screen, manager):
+    """PF-M2.1 — one block per item per day.
+
+    Nothing refused this before: ``add_block_at`` refuses a box with four
+    blocks in it, not an item that is already on the day, so the same item
+    could be blocked twice on two free boxes.
+    """
+    item = _item(manager, "Draft the proposal")
+    screen.refresh()
+
+    screen.block_item(item, 0)
+    screen.block_item(item, 3)
+
+    blocks = manager.get_time_blocks(THURSDAY)
+    assert [b.label for b in blocks] == ["Draft the proposal"], (
+        f"the item was blocked twice: {[b.label for b in blocks]}"
+    )
+    assert "already blocked at" in screen.status_label.cget("text"), (
+        screen.status_label.cget("text")
+    )
+
+
+def test_pfm22_the_refusal_says_where_the_block_is(screen, manager):
+    """PF-M2.2 — a refusal that does not say where is a second trip to look."""
+    item = _item(manager, "Draft the proposal")
+    screen.refresh()
+    screen.block_item(item, 2)
+    where = manager.get_time_blocks(THURSDAY)[0].start_time
+
+    screen.block_item(item, 5)
+
+    status = screen.status_label.cget("text")
+    assert where in status, f"{where!r} is not in {status!r}"
+    assert "drag that block to move it" in status, status
+
+
+def test_pfm23_a_different_item_still_lands(screen, manager):
+    """PF-M2.3 — the guard is about one item, not about one box."""
+    first = _item(manager, "First")
+    second = _item(manager, "Second")
+    screen.refresh()
+
+    screen.block_item(first, 0)
+    screen.block_item(second, 0)
+
+    assert [b.label for b in manager.get_time_blocks(THURSDAY)] == ["First", "Second"]
+
+
+def test_pfm24_a_break_is_not_an_item_to_refuse(screen, manager):
+    """PF-M2.4 — the guard reads item blocks only.
+
+    A break or a buffer carries no ``item_id``, and repeating across a day is
+    what they are for. A guard keyed on the block's label would refuse the
+    second one.
+    """
+    screen.refresh()
+
+    screen.add_padding_block(BlockType.BREAK)
+    screen.add_padding_block(BlockType.BREAK)
+
+    kinds = [b.block_type for b in manager.get_time_blocks(THURSDAY)]
+    assert kinds.count(BlockType.BREAK) == 2, kinds
+
+
+def test_pfm31_a_child_lands_after_its_parent(screen, manager):
+    """PF-M3.1 — a follow-on task lands behind the work it follows.
+
+    The box has a block in it already, so "after its parent" and "at the end
+    of the box" are different answers: without the rule the child goes last.
+    """
+    parent = _item(manager, "Write the talk")
+    other = _item(manager, "Unrelated")
+    child = _item(manager, "Rewrite slide 3", parent_id=parent.id)
+    screen.refresh()
+
+    screen.block_item(parent, 2)
+    screen.block_item(other, 2)
+    screen.block_item(child, 2)
+
+    labels = [b.label for b in manager.get_time_blocks(THURSDAY)]
+    assert labels == ["Write the talk", "Rewrite slide 3", "Unrelated"], labels
+
+
+def test_pfm32_weekly_tactic_siblings_keep_their_order(screen, manager):
+    """PF-M3.2 — the second relation the schema holds.
+
+    Two items of one Weekly Tactic are linked through ``weekly_tactic_id``;
+    the same rule puts the second behind the first. The link must name a real
+    ``item_type='week'`` row (WT-INV4), so the tactic is built — with an Annual
+    Plan Element id the week-item check demands.
+    """
+    tactic = _item(
+        manager,
+        "This week's tactic",
+        item_type="week",
+        annual_plan_element_id="ape-under-test",
+    )
+    first = _item(manager, "First step", weekly_tactic_id=tactic.id)
+    other = _item(manager, "Unrelated")
+    second = _item(manager, "Second step", weekly_tactic_id=tactic.id)
+    screen.refresh()
+
+    screen.block_item(first, 1)
+    screen.block_item(other, 1)
+    screen.block_item(second, 1)
+
+    labels = [b.label for b in manager.get_time_blocks(THURSDAY)]
+    assert labels == ["First step", "Second step", "Unrelated"], labels
+
+
+def test_pfm33_an_unlinked_drop_joins_the_end(screen, manager):
+    """PF-M3.3 — an ordinary drop is unchanged: it joins the end of the box."""
+    first = _item(manager, "First")
+    second = _item(manager, "Second")
+    third = _item(manager, "Third")
+    screen.refresh()
+
+    screen.block_item(first, 0)
+    screen.block_item(second, 0)
+    screen.block_item(third, 0)
+
+    labels = [b.label for b in manager.get_time_blocks(THURSDAY)]
+    assert labels == ["First", "Second", "Third"], labels
+
+
+def test_pfm34_a_link_with_no_block_in_the_box_is_no_rule(screen, manager):
+    """PF-M3.4 — a partner elsewhere on the day orders nothing."""
+    parent = _item(manager, "Write the talk")
+    child = _item(manager, "Rewrite slide 3", parent_id=parent.id)
+    screen.refresh()
+
+    screen.block_item(parent, 0)
+    screen.block_item(child, 4)
+
+    blocks = manager.get_time_blocks(THURSDAY)
+    assert [b.slot_index for b in blocks] == [0, 4], [b.slot_index for b in blocks]
+    assert blocks[1].position == 1, (
+        f"the child took position {blocks[1].position} in a box it shares with "
+        "nobody"
+    )

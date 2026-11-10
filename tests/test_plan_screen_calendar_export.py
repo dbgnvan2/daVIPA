@@ -753,19 +753,21 @@ def test_cem441_the_header_holds_the_export_button_wired_to_the_export(screen):
 
     Both halves matter: a button wired to nothing and a working export no
     button reaches are the same bug from the user's side (P21).
-    """
-    header = screen.btn_export_calendar.master
-    texts = [
-        child.cget("text")
-        for child in header.winfo_children()
-        if isinstance(child, ctk.CTkButton)
-    ]
 
-    assert "⤴ Google Calendar" in texts
+    PF-M4 put the header on two rows, so "beside the other day-wide actions"
+    is no longer what this asks: the export moved to the tools row, which is
+    where the walk asked for it. What is unchanged is that it is *in the
+    header*, and that is what this asserts.
+    """
+    header = screen.header
+    assert screen.btn_export_calendar.cget("text") == "⤴ Google Calendar"
     assert screen.btn_export_calendar.cget("command") is not None
     assert screen.btn_export_calendar._command == screen.export_day_to_calendar
-    assert screen.btn_export_calendar.master is screen.btn_autoload.master, (
-        "it belongs in the header, beside the other day-wide actions"
+    assert screen.btn_export_calendar.master.master is header, (
+        "the export button is not inside the header any more"
+    )
+    assert screen.btn_export_calendar.master is screen.btn_add_buffer.master, (
+        "it belongs on the tools row, with the other buttons that add to the day"
     )
 
 
@@ -794,7 +796,7 @@ def test_cem441b_the_header_fits_the_window_it_opens_in(screen, root):
     screen.pack(fill="both", expand=True)
     root.update_idletasks()
 
-    header = screen.btn_export_calendar.master
+    header = screen.header
     margin = sum(int(v) for v in re.findall(r"\d+", str(header.grid_info()["padx"])))
     if margin and len(re.findall(r"\d+", str(header.grid_info()["padx"]))) == 1:
         margin *= 2
