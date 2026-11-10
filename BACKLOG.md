@@ -1,128 +1,25 @@
 # daVIPA Backlog
 
-Last Updated: 2026-11-09 — trimmed back to what is active. 245 items became
-76: the closed ones, the review-sweep residue ("below medium", "cold pass",
-"deferred") and the items whose subject was deleted with the prose-reading
-guards on 2026-11-09 are filed in
-`docs/unused-docs/backlog_archive_2026-11-09.md`, with the reason on each.
-The running "Last Updated" narrative that used to sit here — one paragraph
-listing every batch of the preceding fortnight — went with them.
+Last Updated: 2026-11-09 — trimmed back to what is active, in two passes.
+245 items became 73: the closed ones, the review-sweep residue ("below
+medium", "cold pass", "deferred") and the items whose subject was deleted with
+the prose-reading guards are filed in
+`docs/unused-docs/backlog_archive_2026-11-09.md`, with the reason on each. The
+running "Last Updated" narrative that used to sit here went with them.
+
+Then 73 became 49, under `standards/effort-budget.md` rule 3: a below-medium
+finding about a test or a document is dropped, not filed. The 24 are named in the
+commit that removed them, which is their whole record: 18 about tests, 5 about
+documents, and one stale code item (a 2026-08-18 entry describing
+`screens/reschedule_dialog.py` in the present tense; that file was deleted in
+`a8b8d05` and the class it named is in no `src/` file). What survives is 34
+code items — 16 a user would see, 15 internal duplication or dead code, 3 in
+`tools/agents/check_docs_sync.py` — 6 test items of medium severity, and the
+feature requests, user stories and notes at the end.
 
 One batch at a time in this checkout (`CLAUDE.md`). What is here is open work:
 adjacent issues from recent batches, screen reports, the carried-forward
 features, and the long-standing bugs, requests and user stories at the end.
-
-## `main` is green — what is left of the go-green list (2026-11-09)
-
-Closed. CI run **42721197588** at `f01c23f` is green on Python 3.11, 3.12 and
-3.13: `2660 passed, 10 skipped`. The twenty failures this section tracked from
-run 42550648188 on `b6d6ddf` are all closed — eleven by the PDT and PRIT
-batches on 2026-11-08, the remaining nine on 2026-11-09 by WTP-A11 (seven
-tests that measured the CI display rather than the code) and by the two that
-failed only in CI.
-
-The one item below is what did not close with them. The section's history —
-which batch closed which group, and the run that confirmed each — is filed in
-`docs/unused-docs/backlog_archive_2026-11-09.md`.
-
-Re-measure a failure list with:
-
-```
-gh run view <run-id> --log-failed | grep -oE "_{3,} test_[a-z0-9_]+ _{3,}" | sed -E 's/_+ (test_[a-z0-9_]+) _+/\1/' | sort -u
-```
-
-### The traceability pair — partly closed (low)
-
-`::test_every_referenced_test_name_exists` is **green** (PDT-M4.1, `2cd83a3`).
-References left behind by the PD-M14 rewrite were repointed at the tests that
-now cover them, one at a time rather than matched approximately: **8 repointed
-and 1 dropped across 3 rows of `docs/spec_coverage.md`, and 3 `Tests:` lines
-across `src/getmoredone/screens/plan.py` and
-`src/getmoredone/time_block_layout.py`**. (`2cd83a3`'s subject says "seven",
-and the first two versions of this item said five and then seven; all three
-counted names in a hand-written list, not edits in the diff.) One of them,
-`edge_limit_time`, had no test under the name it claimed and none under any
-other; it now points at
-`tests/test_plan_screen.py::test_pdm146_both_ends_refuse_at_midnight_and_say_which`,
-which is what asserts its limit reaches the message.
-
-`::test_every_referenced_test_file_exists` was **still red** on the two
-`models.py` references only, which was item 2. **Closed 2026-11-08 by the PRIT
-batch** — the two files were written (`750afe6`), not the docstrings deleted,
-which is what item 2 said the closure had to be. All three tests in
-`tests/test_traceability_refs.py` are green.
-
-## Adjacent issues — the status-claim batch (SST, 2026-11-08)
-
-Found while measuring for the SST batch, outside its scope, not fixed.
-
-### SST-A2 — fourteen test references are written in a form no guard reads (low)
-
-`docs/spec_coverage*.md` carries 14 references of the form
-`test_time_block_layout.py::test_name` — the basename without the `tests/`
-prefix. `tests/test_traceability_refs.py`'s pattern requires `tests/`, so none
-of the fourteen is checked, and `tests/test_doc_status_claims.py` leaves bare
-`::test_…` names to that guard on purpose.
-
-Resolved by hand: thirteen point at tests that exist. The fourteenth,
-`test_time_block_layout.py::test_pdm58_the_day_cannot_cross_midnight`, does
-not — and it is a deliberate quotation, inside
-`docs/unused-docs/spec_coverage_2026-11-08_plan_calendar_export.md`'s record of which
-references were failing at the time. So widening the existing pattern to accept
-the bare form would turn a correct historical record red, which is why it was
-not widened here.
-
-The fix is the convention the `Tests:` guard already documents for retired
-tests — a quoted reference drops the `::` form — applied to records that quote
-a broken reference. Thirteen live references would then be checked, and the
-fourteenth would stop looking like a live pointer.
-
-**Priority:** Low
-**Effort:** Low
-
-### SST-A12 — `_defined_names()` cannot resolve an indented constant (low)
-
-Its third pattern is `^(\w+)\s*[:=]`, column 0 only. Four of the current
-implementation references resolve *only* through it — `CELEBRATION_TYPES`,
-`LEVEL_KEYS`, `PRIORITY_BANDS`, `_HEX_COLOR_RE` — so naming a constant is an
-established style here. A coverage row naming a class-level constant or a
-`models.py` dataclass field, both indented, is correct and unresolvable, and
-`test_sstm5_every_implementation_reference_resolves` fails on it. Walking the
-AST for assignment targets at any depth is the fix.
-
-Filed 2026-11-09 by the fourth cold pass over the SST batch.
-
-**Priority:** Low
-**Effort:** Low
-
-### SST-A17 — the docs-gate command this batch documented assumes a built venv (low)
-
-`CLAUDE.md` now says to run the docs-sync check by hand with the interpreter
-inside `./venv/`, which exists only after `start.sh` has built it. On a fresh
-clone on the other Mac the documented command fails with "no such file", though
-`tools/agents/check_docs_sync.py` itself needs nothing from the venv. Naming
-`python3` there, or saying the venv is a precondition, is the fix.
-
-Filed 2026-11-09 by the fifth cold pass over the SST batch.
-
-**Priority:** Low
-**Effort:** Low
-
-### SST-A18 — a test docstring still calls the docs-sync gate a merge gate (medium-low)
-
-`tests/test_release_licensing.py::test_bi2_the_docs_sync_gate_knows_about_both_dependency_files`
-opens by saying `CLAUDE.md` makes "dependencies changed -> docs updated" a merge
-gate. `CLAUDE.md` now says the opposite, because this batch measured it: the
-workflow triggers on `pull_request` only and this repo opens none, so the gate
-has never run here. The test's assertions are fine; its stated reason is a claim
-this repo makes about itself that is no longer true — this batch's own subject,
-found in a file the batch did not open. Rewording it belongs with `SST-A8`,
-which moves the check into the suite.
-
-Filed 2026-11-09 by the fifth cold pass over the SST batch.
-
-**Priority:** Medium-low
-**Effort:** Low
 
 ## Adjacent issues — priority defaults and the cap (PRI, filed 2026-11-08)
 
@@ -265,41 +162,6 @@ triple, and the wording should be settled once, there, rather than twice.
 **Priority:** Low
 **Effort:** Low
 
-### 2026-11-08 - Type: Technical Debt
-
-**Title:** UPD-A13 - no test enforces docs/DOCUMENTATION_INDEX.md's completeness
-**Description:** The global rule in `~/.claude/CLAUDE.md` is that where a repo
-keeps a documentation index, every document is listed in it **and a test
-enforces that**. No test checks the index for completeness. (This line used
-to say `grep -rn DOCUMENTATION_INDEX tests/` returned nothing; the SST batch
-falsified that on 2026-11-08 — the grep now returns the eight lines in
-`tests/test_doc_status_claims.py`, none of which checks completeness. Corrected
-2026-11-09 by the second cold pass; the conclusion stands, its evidence did
-not.) **Measured 2026-11-09 by the third cold pass: 26 of the 42
-`docs/unused-docs/implementation_plan_*.md`, `docs/spec_*.md` and `docs/unused-docs/spec_coverage_*.md`
-documents are absent from the index.** Two of the 26 were the stale status
-claims that pass found — a spec headed as a draft over a module that shipped in
-August, and a plan whose `## Status` described three built phases in the future
-tense. That is the mechanism: a document in no index is a document nobody
-re-reads. The index is kept by hand - which is how it came to carry a
-"Not approved" line for a plan that had been approved and built the same day,
-found while writing this batch's entry.
-
-The test is small: walk `docs/*.md` plus `docs/unused-docs/changes/*.md`, read the
-`### <path>` headings out of the index, and assert the two sets match, with an
-explicit allow-list for anything deliberately unlisted. It was not written
-inside this batch because the batch's own entry is one of the things it would
-police, and a check written by the change it is checking is the wrong order.
-This is the same class as P25: a rule that holds on only one surface, and not
-the one anyone uses.
-
-**The same gap is filed again, at low, as `PLC-A5`**, whose own text is where
-six other places route a reader for it. Whichever is taken, close both: the
-test design is here, the routing is there, and `SSC-8` was the finding that
-they had no pointer between them.
-**Priority:** Medium
-**Effort:** Low
-
 ## Adjacent issues — Plan day calendar export (CE, 2026-11-08)
 
 Found while building CE-M1 to CE-M5. Flagged, not fixed (global rule 10): each
@@ -392,28 +254,6 @@ Two things the plan step has to settle, both recorded in the spec:
 **Priority:** Next feature
 **Effort:** High (two batches)
 
-## Adjacent issue — weekly tactic as parent (WTP, 2026-11-08)
-
-Found while building WTP-M6.4. Flagged, not fixed (global rule 10).
-
-### WTP-A1 — the shipped-column width test names its sets by hand (low)
-
-`tests/test_unified_panel_design.py::test_updm31_every_shipped_column_declares_a_width_it_can_have`
-holds a literal dict of column sets, so a set added to `chip_table.py` is not
-checked until somebody remembers to add it there too. That is what had
-happened: `WEEK_ACTIONS_LEFT_COLUMNS` shipped in UPD-M6 and was never in the
-dict, and the two sets this batch touched were added by hand for the same
-reason. The guarantee the test is written to give — *every* shipped column
-declares a width inside its own bounds — is not the guarantee it enforces.
-
-The fix is to enumerate the module instead: every module-level
-`Tuple[ChipColumn, ...]` in `chip_table.py`, found by name rather than listed.
-Not fixed here because it is a change to a test's subject, which is the kind of
-rewrite that wants its own pass rather than riding along with a feature.
-
-**Priority:** Low
-**Effort:** Small
-
 ## Adjacent issues — CI green (CIG, 2026-11-09)
 
 Found while building `CIG-M1` to `CIG-M4`. Flagged per rule 10, not fixed: each
@@ -479,87 +319,6 @@ be the third design for these tests in one day.
 
 **Priority:** Medium
 **Effort:** Small
-
-### CIG-A4 — `test_cigm14_the_private_copy_of_the_precondition_is_gone` asserts by grep (low)
-
-Two unanchored substring checks over
-`tests/test_weekly_tactic_completion_widgets.py`. The repo rule is to parse
-rather than grep where a behavioural check is impractical, and
-`tests/source_asserts.py` exists for exactly this. The substance — that the
-private skip wording is gone and `_TOPMOST_ON` survives — is right; the form is
-not.
-
-**Priority:** Low
-**Effort:** Small
-
-### CIG-A5 — the `-alpha` probe is partly vacuous (low)
-
-`_PROBES["-alpha"]` sets 0.0 and asserts 0.0 comes back. `conftest` already
-sets alpha 0.0 on every test window at creation, so on a display where the
-attribute is simply ignored and the read-back returns whatever was last stored,
-the probe answers True without the display having honoured anything. A value
-the wrapper does not already set — 0.5 — would distinguish the two.
-
-Low rather than medium because the probe is measured against a second window by
-`CIG-M1.1`, so a wrong answer is a red test rather than a silent skip; and
-because the probe's window is built with raw `tk.Tk`, outside the wrapper.
-
-**Priority:** Low
-**Effort:** Small
-
-### CIG-A6 — `_requirers()` matches only a bare `require(...)` (low)
-
-The AST walk looks for `ast.Name` with `id == "require"`. A caller that writes
-`caps.require("-topmost")` — which the module's own docstring style invites —
-is an `ast.Attribute` and is invisible to it, so it would read as a missing
-precondition. Harmless today, because all eight callers import the bare name;
-it is the form that is wrong. Same family as `CIG-A1`.
-
-**Priority:** Low
-**Effort:** Small
-
-### CIG-A7 — the new test file carries no marker, and three smaller things (low)
-
-`tests/test_display_capabilities.py` AST-walks the test tree and reads source
-text, which is what the `meta` marker is for, and it has none: it is counted as
-app behaviour by `-m "not meta"`. Alongside it: `_independently()` in that file
-has no `except` mirror of the probe's own, so a display that raises leaves the
-comparison an error rather than a disagreement;
-`test_pbm61_a_tall_row_keeps_its_slack_below_its_text`'s docstring cites
-`plan_blocks.py` by line number, which `SST-M8` forbids for the chronic
-documents and is the same defect class here; and the probe builds a second Tcl
-interpreter, so it is the first `tk.Tk()` of a run and sets `_default_root`.
-
-**Priority:** Low
-**Effort:** Small
-
-### CIG-A8 — why the body reports 1208px under X11 is unknown (low)
-
-`test_updm14_zero_width_body_is_a_noop` failed on CI for months with
-`assert 1208 <= 8`: `body.configure(width=8)` did not change
-`body.winfo_width()` there, and does here. Two explanations were written into
-the test as comments and both were withdrawn after measurement — the body
-reports 1px whatever its holder does, and the root's geometry is not what the
-body follows. The test no longer depends on the answer, so this is filed as the
-open question it is rather than guessed at again.
-
-**Priority:** Low
-**Effort:** Medium (diagnosis, on a machine with the CI display)
-
-### CIG-A9 — the traceability guard cannot see a bare `::name` (low)
-
-`docs/spec_coverage.md` cited
-`::test_pbm61_a_tall_row_keeps_its_two_lines_together` after this batch renamed
-it, and `tests/test_traceability_refs.py` stayed green: its pattern is
-`(tests/[\w/]+\.py)(?:::(\w+))?`, so a `::name` with no file before it is not
-a reference it can check. The coverage file's Tests column is written that way
-throughout — the file is named once in a section header and every row uses the
-bare form — so the guard is blind to the majority of that column.
-
-Found by reading, not by a test, which is the point of filing it.
-
-**Priority:** Low
-**Effort:** Medium
 
 ## Adjacent issues — priority level colours (PLC, 2026-11-08)
 
@@ -937,26 +696,6 @@ seventh. The fix is mechanical and identical in each: delete the
 `finally`, keep the destroy-and-rebuild. What it needs is a walk of each
 screen afterwards, which is the actual cost.
 
-### 2026-11-07 - Type: Documentation
-
-**Title:** The documentation index lists two spec docs and none of the plans
-**Description:** `docs/DOCUMENTATION_INDEX.md` names
-`docs/spec_2026-11-07_ape_period_consistency.md` and
-`docs/spec_2026-11-07_ape_week_actions.md` individually, and covers handoff
-notes with one generic `docs/unused-docs/changes/` entry. The seventeen
-`implementation_plan_*.md` files, the other seven `spec_*.md` files and the five
-`spec_coverage*.md` files are not listed anywhere in it, including
-`implementation_plan_2026-11-06_plan_day_controls.md`, which is the plan of
-record for PD-M1 - PD-M11.
-**Priority:** Low
-**Effort:** Small - one pass over `ls docs/`, plus the meta test
-**Notes:** Found while updating docs for PD-M11; the gap predates that batch and
-no test enforces the index, so nothing failed. The global rule is that where a
-repo keeps a documentation index every document is listed in it and a test
-enforces that - this repo has the index and not the test. Worth doing as one
-docs pass with a meta test that compares `docs/*.md` against the index, rather
-than one entry at a time.
-
 ## Adjacent issues from the plan day-controls batch (2026-11-06)
 
 Found while building PD-M2 and PD-M3, not introduced by either, and not fixed
@@ -1107,41 +846,6 @@ and an idempotency case).
 **Notes:** Found by the learning-qa sweep of commit 55f1b36 (finding 8, P1/P3 — a
 repairable condition recorded as a terminal one).
 
-### 2026-08-18 - Type: Enhancement
-
-**Title:** `RescheduleDialog` has no caller in `src/`
-**Description:** `src/getmoredone/screens/reschedule_dialog.py` defines
-`RescheduleDialog`, but nothing in `src/` constructs it — the only references are
-the class statement itself and two tests. The live "push to next day" path
-(`today.py`, `upcoming.py`) calls `reschedule_item` directly instead. So a
-dialog that offers a reason field and a date picker is unreachable from the app.
-**Priority:** Low
-**Effort:** Small
-**Notes:** Found by the learning-qa sweep of ca802ff (finding 6, P21 —
-built-but-not-wired). Either wire it to a Reschedule action or delete it; a
-surface reachable only from a test inflates the WT-M6 coverage claim. Left alone
-in this change because it is out of scope for the weekly-tactic spec, and it was
-already like this before.
-
-### SAG-A4 — one assertion couples an exit code to an outcome-name spelling (low)
-
-`tests/test_docs_sync_rule.py` decides which side of `gate.PASSING` an outcome
-should fall on by testing `expected.startswith(("pass", "no-"))` — that is, by
-the spelling of the fixture's own outcome name. Renaming an outcome's *value*
-silently changes which branch the assertion exercises rather than failing. A
-per-fixture expectation would be independent of the spelling.
-
-The gap is also wider than the title: **no test asserts `main`'s exit code at
-all.** `return 0 if code in PASSING else 1` is the line a CI step would act on,
-and only `verdict`'s outcome name is asserted.
-
-Filed 2026-11-09 by the first cold pass over the SAG batch, which described this
-as an assertion on `main`'s exit code; the second pass measured that there is no
-such assertion.
-
-**Priority:** Low
-**Effort:** Small
-
 ### SAG-A5 — `run()` puts a literal backslash-n in its error message (low)
 
 `tools/agents/check_docs_sync.py::run` raises
@@ -1177,19 +881,6 @@ is that below-medium findings are not fixed in-loop.
 **Priority:** Low
 **Effort:** Small
 
-### SAG-A10 — `test_sagm23` cannot tell an unreadable range from a missing git (low)
-
-`tests/test_docs_sync_rule.py` asserts that the tool's output contains
-"skipped" when the range cannot be read. It would also pass if git were absent
-or the working directory were not a repository, so the test does not establish
-that the *range* is what failed. Asserting on the message's command text as
-well would separate the two.
-
-Filed 2026-11-09 by the third cold pass over the SAG batch.
-
-**Priority:** Low
-**Effort:** Small
-
 ### SAG-A11 — `run()` has no timeout on its subprocess (low, P5)
 
 `tools/agents/check_docs_sync.py::run` calls `subprocess.run` with no
@@ -1217,20 +908,6 @@ function.
 **Notes:**
 ```
 
-### SAG-A18 — `tests/` itself is outside the traceability scan, undocumented (low)
-
-`SCANNED` covers `src`, `tools`, `conftest.py` and four document globs, but not
-`tests/*.py`, which holds 118 path-form references of its own. The exclusion is
-load-bearing and deliberate — ten of those references are fictional fixtures
-(`tests/test_a.py`, `tests/test_thing.py`, and this guard's own comment citing
-`tests/test_column_resize.py::test_updf13_` as the example of a dead citation),
-so adding the arm would go red on the guard's own prose. Unlike
-`COVERAGE_WITHOUT_PATHS`, nothing says so: a reader sees four document families
-scanned and a test suite that is not. Either document the exclusion where
-`SCANNED` is defined, or add the arm with a named exemption for the fixtures.
-Measured by the sixth cold pass, which also confirmed all 118 resolve today
-except the deliberate fixtures.
-
 ### SBN-A1 — a bare `::name` citation resolves against the whole suite, not against its own file (medium)
 
 `tests/test_traceability_refs.py`'s bare arm (`SBN-M1`) accepts a name defined
@@ -1247,17 +924,6 @@ Not fixed because the anchoring rule was measured and rejected: see the closed
 options are a per-document convention (declare the file a table's bare names
 belong to, in the document) or leaving it as the weaker check it is. The first
 is a documentation change across 34 documents, not a guard change.
-
-### SBN-A2 — bare `::name` citations that name a `src/` symbol are read by nothing (low)
-
-68 bare names in the scanned families are not test names — `::update_action_item`,
-`::export_day`, `::_build_service` — almost all of them continuing a
-`src/…py::func` citation in a neighbouring table cell, and 51 of them resolve
-against nothing under `tests/`, which is why they are excluded by `_TESTISH`
-rather than merely unresolved. Checking them means resolving against `src/`,
-which `tests/test_doc_status_claims.py::test_sstm5_every_implementation_reference_resolves`
-already does for the Implementation column of the coverage family only. The arm
-to add is that resolver over the bare form, in all four families.
 
 ### SBN-A3 — PD-M14.4 and PD-M14.7 have no automated test, under any name (medium)
 
@@ -1277,62 +943,4 @@ after the cold pass corrected an over-broad first claim:
   ever built.
 
 A product judgement, which is why it is filed rather than answered.
-
-### SBN-A4 — the guard asserts that bare citations keep existing, so improving a family turns it red (low)
-
-`::test_this_guard_can_actually_fire` asserts membership per family: at least
-one bare `::name` citation must be found in the coverage family, the plans, the
-dated specs and the handoff notes. That is deliberate — an exact count goes red
-on every batch and a floor is forbidden here — but it means a future batch that
-converts one family's bare citations to the path form, which is the stronger
-form, fails the guard for having improved the documents. The fix is to assert
-the arm's *mechanism* against a fixture (a document the test writes) rather
-than against the repo's current prose, the same move the sixth SAG cold pass
-made for the resolver probe.
-
-### SBN-A5 — T5.3's raising-handler case is not covered (low)
-
-`docs/unused-docs/implementation_plan_2026-08-25_timer_session_endings.md`'s T5.3 is
-"topmost restored even when the modal's handler **raises**". The test that
-carries `T5.3` asserts the other half (a parent that was not topmost is left
-alone), and no test in `tests/test_timer_session_endings.py` raises inside a
-modal's handler and then checks the restore — `grep -n raise` over that file
-finds none. The plan said `::test_t57_an_unbalanced_resume_does_not_break_the_next_modal`
-covered it; that test drives a stray resume, which is the depth counter. The
-document now says the case is uncovered. The test is a few lines of work: open
-a modal whose handler raises, assert topmost comes back and the depth returns
-to zero.
-
-### SBN-A7 — two alternatives in `_BARE`'s lookbehind are unexercised (low)
-
-`_BARE = re.compile(r"(?<![\w.)])::(\w+)")`. Measured over the scanned
-documents: of 1930 `::name` tokens, the character before is a backtick (1098),
-the `y` of `.py` or another name character (794), an ellipsis (37) or a line
-start — `)` never occurs and the one `.` case is excluded by `_TESTISH` anyway.
-The `_FULL` mask was deleted in the same batch on exactly this ground, that it
-changed no outcome; these two alternatives were kept. Either drop them or add
-the fixture that exercises them.
-
-### GSF-A5 — `BACKLOG.md` says a file under `src/getmoredone/screens/` defines a function, and no such file is tracked (medium)
-
-`grep -n 'reschedule_dialog.py' BACKLOG.md` finds two entries, one of which
-says in the present tense that `src/getmoredone/screens/reschedule_dialog.py`
-*defines* a function. `git ls-files` finds no file of that name anywhere, and
-none named `confirm_dialog.py` either, which a third entry also names. Found by
-the GSF class measurement, which counted 55 unresolvable path citations in the
-live documents and found this to be the one genuine defect among the 25
-distinct names. Either the file was renamed and these entries were not, or the
-entries describe work that was never built; the fix needs those items read
-rather than their citations rewritten, which is why it is filed and not
-repaired here.
-
-### MAW-A1 — `.agents/` now holds only a template (low)
-
-The three role prompts are deleted, so `.agents/prompts/` is gone and
-`.agents/` holds nothing but `templates/handoff-note.md`, which
-`tests/test_repo_hygiene.py::test_mawm12_the_retired_agent_apparatus_is_absent`
-positively requires to stay. Whether a one-file `.agents/` tree is worth
-keeping, or the template belongs under `docs/` or `.github/`, is a tidying
-question with a guard to update either way. Found while measuring the deletion
-set.
 
