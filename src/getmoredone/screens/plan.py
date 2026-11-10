@@ -1353,8 +1353,12 @@ class PlanScreen(ctk.CTkFrame):
                 )
                 return
 
-        # PF-M3 -- a follow-on task lands behind the work it follows.
+        # PF-M3 -- a follow-on task lands with the work it follows.
         after = self._linked_block_in_slot(item, slot_index)
+        # ... and when its partner is in another box, a continuation goes to
+        # the top of the one it was dropped on rather than under everything
+        # already there.
+        top = after is None and self._continues_a_block(item)
 
         block = TimeBlock(
             block_date=self.selected_date,
@@ -1370,7 +1374,13 @@ class PlanScreen(ctk.CTkFrame):
                 block,
                 slot_index,
                 self.bounds,
+                # PF-M6 -- the drawn day, not the template's hours. A box that
+                # exists because the day was extended earlier or later is on
+                # screen and accepts a drop; reading only the template refused
+                # it as "outside the day" while the user was looking at it.
+                day_span=self._grid.span,
                 after_block_id=after.id if after is not None else None,
+                at_top=top,
             )
         except SlotRefusedError as refused:
             self.set_status(refusal_text(refused.reason), "error")
@@ -1447,6 +1457,7 @@ class PlanScreen(ctk.CTkFrame):
             self.bounds,
             slot_index,
             slots_for_minutes(minutes),
+            day_span=self._grid.span,
         )
         return refusal_text(reason) if reason else None
 
@@ -1470,6 +1481,26 @@ class PlanScreen(ctk.CTkFrame):
             self._non_work_day = True
             return True
 
+    def _continues_a_block(self, item: ActionItem) -> bool:
+        """Is this item a continuation of work already blocked on this day?
+
+        Purpose: PF-M3 -- "continuation from previous block" goes to the top of
+                 the box it is dropped on, not under whatever is already there.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m3
+        Tests:   tests/test_plan_screen.py::test_pfm35_a_continuation_lands_on_top
+
+        A child item whose parent is on the day. Not a Weekly Tactic: a tactic
+        is a container for unrelated work, and ordering its steps as a chain
+        was the wrong reading of "linked" (2026-11-10).
+        """
+        parent = getattr(item, "parent_id", None)
+        if not parent:
+            return False
+        for block in self.db_manager.get_time_blocks(self.selected_date):
+            if block.block_type == BlockType.ITEM and block.item_id == parent:
+                return True
+        return False
+
     def _linked_block_in_slot(
         self, item: ActionItem, slot_index: int
     ) -> Optional[TimeBlock]:
@@ -1480,22 +1511,16 @@ class PlanScreen(ctk.CTkFrame):
         Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m3
         Tests:   tests/test_plan_screen.py::test_pfm31_a_child_lands_after_its_parent
 
-        **Linked**, for this building, is one of two things the schema holds:
-        either item is the other's ``parent_id``, or both carry the same
-        non-empty ``weekly_tactic_id``. ``item_links`` points at notes, files
-        and URLs, not at other items, so it cannot be the relation meant. If
-        the walk shows a different one, this is the method to correct.
+        **Linked** is the parent/child pair: either item is the other's
+        ``parent_id``. Nothing else is treated as a link — ``item_links``
+        points at notes, files and URLs, and a shared ``weekly_tactic_id`` is a
+        container for steps that need not follow one another (2026-11-10: the
+        weekly tactic rule was removed for exactly that reason).
 
-        The nearest match wins, walking the box in the order it is drawn, so a
-        box holding both a parent and a tactic sibling puts the item after the
-        first of them it meets.
+        The first match in draw order wins, which is what "the nearest" means
+        here: the box is ordered by position and the walk follows it.
         """
-        # The first match in draw order, which is what "the nearest" means
-        # here: the box is ordered by position and the walk follows it.
-        mine = {
-            "parent": getattr(item, "parent_id", None),
-            "tactic": getattr(item, "weekly_tactic_id", None),
-        }
+        mine = {"parent": getattr(item, "parent_id", None)}
         for block in self.db_manager.get_time_blocks(self.selected_date):
             if block.slot_index != slot_index:
                 continue
@@ -1509,9 +1534,6 @@ class PlanScreen(ctk.CTkFrame):
             if mine["parent"] and getattr(other, "id", None) == mine["parent"]:
                 return block
             if getattr(other, "parent_id", None) == item.id:
-                return block
-            tactics = {mine["tactic"], getattr(other, "weekly_tactic_id", None)}
-            if len(tactics) == 1 and mine["tactic"]:
                 return block
         return None
 

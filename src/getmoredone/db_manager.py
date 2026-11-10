@@ -1633,6 +1633,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
     def add_block_at(
         self, block: TimeBlock, slot_index: int, bounds, day_span=None,
         after_block_id: Optional[str] = None,
+        at_top: bool = False,
     ) -> TimeBlock:
         """Create a block in a particular box.
 
@@ -1644,11 +1645,11 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         The fit is checked before anything is written, so a refusal leaves the
         day exactly as it was rather than rolling a write back.
 
-        ``after_block_id`` is PF-M3: a box orders its blocks by ``position``
-        and a drop joins the end, which is right for an unrelated task and
-        wrong for one dragged behind the work it belongs to. Given a block, the
-        new one takes the position directly behind it and the rest of the box
-        moves down one.
+        ``after_block_id`` and ``at_top`` are PF-M3: a box orders its blocks by
+        ``position`` and a drop joins the end, which is right for an unrelated
+        task and wrong for one dragged as a continuation of other work. Given a
+        block, the new one goes directly behind it; given ``at_top``, it goes
+        in front of everything in the box and the rest move down one.
         """
         self._refuse_unless_it_fits(
             block.block_date,
@@ -1659,43 +1660,53 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         )
         with self.transaction() as conn:
             self._settle_block_on_slot(block, slot_index, bounds)
+            position = 1 if at_top else None
             if after_block_id:
-                self._move_behind(conn, after_block_id, block, slot_index)
+                position = self._position_after(conn, after_block_id)
+            if position is not None:
+                self._insert_at(conn, block, slot_index, position)
             self.create_time_block(block)
         return block
 
-    def _move_behind(
-        self, conn, after_block_id: str, block: TimeBlock, slot_index: int
-    ) -> None:
-        """Give ``block`` the position directly behind another block's.
+    def _position_after(self, conn, after_block_id: str) -> Optional[int]:
+        """The position directly behind that block, or ``None`` if it is gone.
 
-        Purpose: PF-M3 -- one place decides what "after it" means, so a drop
-                 and any later caller cannot disagree about the order.
+        Purpose: PF-M3 -- a caller that identified a partner from the day it
+                 read is not wrong when the row has gone since; it just has no
+                 partner to sit behind, and the block keeps the end-of-box
+                 position ``_settle_block_on_slot`` gave it.
         Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m3
         Tests:   tests/test_plan_screen.py::test_pfm31_a_child_lands_after_its_parent
-
-        A missing partner is not an error: the caller identified it from the
-        day it read, and between that read and this write the row can be gone.
-        The block then keeps the end-of-box position ``_settle_block_on_slot``
-        already gave it.
         """
         row = conn.execute(
             "SELECT position FROM time_blocks WHERE id = ?", (after_block_id,)
         ).fetchone()
-        if row is None:
-            return
+        return None if row is None else int(row["position"]) + 1
 
-        behind = int(row["position"])
+    def _insert_at(
+        self, conn, block: TimeBlock, slot_index: int, position: int
+    ) -> None:
+        """Put ``block`` at this position in its box, moving the rest down one.
+
+        Purpose: PF-M3 -- one place decides what "here" means, so the top of a
+                 box and the place behind a partner cannot disagree about the
+                 order.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m3
+        Tests:   tests/test_plan_screen.py::test_pfm35_a_continuation_lands_on_top
+
+        Scoped to ``(block_date, slot_index)``: positions are per box, so a
+        shift that ran wider would renumber other boxes and other days.
+        """
         conn.execute(
             """
             UPDATE time_blocks
             SET position = position + 1
             WHERE block_date = ? AND slot_index = ?
-              AND position > ? AND id IS NOT ?
+              AND position >= ? AND id IS NOT ?
             """,
-            (block.block_date, int(slot_index), behind, block.id),
+            (block.block_date, int(slot_index), int(position), block.id),
         )
-        block.position = behind + 1
+        block.position = int(position)
 
     def shift_all_slots(self, by: int) -> int:
         """Renumber every date's blocks so they keep their clock times when Day Start moves.
