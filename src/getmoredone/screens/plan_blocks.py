@@ -627,18 +627,12 @@ def build_slot_row(
         return rendered
 
     inner = 0
-    for block in grid_slot.starting:
-        chip = _build_block_chip(
-            body,
-            block,
-            items_by_id.get(block.item_id),
-            inner,
-            continued=False,
-            chip_height=chip_height,
-            title_width=title_width,
-        )
-        rendered.block_widgets.append((block, chip))
-        inner += 1
+    # PF-M7 -- continuations first. A box a longer task runs through draws that
+    # task's greyed chip, and it used to be drawn *after* everything that starts
+    # in the box: every new task dropped there pushed the continuation down, so
+    # the half hour read as a list of new work with the thing it is continuing
+    # at the bottom. Work that carries on from the box above belongs at the top
+    # of the one it runs into.
     for block in grid_slot.continued:
         # Which continuation this is, so only the final box can claim the
         # spare minutes: they are a property of the last box, and a middle box
@@ -659,6 +653,18 @@ def build_slot_row(
             chip_height=chip_height,
             title_width=title_width,
         )
+        inner += 1
+    for block in grid_slot.starting:
+        chip = _build_block_chip(
+            body,
+            block,
+            items_by_id.get(block.item_id),
+            inner,
+            continued=False,
+            chip_height=chip_height,
+            title_width=title_width,
+        )
+        rendered.block_widgets.append((block, chip))
         inner += 1
 
     return rendered
