@@ -196,6 +196,43 @@ start in a box, and a continuation chip is the same block drawn again.
 |---|---|---|
 | PF-M7.1 | A continuation chip is drawn above the tasks that start in that box | `tests/test_plan_screen.py::test_pfm71_a_continuation_sits_above_what_starts_in_that_box` |
 
+## PF-M8 — A day can have a lunch of its own
+
+**Asked:** "Allow the user to move the Lunch item, like they can break and
+buffer." Chosen at the fork: **per day**, not for every date.
+
+Lunch has been a property of the day's *shape*: `bounds.lunch_start_minutes` and
+`lunch_minutes`, one setting, shaded onto every date's grid and taking no tasks.
+Break and buffer blocks are rows, so they move; lunch could not.
+
+A date now gets a lunch of its own by having a `LUNCH` block:
+
+- `BlockType.LUNCH` in `models`, so the three layers agree on the string.
+- `lunch_window(blocks, bounds)` in `time_block_layout`: a date's `LUNCH` block
+  wins; without one the settings' window is used. `day_grid` takes the window as
+  a parameter, so `is_lunch` on a slot has one derivation instead of two.
+- `build_day_grid` and `can_place` both read it, so the drawn grid and the
+  refusal agree — and a block placed *as* lunch passes `ignore_lunch`, or it
+  would be refused by the lunch it defines.
+- The screen draws the chip exactly as before. Without a block it is the
+  settings', handed back as `SlotRow.lunch_chip` and bound to a drag that
+  writes the block on release; with one it is that block's, so drag, resize and
+  the right-click menu (including **Delete**) already work.
+- **Delete is the way back.** Remove the block and the date is on Day Settings'
+  lunch again; nothing remembers an override.
+- Length stays a setting: moving lunch moves *when* it is.
+
+Clear Day keeps it, like a break or a buffer: it was put there by hand.
+
+| ID | Criterion | Verified by |
+|---|---|---|
+| PF-M8.1 | A lunch block replaces the settings' lunch for that date only | `tests/test_plan_screen.py::test_pfm81_a_lunch_block_moves_the_lunch_for_that_date` |
+| PF-M8.2 | A lunch box still takes no tasks, wherever it has moved to | `::test_pfm82_a_task_cannot_land_on_the_moved_lunch` |
+| PF-M8.4 | Dragging the settings' lunch writes this date's block | `::test_pfm84_dragging_the_lunch_chip_gives_this_date_a_lunch_block` |
+| PF-M8.5 | A second drag moves that block rather than writing another | `::test_pfm85_a_second_drag_moves_that_block` |
+| PF-M8.6 | Clear Day keeps the lunch block | `::test_pfm86_clear_day_keeps_the_lunch_block` |
+| PF-M8.7 | Deleting the block returns the date to Day Settings' lunch | `::test_pfm87_deleting_the_lunch_block_returns_the_date_to_the_settings` |
+
 ## PF-M4 — The header is two rows
 
 **Asked:** "Put the Buffer, Break, Calendar and Day Settings buttons on the

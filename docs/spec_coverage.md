@@ -1901,3 +1901,15 @@ them already, asked at a different moment than either.
 | PF-M5.3 | The tools row fits the narrowest window | `plan.py::create_header` | `::test_pfm53_the_buttons_fit_the_narrowest_window` |
 | PF-M6.1 | A box above Day Start, left by an Earlier drop, accepts a later drop | `plan.py::block_item` (`day_span=self._grid.span`) | `::test_pfm61_a_box_the_day_grew_into_accepts_a_drop` |
 | PF-M6.2 | A box past Day End accepts a later drop | same | `::test_pfm62_a_box_the_day_grew_into_at_the_end_accepts_a_drop` |
+
+### PF-M7 and PF-M8 — a continuation's place, and a lunch of the day's own (2026-11-10)
+
+| Criterion | Implementation | Test |
+|---|---|---|
+| PF-M7.1 | A continuation chip is drawn above the tasks that start in the box | `plan_blocks.py::build_slot_row` (continuations drawn first) | `tests/test_plan_screen.py::test_pfm71_a_continuation_sits_above_what_starts_in_that_box` |
+| PF-M8.1 | A lunch block replaces the settings' lunch for that date only | `models.py::BlockType.LUNCH`, `time_block_layout.py::lunch_window`, `::day_grid(lunch=)`, `::build_day_grid` | `::test_pfm81_a_lunch_block_moves_the_lunch_for_that_date` |
+| PF-M8.2 | A lunch box takes no tasks wherever it moved to | `time_block_layout.py::can_place` (lunch from `lunch_window`) | `::test_pfm82_a_task_cannot_land_on_the_moved_lunch` |
+| PF-M8.4 | Dragging the settings' lunch writes this date's block | `plan_blocks.py::build_slot_row` (`lunch_chip`), `plan.py::bind_lunch_handlers`, `::place_lunch_at` | `::test_pfm84_dragging_the_lunch_chip_gives_this_date_a_lunch_block` |
+| PF-M8.5 | A second drag moves that block | `plan.py::place_lunch_at` → `db_manager.py::place_block_at` | `::test_pfm85_a_second_drag_moves_that_block` |
+| PF-M8.6 | Clear Day keeps the lunch block | `plan.py::clear_day` (item blocks only) | `::test_pfm86_clear_day_keeps_the_lunch_block` |
+| PF-M8.7 | Deleting the block returns the date to Day Settings' lunch | `plan.py::delete_block`, `time_block_layout.py::lunch_window` | `::test_pfm87_deleting_the_lunch_block_returns_the_date_to_the_settings` |

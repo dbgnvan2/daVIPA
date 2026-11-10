@@ -397,8 +397,9 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   rather than one right-click per block. It asks first, with the count in the
   question (*"Remove 5 scheduled items from 2026-11-07?"*), because the app has
   no undo. **Breaks and buffers stay**: AutoLoad never wrote one, each was put
-  there by hand, and the question says how many are staying. Lunch is not a
-  block at all — it comes from *Day Settings* — so it is untouched either way.
+  there by hand, and the question says how many are staying. A lunch you moved
+  stays too, for the same reason. Lunch is otherwise not a block at all — it
+  comes from *Day Settings* — so it is untouched either way.
   A day with no items scheduled says *nothing to remove* and asks nothing. It
   does not ask about the weekday list: taking work off a day is not planning
   work onto it, so a Saturday you filled can be cleared without being asked
@@ -581,6 +582,14 @@ Day pane (right):
   Why: It is part of the day's shape, so it is drawn in its place rather than as
   a gap you have to infer. A drop on it is refused with *That would run into
   lunch — try a later box*.
+
+  **Lunch can be moved, on that date only.** Drag the `Lunch` box onto another
+  half hour and the day keeps its own lunch there; every other date keeps the
+  lunch Day Settings names. The first drag writes the lunch block the setting
+  had been standing in for, its length is still *Day Settings → Lunch
+  (minutes)*, and **deleting** the box (right-click → *Delete block*) hands the
+  date back to Day Settings. A date with its own lunch shows one Lunch box, not
+  two: the moved one replaces the setting rather than sitting beside it.
 - **A refusal always says which** — What: One of *That is outside the day — Day
   Settings sets its hours*, *That would run into lunch — try a later box*, or
   *That half hour is full — try another box*. Choosing a length for a block that

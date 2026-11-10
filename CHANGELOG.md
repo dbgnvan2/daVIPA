@@ -40,6 +40,11 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   chip was drawn below whatever else had been dropped in the box, so every new
   task pushed it down. It is drawn first now, and the tasks that start in the
   box stack below it.
+- **Lunch can be moved, on that date only.** Drag the `Lunch` box onto another
+  half hour and the day keeps its own lunch there; the first drag writes a
+  lunch block the setting had been standing in for, and the length is still
+  *Day Settings → Lunch (minutes)*. Every other date keeps the lunch the
+  setting names, and deleting the box hands this date back to it.
 - **A box the day grew into accepts a drop.** Extending the day on **Earlier**
   or **Later** draws half hours outside Day Settings' hours; dropping an item on
   one of them was refused as "outside the day" while the box was on screen. The
