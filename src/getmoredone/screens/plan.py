@@ -202,14 +202,14 @@ MAX_ITEM_ROWS = 60
 # the last box ends at Day End, so no placement can run past what HH:MM can
 # express.
 REFUSAL_TEXT = {
-    SlotRefusal.OUTSIDE_GRID: "That is outside the day — Day Settings sets its hours",
-    SlotRefusal.CROSSES_LUNCH: "That would run into lunch — try a later box",
-    SlotRefusal.SLOT_FULL: "That half hour is full — try another box",
+    SlotRefusal.OUTSIDE_GRID: "That Time Block is outside the day — Day Settings sets its hours",
+    SlotRefusal.CROSSES_LUNCH: "That Time Block runs into lunch — try a later one",
+    SlotRefusal.SLOT_FULL: "That Time Block is full — try another one",
 }
 
 #: Said when a refusal arrives with a reason nothing here words. Better than
 #: showing the user the reason's internal name, and loud enough to be noticed.
-UNKNOWN_REFUSAL = "That block cannot go there"
+UNKNOWN_REFUSAL = "That Action Item cannot go there"
 
 
 #: How often the Tk thread looks for the calendar export worker's result.
@@ -300,6 +300,11 @@ class PlanScreen(ctk.CTkFrame):
         #: The hovered box's own border width, so clearing the hover puts it
         #: back instead of flattening it to 0.
         self._drag_hover_border: int = 1
+        #: PF-M9 -- the outline's colour is restored too. Clearing only the
+        #: width left the last-hovered Time Block tinted with the hover colour
+        #: for the rest of the session: reported as "something outlines a Time
+        #: Block and keeps it outlined as if the movement wasn't saved".
+        self._drag_hover_colour = None
         self._block_menu: Optional[tk.Menu] = None
         #: The pending autoscroll tick (PD-M11.5), or ``None`` when the day is
         #: not scrolling itself. One at a time: the tick reschedules itself, so
@@ -1292,7 +1297,7 @@ class PlanScreen(ctk.CTkFrame):
             slot_index = self.first_free_slot(minutes)
             if slot_index is None:
                 self.set_status(
-                    f"No free half hour left for a {minutes}m {block_type}", "warning"
+                    f"No Time Block free for a {minutes}m {block_type}", "warning"
                 )
                 return
 
@@ -1354,7 +1359,7 @@ class PlanScreen(ctk.CTkFrame):
             slot_index = self.first_free_slot(minutes)
             if slot_index is None:
                 self.set_status(
-                    f"No free half hour left for {minutes}m of {item.title}", "warning"
+                    f"No Time Block free for {minutes}m of {item.title}", "warning"
                 )
                 return
 
@@ -1433,8 +1438,8 @@ class PlanScreen(ctk.CTkFrame):
         if sitting is None:
             return None
         return (
-            f"{item.title} is already blocked at {sitting.start_time} "
-            "— drag that block to move it"
+            f"{item.title} is already in a Time Block at {sitting.start_time}"
+            " — drag that Time Block to move it"
         )
 
     def _drop_refusal(self, item: ActionItem, slot_index: int) -> Optional[str]:
@@ -2727,32 +2732,30 @@ class PlanScreen(ctk.CTkFrame):
                 # summary, or the "outside the day" group below the grid.
                 # Reported rather than guessed at: picking a box for them
                 # would put the work somewhere they did not point.
-                self.set_status("Drop an item on a half-hour box", "muted")
+                self.set_status("Drop an Action Item on a Time Block", "muted")
         elif kind == "block" and block is not None:
             if target is not None:
                 self.after_idle(lambda: self.move_block_to_slot(block.id, target))
             elif edge is not None:
-                # PD-M5.7 — the day grows to make room for work that is not
-                # planned yet, not to rehouse work that already has a box. A
-                # block dropped here would be asking the day to lengthen for
-                # something it is already long enough to hold.
-                self.set_status(
-                    "A block cannot make a new half hour — move it onto a box, "
-                    "or drag an item here to lengthen the day",
-                    "warning",
-                )
+                # PF-M9 -- a scheduled Action Item can lengthen the day too.
+                # It used to be refused on the argument that the day grows for
+                # work that is not planned yet; reported from the running screen
+                # on 2026-11-10 as "dragging an item to earlier than day start
+                # doesn't work", which is what a refusal with no reason the user
+                # can act on looks like.
+                self.after_idle(lambda: self.move_block_to_edge(block.id, edge))
             elif self.pointer_over_day():
                 # Same reason as the item branch above, and the same words'
                 # worth of explanation: a move that does nothing and says
                 # nothing is indistinguishable from a drag that missed.
-                self.set_status("Drop a block on a half-hour box", "muted")
+                self.set_status("Drop that Action Item on a Time Block", "muted")
         elif kind == "lunch":
             # PF-M8 -- the settings' lunch, dragged. The first one writes the
             # block this date was standing in for; later ones move it.
             if target is not None:
                 self.after_idle(lambda: self.place_lunch_at(target))
             elif self.pointer_over_day():
-                self.set_status("Drop lunch on a half-hour box", "muted")
+                self.set_status("Drop lunch on a Time Block", "muted")
 
     def _end_drag(self):
         """Take the label off the screen and forget what was being dragged.
@@ -2992,6 +2995,53 @@ class PlanScreen(ctk.CTkFrame):
         self.load_blocks()
         self.set_status(f"Moved to {moved.start_time}", "success")
 
+    def move_block_to_edge(self, block_id: str, edge: str):
+        """PF-M9 — put a scheduled Action Item past one end of the day.
+
+        Purpose: the same gesture an Action Item from the list makes, for work
+                 that is already in a Time Block. It used to be refused with a
+                 sentence about "a block" making "a new half hour", which said
+                 nothing a user could act on and used one word for two things.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m9
+        Tests:   tests/test_plan_screen.py::test_pfm91_a_scheduled_item_makes_the_day_earlier
+
+        The day grows by the block's own length, as it does for an Action Item
+        from the list, and the block lands in the new outer box.
+        """
+        block = self.db_manager.get_time_block(block_id)
+        if block is None:
+            self.set_status("That Action Item is no longer on the day", "error")
+            return
+
+        grown = extended_span(
+            self._grid.span,
+            self.bounds,
+            edge,
+            slots_for_minutes(block.planned_minutes),
+        )
+        if grown is None:
+            self.set_status(
+                f"{PD_EARLIER_TEXT if edge == DAY_EXTEND_EARLIER else PD_LATER_TEXT}"
+                f" stops at {edge_limit_time(edge)} — the day cannot go "
+                f"further that way",
+                "warning",
+            )
+            return
+
+        try:
+            moved = self.db_manager.place_block_at(
+                block.id, grown.slot_index, self.bounds, day_span=grown.span
+            )
+        except SlotRefusedError as refused:
+            self.set_status(refusal_text(refused.reason), "error")
+            return
+        except ValueError as error:
+            self.set_status(str(error), "error")
+            return
+
+        self.refresh()
+        self.set_status(f"Moved to {moved.start_time}", "success")
+
     def update_hover_target(self):
         """Outline the box under the pointer during a drag.
 
@@ -3014,6 +3064,7 @@ class PlanScreen(ctk.CTkFrame):
         self.clear_hover_target()
         if hovered is not None:
             self._drag_hover_border = hovered.cget("border_width")
+            self._drag_hover_colour = hovered.cget("border_color")
             hovered.configure(
                 border_width=2, border_color=semantic_colors()["primary_hover"]
             )
@@ -3029,7 +3080,8 @@ class PlanScreen(ctk.CTkFrame):
         if self._drag_hover_frame is not None:
             try:
                 self._drag_hover_frame.configure(
-                    border_width=self._drag_hover_border
+                    border_width=self._drag_hover_border,
+                    border_color=self._drag_hover_colour,
                 )
             except tk.TclError:
                 pass

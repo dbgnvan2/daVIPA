@@ -1751,7 +1751,9 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             )
             return cursor.rowcount
 
-    def place_block_at(self, block_id: str, slot_index: int, bounds) -> TimeBlock:
+    def place_block_at(
+        self, block_id: str, slot_index: int, bounds, day_span=None
+    ) -> TimeBlock:
         """Move an existing block to another box.
 
         Purpose: TG-M11 -- dragging a block up or down the day.
@@ -1761,6 +1763,10 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         The block does not count against the room in the box it is moving to
         if it is already there, which is what lets it be nudged inside a full
         box instead of being refused by its own presence.
+
+        ``day_span`` is PF-M9: a block dropped past either end of the day is
+        asking for the day to be wider, and the fit has to be checked against
+        the day that will exist rather than the one on screen.
         """
         block = self.get_time_block(block_id)
         if block is None:
@@ -1769,6 +1775,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         self._refuse_unless_it_fits(
             block.block_date, slot_index, block.planned_minutes, bounds,
             ignoring=block.id,
+            day_span=day_span,
             # PF-M8 -- moving the day's lunch is not a collision with it.
             ignore_lunch=BlockType.normalize(block.block_type) == BlockType.LUNCH,
         )
