@@ -566,7 +566,8 @@ place now. The second report had a cause of its own as well - the two ends of
 the day were rows of the scrolling grid, so **Later** sat below the bottom of
 a pane too short for eighteen half hours - and the fourth is built as the
 autoscroll (PD-M11.5). Leave these entries here until the running app says
-they are gone.
+they are gone. The check is written out as **The walk** at the end of that
+plan: five gestures, two screens, one pass.
 
 ### 2026-11-07 - Type: Bug
 

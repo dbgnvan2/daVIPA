@@ -508,7 +508,7 @@ PD-M11.4 is the test that does not.
 | PD-M11.5 | A drag held at the top or bottom edge of the day's viewport scrolls the day, on its own clock, the same distance per tick whatever the platform's scroll increment is | `::test_pdm115_the_day_canvas_is_the_scroll_frames_master`, `::test_pdm115_the_pointer_at_the_bottom_edge_scrolls_down`, `::test_pdm115_the_pointer_at_the_top_edge_scrolls_up`, `::test_pdm115_the_pointer_in_the_middle_scrolls_nothing`, `::test_pdm115_a_pointer_beside_the_day_scrolls_nothing`, `::test_pdm115_a_tick_is_the_same_distance_on_any_platform`, `::test_pdm115_a_drag_held_at_the_bottom_edge_scrolls_the_day` |
 | PD-M11.6 | A tick with the pointer out of the edge zone, or with no drag in progress, scrolls nothing and schedules nothing | `::test_pdm116_a_tick_outside_the_edge_zone_stops_the_scroll`, `::test_pdm116_a_tick_with_no_drag_scrolls_nothing` |
 | PD-M11.7 | Ending a drag cancels the pending tick rather than forgetting it | `::test_pdm117_ending_a_drag_cancels_the_scroll` |
-| PD-M11.8 | On the running app: the day pane is on screen as soon as a block moves; an item dropped on **Earlier** and on **Later** lengthens the day; *Schedule anyway* shows the block it wrote | *(not code-testable — no test can see the screen)* |
+| PD-M11.8 | On the running app: the day pane is on screen as soon as a block moves; an item dropped on **Earlier** and on **Later** lengthens the day; *Schedule anyway* shows the block it wrote | *(not code-testable — no test can see the screen; **The walk** at the end)* |
 
 **PD-M5.1's test changed, and why.** It asserted that the Earlier box was a row
 of the scrolling grid above every slot row and the Later box a row below them
@@ -753,7 +753,7 @@ module is about.
 | PD-M13.2 | A break added after a failed question says which day it was on | `::test_pdm132_a_break_added_after_a_failed_question_says_the_day` |
 | PD-M13.3 | The note is said for the gesture it was raised for, and then cleared | `::test_pdm133_the_note_belongs_to_the_gesture` |
 | PD-M13.3 | A work day sees neither the question nor the note | `::test_pdm7_a_work_day_says_nothing` |
-| PD-M13.4 | On the running app: a Saturday drop on a half hour writes a block, a drop on **Earlier** and on **Later** lengthens the day, and the app keeps responding | *(not code-testable — no test in this suite can build a visible window, and both of the last two failures were invisible to every test that could not)* |
+| PD-M13.4 | On the running app: a Saturday drop on a half hour writes a block, a drop on **Earlier** and on **Later** lengthens the day, and the app keeps responding | *(not code-testable — no test in this suite can build a visible window, and both of the last two failures were invisible to every test that could not; **The walk** at the end)* |
 
 PD-M13.4 is the walk, and it is the third one for these two reports. The first
 two remedies were both written against a correct diagnosis and both failed on
@@ -778,3 +778,95 @@ Per `CLAUDE.md`: at most two warm passes, at least one cold pass regardless,
 severity before any fix, below-medium to `BACKLOG.md`. And per P41's new
 entry — **run the program before the final cold pass**, not after it, since
 every one of the six asks is a gesture that only a walk can exercise.
+
+---
+
+## The walk — one pass over the running app (2026-11-10)
+
+PD-M11.8, PD-M13.4 and the Scheduler's drag-release question are one sitting's
+work, not three. Five gestures, two screens, no restart between them.
+
+Quit `/Applications/daVIPA.app` first. It holds the lock, so a source launch
+exits silently with status 0 — the time grid's handoff note records the same
+— then run `./start.sh` and keep its terminal in view: that console is the
+only place a traceback reaches anyone, and a traceback is what settled PD-M12.
+
+Each step names the `BACKLOG.md` entry it settles, by title. A step that passes
+is silence: the entry leaves `BACKLOG.md` with the reason, and where it was its
+section's last item, the section goes with it.
+
+**1. A moved block repaints.** *Moving a Day Block leaves a blank panel until
+the mouse leaves it*, High.
+
+Drag a block already on the day from one half hour to another and release it.
+The day pane is redrawn as the drop lands: the block sits in its new slot with
+no blank panel, and the pointer does not have to leave the pane first.
+`_flush_redraw` exists for this shape (PD-M10), so the question is whether the
+move path reaches it at all.
+
+If it fails: which pane went blank, and whether the status line still wrote
+`Blocked … at HH:MM`.
+
+**2. Both ends of the day accept a drop.** *An item cannot be moved into the
+early or late extended sections*, High.
+
+Drag an item from the Items pane onto the **Earlier** box above the first half
+hour, then a second item onto **Later** below the last. Both sit in holders
+outside the scroll frame (PD-M11.2), so neither needs a scroll to reach. Each
+drop lengthens the day by that block's length and draws the item in the new
+outer box.
+
+If it fails: whether the box showed any drop feedback, and what the status line
+said.
+
+**3. The day scrolls while a drag is held at its edge.** *The Day Plan does not
+scroll while dragging an item past its edge*, Medium.
+
+Scroll the day to its top, pick up a block, and hold the pointer within 32 px
+of the bottom inner edge of the day pane without releasing
+(`PLAN_AUTOSCROLL_EDGE_PX`). The day scrolls on its own clock while the pointer
+stays in that band, and the release lands where the day now shows. A pointer in
+the middle of the pane scrolls nothing, and neither does one over the Items
+column.
+
+If it fails: stopped entirely, or one tick and then quit.
+
+**4. A button still asks on a non-work day, and the answer writes.** *Schedule
+anyway on a non-work day does nothing*, High.
+
+Pick a non-work day in the Date picker — 2026-11-14 is the nearest Saturday,
+and **Day Settings** → *Days for Blocks* is what defines the week — then
+click **AutoLoad**. The question names the date and the days the week allows;
+after **Yes** the day fills and the status line reports
+`AutoLoad: blocked N of M`. A second AutoLoad on that same date does not ask
+again. Repeat once with **+ Break**.
+
+Since PD-M13 **a drop never asks**: `_require_block_day(ask=True)` is reached
+from the two button gestures only, and both drop paths pass `ask=False`. This
+one cannot be tested by dragging, and no question appearing is the built
+behaviour rather than a failure.
+
+If it fails, which of the three: the question shows and nothing is written; no
+question is shown at all; or the blocks are written and not drawn.
+
+**5. The Scheduler's drag-release still files.** *The Scheduler asks through
+the platform's dialog inside a drag release*, High if it reproduces.
+
+On the Scheduler, drag an ordinary item onto a project box, then a **Weekly
+Tactic** onto one. Both file, and the screen says so where it already reports.
+`on_drag_release` calls `_drop_onto_project` from inside the release handler,
+whose `messagebox` calls are the same call from the same kind of place as the
+fault PD-M12 fixed on Plan.
+
+If it fails: nothing filed and nothing said is the `TclError` signature; a hang
+is what PD-M12's own in-app dialog did. `confirm_dialog.py` is deleted — do
+not restore it to try this again.
+
+### What a result does
+
+| Result | What follows |
+|---|---|
+| Passes | The entry leaves `BACKLOG.md`; a section goes with its last item. |
+| Fails as recorded | Diagnosis and fix on that one path. The code is written; what is missing is a call, not a design. |
+| Fails differently | The entry is rewritten from what the screen did, not from the earlier reading of it. |
+| Not run | Nothing is claimed. The entry stays, and the commit message names the step that did not happen. |
