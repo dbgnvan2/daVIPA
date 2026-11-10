@@ -6474,13 +6474,14 @@ def test_pfm31_a_child_lands_after_its_parent(screen, manager):
     assert labels == ["Write the talk", "Rewrite slide 3", "Unrelated"], labels
 
 
-def test_pfm32_weekly_tactic_siblings_keep_their_order(screen, manager):
-    """PF-M3.2 — the second relation the schema holds.
+def test_pfm32_a_weekly_tactic_sibling_is_not_a_link(screen, manager):
+    """PF-M3.2 — a tactic is a container, not a chain.
 
-    Two items of one Weekly Tactic are linked through ``weekly_tactic_id``;
-    the same rule puts the second behind the first. The link must name a real
-    ``item_type='week'`` row (WT-INV4), so the tactic is built — with an Annual
-    Plan Element id the week-item check demands.
+    The first version treated two items of one Weekly Tactic as a follow-on
+    pair, on the reading that "linked" meant the tactic. Reported from the
+    running screen on 2026-11-10: "just ignore weekly tactics". A tactic is a
+    container for steps that need not follow one another, so its siblings get
+    no ordering rule at all and the drop joins the end like any other.
     """
     tactic = _item(
         manager,
@@ -6498,7 +6499,82 @@ def test_pfm32_weekly_tactic_siblings_keep_their_order(screen, manager):
     screen.block_item(second, 1)
 
     labels = [b.label for b in manager.get_time_blocks(THURSDAY)]
-    assert labels == ["First step", "Second step", "Unrelated"], labels
+    assert labels == ["First step", "Unrelated", "Second step"], labels
+
+
+def test_pfm35_a_continuation_lands_on_top(screen, manager):
+    """PF-M3.5 — a continuation goes to the top of the box it is dropped on.
+
+    Reported from the running screen on 2026-11-10: "a continuation from the
+    previous block should stay at the top of the block — it seems to go to the
+    bottom." The partner is in another box, so there is nothing here to sit
+    behind, and the end of the box is the wrong place for work that carries on
+    from the box above.
+    """
+    parent = _item(manager, "Write the talk")
+    other = _item(manager, "Something else")
+    child = _item(manager, "Keep writing", parent_id=parent.id)
+    screen.refresh()
+
+    screen.block_item(parent, 0)
+    screen.block_item(other, 4)
+    screen.block_item(child, 4)
+
+    labels = [b.label for b in manager.get_time_blocks(THURSDAY)]
+    assert labels == ["Write the talk", "Keep writing", "Something else"], labels
+    positions = {
+        b.label: b.position for b in manager.get_time_blocks(THURSDAY)
+    }
+    assert positions["Keep writing"] == 1, positions
+    assert positions["Something else"] == 2, positions
+
+
+def test_pfm61_a_box_the_day_grew_into_accepts_a_drop(screen, manager):
+    """PF-M6 — the morning box that only exists because the day grew earlier.
+
+    Reported as "dragging and dropping on the morning area is now broken".
+    ``block_item`` passed no day span, so the fit check read the template's
+    hours while the user was looking at a box outside them, and refused a
+    visible half hour as "outside the day".
+
+    The demo's own day has this shape: Day Start 09:00, and blocks at 08:30
+    left by an Earlier drop.
+    """
+    first = _item(manager, "early start")
+    second = _item(manager, "second morning task")
+    screen.refresh()
+
+    screen.extend_day_for(first, DAY_EXTEND_EARLIER)
+    grown = screen._grid.span
+    assert grown.first < 0, f"the day did not grow earlier: {grown}"
+
+    screen.block_item(second, grown.first)
+
+    labels = [b.label for b in manager.get_time_blocks(THURSDAY)]
+    assert "second morning task" in labels, (
+        labels,
+        screen.status_label.cget("text"),
+    )
+
+
+def test_pfm62_a_box_the_day_grew_into_at_the_end_accepts_a_drop(screen, manager):
+    """PF-M6.2 — the same for the evening end.
+
+    The other half of the report: "dragging to the bottom to lengthen the day
+    doesn't work either". A box past Day End is refused by the template and
+    accepted by the drawn day, so the check reads the drawn day.
+    """
+    first = _item(manager, "late finish")
+    second = _item(manager, "later still")
+    screen.refresh()
+
+    screen.extend_day_for(first, DAY_EXTEND_LATER)
+    grown = screen._grid.span
+
+    screen.block_item(second, grown.last)
+
+    labels = [b.label for b in manager.get_time_blocks(THURSDAY)]
+    assert "later still" in labels, (labels, screen.status_label.cget("text"))
 
 
 def test_pfm33_an_unlinked_drop_joins_the_end(screen, manager):
