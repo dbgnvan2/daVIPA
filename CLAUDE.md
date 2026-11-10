@@ -113,9 +113,27 @@ So:
   2026-11-09. They are kept for recovery and for history, and **no test reads
   them**. A record says what was true on its date; a pointer in it to something
   since deleted is history, not a defect.
+- **`BACKLOG.md` holds open work and nothing else.** Not sweep sections, not a
+  running "Last Updated" narrative, not items that record their own closure.
+  An item is a thing someone would do; when it is done or moot it leaves, with
+  the reason, to `docs/unused-docs/`. It was 5,615 lines and 245 items on
+  2026-11-09 and 74 items after the trim, and it had churned +4,350/−4,815
+  lines in the three preceding days — a journal, not a list.
+- **A commit message is a subject and up to about five lines.** What changed,
+  and the measurement if one decided it. Not an account of what an earlier
+  draft of the same message, document or batch got wrong: over 2026-11-07 to
+  09 the bodies ran to 6,073 lines, 28 per commit, with 250 mentions of
+  "withdrawn", "corrected" or "was wrong". Each correction read as diligence
+  and generated more text for the next pass to audit. Correct the thing;
+  do not narrate the correction.
 - **No guard reads prose.** The citation and vocabulary guards are deleted —
-  five of them, with their exemption tables and 2,500 lines of test code. What
-  survives is about code, not writing: `tests/test_repo_hygiene.py` (no stray
+  five of them, with their exemption tables and 2,500 lines of test code. The
+  cost is measured: those guards were +3,044/−2,977 lines across 15 commits
+  inside 72 hours, a net 67 lines, and three times they went red on sentences
+  written in the same batch, so fixing my own wording looked like progress.
+  **Nothing in this repo asserts on English — not on a document, not on a
+  commit message, not on a docstring's wording.** What survives is about code,
+  not writing: `tests/test_repo_hygiene.py` (no stray
   scripts, bundled resources tracked and valid),
   `tests/test_traceability_refs.py` (a `Spec:`/`Tests:` pointer in code or in a
   live spec resolves), `tests/test_ci_contract.py` (the workflow's versions and
@@ -278,6 +296,20 @@ run by the context that wrote the code and inherits its blind spots — it runs
 out of new assumptions to question long before it runs out of defects. A cold
 pass gets the diff and the range and none of the narrative.
 
+**The weight of the sweep scales to what the change can break.** Measured over
+2026-11-07 to 09: 214 commits, of which 32 changed app behaviour, against
++23,246 lines under `docs/` and +21,393 under `tests/`. Most of that was the
+full budget below applied to markdown and to hygiene tests, where it buys
+nothing:
+
+- **`src/` or a data path, status machine, external call or scoring function:**
+  the full budget below, cold pass included.
+- **Tests only, config only, or a document:** no sweep. Run the tests the
+  change touches, read the diff once, push. A wrong sentence in `BACKLOG.md`
+  costs a re-read; a review pass over it costs an hour and produces more
+  sentences to review.
+- **Mixed:** sweep the `src/` half.
+
 The budget:
 
 - **At most 2 warm passes per batch.** Beyond two they converge on the
@@ -290,8 +322,15 @@ The budget:
   contract, test quality) over repeating the same sweep.
 - **Stop when a pass yields no finding of medium or higher severity.**
 - **Every finding gets a severity before any fix is written.** Below-medium
-  findings go to `BACKLOG.md`; they are not fixed in-loop, because a cosmetic
-  fix buys none of the safety it costs.
+  findings are **dropped** — not fixed in-loop, because a cosmetic fix buys
+  none of the safety it costs, and not filed either. Filing them is what made
+  `BACKLOG.md` 5,615 lines: 116 of its 245 items were sweep residue nobody was
+  going to action, and the trim on 2026-11-09 deleted them unread. A
+  below-medium finding worth keeping is worth a line in the commit message
+  that ships beside it; anything less than that is noise with a tracking cost.
+- **A sweep's own record is the commit message.** No sweep section in
+  `BACKLOG.md`, no pass-by-pass write-up, no running account of what an earlier
+  pass got wrong.
 - **Every in-loop fix is itself in scope for the next pass.** The fix commit is
   the least-reviewed code in any change — written last, fastest, and in the
   most anchored state.
