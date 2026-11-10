@@ -6640,3 +6640,167 @@ def test_pfm34_a_link_with_no_block_in_the_box_is_no_rule(screen, manager):
         f"the child took position {blocks[1].position} in a box it shares with "
         "nobody"
     )
+
+
+# ================= PF-M8 — a lunch this date can call its own ==============
+
+
+def _lunch_blocks(manager, block_date=THURSDAY):
+    return [
+        block
+        for block in manager.get_time_blocks(block_date)
+        if BlockType.normalize(block.block_type) == BlockType.LUNCH
+    ]
+
+
+def _lunch_times(panel):
+    return [entry.slot.start_time for entry in panel._grid.slots if entry.slot.is_lunch]
+
+
+def test_pfm81_a_lunch_block_moves_the_lunch_for_that_date(screen, manager):
+    """PF-M8.1 — the date's own lunch replaces the settings' lunch, for it only.
+
+    Day Settings' Lunch Start describes a normal day, the way Day Start and Day
+    End do. A day that moves its lunch must not be shaded in two places, and the
+    next date must not inherit the move.
+    """
+    assert "12:00" in _lunch_times(screen), "precondition: the settings' lunch"
+
+    placed = manager.add_block_at(
+        TimeBlock(
+            block_date=THURSDAY,
+            start_time="",
+            end_time="",
+            planned_minutes=60,
+            label="Lunch",
+            block_type=BlockType.LUNCH,
+        ),
+        12,
+        screen.bounds,
+    )
+    screen.refresh()
+
+    times = _lunch_times(screen)
+    assert times, "the moved lunch is not marked at all"
+    assert "12:00" not in times, f"the settings' lunch is still shaded: {times}"
+    assert placed.start_time in times, (placed.start_time, times)
+
+    screen.selected_date = FRIDAY
+    screen.refresh()
+    assert "12:00" in _lunch_times(screen), (
+        "moving one date's lunch moved another date's"
+    )
+
+
+def test_pfm82_a_task_cannot_land_on_the_moved_lunch(screen, manager):
+    """PF-M8.2 — a lunch box takes no tasks, wherever the lunch now is."""
+    manager.add_block_at(
+        TimeBlock(
+            block_date=THURSDAY,
+            start_time="",
+            end_time="",
+            planned_minutes=60,
+            label="Lunch",
+            block_type=BlockType.LUNCH,
+        ),
+        12,
+        screen.bounds,
+    )
+    screen.refresh()
+    item = _item(manager, "through lunch")
+    screen.refresh()
+
+    screen.block_item(item, 12)
+
+    status = screen.status_label.cget("text")
+    assert status == refusal_text(SlotRefusal.CROSSES_LUNCH), status
+    assert [
+        block for block in manager.get_time_blocks(THURSDAY)
+        if BlockType.normalize(block.block_type) == BlockType.ITEM
+    ] == [], "a task landed on the lunch"
+
+
+def test_pfm84_dragging_the_lunch_chip_gives_this_date_a_lunch_block(
+    screen, manager, monkeypatch
+):
+    """PF-M8.4 — the first drag writes the block the settings stood in for."""
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    _pointer_on(screen, monkeypatch, frames[4])
+
+    screen.start_lunch_drag(None)
+    screen.on_drag_release(None)
+    screen.update_idletasks()
+
+    blocks = _lunch_blocks(manager)
+    assert len(blocks) == 1, f"{len(blocks)} lunch blocks written"
+    assert blocks[0].slot_index == 4, blocks[0].slot_index
+    assert blocks[0].planned_minutes == screen.bounds.lunch_length, (
+        blocks[0].planned_minutes
+    )
+    assert "Lunch moved to" in screen.status_label.cget("text")
+
+
+def test_pfm85_a_second_drag_moves_that_block(screen, manager, monkeypatch):
+    """PF-M8.5 — moving lunch again moves the block; it does not add another."""
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    _pointer_on(screen, monkeypatch, frames[4])
+    screen.start_lunch_drag(None)
+    screen.on_drag_release(None)
+    screen.update_idletasks()
+
+    _pointer_on(screen, monkeypatch, frames[6])
+    lunch = _lunch_blocks(manager)[0]
+    # The first move refreshed the screen, so the frames read above are gone.
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    _pointer_on(screen, monkeypatch, frames[6])
+    screen.start_block_drag(None, lunch)
+    screen.on_drag_release(None)
+    screen.update_idletasks()
+
+    blocks = _lunch_blocks(manager)
+    assert len(blocks) == 1, f"a second lunch block was written: {blocks}"
+    assert blocks[0].slot_index == 6, blocks[0].slot_index
+
+
+def test_pfm86_clear_day_keeps_the_lunch_block(screen, manager, monkeypatch):
+    """PF-M8.6 — Clear Day empties the day of tasks, not of its lunch."""
+    monkeypatch.setattr("tkinter.messagebox.askyesno", lambda *a, **k: True)
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    _pointer_on(screen, monkeypatch, frames[4])
+    screen.start_lunch_drag(None)
+    screen.on_drag_release(None)
+    screen.update_idletasks()
+    item = _item(manager, "to be cleared")
+    screen.refresh()
+    screen.block_item(item, 0)
+    assert len(_lunch_blocks(manager)) == 1
+
+    screen.clear_day()
+
+    assert _lunch_blocks(manager), "Clear Day took the lunch with it"
+    assert [
+        block for block in manager.get_time_blocks(THURSDAY)
+        if BlockType.normalize(block.block_type) == BlockType.ITEM
+    ] == []
+
+
+def test_pfm87_deleting_the_lunch_block_returns_the_date_to_the_settings(
+    screen, manager, monkeypatch
+):
+    """PF-M8.7 — delete it and the date is back on Day Settings' lunch.
+
+    The block is what the move wrote, so removing it is the way back: no second
+    gesture, no remembered override.
+    """
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    _pointer_on(screen, monkeypatch, frames[4])
+    screen.start_lunch_drag(None)
+    screen.on_drag_release(None)
+    screen.update_idletasks()
+    assert "12:00" not in _lunch_times(screen)
+
+    screen.delete_block(_lunch_blocks(manager)[0].id)
+    screen.refresh()
+
+    assert _lunch_blocks(manager) == []
+    assert "12:00" in _lunch_times(screen), _lunch_times(screen)
