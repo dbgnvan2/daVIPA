@@ -50,6 +50,7 @@ from ..time_block_layout import (
     SlotRefusal,
     SlotRefusedError,
     build_day_grid,
+    can_place,
     default_minutes_for_block_type,
     duration_for_item,
     edge_limit_time,
@@ -574,7 +575,7 @@ class PlanScreen(ctk.CTkFrame):
             command=self.open_settings,
             **button_style("secondary"),
         )
-        self.btn_settings.grid(row=0, column=3, sticky="ew")
+        self.btn_settings.grid(row=0, column=3, sticky="ew", padx=(0, 8))
 
         # CE-M4.1 -- the status line is NOT in the header.
         # Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
@@ -1334,13 +1335,13 @@ class PlanScreen(ctk.CTkFrame):
         # blocks in it, not an item that is already on the day, so dropping an
         # item that is already blocked wrote a second block on any free box
         # and was refused as a full box on its own.
-        sitting = self._blocked_today(item.id)
-        if sitting is not None:
-            self.set_status(
-                f"{item.title} is already blocked at {sitting.start_time} "
-                "— drag that block to move it",
-                "warning",
-            )
+        blocked = self._already_blocked_text(item)
+        if blocked is not None:
+            # The note is one-shot and belongs to a gesture that wrote
+            # something; this gesture wrote nothing, so it is cleared rather
+            # than left to surface on the next status line.
+            self._non_work_day = False
+            self.set_status(blocked, "warning")
             return
 
         minutes = duration_for_item(item, self.bounds.default_block_minutes)
@@ -1405,6 +1406,70 @@ class PlanScreen(ctk.CTkFrame):
                 return block
         return None
 
+    def _already_blocked_text(self, item: ActionItem) -> Optional[str]:
+        """The sentence a drop of an item already on the day leaves, if it is.
+
+        Purpose: PF-M2 -- one wording for three call sites, so the box drop,
+                 the two ends of the day and the pre-check below cannot drift.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m2
+        Tests:   tests/test_plan_screen.py::test_pfm22_the_refusal_says_where_the_block_is
+        """
+        sitting = self._blocked_today(item.id)
+        if sitting is None:
+            return None
+        return (
+            f"{item.title} is already blocked at {sitting.start_time} "
+            "— drag that block to move it"
+        )
+
+    def _drop_refusal(self, item: ActionItem, slot_index: int) -> Optional[str]:
+        """Why a drop on this box would write nothing, or ``None`` if it would.
+
+        Purpose: PF-M1 -- the question is about a day, but it is asked about a
+                 *gesture*, and a confirmation that leads straight to a refusal
+                 spends the day's one answer on nothing: the yes is remembered
+                 in ``_work_anyway`` whether or not the write happened. So the
+                 two refusals the grid already knows about are read first.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m1
+        Tests:   tests/test_plan_screen.py::test_pfm17_a_drop_that_cannot_write_asks_nothing
+
+        Read, not enforced: ``block_item`` and ``extend_day_for`` make both
+        checks again, because they are the write paths and a caller that is not
+        this handler must get the same answers.
+        """
+        blocked = self._already_blocked_text(item)
+        if blocked is not None:
+            return blocked
+
+        minutes = duration_for_item(item, self.bounds.default_block_minutes)
+        reason = can_place(
+            self.db_manager.get_time_blocks(self.selected_date),
+            self.bounds,
+            slot_index,
+            slots_for_minutes(minutes),
+        )
+        return refusal_text(reason) if reason else None
+
+    def _allow_this_day(self) -> bool:
+        """Ask about a day outside the working week, and never lose the drop.
+
+        Purpose: PF-M1 -- ``_require_block_day`` catches the ``TclError`` the
+                 platform raises for a dialog it will not show. This catches
+                 everything else, because the failure this path has already
+                 produced twice is a gesture that wrote nothing and said
+                 nothing: a question that raises is logged, the day is allowed,
+                 and the status line names it.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m1
+        Tests:   tests/test_plan_screen.py::test_pfm15_a_question_that_raises_still_schedules
+        """
+        try:
+            return self._require_block_day()
+        except Exception:  # noqa: BLE001 - a dialog may not eat the drop
+            logger.exception("the non-work-day question raised on a drop")
+            self._work_anyway.add(self.selected_date)
+            self._non_work_day = True
+            return True
+
     def _linked_block_in_slot(
         self, item: ActionItem, slot_index: int
     ) -> Optional[TimeBlock]:
@@ -1425,6 +1490,8 @@ class PlanScreen(ctk.CTkFrame):
         box holding both a parent and a tactic sibling puts the item after the
         first of them it meets.
         """
+        # The first match in draw order, which is what "the nearest" means
+        # here: the box is ordered by position and the walk follows it.
         mine = {
             "parent": getattr(item, "parent_id", None),
             "tactic": getattr(item, "weekly_tactic_id", None),
@@ -2530,19 +2597,30 @@ class PlanScreen(ctk.CTkFrame):
             # the idle callback*; this handler is the moment the gesture is
             # still synchronous, and it is the moment the Scheduler already
             # asks from. So the question is here, the write stays below, and
-            # the ask is wrapped (`_require_block_day` catches TclError): a
-            # platform that refuses it writes the block and says which day it
-            # was on, which is what happened before this module.
+            # the ask is wrapped (`_allow_this_day`): a platform that refuses
+            # the dialog writes the block and says which day it was on, which
+            # is what happened before this module.
             #
-            # Read first, ask second, schedule third: the pointer has to be
-            # read while it is still there, and a drop on the heading is not
-            # worth a question about nothing.
+            # Read first, refuse second, ask third, schedule fourth. The
+            # pointer has to be read while it is still there; a drop that
+            # cannot write is refused before the day's one answer is spent on
+            # it, because the yes is remembered whether the write happens or
+            # not; and a drop on the heading is not worth a question about
+            # nothing.
             if target is not None:
-                if not self._require_block_day():
+                refusal = self._drop_refusal(item, target)
+                if refusal is not None:
+                    self.set_status(refusal, "warning")
+                    return
+                if not self._allow_this_day():
                     return
                 self.after_idle(lambda: self.block_item(item, target))
             elif edge is not None:
-                if not self._require_block_day():
+                refusal = self._already_blocked_text(item)
+                if refusal is not None:
+                    self.set_status(refusal, "warning")
+                    return
+                if not self._allow_this_day():
                     return
                 self.after_idle(lambda: self.extend_day_for(item, edge))
             elif self.pointer_over_day():
@@ -2718,6 +2796,15 @@ class PlanScreen(ctk.CTkFrame):
         """
         # PD-M13 -- a drop never asks; see _require_block_day.
         if not self._require_block_day(ask=False):
+            return
+
+        # PF-M2 -- the same one-block rule the box drop obeys. Without it the
+        # invariant the refusal states was false on this path: an item already
+        # at 09:00 could be dropped on Earlier and get a second block.
+        blocked = self._already_blocked_text(item)
+        if blocked is not None:
+            self._non_work_day = False
+            self.set_status(blocked, "warning")
             return
 
         minutes = duration_for_item(item, self.bounds.default_block_minutes)
