@@ -79,6 +79,7 @@ moment" is an argument, and the walk is the evidence.
 | PF-M1.4 | A work day's drop asks nothing, as before | `::test_pfm14_a_work_day_drop_never_asks` |
 | PF-M1.5 | A question that raises schedules the write, as today | `::test_pfm15_a_question_that_raises_still_schedules` |
 | PF-M1.6 | On the running app: a single item dropped on a Saturday shows the question | *(not code-testable — **The walk**, step 4)* |
+| PF-M1.7 | A drop that would refuse asks nothing, so the day's one answer is not spent on it | `::test_pfm17_a_drop_that_cannot_write_asks_nothing` |
 
 ## PF-M2 — One block per item per day, said out loud
 
@@ -105,6 +106,7 @@ that is read rather than dragged.
 | PF-M2.2 | The refusal names the box the existing block is in | `::test_pfm22_the_refusal_says_where_the_block_is` |
 | PF-M2.3 | A different item still lands on the same box | `::test_pfm23_a_different_item_still_lands` |
 | PF-M2.4 | A break and a buffer are still repeatable: the guard reads item blocks | `::test_pfm24_a_break_is_not_an_item_to_refuse` |
+| PF-M2.5 | A drop on **Earlier** or **Later** refuses a second block too | `::test_pfm25_a_drop_on_an_end_also_refuses_a_second_block` |
 
 ## PF-M3 — A dropped item lands after the block it is linked to
 

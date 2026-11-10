@@ -22,7 +22,9 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   because the question used to be put to the screen at the moment the drag was
   released, which macOS refuses. It is asked in the release handler now, before
   the write is deferred, and a dialog that cannot be shown still schedules the
-  work and says which day it was on.
+  work and says which day it was on. A drop the grid would refuse anyway — an
+  item already on the day, a box with no room left — is refused without asking,
+  so the day's one answer is not spent on a gesture that writes nothing.
 - **One block per item per day.** Dropping an item that is already on the day
   writes nothing and names the half hour it is at — *"… is already blocked at
   09:00 — drag that block to move it"*. Nothing refused this before: the grid
