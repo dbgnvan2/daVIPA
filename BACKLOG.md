@@ -12,10 +12,12 @@ finding about a test or a document is dropped, not filed. The 24 are named in th
 commit that removed them, which is their whole record: 18 about tests, 5 about
 documents, and one stale code item (a 2026-08-18 entry describing
 `screens/reschedule_dialog.py` in the present tense; that file was deleted in
-`a8b8d05` and the class it named is in no `src/` file). What survives is 34
-code items — 16 a user would see, 15 internal duplication or dead code, 3 in
-`tools/agents/check_docs_sync.py` — 6 test items of medium severity, and the
-feature requests, user stories and notes at the end.
+`a8b8d05` and the class it named is in no `src/` file). Then three of the Plan
+screen's on-screen reports were confirmed gone on 2026-11-10 and left with that
+confirmation, which is how the code items below number 31: 13 a user would see,
+15 internal duplication or dead code, 3 in `tools/agents/check_docs_sync.py` —
+plus 6 test items of medium severity, and the feature requests, user stories and
+notes at the end.
 
 One batch at a time in this checkout (`CLAUDE.md`). What is here is open work:
 adjacent issues from recent batches, screen reports, the carried-forward
@@ -551,70 +553,31 @@ than renaming a label inside it.
 
 ## Reported from the running screen — Plan / Day Plan (2026-11-07)
 
-Four faults reported by the user after the PD-* batch shipped. **Recorded, not
-investigated**: the descriptions below are the report, not a diagnosis. Nothing
-here has been reproduced, read in the code, or confirmed against a running app
-by this session.
+Four faults were reported after the PD-* batch shipped. Three were confirmed
+gone on the running app on 2026-11-10 — the blank panel a moved block left
+behind, the two ends of the day refusing a drop, and the missing drag-scroll —
+and left this file with that confirmation. What remains is the fourth.
 
-**All four are addressed by PD-M11** (`docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md`),
-on 2026-11-07, pending the on-screen check that is PD-M11.8. The first three
-turned out to be one cause and not the one PD-M10 treated: the panes were
-rebuilt by lifting the scroll frame out of the grid, which unmaps the canvas
-the rows are drawn in and leaves its window width and scrollregion to
-`<Configure>` handlers that an idle flush does not run. They are rebuilt in
-place now. The second report had a cause of its own as well - the two ends of
-the day were rows of the scrolling grid, so **Later** sat below the bottom of
-a pane too short for eighteen half hours - and the fourth is built as the
-autoscroll (PD-M11.5). Leave these entries here until the running app says
-they are gone. The check is written out as **The walk** at the end of that
-plan: five gestures, two screens, one pass.
+That one had two answers in it: the buttons asked before they wrote, and a drag
+wrote without asking. The asymmetry was PD-M13's decision, taken because a
+dialog could not be put on the screen at the moment a drag is released. On
+2026-11-10 the question was asked for on the drop as well. It is built and
+unverified on screen.
 
-### 2026-11-07 - Type: Bug
+### 2026-11-10 - Type: Bug
 
-**Title:** Moving a Day Block leaves a blank panel until the mouse leaves it
-**Description:** Moving a block on the Day Plan produces a blank panel. It
-fills in as soon as the mouse moves outside the panel area.
+**Title:** A single item dropped on a non-work day should ask, as AutoLoad does
+**Description:** AutoLoad raises the confirmation on a day outside the working
+week; dragging one item onto that day writes it and says so in the status line
+only. Both should ask, and the drop is the one the walk found silent.
 **Priority:** High
-**Effort:** Unknown
-**Notes:** Reads like the repaint class the PD-* batch set out to fix — a pane
-re-gridded inside an event callback that Tk does not draw until the next
-mouse motion over the window. That batch added `_flush_redraw` for exactly
-that shape, so either a path was missed or the fix does not cover the move
-path. First thing to check: whether the move path calls the flush at all.
-
-### 2026-11-07 - Type: Bug
-
-**Title:** An item cannot be moved into the early or late extended sections
-**Description:** Dragging an item into the early or late extended section of
-the day does not drop it there.
-**Priority:** High
-**Effort:** Unknown
-
-### 2026-11-07 - Type: Bug
-
-**Title:** "Schedule anyway" on a non-work day does nothing
-**Description:** Scheduling on a non-work day raises the confirmation message,
-but answering "schedule anyway" does not schedule the item — or the item does
-not appear afterwards. Which of those two it is has not been established.
-**Priority:** High
-**Effort:** Unknown
-**Notes:** Possibly the same thing as the sweep's PLAUSIBLE low finding
-recorded below ("`plan._require_block_day` opens a modal from inside a drop's
-`after_idle`"): the permission is recorded against one read of
-`self.selected_date` and the caller reads it again after the modal returns.
-That finding was left unfixed because neither review pass could drive a date
-change through Tk's modal grab and there was no demonstrated misbehaviour to
-test against. **This report may be that demonstration.** Unverified — do not
-treat the two as the same bug until one reproduction shows it.
-
-### 2026-11-07 - Type: Enhancement
-
-**Title:** The Day Plan does not scroll while dragging an item past its edge
-**Description:** Dragging an item up or down towards an area that is off
-screen should scroll the Day Plan window to follow it. It does not, so an
-item cannot be dragged to a time that is not already visible.
-**Priority:** Medium
-**Effort:** Unknown
+**Effort:** Built — waiting on walk step 4
+**Notes:** PF-M1 asks in the release handler, after the pointer is read and
+before the write is deferred to the idle callback the platform refused a dialog
+in. It is the moment the Scheduler already asks from, and the ask is wrapped: a
+platform that refuses it writes the block and names the day, which is the
+behaviour it replaces. `docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md`
+step 4 settles it.
 
 
 ## Adjacent issues from the PD-M12 batch (2026-11-07)

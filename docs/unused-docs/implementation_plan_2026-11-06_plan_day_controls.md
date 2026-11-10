@@ -790,6 +790,8 @@ Quit `/Applications/daVIPA.app` first. It holds the lock, so a source launch
 exits silently with status 0 — the time grid's handoff note records the same
 — then run `./start.sh` and keep its terminal in view: that console is the
 only place a traceback reaches anyone, and a traceback is what settled PD-M12.
+`./start-demo.sh` runs the same gestures against the demo database, and its
+console is just as good a place to catch one.
 
 Each step names the `BACKLOG.md` entry it settles, by title. A step that passes
 is silence: the entry leaves `BACKLOG.md` with the reason, and where it was its
@@ -841,10 +843,19 @@ after **Yes** the day fills and the status line reports
 `AutoLoad: blocked N of M`. A second AutoLoad on that same date does not ask
 again. Repeat once with **+ Break**.
 
-Since PD-M13 **a drop never asks**: `_require_block_day(ask=True)` is reached
-from the two button gestures only, and both drop paths pass `ask=False`. This
-one cannot be tested by dragging, and no question appearing is the built
-behaviour rather than a failure.
+Then **drag one item** from the Items pane onto a half hour of a *different*
+non-work day — 2026-11-15 — because the first day's Yes is remembered for the
+sitting and would suppress the question. The same dialog is the pass: **Yes**
+writes the block, **Cancel** writes nothing and leaves "… is not a block day
+(Day Settings allows …)" on the status line. This half was built on 2026-11-10
+(PF-M1, `docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md`)
+and is the third attempt at a question on this path, so what is being watched
+for is a dialog that never appears, or a window that stops responding.
+
+Since PD-M13 the *write* never asks: both drop paths pass `ask=False`, and the
+write is not where a modal belongs. Since 2026-11-10 the *gesture* asks — PF-M1
+puts the question in the release handler before the write is deferred — so a
+drop that raises no question is now a failure, not the built behaviour.
 
 If it fails, which of the three: the question shows and nothing is written; no
 question is shown at all; or the blocks are written and not drawn.

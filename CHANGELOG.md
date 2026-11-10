@@ -7,6 +7,32 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — the Plan screen's header, and what a drop says (2026-11-10)
+
+- **The header is two rows now.** The date, **Clear Day** and **AutoLoad** —
+  the three controls that are about the whole day — sit on the first; **+
+  Buffer**, **+ Break**, **⤴ Google Calendar** and **⚙ Day Settings** on the
+  second. Every button on both rows takes an equal share of the width, so
+  widening the window widens them together instead of leaving 90px buttons
+  beside panes that grew.
+- **A single item dragged onto a non-work day now asks first.** The question is
+  the one the buttons already asked — *"<date> is not a regular work day. Day
+  Settings allows Mon, Tue, Wed, Thu, Fri. Schedule anyway?"* — asked once per
+  date. Until now a drag wrote the block and said so in the status line,
+  because the question used to be put to the screen at the moment the drag was
+  released, which macOS refuses. It is asked in the release handler now, before
+  the write is deferred, and a dialog that cannot be shown still schedules the
+  work and says which day it was on.
+- **One block per item per day.** Dropping an item that is already on the day
+  writes nothing and names the half hour it is at — *"… is already blocked at
+  09:00 — drag that block to move it"*. Nothing refused this before: the grid
+  refused a *box* with four blocks in it, not an item that was already planned,
+  so the same item could be blocked twice on two free boxes.
+- **A follow-on lands behind the work it follows.** When the dropped item is
+  the parent or the child of a block already in that box, or a step of the same
+  Weekly Tactic, it takes the position directly after that block rather than
+  the end of the box. An unlinked drop is unchanged.
+
 ### Changed — what the VSP tabs' on-screen walk asked for (2026-11-08)
 
 - **The filter area is a line of its own on every VSP tab.** Segment, Sub and

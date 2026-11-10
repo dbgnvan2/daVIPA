@@ -292,7 +292,13 @@ Three things follow from the grid, and they are the whole model:
    can share one half hour; the box grows to show them all, and still counts as
    one half hour of your day.
 
-Header:
+Header, in two rows. The first holds the date, **Clear Day** and **AutoLoad** —
+the three controls that are about the day as a whole. The second holds
+**+ Buffer**, **+ Break**, **⤴ Google Calendar** and **⚙ Day Settings**, the
+four that add something to the day or open something else. Every button on both
+rows takes an equal share of the width, so widening the window widens the
+buttons together instead of leaving them at a fixed size beside panes that grew.
+
 - **Date picker** — What: Chooses the day you are planning. Why: Changing it
   reloads both panes. It is a picker rather than a typed field, so a date that
   cannot be stored cannot be entered.
@@ -480,6 +486,19 @@ Items pane (left):
   left spare. A label with the item's name follows the pointer once you start
   to move it — not on the press, so an ordinary click on a row leaves nothing
   behind.
+
+  **One block per item per day.** Dropping an item that is already on the day
+  writes nothing and says where it is — *"Draft the proposal is already blocked
+  at 09:00 — drag that block to move it"*. The row's *already blocked* marker
+  was the passive version of the same fact; this is the version that answers a
+  drag.
+
+  **A follow-on lands behind the work it follows.** When the item you drop is
+  linked to a block already in that box — one is the other's parent, or the two
+  are steps of the same Weekly Tactic — it takes the place directly after that
+  block rather than the end of the box. An unlinked drop still joins the end,
+  which is what it always did.
+
 - **The day scrolls itself while you drag** — What: Hold a dragged item or
   block near the top or bottom edge of the day pane and the day scrolls that
   way, until you move off the edge or let go. Why: A half hour you cannot see
@@ -590,15 +609,17 @@ Day Settings modal:
   are not a lock on the calendar, and what happens on an unchecked day depends
   on how you got there:
   - **Dragging an item** onto a half hour, or onto **Earlier** or **Later**,
-    just works. The block is written and the status line says which day it was
-    on — *"Blocked 30m for … — 2026-11-07 is not a regular work day (Day
-    Settings allows Mon, Tue, Wed, Thu, Fri)"*. Nothing to dismiss: on macOS a
-    question cannot be put on the screen at the moment a drag is released, and
-    the two attempts to ask one there cost a silent dropped drag and then a
-    hung window.
-  - **AutoLoad** and the **break/buffer** button ask first — *"<date> is not a
-    regular work day. Day Settings allows Mon, Tue, Wed, Thu, Fri. Schedule
-    anyway?"* — because either one can fill a whole day at once. The question
+    asks the same question first — *"<date> is not a regular work day. Day
+    Settings allows Mon, Tue, Wed, Thu, Fri. Schedule anyway?"* — and blocks
+    the item on a Yes. **Cancel** writes nothing and the status line says which
+    days the week allows. If the question cannot be shown at all, the work is
+    scheduled rather than lost and the status line says which day it was on:
+    losing the gesture silently is the one outcome worse than either answer.
+    Until 2026-11-10 this gesture wrote the block without asking, because the
+    question used to be put to the screen at the moment the drag was released —
+    a moment macOS refuses a dialog at. It is asked before that moment now.
+  - **AutoLoad** and the **break/buffer** button ask the same question —
+    because either one can fill a whole day at once. The question
     is asked once for that date, not once per item, and answering it plans that
     day only: it does not tick the box, and the next time the screen is opened
     on that date it asks again. **Cancel** writes nothing and says which days

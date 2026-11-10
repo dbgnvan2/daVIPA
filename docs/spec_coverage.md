@@ -1866,3 +1866,35 @@ the prose of this repo's own records, and records are filed now rather than
 tested — `CLAUDE.md`, *Working agreements → Records are filed, not tested*.
 The rows above are kept as what verified each criterion on its date. They are
 history, not a current pointer; the criteria themselves were met.
+
+## PF — the Plan screen's header and its drops (2026-11-10)
+
+Plan: `docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md`
+
+The four asks and one report that came out of the 2026-11-10 walk of the Plan
+screen. PF-M1 is the one to watch: a dialog on a path that has eaten two of
+them already, asked at a different moment than either.
+
+| Criterion | Implementation | Test |
+|---|---|---|
+| PF-M1.1 | A single item dropped on a non-work day asks before it writes | `plan.py::on_drag_release` (`_require_block_day()` before the idle write) | `tests/test_plan_screen.py::test_pfm11_the_drop_asks_on_a_non_work_day` |
+| PF-M1.2 | Declining writes nothing and names the day | `plan.py::_require_block_day` | `::test_pfm12_declining_the_drop_writes_nothing` |
+| PF-M1.3 | The drop asks once per date | `plan.py::_work_anyway` | `::test_pfm13_the_drop_asks_once_per_date` |
+| PF-M1.4 | A work day's drop asks nothing | `plan.py::on_drag_release` | `::test_pfm14_a_work_day_drop_never_asks` |
+| PF-M1.5 | A question that raises still schedules | `plan.py::_require_block_day` (`try/except tk.TclError`) | `::test_pfm15_a_question_that_raises_still_schedules` |
+| PF-M1.6 | On the running app: the question appears for a single item | — (walk step 4) | *(not code-testable)* |
+| PF-M2.1 | A second drop of the same item writes no second block | `plan.py::block_item` (`_blocked_today`) | `::test_pfm21_a_second_drop_of_the_same_item_writes_nothing` |
+| PF-M2.2 | The refusal names the box the block is in | `plan.py::block_item` | `::test_pfm22_the_refusal_says_where_the_block_is` |
+| PF-M2.3 | A different item still lands on that box | `plan.py::block_item` | `::test_pfm23_a_different_item_still_lands` |
+| PF-M2.4 | Breaks and buffers stay repeatable | `plan.py::_blocked_today` (item blocks only) | `::test_pfm24_a_break_is_not_an_item_to_refuse` |
+| PF-M3.1 | A child lands directly after its parent | `plan.py::_linked_block_in_slot`, `db_manager.py::add_block_at(after_block_id=)`, `::_move_behind` | `::test_pfm31_a_child_lands_after_its_parent` |
+| PF-M3.2 | Weekly Tactic siblings order the same way | same | `::test_pfm32_weekly_tactic_siblings_keep_their_order` |
+| PF-M3.3 | An unlinked drop joins the end of the box | same | `::test_pfm33_an_unlinked_drop_joins_the_end` |
+| PF-M3.4 | A link with no partner in the box is no rule | `plan.py::_linked_block_in_slot` | `::test_pfm34_a_link_with_no_block_in_the_box_is_no_rule` |
+| PF-M4.1 | The header is two rows, controls split as asked | `plan.py::create_header` | `tests/test_plan_screen_pf_header.py::test_pfm41_the_header_is_two_rows` |
+| PF-M4.2 | Every control survives the move | `plan.py::create_header` | `::test_pfm42_every_control_survives_the_move` |
+| PF-M4.3 | The status line stays outside the header | `plan.py::create_header` | `::test_pfm43_the_status_line_stays_out_of_the_header` |
+| PF-M4.4 | The header still fits the default window | `plan.py::create_header` | `tests/test_plan_screen_calendar_export.py::test_cem441b_the_header_fits_the_window_it_opens_in` |
+| PF-M5.1 | Every button shares a weighted, uniform column group | `plan.py::create_header` | `tests/test_plan_screen_pf_header.py::test_pfm51_the_buttons_share_one_column_group` |
+| PF-M5.2 | Widening the window widens all four equally | `plan.py::create_header` | `::test_pfm52_widening_the_window_keeps_them_equal` (mapped window) |
+| PF-M5.3 | The tools row fits the narrowest window | `plan.py::create_header` | `::test_pfm53_the_buttons_fit_the_narrowest_window` |
