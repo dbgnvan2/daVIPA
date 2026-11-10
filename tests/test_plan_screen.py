@@ -6529,6 +6529,39 @@ def test_pfm35_a_continuation_lands_on_top(screen, manager):
     assert positions["Something else"] == 2, positions
 
 
+def test_pfm71_a_continuation_sits_above_what_starts_in_that_box(screen, manager):
+    """PF-M7 — the continuation of a long task is drawn at the top of the box.
+
+    Reported from the running screen on 2026-11-10: "a continuation item (same
+    task) is NOT staying at the top of the block. Each new item pushes the
+    continuation item down." It was drawn after everything that starts in the
+    box, so every drop there pushed it further down.
+
+    Read from the widget order rather than a stored row: what the report is
+    about is where the chip is on screen, and ``grid`` row order is that.
+    """
+    long_task = _item(manager, "Write the talk", work_block=60)
+    other = _item(manager, "Something else")
+    screen.refresh()
+
+    screen.block_item(long_task, 0)
+    screen.block_item(other, 1)
+
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    texts = _label_texts(frames[1])
+    continuation = next(
+        (at for at, text in enumerate(texts) if text.startswith("↳")), None
+    )
+    assert continuation is not None, texts
+    assert "Something else" in texts, texts
+    started_here = texts.index("Something else")
+
+    assert continuation < started_here, (
+        f"the continuation is drawn below the task that starts in the box: "
+        f"{texts}"
+    )
+
+
 def test_pfm61_a_box_the_day_grew_into_accepts_a_drop(screen, manager):
     """PF-M6 — the morning box that only exists because the day grew earlier.
 
