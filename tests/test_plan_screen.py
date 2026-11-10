@@ -6322,6 +6322,75 @@ def test_pfm15_a_question_that_raises_still_schedules(
     )
 
 
+def test_pfm17_a_drop_that_cannot_write_asks_nothing(
+    root, manager, settings, monkeypatch
+):
+    """PF-M1.7 — the day's one answer is not spent on a drop that refuses.
+
+    Found by a cold review pass on the PF-M1 change. The question was asked
+    before the two refusals the grid already knew about, and a yes is
+    remembered in ``_work_anyway`` whether the write happens or not — so one
+    wasted confirmation silenced the question for the rest of the sitting.
+    """
+    asked = []
+    monkeypatch.setattr(
+        "tkinter.messagebox.askyesno", lambda *a, **k: asked.append(1) or True
+    )
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    blocked_item = _item(manager, "already on the day", SATURDAY)
+    panel.block_item(blocked_item, 0)
+    fresh = _item(manager, "nowhere to go", SATURDAY)
+    for _ in range(4):
+        _add_block(manager, 30, "filler", 5, block_date=SATURDAY)
+    panel.refresh()
+
+    _drop_on_box(panel, monkeypatch, blocked_item, 2)
+
+    assert asked == [], f"a refused drop asked the day's question: {asked}"
+    assert "already blocked at" in panel.status_label.cget("text")
+
+    _drop_on_box(panel, monkeypatch, fresh, 5)
+
+    assert asked == [], f"a full box asked the day's question: {asked}"
+    assert panel.status_label.cget("text") == refusal_text(SlotRefusal.SLOT_FULL), (
+        panel.status_label.cget("text")
+    )
+    assert len(manager.get_time_blocks(SATURDAY)) == 5, (
+        "a refused drop wrote a block"
+    )
+
+
+def test_pfm25_a_drop_on_an_end_also_refuses_a_second_block(
+    root, manager, settings, monkeypatch
+):
+    """PF-M2.5 — the one-block rule holds on the two ends of the day too.
+
+    Found by the same review pass: ``extend_day_for`` has its own write and its
+    own guard, and it had no duplicate check — so the sentence "already blocked
+    at 09:00" from one gesture and a second block from another were both true.
+    """
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = SATURDAY
+    panel.refresh()
+    item = _item(manager, "weekend work", SATURDAY)
+    panel.block_item(item, 0)
+    before = len(manager.get_time_blocks(SATURDAY))
+    _pointer_on(panel, monkeypatch, _virtual(panel, DAY_EXTEND_EARLIER))
+
+    panel.start_item_drag(None, item)
+    panel.on_drag_release(None)
+    panel.update_idletasks()
+
+    assert len(manager.get_time_blocks(SATURDAY)) == before, (
+        "the day lengthened for an item that was already on it"
+    )
+    assert "already blocked at" in panel.status_label.cget("text"), (
+        panel.status_label.cget("text")
+    )
+
+
 def test_pfm21_a_second_drop_of_the_same_item_writes_nothing(screen, manager):
     """PF-M2.1 — one block per item per day.
 

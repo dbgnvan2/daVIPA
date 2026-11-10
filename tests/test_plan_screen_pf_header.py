@@ -161,10 +161,14 @@ def test_pfm51_the_buttons_share_one_column_group(screen):
 
 
 def test_pfm52_widening_the_window_keeps_them_equal(screen, root, mapped_windows):
-    """PF-M5.2 — the four tools grow together, by the same amount each.
+    """PF-M5.2 — the four tools grow together, and to the same width.
 
     The complaint was 90px buttons beside panes that moved. Measured rather
     than read, because ``uniform`` is the mechanism and this is its effect.
+
+    ``mapped_windows`` only lets a window *stay* mapped; the window still has
+    to be deiconified, which is what every geometry test here does. Without
+    it ``winfo_width`` is 1 for everything and the comparison is 1 against 1.
     """
     tools = [
         screen.btn_add_buffer,
@@ -175,13 +179,17 @@ def test_pfm52_widening_the_window_keeps_them_equal(screen, root, mapped_windows
     screen.pack(fill="both", expand=True)
 
     root.geometry(f"{DEFAULT_WINDOW_WIDTH_PX}x700")
-    root.update_idletasks()
+    root.deiconify()
+    root.update()
+
     narrow = [button.winfo_width() for button in tools]
 
     root.geometry(f"{DEFAULT_WINDOW_WIDTH_PX + 400}x700")
-    root.update_idletasks()
+    root.update()
+
     wide = [button.winfo_width() for button in tools]
 
+    assert min(narrow) > 1, f"the window never mapped: {narrow}"
     assert max(wide) - min(wide) <= 2, f"the four are not equal once wide: {wide}"
     assert min(wide) > min(narrow), (
         f"the buttons did not grow with the window: {narrow} then {wide}"
@@ -191,20 +199,21 @@ def test_pfm52_widening_the_window_keeps_them_equal(screen, root, mapped_windows
 def test_pfm53_the_buttons_fit_the_narrowest_window(screen):
     """PF-M5.3 — the row's own request still fits the window it opens in.
 
-    Requested widths, not realised ones: a withdrawn window reports 1, and the
-    question here is whether the row asks for more than it is given.
+    Under ``uniform`` the row asks for four of the *widest* button plus the
+    gaps, not for the four widths added up: the column group equalises them
+    before Tk measures. Summing the individual requests would pass at a width
+    where the row cannot fit, which is the failure this is here to catch.
+
+    Requested widths, not realised ones: a withdrawn window reports 1.
     """
-    tools_row = _row(screen.btn_settings)
-    wanted = sum(
-        button.winfo_reqwidth()
-        for button in (
-            screen.btn_add_buffer,
-            screen.btn_add_break,
-            screen.btn_export_calendar,
-            screen.btn_settings,
-        )
-    )
-    wanted += 8 * 3  # the three gaps between them
+    tools = [
+        screen.btn_add_buffer,
+        screen.btn_add_break,
+        screen.btn_export_calendar,
+        screen.btn_settings,
+    ]
+    widest = max(button.winfo_reqwidth() for button in tools)
+    wanted = 4 * widest + 8 * 4  # four equal columns, a gap on each
     wanted += 20  # the row's own padx
 
     assert wanted <= DEFAULT_WINDOW_WIDTH_PX, (
