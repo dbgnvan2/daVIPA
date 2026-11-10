@@ -569,7 +569,44 @@ def span_for_blocks(blocks: Iterable[TimeBlock], bounds: DayBounds) -> DaySpan:
     return span
 
 
-def day_grid(bounds: DayBounds, span: Optional[DaySpan] = None) -> List[Slot]:
+def lunch_window(
+    blocks: Iterable[TimeBlock], bounds: DayBounds, ignoring: Optional[str] = None
+) -> Optional[Tuple[int, int]]:
+    """The minutes lunch covers on this date, or ``None`` for the settings'.
+
+    Purpose: PF-M8 -- a day's lunch can be moved. When that happens the date
+             carries a ``LUNCH`` block, and that block *is* the lunch: Day
+             Settings' hour describes a normal day, exactly as its Day Start and
+             Day End do, and a day that moved its lunch must not be shaded in
+             two places.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m8
+    Tests:   tests/test_time_grid.py::test_pfm81_a_lunch_block_moves_the_lunch_for_that_date
+
+    ``None`` rather than the settings' window, so the caller can tell "this date
+    has its own lunch" from "this date has the same lunch the settings name" --
+    the two produce the same grid and different behaviour on the next move.
+
+    ``ignoring`` drops one block from the read: the lunch block being moved must
+    not count itself as the lunch where it is leaving.
+    """
+    for block in blocks:
+        if ignoring is not None and getattr(block, "id", None) == ignoring:
+            continue
+        if BlockType.normalize(block.block_type) != BlockType.LUNCH:
+            continue
+        if block.slot_index is None:
+            continue
+        start = bounds.day_start_minutes + int(block.slot_index) * SLOT_MINUTES
+        length = max(SLOT_MINUTES, int(block.planned_minutes or SLOT_MINUTES))
+        return (start, start + length)
+    return None
+
+
+def day_grid(
+    bounds: DayBounds,
+    span: Optional[DaySpan] = None,
+    lunch: Optional[Tuple[int, int]] = None,
+) -> List[Slot]:
     """Every half hour of the drawn day, in order.
 
     Purpose: the set of boxes a day offers, which is the thing items are
@@ -587,8 +624,13 @@ def day_grid(bounds: DayBounds, span: Optional[DaySpan] = None) -> List[Slot]:
     walking the list.
     """
     drawn = template_span(bounds) if span is None else span
-    lunch_start = bounds.lunch_start_minutes
-    lunch_end = bounds.lunch_end_minutes
+    if lunch is not None:
+        lunch_start, lunch_end = lunch
+        has_lunch = lunch_end > lunch_start
+    else:
+        lunch_start = bounds.lunch_start_minutes
+        lunch_end = bounds.lunch_end_minutes
+        has_lunch = bounds.lunch_length > 0
 
     slots: List[Slot] = []
     for index in range(drawn.first, drawn.last + 1):
@@ -596,9 +638,7 @@ def day_grid(bounds: DayBounds, span: Optional[DaySpan] = None) -> List[Slot]:
         # Overlap, not containment: a lunch of 12:15--12:45 makes both the
         # 12:00 and the 12:30 slot unavailable, because a block in either
         # would run through part of it.
-        overlaps_lunch = (
-            bounds.lunch_length > 0 and at < lunch_end and lunch_start < at + SLOT_MINUTES
-        )
+        overlaps_lunch = has_lunch and at < lunch_end and lunch_start < at + SLOT_MINUTES
         slots.append(Slot(index=index, start_minutes=at, is_lunch=overlaps_lunch))
     return slots
 
@@ -730,6 +770,7 @@ def can_place(
     *,
     ignoring: Optional[str] = None,
     day_span: Optional[DaySpan] = None,
+    ignore_lunch: bool = False,
 ) -> Optional[str]:
     """``None`` if a block of ``span`` boxes may sit at ``slot_index``.
 
@@ -751,7 +792,11 @@ def can_place(
     """
     span = max(1, int(span))
     drawn = template_span(bounds) if day_span is None else day_span
-    grid = day_grid(bounds, drawn)
+    # PF-M8 -- lunch is where this date's own lunch block puts it, unless the
+    # block being placed *is* that lunch: then there is no lunch in the way, or
+    # the lunch could never be moved off the box it sits on.
+    lunch = None if ignore_lunch else lunch_window(blocks, bounds, ignoring=ignoring)
+    grid = day_grid(bounds, drawn, lunch)
     if not drawn.holds(slot_index, span):
         return SlotRefusal.OUTSIDE_GRID
 
@@ -886,7 +931,9 @@ def build_day_grid(
     """
     blocks = list(blocks)
     drawn = span_for_blocks(blocks, bounds) if span is None else span
-    grid = [GridSlot(slot=slot) for slot in day_grid(bounds, drawn)]
+    # PF-M8 -- the date's own lunch, when it has one. ``None`` is the settings'.
+    lunch = lunch_window(blocks, bounds)
+    grid = [GridSlot(slot=slot) for slot in day_grid(bounds, drawn, lunch)]
     outside: List[TimeBlock] = []
 
     for block in sort_blocks_by_slot(blocks):
@@ -896,7 +943,10 @@ def build_day_grid(
             outside.append(block)
             continue
         at = drawn.position_of(start)
-        if any(entry.slot.is_lunch for entry in grid[at : at + length]):
+        is_lunch = BlockType.normalize(block.block_type) == BlockType.LUNCH
+        # A lunch block lives on the lunch it defines; everything else in a
+        # lunch box is surfaced rather than hidden behind "Lunch".
+        if not is_lunch and any(entry.slot.is_lunch for entry in grid[at : at + length]):
             outside.append(block)
             continue
         grid[at].starting.append(block)

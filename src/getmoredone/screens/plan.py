@@ -1184,6 +1184,11 @@ class PlanScreen(ctk.CTkFrame):
                 for block, widget in rendered.block_widgets:
                     self.bind_block_handlers(widget, block)
                     self._block_widgets.append((widget, block.id))
+                # PF-M8 -- the settings' lunch, before this date has one of its
+                # own: draggable, so a day can be given its own lunch hour
+                # without going to Day Settings and moving it on every date.
+                if rendered.lunch_chip is not None:
+                    self.bind_lunch_handlers(rendered.lunch_chip)
                 row += 1
 
             self._virtual_frames.append((
@@ -2282,6 +2287,78 @@ class PlanScreen(ctk.CTkFrame):
             widget.bind("<B1-Motion>", self.on_drag_motion)
             widget.bind("<ButtonRelease-1>", self.on_drag_release)
 
+    def bind_lunch_handlers(self, frame):
+        """Make the settings' lunch chip draggable. PF-M8.
+
+        Purpose: a day can be given its own lunch hour by dragging the one it
+                 has, rather than by changing Day Settings, which moves lunch
+                 on every date.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m8
+        Tests:   tests/test_plan_screen.py::test_pfm84_dragging_the_lunch_chip_gives_this_date_a_lunch_block
+
+        No right-click menu: there is no block to delete yet. Once the drag has
+        created one, the chip is that block's and every block gesture applies --
+        including Delete, which returns the date to the settings' lunch.
+        """
+        for widget in _subtree(frame):
+            widget.bind("<ButtonPress-1>", self.start_lunch_drag)
+            widget.bind("<B1-Motion>", self.on_drag_motion)
+            widget.bind("<ButtonRelease-1>", self.on_drag_release)
+
+    def start_lunch_drag(self, _event):
+        """Begin dragging the settings' lunch, which has no block behind it."""
+        self._drag_kind = "lunch"
+        self._drag_block = None
+        self._drag_item = None
+        self._arm_drag_label("Lunch")
+
+    def _lunch_block(self) -> Optional[TimeBlock]:
+        """This date's own lunch block, if it has been moved once. PF-M8."""
+        for block in self.db_manager.get_time_blocks(self.selected_date):
+            if BlockType.normalize(block.block_type) == BlockType.LUNCH:
+                return block
+        return None
+
+    def place_lunch_at(self, slot_index: int):
+        """PF-M8 — give this date a lunch block, or move the one it has.
+
+        Purpose: the one gesture that makes a day's lunch its own. The first
+                 drag writes the block the settings were standing in for; every
+                 later one moves it, and deleting it hands the date back to Day
+                 Settings.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m8
+        Tests:   tests/test_plan_screen.py::test_pfm84_dragging_the_lunch_chip_gives_this_date_a_lunch_block
+                 tests/test_plan_screen.py::test_pfm85_a_second_drag_moves_that_block
+
+        The minutes come from Day Settings' lunch length: what is being moved is
+        when lunch is, and its length is still a setting.
+        """
+        block = self._lunch_block()
+        try:
+            if block is None:
+                block = TimeBlock(
+                    block_date=self.selected_date,
+                    start_time="",
+                    end_time="",
+                    planned_minutes=self.bounds.lunch_length,
+                    label="Lunch",
+                    block_type=BlockType.LUNCH,
+                )
+                self.db_manager.add_block_at(
+                    block, slot_index, self.bounds, day_span=self._grid.span
+                )
+            else:
+                self.db_manager.place_block_at(block.id, slot_index, self.bounds)
+        except SlotRefusedError as refused:
+            self.set_status(refusal_text(refused.reason), "error")
+            return
+        except ValueError as error:
+            self.set_status(str(error), "error")
+            return
+
+        self.refresh()
+        self.set_status(f"Lunch moved to {block.start_time}", "success")
+
     def open_block_menu(self, event, block: TimeBlock):
         """TB-M9 — durations, a custom length, and delete.
 
@@ -2669,6 +2746,13 @@ class PlanScreen(ctk.CTkFrame):
                 # worth of explanation: a move that does nothing and says
                 # nothing is indistinguishable from a drag that missed.
                 self.set_status("Drop a block on a half-hour box", "muted")
+        elif kind == "lunch":
+            # PF-M8 -- the settings' lunch, dragged. The first one writes the
+            # block this date was standing in for; later ones move it.
+            if target is not None:
+                self.after_idle(lambda: self.place_lunch_at(target))
+            elif self.pointer_over_day():
+                self.set_status("Drop lunch on a half-hour box", "muted")
 
     def _end_drag(self):
         """Take the label off the screen and forget what was being dragged.

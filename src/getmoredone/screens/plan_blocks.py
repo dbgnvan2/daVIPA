@@ -519,6 +519,10 @@ class SlotRow:
     frame: ctk.CTkFrame
     slot_index: int
     block_widgets: List[Tuple[TimeBlock, ctk.CTkFrame]] = field(default_factory=list)
+    #: PF-M8 -- the settings' lunch chip, when this date has no lunch block of
+    #: its own. Handed back so the screen can make it draggable; a date with a
+    #: lunch block returns that block in ``block_widgets`` instead.
+    lunch_chip: Optional[ctk.CTkFrame] = None
 
 
 def _configure_slot_columns(frame: ctk.CTkFrame) -> None:
@@ -623,7 +627,23 @@ def build_slot_row(
     rendered = SlotRow(frame=frame, slot_index=slot.index)
 
     if slot.is_lunch:
-        _build_lunch_chip(body, row=0)
+        lunch_block = next(
+            (
+                block
+                for block in grid_slot.starting
+                if BlockType.normalize(block.block_type) == BlockType.LUNCH
+            ),
+            None,
+        )
+        chip = _build_lunch_chip(body, row=0)
+        if lunch_block is None:
+            # PF-M8 -- the settings' lunch: drawn the same way, and handed back
+            # so the screen can let a drag give this date a lunch of its own.
+            rendered.lunch_chip = chip
+        else:
+            # This date's own lunch, owned by a block: the same chip, and the
+            # drag and delete every other block has.
+            rendered.block_widgets.append((lunch_block, chip))
         return rendered
 
     inner = 0

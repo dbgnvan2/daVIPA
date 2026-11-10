@@ -485,8 +485,12 @@ class BlockType:
     ITEM = "item"
     BUFFER = "buffer"
     BREAK = "break"
+    #: PF-M8 -- a lunch the user moved on this date. Absent, lunch is the hour
+    #: Day Settings names; present, this block *is* the day's lunch and Day
+    #: Settings' lunch does not apply to that date.
+    LUNCH = "lunch"
 
-    ALL = (ITEM, BUFFER, BREAK)
+    ALL = (ITEM, BUFFER, BREAK, LUNCH)
 
     @staticmethod
     def normalize(value: Optional[str]) -> str:
