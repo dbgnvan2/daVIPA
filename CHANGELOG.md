@@ -35,6 +35,11 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   another box goes to the **top** of the box it is dropped on, rather than under
   everything already there. A Weekly Tactic is a container for steps that need
   not follow one another, so its siblings get no ordering rule.
+- **A continuation is drawn at the top of the box it runs into.** A task that
+  spans half hours shows a greyed `↳` chip in each box it runs through; that
+  chip was drawn below whatever else had been dropped in the box, so every new
+  task pushed it down. It is drawn first now, and the tasks that start in the
+  box stack below it.
 - **A box the day grew into accepts a drop.** Extending the day on **Earlier**
   or **Later** draws half hours outside Day Settings' hours; dropping an item on
   one of them was refused as "outside the day" while the box was on screen. The

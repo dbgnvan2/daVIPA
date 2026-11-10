@@ -177,6 +177,25 @@ whether that is what was seen is a question for the next walk.
 | PF-M6.2 | A box past Day End, left by a Later drop, accepts a later drop | `::test_pfm62_a_box_the_day_grew_into_at_the_end_accepts_a_drop` |
 | PF-M6.3 | The pre-check and the write read the same span | covered by PF-M6.1: the refusal came from the write path |
 
+## PF-M7 — A continuation is drawn at the top of the box it runs into
+
+**Reported:** "a continuation item (same task) is NOT staying at the top of the
+block. Each new item pushes the continuation item down. However, each regular
+item stays on top and items go below."
+
+`build_slot` drew the box in two passes — everything that *starts* in it, then
+everything that *runs through* it — so the greyed `↳` chip was always drawn
+last, and every drop into that half hour pushed it further down. The order is
+reversed: continuations first, then the tasks that start here, each group in
+its own order.
+
+Nothing about the database changes: `position` still orders the blocks that
+start in a box, and a continuation chip is the same block drawn again.
+
+| ID | Criterion | Verified by |
+|---|---|---|
+| PF-M7.1 | A continuation chip is drawn above the tasks that start in that box | `tests/test_plan_screen.py::test_pfm71_a_continuation_sits_above_what_starts_in_that_box` |
+
 ## PF-M4 — The header is two rows
 
 **Asked:** "Put the Buffer, Break, Calendar and Day Settings buttons on the
