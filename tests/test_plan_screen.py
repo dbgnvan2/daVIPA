@@ -2339,7 +2339,7 @@ def test_a_block_released_off_a_box_says_so(screen, manager, monkeypatch):
 
     screen.on_drag_release(None)
 
-    assert screen.status_label.cget("text") == "Drop a block on a half-hour box"
+    assert screen.status_label.cget("text") == "Drop that Action Item on a Time Block"
     assert manager.get_time_blocks(THURSDAY)[0].slot_index == 3, "the block moved anyway"
 
 
@@ -5595,24 +5595,50 @@ def test_pdm141_a_write_that_fails_is_not_reported_as_a_longer_day(
     assert "the disk said no" in screen.status_label.cget("text")
 
 
-def test_pdm57_a_block_drag_onto_a_virtual_box_is_refused(
+def test_pfm91_a_scheduled_item_makes_the_day_earlier(
     screen, manager, monkeypatch
 ):
-    """PD-M5.7 — a block already has a half hour; it cannot invent another."""
+    """PF-M9 — a scheduled Action Item can lengthen the day, as an item can.
+
+    This replaces PD-M5.7, which refused the gesture on the argument that the
+    day grows for work that is not planned yet. Reported from the running
+    screen on 2026-11-10: "try to drag an item to earlier than day start and it
+    doesn't work", with a refusal that used "block" for the box and for the
+    work in it. The day grows by the block's own length and the block moves into
+    the new box; Day Settings' Day Start is still not rewritten (PD-M14.1).
+    """
     item = _item(manager, "Draft the proposal")
     block = _add_block(manager, 30, "Draft the proposal", slot_index=4, item_id=item.id)
     screen.refresh()
-    before = _stored(manager)
     _pointer_on(screen, monkeypatch, _virtual(screen, DAY_EXTEND_EARLIER))
 
     screen.start_block_drag(None, block)
     screen.on_drag_release(None)
     screen.update_idletasks()
 
-    assert _stored(manager) == before, f"the block moved: {_stored(manager)}"
-    assert screen.settings.plan_day_start == "08:00", "a block lengthened the day"
-    text = screen.status_label.cget("text")
-    assert "cannot make a new half hour" in text, text
+    moved = manager.get_time_block(block.id)
+    assert moved.slot_index == -1, f"the block did not move: {moved.slot_index}"
+    assert screen.settings.plan_day_start == "08:00", (
+        "the gesture rewrote Day Start instead of growing this date"
+    )
+    assert "Moved to" in screen.status_label.cget("text")
+
+
+def test_pfm92_a_scheduled_item_makes_the_day_later(screen, manager, monkeypatch):
+    """PF-M9.2 — the same at the other end."""
+    item = _item(manager, "Late finish")
+    block = _add_block(manager, 30, "Late finish", slot_index=4, item_id=item.id)
+    screen.refresh()
+    _pointer_on(screen, monkeypatch, _virtual(screen, DAY_EXTEND_LATER))
+
+    screen.start_block_drag(None, block)
+    screen.on_drag_release(None)
+    screen.update_idletasks()
+
+    moved = manager.get_time_block(block.id)
+    assert moved.slot_index == screen._grid.span.last, (
+        f"the block did not move to the new end: {moved.slot_index}"
+    )
 
 
 def test_pdm5_an_item_drag_onto_a_virtual_box_extends_the_day(
@@ -5664,7 +5690,7 @@ def test_pdm5_a_drop_in_the_day_but_on_no_box_still_does_nothing(
 
     assert _stored(manager) == [], f"a block was created: {_stored(manager)}"
     assert screen.settings.plan_day_start == "08:00", "the day was lengthened"
-    assert "Drop an item on a half-hour box" in screen.status_label.cget("text")
+    assert "Drop an Action Item on a Time Block" in screen.status_label.cget("text")
 
 
 def test_pdm5_a_real_box_wins_over_a_virtual_one(screen, manager, monkeypatch):
@@ -6349,7 +6375,7 @@ def test_pfm17_a_drop_that_cannot_write_asks_nothing(
     _drop_on_box(panel, monkeypatch, blocked_item, 2)
 
     assert asked == [], f"a refused drop asked the day's question: {asked}"
-    assert "already blocked at" in panel.status_label.cget("text")
+    assert "already in a Time Block at" in panel.status_label.cget("text")
 
     _drop_on_box(panel, monkeypatch, fresh, 5)
 
@@ -6386,7 +6412,7 @@ def test_pfm25_a_drop_on_an_end_also_refuses_a_second_block(
     assert len(manager.get_time_blocks(SATURDAY)) == before, (
         "the day lengthened for an item that was already on it"
     )
-    assert "already blocked at" in panel.status_label.cget("text"), (
+    assert "already in a Time Block at" in panel.status_label.cget("text"), (
         panel.status_label.cget("text")
     )
 
@@ -6408,7 +6434,7 @@ def test_pfm21_a_second_drop_of_the_same_item_writes_nothing(screen, manager):
     assert [b.label for b in blocks] == ["Draft the proposal"], (
         f"the item was blocked twice: {[b.label for b in blocks]}"
     )
-    assert "already blocked at" in screen.status_label.cget("text"), (
+    assert "already in a Time Block at" in screen.status_label.cget("text"), (
         screen.status_label.cget("text")
     )
 
@@ -6424,7 +6450,7 @@ def test_pfm22_the_refusal_says_where_the_block_is(screen, manager):
 
     status = screen.status_label.cget("text")
     assert where in status, f"{where!r} is not in {status!r}"
-    assert "drag that block to move it" in status, status
+    assert "drag that Time Block to move it" in status, status
 
 
 def test_pfm23_a_different_item_still_lands(screen, manager):
@@ -6804,3 +6830,33 @@ def test_pfm87_deleting_the_lunch_block_returns_the_date_to_the_settings(
 
     assert _lunch_blocks(manager) == []
     assert "12:00" in _lunch_times(screen), _lunch_times(screen)
+
+
+def test_pfm94_clearing_the_hover_restores_the_border_colour(screen, manager, monkeypatch):
+    """PF-M9.4 — the outline a drag leaves behind goes away completely.
+
+    Reported from the running screen on 2026-11-10: "something outlines a Time
+    Block and keeps it outlined as if the movement wasn't saved."
+    ``clear_hover_target`` restored the border *width* and not the *colour*, so
+    the last Time Block a drag crossed kept the hover tint for the rest of the
+    session — and a refused drop refreshes nothing, which is why it stayed.
+    """
+    item = _item(manager, "Draft the proposal")
+    screen.refresh()
+    frames = dict((index, frame) for frame, index in _slot_frames(screen))
+    hovered = frames[2]
+    before = (hovered.cget("border_width"), hovered.cget("border_color"))
+
+    # A drag has to be in progress for the hover to draw at all.
+    screen._drag_kind = "item"
+    screen._drag_item = item
+    _pointer_on(screen, monkeypatch, hovered)
+    screen.update_hover_target()
+
+    assert hovered.cget("border_width") == 2, "the hover did not draw"
+
+    screen.clear_hover_target()
+
+    after = (hovered.cget("border_width"), hovered.cget("border_color"))
+    assert after == before, f"the outline stayed: {after} against {before}"
+    screen._end_drag()
