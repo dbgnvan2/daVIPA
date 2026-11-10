@@ -1631,7 +1631,8 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             raise SlotRefusedError(reason)
 
     def add_block_at(
-        self, block: TimeBlock, slot_index: int, bounds, day_span=None
+        self, block: TimeBlock, slot_index: int, bounds, day_span=None,
+        after_block_id: Optional[str] = None,
     ) -> TimeBlock:
         """Create a block in a particular box.
 
@@ -1642,6 +1643,12 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
 
         The fit is checked before anything is written, so a refusal leaves the
         day exactly as it was rather than rolling a write back.
+
+        ``after_block_id`` is PF-M3: a box orders its blocks by ``position``
+        and a drop joins the end, which is right for an unrelated task and
+        wrong for one dragged behind the work it belongs to. Given a block, the
+        new one takes the position directly behind it and the rest of the box
+        moves down one.
         """
         self._refuse_unless_it_fits(
             block.block_date,
@@ -1650,10 +1657,45 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             bounds,
             day_span=day_span,
         )
-        with self.transaction():
+        with self.transaction() as conn:
             self._settle_block_on_slot(block, slot_index, bounds)
+            if after_block_id:
+                self._move_behind(conn, after_block_id, block, slot_index)
             self.create_time_block(block)
         return block
+
+    def _move_behind(
+        self, conn, after_block_id: str, block: TimeBlock, slot_index: int
+    ) -> None:
+        """Give ``block`` the position directly behind another block's.
+
+        Purpose: PF-M3 -- one place decides what "after it" means, so a drop
+                 and any later caller cannot disagree about the order.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m3
+        Tests:   tests/test_plan_screen.py::test_pfm31_a_child_lands_after_its_parent
+
+        A missing partner is not an error: the caller identified it from the
+        day it read, and between that read and this write the row can be gone.
+        The block then keeps the end-of-box position ``_settle_block_on_slot``
+        already gave it.
+        """
+        row = conn.execute(
+            "SELECT position FROM time_blocks WHERE id = ?", (after_block_id,)
+        ).fetchone()
+        if row is None:
+            return
+
+        behind = int(row["position"])
+        conn.execute(
+            """
+            UPDATE time_blocks
+            SET position = position + 1
+            WHERE block_date = ? AND slot_index = ?
+              AND position > ? AND id IS NOT ?
+            """,
+            (block.block_date, int(slot_index), behind, block.id),
+        )
+        block.position = behind + 1
 
     def shift_all_slots(self, by: int) -> int:
         """Renumber every date's blocks so they keep their clock times when Day Start moves.

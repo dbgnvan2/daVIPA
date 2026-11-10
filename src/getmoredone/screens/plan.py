@@ -460,92 +460,121 @@ class PlanScreen(ctk.CTkFrame):
     # ================= construction =========================================
 
     def create_header(self):
+        """The screen's controls, in two rows.
+
+        Purpose: PF-M4 -- the walk asked for the four buttons that add things
+                 to the day on their own line, so the date and the two buttons
+                 that act on the whole day are not crowded by them.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m4
+        Tests:   tests/test_plan_screen_pf_header.py::test_pfm41_the_header_is_two_rows
+
+        PF-M5 -- every button sits in a weighted, uniform column, so widening
+        the window widens them equally instead of leaving 90px buttons beside
+        panes that moved. The title and the date picker keep their own widths;
+        what is left over is shared.
+        """
         header = ctk.CTkFrame(self)
         header.grid(row=0, column=0, columnspan=3, sticky="ew", padx=10, pady=(10, 0))
+        header.grid_columnconfigure(0, weight=1)
+        #: The header, named for the tests that measure it. ``btn_*.master`` is
+        #: a row inside it now, and a test that measured that row would be
+        #: measuring a quarter of what it means to measure.
+        self.header = header
+
+        # -- row 1: the date, Clear Day, AutoLoad --------------------------
+        day_row = ctk.CTkFrame(header, fg_color="transparent")
+        day_row.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
+        day_row.grid_columnconfigure(3, weight=1, uniform="day_row")
+        day_row.grid_columnconfigure(4, weight=1, uniform="day_row")
 
         ctk.CTkLabel(
-            header,
+            day_row,
             text="Plan - Time Blocks",
             font=ctk.CTkFont(size=20, weight="bold"),
-        ).pack(side="left", padx=10, pady=10)
+        ).grid(row=0, column=0, sticky="w", padx=(0, 16), pady=4)
 
-        ctk.CTkLabel(header, text="Date:").pack(side="left", padx=(16, 4))
+        ctk.CTkLabel(day_row, text="Date:").grid(
+            row=0, column=1, sticky="w", padx=(0, 4)
+        )
         self.date_picker = DatePickerButton(
-            header,
+            day_row,
             initial_date=self.selected_date,
             on_date_changed=self.on_date_changed,
             settings=self.settings,
             fg_color="transparent",
         )
-        self.date_picker.pack(side="left", padx=(0, 10))
-
-        self.btn_settings = ctk.CTkButton(
-            header,
-            text="⚙ Day Settings",
-            width=130,
-            command=self.open_settings,
-            **button_style("secondary"),
-        )
-        self.btn_settings.pack(side="right", padx=10)
-
-        # CE-M4.1 -- secondary, not primary: AutoLoad is this screen's one
-        # primary action and the theme rule allows exactly one.
-        # Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
-        # Tests: tests/test_plan_screen_calendar_export.py::test_cem441_the_header_holds_the_export_button_wired_to_the_export
-        self.btn_export_calendar = ctk.CTkButton(
-            header,
-            text="⤴ Google Calendar",
-            # 150, not 160: the header is 8px inside the default window width
-            # at this size and was 3px over it at the old one. See the status
-            # label below and ``test_cem441b``.
-            width=150,
-            command=self.export_day_to_calendar,
-            **button_style("secondary"),
-        )
-        self.btn_export_calendar.pack(side="right", padx=4)
-
-        self.btn_add_break = ctk.CTkButton(
-            header,
-            text="+ Break",
-            width=90,
-            command=lambda: self.add_padding_block(BlockType.BREAK),
-            **button_style("secondary"),
-        )
-        self.btn_add_break.pack(side="right", padx=4)
-
-        self.btn_add_buffer = ctk.CTkButton(
-            header,
-            text="+ Buffer",
-            width=90,
-            command=lambda: self.add_padding_block(BlockType.BUFFER),
-            **button_style("secondary"),
-        )
-        self.btn_add_buffer.pack(side="right", padx=4)
-
-        # The one button on this screen that acts on the whole day, so the one
-        # that carries the primary colour. Nothing else here is primary, which
-        # is the condition the theme rule puts on using it at all.
-        self.btn_autoload = ctk.CTkButton(
-            header,
-            text="AutoLoad",
-            width=100,
-            command=self.autoload_day,
-            **button_style("primary"),
-        )
-        self.btn_autoload.pack(side="right", padx=4)
+        self.date_picker.grid(row=0, column=2, sticky="w", padx=(0, 12))
 
         # The reverse of the button beside it, styled as what it is. Danger
         # rather than primary: AutoLoad is this screen's one primary action,
         # and a destructive button that looks like the main one is a misclick
         # waiting to happen.
         self.btn_clear_day = ctk.CTkButton(
-            header,
+            day_row,
             text="Clear Day",
             width=100,
             command=self.clear_day,
             **button_style("danger"),
         )
-        self.btn_clear_day.pack(side="right", padx=4)
+        self.btn_clear_day.grid(row=0, column=3, sticky="ew", padx=(0, 8), pady=4)
+
+        # The one button on this screen that acts on the whole day, so the one
+        # that carries the primary colour. Nothing else here is primary, which
+        # is the condition the theme rule puts on using it at all.
+        self.btn_autoload = ctk.CTkButton(
+            day_row,
+            text="AutoLoad",
+            width=100,
+            command=self.autoload_day,
+            **button_style("primary"),
+        )
+        self.btn_autoload.grid(row=0, column=4, sticky="ew", pady=4)
+
+        # -- row 2: the four that add or open something ---------------------
+        tools_row = ctk.CTkFrame(header, fg_color="transparent")
+        tools_row.grid(row=1, column=0, sticky="ew", padx=10, pady=(6, 10))
+        for column in range(4):
+            tools_row.grid_columnconfigure(column, weight=1, uniform="tools_row")
+
+        self.btn_add_buffer = ctk.CTkButton(
+            tools_row,
+            text="+ Buffer",
+            width=90,
+            command=lambda: self.add_padding_block(BlockType.BUFFER),
+            **button_style("secondary"),
+        )
+        self.btn_add_buffer.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+
+        self.btn_add_break = ctk.CTkButton(
+            tools_row,
+            text="+ Break",
+            width=90,
+            command=lambda: self.add_padding_block(BlockType.BREAK),
+            **button_style("secondary"),
+        )
+        self.btn_add_break.grid(row=0, column=1, sticky="ew", padx=(0, 8))
+
+        # CE-M4.1 -- secondary, not primary: AutoLoad is this screen's one
+        # primary action and the theme rule allows exactly one.
+        # Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
+        # Tests: tests/test_plan_screen_calendar_export.py::test_cem441_the_header_holds_the_export_button_wired_to_the_export
+        self.btn_export_calendar = ctk.CTkButton(
+            tools_row,
+            text="⤴ Google Calendar",
+            width=150,
+            command=self.export_day_to_calendar,
+            **button_style("secondary"),
+        )
+        self.btn_export_calendar.grid(row=0, column=2, sticky="ew", padx=(0, 8))
+
+        self.btn_settings = ctk.CTkButton(
+            tools_row,
+            text="⚙ Day Settings",
+            width=130,
+            command=self.open_settings,
+            **button_style("secondary"),
+        )
+        self.btn_settings.grid(row=0, column=3, sticky="ew")
 
         # CE-M4.1 -- the status line is NOT in the header.
         # Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
@@ -1300,6 +1329,20 @@ class PlanScreen(ctk.CTkFrame):
         if not self._require_block_day(ask=False):
             return
 
+        # PF-M2 -- one block per item per day, said out loud. Nothing refused
+        # a second block before this: ``add_block_at`` refuses a box with four
+        # blocks in it, not an item that is already on the day, so dropping an
+        # item that is already blocked wrote a second block on any free box
+        # and was refused as a full box on its own.
+        sitting = self._blocked_today(item.id)
+        if sitting is not None:
+            self.set_status(
+                f"{item.title} is already blocked at {sitting.start_time} "
+                "— drag that block to move it",
+                "warning",
+            )
+            return
+
         minutes = duration_for_item(item, self.bounds.default_block_minutes)
         if slot_index is None:
             slot_index = self.first_free_slot(minutes)
@@ -1308,6 +1351,9 @@ class PlanScreen(ctk.CTkFrame):
                     f"No free half hour left for {minutes}m of {item.title}", "warning"
                 )
                 return
+
+        # PF-M3 -- a follow-on task lands behind the work it follows.
+        after = self._linked_block_in_slot(item, slot_index)
 
         block = TimeBlock(
             block_date=self.selected_date,
@@ -1319,7 +1365,12 @@ class PlanScreen(ctk.CTkFrame):
             block_type=BlockType.ITEM,
         )
         try:
-            self.db_manager.add_block_at(block, slot_index, self.bounds)
+            self.db_manager.add_block_at(
+                block,
+                slot_index,
+                self.bounds,
+                after_block_id=after.id if after is not None else None,
+            )
         except SlotRefusedError as refused:
             self.set_status(refusal_text(refused.reason), "error")
             return
@@ -1335,6 +1386,67 @@ class PlanScreen(ctk.CTkFrame):
             # minute this one ends.
             text += f" — {boxes} boxes, {spare}m spare"
         self.set_status(text, "success")
+
+    def _blocked_today(self, item_id: str) -> Optional[TimeBlock]:
+        """The block this item already has on the date on screen, if any.
+
+        Purpose: PF-M2 -- one block per item per day, so a second drag says
+                 where the work already is instead of writing beside it.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m2
+        Tests:   tests/test_plan_screen.py::test_pfm21_a_second_drop_of_the_same_item_writes_nothing
+
+        Item blocks only. A break or a buffer carries no ``item_id``, and the
+        two of them repeating across a day is what they are for.
+        """
+        for block in self.db_manager.get_time_blocks(self.selected_date):
+            if block.block_type != BlockType.ITEM:
+                continue
+            if block.item_id == item_id:
+                return block
+        return None
+
+    def _linked_block_in_slot(
+        self, item: ActionItem, slot_index: int
+    ) -> Optional[TimeBlock]:
+        """The block in this box that ``item`` should follow, if there is one.
+
+        Purpose: PF-M3 -- a task dragged next to the work it belongs to takes
+                 the place after it rather than the end of the box.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m3
+        Tests:   tests/test_plan_screen.py::test_pfm31_a_child_lands_after_its_parent
+
+        **Linked**, for this building, is one of two things the schema holds:
+        either item is the other's ``parent_id``, or both carry the same
+        non-empty ``weekly_tactic_id``. ``item_links`` points at notes, files
+        and URLs, not at other items, so it cannot be the relation meant. If
+        the walk shows a different one, this is the method to correct.
+
+        The nearest match wins, walking the box in the order it is drawn, so a
+        box holding both a parent and a tactic sibling puts the item after the
+        first of them it meets.
+        """
+        mine = {
+            "parent": getattr(item, "parent_id", None),
+            "tactic": getattr(item, "weekly_tactic_id", None),
+        }
+        for block in self.db_manager.get_time_blocks(self.selected_date):
+            if block.slot_index != slot_index:
+                continue
+            if block.block_type != BlockType.ITEM or not block.item_id:
+                continue
+            if block.item_id == item.id:
+                continue
+            other = self.db_manager.get_action_item(block.item_id)
+            if other is None:
+                continue
+            if mine["parent"] and getattr(other, "id", None) == mine["parent"]:
+                return block
+            if getattr(other, "parent_id", None) == item.id:
+                return block
+            tactics = {mine["tactic"], getattr(other, "weekly_tactic_id", None)}
+            if len(tactics) == 1 and mine["tactic"]:
+                return block
+        return None
 
     # ================= exporting the day ====================================
 
@@ -2409,9 +2521,29 @@ class PlanScreen(ctk.CTkFrame):
         # also a precedence no test can check.
         edge = self.virtual_under_pointer()
         if kind == "item" and item is not None:
+            # PF-M1 -- the question the buttons ask, asked here.
+            #
+            # PD-M13 took it off this path because a modal opened from the
+            # idle callback below raised TclError on macOS, and an in-app
+            # toplevel in its place hung the app. Both were reported from
+            # the running screen. What cannot happen there is the modal *in
+            # the idle callback*; this handler is the moment the gesture is
+            # still synchronous, and it is the moment the Scheduler already
+            # asks from. So the question is here, the write stays below, and
+            # the ask is wrapped (`_require_block_day` catches TclError): a
+            # platform that refuses it writes the block and says which day it
+            # was on, which is what happened before this module.
+            #
+            # Read first, ask second, schedule third: the pointer has to be
+            # read while it is still there, and a drop on the heading is not
+            # worth a question about nothing.
             if target is not None:
+                if not self._require_block_day():
+                    return
                 self.after_idle(lambda: self.block_item(item, target))
             elif edge is not None:
+                if not self._require_block_day():
+                    return
                 self.after_idle(lambda: self.extend_day_for(item, edge))
             elif self.pointer_over_day():
                 # In the day column but not on a box -- the heading, the
