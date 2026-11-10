@@ -40,6 +40,15 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   chip was drawn below whatever else had been dropped in the box, so every new
   task pushed it down. It is drawn first now, and the tasks that start in the
   box stack below it.
+- **A scheduled Action Item can lengthen the day.** Dragging a block that is
+  already in a Time Block onto **Earlier** or **Later** now moves it into the
+  new Time Block and the day grows to hold it, instead of refusing. The
+  refusal that used to appear there — *"A block cannot make a new half hour"* —
+  is gone. **Wording:** the screen now says **Time Block** for the half-hour
+  spaces and **Action Item** for the work in them: *"Drop an Action Item on a
+  Time Block"*, *"That Time Block is full"*, *"… is already in a Time Block at
+  09:00"*. The outline a drag leaves on the last Time Block it crossed no
+  longer stays behind after the drop.
 - **Lunch can be moved, on that date only.** Drag the `Lunch` box onto another
   half hour and the day keeps its own lunch there; the first drag writes a
   lunch block the setting had been standing in for, and the length is still

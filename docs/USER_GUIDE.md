@@ -26,6 +26,14 @@ daVIPA is a desktop task manager focused on prioritization and execution.
 - What: The central record you work with. Required fields: `Who` and `Title`.
 - Why: A consistent structure makes filtering, scheduling, and prioritization reliable.
 
+### Time Blocks (the spaces on the Day Plan)
+- What: One half-hour space in the Plan screen's day. Empty, or holding up to
+  four Action Items.
+- Why: The two words are not interchangeable, and the screen's messages use them
+  this way: **Action Items** are the work, **Time Blocks** are the spaces it
+  goes into. A 90-minute Action Item takes three Time Blocks; a break, a buffer
+  or a lunch takes one.
+
 ### Priority score
 - What: Calculated as Importance x Urgency x Effort-Cost (Size) x Value.
 - Why: A single number makes it easy to rank items and focus on the highest impact work.

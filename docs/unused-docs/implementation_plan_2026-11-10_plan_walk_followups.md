@@ -233,6 +233,42 @@ Clear Day keeps it, like a break or a buffer: it was put there by hand.
 | PF-M8.6 | Clear Day keeps the lunch block | `::test_pfm86_clear_day_keeps_the_lunch_block` |
 | PF-M8.7 | Deleting the block returns the date to Day Settings' lunch | `::test_pfm87_deleting_the_lunch_block_returns_the_date_to_the_settings` |
 
+## PF-M9 — A scheduled Action Item can lengthen the day, and the screen speaks plainly
+
+**Reported:** "Try to drag an item to earlier than day start and it doesn't
+work. Same for the end of day. Error message doesn't make sense — 'A block
+cannot make a new half hour…'"
+
+**The vocabulary, as the user put it:** *"Time Blocks are the empty spaces on
+the Day Plan. Action Items are the objects that fill in the Time Blocks."*
+The screen had been using "block" for both and "item" for the work, so a
+refusal about a scheduled Action Item read as a refusal about a space.
+
+**What changes:**
+
+- A block dropped on **Earlier** or **Later** moves into the new outer Time
+  Block and the day grows by its own length. This withdraws **PD-M5.7**, which
+  refused the gesture so that the day only grew for work that was not planned
+  yet — a rule the user cannot see, enforced by a sentence about "a block"
+  making "a half hour". `place_block_at` now takes a `day_span`, the way
+  `add_block_at` already did, so the fit is checked against the day that will
+  exist.
+- Day Settings' Day Start is still not rewritten (PD-M14.1): the day grows for
+  this date, by the block that asked.
+- **Wording, one pass:** `REFUSAL_TEXT`, `UNKNOWN_REFUSAL`, the four
+  drop-guidance lines and the duplicate refusal now say *Time Block* for the
+  space and *Action Item* for the work.
+- **The outline that stayed.** `clear_hover_target` restored the border *width*
+  and not the *colour*, so the last Time Block a drag crossed kept the hover
+  tint — "something outlines a Time Block and keeps it outlined as if the
+  movement wasn't saved". Both are restored now.
+
+| ID | Criterion | Verified by |
+|---|---|---|
+| PF-M9.1 | A scheduled Action Item makes the day earlier and lands in the new Time Block | `tests/test_plan_screen.py::test_pfm91_a_scheduled_item_makes_the_day_earlier` |
+| PF-M9.2 | The same at the later end | `::test_pfm92_a_scheduled_item_makes_the_day_later` |
+| PF-M9.4 | Ending a drag puts the outlined Time Block's border back, colour and all | `tests/test_plan_screen.py::test_pfm94_clearing_the_hover_restores_the_border_colour` |
+
 ## PF-M4 — The header is two rows
 
 **Asked:** "Put the Buffer, Break, Calendar and Day Settings buttons on the
