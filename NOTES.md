@@ -7,6 +7,20 @@ list is closed with them.
 
 One batch at a time from here, per `CLAUDE.md`. What that leaves:
 
+- **The branch list is cut to what is live** (2026-11-09, on the user's
+  decision). Four refs that were ancestors of `main` with nothing ahead were
+  deleted — `claude/elegant-neumann-ab55c9`, `claude/plan-day-range-on-main`,
+  `feat/scheduler-projects-and-editor-ux` and `codex/agent-code`, the last of
+  which was `MAW-N1` — and the two clean worktrees under `.claude/worktrees/`
+  were removed. Tips are recorded in
+  `docs/unused-docs/backlog_archive_2026-11-09.md` in case a ref is wanted
+  back. What is left is `main` plus three branches that hold commits `main`
+  does not: `claude/plan-day-range-pdm13` (28 ahead; `CLAUDE.md` says it must
+  not be merged) with `dayrange-backup` at the same tip and
+  `claude/plan-day-faults-03c116` as its ancestor, and
+  `claude/setup-getmoredone-env-BjJcS` (one commit from 2026-08-25 removing
+  `grab_set()` and adding a toast widget, 659 behind, still not on `main`).
+
 - **`BACKLOG.md` is trimmed to what is active** (2026-11-09, on the user's
   instruction). 245 items became 74: 27 recorded their own closure, 116 were
   review-sweep residue ("below medium", "cold pass", "deferred"), and 28 named

@@ -1336,13 +1336,3 @@ keeping, or the template belongs under `docs/` or `.github/`, is a tidying
 question with a guard to update either way. Found while measuring the deletion
 set.
 
-### MAW-N1 — `origin/codex/agent-code` still exists on the remote (needs a decision)
-
-The last of the three role branches. Measured 2026-11-09:
-`git rev-list --left-right --count main...origin/codex/agent-code` gives
-**624 0** and `git merge-base --is-ancestor origin/codex/agent-code main`
-succeeds, so it is 624 commits behind `main`, nothing ahead, and every commit
-on it is already here. Deleting the ref would lose nothing. Last commit
-2026-04-03. Deleting a remote branch is the user's call, not mine, which is why
-this is filed as a decision rather than done.
-

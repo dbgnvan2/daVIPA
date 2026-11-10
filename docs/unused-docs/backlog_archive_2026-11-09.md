@@ -4352,3 +4352,33 @@ this run. Re-measure with:
 gh run view 42574256150 --log-failed | grep -oE "_{3,} test_[a-z0-9_]+ _{3,}" | sed -E 's/_+ (test_[a-z0-9_]+) _+/\1/' | sort -u
 ```
 
+
+
+## MAW-N1, decided 2026-11-09
+
+The user's answer was to delete the merged branches. `origin/codex/agent-code`
+(`4123b95`) was deleted with three others, each re-verified as an ancestor of
+`main` immediately beforehand:
+
+| Ref | Tip | Where it was |
+|---|---|---|
+| `claude/elegant-neumann-ab55c9` | `6d4b346` | local, remote, worktree |
+| `claude/plan-day-range-on-main` | `3f705b4` | local |
+| `feat/scheduler-projects-and-editor-ux` | `4931b4a` | local, remote |
+| `codex/agent-code` | `4123b95` | remote |
+
+Every commit on each was already on `main`, so the tips above are the whole of
+what the refs named. The two worktrees under `.claude/worktrees/` were clean
+and were removed; removing the second did not touch
+`claude/plan-day-range-pdm13`, which it had checked out.
+
+### MAW-N1 — `origin/codex/agent-code` still exists on the remote (needs a decision)
+
+The last of the three role branches. Measured 2026-11-09:
+`git rev-list --left-right --count main...origin/codex/agent-code` gives
+**624 0** and `git merge-base --is-ancestor origin/codex/agent-code main`
+succeeds, so it is 624 commits behind `main`, nothing ahead, and every commit
+on it is already here. Deleting the ref would lose nothing. Last commit
+2026-04-03. Deleting a remote branch is the user's call, not mine, which is why
+this is filed as a decision rather than done.
+
