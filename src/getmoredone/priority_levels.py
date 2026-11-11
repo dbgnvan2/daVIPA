@@ -212,17 +212,18 @@ class RowFill:
     ``fg_color`` wants for "inherit", and it is not the empty string, which Tk
     rejects.
 
-    ``text_color`` is ``None`` for every source except ``level``, and means
-    "leave the screen's own ``row_text`` alone". Only a level fill carries a
-    text colour, because only a level fill is a colour the user chose with no
-    theme behind it: a pale green row in the dark theme needs dark text, and
-    the theme's ``row_text`` there is near-white.
+    ``text_color`` is ``None`` for the ``completed`` and ``none`` sources, and
+    means "leave the screen's own ``row_text`` alone". A ``level`` or
+    ``segment`` fill carries one, because both are colours the user chose with
+    no theme behind them: a pale green row in the dark theme needs dark text,
+    and the theme's ``row_text`` there is near-white. A ``segment`` fill
+    Tk accepts but ``normalize_hex_color`` cannot read is the one exception --
+    there is nothing to derive from, so it falls back to ``None`` (LRR-M2.1).
 
-    Segment and completed fills keep exactly the text colour they have today.
-    Their contrast is a real problem -- a pale segment colour in the dark theme
-    also gets near-white text -- but it is a pre-existing one, logged in
-    ``BACKLOG.md``, and fixing it here would be a silent sweep of behaviour
-    nobody asked about.
+    The completed tint keeps the theme's text colour, and that is a decision
+    rather than an omission: ``success_tint`` is a theme token, paired in the
+    theme with the same theme's ``row_text``. Deriving a colour for it would
+    override a pairing that was designed instead of inherited.
     """
 
     fill: Optional[str]
@@ -260,10 +261,27 @@ def row_fill(
       fill.
 
     Both differences are preserved here rather than quietly fixed; they are
-    logged in ``BACKLOG.md`` instead.
+    logged in ``BACKLOG.md`` instead (``PLC-A2``).
+
+    A segment fill derives its text colour the same way a level fill does, so
+    a pale VSP segment colour no longer draws the dark theme's near-white
+    ``row_text`` on itself (LRR-M2.1, closing ``PLC-A1``). The fill itself is
+    passed through exactly as given, including a value ``normalize_hex_color``
+    rejects: what colour a row draws is not what ``PLC-A1`` was about, and
+    changing it here would be the silent sweep that filing it avoided.
     """
     if segment_color:
-        return RowFill(segment_color, None, SOURCE_SEGMENT)
+        # Derived only from a value that can be read. ``pick_text_color``
+        # answers black for anything it cannot parse, and black on an unknown
+        # background can be worse than the theme's own row text -- black on
+        # ``navy`` is about 1.3:1 -- so an unreadable colour keeps today's
+        # behaviour instead of being guessed at.
+        readable = normalize_hex_color(segment_color)
+        return RowFill(
+            segment_color,
+            pick_text_color(readable) if readable else None,
+            SOURCE_SEGMENT,
+        )
     if use_completed_tint:
         return RowFill(palette["success_tint"], None, SOURCE_COMPLETED)
     colour = level_color(settings, priority_level_for_item(item))

@@ -9,7 +9,12 @@ from typing import Optional, TYPE_CHECKING
 from ..models import ActionItem
 from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
-from ..priority_levels import row_control_kwargs, row_fill
+from ..priority_levels import (
+    LEVEL_ANY_CRITICAL,
+    priority_level_for_item,
+    row_control_kwargs,
+    row_fill,
+)
 from ..date_utils import increment_date
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import (
@@ -418,7 +423,7 @@ class UpcomingScreen(ctk.CTkFrame):
         due_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_due_date_inline(item_id))
 
         # Priority score
-        is_priority_critical = item.importance == 20 or item.urgency == 20
+        is_priority_critical = priority_level_for_item(item) == LEVEL_ANY_CRITICAL
         score_label = ctk.CTkLabel(
             frame,
             text=f"P:{item.priority_score}",

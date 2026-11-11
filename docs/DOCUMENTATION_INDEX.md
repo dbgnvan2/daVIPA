@@ -352,6 +352,37 @@ being the PDT-M5 document criteria with a
   human-review proposal for each
 - Nine CI-environment failures listed as adjacent and not touched
 
+### docs/unused-docs/implementation_plan_2026-11-10_list_row_rendering.md
+
+Implementation plan for the five list screens' row rendering (LRR-M1 - LRR-M2),
+closing `BACKLOG.md`'s `PRI-A1` and `PLC-A1`, both medium and both filed
+2026-11-08. **Approved 2026-11-10 and built the same day: 5 of 5 criteria
+`done`, one item not code-testable (how the change looks on the user's own
+segment colours, reported as a manual checklist)** - per-criterion status in
+`docs/spec_coverage.md`. Touches `src/getmoredone/priority_levels.py` and the
+five screens; no handoff note, the commit messages being the record:
+
+- Both defects are one shape - a rule written out by hand in `today.py`,
+  `upcoming.py`, `all_items.py`, `hierarchical.py` and `completed.py` where an
+  authority for it already existed, and five copies that had drifted from it
+- `priority_level_for_item` replaces `item.importance == 20 or item.urgency ==
+  20` for the red `P:` chip. The authority compares against `PriorityFactors`
+  with `>=` and an `int()` coercion, so it catches an importance of `25` and
+  one stored as the string `"20"`, which the literal read as not critical -
+  the dangerous direction to be wrong in
+- The guard is an AST walk over all of `screens/`, not the five files that had
+  the defect, at an exact count of zero. It found exactly the ten comparisons
+  the plan named and nothing else in 58 modules
+- `row_fill` now derives a segment fill's text colour with `pick_text_color`,
+  so a pale VSP segment colour no longer draws the dark theme's near-white row
+  text. The completed tint deliberately keeps the theme's, `success_tint`
+  being a token paired in the theme with that same theme's `row_text`
+- A segment colour Tk accepts but `normalize_hex_color` cannot read falls back
+  to the theme's text rather than to `pick_text_color`'s black, which on an
+  unknown background can be worse than what it replaced
+- `PLC-A3` is left filed, its colour half still open: the chip's `danger` is a
+  product decision about what critical looks like, not a copy to sweep
+
 ### docs/unused-docs/implementation_plan_2026-11-09_ci_green.md
 
 Implementation plan for the nine tests CI has been red on since 2026-11-07

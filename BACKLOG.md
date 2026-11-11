@@ -31,28 +31,10 @@ as PRI-A1 … PRI-A4 when this plan is approved", and repeated in
 `docs/DOCUMENTATION_INDEX.md`. The plan was approved and built; the four
 filings were never made, so two documents asserted the existence of items that
 were nowhere. Filed 2026-11-08 by the SST batch, which closed `SSC-1`'s second
-clause, and held to by
-`tests/test_doc_status_claims.py::test_sstm9_every_promised_pri_adjacent_item_is_filed`.
+clause.
 
 **Two of the plan's four descriptions were wrong, and are corrected here**
 rather than copied. Measured at `79cd32d`.
-
-### PRI-A1 — `item.importance == 20 or item.urgency == 20`, by hand in five screens (medium)
-
-```
-grep -rn "importance == 20" src/getmoredone/screens/
-```
-
-Five screens: `today.py`, `all_items.py`, `completed.py`, `hierarchical.py`,
-`upcoming.py`. The literal `20` is P4, and
-`priority_levels.priority_level_for_item` already answers exactly this
-question. `PLC-A3` and `PLC-A6` are the same five copies reached from the
-colour side — `PLC-A6` measures the two inputs they already disagree on (an
-importance of `25`, and one stored as the string `"20"`). **One fix, filed
-three times**; whoever takes it should close all three.
-
-**Priority:** Medium
-**Effort:** Low
 
 ### PRI-A2 — the score column's width is a magic number in five places (low)
 
@@ -314,18 +296,6 @@ Found while building PLC-M1 to PLC-M5. Flagged, not fixed (global rule 10):
 each is real, none is what was asked for, and a fix for any of them would be a
 silent sweep of behaviour nobody asked about.
 
-### PLC-A1 — a segment-coloured row keeps the theme's text colour (medium)
-
-All five list screens set `row_text = palette["row_text"]` and then fill the
-row with a VSP segment colour from the database, so a pale segment colour in
-the dark theme gets near-white text on it. `today.py:487` is where the new fill pays for it; `upcoming.py`, `all_items.py`, `hierarchical.py` and `completed.py` have
-the same shape.
-
-Exactly the defect PLC-M4.4 fixes for the new priority fill, and fixed there in
-the obvious way — derive the text colour from the fill with `pick_text_color`.
-Not extended to segment fills in this batch, because that changes how every
-segment-coloured row already on the user's screen looks.
-
 ### PLC-A2 — Hierarchical and Completed ignore their own segment colour for the fill (low)
 
 Both resolve `segment_color`, apply it as an accent, and then never consider it
@@ -337,12 +307,19 @@ records which, and `row_fill` preserves the difference by having both pass
 
 ### PLC-A3 — the `P:` chip hard-codes `danger` for critical, in five screens (low)
 
-`fg_color=palette["danger"] if is_priority_critical else "transparent"`, with
-its own inline `importance == 20 or urgency == 20` beside it
-(`today.py:652`, `upcoming.py:417`, `all_items.py:371`, `hierarchical.py:309`,
-`completed.py:271`). Out of scope by the user's explicit choice — the colour
+`fg_color=palette["danger"] if is_priority_critical else "transparent"`, in all
+five list screens. Out of scope by the user's explicit choice — the colour
 setting paints the row tint only — but with Any Critical now green, the row and
 its chip disagree by design. Worth a decision rather than leaving it implicit.
+
+What remains open here is the chip's **colour**, and only that. Its
+*condition* was the second half of this filing and is closed: the LRR batch
+(2026-11-10) replaced the five inline `importance == 20 or urgency == 20`
+copies with `priority_level_for_item(item) == LEVEL_ANY_CRITICAL`, held by
+`tests/test_priority_level_colors.py::test_lrrm11_no_screen_tests_importance_against_a_literal`.
+So the chip and the row tint now agree on *which* items are critical and
+disagree only on what critical should look like, which is the product
+decision.
 
 ### PLC-A4 — `settings.py` is 1214 lines (low)
 

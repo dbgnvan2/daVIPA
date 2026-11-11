@@ -820,6 +820,12 @@ Priority Colours (added 2026-11-08):
   colour is chosen automatically for contrast against whatever you pick, so a
   pale colour gets dark text in either mode, and the row's own controls — the
   complete checkbox, and Today's drag grip — follow it for the same reason.
+- A **VSP segment colour outranks these tints**: where Today, Upcoming and All
+  Items can colour a row from its segment, that colour wins and the priority
+  tint is not drawn. Since 2026-11-10 a segment-coloured row picks its text
+  colour for contrast in the same way, so a pale segment colour reads in the
+  dark theme instead of keeping the theme's near-white row text. Nothing about
+  the segment colours themselves changed — only the text drawn on them.
 - A saved colour shows the next time you open one of those screens; no relaunch
   is needed.
 - These are **not** the Plan screen's priority bands. A band comes from the

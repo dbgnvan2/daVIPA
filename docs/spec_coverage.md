@@ -1913,3 +1913,21 @@ them already, asked at a different moment than either.
 | PF-M8.5 | A second drag moves that block | `plan.py::place_lunch_at` → `db_manager.py::place_block_at` | `::test_pfm85_a_second_drag_moves_that_block` |
 | PF-M8.6 | Clear Day keeps the lunch block | `plan.py::clear_day` (item blocks only) | `::test_pfm86_clear_day_keeps_the_lunch_block` |
 | PF-M8.7 | Deleting the block returns the date to Day Settings' lunch | `plan.py::delete_block`, `time_block_layout.py::lunch_window` | `::test_pfm87_deleting_the_lunch_block_returns_the_date_to_the_settings` |
+
+### LRR — the five list screens' row rendering (2026-11-10)
+
+Plan: [`docs/unused-docs/implementation_plan_2026-11-10_list_row_rendering.md`](unused-docs/implementation_plan_2026-11-10_list_row_rendering.md).
+Closes `PRI-A1` and `PLC-A1`, both medium, both filed 2026-11-08. Tests are in
+`tests/test_priority_level_colors.py`.
+
+| Criterion | Implementation | Test | Status |
+|---|---|---|---|
+| LRR-M1.1 | The five screens ask the authority for the `P:` chip; no priority factor is compared to a literal anywhere in `screens/` | `today.py`, `upcoming.py`, `all_items.py`, `hierarchical.py`, `completed.py` (`is_priority_critical`) | `::test_lrrm11_no_screen_tests_importance_against_a_literal` | done |
+| LRR-M1.2 | An importance of 25, and one stored as the string `"20"`, are critical to the chip | `priority_levels.py::priority_level_for_item` → `::_at_least` | `::test_lrrm12_an_off_scale_critical_is_still_critical` | done |
+| LRR-M2.1 | A segment fill carries a text colour derived with `pick_text_color`; an unreadable colour keeps the theme's | `priority_levels.py::row_fill` | `::test_lrrm21_a_segment_fill_carries_its_own_text_colour`, `::test_lrrm21_an_unreadable_segment_colour_keeps_the_themes_text` | done |
+| LRR-M2.2 | A pale segment colour gets dark text and a dark one light text, both over 4.5:1 | same | `::test_lrrm22_the_segment_text_colour_follows_the_fill` | done |
+| LRR-M2.3 | The completed tint still returns `None`, and the segment fill still does not | same | `::test_lrrm23_the_completed_tint_keeps_the_themes_text_colour` | done |
+
+Not code-testable: how the change looks on the user's own segment colours.
+That went to the manual checklist in the plan's §5, reported with the batch
+rather than asserted.

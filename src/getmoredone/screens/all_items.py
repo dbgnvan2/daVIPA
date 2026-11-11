@@ -8,7 +8,12 @@ from typing import TYPE_CHECKING
 from ..models import Status
 from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
-from ..priority_levels import row_control_kwargs, row_fill
+from ..priority_levels import (
+    LEVEL_ANY_CRITICAL,
+    priority_level_for_item,
+    row_control_kwargs,
+    row_fill,
+)
 from .segment_color_utils import resolve_segment_color_for_item
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
 from .week_collision_notice import (
@@ -372,7 +377,7 @@ class AllItemsScreen(ctk.CTkFrame):
                 due_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_due_date_inline(item_id))
 
                 # Priority
-                is_priority_critical = item.importance == 20 or item.urgency == 20
+                is_priority_critical = priority_level_for_item(item) == LEVEL_ANY_CRITICAL
                 priority_label = ctk.CTkLabel(
                     item_frame,
                     text=str(item.priority_score),

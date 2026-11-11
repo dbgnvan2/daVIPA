@@ -7,7 +7,11 @@ from typing import TYPE_CHECKING
 
 from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
-from ..priority_levels import row_fill
+from ..priority_levels import (
+    LEVEL_ANY_CRITICAL,
+    priority_level_for_item,
+    row_fill,
+)
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import notify_weekly_tactic_changes
 from ..theme import apply_segment_accent, semantic_colors, button_style, combo_box_style, list_row_font
@@ -268,7 +272,7 @@ class CompletedScreen(ctk.CTkFrame):
                     completed_label.grid(row=0, column=3, padx=5, pady=5)
 
                 # Priority score
-                is_priority_critical = item.importance == 20 or item.urgency == 20
+                is_priority_critical = priority_level_for_item(item) == LEVEL_ANY_CRITICAL
                 score_label = ctk.CTkLabel(
                     item_frame,
                     text=f"P:{item.priority_score}",
