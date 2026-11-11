@@ -39,28 +39,52 @@ kept. By directory, dropped: `tests/` 284, `docs/` 101, `tools/` 39,
 `assets/` 5, and 8 across `BACKLOG.md`, `AGENTS.md` and `NOTES.md`.
 
 Per-scan, before -> after: `hex` 511 -> 154, `named` 71 -> 41, `widget`
-555 -> 526, `theme_api` 25 -> 2, `app_settings` 26 -> 26, `theme_files`
-765 -> 765, `tuples` 2 -> 2.
+555 -> 526, `theme_api` 23 -> 2, `app_settings` 26 -> 26, `theme_files`
+765 -> 765, `tuples` 2 -> 2. `theme_api`'s 23 is the count with the three
+globs in place; 25 is the count without the gate-fixture glob, and quoting it
+here left the table summing to 1955 against a stated 1953.
 
-## Two blind spots this leaves
+## Revised the same day: the generator is in, and the grays are visible
 
-Both hold real UI colour and are no longer inventoried. Widening to either is
-a one-line change in `SCAN_COMMANDS`.
+Two changes the repo owner asked for after this was filed.
 
-- `tools/generate_ctk_themes.py` -- 37 colour occurrences on 2026-11-11. It
-  *writes* the files in `themes/`, so the inventory now covers its output
-  while missing where those colours are authored.
-- `assets/icons/*.svg` -- 5 named-colour occurrences. Shipped UI resources.
+**`tools/generate_ctk_themes.py` is now scanned** -- it writes the files in
+`themes/`, so the inventory covered its output while missing where those
+colours are authored. It put 37 lines back (33 `hex`, 4 `named`). Declared as
+a *file*, not as the `tools` directory: `tools/color_audit.py` beside it
+matches `HEX_PATTERN` with its own regex literals, so a directory path would
+report the scanner's source as the app's colour usage.
+
+**`NAMED_PATTERN` now matches the gray-scale suffix.** It took bare colour
+words only, so CustomTkinter's `"gray95"`/`"gray17"` were invisible to every
+scan: 539 of the 544 lines holding one, 527 of them theme lines carrying no
+other colour and so appearing nowhere in the report at all. Found by the cold
+pass over this narrowing.
+
+A measured gotcha that came out of it: `.gitignore` has `*.json` whitelisted
+back by `!themes/*.json`, and rg 14.1.1 honours that whitelist only when
+`themes` is the sole search path -- `rg P themes` returns 532 lines, `rg P src
+themes` returns 1. Any scan over `themes` therefore keeps its own invocation.
+
+## The one blind spot this leaves
+
+`assets/icons/*.svg` -- 5 named-colour occurrences, shipped UI resources, not
+inventoried.
 
 ## What stops it drifting back
 
-- `test_civm14_every_scan_stays_inside_src_and_themes` asserts, behaviourally
-  across all seven scans, that no returned line lies outside those two trees.
-  Mutation-proved: widening `UI_CODE_ROOT` to `"."` turns it red.
+- `test_civm14_every_scan_stays_inside_the_declared_paths` asserts,
+  behaviourally across all seven scans, that no returned line lies outside
+  `src/`, `themes/` or the named generator file. Mutation-proved: widening the
+  scan paths to `"."` turns it red.
+- `test_civm15_gray_scale_literals_reach_the_named_tables` asserts that every
+  line holding a `gray95`-style literal is returned by `named` or
+  `theme_files`. It was written first and failed at 539 of 544.
 - `test_civm5_the_scans_feeding_one_count_do_not_overlap` still guards the
   double count the `!themes/**` glob used to prevent. Mutation-proved:
   pointing `theme_files` at the repo root turns it red.
 
-The scope is now one named constant, so a future widening is a deliberate
-edit that fails a test rather than a silent change in what the document
-means.
+Scope lives in `UI_CODE_PATHS`, with `"themes"` and the `app_settings` path
+still literals in `SCAN_COMMANDS`, so it is not quite one constant. A widening
+is still a deliberate edit that fails a test rather than a silent change in
+what the document means.

@@ -37,10 +37,10 @@ python tools/create_demo_data.py
 
 # Regenerate the colour inventory. docs/ui_color_inventory.md is generated,
 # and tests/test_color_inventory_sync.py fails while it is stale -- so any
-# change that adds or removes a colour literal under src/ or themes/ needs
-# this run committed with it. Those two trees are the whole scan (CIV-A1,
-# 2026-11-11), so an edit to a test or a document no longer reddens the
-# suite. Needs ripgrep on PATH.
+# change that adds or removes a colour literal under src/, themes/ or
+# tools/generate_ctk_themes.py needs this run committed with it. Those are the
+# whole scan (CIV-A1, 2026-11-11), so an edit to a test or a document no
+# longer reddens the suite. Needs ripgrep on PATH.
 ./venv/bin/python tools/color_audit.py
 ```
 

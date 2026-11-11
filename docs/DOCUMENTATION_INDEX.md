@@ -88,9 +88,10 @@ Feature backlog and task tracking:
 
 ### docs/ui_color_inventory.md (generated)
 
-Every colour literal in `src/` and `themes/` -- the UI code and the themes it
-loads -- with the file and line of each occurrence and frequency tables for
-the hex and named colours. It is an audit of UI code, not a repository-wide
+Every colour literal in `src/`, `themes/` and `tools/generate_ctk_themes.py`
+-- the UI code, the themes it loads, and the tool that writes them -- with the
+file and line of each occurrence and frequency tables for the hex and named
+colours. Gray-scale literals (`gray95`) are included. It is an audit of UI code, not a repository-wide
 census: that scope was decided as CIV-A1 on 2026-11-11 and is recorded in
 `docs/unused-docs/changes/2026-11-11-colour-inventory-scope.md`. **Generated
 -- never hand-edit it** (global rule 2: fix the code, don't fake the state).
