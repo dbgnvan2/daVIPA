@@ -26,27 +26,31 @@ NAMED_PATTERN = (
     r"|'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)'"
 )
 
-# The inventory is this scan's own output; feeding it back in would compound.
-_NOT_SELF = ("-g", "!docs/ui_color_inventory.md")
-# themes/*.json is scanned once, by `theme_files`, whose pattern covers hex and
-# named together. Without this the "." scans cover the same bytes and every
-# theme colour reaches the frequency tables twice. Measured 2026-11-11 before
-# the fix: `#000000` read 79 in the frequency table against 57 rows in the
-# occurrence table below it, the 22 of difference being the theme files
-# counted a second time. Those are that day's figures and not an invariant --
-# the scan is repo-wide, so any file that merely mentions a colour moves
-# them, this comment included.
+# The scan covers the UI code and the themes it loads, and nothing else.
+# Decided by the repo owner as CIV-A1 on 2026-11-11, after two cold passes
+# raised the repo-root scan as a high severity finding. That scan counted
+# every document, spec, plan, archive and test fixture mentioning a colour as
+# the app's colour usage, which cost three things. A docs-only edit made the
+# committed report stale, because the occurrence rows cite the matched line by
+# number -- against this repo's own rule that a document alone earns no sweep.
+# 3 of the 5 lines the `tuples` scan returned came from the staleness gate's
+# fixture file, so `scan_all`'s refusal of an empty scan, the only guard
+# against a scan going blind, could be satisfied by test data. And section 1's
+# Hard Rule is about hard-coded colours in UI code, which is not what a
+# repository-wide census measures. Narrowing dropped 437 of 1953 occurrences.
+#
+# Two places outside these two trees do hold real UI colour and are therefore
+# no longer inventoried: `tools/generate_ctk_themes.py`, which writes the
+# files in `themes/`, and the named colours inside `assets/icons/*.svg`.
+# Widening to either is a one-line change here.
+#
+# These paths are also why this file carries no exclusion globs any more. The
+# repo-root scan needed three -- the report itself, `themes/**` so its colours
+# were not counted twice, and the gate's own fixtures -- and none of the three
+# is reachable from `src`.
+# Tests: tests/test_color_inventory_sync.py::test_civm14_every_scan_stays_inside_src_and_themes
 # Tests: tests/test_color_inventory_sync.py::test_civm5_the_scans_feeding_one_count_do_not_overlap
-_NOT_THEMES = ("-g", "!themes/**")
-# The staleness gate's fixtures are hand-written stand-ins for rg output, so
-# they look exactly like colour usage to these scans and were counted as it:
-# measured on 2026-11-11, before this exclusion, 3 of the 5 lines the
-# `tuples` scan returned came from that one file, which
-# meant `scan_all`'s refusal of an empty scan -- the only guard here against a
-# scan going blind -- could be held above zero by test data alone. This is the
-# same self-reference as `_NOT_SELF`, not a narrowing of what the scan covers.
-# Tests: tests/test_color_inventory_sync.py::test_civm7_no_scan_reads_this_gate_s_own_fixtures
-_NOT_GATE = ("-g", "!tests/test_color_inventory_sync.py")
+UI_CODE_ROOT = "src"
 
 
 def _rg(*args: str) -> List[str]:
@@ -72,17 +76,17 @@ def _rg(*args: str) -> List[str]:
 SCAN_COMMANDS: Dict[str, List[str]] = {
     "widget": _rg(
         "fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=",
-        ".", *_NOT_SELF, *_NOT_GATE,
+        UI_CODE_ROOT,
     ),
-    "hex": _rg(HEX_PATTERN, ".", *_NOT_SELF, *_NOT_THEMES, *_NOT_GATE),
-    "named": _rg("-i", NAMED_PATTERN, ".", *_NOT_SELF, *_NOT_THEMES, *_NOT_GATE),
+    "hex": _rg(HEX_PATTERN, UI_CODE_ROOT),
+    "named": _rg("-i", NAMED_PATTERN, UI_CODE_ROOT),
     "theme_api": _rg(
         "set_default_color_theme\\(|set_appearance_mode\\(",
-        ".", *_NOT_SELF, *_NOT_GATE,
+        UI_CODE_ROOT,
     ),
     "tuples": _rg(
         "(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\\s*=\\s*(\\(|\\[)",
-        ".", *_NOT_SELF, *_NOT_GATE,
+        UI_CODE_ROOT,
     ),
     "app_settings": _rg(
         "color|theme|appearance_mode|theme_name|drag_schedule_date_text_color|color_hex",
@@ -120,13 +124,17 @@ RG_BENIGN_STDERR = re.compile(r"^WARNING: stopped searching binary file ")
 
 # Scans allowed to return nothing, by name. Declaring one is a reviewable
 # one-line change here rather than an edit to scan_all's logic (global rule 8).
-# `tuples` is the scan nearest to empty. Its current count is in the per-scan
-# table of the generated report, which is the figure to read rather than one
-# copied out of it to here -- adding `_NOT_GATE` below took it from 5 to 2 and
-# left this line stating 5. On 2026-11-11 it returned two lines, one of them a
-# false positive on a parenthesised assignment, so migrating the single real
-# colour tuple -- which section 3 of the report recommends -- is what would
-# empty this scan and make a declaration here necessary.
+# `tuples` and `theme_api` both return 2 lines after the CIV-A1 narrowing, and
+# the per-scan table of the generated report carries the current counts, which
+# are the figures to read rather than ones copied out of it to here -- a line
+# stating 5 survived here after the gate's own fixtures stopped being counted,
+# which had taken `tuples` to 2. `theme_api`'s two are the single
+# `set_appearance_mode` and `set_default_color_theme` call sites in
+# `theme.py`, which are not going anywhere. `tuples` is the one at risk: on
+# 2026-11-11 one of its two lines was a false positive on a parenthesised
+# assignment, so migrating the single real colour tuple -- which section 3 of
+# the report recommends -- is what would empty a scan and make a declaration
+# here necessary.
 SCANS_ALLOWED_EMPTY: set = set()
 
 
@@ -315,7 +323,20 @@ def build_report(lines: Dict[str, List[str]]) -> str:
     out: List[str] = []
     out.append("# UI Color Inventory")
     out.append("")
-    out.append("Generated via deterministic `rg` scans from repo root.")
+    out.append(
+        "Generated via deterministic `rg` scans of `src/` and `themes/`: the "
+        "UI code and the themes it loads."
+    )
+    out.append("")
+    out.append(
+        "Not covered, by the CIV-A1 decision of 2026-11-11: the tests, "
+        "documents and plans that mention colours, and two places outside "
+        "those trees that do hold real UI colour -- "
+        "`tools/generate_ctk_themes.py`, which writes the files in "
+        "`themes/`, and the named colours inside `assets/icons/*.svg`. "
+        "Section 1's Hard Rule is about hard-coded colours in UI code, and "
+        "this is the scan that matches it."
+    )
     out.append("")
     out.append("## Scan Commands")
     out.append("")
