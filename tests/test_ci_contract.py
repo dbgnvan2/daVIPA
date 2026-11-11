@@ -264,6 +264,9 @@ META_TEST_FILES = {
     "tests/test_repo_hygiene.py",
     "tests/test_traceability_refs.py",
     "tests/test_no_vacuous_tests.py",
+    # CIV-M4: the colour-inventory gate asserts on a generated document and on
+    # tools/, not on application behaviour.
+    "tests/test_color_inventory_sync.py",
 }
 
 
