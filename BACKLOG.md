@@ -347,6 +347,30 @@ authority module's maths for a case no live path produces.
 **Priority:** Low
 **Effort:** Low
 
+### CI-A1 — the apt step has no retry, so a mirror outage is a red build (medium)
+
+`.github/workflows/tests.yml:47-48` runs `sudo apt-get update` then
+`sudo apt-get install -y xvfb python3-tk` with nothing around them. On
+2026-11-11 all three matrix jobs (3.11, 3.12, 3.13) died there with
+`Temporary failure resolving 'security.ubuntu.com'` and
+`E: Failed to fetch .../python3-tk_3.14.3-0ubuntu2_amd64v3.deb`, exit code
+100, before pytest ran at all. A re-run four minutes later failed identically.
+Twelve minutes of red that said nothing about the commit.
+
+This is P1 and global rule 5 in the workflow rather than in `src/`: a
+retryable network failure given a terminal result, on an external call with no
+timeout, retry or backoff. The fix is retry options on the apt call
+(`-o Acquire::Retries=3`, or a retry action around the step), possibly with
+the two packages cached.
+
+Not done in the SCV batch that found it: it is a change to the CI contract,
+which `tests/test_ci_contract.py` asserts on, and that wants a batch of its
+own rather than a workflow edit tacked onto the end of one. Found by two
+sessions independently on 2026-11-11.
+
+**Priority:** Medium
+**Effort:** Low
+
 ### PLC-A2 — Hierarchical and Completed ignore their own segment colour for the fill (low)
 
 Both resolve `segment_color`, apply it as an accent, and then never consider it
