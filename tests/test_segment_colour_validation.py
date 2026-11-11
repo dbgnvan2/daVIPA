@@ -359,7 +359,20 @@ def test_scvm31_the_taxonomy_writers_store_the_normalised_form(tmp_path):
     pass it, so without this the three of them would write ``#ABC`` -- a
     four-character colour in the database, the very thing §4 of the plan
     accepts the short form only in order to avoid.
+
+    Reads the table, not ``get_vision_subsegments`` / ``get_vision_categories``.
+    Those run the SCV-M3.1 repair pass, which canonicalises on read: asserted
+    through them, this test passed with all three writers reverted to
+    ``.strip().upper()``, because the ``#ABC`` they stored was rewritten to
+    ``#AABBCC`` by the read that checked it. Corrected 2026-11-11 after a cold
+    pass measured exactly that.
     """
+
+    def stored(table, row_id):
+        return manager.db.conn.execute(
+            f"SELECT color_hex FROM {table} WHERE id = ?", (row_id,)
+        ).fetchone()["color_hex"]
+
     manager = VPSManager(str(tmp_path / "scv_writers.db"))
     try:
         seg_name = manager.get_all_segments(active_only=False)[0]["name"]
@@ -369,15 +382,15 @@ def test_scvm31_the_taxonomy_writers_store_the_normalised_form(tmp_path):
         cat = manager.get_vision_categories(seg_name, "Scv Sub")[0]
 
         assert manager.update_vision_subsegment_color(sub["id"], "#abc") is True
-        assert manager.get_vision_subsegments(seg_name)[0]["color_hex"] == "#AABBCC"
+        assert stored("vision_subsegments", sub["id"]) == "#AABBCC"
 
         assert manager.update_vision_subsegment(
             sub["id"], "Scv Sub", "#def", "", "") is True
-        assert manager.get_vision_subsegments(seg_name)[0]["color_hex"] == "#DDEEFF"
+        assert stored("vision_subsegments", sub["id"]) == "#DDEEFF"
 
         assert manager.update_vision_category(
             cat["id"], "Scv Cat", "#abc", "", "") is True
-        assert manager.get_vision_categories(seg_name, "Scv Sub")[0]["color_hex"] == "#AABBCC"
+        assert stored("vision_categories", cat["id"]) == "#AABBCC"
 
         for value in INT_BASE_16_ACCEPTS:
             with pytest.raises(ValueError):
@@ -742,6 +755,13 @@ def test_scvm66_the_category_pass_does_not_requery_per_row(tmp_path):
         assert len(cats) == 3
         for cat in cats:
             _seed_malformed(manager, "vision_categories", cat["id"], "#0X1234")
+        # The parent subsegment goes bad too, so the colour-map branch is
+        # actually entered. Without this the map count was 0 either way and
+        # that assertion could not fail -- found by a cold pass, 2026-11-11.
+        sub = manager.db.conn.execute(
+            "SELECT id FROM vision_subsegments WHERE LOWER(name) = 'scv sub'"
+        ).fetchone()["id"]
+        _seed_malformed(manager, "vision_subsegments", sub, "#0X1234")
 
         calls = {"subsegments": 0, "colour_map": 0}
         real_subsegments = type(manager).get_vision_subsegments
@@ -766,9 +786,9 @@ def test_scvm66_the_category_pass_does_not_requery_per_row(tmp_path):
         assert len(repaired) == 3
         for row in repaired:
             assert normalize_hex_color(row["color_hex"]) == row["color_hex"], row
-        assert calls["subsegments"] <= 1, (
+        assert calls["subsegments"] == 1, (
             f"three bad rows made {calls['subsegments']} subsegment queries")
-        assert calls["colour_map"] <= 1, (
+        assert calls["colour_map"] == 1, (
             f"three bad rows made {calls['colour_map']} colour-map queries")
     finally:
         manager.close()
@@ -820,3 +840,184 @@ def test_scvm67_an_unloaded_segment_colour_is_not_persisted(tmp_path):
             f"a colour guessed from a missing segment was persisted as {stored!r}")
     finally:
         reopened.close()
+
+
+# ======================================================================
+# SCV-M7 — the screens that list a segment, and the parent of a parent
+#
+# A second cold pass, over the whole unpushed range and with test quality and
+# the UI contract as its lenses rather than the failure patterns the first one
+# used. Its high finding is the one that matters: SCV-M6.2 and SCV-M6.3 made
+# the colour dialogs openable, and the two screens that list segments still
+# raised before an Edit button was ever created, so the dialogs could not be
+# reached. ``_warn_unreadable_segment_color`` sends the user to one of those
+# two screens by name.
+# ======================================================================
+
+
+def test_scvm71_the_vision_elements_segment_list_renders_a_malformed_colour(tmp_path):
+    """SCV-M7.1 (high) — the remediation path has to render to be a path.
+
+    ``refresh_segments`` built each row's chip with
+    ``fg_color=row.get("color_hex") or "#334155"`` straight from
+    ``get_vision_segments_admin``, whose ``color_hex`` is
+    ``segment_descriptions.color_hex`` -- the one table with no repair pass.
+    The Edit button is created after the chip in the same loop iteration, so
+    one legacy value meant no Edit button for that row and no rows after it.
+    P13 again: the whole batch gated the dialog and left the list that opens
+    it ungated.
+    """
+    import customtkinter as ctk
+    from src.getmoredone.screens.vision_segments import VisionSegmentsScreen
+
+    manager = VPSManager(str(tmp_path / "scv_elements_list.db"))
+    try:
+        seg_name = manager.get_all_segments(active_only=False)[0]["name"]
+        seg_id = manager.get_all_segments(active_only=False)[0]["id"]
+        manager.create_vision_subsegment(seg_name, "Scv Sub")
+        manager.create_or_get_vision_element(seg_name, "Scv Sub", "Scv Cat")
+        _seed_malformed(manager, "segment_descriptions", seg_id, "#0X1234")
+        assert manager.get_segment(seg_id)["color_hex"] == "#0X1234"
+
+        root = ctk.CTk()
+        root.withdraw()
+        try:
+            screen = VisionSegmentsScreen(root, manager, None)
+            # All three lists, because all three draw a segment chip from the
+            # same ungated value.
+            screen.refresh_segments()
+            screen.refresh_subsegments()
+            screen.refresh_categories()
+            labels = [w for row in screen.seg_list.winfo_children()
+                      for w in row.winfo_children()
+                      if isinstance(w, ctk.CTkButton)]
+            assert any(w.cget("text") == "Edit" for w in labels), (
+                "the segment list rendered no Edit button, so the one dialog "
+                "that can repair the colour cannot be opened")
+        finally:
+            root.destroy()
+    finally:
+        manager.close()
+
+
+def test_scvm72_the_colour_picker_opens_on_a_malformed_stored_colour(tmp_path):
+    """SCV-M7.2 — the Pick button is the control the user needs most.
+
+    ``_color_input``'s swatch was gated by SCV-M6.3 and its ``pick()`` was
+    not: ``colorchooser.askcolor(initialcolor=var.get())`` passes the entry's
+    raw text, which by design is the stored value the user is being asked to
+    correct. So the dialog opened and the button that fixes it raised. Its
+    sibling ``vps_segment_editor.pick_color`` already used the normalised
+    value; P5 says both members or neither.
+
+    Driven by capturing ``askcolor``'s argument rather than opening a chooser:
+    a real one is modal and needs a person.
+    """
+    import customtkinter as ctk
+    from src.getmoredone.screens import vision_segments as vs
+
+    captured = {}
+
+    def fake_askcolor(initialcolor=None, title=None):
+        captured["initialcolor"] = initialcolor
+        # What Tk itself does with the value, measured rather than assumed.
+        captured["root"].winfo_rgb(initialcolor)
+        return (None, None)
+
+    root = ctk.CTk()
+    root.withdraw()
+    captured["root"] = root
+    real_askcolor = vs.colorchooser.askcolor
+    vs.colorchooser.askcolor = fake_askcolor
+    try:
+        for stored in ("#0X1234", "#1_2345", "#+12345", ""):
+            row, var = vs.VisionSegmentsScreen._color_input(None, root, stored)
+            pick_button = [w for w in row.winfo_children()
+                           if isinstance(w, ctk.CTkButton)][0]
+            pick_button.invoke()
+            assert captured["initialcolor"] == vs.DEFAULT_SWATCH_COLOR, (
+                f"the picker opened on {captured['initialcolor']!r} for a "
+                f"stored {stored!r}")
+
+        row, var = vs.VisionSegmentsScreen._color_input(None, root, "#1a2b3c")
+        [w for w in row.winfo_children() if isinstance(w, ctk.CTkButton)][0].invoke()
+        assert captured["initialcolor"] == "#1A2B3C"
+    finally:
+        vs.colorchooser.askcolor = real_askcolor
+        root.destroy()
+
+
+def test_scvm73_a_malformed_parent_segment_colour_is_not_persisted(tmp_path):
+    """SCV-M7.3 — SCV-M6.7's test covered the missing row, not the bad one.
+
+    The repair pass decided "this is a guess" with ``parent is None`` from
+    ``match_segment_color``, which answers with whatever
+    ``segment_descriptions`` holds. So a *present* segment whose own colour is
+    the legacy malformed value gave a non-``None`` parent, ``guessed`` stayed
+    ``False``, ``_derive_subsegment_color`` fell back to ``#64748B``, and that
+    grey was written and reported as ``rewrote``. The same P1 the criterion
+    was written against, by the route its test did not take -- and the more
+    likely route, since this batch exists because such values are in the
+    table.
+    """
+    db_path = tmp_path / "scv_bad_parent.db"
+    manager = VPSManager(str(db_path))
+    try:
+        seg = manager.get_all_segments(active_only=False)[0]
+        manager.create_vision_subsegment(seg["name"], "Scv Sub")
+        sub = manager.get_vision_subsegments(seg["name"])[0]
+        _seed_malformed(manager, "segment_descriptions", seg["id"], "#0X1234")
+        _seed_malformed(manager, "vision_subsegments", sub["id"], "#0X1234")
+
+        shown = manager.get_vision_subsegments(seg["name"])[0]["color_hex"]
+        assert normalize_hex_color(shown) == shown, shown
+    finally:
+        manager.close()
+
+    reopened = VPSManager(str(db_path))
+    try:
+        stored = reopened.db.conn.execute(
+            "SELECT color_hex FROM vision_subsegments WHERE id = ?", (sub["id"],)
+        ).fetchone()["color_hex"]
+        assert stored == "#0X1234", (
+            f"a colour derived from a malformed parent was persisted as {stored!r}")
+    finally:
+        reopened.close()
+
+
+def test_scvm74_the_settings_segment_list_renders_a_malformed_colour():
+    """SCV-M7.4 — the other screen that lists a segment, same raise.
+
+    ``settings_vsp_segments.create_segment_row`` builds its 40x40 colour
+    indicator with ``fg_color=segment['color_hex']`` from
+    ``get_all_segments``, which is ``SELECT * FROM segment_descriptions`` --
+    ungated, unrepaired. This is the screen the batch's own manual checklist
+    sends the user to, so it is in scope rather than an adjacent issue: with
+    it raising, checklist items 1 and 2 cannot be performed at all.
+
+    Called unbound with a stub: the row builder reads one attribute of the
+    screen and the two it binds into lambdas are never invoked here.
+    """
+    import customtkinter as ctk
+    from types import SimpleNamespace
+    from src.getmoredone.screens.settings_vsp_segments import (
+        SettingsVSPSegmentsMixin,
+    )
+
+    root = ctk.CTk()
+    root.withdraw()
+    try:
+        holder = ctk.CTkFrame(root)
+        stub = SimpleNamespace(segments_scroll_frame=holder)
+        for stored in ("#0X1234", "#1_2345", "#+12345", None, ""):
+            SettingsVSPSegmentsMixin.create_segment_row(
+                stub,
+                {"id": "sd-1", "name": "Scv", "description": "",
+                 "color_hex": stored, "is_active": 1},
+                0,
+            )
+        built = holder.winfo_children()
+        assert len(built) == 5, (
+            f"a malformed colour stopped a row being built: {len(built)} of 5")
+    finally:
+        root.destroy()
