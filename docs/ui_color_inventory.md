@@ -3,34 +3,61 @@
 Generated via deterministic `rg` scans from repo root.
 
 ## Scan Commands
+
+Rendered from `SCAN_COMMANDS` in `tools/color_audit.py`, so what is printed here is what produced this file. The four hand-written lines this replaced had drifted: they omitted three of the seven scans and every flag.
+
 ```bash
-rg -n "fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=" .
-rg -n "#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b" .
-rg -n -i "\"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)\"|\'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)\'" .
-rg -n "set_default_color_theme\(|set_appearance_mode\(" .
+# widget
+rg --sort path --no-config -n 'fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=' . -g '!docs/ui_color_inventory.md'
+# hex
+rg --sort path --no-config -n '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b' . -g '!docs/ui_color_inventory.md' -g '!themes/**'
+# named
+rg --sort path --no-config -n -i '"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)'"'"'' . -g '!docs/ui_color_inventory.md' -g '!themes/**'
+# theme_api
+rg --sort path --no-config -n 'set_default_color_theme\(|set_appearance_mode\(' . -g '!docs/ui_color_inventory.md'
+# tuples
+rg --sort path --no-config -n '(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\s*=\s*(\(|\[)' . -g '!docs/ui_color_inventory.md'
+# app_settings
+rg --sort path --no-config -n 'color|theme|appearance_mode|theme_name|drag_schedule_date_text_color|color_hex' src/getmoredone/app_settings.py
+# theme_files
+rg --sort path --no-config -n '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)'"'"'' themes -g '*.json'
 ```
 
 ## 1) Summary Counts By Type
 
-- Hex colors (match count): **2282**
-- Named colors (match count): **137**
+- Hex colors (match count): **1508**
+- Named colors (match count): **117**
 - Tuple colors / appearance tuples (match count): **5**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **25**
 - Widget explicit overrides (line count): **569**
+
+Lines returned per scan. A scan that has gone blind returns
+nothing and rg still exits successfully, so these are recorded
+here where the staleness gate compares them.
+
+| Scan | Lines |
+|---|---:|
+| `app_settings` | 26 |
+| `hex` | 520 |
+| `named` | 72 |
+| `theme_api` | 25 |
+| `theme_files` | 765 |
+| `tuples` | 5 |
+| `widget` | 569 |
 
 Widget override property breakdown:
 
 | Property | Count |
 |---|---:|
-| `border_color` | 18 |
-| `button_color` | 4 |
-| `corner_radius` | 63 |
+| `border_color` | 17 |
+| `button_color` | 3 |
+| `corner_radius` | 62 |
 | `fg_color` | 271 |
-| `highlight_color` | 2 |
-| `hover_color` | 17 |
-| `progress_color` | 2 |
-| `selected_color` | 2 |
-| `text_color` | 238 |
+| `highlight_color` | 1 |
+| `hover_color` | 16 |
+| `progress_color` | 1 |
+| `selected_color` | 1 |
+| `text_color` | 237 |
 
 AppSettings persisted color/theme fields:
 
@@ -67,32 +94,32 @@ Hex top values:
 
 | Color | Count |
 |---|---:|
-| `#dce4ee` | 122 |
-| `#ffffff` | 111 |
-| `#979da2` | 104 |
-| `#000000` | 79 |
-| `#565b5e` | 68 |
-| `#3e454a` | 54 |
-| `#4a4d50` | 54 |
-| `#939ba2` | 54 |
-| `#949a9f` | 54 |
+| `#ffffff` | 84 |
+| `#dce4ee` | 63 |
+| `#000000` | 59 |
+| `#979da2` | 52 |
 | `#abc` | 45 |
-| `#2e1c8f` | 40 |
-| `#1d1d1f` | 35 |
-| `#343638` | 32 |
-| `#6e6e73` | 32 |
+| `#565b5e` | 34 |
 | `#aabbcc` | 32 |
-| `#f9f9fa` | 32 |
-| `#334155` | 30 |
-| `#86868b` | 29 |
-| `#111111` | 25 |
+| `#3e454a` | 27 |
+| `#4a4d50` | 27 |
+| `#939ba2` | 27 |
+| `#949a9f` | 27 |
 | `#dcfce7` | 25 |
+| `#123456` | 22 |
+| `#334155` | 22 |
+| `#1d1d1f` | 21 |
+| `#2e1c8f` | 21 |
+| `#6e6e73` | 17 |
+| `#343638` | 16 |
+| `#f9f9fa` | 16 |
+| `#111111` | 15 |
 
 Named top values:
 
 | Color | Count |
 |---|---:|
-| `gray` | 54 |
+| `gray` | 34 |
 | `white` | 24 |
 | `green` | 18 |
 | `red` | 15 |
@@ -128,6 +155,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `tests/test_color_contrast.py:13` | `assert pick_text_color("#FFFF00") == "#000000"  # bright yellow -> black` |
 | `tests/test_color_contrast.py:19` | `assert math.isclose(contrast_ratio("#000000", "#FFFFFF"), 21.0, rel_tol=0.0, abs_tol=0.01)` |
 | `tests/test_color_contrast.py:44` | `assert math.isclose(relative_luminance("#000000"), 0.0, rel_tol=0.0, abs_tol=1e-9)` |
+| `tests/test_color_inventory_sync.py:188` | ``hex` and `named` had already counted: the table read `#000000` 79, which` |
 | `tests/test_drag_schedule_support.py:30` | `assert interpolate_hex_color("#000000", "#FFFFFF", 0.5) == "#808080"` |
 | `tests/test_priority_level_colors.py:568` | `settings.priority_level_color_any_critical = "#000000"` |
 | `tests/test_priority_level_colors.py:569` | `stub = _StubSettingsScreen(settings, {LEVEL_ANY_CRITICAL: "#000000"})` |
@@ -164,6 +192,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:209` | `"#000000",` |
 | `themes/black_white.json:213` | `"#000000",` |
 | `themes/black_white.json:278` | `"#000000",` |
+| `tools/color_audit.py:33` | `# theme colour reaches the frequency tables twice -- #000000 read 79, which is` |
 | `tools/generate_ctk_themes.py:53` | `APPLE_GREY_HOVER = ["#000000", "#F5F5F7"]` |
 | `tools/generate_ctk_themes.py:57` | `BLACK_WHITE_HOVER = ["#000000", "#FFFFFF"]` |
 | `tools/generate_ctk_themes.py:61` | `("CTk", "fg_color"): ["#F5F5F7", "#000000"],` |
@@ -2030,6 +2059,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
+| `tests/test_color_inventory_sync.py:229` | `one_line = ['x.py:1:fg_color="#abcdef"']` |
 | `tests/test_drag_schedule_support.py:20` | `assert normalized_date_text_color("#ABCDEF") == "#ABCDEF"` |
 | `tests/test_priority_level_colors.py:1111` | `stub.priority_level_color_vars[LEVEL_ANY_CRITICAL].set("#abcdef")` |
 | `tests/test_priority_level_colors.py:1115` | `assert seen["color"] == "#ABCDEF"` |
