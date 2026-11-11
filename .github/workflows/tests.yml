@@ -40,12 +40,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install system packages for headless Tk
+      - name: Install system packages for headless Tk and the colour scan
         # python3-tk: CustomTkinter needs real Tk; the setup-python build has it,
         # but xvfb supplies the display the GUI tests would otherwise skip for.
+        # ripgrep: tools/color_audit.py shells out to it, and the suite checks
+        # the generated inventory is current. Not a Python dependency, so it
+        # cannot come from requirements-dev.txt.
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb python3-tk
+          sudo apt-get install -y xvfb python3-tk ripgrep
 
       - name: Install dependencies
         # requirements-dev.txt includes requirements.txt, so this installs the

@@ -93,18 +93,60 @@ class Entry:
     snippet: str
 
 
+# rg searches in parallel and promises no output order, so every scan asks for
+# path order. build_report sorts what it emits as well, and that is what the
+# staleness gate relies on -- this keeps the report's own "deterministic rg
+# scans" claim true at the source, and stops a section added later from being
+# order-dependent by default.
+# Tests: tests/test_color_inventory_sync.py::test_civm12_every_scan_command_asks_ripgrep_to_sort
+for _scan_cmd in SCAN_COMMANDS.values():
+    _scan_cmd[1:1] = ["--sort", "path"]
+
+
 def run_rg(cmd: Sequence[str]) -> List[str]:
-    result = subprocess.run(
-        cmd,
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        # A bare FileNotFoundError names the binary and not the remedy, and
+        # this generator is the only thing in the repo that needs ripgrep.
+        # Tests: tests/test_color_inventory_sync.py::test_civm3_the_generator_names_the_scanner_when_it_is_missing
+        raise RuntimeError(
+            f"{cmd[0]!r} is not on PATH. tools/color_audit.py scans with "
+            "ripgrep: install it (`brew install ripgrep`, or `apt-get install "
+            "ripgrep`) and run this again."
+        ) from exc
     # rg returns 1 when no matches; that is fine.
     if result.returncode not in (0, 1):
         raise RuntimeError(f"Command failed ({result.returncode}): {' '.join(cmd)}\\n{result.stderr}")
     return [ln for ln in result.stdout.splitlines() if ln.strip()]
+
+
+def scan_line_key(line: str) -> Tuple[str, int, str]:
+    """Order raw rg output by file, then line number, then text.
+
+    Lexical order would put ``:100:`` before ``:9:``; an unparseable line
+    sorts by its own text rather than being dropped.
+    """
+    entry = parse_line(line)
+    if entry is None:
+        return (line, 0, "")
+    return (entry.path, entry.line, entry.snippet)
+
+
+def by_count_then_name(counter: Counter) -> List[Tuple[str, int]]:
+    """Most frequent first, ties broken by colour name.
+
+    ``Counter.most_common`` breaks ties by insertion order, which here is
+    ripgrep's output order, which is thread scheduling. Two runs over an
+    unchanged tree disagreed because of this.
+    """
+    return sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))
 
 
 def parse_line(line: str) -> Entry | None:
@@ -166,7 +208,10 @@ def build_report(lines: Dict[str, List[str]]) -> str:
         (entry for entry in (parse_line(line) for line in lines["theme_api"]) if entry),
         key=lambda e: (e.path, e.line),
     )
-    tuple_entries = [entry for entry in (parse_line(line) for line in lines["tuples"]) if entry]
+    tuple_entries = sorted(
+        (entry for entry in (parse_line(line) for line in lines["tuples"]) if entry),
+        key=lambda e: (e.path, e.line),
+    )
 
     out: List[str] = []
     out.append("# UI Color Inventory")
@@ -202,21 +247,21 @@ def build_report(lines: Dict[str, List[str]]) -> str:
     out.append("AppSettings persisted color/theme fields:")
     out.append("")
     out.append("```text")
-    out.extend(lines["app_settings"])
+    out.extend(sorted(lines["app_settings"], key=scan_line_key))
     out.append("```")
     out.append("")
     out.append("Hex top values:")
     out.append("")
     out.append("| Color | Count |")
     out.append("|---|---:|")
-    for color, count in Counter(hex_occ).most_common(20):
+    for color, count in by_count_then_name(Counter(hex_occ))[:20]:
         out.append(f"| `{color}` | {count} |")
     out.append("")
     out.append("Named top values:")
     out.append("")
     out.append("| Color | Count |")
     out.append("|---|---:|")
-    for color, count in Counter(named_occ).most_common():
+    for color, count in by_count_then_name(Counter(named_occ)):
         out.append(f"| `{color}` | {count} |")
     out.append("")
     out.append("## 2) Complete Occurrence Table (Grouped by Color Value, then File)")

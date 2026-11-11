@@ -34,6 +34,12 @@ nice -n 19 pytest tests/test_<touched>.py -q
 
 # Create demo data
 python tools/create_demo_data.py
+
+# Regenerate the colour inventory. docs/ui_color_inventory.md is generated,
+# and tests/test_color_inventory_sync.py fails while it is stale -- so any
+# change that adds or removes a colour literal needs this run committed with
+# it. Needs ripgrep on PATH.
+./venv/bin/python tools/color_audit.py
 ```
 
 ## Architecture
