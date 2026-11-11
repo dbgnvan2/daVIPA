@@ -72,13 +72,9 @@ Strategic planning hierarchy: vision → annual plans → quarterly → monthly 
 CustomTkinter JSON themes in `/themes/`. Loaded at startup via `AppSettings` before any widgets are created.
 
 The colour rules are `AGENTS.md`'s *Semantic color rules* and *Refactor
-policy* — one primary, status colours for status only, segment colours as
-accents, no new hard-coded colours in widgets — and are not restated here. Two
-corrections to that file apply: the semantic helper is `theme.py`, not
-`ui/theme_tokens.py`, and *never as full-row fills* is contradicted by the code
-as shipped, since `priority_levels.row_fill` makes a segment colour the row
-fill on Today, Upcoming and All Items. Unresolved: either the rule is stale or
-those three screens are out of policy.
+policy* — one primary, status colours for status only, no new hard-coded
+colours in widgets, and a data colour as a row fill only where that row's
+foreground is derived from it for contrast — and are not restated here.
 
 ## Working agreements
 

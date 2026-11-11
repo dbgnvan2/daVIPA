@@ -263,7 +263,7 @@ def build_report(lines: Dict[str, List[str]]) -> str:
     out.append("- Convert direct `fg_color`/`hover_color`/`text_color` literals in screens to semantic token lookups.")
     out.append("- **Allowed data-driven colors:**")
     out.append("- Keep `segment_descriptions.color_hex` as the only domain data-driven color source.")
-    out.append("- Restrict segment colors to accent/chip/stripe/icon usage; avoid full-row fills.")
+    out.append("- A segment color may fill a row only where that row's foreground is derived from it for contrast (`priority_levels.row_fill`); everywhere else keep it to accent/chip/stripe/icon usage.")
     out.append("- **Persisted settings:**")
     out.append("- Keep only settings-level color fields that are user-configurable and intentional (`drag_schedule_date_text_color`) plus theme selectors (`appearance_mode`, `theme_name`).")
     out.append("")

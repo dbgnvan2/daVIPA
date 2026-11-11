@@ -25,7 +25,7 @@ Follow `AGENT_UI_REGRESSION_POLICY.md` for any UI change. Existing user-visible 
 
 ### Theme System (CRITICAL)
 - **No hard-coded colors:** Never use hex or named colors directly in widgets. Use semantic tokens from `theme.py`.
-- **Accents only:** Category/segment colors from DB are for chips/icons/stripes only, never full-row fills.
+- **Data colours:** Category/segment colors from the DB fill a row only where the row's text and controls are derived from the fill for contrast (`priority_levels.row_fill`); everywhere else they are chips/icons/stripes. See `AGENTS.md`, *Semantic color rules*.
 - **Centralization:** Add new semantic colors to `theme.py`, not in individual screens.
 
 ### File Maintainability (`codex.md`)

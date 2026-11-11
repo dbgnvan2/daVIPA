@@ -97,7 +97,16 @@ Implement a cohesive UI color system with low runtime overhead by:
 ## Semantic color rules
 - Reduce color noise: only 1 “primary” color for main action emphasis.
 - “Success/Warning/Danger” colors are for status only (not decoration).
-- Segment/category colors from data (e.g., segment_descriptions.color_hex) are allowed ONLY for small accents (chip/stripe/icon), not full-row fills.
+- Segment/category colors from data (e.g., segment_descriptions.color_hex) may
+  fill a row only where every foreground on that row is derived from the fill
+  for contrast -- text at 4.5:1, non-text controls at 3:1. That path is
+  `priority_levels.row_fill` with `pick_text_color` and `row_control_kwargs`,
+  and Today, Upcoming and All Items take it; Hierarchical and Completed pass
+  `segment_color=None` and get a stripe. Where the drawing code does not derive
+  its foreground, the colour stays a chip/stripe/icon accent. This replaced a
+  blanket ban on full-row fills on 2026-11-11: the ban was guarding against a
+  saturated fill under theme-coloured text, and deriving the foreground is what
+  actually removes that risk.
 
 ## Refactor policy
 - No new hard-coded colors in widgets (hex or named colors) except:
@@ -105,7 +114,7 @@ Implement a cohesive UI color system with low runtime overhead by:
   - very rare one-off brand assets (must be centralized)
 - Replace existing hard-coded fg_color/hover_color/text_color with:
   - theme defaults OR
-  - a small semantic style helper (e.g., ui/theme_tokens.py)
+  - a small semantic style helper -- `src/getmoredone/theme.py`
 
 ## Definition of done
 1) Theme can be switched via Settings screen (and persists).

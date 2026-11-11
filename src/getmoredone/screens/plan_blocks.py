@@ -39,10 +39,10 @@ from ..time_block_layout import (
     spare_minutes_in_last_slot,
 )
 
-# The coloured edge that carries the priority band. Narrow on purpose: the
-# project's theme rule allows a DB/semantic colour as a chip or stripe accent
-# and not as a full-row fill, because a wall of saturated rows stops carrying
-# information and starts fighting the text on top of it.
+# The coloured edge that carries the priority band. Narrow on purpose: a
+# saturated full-row fill stops carrying information and starts fighting the
+# text on top of it, and this band has no derived foreground of its own -- the
+# project rule permits a fill only where the row's foreground comes from it.
 STRIPE_WIDTH_PX = 6
 
 #: What the stripe asks to be tall. It is gridded ``sticky="ns"`` and stretched

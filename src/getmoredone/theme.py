@@ -153,7 +153,7 @@ def semantic_colors() -> Dict[str, str]:
 
 
 def apply_segment_accent(frame: ctk.CTkFrame, segment_color: str | None):
-    """Apply a narrow accent stripe; segment colors should not fill full rows.
+    """Apply a narrow accent stripe in the segment's own colour.
 
     Purpose: SCV-M6.3 -- ``row_fill`` claimed to be the last gate before
              ``fg_color`` in the five row builders, and it is not: every one of
@@ -354,12 +354,12 @@ def priority_fill_colors() -> Dict[str, str]:
     Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m4
     Tests:   tests/test_plan_screen.py::test_pbm41_a_chips_title_is_coloured_for_the_shade_behind_it
 
-    A tint and not the accent. The project rule allows a colour as a chip or
-    stripe accent and not as a full-row fill, and the reason it gives -- a wall
-    of saturated rows stops carrying information and fights the text on top of
-    it -- applies whatever the colour's source. These are chosen so
-    ``pick_text_color`` clears 4.5:1 on them and so the band's own stripe still
-    clears 3:1 when drawn on them rather than on the bare surface.
+    A tint and not the accent. A wall of saturated rows stops carrying
+    information and fights the text on top of it, whatever the colour's source,
+    and the project rule permits a fill only where the foreground is derived
+    from it. These are chosen so ``pick_text_color`` clears 4.5:1 on them and
+    so the band's own stripe still clears 3:1 when drawn on them rather than on
+    the bare surface.
     """
     mode = (ctk.get_appearance_mode() or "Dark").lower()
     if mode == "light":
