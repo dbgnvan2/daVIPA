@@ -824,8 +824,13 @@ Priority Colours (added 2026-11-08):
   Items can colour a row from its segment, that colour wins and the priority
   tint is not drawn. Since 2026-11-10 a segment-coloured row picks its text
   colour for contrast in the same way, so a pale segment colour reads in the
-  dark theme instead of keeping the theme's near-white row text. Nothing about
-  the segment colours themselves changed — only the text drawn on them.
+  dark theme instead of keeping the theme's near-white row text.
+  - Since 2026-11-11 a segment colour that is **not** a `#RRGGBB` value draws
+    no fill at all, so those rows look as they would with no segment colour
+    set, and `app.log` names the value once. Before that the value was passed
+    to the row as given and could blank the screen it was drawn on. A colour
+    set in the segment editor is always a `#RRGGBB` value, so this applies
+    only to one left behind by an earlier version.
 - A saved colour shows the next time you open one of those screens; no relaunch
   is needed.
 - These are **not** the Plan screen's priority bands. A band comes from the
@@ -916,6 +921,12 @@ Email Import (Gmail):
 
 VSP Life Segments:
 - **+ New Segment** — What: Creates a new life segment. Why: Organize VSP plans by life area.
+- **Segment colour** — What: The `#RRGGBB` field in the segment editor, with a
+  **Pick Color** button beside it. Why: Colour a segment's rows on Today,
+  Upcoming and All Items. Since 2026-11-11 the short form `#abc` is accepted
+  and saved as `#AABBCC`, and the field refuses anything that is not six hex
+  digits — `#0X1234` and `#1_2345` were accepted before that and could not be
+  drawn.
 - **Refresh** — What: Reloads the list. Why: See recent changes.
 - **Edit** — What: Modify segment details. Why: Keep segments accurate.
 - **Delete** — What: Deletes a segment if no linked VSP records exist. Why: Clean up unused segments.

@@ -1946,5 +1946,36 @@ Three below-medium findings were dropped under the sweep budget in
 `CLAUDE.md`, and one — a silent fallback — was taken anyway because it shared
 an edit with the above: `row_fill` now warns once per unreadable segment
 colour. The remaining two are noted in the batch's commit message. One
-medium finding was pre-existing rather than a regression and is filed as
-`BACKLOG.md`'s `LRR-A1` instead of being swept.
+medium finding was pre-existing rather than a regression and was filed as
+`BACKLOG.md`'s `LRR-A1` instead of being swept; it was closed on 2026-11-11 by
+the SCV batch below, and the `LRR-A1` entry is gone from `BACKLOG.md`.
+
+### SCV — one authority for a segment colour (2026-11-11)
+
+Plan: [`docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md`](unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md).
+Closes `LRR-A1`, medium, filed 2026-11-10. Tests are in
+`tests/test_segment_colour_validation.py` except where named otherwise.
+
+| Criterion | Implementation | Test | Status |
+|---|---|---|---|
+| SCV-M1.1 | Both validators answer from `color_contrast`; a colour is sliced into `int(..., 16)` in `color_contrast.hex_to_rgb` and in the two modules `SCV-A1`/`SCV-A3` name, and nowhere else | `color_contrast.py::hex_to_rgb`, `vps_manager.py::VPSManager._is_valid_hex_color`, `screens/vps_segment_editor.py::VPSSegmentEditorDialog.validate_color` | `::test_scvm11_no_hand_rolled_hex_validator_survives` | done |
+| SCV-M1.2 | `#0X1234`, `#1_2345` and `#+12345` are refused by both validators and by the authority; `#0b1010` still passes | same | `::test_scvm12_the_validators_refuse_what_int_base_16_allows`, `::test_scvm12_a_six_digit_colour_that_looks_like_a_literal_still_passes` | done |
+| SCV-M1.3 | The editor stores the normalised form, so `#abc` lands as `#AABBCC` | `screens/vps_segment_editor.py::VPSSegmentEditorDialog.save_segment` | `::test_scvm13_the_editor_stores_the_normalised_form`, `tests/test_vps_segments.py::test_scvm13_validate_color_accepts_what_the_normaliser_reads` | done |
+| SCV-M2.1 | `_derive_subsegment_color` raises for nothing a caller can hold, and falls back to `#64748B` where it cannot read a base | `vps_manager.py::VPSManager._derive_subsegment_color` | `::test_scvm21_deriving_from_a_malformed_colour_falls_back`, `::test_scvm21_deriving_answers_for_anything_a_caller_can_hold`, `::test_scvm21_a_valid_colour_still_derives_what_it_always_did` | done |
+| SCV-M2.2 | `#+12345` falls back rather than deriving `#0B368D` from a misread slice | same | `::test_scvm22_a_colour_that_parses_wrongly_is_not_derived_from` | done |
+| SCV-M3.1 | The repair pass repairs a row holding `#0X1234` instead of skipping it, the repair persists, and the three taxonomy writers store the normalised form | `vps_manager_taxonomy.py::get_vision_subsegments`, `::get_vision_categories`, `::update_vision_subsegment_color`, `::update_vision_subsegment`, `::update_vision_category` | `::test_scvm31_the_repair_pass_sees_a_malformed_stored_colour`, `::test_scvm31_the_taxonomy_writers_store_the_normalised_form` | done |
+| SCV-M4.1 | `row_fill` returns a `#RRGGBB` fill or none at all, never the raw stored value | `priority_levels.py::row_fill` | `tests/test_priority_level_colors.py::test_scvm41_a_malformed_segment_colour_does_not_become_a_fill` | done |
+
+One item is not code-testable and is reported as a three-step manual
+checklist instead: what the segment editor and the VSP screens do on screen
+(plan §6). Two adjacent issues are filed rather than swept, as `BACKLOG.md`'s
+`SCV-A1` and `SCV-A2`; a third, already correct, is recorded in
+`::test_scvm11_no_hand_rolled_hex_validator_survives`'s docstring as `SCV-A3`
+so the next reader does not "fix" it.
+
+Two existing tests changed, each with its reason stated in its own docstring
+and both reason (b), the behaviour changed intentionally:
+`tests/test_priority_level_colors.py::test_lrrm21_an_unreadable_segment_colour_keeps_the_themes_text`
+no longer asserts the raw value is the fill (SCV-M4.1), and
+`tests/test_vps_segments.py::test_bc3_validate_color_rejects_everything_else`
+no longer lists `#abc` and `aabbcc` as refusals (SCV-M1.3, plan §4).

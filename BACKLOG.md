@@ -294,32 +294,32 @@ be the third design for these tests in one day.
 
 Found while building PLC-M1 to PLC-M5. Flagged, not fixed (global rule 10):
 each is real, none is what was asked for, and a fix for any of them would be a
-silent sweep of behaviour nobody asked about. `LRR-A1` was added 2026-11-10 by
-the LRR batch's cold pass, on the same terms.
+silent sweep of behaviour nobody asked about. `SCV-A1` and `SCV-A2` were added
+2026-11-11 on the same terms, by the batch that closed `LRR-A1`.
 
-### LRR-A1 — a segment colour the Settings validator accepts can crash a row build (medium)
+### SCV-A1 — `interpolate_hex_color` slices into `int(…, 16)` with no guard (low)
 
-`vps_segment_editor.validate_color` checks `startswith("#")`, `len() == 7`, and
-`int(color_hex[1:], 16)`. Python's `int(x, 16)` accepts an `0x` prefix and
-underscore separators, so `#0X1234`, `#1_2345` and `#+12345` all pass a
-validator written to mean "six hex digits". `vps_manager.create_segment` and
-`update_segment` add no check of their own, and `segment_color_utils`'
-normaliser only strips whitespace.
+`screens/drag_schedule_support.py:109-110` reads both endpoints of its gradient
+as `int(s[0:2], 16)` with nothing checking them first, which is the third copy
+of the parse `SCV-M1` removed from the other two. Not on the stored-colour
+path — its only caller is the gradient in its own module, over theme colours —
+so it is not what `LRR-A1` named, and fixing it in the SCV batch would have
+been a sweep of a module nobody asked about. It will behave exactly as
+`_derive_subsegment_color` did the day something hands it a stored colour.
+`tests/test_segment_colour_validation.py::test_scvm11_no_hand_rolled_hex_validator_survives`
+counts it, so it cannot multiply unnoticed.
 
-Such a value reaches `ctk.CTkFrame(..., fg_color=bg_color)` in the row builders
-of Today, Upcoming and All Items, where Tk raises `TclError` part-way through a
-refresh and takes the list screen down with it. `color_contrast.normalize_hex_color`
-exists precisely to stop this for the priority-level colours (PLC-M2.5); the
-segment path never got the same treatment.
+**Priority:** Low
+**Effort:** Low
 
-`row_fill` now computes the normalised form to derive a segment row's text
-colour and deliberately passes the *raw* value through as the fill, because
-changing what colour a row draws is outside what `PLC-A1` named. The one-line
-fix is therefore already in reach of the value in hand — either fall back to a
-theme colour, or tighten `validate_color` to the `#RRGGBB` regex
-`color_contrast` already has. `priority_levels` logs the unreadable value once
-per colour as of 2026-11-10, so the case is visible in `app.log` rather than
-silent.
+### SCV-A2 — `get_segment_colors_by_id` hands callers the raw stored value (medium)
+
+`vps_manager.py` returns `(row["color_hex"] or "").strip() or "#334155"`, i.e.
+whatever the database holds. `SCV-M4` closed the row-fill reader specifically,
+and the taxonomy writers and the segment editor now store only `#RRGGBB`, so a
+malformed value has to predate 2026-11-11 to be in there at all. The map's
+other readers were not surveyed in that batch, and a survey is the work here —
+not a normalising wrapper, which would hide which readers needed one.
 
 **Priority:** Medium
 **Effort:** Low
