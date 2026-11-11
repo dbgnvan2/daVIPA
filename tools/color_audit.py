@@ -30,9 +30,12 @@ NAMED_PATTERN = (
 _NOT_SELF = ("-g", "!docs/ui_color_inventory.md")
 # themes/*.json is scanned once, by `theme_files`, whose pattern covers hex and
 # named together. Without this the "." scans cover the same bytes and every
-# theme colour reaches the frequency tables twice -- #000000 read 79, which is
-# 57 from here plus the same 22 again from `theme_files`, while the occurrence
-# table (which dedups) listed 57.
+# theme colour reaches the frequency tables twice. Measured 2026-11-11 before
+# the fix: `#000000` read 79 in the frequency table against 57 rows in the
+# occurrence table below it, the 22 of difference being the theme files
+# counted a second time. Those are that day's figures and not an invariant --
+# the scan is repo-wide, so any file that merely mentions a colour moves
+# them, this comment included.
 # Tests: tests/test_color_inventory_sync.py::test_civm5_the_scans_feeding_one_count_do_not_overlap
 _NOT_THEMES = ("-g", "!themes/**")
 
@@ -87,6 +90,16 @@ class Entry:
 
 RG_TIMEOUT_SECONDS = 120
 
+# rg writes this on a successful search and still exits 0, so it is not a sign
+# of a partial scan. Everything else on stderr is.
+RG_BENIGN_STDERR = re.compile(r"^WARNING: stopped searching binary file ")
+
+# Scans allowed to return nothing, by name. Declaring one is a reviewable
+# one-line change here rather than an edit to scan_all's logic (global rule 8).
+# `tuples` is the near one: 5 lines today, and section 3 of the report
+# recommends migrating the real ones.
+SCANS_ALLOWED_EMPTY: set = set()
+
 
 def run_rg(cmd: Sequence[str]) -> List[str]:
     try:
@@ -123,14 +136,19 @@ def run_rg(cmd: Sequence[str]) -> List[str]:
     # rg returns 1 when no matches; that is fine.
     if result.returncode not in (0, 1):
         raise RuntimeError(f"Command failed ({result.returncode}): {' '.join(cmd)}\\n{result.stderr}")
-    if result.stderr.strip():
-        # rg does not fail a whole run for one unreadable file, a broken
-        # symlink or a non-UTF-8 path: it writes the error here and still
-        # exits 0 or 1. Discarding it made a partial scan look like a clean
-        # one, which is a shorter inventory with no signal attached.
+    # rg does not fail a whole run for one unreadable file, a broken symlink
+    # or a non-UTF-8 path: it writes the error here and still exits 0 or 1.
+    # Discarding it made a partial scan look like a clean one, which is a
+    # shorter inventory with no signal attached.
+    complaints = [
+        line for line in result.stderr.splitlines()
+        if line.strip() and not RG_BENIGN_STDERR.match(line.strip())
+    ]
+    if complaints:
         raise RuntimeError(
             "rg reported errors, so this scan may be partial:\n"
-            f"{result.stderr.strip()}\ncommand: {shlex.join(list(cmd))}"
+            + "\n".join(complaints)
+            + f"\ncommand: {shlex.join(list(cmd))}"
         )
     return [ln for ln in result.stdout.splitlines() if ln.strip()]
 
@@ -152,12 +170,13 @@ def scan_all() -> Dict[str, List[str]]:
     results: Dict[str, List[str]] = {}
     for name, cmd in SCAN_COMMANDS.items():
         found = run_rg(cmd)
-        if not found:
+        if not found and name not in SCANS_ALLOWED_EMPTY:
             raise RuntimeError(
                 f"the {name!r} scan returned no lines. rg cannot tell "
                 "'nothing matches' apart from 'an ignore rule hid every "
                 "candidate file', so this is either a real emptying -- in "
-                "which case say so here -- or a scan that has gone blind. "
+                "which case add it to SCANS_ALLOWED_EMPTY -- or a scan that "
+                "has gone blind. "
                 f"command: {shlex.join(list(cmd))}"
             )
         results[name] = found
@@ -281,9 +300,10 @@ def build_report(lines: Dict[str, List[str]]) -> str:
     )
     out.append(f"- Widget explicit overrides (line count): **{len(lines['widget'])}**")
     out.append("")
-    out.append("Lines returned per scan. A scan that has gone blind returns")
-    out.append("nothing and rg still exits successfully, so these are recorded")
-    out.append("here where the staleness gate compares them.")
+    out.append("Lines returned per scan. `scan_all` refuses an empty scan, so")
+    out.append("this table is not the blindness check -- it is here to localise")
+    out.append("a diff to one scan, and because section 1 omits the hex, named")
+    out.append("and theme_files line counts.")
     out.append("")
     out.append("| Scan | Lines |")
     out.append("|---|---:|")
