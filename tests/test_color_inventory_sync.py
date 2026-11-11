@@ -1,15 +1,9 @@
 """The colour inventory is generated, so it can drift; these keep it honest.
 
-``docs/ui_color_inventory.md`` is written by ``tools/color_audit.py`` and read
-by people, not by code. Nothing ran the generator between 18dbe02 and
-2026-11-11, and by then the committed file was 3,250 lines out of date and
-still asserted a colour rule the project had retired. A generated document
-with no gate is a document that is wrong and says nothing about it.
-
-A gate like this only works if the generator is deterministic, and it was not:
-four sections of the report came out in whatever order ripgrep's threads
-produced, so two runs over an unchanged tree disagreed. The determinism tests
-come first here because the staleness test is built on them.
+Nothing ran ``tools/color_audit.py`` between 18dbe02 and 2026-11-11, by which
+point ``docs/ui_color_inventory.md`` was 3,250 lines stale and still asserted a
+retired colour rule. The determinism tests come first because the staleness
+test is built on them: four report sections came out in thread order.
 
 Spec:  no spec file -- four criteria, no user-visible behaviour (CLAUDE.md,
        *Records are filed, not tested*).
@@ -34,13 +28,10 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 import color_audit  # noqa: E402  (needs the path above)
 
 
-# A hand-built stand-in for a scan, small enough to reason about and shaped to
-# hit every ordering decision build_report makes:
-#   * `#aabbcc` and `#ddeeff` tie at two hex occurrences each
-#   * "red" and "blue" tie at two named occurrences each
-#   * app_settings and tuples carry three lines apiece, out of path order
-# A tie is the only place insertion order can leak into the output, so a
-# fixture without one would pass against the bug.
+# A hand-built stand-in for a scan, shaped to hit every ordering decision
+# build_report makes: `#aabbcc`/`#ddeeff` tie at two hex occurrences, "red"/
+# "blue" tie at two named, and app_settings and tuples carry three lines each
+# out of path order. A tie is the only place insertion order can leak out.
 SCAN_FIXTURE = {
     "hex": [
         "src/b.py:10:    fg_color=\"#aabbcc\"",
@@ -54,10 +45,8 @@ SCAN_FIXTURE = {
         "src/c.py:6:     hover_color=\"red\"",
         "src/a.py:4:     fg_color=\"blue\"",
     ],
-    # Non-overlapping with `hex`/`named` on purpose: the scans are disjoint by
-    # construction now (CIV-M5 proves it against real rg), and a fixture that
-    # overlapped would be asserting the double-count bug rather than the fix.
-    # These exist so build_report's two-source counting path runs here at all.
+    # Non-overlapping with `hex`/`named` on purpose: CIV-M5 proves the scans
+    # disjoint against real rg, so an overlapping fixture would assert the bug.
     "theme_files": [
         'themes/t.json:2:      "#abcdef",',
         'themes/t.json:9:      "teal",',
@@ -161,12 +150,10 @@ def test_civm12_every_scan_command_asks_ripgrep_to_sort():
 def test_civm12_every_scan_command_asks_ripgrep_for_the_filename():
     """A scan given one explicit file omits the path, and then nothing parses.
 
-    rg prints the filename only when it is searching more than one file, so
-    `app_settings` -- the only scan that passes an explicit path -- came back
-    as `55:    appearance_mode: str = "dark"`. parse_line returned None for
-    all 26 of its lines, scan_line_key fell back to ordering the raw string,
-    and the AppSettings block came out in lexical order: 445, 446, 447, 55,
-    56, 626. Measured with rg 14.1.1 on 2026-11-11.
+    rg prints the filename only when searching more than one file, so
+    `app_settings` came back as `55:    appearance_mode: str = "dark"`:
+    parse_line returned None for all 26 lines and the block came out in
+    lexical order, 445, 446, 447, 55, 56, 626. rg 14.1.1, 2026-11-11.
     """
     without_filename = [
         name for name, cmd in color_audit.SCAN_COMMANDS.items()
@@ -217,15 +204,11 @@ def test_civm2_the_committed_inventory_matches_a_fresh_generation():
 def test_civm5_the_scans_feeding_one_count_do_not_overlap():
     """Two scans over the same bytes counted every theme colour twice.
 
-    Back when all three searched from the repo root, `theme_files`
-    re-counted what `hex` and `named` had already counted. Measured
-    2026-11-11 before the fix: the table read `#000000` 79 against 57 rows in
-    the occurrence table below it, which dedups by full identity. The
-    frequency tables are what a reader ranks by.
-
-    `hex` and `named` now search `src` and `theme_files` searches `themes`,
-    so the disjointness holds by construction. That construction is what
-    this asserts -- not those figures, and not the glob that used to carry it.
+    When all three searched from the repo root, `theme_files` re-counted what
+    `hex` and `named` had. Measured 2026-11-11 before the fix: the table read
+    `#000000` 79 against 57 rows in the occurrence table, which dedups by full
+    identity. Disjointness now holds by construction, and that construction is
+    what this asserts -- not those figures, nor the glob that used to carry it.
     """
     def keys(scan_name):
         out = set()
@@ -268,15 +251,10 @@ def test_civm13_both_frequency_tables_count_the_theme_files_scan():
 
     The gate regenerates and diffs, and the determinism tests compare two
     generations of one fixture, so nothing said what a given input should
-    produce. Drop `theme_files` from either frequency loop and both stay
-    green: the report is still deterministic, and the gate agrees with
-    itself once the shorter report is regenerated and committed. What is lost
-    is every theme colour -- 765 lines of the real scan -- from the tables a
-    reader ranks by.
-
-    The fixture's theme lines are `#abcdef` and `teal`, which appear in no
-    other scan, so their presence here can only have come through
-    `theme_files`.
+    produce. Drop `theme_files` from either frequency loop and both stay green
+    while every theme colour leaves the ranked tables. The fixture's theme
+    lines, `#abcdef` and `teal`, appear in no other scan, so their presence
+    here can only have come through `theme_files`.
     """
     report = color_audit.build_report(SCAN_FIXTURE)
     hex_rows = _frequency_rows(report, "Hex top values:")
@@ -293,11 +271,9 @@ def test_civm13_both_frequency_tables_count_the_theme_files_scan():
 def test_civm13_the_frequency_tables_hold_every_colour_and_rank_them():
     """Exact rows, in order: a truncated table would otherwise pass.
 
-    `by_count_then_name(...)[:20]` caps the hex table. Narrow that cap and
-    the report stays deterministic and self-consistent, so only an assertion
-    on the rows themselves can see it. The fixture's ties (#aabbcc/#ddeeff
-    at 2, blue/red at 2) also pin the documented order -- count descending,
-    then name -- rather than merely "sorted somehow".
+    `by_count_then_name(...)[:20]` caps the hex table; narrowing that cap
+    keeps the report deterministic and self-consistent, so only an assertion
+    on the rows can see it. The fixture's ties pin count-then-name order.
     """
     report = color_audit.build_report(SCAN_FIXTURE)
 
@@ -386,11 +362,9 @@ def test_civm7_stderr_on_a_successful_exit_is_not_discarded(monkeypatch):
     """White-box cover for the complaints branch, on a synthetic result.
 
     Measured with rg 14.1.1 on 2026-11-11: an unreadable file in a recursive
-    scan exits **2**, so that case lands in the returncode branch above and
-    not here. This branch covers a per-file complaint that arrives with a
-    successful exit, which must not be dropped -- a partial scan is a
-    shorter inventory with no signal attached -- and rg's exit code for this
-    is something it has changed before.
+    scan exits **2**, so it lands in the returncode branch above, not here.
+    This covers a complaint arriving with a successful exit, which must not be
+    dropped -- and rg has changed that exit code before.
     """
     monkeypatch.setattr(
         color_audit.subprocess, "run",
@@ -407,15 +381,10 @@ def test_civm7_stderr_on_a_successful_exit_is_not_discarded(monkeypatch):
 def test_civm7_a_benign_notice_on_stderr_does_not_abort_the_scan(monkeypatch):
     """White-box cover for the allowlist, on a synthetic result.
 
-    Measured with rg 14.1.1 on 2026-11-11: a recursive scan skips a binary
-    file in silence, and an explicit binary argument writes `binary file
-    matches (...)` to **stdout** with no WARNING prefix. So no rg checked
-    here puts this on stderr, and the allowlist is defensive rather than
-    load bearing. It stays because all seven scans share run_rg: on a
-    version that does emit a benign notice, one matching binary file would
-    otherwise take down the gate, the overlap test and the rg preflight
-    together, with a message blaming a partial scan. The input below is
-    synthetic for that reason.
+    Measured with rg 14.1.1 on 2026-11-11: no rg checked here puts a
+    binary-file notice on stderr, so the allowlist is defensive and the input
+    below is synthetic. It stays because all seven scans share run_rg, and a
+    version that did emit one would take them all down together.
     """
     notice = (
         'WARNING: stopped searching binary file ./x.bin after match '
@@ -445,15 +414,10 @@ def test_civm7_the_scan_is_decoded_as_utf8_and_bounded(monkeypatch):
 def test_civm7_every_line_of_every_real_scan_can_be_parsed():
     """Covers -n, -H and --no-config behaviourally, which no flag check can.
 
-    Drop -n or -H, or let a developer's ~/.ripgreprc set --heading or
-    --no-line-number, and parse_line returns None for every line of the
-    affected scan. The occurrence table and both frequency tables survive
-    that silently: the report comes out structurally valid and short.
-
-    Every scan, not just one: the hex scan passes "." and so always carried a
-    path, while `app_settings` passes a single file and parsed 0 of 26. The
-    one scan that was broken was the one outside the earlier version of this
-    test.
+    Drop -n or -H, or let a ~/.ripgreprc set --heading, and parse_line returns
+    None for every line of that scan while the report stays structurally valid
+    and short. Every scan, not just one: a directory argument gets a path
+    printed for free, while `app_settings` passes a file and parsed 0 of 26.
     """
     failures = {}
     for name, cmd in color_audit.SCAN_COMMANDS.items():
@@ -468,47 +432,113 @@ def test_civm7_every_line_of_every_real_scan_can_be_parsed():
     )
 
 
-def test_civm14_every_scan_stays_inside_src_and_themes():
+def test_civm14_every_scan_stays_inside_the_declared_paths():
     """The inventory is an audit of UI code, and this is what makes it one.
 
-    Scanning from the repo root counted documents, specs, archives and this
-    file's own fixtures as the app's colour usage. Measured 2026-11-11, with
-    three consequences: 3 of the `tuples` scan's 5 lines came from this test
-    file, so `scan_all`'s refusal of an empty scan -- the only guard against
-    a scan going blind -- could be satisfied by test data; a docs-only edit
-    made the committed report stale, because the occurrence rows cite the
-    matched line by number; and section 1's own Hard Rule is about
-    hard-coded colours in UI code, which was not what the scan measured.
-
-    This replaces the three exclusion globs the repo-root scan needed
-    (`!docs/ui_color_inventory.md`, `!themes/**`, and this file). With `src`
-    and `themes` as the only search paths none of them is reachable, so the
-    globs went and the property they were approximating is asserted here
-    instead. Decided by the repo owner as CIV-A1 on 2026-11-11; the scan is
-    one edit away from being widened again, which is why this is a test.
+    A repo-root scan counted documents and this file's own fixtures as the
+    app's colour usage: 3 of the `tuples` scan's 5 lines came from here, so
+    scan_all's empty-scan guard could be satisfied by test data (2026-11-11).
+    It replaces three globs now unreachable. The allowed set names a file, not
+    `tools`: color_audit.py's own regexes match HEX_PATTERN.
     """
-    allowed = {"src", "themes"}
+    trees = ("src/", "themes/")
+    files = ("tools/generate_ctk_themes.py",)
     strays = {}
     for name, cmd in color_audit.SCAN_COMMANDS.items():
         outside = sorted({
-            entry.path
+            e.path
             for ln in color_audit.run_rg(cmd)
-            if (entry := color_audit.parse_line(ln))
-            and entry.path.split("/")[0] not in allowed
+            if (e := color_audit.parse_line(ln))
+            and not e.path.startswith(trees) and e.path not in files
         })
         if outside:
             strays[name] = outside[:3]
     assert strays == {}, (
-        "these scans reach outside src/ and themes/, as "
-        f"{{scan: examples}}: {strays}. The inventory covers the UI code and "
-        "the themes it loads; a wider scan reports documents, plans and test "
-        "fixtures as the app's colour usage."
+        f"these scans reach outside the declared paths, as {{scan: examples}}: "
+        f"{strays}. A wider scan reports documents, plans, test fixtures or "
+        "this scanner's own regexes as the app's colour usage."
     )
 
 
 # --------------------------------------------------------------------------
 # CIV-M3 — the gate cannot pass vacuously for want of the scanner
 # --------------------------------------------------------------------------
+
+def test_civm15_gray_scale_literals_reach_the_named_tables():
+    """CustomTkinter's grays are colours, and NAMED_PATTERN must see them.
+
+    It matched bare words only, so ``"gray95"`` was invisible: 539 of the 544
+    lines holding one, 527 of them theme lines with no other colour
+    (2026-11-11). Only the two scans feeding the named tables are asserted,
+    since ``widget`` already lists a ``fg_color=("gray70", ...)`` line while
+    keeping its values out of the ranked table. One probe per tree: rg honours
+    ``.gitignore``'s ``!themes/*.json`` whitelist only when ``themes`` is the
+    sole search path -- 532 lines alone, 1 beside ``src``.
+    """
+    gray = r"""["']gr[ae]y[0-9]{1,3}["']"""
+    want = {
+        (e.path, e.line)
+        for cmd in (color_audit._rg(gray, *color_audit.UI_CODE_PATHS),
+                    color_audit._rg(gray, "themes", "-g", "*.json"))
+        for ln in color_audit.run_rg(cmd)
+        if (e := color_audit.parse_line(ln))
+    }
+    assert want, "no gray-scale literal on disk; this test would be vacuous"
+    got = set()
+    for name in ("named", "theme_files"):
+        for ln in color_audit.run_rg(color_audit.SCAN_COMMANDS[name]):
+            if e := color_audit.parse_line(ln):
+                got.add((e.path, e.line))
+    missing = sorted(want - got)
+    assert missing == [], (
+        f"{len(missing)} of {len(want)} lines holding a gray-scale literal "
+        "are returned by neither `named` nor `theme_files`, so their values "
+        f"never reach the frequency tables. First three: {missing[:3]}"
+    )
+    # Reaching the scan is not reaching the table: the search pattern and the
+    # extraction regex are separate, and a line can be returned while its
+    # value is dropped. Measured 2026-11-11, the state this caught: all 527
+    # theme lines were returned and 0 of their values were ranked.
+    values = {
+        m.group(0).strip("\"'").lower()
+        for cmd in (color_audit._rg(gray, *color_audit.UI_CODE_PATHS),
+                    color_audit._rg(gray, "themes", "-g", "*.json"))
+        for ln in color_audit.run_rg(cmd)
+        for m in re.finditer(r"""["']gr[ae]y[0-9]{1,3}["']""", ln)
+    }
+    tables = color_audit.build_report(color_audit.scan_all()).split("## 2)")[0]
+    absent = sorted(v for v in values if v not in tables)
+    assert absent == [], (
+        f"{len(absent)} of {len(values)} distinct gray-scale values are "
+        f"missing from the frequency tables a reader ranks by: {absent[:5]}"
+    )
+
+
+def test_civm16_the_search_pattern_and_the_extractor_agree():
+    """Two regexes for one word list diverged, and the report went quiet.
+
+    `NAMED_PATTERN` searches, `NAMED_RE` extracts the value for the frequency
+    tables. They were separate literals until 2026-11-11, when the gray-scale
+    fix to the first left the second on bare words: all 527 theme lines were
+    returned and 0 of their 30 values were ranked. Both now derive from
+    `_NAMED_WORDS`, and this holds them to it word by word.
+    """
+    words = color_audit._NAMED_WORDS.split("|")
+    assert len(words) == 12, f"word list is {len(words)} long, expected 12"
+    broken = {}
+    for w in words:
+        sample = w.replace("[0-9]{0,3}", "42")
+        line = f'''x.py:1:    fg_color="{sample}",'''
+        found = re.search(color_audit.NAMED_PATTERN, line) is not None
+        got = color_audit.NAMED_RE.search(line)
+        if not found or got is None or got.group("c").lower() != sample:
+            broken[sample] = (found, got.group("c") if got else None)
+    assert broken == {}, (
+        "these words disagree between the search pattern and the extractor, "
+        f"as {{word: (searched, extracted)}}: {broken}. A word only one of "
+        "them knows reaches no frequency table."
+    )
+
 
 def test_civm3_the_generator_names_the_scanner_when_it_is_missing():
     """A bare FileNotFoundError does not tell you to install ripgrep."""
@@ -523,10 +553,9 @@ def test_civm3_the_generator_names_the_scanner_when_it_is_missing():
 def test_civm3_the_workflow_installs_the_scanner_the_generator_needs():
     """CI runs the suite, so CI needs rg or the gate above errors there."""
     workflow = (REPO_ROOT / ".github/workflows/tests.yml").read_text(encoding="utf-8")
-    # Anchored to the whole line and compared exactly, not searched for as a
-    # substring: `apt-get install -y xvfb  # ripgrep comes from elsewhere`
-    # satisfied a substring match, and a floor assertion would have hidden a
-    # package being dropped (CLAUDE.md, Test rules -- exact counts, no floors).
+    # Anchored to the whole line and compared exactly, not as a substring:
+    # `apt-get install -y xvfb  # ripgrep comes from elsewhere` satisfied a
+    # substring match, and a floor would hide a package being dropped.
     install_lines = [
         line.strip() for line in workflow.splitlines()
         if re.match(r"^\s*sudo apt-get install\b", line)
