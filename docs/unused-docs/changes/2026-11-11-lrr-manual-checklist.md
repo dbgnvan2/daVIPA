@@ -181,8 +181,16 @@ it did.
   supersede the paragraph in `row_fill`'s docstring explaining why it does.
   **Built and closed 2026-11-11** (SCV, 7 of 7 criteria `done`): `LRR-A1` is
   gone from `BACKLOG.md`, `row_fill` returns the normalised value or no fill,
-  and that docstring paragraph is replaced. Item 9 below is superseded — a
-  malformed segment colour now draws no fill rather than reaching Tk.
+  and that docstring paragraph is replaced. **Item 9 below still stands**, and
+  an earlier draft of this bullet wrongly called it superseded: `row_fill`
+  still calls `_warn_unreadable_segment_color`, and its message still contains
+  the string item 9 says to grep for. Only the consequence the item describes
+  has changed — the row now draws no fill and no accent stripe instead of
+  taking the screen down, and the message now says so and where to fix it. The
+  check matters more than before, not less: there is still no repair pass for
+  `segment_descriptions`, so that log line is the only signal a user gets that
+  one of their own segment colours is malformed. Corrected 2026-11-11 after a
+  cold read by the session that filed item 9.
 - A 3-digit segment colour (`#ABC`) derives its text from the CSS expansion
   (`#AABBCC`) while Tk draws the X11 one (`#A0B0C0`). Same black/white answer
   either way, so the consequence is a wrong contrast figure rather than a
