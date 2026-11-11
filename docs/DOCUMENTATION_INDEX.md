@@ -24,11 +24,18 @@ Agent handoff notes and implementation summaries:
 - Risks / known gaps
 - Follow-up guidance for subsequent agents
 
-Notes are not listed here individually (PLC-A5 covers that gap), with one
-exception worth finding without reading the directory:
-[`2026-11-08-one-batch-at-a-time.md`](changes/2026-11-08-one-batch-at-a-time.md)
-records the end of concurrent batches, the state `main` was left in, and the
-two unmerged branches.
+Notes are not listed here individually (PLC-A5 covers that gap), with two
+exceptions worth finding without reading the directory:
+
+- [`2026-11-08-one-batch-at-a-time.md`](changes/2026-11-08-one-batch-at-a-time.md)
+  records the end of concurrent batches, the state `main` was left in, and the
+  two unmerged branches.
+- [`2026-11-11-manual-walk-four-batches.md`](changes/2026-11-11-manual-walk-four-batches.md)
+  is one pass through the app covering what four batches left unverified on
+  screen — LRR, SCV, CE/AWA and PF — in walk order rather than batch order. It
+  is the only note that belongs to no single batch: sections A and B
+  consolidate the two per-batch checklists, which stay the reference for a
+  failure, and sections C, D and E are the two batches that had none.
 
 ### README.md (27KB)
 
