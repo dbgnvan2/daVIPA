@@ -1022,12 +1022,13 @@ def test_plcm49_controls_follow_a_level_fill():
         # text_color already clears 4.5:1 against the same fill.
         assert contrast_ratio(kwargs["border_color"], colour) >= 3.0
 
-    # Every other kind of fill leaves the theme's controls alone, so a
-    # segment-coloured or completed row looks exactly as it did before.
-    assert row_control_kwargs(RowFill("#123456", None, SOURCE_SEGMENT)) == {}
+    # A fill that brings no text colour leaves the theme's controls alone, so a
+    # completed row looks exactly as it did before.
     assert row_control_kwargs(RowFill(PALETTE["success_tint"], None,
                                       SOURCE_COMPLETED)) == {}
     assert row_control_kwargs(RowFill(None, None, SOURCE_NONE)) == {}
+    # And so does a segment colour nobody could read a contrast from.
+    assert row_control_kwargs(RowFill("navy", None, SOURCE_SEGMENT)) == {}
 
 
 def test_plc_cold_the_three_screens_with_row_controls_pass_the_kwargs():
@@ -1376,3 +1377,180 @@ def test_lrrm12_an_off_scale_critical_is_still_critical():
         assert is_critical(stringly), f"{name}: importance '20' is not critical"
         assert is_critical(ordinary), f"{name}: an ordinary critical item is not critical"
         assert not is_critical(not_critical), f"{name}: a medium item is critical"
+
+
+# =========================================================================
+# LRR cold pass — findings from the 2026-11-10 learning-qa review
+# =========================================================================
+
+def _literal_twenty_comparisons(path):
+    """Every comparison against ``20`` or ``"20"`` in one module, by AST.
+
+    The companion to ``_factor_literal_comparisons``, and the reason that one
+    is not enough on its own. That walk requires an ``ast.Attribute`` named
+    ``importance`` or ``urgency`` on one side, so it is blind to the form the
+    factor chips use: the factor is bound into a tuple, read back as the local
+    ``value``, and compared as ``str(value).strip() == "20"``. A ``Name`` on
+    one side and a *string* literal on the other misses both of that walk's
+    conditions, which is how four copies of the critical rule survived a guard
+    named for banning them (found by a cold pass, 2026-11-10).
+
+    So this one asks the blunter question -- is the number 20 compared against
+    anything at all in this module -- which needs no guess about how the
+    factor reached the comparison. It is only usable because the answer across
+    all of ``screens/`` is zero: the scale lives in ``PriorityFactors``, and
+    nothing in a screen has a legitimate reason to compare anything to 20.
+    """
+    hits = []
+    for node in ast.walk(ast.parse(path.read_text())):
+        if not isinstance(node, ast.Compare):
+            continue
+        for side in [node.left, *node.comparators]:
+            elements = (
+                side.elts if isinstance(side, (ast.Tuple, ast.List, ast.Set))
+                else [side]
+            )
+            for element in elements:
+                if (
+                    isinstance(element, ast.Constant)
+                    and not isinstance(element.value, bool)
+                    and element.value in (20, "20")
+                ):
+                    hits.append((node.lineno, ast.unparse(node)))
+    return hits
+
+
+def test_lrr_cold_no_screen_compares_anything_to_twenty():
+    """LRR-M1.1, second half — the literal 20 in any form, anywhere in screens/.
+
+    ``test_lrrm11_no_screen_tests_importance_against_a_literal`` is named for
+    a ban it could not enforce: it looks for ``item.importance == <int>``, and
+    the four factor chips wrote ``str(value).strip() == "20"`` over a
+    tuple-bound factor instead. Both halves of that shape are invisible to it.
+
+    A guard narrower than its own name is the failure this repo has been
+    bitten by most (``tests/source_asserts.py``'s own docstring opens on one),
+    so the name is now backed by two checks that fail for different reasons.
+    Exact count of zero over every module, never a floor.
+    """
+    screens = sorted((_SRC / "screens").glob("*.py"))
+    assert len(screens) > 40, f"only {len(screens)} screen modules found"
+
+    hits = {
+        path.name: found
+        for path in screens
+        if (found := _literal_twenty_comparisons(path))
+    }
+    assert hits == {}, "20 is compared against a literal in " + ", ".join(
+        f"{name}:{lineno} ({source})"
+        for name, found in hits.items()
+        for lineno, source in found
+    )
+
+
+def _factor_chip_condition(builder):
+    """The row builder's own test for "paint this factor chip red", compiled.
+
+    Found by its effect rather than by its text: the one ``if`` in the builder
+    whose body writes ``label_kwargs["fg_color"]``. Returns a callable taking
+    the loop's own two names, so the screen's real condition runs against
+    adversarial factors -- the same approach as ``_chip_condition``, and for
+    the same reason: the condition sits inside a ``for`` over a list of
+    four-tuples in a builder that cannot be called without a Tk root.
+    """
+    tree = ast.parse(textwrap.dedent(inspect.getsource(builder)))
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.If):
+            continue
+        # Only the branch that writes it *directly*. ``ast.walk`` descends, so
+        # matching anywhere in the subtree also matched the enclosing
+        # ``if self.columns_expanded:`` that draws the factor row at all.
+        for statement in node.body:
+            if (
+                isinstance(statement, ast.Assign)
+                and isinstance(target := statement.targets[0], ast.Subscript)
+                and isinstance(target.value, ast.Name)
+                and target.value.id == "label_kwargs"
+                and isinstance(target.slice, ast.Constant)
+                and target.slice.value == "fg_color"
+            ):
+                found.append(node.test)
+                break
+    assert len(found) == 1, f"found {len(found)} fg_color branches, not 1"
+    expression = ast.fix_missing_locations(ast.Expression(body=found[0]))
+    code = compile(expression, "<factor-chip-condition>", "eval")
+    module_globals = vars(inspect.getmodule(builder))
+    return lambda label, value: eval(  # noqa: S307
+        code, module_globals, {"label": label, "value": value}
+    )
+
+
+#: The four builders that draw the expandable I/U/E/V factor chips. Hierarchical
+#: draws no factor row, which is why there are four and not five; the count is
+#: asserted below so a fifth cannot be added without this list being revisited.
+FACTOR_CHIP_BUILDERS = tuple(
+    (name, builder) for name, builder in ROW_BUILDERS
+    if name != "hierarchical.create_item_row"
+)
+
+
+def test_lrr_cold_the_factor_chips_ask_the_authority_too():
+    """LRR-M1.2, second half — the I and U chips, which the first fix missed.
+
+    ``str(value).strip() == "20"``, in ``today.py``, ``upcoming.py``,
+    ``all_items.py`` and ``completed.py``: the same "is this factor critical"
+    question the ``P:`` badge asks, two screenfuls below it, answered by a
+    literal. It disagreed with the badge for exactly the inputs the badge was
+    just taught to accept — an importance of 25 gave a red badge and a plain
+    ``I:25`` chip on the same row — and it compared urgency against the
+    importance threshold, which ``_at_least``'s docstring calls a fact about
+    this build rather than a rule.
+
+    ``E`` and ``V`` are asserted too: they are Size and Value, which are not
+    factors a priority *level* is a rule on, so a critical-looking value there
+    must not paint a chip. Without them this passes on a condition that
+    ignores the label.
+    """
+    assert len(FACTOR_CHIP_BUILDERS) == 4, FACTOR_CHIP_BUILDERS
+
+    for name, builder in FACTOR_CHIP_BUILDERS:
+        paints_red = _factor_chip_condition(builder)
+        for label in ("I", "U"):
+            assert paints_red(label, CRITICAL), f"{name}: {label}:{CRITICAL}"
+            assert paints_red(label, CRITICAL + 5), f"{name}: {label}:{CRITICAL + 5}"
+            assert paints_red(label, "20"), f"{name}: {label} as the string '20'"
+            assert not paints_red(label, HIGH), f"{name}: {label}:{HIGH} is not critical"
+            assert not paints_red(label, None), f"{name}: {label} unset"
+            assert not paints_red(label, ""), f"{name}: {label} blank"
+        for label in ("E", "V"):
+            assert not paints_red(label, CRITICAL), f"{name}: {label} is not a level factor"
+
+
+def test_lrr_cold_a_segment_fill_carries_its_controls_too():
+    """The checkbox and grip follow a segment fill, as they do a level fill.
+
+    ``row_control_kwargs`` gated on ``source != SOURCE_LEVEL``, which was a
+    proxy for "this fill brings a derived text colour" and correct only while
+    the level fill was the one source that did. LRR-M2.1 made that false: on
+    Today, Upcoming and All Items — the three screens that both fill a row
+    from its segment and build row controls — the row text moved to the
+    derived colour and the ``CTkCheckBox`` kept CustomTkinter's theme border,
+    which is the light-on-light pairing PLC-M4.9 exists to prevent.
+
+    Today's drag grip had already moved on its own, reading
+    ``fill.text_color or palette["border"]`` directly, so the row was
+    inconsistent with itself as well as with the theme.
+    """
+    settings = AppSettings()
+    item = _item(MEDIUM, MEDIUM)
+    for colour in ("#DCFCE7", "#334155", "#F8FAFC", "#0F172A"):
+        fill = row_fill(
+            settings, PALETTE, item=item, use_completed_tint=False,
+            segment_color=colour,
+        )
+        kwargs = row_control_kwargs(fill)
+        assert set(kwargs) == {"border_color", "fg_color", "checkmark_color"}, colour
+        assert kwargs["border_color"] == fill.text_color
+        assert kwargs["checkmark_color"] == fill.fill
+        assert contrast_ratio(kwargs["border_color"], colour) >= 3.0, colour
