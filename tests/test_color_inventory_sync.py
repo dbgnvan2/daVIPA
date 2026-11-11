@@ -19,7 +19,7 @@ Tests: this file.
 from __future__ import annotations
 
 import random
-import subprocess
+import re
 import sys
 from pathlib import Path
 
@@ -73,6 +73,15 @@ SCAN_FIXTURE = {
         "src/settings.py:12:  self.drag_schedule_date_text_color = value",
     ],
 }
+
+
+def test_civm11_the_fixture_covers_every_scan_the_generator_runs():
+    """A key missing here would exercise a report the generator never builds."""
+    assert set(SCAN_FIXTURE) == set(color_audit.SCAN_COMMANDS), (
+        "SCAN_FIXTURE and SCAN_COMMANDS disagree: "
+        f"only in fixture {sorted(set(SCAN_FIXTURE) - set(color_audit.SCAN_COMMANDS))}, "
+        f"only in generator {sorted(set(color_audit.SCAN_COMMANDS) - set(SCAN_FIXTURE))}"
+    )
 
 
 def _shuffled(scans: dict[str, list[str]], seed: int) -> dict[str, list[str]]:
@@ -150,11 +159,7 @@ def test_civm2_the_committed_inventory_matches_a_fresh_generation():
     committed = color_audit.DEFAULT_OUTPUT
     assert committed.exists(), f"{committed} is missing"
 
-    scans = {
-        name: color_audit.run_rg(cmd)
-        for name, cmd in color_audit.SCAN_COMMANDS.items()
-    }
-    fresh = color_audit.build_report(scans)
+    fresh = color_audit.build_report(color_audit.scan_all())
     on_disk = committed.read_text(encoding="utf-8")
 
     if fresh != on_disk:
@@ -169,8 +174,63 @@ def test_civm2_the_committed_inventory_matches_a_fresh_generation():
             f"disk, {len(fresh_lines)} regenerated; first difference at line "
             f"{first + 1}). Run:\n"
             "    ./venv/bin/python tools/color_audit.py\n"
-            "and commit the result. It is generated -- do not edit it by hand."
+            "and commit the result. It is generated -- do not edit it by hand.\n"
+            "Note the scan reads the WORKING TREE, not HEAD: uncommitted or "
+            "untracked files of your own, or another session's, are included, "
+            "so regenerate only once the tree holds what you mean to commit."
         )
+
+
+def test_civm5_the_scans_feeding_one_count_do_not_overlap():
+    """Two scans over the same bytes counted every theme colour twice.
+
+    The "." scans reach themes/ as well, so `theme_files` re-counted what
+    `hex` and `named` had already counted: the table read `#000000` 79, which
+    was 57 plus the same 22 again, while the occurrence table below it -- which
+    dedups by full identity -- listed 57. The frequency tables are what a
+    reader ranks by.
+    """
+    def keys(scan_name):
+        out = set()
+        for line in color_audit.run_rg(color_audit.SCAN_COMMANDS[scan_name]):
+            entry = color_audit.parse_line(line)
+            if entry:
+                out.add((entry.path, entry.line))
+        return out
+
+    theme_files = keys("theme_files")
+    for counted_with in ("hex", "named"):
+        overlap = keys(counted_with) & theme_files
+        assert overlap == set(), (
+            f"the {counted_with!r} and 'theme_files' scans both feed one "
+            f"frequency table and cover {len(overlap)} of the same file-lines, "
+            f"so every match there is counted twice. Example: {sorted(overlap)[:3]}"
+        )
+
+
+# --------------------------------------------------------------------------
+# CIV-M6 — a scan that has gone blind is not silently accepted
+# --------------------------------------------------------------------------
+
+def test_civm6_an_empty_scan_is_refused(monkeypatch):
+    """rg exits 1 for "no matches" and for "everything was ignored" alike."""
+    monkeypatch.setattr(color_audit, "run_rg", lambda cmd: [])
+    with pytest.raises(RuntimeError) as excinfo:
+        color_audit.scan_all()
+    message = str(excinfo.value)
+    assert "returned no lines" in message, message
+    assert any(name in message for name in color_audit.SCAN_COMMANDS), (
+        f"the error does not say which scan came back empty: {message!r}"
+    )
+
+
+def test_civm6_scan_all_passes_a_populated_result_through(monkeypatch):
+    """Adversarial: a scan_all that always raised would make the gate dead."""
+    one_line = ['x.py:1:fg_color="#abcdef"']
+    monkeypatch.setattr(color_audit, "run_rg", lambda cmd: list(one_line))
+    result = color_audit.scan_all()
+    assert set(result) == set(color_audit.SCAN_COMMANDS), result
+    assert all(value == one_line for value in result.values()), result
 
 
 # --------------------------------------------------------------------------
@@ -190,23 +250,27 @@ def test_civm3_the_generator_names_the_scanner_when_it_is_missing():
 def test_civm3_the_workflow_installs_the_scanner_the_generator_needs():
     """CI runs the suite, so CI needs rg or the gate above errors there."""
     workflow = (REPO_ROOT / ".github/workflows/tests.yml").read_text(encoding="utf-8")
-    apt_lines = [
-        line for line in workflow.splitlines()
-        if "apt-get install" in line and not line.strip().startswith("#")
+    # Anchored to the whole line and compared exactly, not searched for as a
+    # substring: `apt-get install -y xvfb  # ripgrep comes from elsewhere`
+    # satisfied a substring match, and a floor assertion would have hidden a
+    # package being dropped (CLAUDE.md, Test rules -- exact counts, no floors).
+    install_lines = [
+        line.strip() for line in workflow.splitlines()
+        if re.match(r"^\s*sudo apt-get install\b", line)
     ]
-    assert apt_lines, "tests.yml no longer installs system packages"
-    assert any("ripgrep" in line for line in apt_lines), (
-        "tests.yml does not install ripgrep, which tools/color_audit.py shells "
-        f"out to. apt-get lines found: {apt_lines}"
+    assert install_lines == ["sudo apt-get install -y xvfb python3-tk ripgrep"], (
+        "tests.yml's system-package line is not what the suite needs. ripgrep "
+        "is there because tools/color_audit.py shells out to it and the gate "
+        f"below regenerates the inventory. Found: {install_lines}"
     )
 
 
 def test_civm3_ripgrep_is_on_path_here_too():
     """The staleness gate is only meaningful where rg exists."""
-    result = subprocess.run(
-        ["rg", "--version"], capture_output=True, text=True, check=False,
-    )
-    assert result.returncode == 0, (
-        "ripgrep is not on PATH, so the inventory gate cannot run. "
-        "Install it (brew install ripgrep)."
+    try:
+        version_lines = color_audit.run_rg(["rg", "--version"])
+    except RuntimeError as exc:
+        pytest.fail(f"the colour-inventory gate cannot run here: {exc}")
+    assert any("ripgrep" in line for line in version_lines), (
+        f"`rg` on PATH does not identify as ripgrep: {version_lines[:1]}"
     )
