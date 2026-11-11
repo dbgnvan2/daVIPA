@@ -170,20 +170,6 @@ Found while building CE-M1 to CE-M5. Flagged, not fixed (global rule 10): each
 is real, none is what was asked for, and each sits in code the export only
 reads past.
 
-### CE-A1 — `update_event` silently drops `location` and `attendees` (medium)
-
-`src/getmoredone/google_calendar.py::update_event` sends the body it fetched
-with `summary`, `start`, `end` and `description` replaced. `location` and
-`attendees` survive only because the fetched body carries them; nothing in the
-signature lets a caller change them, and a caller that means to clear one has
-no way to say so. The day export never sets either, so this batch cannot
-trigger it — but the Item Editor's calendar dialog sets both on create, and
-the first code that edits such an event through `update_event` will find it
-can only ever preserve what is already there.
-
-**Priority:** Medium
-**Effort:** Small
-
 ### CE-A2 — `_say` prints to stdout from a GUI app (low)
 
 `src/getmoredone/google_calendar.py::_say` writes status lines to stdout.
@@ -486,23 +472,6 @@ it made the meta test suite red and blocked verification.
 
 ### 2026-11-07 - Type: Bug
 
-**Title:** AWA-A1 - APE Week Assignment's Add Action Item writes the wrong link column
-**Description:** `screens/weekly_items.py:442` sets `parent_id` and leaves
-`weekly_tactic_id` NULL, against `weekly_tactic_migrations.py:135`, which
-exists to keep the two apart, and against `tactic_id_of`
-(`weekly_tactic.py:144`), the predicate WT-M3.D.1 names as the single
-authority. That one button is why the demo database's only tactic child is
-linked by `parent_id`. The new APE Week Actions tab's own Add button writes
-`weekly_tactic_id`, so the two buttons on two tabs now disagree in a way a user
-can see. Nothing is lost today, because
-`get_action_items_for_weekly_tactic` reads both columns. The spec recommends
-setting both columns on create — one line plus a test. It was left out because
-it is beyond what was asked and is the user's call.
-**Priority:** Medium
-**Effort:** Small
-
-### 2026-11-07 - Type: Bug
-
 **Title:** AWA-A4 - the APE Week Actions panel inherits Today's pin, and the pin is shared
 **Description:** `create_item_row` binds the drag grip to `_start_pin_drag` /
 `_finish_pin_drag` (`today.py:541-542`), which write
@@ -514,29 +483,6 @@ grip on this panel, or giving the panel its own rank column — is a behaviour
 change beyond what the tab was asked to do, so neither was made.
 **Priority:** Medium
 **Effort:** Small
-
-### 2026-11-07 - Type: Refactor
-
-**Title:** AWA-A3 - three readers disagree about what a Weekly Tactic's child is
-**Description:** `weekly_tactic_maintenance._child_count` (line 278) already
-reads both link columns while `tactic_of` reads one. AWA-M2 adds a third
-reader, matching `_child_count`. Consolidating all three onto one helper is the
-right end state and is larger than the AWA feature was.
-
-**Mostly resolved 2026-11-07** (`8a324cb`), after the AWA sweep raised the same
-duplication as a high finding: the two *SQL* readers now share
-`weekly_tactic.LINK_PREDICATE_SQL`, and they had already drifted - `_child_count`
-lacked the `item_type != 'week'` exclusion, so the dedupe chose which duplicate
-tactic survived by counting a nested tactic as a child. What this entry recorded
-as a Low refactor was, by then, deciding which rows a delete kept. The guard test
-could not see it: it scanned `screens/` and `vps_manager.py` only.
-
-What remains is the object-level reader: `tactic_of` answers "is this item
-week-filed" from `weekly_tactic_id` alone, which WT-INV6 depends on, and so still
-returns None for a `parent_id`-only child. That is AWA-A1's subject, not this
-one. Closing this entry means fixing AWA-A1.
-**Priority:** Low
-**Effort:** Low (what is left)
 
 ### 2026-11-07 - Type: Cleanup
 

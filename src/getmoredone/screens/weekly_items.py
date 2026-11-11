@@ -594,6 +594,17 @@ class WeeklyItemsScreen(ctk.CTkFrame):
             title=title,
             description=f"Related to weekly item: {weekly.get('title') or ''}",
             parent_id=weekly["id"],
+            # AWA-A1 — both columns name the tactic. `parent_id` alone left
+            # `weekly_tactic.tactic_of` — the one predicate WT-M3.D.1 names as
+            # the authority on "is this item week-filed" — answering no for
+            # every row this button made, while the APE Week Actions tab's own
+            # Add wrote `weekly_tactic_id`: two buttons, two row shapes, one
+            # relationship. `parent_of` still answers the tactic either way
+            # (WTP-D3: `parent_id` wins when both are set), so the tree is
+            # unchanged. Closes AWA-A3's remainder.
+            # Spec:  docs/spec_2026-11-07_ape_week_actions.md#awa-m5
+            # Tests: tests/test_weekly_items_tactic_link.py::test_awaa1_the_add_button_sets_both_link_columns
+            weekly_tactic_id=weekly["id"],
             start_date=weekly.get("start_date"),
             due_date=weekly.get("start_date"),
             category=weekly.get("category"),

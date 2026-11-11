@@ -674,6 +674,8 @@ class GoogleCalendarManager:
         start_datetime: Optional[datetime] = None,
         duration_minutes: Optional[int] = None,
         description: Optional[str] = None,
+        location: Optional[str] = None,
+        attendees: Optional[list] = None,
         calendar_id: str = DEFAULT_CALENDAR_ID,
     ) -> Dict[str, Any]:
         """Update an existing calendar event.
@@ -685,6 +687,15 @@ class GoogleCalendarManager:
         event it could not recognise as its own.
         Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m33
         Tests: tests/test_google_calendar_export_calls.py::test_cem332_update_preserves_the_marker
+
+        CE-A1 -- ``location`` and ``attendees`` are writable here, as they
+        already are on ``create_event``. Without them the only reachable
+        outcome was whatever the fetched body held, so a meeting made with a
+        room and a guest list could never have either changed. ``None`` leaves
+        the field as it came; an empty value clears it, the same rule
+        ``description`` follows, because a caller that means to drop the room
+        has to be able to say so.
+        Tests: tests/test_google_calendar_export_calls.py::test_cea1_update_can_change_the_location_and_the_attendees
 
         Raises:
             CalendarEventMissing: if the event is gone (404/410), so the
@@ -705,6 +716,10 @@ class GoogleCalendarManager:
             event['summary'] = summary
         if description is not None:
             event['description'] = description
+        if location is not None:
+            event['location'] = location
+        if attendees is not None:
+            event['attendees'] = [{'email': email} for email in attendees]
         if start_datetime and duration_minutes:
             end_datetime = start_datetime + timedelta(minutes=duration_minutes)
             local_tz = self._get_local_timezone()
