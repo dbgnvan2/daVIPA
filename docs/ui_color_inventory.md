@@ -8,28 +8,28 @@ Rendered from `SCAN_COMMANDS` in `tools/color_audit.py`, so what is printed here
 
 ```bash
 # widget
-rg --sort path --no-config -n 'fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=' . -g '!docs/ui_color_inventory.md'
+rg --sort path --no-config -n -H 'fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=' . -g '!docs/ui_color_inventory.md' -g '!tests/test_color_inventory_sync.py'
 # hex
-rg --sort path --no-config -n '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b' . -g '!docs/ui_color_inventory.md' -g '!themes/**'
+rg --sort path --no-config -n -H '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b' . -g '!docs/ui_color_inventory.md' -g '!themes/**' -g '!tests/test_color_inventory_sync.py'
 # named
-rg --sort path --no-config -n -i '"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)'"'"'' . -g '!docs/ui_color_inventory.md' -g '!themes/**'
+rg --sort path --no-config -n -H -i '"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)'"'"'' . -g '!docs/ui_color_inventory.md' -g '!themes/**' -g '!tests/test_color_inventory_sync.py'
 # theme_api
-rg --sort path --no-config -n 'set_default_color_theme\(|set_appearance_mode\(' . -g '!docs/ui_color_inventory.md'
+rg --sort path --no-config -n -H 'set_default_color_theme\(|set_appearance_mode\(' . -g '!docs/ui_color_inventory.md' -g '!tests/test_color_inventory_sync.py'
 # tuples
-rg --sort path --no-config -n '(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\s*=\s*(\(|\[)' . -g '!docs/ui_color_inventory.md'
+rg --sort path --no-config -n -H '(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\s*=\s*(\(|\[)' . -g '!docs/ui_color_inventory.md' -g '!tests/test_color_inventory_sync.py'
 # app_settings
-rg --sort path --no-config -n 'color|theme|appearance_mode|theme_name|drag_schedule_date_text_color|color_hex' src/getmoredone/app_settings.py
+rg --sort path --no-config -n -H 'color|theme|appearance_mode|theme_name|drag_schedule_date_text_color|color_hex' src/getmoredone/app_settings.py
 # theme_files
-rg --sort path --no-config -n '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)'"'"'' themes -g '*.json'
+rg --sort path --no-config -n -H '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)'"'"'' themes -g '*.json'
 ```
 
 ## 1) Summary Counts By Type
 
-- Hex colors (match count): **1509**
-- Named colors (match count): **118**
-- Tuple colors / appearance tuples (match count): **5**
-- CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **25**
-- Widget explicit overrides (line count): **569**
+- Hex colors (match count): **1498**
+- Named colors (match count): **115**
+- Tuple colors / appearance tuples (match count): **2**
+- CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **23**
+- Widget explicit overrides (line count): **555**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -39,56 +39,56 @@ and theme_files line counts.
 | Scan | Lines |
 |---|---:|
 | `app_settings` | 26 |
-| `hex` | 521 |
-| `named` | 73 |
-| `theme_api` | 25 |
+| `hex` | 511 |
+| `named` | 71 |
+| `theme_api` | 23 |
 | `theme_files` | 765 |
-| `tuples` | 5 |
-| `widget` | 569 |
+| `tuples` | 2 |
+| `widget` | 555 |
 
 Widget override property breakdown:
 
 | Property | Count |
 |---|---:|
-| `border_color` | 17 |
+| `border_color` | 15 |
 | `button_color` | 3 |
 | `corner_radius` | 62 |
-| `fg_color` | 271 |
+| `fg_color` | 265 |
 | `highlight_color` | 1 |
-| `hover_color` | 16 |
+| `hover_color` | 14 |
 | `progress_color` | 1 |
 | `selected_color` | 1 |
-| `text_color` | 237 |
+| `text_color` | 233 |
 
 AppSettings persisted color/theme fields:
 
 ```text
-126:    # Drag Schedule date box text color (hex)
-127:    drag_schedule_date_text_color: str = "#FFFFFF"
-310:                settings.appearance_mode = cls._normalize_appearance_mode(
-311:                    settings.appearance_mode)
-312:                settings.theme_name = cls._normalize_theme_name(
-313:                    settings.theme_name)
-445:        self.appearance_mode = self._normalize_appearance_mode(
-446:            self.appearance_mode)
-447:        self.theme_name = self._normalize_theme_name(self.theme_name)
-55:    appearance_mode: str = "dark"  # system | dark | light
-56:    theme_name: str = "apple_grey"
-626:        _normalize_theme_name defers its import for the same reason.
-696:    def _normalize_appearance_mode(value: Optional[str]) -> str:
-69:    # tests/test_priority_level_colors.py::test_plcm21_every_level_has_a_settings_field
-702:    def _normalize_theme_name(value: Optional[str]) -> str:
-703:        """Coerce a persisted theme name, using theme.py's list and no other.
-705:        This held a SECOND hardcoded copy of the theme names. Adding a theme to
-708:        load, because the new name was not in the copy. Picking a new theme
-711:        Imported inside the function: theme.py pulls in customtkinter, and
-715:        from .theme import normalize_theme_name
-717:        return normalize_theme_name(value)
-73:    # "" means no fill — the row keeps the theme's own background, which is
-78:    # The defaults are duplicated from theme.priority_level_fill_colors(),
-82:    priority_level_color_any_critical: str = "#DCFCE7"
-83:    priority_level_color_any_high: str = "#FEF3C7"
-84:    priority_level_color_no_high_or_critical: str = ""
+src/getmoredone/app_settings.py:55:    appearance_mode: str = "dark"  # system | dark | light
+src/getmoredone/app_settings.py:56:    theme_name: str = "apple_grey"
+src/getmoredone/app_settings.py:69:    # tests/test_priority_level_colors.py::test_plcm21_every_level_has_a_settings_field
+src/getmoredone/app_settings.py:73:    # "" means no fill — the row keeps the theme's own background, which is
+src/getmoredone/app_settings.py:78:    # The defaults are duplicated from theme.priority_level_fill_colors(),
+src/getmoredone/app_settings.py:82:    priority_level_color_any_critical: str = "#DCFCE7"
+src/getmoredone/app_settings.py:83:    priority_level_color_any_high: str = "#FEF3C7"
+src/getmoredone/app_settings.py:84:    priority_level_color_no_high_or_critical: str = ""
+src/getmoredone/app_settings.py:126:    # Drag Schedule date box text color (hex)
+src/getmoredone/app_settings.py:127:    drag_schedule_date_text_color: str = "#FFFFFF"
+src/getmoredone/app_settings.py:310:                settings.appearance_mode = cls._normalize_appearance_mode(
+src/getmoredone/app_settings.py:311:                    settings.appearance_mode)
+src/getmoredone/app_settings.py:312:                settings.theme_name = cls._normalize_theme_name(
+src/getmoredone/app_settings.py:313:                    settings.theme_name)
+src/getmoredone/app_settings.py:445:        self.appearance_mode = self._normalize_appearance_mode(
+src/getmoredone/app_settings.py:446:            self.appearance_mode)
+src/getmoredone/app_settings.py:447:        self.theme_name = self._normalize_theme_name(self.theme_name)
+src/getmoredone/app_settings.py:626:        _normalize_theme_name defers its import for the same reason.
+src/getmoredone/app_settings.py:696:    def _normalize_appearance_mode(value: Optional[str]) -> str:
+src/getmoredone/app_settings.py:702:    def _normalize_theme_name(value: Optional[str]) -> str:
+src/getmoredone/app_settings.py:703:        """Coerce a persisted theme name, using theme.py's list and no other.
+src/getmoredone/app_settings.py:705:        This held a SECOND hardcoded copy of the theme names. Adding a theme to
+src/getmoredone/app_settings.py:708:        load, because the new name was not in the copy. Picking a new theme
+src/getmoredone/app_settings.py:711:        Imported inside the function: theme.py pulls in customtkinter, and
+src/getmoredone/app_settings.py:715:        from .theme import normalize_theme_name
+src/getmoredone/app_settings.py:717:        return normalize_theme_name(value)
 ```
 
 Hex top values:
@@ -97,11 +97,11 @@ Hex top values:
 |---|---:|
 | `#ffffff` | 84 |
 | `#dce4ee` | 63 |
-| `#000000` | 59 |
+| `#000000` | 58 |
 | `#979da2` | 52 |
 | `#abc` | 45 |
 | `#565b5e` | 34 |
-| `#aabbcc` | 32 |
+| `#aabbcc` | 28 |
 | `#3e454a` | 27 |
 | `#4a4d50` | 27 |
 | `#939ba2` | 27 |
@@ -123,14 +123,13 @@ Named top values:
 | `gray` | 34 |
 | `white` | 24 |
 | `green` | 18 |
-| `red` | 15 |
-| `blue` | 7 |
+| `red` | 14 |
 | `black` | 6 |
+| `blue` | 6 |
 | `orange` | 6 |
 | `grey` | 3 |
 | `yellow` | 3 |
 | `cyan` | 1 |
-| `teal` | 1 |
 
 ## 2) Complete Occurrence Table (Grouped by Color Value, then File)
 
@@ -157,7 +156,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `tests/test_color_contrast.py:13` | `assert pick_text_color("#FFFF00") == "#000000"  # bright yellow -> black` |
 | `tests/test_color_contrast.py:19` | `assert math.isclose(contrast_ratio("#000000", "#FFFFFF"), 21.0, rel_tol=0.0, abs_tol=0.01)` |
 | `tests/test_color_contrast.py:44` | `assert math.isclose(relative_luminance("#000000"), 0.0, rel_tol=0.0, abs_tol=1e-9)` |
-| `tests/test_color_inventory_sync.py:197` | `the table read `#000000` 79 against 57 rows in the occurrence table below` |
 | `tests/test_drag_schedule_support.py:30` | `assert interpolate_hex_color("#000000", "#FFFFFF", 0.5) == "#808080"` |
 | `tests/test_priority_level_colors.py:568` | `settings.priority_level_color_any_critical = "#000000"` |
 | `tests/test_priority_level_colors.py:569` | `stub = _StubSettingsScreen(settings, {LEVEL_ANY_CRITICAL: "#000000"})` |
@@ -1975,10 +1973,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:131` | `closes, and re-opening the editor on that segment shows `#AABBCC` in the` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:91` | `decided it — but only together with storing the normalised `#AABBCC`. Accepting` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:115` | `2. Type `#abc` and save: accepted, and the stored value reads back `#AABBCC`.` |
-| `tests/test_color_inventory_sync.py:39` | `#   * `#aabbcc` and `#ddeeff` tie at two hex occurrences each` |
-| `tests/test_color_inventory_sync.py:46` | `"src/b.py:10:    fg_color=\"#aabbcc\"",` |
-| `tests/test_color_inventory_sync.py:48` | `"src/c.py:5:     border_color=\"#aabbcc\"",` |
-| `tests/test_color_inventory_sync.py:66` | `"src/b.py:10:    fg_color=\"#aabbcc\"",` |
 | `tests/test_priority_level_colors.py:397` | `assert level_color(settings, LEVEL_ANY_HIGH) == "#AABBCC"` |
 | `tests/test_priority_level_colors.py:1229` | `assert short.text_color == pick_text_color("#AABBCC")` |
 | `tests/test_priority_level_colors.py:1606` | `("#ABC", "#AABBCC"), ("#abc", "#AABBCC")):` |
@@ -2061,8 +2055,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `tests/test_color_inventory_sync.py:62` | `'themes/t.json:2:      "#abcdef",',` |
-| `tests/test_color_inventory_sync.py:244` | `one_line = ['x.py:1:fg_color="#abcdef"']` |
 | `tests/test_drag_schedule_support.py:20` | `assert normalized_date_text_color("#ABCDEF") == "#ABCDEF"` |
 | `tests/test_priority_level_colors.py:1111` | `stub.priority_level_color_vars[LEVEL_ANY_CRITICAL].set("#abcdef")` |
 | `tests/test_priority_level_colors.py:1115` | `assert seen["color"] == "#ABCDEF"` |
@@ -2426,10 +2418,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `tests/test_color_inventory_sync.py:39` | `#   * `#aabbcc` and `#ddeeff` tie at two hex occurrences each` |
-| `tests/test_color_inventory_sync.py:47` | `"src/a.py:20:    fg_color=\"#ddeeff\"",` |
-| `tests/test_color_inventory_sync.py:49` | `"src/a.py:3:     text_color=\"#ddeeff\"",` |
-| `tests/test_color_inventory_sync.py:67` | `"src/a.py:20:    hover_color=\"#ddeeff\"",` |
 | `tests/test_segment_colour_validation.py:389` | `assert stored("vision_subsegments", sub["id"]) == "#DDEEFF"` |
 
 ### `#de1b24`
@@ -3116,7 +3104,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/timer_window.py:892` | `status_color = "green" if self.timer_state == self.RUNNING else "blue"` |
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:248` | `"blue": palette["primary"],` |
-| `tests/test_color_inventory_sync.py:40` | `#   * "red" and "blue" tie at two named occurrences each` |
 | `tests/test_date_picker.py:332` | `"gray", "grey", "red", "green", "blue", "yellow", "orange", "pink",` |
 | `tests/test_theme_settings.py:72` | `assert status_text_color("blue")` |
 | `tools/generate_ctk_themes.py:48` | `"blue": ["#3B8ED0", "#1F6AA5"],` |
@@ -3219,18 +3206,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/vision_planning.py:315` | `fg_color="darkred", hover_color="red",` |
 | `src/getmoredone/screens/vision_planning.py:577` | `fg_color="darkred", hover_color="red",` |
 | `src/getmoredone/theme.py:243` | `"red": palette["danger"],` |
-| `tests/test_color_inventory_sync.py:40` | `#   * "red" and "blue" tie at two named occurrences each` |
 | `tests/test_date_picker.py:332` | `"gray", "grey", "red", "green", "blue", "yellow", "orange", "pink",` |
 | `tests/test_priority_level_colors.py:332` | `"red",` |
 | `tests/test_priority_level_colors.py:1216` | `for colour in ("navy", "red", "not-a-colour", "#GGHHII"):` |
 | `tests/test_priority_level_colors.py:1597` | `for colour in ("navy", "red", "not-a-colour", "#GGHHII", "#0X1234",` |
 | `tests/test_theme_settings.py:70` | `assert status_text_color("red")` |
-
-### `teal`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_color_inventory_sync.py:63` | `'themes/t.json:9:      "teal",',` |
 
 ### `white`
 
@@ -3273,8 +3253,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `AGENTS.md:95` | `- call set_default_color_theme(path_for_theme_name)` |
 | `src/getmoredone/theme.py:57` | `ctk.set_appearance_mode(mode)` |
 | `src/getmoredone/theme.py:65` | `ctk.set_default_color_theme(str(theme_path))` |
-| `tests/test_color_inventory_sync.py:70` | `"src/z.py:9:     set_appearance_mode(\"dark\")",` |
-| `tests/test_color_inventory_sync.py:71` | `"src/a.py:1:     set_default_color_theme(\"blue\")",` |
 | `tests/test_plan_screen.py:160` | `ctk.set_appearance_mode("light")` |
 | `tests/test_plan_screen.py:164` | `ctk.set_appearance_mode("system" if was_system else previous)` |
 | `tests/test_priority_level_colors.py:130` | `ctk.set_appearance_mode("system" if was_system else original)` |
@@ -3300,9 +3278,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
 | `src/getmoredone/screens/vps_segment_editor.py:35` | `self.selected_color = (` |
-| `tests/test_color_inventory_sync.py:74` | `"src/z.py:40:    fg_color=(\"white\", \"black\")",` |
-| `tests/test_color_inventory_sync.py:75` | `"src/a.py:2:     text_color=(\"black\", \"white\")",` |
-| `tests/test_color_inventory_sync.py:76` | `"src/m.py:7:     border_color=(\"gray\", \"grey\")",` |
 
 ## 3) Replace Plan
 
