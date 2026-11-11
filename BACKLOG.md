@@ -290,6 +290,32 @@ be the third design for these tests in one day.
 **Priority:** Medium
 **Effort:** Small
 
+### CIG-A4 — the real-database guard fires on the running app, not on a test (medium)
+
+`conftest.py`'s guard prints "the user's real database file changed during this
+run: ~/Library/Application Support/GetMoreDone/getmoredone.db", and for the
+content case adds "a test wrote it, or it was edited. If a test did it:
+something bypassed the isolation in conftest.py". Measured 2026-11-11: that
+is the packaged app, not a test.
+
+Method and figures. With `/Applications/daVIPA.app` running (`pgrep -fl
+daVIPA` gave pid 44389) and **no tests running at all**, the file's SHA-256
+prefix moved from `bf2c803e6ae3576d` to `891df02070888a39` across a 50-second
+idle. Each of the five files run that session — `test_segment_colour_validation`,
+`test_traceability_refs`, `test_repo_hygiene`, `test_docs_sync_rule`,
+`test_ci_contract` — left the hash unchanged when run on its own. The guard had
+fired twice on the combined run, once for timestamp only and once for content.
+
+So the warning names the wrong cause and names it accusingly, on a repo whose
+own rule is that a red build nobody reads is worse than no CI. The honest
+options are to narrow the guard to a change a test could have caused, or to
+check for the running app and say so in the warning text instead. Filed, not
+fixed: it is a change to the test harness at the end of a batch about segment
+colours, and the measurement is the part that was missing.
+
+**Priority:** Medium
+**Effort:** Low
+
 ## Adjacent issues — priority level colours (PLC, 2026-11-08)
 
 Found while building PLC-M1 to PLC-M5. Flagged, not fixed (global rule 10):
