@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import random
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -53,7 +54,14 @@ SCAN_FIXTURE = {
         "src/c.py:6:     hover_color=\"red\"",
         "src/a.py:4:     fg_color=\"blue\"",
     ],
-    "theme_files": [],
+    # Non-overlapping with `hex`/`named` on purpose: the scans are disjoint by
+    # construction now (CIV-M5 proves it against real rg), and a fixture that
+    # overlapped would be asserting the double-count bug rather than the fix.
+    # These exist so build_report's two-source counting path runs here at all.
+    "theme_files": [
+        'themes/t.json:2:      "#abcdef",',
+        'themes/t.json:9:      "teal",',
+    ],
     "widget": [
         "src/b.py:10:    fg_color=\"#aabbcc\"",
         "src/a.py:20:    hover_color=\"#ddeeff\"",
@@ -185,10 +193,11 @@ def test_civm5_the_scans_feeding_one_count_do_not_overlap():
     """Two scans over the same bytes counted every theme colour twice.
 
     The "." scans reach themes/ as well, so `theme_files` re-counted what
-    `hex` and `named` had already counted: the table read `#000000` 79, which
-    was 57 plus the same 22 again, while the occurrence table below it -- which
-    dedups by full identity -- listed 57. The frequency tables are what a
-    reader ranks by.
+    `hex` and `named` had already counted. Measured 2026-11-11 before the fix:
+    the table read `#000000` 79 against 57 rows in the occurrence table below
+    it, which dedups by full identity. The frequency tables are what a reader
+    ranks by. This asserts the disjointness, not those figures, which move
+    whenever any file in the repo gains a colour.
     """
     def keys(scan_name):
         out = set()
@@ -224,13 +233,123 @@ def test_civm6_an_empty_scan_is_refused(monkeypatch):
     )
 
 
-def test_civm6_scan_all_passes_a_populated_result_through(monkeypatch):
-    """Adversarial: a scan_all that always raised would make the gate dead."""
+def test_civm6_scan_all_runs_every_scan_with_its_own_command(monkeypatch):
+    """Adversarial, two ways.
+
+    A scan_all that always raised would make the gate dead; one that passed
+    the same command seven times, or the wrong command for a name, would keep
+    both this and the empty-scan test green while the report was built from
+    one scan repeated. So the commands are recorded and compared exactly.
+    """
     one_line = ['x.py:1:fg_color="#abcdef"']
-    monkeypatch.setattr(color_audit, "run_rg", lambda cmd: list(one_line))
+    calls = []
+
+    def record(cmd):
+        calls.append(list(cmd))
+        return list(one_line)
+
+    monkeypatch.setattr(color_audit, "run_rg", record)
     result = color_audit.scan_all()
+
+    assert calls == [list(cmd) for cmd in color_audit.SCAN_COMMANDS.values()], calls
     assert set(result) == set(color_audit.SCAN_COMMANDS), result
     assert all(value == one_line for value in result.values()), result
+
+
+def test_civm6_a_scan_declared_empty_is_allowed(monkeypatch):
+    """The escape hatch is a name in a set, not an edit to scan_all."""
+    monkeypatch.setattr(color_audit, "run_rg", lambda cmd: [])
+    monkeypatch.setattr(
+        color_audit, "SCANS_ALLOWED_EMPTY", set(color_audit.SCAN_COMMANDS)
+    )
+    result = color_audit.scan_all()
+    assert set(result) == set(color_audit.SCAN_COMMANDS), result
+    assert all(value == [] for value in result.values()), result
+
+
+# --------------------------------------------------------------------------
+# CIV-M7 — run_rg's failure handling, which the happy path never reaches
+# --------------------------------------------------------------------------
+
+class _FakeCompleted:
+    def __init__(self, stdout="", stderr="", returncode=0):
+        self.stdout = stdout
+        self.stderr = stderr
+        self.returncode = returncode
+
+
+def test_civm7_a_timeout_is_reported_as_a_timeout(monkeypatch):
+    def raise_timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(
+            cmd="rg", timeout=color_audit.RG_TIMEOUT_SECONDS
+        )
+
+    monkeypatch.setattr(color_audit.subprocess, "run", raise_timeout)
+    with pytest.raises(RuntimeError) as excinfo:
+        color_audit.run_rg(["rg", "-n", "x", "."])
+    assert "did not finish" in str(excinfo.value), str(excinfo.value)
+
+
+def test_civm7_stderr_on_a_successful_exit_is_not_discarded(monkeypatch):
+    """rg reports an unreadable file on stderr and still exits 0."""
+    monkeypatch.setattr(
+        color_audit.subprocess, "run",
+        lambda *a, **k: _FakeCompleted(
+            stdout="a.py:1:x\n", stderr="rg: b.py: Permission denied\n"
+        ),
+    )
+    with pytest.raises(RuntimeError) as excinfo:
+        color_audit.run_rg(["rg", "-n", "x", "."])
+    assert "may be partial" in str(excinfo.value), str(excinfo.value)
+    assert "Permission denied" in str(excinfo.value), str(excinfo.value)
+
+
+def test_civm7_the_binary_file_notice_does_not_abort_the_scan(monkeypatch):
+    """It is emitted on a *successful* search, so raising would red the suite.
+
+    Every caller shares run_rg, so one binary file that happens to match
+    would take down the gate, the overlap test and the rg preflight together,
+    with a message blaming a partial scan and no way to proceed.
+    """
+    notice = (
+        'WARNING: stopped searching binary file ./x.bin after match '
+        '(found "\\0" byte around offset 12)\n'
+    )
+    monkeypatch.setattr(
+        color_audit.subprocess, "run",
+        lambda *a, **k: _FakeCompleted(stdout="a.py:1:x\n", stderr=notice),
+    )
+    assert color_audit.run_rg(["rg", "-n", "x", "."]) == ["a.py:1:x"]
+
+
+def test_civm7_the_scan_is_decoded_as_utf8_and_bounded(monkeypatch):
+    """text=True alone decodes by locale: cp1252 on Windows, ASCII under C."""
+    seen = {}
+
+    def record(*args, **kwargs):
+        seen.update(kwargs)
+        return _FakeCompleted(stdout="a.py:1:x\n")
+
+    monkeypatch.setattr(color_audit.subprocess, "run", record)
+    color_audit.run_rg(["rg", "-n", "x", "."])
+    assert seen.get("encoding") == "utf-8", seen
+    assert seen.get("timeout") == color_audit.RG_TIMEOUT_SECONDS, seen
+
+
+def test_civm7_every_line_the_real_scan_returns_can_be_parsed():
+    """Covers -n and --no-config behaviourally, which no flag check can.
+
+    Drop -n, or let a developer's ~/.ripgreprc set --heading or
+    --no-line-number, and parse_line returns None for every line. The
+    occurrence table and both frequency tables survive that silently: the
+    report comes out structurally valid and almost entirely empty.
+    """
+    lines = color_audit.run_rg(color_audit.SCAN_COMMANDS["hex"])
+    unparsed = [line for line in lines if color_audit.parse_line(line) is None]
+    assert len(unparsed) == 0, (
+        f"{len(unparsed)} of {len(lines)} scan lines did not parse. "
+        f"First: {unparsed[:2]}"
+    )
 
 
 # --------------------------------------------------------------------------
