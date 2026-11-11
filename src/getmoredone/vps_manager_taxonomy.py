@@ -186,7 +186,15 @@ class VPSTaxonomyMixin:
             if color is None:
                 if color_map is None:
                     color_map = self.get_segment_color_map()
-                parent = self.match_segment_color(row.get("segment_name", ""), color_map)
+                # SCV-M7.3: normalised before the test, because
+                # ``match_segment_color`` answers with whatever
+                # ``segment_descriptions`` holds. A present segment whose own
+                # colour is the legacy malformed value gave a non-``None``
+                # parent, so ``guessed`` stayed False and the grey
+                # ``_derive_subsegment_color`` fell back to was written -- the
+                # exact P1 this flag exists to prevent, by the likelier route.
+                parent = normalize_hex_color(
+                    self.match_segment_color(row.get("segment_name", ""), color_map))
                 guessed = parent is None
                 if parent is None:
                     parent = self.resolve_segment_color(row.get("segment_name", ""), color_map)
@@ -264,7 +272,9 @@ class VPSTaxonomyMixin:
                     if color_map is None:
                         color_map = self.get_segment_color_map()
                     seg = row.get("segment_name") or ""
-                    parent = self.match_segment_color(seg, color_map)
+                    # SCV-M7.3, as above.
+                    parent = normalize_hex_color(
+                        self.match_segment_color(seg, color_map))
                     guessed = parent is None
                     if parent is None:
                         parent = self.resolve_segment_color(seg, color_map)

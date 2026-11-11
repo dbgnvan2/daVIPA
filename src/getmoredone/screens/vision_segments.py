@@ -7,10 +7,34 @@ from typing import TYPE_CHECKING, Optional
 from ..theme import button_style, status_text_color
 from ..color_contrast import normalize_hex_color, pick_text_color
 
-#: The swatch's fallback when a stored colour cannot be read (SCV-M6.3).
+#: The fallback when a stored colour cannot be read (SCV-M6.3, SCV-M7.1).
 #: Slate, the same neutral the segment dialog already defaults to, so an
 #: unreadable value does not look like a deliberate choice.
 DEFAULT_SWATCH_COLOR = "#334155"
+
+
+def _chip_color(*candidates: "Optional[str]") -> str:
+    """The first candidate Tk can draw, else ``DEFAULT_SWATCH_COLOR``.
+
+    Purpose: SCV-M7.1 -- every chip on this screen was built with
+             ``fg_color=<stored value> or <fallback>``, which answers with the
+             stored value whenever it is merely non-empty. The segment chips
+             read ``segment_descriptions.color_hex``, the one table with no
+             repair pass, so one legacy ``#0X1234`` raised ``TclError`` before
+             the row's Edit button was created -- and this is the screen
+             ``priority_levels._warn_unreadable_segment_color`` names as the
+             place to repair it.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m4
+    Tests:   tests/test_segment_colour_validation.py::test_scvm71_the_vision_elements_segment_list_renders_a_malformed_colour
+
+    Takes the chain rather than one value because the subsegment and category
+    chips fall back to their parent's colour, which is itself ungated.
+    """
+    for candidate in candidates:
+        readable = normalize_hex_color(candidate)
+        if readable:
+            return readable
+    return DEFAULT_SWATCH_COLOR
 
 if TYPE_CHECKING:
     from ..vps_manager import VPSManager
@@ -159,8 +183,8 @@ class VisionSegmentsScreen(ctk.CTkFrame):
             seg_chip = ctk.CTkLabel(
                 frame,
                 text=f" {self._clip_label(row.get('name') or '', 15)} ",
-                fg_color=row.get("color_hex") or "#334155",
-                text_color=pick_text_color(row.get("color_hex") or "#334155"),
+                fg_color=_chip_color(row.get("color_hex")),
+                text_color=pick_text_color(_chip_color(row.get("color_hex"))),
                 corner_radius=6,
                 width=self.SEGMENT_COL_WIDTH - 12,
                 anchor="w",
@@ -192,8 +216,8 @@ class VisionSegmentsScreen(ctk.CTkFrame):
             seg_chip = ctk.CTkLabel(
                 frame,
                 text=f" {self._clip_label(row.get('segment_name') or '', 15)} ",
-                fg_color=segment_color,
-                text_color=pick_text_color(segment_color),
+                fg_color=_chip_color(segment_color),
+                text_color=pick_text_color(_chip_color(segment_color)),
                 corner_radius=6,
                 width=self.SEGMENT_COL_WIDTH - 12,
                 anchor="w",
@@ -202,8 +226,9 @@ class VisionSegmentsScreen(ctk.CTkFrame):
             sub_chip = ctk.CTkLabel(
                 frame,
                 text=f" {self._clip_label(row.get('name') or '', 20)} ",
-                fg_color=row.get("color_hex") or segment_color,
-                text_color=pick_text_color(row.get("color_hex") or segment_color),
+                fg_color=_chip_color(row.get("color_hex"), segment_color),
+                text_color=pick_text_color(
+                    _chip_color(row.get("color_hex"), segment_color)),
                 corner_radius=6,
                 width=self.SUBSEGMENT_COL_WIDTH - 12,
                 anchor="w",
@@ -248,8 +273,8 @@ class VisionSegmentsScreen(ctk.CTkFrame):
             seg_chip = ctk.CTkLabel(
                 frame,
                 text=f" {self._clip_label(row.get('segment_name') or '', 15)} ",
-                fg_color=segment_color,
-                text_color=pick_text_color(segment_color),
+                fg_color=_chip_color(segment_color),
+                text_color=pick_text_color(_chip_color(segment_color)),
                 corner_radius=6,
                 width=self.SEGMENT_COL_WIDTH - 12,
                 anchor="w",
@@ -258,8 +283,8 @@ class VisionSegmentsScreen(ctk.CTkFrame):
             sub_chip = ctk.CTkLabel(
                 frame,
                 text=f" {self._clip_label(subsegment_name, 20)} ",
-                fg_color=subsegment_color,
-                text_color=pick_text_color(subsegment_color),
+                fg_color=_chip_color(subsegment_color),
+                text_color=pick_text_color(_chip_color(subsegment_color)),
                 corner_radius=6,
                 width=self.SUBSEGMENT_COL_WIDTH - 12,
                 anchor="w",
@@ -268,8 +293,9 @@ class VisionSegmentsScreen(ctk.CTkFrame):
             cat_chip = ctk.CTkLabel(
                 frame,
                 text=f" {self._clip_label(row.get('name') or '', 15)} ",
-                fg_color=row.get("color_hex") or subsegment_color,
-                text_color=pick_text_color(row.get("color_hex") or subsegment_color),
+                fg_color=_chip_color(row.get("color_hex"), subsegment_color),
+                text_color=pick_text_color(
+                    _chip_color(row.get("color_hex"), subsegment_color)),
                 corner_radius=6,
                 width=self.CATEGORY_COL_WIDTH - 12,
                 anchor="w",
@@ -311,14 +337,17 @@ class VisionSegmentsScreen(ctk.CTkFrame):
             row,
             width=20,
             height=20,
-            fg_color=normalize_hex_color(initial) or DEFAULT_SWATCH_COLOR,
+            fg_color=_chip_color(initial),
         )
         swatch.grid(row=0, column=0, padx=(0, 6))
         entry = ctk.CTkEntry(row, textvariable=var)
         entry.grid(row=0, column=1, sticky="ew")
 
         def pick():
-            picked = colorchooser.askcolor(initialcolor=var.get(), title="Pick Color")
+            # SCV-M7.2: the entry holds the stored text by design, so the
+            # picker cannot be opened on it.
+            picked = colorchooser.askcolor(
+                initialcolor=_chip_color(var.get()), title="Pick Color")
             if picked[1]:
                 var.set(picked[1])
                 swatch.configure(fg_color=picked[1])

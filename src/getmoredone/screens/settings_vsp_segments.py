@@ -5,7 +5,12 @@ from __future__ import annotations
 import customtkinter as ctk
 from tkinter import colorchooser, messagebox
 
+from ..color_contrast import normalize_hex_color
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
+
+#: The colour indicator's fallback when a stored colour cannot be read
+#: (SCV-M7.4). Slate, as on the Vision Elements screen.
+DEFAULT_INDICATOR_COLOR = "#334155"
 
 
 class SettingsVSPSegmentsMixin:
@@ -151,9 +156,13 @@ class SettingsVSPSegmentsMixin:
         frame.grid(row=row, column=0, sticky="ew", pady=5, padx=5)
         frame.grid_columnconfigure(2, weight=1)
 
-        # Color indicator
+        # Color indicator. SCV-M7.4: ``get_all_segments`` is a plain SELECT
+        # over ``segment_descriptions``, the one table with no repair pass, so
+        # a legacy value raised TclError here and stopped this row and every
+        # row after it -- on the screen the manual checklist sends the user to.
         color_frame = ctk.CTkFrame(
-            frame, width=40, height=40, fg_color=segment['color_hex'])
+            frame, width=40, height=40,
+            fg_color=normalize_hex_color(segment['color_hex']) or DEFAULT_INDICATOR_COLOR)
         color_frame.grid(row=0, column=0, rowspan=2, padx=10, pady=5)
         color_frame.grid_propagate(False)
 
