@@ -478,6 +478,29 @@ which is listed here only inside this entry rather than as an entry of its own,
 as every handoff note is — it carries the five-step on-screen checklist and the
 measurement of the `TclError` claim this batch set out not to re-measure.
 
+### docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
+
+Implementation plan for the six VSP Planning tabs' left-to-right filter and the
+bottom Add New (VTF-M1 - VTF-M7), from a user report of 2026-11-11. **Draft,
+approved by nobody; no code written.** Touches the five dual-panel tab modules
+and `vision_segments.py`:
+
+- The report's first part is **not a regression**: in the whole history of the
+  four assignment tabs `left_checks` is read only by `add_selected`, the Save
+  button, and no checkbox in any version carried a `command=` or a
+  `trace_add`. The tick has always been the assignment selector, so the
+  filtering asked for was never built
+- Left-to-right filtering works on APE Week Actions only, by row click
+- `annual_vision_segments.py:81-84` says the Annual Plan Elements tab has no
+  lineage to filter by. Every right-hand row carries `vision_element_id` and
+  the three lineage names, so both the tick filter and the dropdowns the other
+  tabs have are available from data already in hand
+- The tick cannot be both filter and assignment selector; the user chose the
+  tick as filter and a bottom Add New as the only way to add. VTF-M4 therefore
+  removes four screens' Save buttons, which the plan records as an explicit
+  UI-contract approval
+- Four decisions (D1 - D4) are open and block step 1
+
 ### docs/unused-docs/implementation_plan_2026-11-09_ci_green.md
 
 Implementation plan for the nine tests CI has been red on since 2026-11-07
