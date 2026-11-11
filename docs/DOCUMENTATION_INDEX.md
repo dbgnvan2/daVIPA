@@ -426,6 +426,11 @@ screen, reported as a three-step manual checklist)** - per-criterion status in
   and only together with storing the normalised `#AABBCC`
 - Two adjacent issues stay filed rather than swept, as `SCV-A1` and `SCV-A2`
 
+Handoff note: `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md`,
+which is listed here only inside this entry rather than as an entry of its own,
+as every handoff note is — it carries the three-step on-screen checklist and
+the one claim this batch did not re-measure.
+
 ### docs/unused-docs/implementation_plan_2026-11-09_ci_green.md
 
 Implementation plan for the nine tests CI has been red on since 2026-11-07
