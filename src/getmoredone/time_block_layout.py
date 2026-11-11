@@ -580,7 +580,7 @@ def lunch_window(
              Day End do, and a day that moved its lunch must not be shaded in
              two places.
     Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m8
-    Tests:   tests/test_time_grid.py::test_pfm81_a_lunch_block_moves_the_lunch_for_that_date
+    Tests:   tests/test_plan_screen.py::test_pfm81_a_lunch_block_moves_the_lunch_for_that_date
 
     ``None`` rather than the settings' window, so the caller can tell "this date
     has its own lunch" from "this date has the same lunch the settings name" --

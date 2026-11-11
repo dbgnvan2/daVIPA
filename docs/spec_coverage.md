@@ -1907,7 +1907,7 @@ them already, asked at a different moment than either.
 | Criterion | Implementation | Test |
 |---|---|---|
 | PF-M7.1 | A continuation chip is drawn above the tasks that start in the box | `plan_blocks.py::build_slot_row` (continuations drawn first) | `tests/test_plan_screen.py::test_pfm71_a_continuation_sits_above_what_starts_in_that_box` |
-| PF-M8.1 | A lunch block replaces the settings' lunch for that date only | `models.py::BlockType.LUNCH`, `time_block_layout.py::lunch_window`, `::day_grid(lunch=)`, `::build_day_grid` | `::test_pfm81_a_lunch_block_moves_the_lunch_for_that_date` |
+| PF-M8.1 | A lunch block replaces the settings' lunch for that date only | `models.py::BlockType.LUNCH`, `time_block_layout.py::lunch_window`, `::day_grid(lunch=)`, `::build_day_grid` | `tests/test_plan_screen.py::test_pfm81_a_lunch_block_moves_the_lunch_for_that_date` |
 | PF-M8.2 | A lunch box takes no tasks wherever it moved to | `time_block_layout.py::can_place` (lunch from `lunch_window`) | `::test_pfm82_a_task_cannot_land_on_the_moved_lunch` |
 | PF-M8.4 | Dragging the settings' lunch writes this date's block | `plan_blocks.py::build_slot_row` (`lunch_chip`), `plan.py::bind_lunch_handlers`, `::place_lunch_at` | `::test_pfm84_dragging_the_lunch_chip_gives_this_date_a_lunch_block` |
 | PF-M8.5 | A second drag moves that block | `plan.py::place_lunch_at` → `db_manager.py::place_block_at` | `::test_pfm85_a_second_drag_moves_that_block` |
