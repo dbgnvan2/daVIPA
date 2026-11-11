@@ -160,6 +160,36 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
     DEFAULT_SUBSEGMENT_BASE = "#64748B"
 
     @staticmethod
+    def _segment_color_to_store(color_hex: Optional[str]) -> Optional[str]:
+        """The value to write to ``segment_descriptions.color_hex``.
+
+        Purpose: SCV-M5.1 -- gate the funnel, not one surface. ``create_segment``
+                 and ``update_segment`` wrote this column with no colour check
+                 of any kind, so SCV-M1.3's normalisation in the segment
+                 editor left two other user-facing writers ungated:
+                 ``create_vision_segment_admin`` and
+                 ``update_vision_segment_admin`` pass
+                 ``color_hex.strip().upper()`` straight through. P25 -- a guard
+                 that is not on the path a person uses is worth nothing, and
+                 ``segment_descriptions`` is the one table whose colour
+                 ``row_fill`` ever draws.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m1
+        Tests:   tests/test_segment_colour_validation.py::test_scvm51_the_segment_writers_refuse_and_normalise_a_colour,
+                 ::test_scvm51_the_vsp_admin_writers_cannot_store_a_bad_colour
+
+        A falsy value passes through unchanged: "no colour" is a state the
+        column holds and ``row_fill`` reads as "draw no fill". Anything else
+        is normalised, and refused if it cannot be.
+        """
+        if not color_hex:
+            return color_hex
+        stored = normalize_hex_color(color_hex)
+        if stored is None:
+            raise ValueError(
+                f"Invalid segment colour {color_hex!r}. Use format #RRGGBB.")
+        return stored
+
+    @staticmethod
     def _is_valid_hex_color(value: Optional[str]) -> bool:
         """Whether ``value`` is a colour ``color_contrast`` can read.
 
@@ -1491,6 +1521,7 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
         if not clean:
             raise ValueError("A life segment needs a name.")
         self._refuse_case_collision(clean)
+        color_hex = self._segment_color_to_store(color_hex)
 
         name = clean
         segment_id = f"seg-{uuid4().hex[:8]}"
@@ -1643,6 +1674,9 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
             # segment_descriptions the raw one, so one segment could be held
             # in two tables under two different names.
             updates["name"] = clean
+
+        if "color_hex" in updates:
+            updates["color_hex"] = self._segment_color_to_store(updates["color_hex"])
 
         updates['updated_at'] = datetime.now().isoformat()
 
