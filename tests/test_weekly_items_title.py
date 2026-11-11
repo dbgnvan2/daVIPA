@@ -18,6 +18,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.getmoredone.screens.item_lineage import lineage_for_item
+from src.getmoredone.weekly_tactic import parent_of
 from src.getmoredone.screens.weekly_items import WeeklyItemsScreen
 from tests.weekly_tactic_fixtures import make_vps, make_week_item, seed_ape
 
@@ -133,7 +134,15 @@ def test_bp6_lineage_survives_even_with_the_annual_plan_element_missing(tmp_path
 
 
 def test_bp6_the_description_still_names_the_tactic(tmp_path, monkeypatch):
-    """Dropping the prefix must not drop the only human trace of where it came from."""
+    """Dropping the prefix must not drop the only human trace of where it came from.
+
+    The link assertion moved from `parent_id` to `parent_of` for AWA-A1: case
+    (b), the behaviour changed on purpose. This button writes the tactic to
+    `weekly_tactic_id` now, as the APE Week Actions button already did, and
+    `parent_of` is the predicate every reader of parenthood calls — so the
+    claim this test makes is unchanged while the column it was reading is not
+    the one the link lives in.
+    """
     vps = make_vps(tmp_path)
     try:
         ape_id = seed_ape(vps)
@@ -145,6 +154,7 @@ def test_bp6_the_description_still_names_the_tactic(tmp_path, monkeypatch):
         item = _create(stub, monkeypatch)[0]
 
         assert weekly_title in (item.description or "")
-        assert item.parent_id == tactic.id
+        assert item.weekly_tactic_id == tactic.id
+        assert parent_of(item) == tactic.id
     finally:
         vps.close()

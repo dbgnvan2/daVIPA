@@ -316,6 +316,44 @@ def test_cea1_update_can_change_the_location_and_the_attendees():
     assert body["attendees"] == []
 
 
+def test_cea1c_an_attendee_kept_in_the_list_keeps_their_reply():
+    """CE-A1 — a whole-body write must not reset what Google knows about a guest.
+
+    Adversarial (P7): a list rebuilt as `[{'email': e} for e in attendees]`
+    passes the test above, and drops `responseStatus`, `displayName` and
+    `optional` off every guest the caller re-sent — so adding one person would
+    silently un-accept everyone else. The fixture carries those keys for that
+    reason.
+
+    `sendUpdates` is asserted in the same test because it is the other half of
+    the same statement: `create_event` says 'none' and this call inherited
+    whatever the API defaults to, which with a writable attendee list is
+    either no invitation at all or mail to everyone on every re-export (P5).
+    """
+    stored = {
+        "id": "evt-1",
+        "attendees": [
+            {"email": "Accepted@example.com", "responseStatus": "accepted",
+             "displayName": "A Person", "optional": True},
+            {"email": "dropped@example.com", "responseStatus": "declined"},
+        ],
+    }
+    service = FakeService(stored=stored)
+
+    _manager(service).update_event(
+        event_id="evt-1",
+        attendees=["accepted@example.com", "added@example.com"],
+    )
+
+    call = service.of_kind("update")[0]
+    assert call["body"]["attendees"] == [
+        {"email": "accepted@example.com", "responseStatus": "accepted",
+         "displayName": "A Person", "optional": True},
+        {"email": "added@example.com"},
+    ]
+    assert call["sendUpdates"] == "none"
+
+
 def test_cea1b_an_update_that_names_neither_keeps_what_the_event_had():
     """CE-A1 — the pass-through must not become a silent clear.
 
