@@ -360,7 +360,12 @@ closing `BACKLOG.md`'s `PRI-A1` and `PLC-A1`, both medium and both filed
 `done`, one item not code-testable (how the change looks on the user's own
 segment colours, reported as a manual checklist)** - per-criterion status in
 `docs/spec_coverage.md`. Touches `src/getmoredone/priority_levels.py` and the
-five screens; no handoff note, the commit messages being the record:
+five screens. Handoff note:
+`docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md`, which is listed
+here only inside this entry rather than as an entry of its own, as every
+handoff note is — it carries the ten-item on-screen checklist and the measured
+contrast figures to check it against, this being a UI change no session can
+verify:
 
 - Both defects are one shape - a rule written out by hand in `today.py`,
   `upcoming.py`, `all_items.py`, `hierarchical.py` and `completed.py` where an
