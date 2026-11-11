@@ -1974,7 +1974,12 @@ Closes `LRR-A1`, medium, filed 2026-11-10. Tests are in
 | SCV-M6.6 | The category pass queries the subsegments and the colour map at most once per call, not once per bad row | `vps_manager_taxonomy.py::get_vision_categories`, `::get_vision_subsegments` | `::test_scvm66_the_category_pass_does_not_requery_per_row` | done |
 | SCV-M6.7 | A colour guessed for a segment with no Settings entry is shown and not stored | `vps_manager.py::VPSManager.match_segment_color`, `vps_manager_taxonomy.py::get_vision_subsegments` | `::test_scvm67_an_unloaded_segment_colour_is_not_persisted` | done |
 
-One item is not code-testable and is reported as a three-step manual
+| SCV-M7.1 | The Vision Elements lists render on a malformed stored segment colour, so the row's Edit button exists | `screens/vision_segments.py::_chip_color`, `::refresh_segments`, `::refresh_subsegments`, `::refresh_categories` | `::test_scvm71_the_vision_elements_segment_list_renders_a_malformed_colour` | done |
+| SCV-M7.2 | The Pick button opens the colour chooser on a readable colour, not on the stored text | `screens/vision_segments.py::VisionSegmentsScreen._color_input` | `::test_scvm72_the_colour_picker_opens_on_a_malformed_stored_colour` | done |
+| SCV-M7.3 | A colour derived from a segment whose *own* colour is malformed is shown and not stored | `vps_manager_taxonomy.py::get_vision_subsegments`, `::get_vision_categories` | `::test_scvm73_a_malformed_parent_segment_colour_is_not_persisted` | done |
+| SCV-M7.4 | Settings → VSP Life Segments renders on a malformed stored colour | `screens/settings_vsp_segments.py::SettingsVSPSegmentsMixin.create_segment_row` | `::test_scvm74_the_settings_segment_list_renders_a_malformed_colour` | done |
+
+One item is not code-testable and is reported as a five-step manual
 checklist instead: what the segment editor and the VSP screens do on screen
 (plan §6). Two adjacent issues are filed rather than swept, as `BACKLOG.md`'s
 `SCV-A1` and `SCV-A2`. A third is `SCV-A3`, which the plan's §5 recorded as
@@ -2019,3 +2024,30 @@ and `::test_updm62_a_row_with_no_category_colour_takes_the_subsegments` now
 expect the canonical `#RRGGBB` from the chip resolver. No consumer in `src/`
 compares one of those values by equality; the repair pass's own `color ==
 stored` compares against the database, not against a resolved colour.
+
+**SCV-M7 is a second cold pass's findings.** The sweep budget requires a
+further pass when one produces a high, and prefers a different failure family:
+this one took test quality and the UI contract where the first took the
+failure patterns. One high, three mediums and two lows, all six fixed, because
+the two lows were a vacuous assertion and a correctness hole in SCV-M6.7
+itself rather than cosmetic.
+
+Its high is the one worth recording. SCV-M6.2 and SCV-M6.3 made every colour
+dialog openable on a malformed stored value, and both screens that *list* a
+segment still raised before the row's Edit button was created — so the dialogs
+could not be reached, on the screen
+`priority_levels._warn_unreadable_segment_color` names as the place to go.
+`settings_vsp_segments.py` is not in the SCV diff and is fixed here anyway
+rather than filed under global rule 10: it is the screen the batch's own
+manual checklist items 1 and 2 use, so with it raising those items cannot be
+performed at all.
+
+Two tests in `tests/test_segment_colour_validation.py` were corrected by the
+same pass, both of them this batch's own:
+`::test_scvm31_the_taxonomy_writers_store_the_normalised_form` read back
+through the SCV-M3.1 repair pass, which canonicalises on read, and passed with
+all three writers reverted to `.strip().upper()`; it now asserts the table and
+was mutation-proved red at `#ABC`. `::test_scvm66_the_category_pass_does_not_requery_per_row`
+asserted a colour-map ceiling that could not fail, because the parent
+subsegment's colour was readable and the branch was never entered; it is now
+an exact count with the parent seeded malformed.

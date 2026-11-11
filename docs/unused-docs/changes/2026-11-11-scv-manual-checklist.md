@@ -17,6 +17,15 @@ was narrower than the claim made for it. `row_fill` said it was the last gate
 before `ctk.CTkFrame(fg_color=…)`; four more sites took a stored colour there,
 including `apply_segment_accent` on the next line of all five row builders.
 
+SCV-M7 is a second cold pass, required because SCV-M6 produced highs, run on
+test quality and the UI contract rather than the failure patterns. Its high
+says the same thing a third time, and this one bites hardest: SCV-M6 made
+every colour dialog openable and left both screens that *list* a segment
+raising before the Edit button that opens them was created. The remediation
+path this note describes did not work. Both are gated now, including
+`settings_vsp_segments.py`, which is not in the SCV diff and is fixed anyway
+because checklist items 1 and 2 below are performed on it.
+
 This note exists for the on-screen checks no test covers, and for one claim
 this batch set out not to re-measure and then measured by accident.
 
@@ -37,7 +46,11 @@ this batch set out not to re-measure and then measured by accident.
 - `src/getmoredone/theme.py` — `apply_segment_accent` (SCV-M6.3)
 - `src/getmoredone/screens/segment_color_utils.py` — `_normalize_color`,
   `resolve_chip_colors` (SCV-M6.3)
-- `src/getmoredone/screens/vision_segments.py` — `_color_input` (SCV-M6.3)
+- `src/getmoredone/screens/vision_segments.py` — `_color_input` (SCV-M6.3),
+  `_chip_color` and all three refresh methods (SCV-M7.1, SCV-M7.2)
+- `src/getmoredone/screens/settings_vsp_segments.py` — `create_segment_row`
+  (SCV-M7.4); not in the SCV diff, fixed because checklist items 1 and 2 run
+  on that screen
 - `src/getmoredone/priority_levels.py` — `row_fill`, `RowFill`'s docstring,
   `_warn_unreadable_segment_color`'s message
 - `tests/test_segment_colour_validation.py` (new),

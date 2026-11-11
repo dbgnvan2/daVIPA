@@ -936,7 +936,12 @@ VSP Life Segments:
   instead. Before 2026-11-11 the dialog failed to open at all on such a value,
   which made it the one screen that could not repair what only it could
   repair. The same is true of the subsegment and category colour dialogs on
-  VSP → Vision Elements.
+  VSP → Vision Elements, and of the **Pick Color** button inside them, which
+  opens on the neutral slate rather than on the value being corrected. Both
+  screens that list segments — this one and VSP → Vision Elements — also now
+  *render* on such a value; before 2026-11-11 the list stopped at the first
+  bad row, so the Edit button never appeared and the colour could not be
+  corrected from the app at all.
 - **Refresh** — What: Reloads the list. Why: See recent changes.
 - **Edit** — What: Modify segment details. Why: Keep segments accurate.
 - **Delete** — What: Deletes a segment if no linked VSP records exist. Why: Clean up unused segments.

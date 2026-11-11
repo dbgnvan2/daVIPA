@@ -406,13 +406,14 @@ Implementation plan for one authority for a segment colour (SCV-M1 - SCV-M4),
 closing `BACKLOG.md`'s `LRR-A1`, medium, filed 2026-11-10 by the LRR batch's
 cold pass. **Approved 2026-11-11 and built the same day: 7 of 7 criteria
 `done`, plus SCV-M5 from a cold pass over the plan and SCV-M6 from the cold
-pass over the code; one item not code-testable (what the editor and the VSP
-screens do on screen, reported as a five-step manual checklist)** -
+pass over the code, and SCV-M7 from a second cold pass on test quality and the
+UI contract; one item not code-testable (what the editor and the VSP screens
+do on screen, reported as a five-step manual checklist)** -
 per-criterion status in `docs/spec_coverage.md`. Touches
 `src/getmoredone/color_contrast.py`, `vps_manager.py`,
 `vps_manager_taxonomy.py`, `priority_levels.py`, `theme.py` and
 `screens/vps_segment_editor.py`, `screens/segment_color_utils.py`,
-`screens/vision_segments.py`:
+`screens/vision_segments.py`, `screens/settings_vsp_segments.py`:
 
 - `LRR-A1` named one hand-rolled hex validator and there were two. The second,
   `VPSManager._is_valid_hex_color`, is the gate on the colour-repair pass
@@ -439,6 +440,12 @@ per-criterion status in `docs/spec_coverage.md`. Touches
   next line of all five row builders with the same raw value, and three more
   sites took one too. The segment editor's raise was in `__init__`, not in the
   loader
+- A second cold pass, on test quality and the UI contract, added `SCV-M7`:
+  one high, three mediums, two lows, all fixed. SCV-M6 made every colour
+  dialog openable and left both screens that *list* a segment raising before
+  the Edit button that opens them was created, so the remediation path did not
+  work. It also found two of this batch's own tests passing for the wrong
+  reason, one of which passed with the code it tests reverted
 
 Handoff note: `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md`,
 which is listed here only inside this entry rather than as an entry of its own,
