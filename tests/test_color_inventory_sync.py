@@ -217,12 +217,15 @@ def test_civm2_the_committed_inventory_matches_a_fresh_generation():
 def test_civm5_the_scans_feeding_one_count_do_not_overlap():
     """Two scans over the same bytes counted every theme colour twice.
 
-    The "." scans reach themes/ as well, so `theme_files` re-counted what
-    `hex` and `named` had already counted. Measured 2026-11-11 before the fix:
-    the table read `#000000` 79 against 57 rows in the occurrence table below
-    it, which dedups by full identity. The frequency tables are what a reader
-    ranks by. This asserts the disjointness, not those figures, which move
-    whenever any file in the repo gains a colour.
+    Back when all three searched from the repo root, `theme_files`
+    re-counted what `hex` and `named` had already counted. Measured
+    2026-11-11 before the fix: the table read `#000000` 79 against 57 rows in
+    the occurrence table below it, which dedups by full identity. The
+    frequency tables are what a reader ranks by.
+
+    `hex` and `named` now search `src` and `theme_files` searches `themes`,
+    so the disjointness holds by construction. That construction is what
+    this asserts -- not those figures, and not the glob that used to carry it.
     """
     def keys(scan_name):
         out = set()
@@ -465,29 +468,41 @@ def test_civm7_every_line_of_every_real_scan_can_be_parsed():
     )
 
 
-def test_civm7_no_scan_reads_this_gate_s_own_fixtures():
-    """SCAN_FIXTURE's stand-in lines are rg output, not UI colour usage.
+def test_civm14_every_scan_stays_inside_src_and_themes():
+    """The inventory is an audit of UI code, and this is what makes it one.
 
-    They were being counted as real occurrences: 3 of the `tuples` scan's 5
-    lines came from this file, so `scan_all`'s refusal of an empty scan --
-    the one mechanism here meant to catch a scan going blind -- could be
-    satisfied by this file's own test data. Migrate the two remaining real
-    tuple colours, which section 3 of the report recommends, and the scan
-    would still return 3 and nothing would go red.
+    Scanning from the repo root counted documents, specs, archives and this
+    file's own fixtures as the app's colour usage. Measured 2026-11-11, with
+    three consequences: 3 of the `tuples` scan's 5 lines came from this test
+    file, so `scan_all`'s refusal of an empty scan -- the only guard against
+    a scan going blind -- could be satisfied by test data; a docs-only edit
+    made the committed report stale, because the occurrence rows cite the
+    matched line by number; and section 1's own Hard Rule is about
+    hard-coded colours in UI code, which was not what the scan measured.
+
+    This replaces the three exclusion globs the repo-root scan needed
+    (`!docs/ui_color_inventory.md`, `!themes/**`, and this file). With `src`
+    and `themes` as the only search paths none of them is reachable, so the
+    globs went and the property they were approximating is asserted here
+    instead. Decided by the repo owner as CIV-A1 on 2026-11-11; the scan is
+    one edit away from being widened again, which is why this is a test.
     """
-    this_file = "tests/test_color_inventory_sync.py"
-    offenders = {}
+    allowed = {"src", "themes"}
+    strays = {}
     for name, cmd in color_audit.SCAN_COMMANDS.items():
-        hits = [
-            ln for ln in color_audit.run_rg(cmd)
-            if (entry := color_audit.parse_line(ln)) and entry.path == this_file
-        ]
-        if hits:
-            offenders[name] = len(hits)
-    assert offenders == {}, (
-        f"{this_file} is inside its own scans, as {{scan: lines}}: "
-        f"{offenders}. Its fixtures are stand-ins for rg output, so counting "
-        "them reports test data as the app's colour usage."
+        outside = sorted({
+            entry.path
+            for ln in color_audit.run_rg(cmd)
+            if (entry := color_audit.parse_line(ln))
+            and entry.path.split("/")[0] not in allowed
+        })
+        if outside:
+            strays[name] = outside[:3]
+    assert strays == {}, (
+        "these scans reach outside src/ and themes/, as "
+        f"{{scan: examples}}: {strays}. The inventory covers the UI code and "
+        "the themes it loads; a wider scan reports documents, plans and test "
+        "fixtures as the app's colour usage."
     )
 
 
