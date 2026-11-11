@@ -1,9 +1,10 @@
 # Implementation plan — the VSP tabs' left-to-right filter and the bottom Add New (VTF-M1 … VTF-M7)
 
 Date: 2026-11-11
-Status: **draft, approved by nobody; the four design decisions are settled**
-(2026-11-11, recorded under *Decisions taken*). Planning only; no code is
-written until the plan itself is approved.
+Status: **approved 2026-11-11 by the user; not started.** The four design
+decisions are settled (recorded under *Decisions taken*). The build waits on
+the checkout: another session's batch is in flight, and this repo allows one
+build batch at a time.
 Screens: `src/getmoredone/screens/annual_vision_segments.py`,
 `ape_assignment.py`, `ape_period_view.py`, `weekly_items.py`,
 `week_actions.py`, `vision_segments.py`
