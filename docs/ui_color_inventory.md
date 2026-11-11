@@ -1,6 +1,8 @@
 # UI Color Inventory
 
-Generated via deterministic `rg` scans from repo root.
+Generated via deterministic `rg` scans of `src/` and `themes/`: the UI code and the themes it loads.
+
+Not covered, by the CIV-A1 decision of 2026-11-11: the tests, documents and plans that mention colours, and two places outside those trees that do hold real UI colour -- `tools/generate_ctk_themes.py`, which writes the files in `themes/`, and the named colours inside `assets/icons/*.svg`. Section 1's Hard Rule is about hard-coded colours in UI code, and this is the scan that matches it.
 
 ## Scan Commands
 
@@ -8,15 +10,15 @@ Rendered from `SCAN_COMMANDS` in `tools/color_audit.py`, so what is printed here
 
 ```bash
 # widget
-rg --sort path --no-config -n -H 'fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=' . -g '!docs/ui_color_inventory.md' -g '!tests/test_color_inventory_sync.py'
+rg --sort path --no-config -n -H 'fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=' src
 # hex
-rg --sort path --no-config -n -H '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b' . -g '!docs/ui_color_inventory.md' -g '!themes/**' -g '!tests/test_color_inventory_sync.py'
+rg --sort path --no-config -n -H '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b' src
 # named
-rg --sort path --no-config -n -H -i '"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)'"'"'' . -g '!docs/ui_color_inventory.md' -g '!themes/**' -g '!tests/test_color_inventory_sync.py'
+rg --sort path --no-config -n -H -i '"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)'"'"'' src
 # theme_api
-rg --sort path --no-config -n -H 'set_default_color_theme\(|set_appearance_mode\(' . -g '!docs/ui_color_inventory.md' -g '!tests/test_color_inventory_sync.py'
+rg --sort path --no-config -n -H 'set_default_color_theme\(|set_appearance_mode\(' src
 # tuples
-rg --sort path --no-config -n -H '(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\s*=\s*(\(|\[)' . -g '!docs/ui_color_inventory.md' -g '!tests/test_color_inventory_sync.py'
+rg --sort path --no-config -n -H '(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\s*=\s*(\(|\[)' src
 # app_settings
 rg --sort path --no-config -n -H 'color|theme|appearance_mode|theme_name|drag_schedule_date_text_color|color_hex' src/getmoredone/app_settings.py
 # theme_files
@@ -25,11 +27,11 @@ rg --sort path --no-config -n -H '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkgree
 
 ## 1) Summary Counts By Type
 
-- Hex colors (match count): **1498**
-- Named colors (match count): **115**
+- Hex colors (match count): **1022**
+- Named colors (match count): **66**
 - Tuple colors / appearance tuples (match count): **2**
-- CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **23**
-- Widget explicit overrides (line count): **555**
+- CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
+- Widget explicit overrides (line count): **526**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -39,26 +41,22 @@ and theme_files line counts.
 | Scan | Lines |
 |---|---:|
 | `app_settings` | 26 |
-| `hex` | 511 |
-| `named` | 71 |
-| `theme_api` | 23 |
+| `hex` | 154 |
+| `named` | 41 |
+| `theme_api` | 2 |
 | `theme_files` | 765 |
 | `tuples` | 2 |
-| `widget` | 555 |
+| `widget` | 526 |
 
 Widget override property breakdown:
 
 | Property | Count |
 |---|---:|
-| `border_color` | 15 |
-| `button_color` | 3 |
-| `corner_radius` | 62 |
-| `fg_color` | 265 |
-| `highlight_color` | 1 |
-| `hover_color` | 14 |
-| `progress_color` | 1 |
-| `selected_color` | 1 |
-| `text_color` | 233 |
+| `border_color` | 14 |
+| `corner_radius` | 61 |
+| `fg_color` | 243 |
+| `hover_color` | 11 |
+| `text_color` | 215 |
 
 AppSettings persisted color/theme fields:
 
@@ -95,81 +93,52 @@ Hex top values:
 
 | Color | Count |
 |---|---:|
-| `#ffffff` | 84 |
-| `#dce4ee` | 63 |
-| `#000000` | 58 |
+| `#dce4ee` | 60 |
 | `#979da2` | 52 |
-| `#abc` | 45 |
+| `#ffffff` | 43 |
 | `#565b5e` | 34 |
-| `#aabbcc` | 28 |
 | `#3e454a` | 27 |
 | `#4a4d50` | 27 |
 | `#939ba2` | 27 |
 | `#949a9f` | 27 |
-| `#dcfce7` | 25 |
-| `#123456` | 22 |
-| `#334155` | 22 |
-| `#1d1d1f` | 21 |
+| `#000000` | 25 |
 | `#2e1c8f` | 21 |
-| `#6e6e73` | 17 |
 | `#343638` | 16 |
 | `#f9f9fa` | 16 |
-| `#111111` | 15 |
+| `#334155` | 15 |
+| `#6e6e73` | 15 |
+| `#1d1d1f` | 14 |
+| `#86868b` | 14 |
+| `#f0e7ff` | 12 |
+| `#42386d` | 11 |
+| `#813389` | 11 |
+| `#111111` | 10 |
 
 Named top values:
 
 | Color | Count |
 |---|---:|
-| `gray` | 34 |
-| `white` | 24 |
-| `green` | 18 |
-| `red` | 14 |
-| `black` | 6 |
-| `blue` | 6 |
-| `orange` | 6 |
-| `grey` | 3 |
-| `yellow` | 3 |
-| `cyan` | 1 |
+| `gray` | 31 |
+| `white` | 9 |
+| `green` | 8 |
+| `red` | 7 |
+| `orange` | 4 |
+| `blue` | 3 |
+| `yellow` | 2 |
+| `black` | 1 |
+| `grey` | 1 |
 
 ## 2) Complete Occurrence Table (Grouped by Color Value, then File)
 
 Each row is from grep output and includes `file:line` and a short snippet.
 
-### `#000`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_weekly_tactic_parent.py:738` | `palette={"primary": "#000", "on_primary": "#fff", "body_text": "#111"},` |
-
 ### `#000000`
 
 | File:Line | Snippet |
 |---|---|
-| `docs/spec_2026-11-07_ape_week_actions.md:583` | `is not `"#000000"`, which could never fail because the theme value it compares` |
-| `docs/unused-docs/backlog_archive_2026-11-09.md:1891` | `deleted line and a corrected fake: a `!= "#000000"` assertion that could never` |
-| `docs/unused-docs/changes/2026-03-02-wcag-auto-text-contrast.md:12` | `- `pick_text_color(bg_hex, light="#FFFFFF", dark="#000000")`` |
-| `docs/unused-docs/changes/2026-11-07-ape-week-actions.md:161` | `written the same round were corrected rather than filed (a `!= "#000000"`` |
 | `src/getmoredone/color_contrast.py:161` | `dark: str = "#000000",` |
 | `src/getmoredone/color_contrast.py:168` | `def pick_text_color(bg_hex: str, light: str = "#FFFFFF", dark: str = "#000000") -> str:` |
 | `src/getmoredone/color_contrast.py:173` | `return "#000000"` |
-| `tests/build_priority_colors_section.py:101` | `host.priority_level_color_vars[LEVEL_KEYS[0]].set("#000000")` |
-| `tests/test_color_contrast.py:13` | `assert pick_text_color("#FFFF00") == "#000000"  # bright yellow -> black` |
-| `tests/test_color_contrast.py:19` | `assert math.isclose(contrast_ratio("#000000", "#FFFFFF"), 21.0, rel_tol=0.0, abs_tol=0.01)` |
-| `tests/test_color_contrast.py:44` | `assert math.isclose(relative_luminance("#000000"), 0.0, rel_tol=0.0, abs_tol=1e-9)` |
-| `tests/test_drag_schedule_support.py:30` | `assert interpolate_hex_color("#000000", "#FFFFFF", 0.5) == "#808080"` |
-| `tests/test_priority_level_colors.py:568` | `settings.priority_level_color_any_critical = "#000000"` |
-| `tests/test_priority_level_colors.py:569` | `stub = _StubSettingsScreen(settings, {LEVEL_ANY_CRITICAL: "#000000"})` |
-| `tests/test_priority_level_colors.py:581` | `assert settings.priority_level_color_any_critical == "#000000"` |
-| `tests/test_priority_level_colors.py:696` | `for colour in ("#DCFCE7", "#FEF3C7", "#000000", "#FFFFFF", "#7F7F7F", "#450A0A"):` |
-| `tests/test_priority_level_colors.py:1158` | `for colour in ("#DCFCE7", "#FEF3C7", "#445566", "#000000", "#FFFFFF"):` |
-| `tests/test_priority_level_colors.py:1172` | ```return RowFill(segment_color, "#000000", ...)`` passes the pale half and` |
-| `tests/test_priority_level_colors.py:1200` | ```pick_text_color`` answers ``#000000`` for anything it cannot parse, and` |
-| `tests/test_unified_panel_design.py:901` | `theme's own value. A second line asserting the colour is not `"#000000"`` |
-| `tests/test_vps_integration.py:1484` | `color_hex="#000000",` |
-| `tests/test_vps_integration.py:1610` | `name="Third", description="", color_hex="#000000", order_index=3` |
-| `tests/test_vps_integration.py:1613` | `name="First", description="", color_hex="#000000", order_index=1` |
-| `tests/test_vps_integration.py:1616` | `name="Second", description="", color_hex="#000000", order_index=2` |
-| `tests/test_vps_segments.py:173` | `@pytest.mark.parametrize("value", ["#000000", "#ffffff", "#AABBCC", "#1a2b3c"])` |
 | `themes/apple_grey.json:5` | `"#000000"` |
 | `themes/apple_grey.json:11` | `"#000000"` |
 | `themes/apple_grey.json:38` | `"#000000",` |
@@ -192,38 +161,12 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:209` | `"#000000",` |
 | `themes/black_white.json:213` | `"#000000",` |
 | `themes/black_white.json:278` | `"#000000",` |
-| `tools/color_audit.py:34` | `# the fix: `#000000` read 79 in the frequency table against 57 rows in the` |
-| `tools/generate_ctk_themes.py:53` | `APPLE_GREY_HOVER = ["#000000", "#F5F5F7"]` |
-| `tools/generate_ctk_themes.py:57` | `BLACK_WHITE_HOVER = ["#000000", "#FFFFFF"]` |
-| `tools/generate_ctk_themes.py:61` | `("CTk", "fg_color"): ["#F5F5F7", "#000000"],` |
-| `tools/generate_ctk_themes.py:62` | `("CTkToplevel", "fg_color"): ["#F5F5F7", "#000000"],` |
-| `tools/generate_ctk_themes.py:74` | `("CTk", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:75` | `("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:76` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:77` | `("CTkFrame", "top_fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:79` | `("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],` |
-| `tools/generate_ctk_themes.py:82` | `("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],` |
-
-### `#0000ff`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_color_contrast.py:22` | `assert math.isclose(contrast_ratio("#0000FF", "#FFFFFF"), 8.59, rel_tol=0.0, abs_tol=0.03)` |
-| `tests/test_vps_data_integrity.py:250` | `color_hex="#0000FF",` |
-| `tests/test_vps_integration.py:1507` | `color_hex="#0000FF",` |
-| `tests/test_vps_integration.py:1634` | `valid_colors = ["#FF0000", "#00FF00", "#0000FF", "#ABCDEF", "#123456"]` |
 
 ### `#000365`
 
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/brand.py:63` | `800: "#40299C", 900: "#2E1C8F", 950: "#000365",` |
-
-### `#003366`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_color_contrast.py:14` | `assert pick_text_color("#003366") == "#FFFFFF"  # dark blue -> white` |
 
 ### `#00bcd4`
 
@@ -235,33 +178,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-03-19-theme-token-cleanup.md:98` | `- Command: `rg -n 'text_color="black"\|fg_color="white"\|dropdown_fg_color="white"\|button_hover_color="white"\|dropdown_text_color="black"\|button_color="white"\|text_color="#00C8` |
 | `src/getmoredone/theme.py:465` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
-
-### `#00ff00`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_vps_data_integrity.py:64` | `color_hex="#00FF00",` |
-| `tests/test_vps_integration.py:1397` | `color_hex="#00FF00",` |
-| `tests/test_vps_integration.py:1492` | `color_hex="#00FF00"` |
-| `tests/test_vps_integration.py:1499` | `assert segment['color_hex'] == "#00FF00"` |
-| `tests/test_vps_integration.py:1551` | `color_hex="#00FF00",` |
-| `tests/test_vps_integration.py:1581` | `color_hex="#00FF00",` |
-| `tests/test_vps_integration.py:1634` | `valid_colors = ["#FF0000", "#00FF00", "#0000FF", "#ABCDEF", "#123456"]` |
-
-### `#00ffaa`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_vision_planning_regressions.py:43` | `assert screen._get_date_text_color() == "#00FFAA"` |
-
-### `#010203`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_priority_level_colors.py:636` | `settings.priority_level_color_any_critical = "#010203"` |
-| `tests/test_priority_level_colors.py:639` | `).fill == "#010203"` |
 
 ### `#0284c7`
 
@@ -282,70 +199,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/theme.py:458` | `"Month": "#059669",` |
 
-### `#07368f`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_segment_colour_validation.py:38` | `#: ``"#-12345"`` derived ``#07368F``, both silently. One regex refuses all` |
-| `tests/test_segment_colour_validation.py:45` | `SILENTLY_MISREAD = {"#+12345": "#0B368D", "# 12345": "#0B368D", "#-12345": "#07368F"}` |
-
-### `#0a0b0c`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_priority_level_colors.py:495` | `LEVEL_ANY_CRITICAL: "#0A0B0C",` |
-| `tests/test_priority_level_colors.py:502` | `assert settings.priority_level_color_any_critical == "#0A0B0C"` |
-| `tests/test_priority_level_colors.py:510` | `assert stub.priority_level_swatches[LEVEL_ANY_CRITICAL].fg_color == "#0A0B0C"` |
-| `tests/test_priority_level_colors.py:523` | `AppSettings(), {LEVEL_ANY_CRITICAL: "#0A0B0C"}, write_succeeds=False` |
-| `tests/test_priority_level_colors.py:1076` | `LEVEL_ANY_CRITICAL: "#0A0B0C",` |
-
-### `#0a1b2c`
-
-| File:Line | Snippet |
-|---|---|
-| `docs/spec_coverage.md:2011` | ``#0A1B2C` rather than the `#0a1b2c` it was created with (SCV-M5.1).` |
-| `tests/test_vps_segments.py:97` | `segment_id = vps.create_segment("Coloured", "desc", "#0a1b2c", 94)` |
-| `tests/test_vps_segments.py:105` | `# intentionally. This read `== "#0a1b2c"`, the literal handed to` |
-| `tests/test_vps_segments.py:107` | `# `#0A1B2C`. The claim here is "seeded from the segment", so it is` |
-| `tests/test_vps_segments.py:112` | `assert dialog.selected_color == "#0A1B2C"` |
-| `tests/test_vps_segments.py:134` | `segment_id = vps.create_segment("Utterly Distinct", "d", "#0a1b2c", 95)` |
-
-### `#0b1010`
-
-| File:Line | Snippet |
-|---|---|
-| `docs/spec_coverage.md:1962` | `\| SCV-M1.2 \| `#0X1234`, `#1_2345` and `#+12345` are refused by both validators and by the authority; `#0b1010` still passes \| same \| `::test_scvm12_the_validators_refuse_what_i` |
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:30` | `\| `#0b1010` \| `True` \| `#0B1010` \| `#35474A` — correct; six hex digits, not a defect \|` |
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:58` | `\| SCV-M1.2 \| The three measured accepts are refused, and `#0b1010` still passes \| `::test_scvm12_the_validators_refuse_what_int_base_16_allows` — the §1 table as the fixture; co` |
-| `tests/test_segment_colour_validation.py:31` | `#: family that must keep working. ``#0b1010`` is not a defect -- it is six hex` |
-| `tests/test_segment_colour_validation.py:46` | `STILL_VALID = "#0b1010"` |
-| `tests/test_segment_colour_validation.py:147` | `"""SCV-M1.2 — ``#0b1010`` is six hex digits, and must keep working.` |
-| `tests/test_segment_colour_validation.py:153` | `assert normalize_hex_color(STILL_VALID) == "#0B1010"` |
-| `tests/test_segment_colour_validation.py:272` | `app. ``#0b1010 -> #35474A`` (the plan's §1 table) and` |
-| `tests/test_segment_colour_validation.py:276` | `assert _derive("#0b1010") == "#35474A"` |
-| `tests/test_segment_colour_validation.py:279` | `assert _derive("  #0B1010 ") == "#35474A"` |
-
 ### `#0b368d`
 
 | File:Line | Snippet |
 |---|---|
-| `BACKLOG.md:408` | `it as "correct already", which is wrong: it reads `#+12345` as `#0B368D` by the` |
-| `docs/DOCUMENTATION_INDEX.md:451` | ``#0B368D` from a misread slice` |
-| `docs/spec_coverage.md:1965` | `\| SCV-M2.2 \| `#+12345` falls back rather than deriving `#0B368D` from a misread slice \| same \| `::test_scvm22_a_colour_that_parses_wrongly_is_not_derived_from` \| done \|` |
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:29` | `\| `#+12345` \| `True` \| `None` \| `#0B368D` — no error, a colour derived from garbage \|` |
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:61` | `\| SCV-M2.2 \| `#+12345` falls back rather than deriving `#0B368D` from a misread slice \| `::test_scvm22_a_colour_that_parses_wrongly_is_not_derived_from` — adversarial (P7): look` |
 | `src/getmoredone/vps_manager.py:220` | ```#+12345`` raised nothing and derived ``#0B368D`` from a` |
-| `tests/test_segment_colour_validation.py:37` | `#: and takes a minus sign, so ``"# 12345"`` derived ``#0B368D`` and` |
-| `tests/test_segment_colour_validation.py:45` | `SILENTLY_MISREAD = {"#+12345": "#0B368D", "# 12345": "#0B368D", "#-12345": "#07368F"}` |
-| `tests/test_segment_colour_validation.py:235` | `that happened to land on ``#0B368D`` by another route would pass a` |
-
-### `#0d0e0f`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_priority_level_colors.py:503` | `assert settings.priority_level_color_any_high == "#0D0E0F"` |
-| `tests/test_priority_level_colors.py:509` | `assert stub.priority_level_color_vars[LEVEL_ANY_HIGH].get() == "#0D0E0F"` |
-| `tests/test_priority_level_colors.py:1077` | `LEVEL_ANY_HIGH: "#0D0E0F",` |
 
 ### `#0d9488`
 
@@ -357,28 +215,13 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:49` | `\| `#0EA5E9` blue \| black \| 7.58 \| 2.16 \| 6.28 \|` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
-
-### `#0f172a`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_priority_level_colors.py:1186` | `dark = text_for("#0F172A")` |
-| `tests/test_priority_level_colors.py:1189` | `assert contrast_ratio("#0F172A", dark) >= MIN_TEXT_CONTRAST` |
-| `tests/test_priority_level_colors.py:1553` | `for colour in ("#DCFCE7", "#334155", "#F8FAFC", "#0F172A"):` |
 
 ### `#100f47`
 
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/brand.py:109` | `GROUND_GRADIENT = ("#100F47", "#291E68")` |
-
-### `#101112`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_priority_level_colors.py:1078` | `LEVEL_NO_HIGH_OR_CRITICAL: "#101112",` |
 
 ### `#101342`
 
@@ -393,21 +236,12 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:50` | `\| `#10B981` green \| black \| 8.28 \| 1.98 \| 6.86 \|` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
-
-### `#111`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_weekly_tactic_parent.py:738` | `palette={"primary": "#000", "on_primary": "#fff", "body_text": "#111"},` |
 
 ### `#111111`
 
 | File:Line | Snippet |
 |---|---|
-| `tests/test_priority_level_colors.py:491` | `settings.priority_level_color_any_critical = "#111111"` |
-| `tests/test_rename_safe_links.py:2227` | `first = vps.create_segment("Santé", "d", "#111111", 90)` |
 | `themes/black_white.json:34` | `"#111111",` |
 | `themes/black_white.json:47` | `"#111111"` |
 | `themes/black_white.json:67` | `"#111111"` |
@@ -418,47 +252,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:194` | `"#111111",` |
 | `themes/black_white.json:205` | `"#111111",` |
 | `themes/black_white.json:274` | `"#111111",` |
-| `tools/generate_ctk_themes.py:56` | `BLACK_WHITE_ANCHOR = ["#111111", "#F3F4F6"]` |
-| `tools/generate_ctk_themes.py:58` | `BLACK_WHITE_BUTTON_TEXT = ["#FFFFFF", "#111111"]` |
-| `tools/generate_ctk_themes.py:80` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],` |
-
-### `#112233`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_priority_level_colors.py:317` | `settings.priority_level_color_any_critical = "#112233"` |
-| `tests/test_priority_level_colors.py:323` | `assert reloaded.priority_level_color_any_critical == "#112233"` |
-| `tests/test_priority_level_colors.py:326` | `assert level_color(reloaded, LEVEL_ANY_CRITICAL) == "#112233"` |
-| `tests/test_unified_panel_design.py:2714` | `resolve_segment_color=lambda name, colors: "#112233",` |
-| `tests/test_unified_panel_design.py:2723` | `assert (seg, sub, cat) == ("#112233", "#445566", "#445566")` |
-| `tests/test_weekly_item_filters.py:26` | `(seg_id, "Creative", "Test Segment", "#112233", 1, 1, now, now),` |
-
-### `#123456`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_priority_level_colors.py:546` | `LEVEL_ANY_CRITICAL: "#123456",` |
-| `tests/test_rename_safe_links.py:1720` | `else original.upper(), "#123456", 99,` |
-| `tests/test_rename_safe_links.py:2040` | `vps.create_segment(existing.upper(), "d", "#123456", 90)` |
-| `tests/test_rename_safe_links.py:2042` | `vps.create_segment(existing.lower(), "d", "#123456", 91)` |
-| `tests/test_rename_safe_links.py:2045` | `vps.create_segment(f"  {existing}  ", "d", "#123456", 92)` |
-| `tests/test_rename_safe_links.py:2048` | `new_id = vps.create_segment("Utterly Distinct", "d", "#123456", 93)` |
-| `tests/test_rename_safe_links.py:2080` | `other = vps.create_segment("Utterly Distinct", "d", "#123456", 93)` |
-| `tests/test_rename_safe_links.py:2164` | `other = vps.create_segment("Quite Separate", "d", "#123456", 92)` |
-| `tests/test_rename_safe_links.py:2187` | `seg = vps.create_segment("Before Padding", "d", "#123456", 94)` |
-| `tests/test_rename_safe_links.py:2380` | `ids["C"] = vps.create_segment("Solo", "d", "#123456", 92)` |
-| `tests/test_rename_safe_links.py:2381` | `ids["D"] = vps.create_segment("Other", "d", "#123456", 93)` |
-| `tests/test_rename_safe_links.py:2476` | `seg = vps.create_segment("Before Failure", "d", "#123456", 96)` |
-| `tests/test_segment_colour_validation.py:183` | `segment_id = manager.create_segment("Scv Colour", "desc", "#123456", 91)` |
-| `tests/test_segment_colour_validation.py:261` | `for value in ("#abc", "\t#123456\n", "AABBCC"):` |
-| `tests/test_segment_colour_validation.py:590` | `segment_id = manager.create_segment("Scv Load", "desc", "#123456", 96)` |
-| `tests/test_vps_integration.py:1634` | `valid_colors = ["#FF0000", "#00FF00", "#0000FF", "#ABCDEF", "#123456"]` |
-| `tests/test_vps_segments.py:212` | `segment_id = vps.create_segment("Test Segment", "desc", "#123456", 99)` |
-| `tests/test_vps_segments.py:217` | `assert stored["color_hex"] == "#123456"` |
-| `tests/test_vps_segments.py:245` | `segment_id = vps.create_segment("Linked Segment", "desc", "#123456", 97)` |
-| `tests/test_vps_segments.py:265` | `segment_id = vps.create_segment("Busy Segment", "desc", "#123456", 96)` |
-| `tests/test_vps_segments.py:304` | `segment_id = vps.create_segment("Contract", "desc", "#123456", 95)` |
-| `tests/test_vps_segments.py:373` | `segment_id = vps.create_segment("Full chain", "desc", "#123456", 90)` |
 
 ### `#14375e`
 
@@ -476,14 +269,12 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/backlog_archive_2026-11-09.md:1639` | `green such as `#14532D` for Any Critical gets about 1:1 and the tick vanishes.` |
 | `src/getmoredone/theme.py:136` | `"success_strong": "#166534" if mode == "light" else "#14532D",` |
 
 ### `#14b8a6`
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:54` | `\| `#14B8A6` teal \| black \| 8.44 \| 1.94 \| 6.99 \|` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
 
 ### `#154b75`
@@ -497,12 +288,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/blue.json:210` | `"#154B75"` |
 | `themes/blue.json:279` | `"#154B75"` |
 
-### `#155e75`
-
-| File:Line | Snippet |
-|---|---|
-| `docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md:184` | `(`#4B5563` light / `#9CA3AF` dark); only `break` differs (`#155E75` / `#22D3EE`).` |
-
 ### `#15803d`
 
 | File:Line | Snippet |
@@ -513,8 +298,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-11-07-plan-clear-day-and-marks.md:43` | `fill: a mark nobody could see. The shipped pair is #166534/#4ADE80 (scheduled)` |
-| `docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md:40` | ``#92400E`, `#166534`) so they clear **4.5:1** against `surface_subtle`. The` |
 | `src/getmoredone/theme.py:136` | `"success_strong": "#166534" if mode == "light" else "#14532D",` |
 | `src/getmoredone/theme.py:150` | `"scheduled_mark": "#166534" if mode == "light" else "#4ADE80",` |
 | `src/getmoredone/theme.py:306` | `"low": "#166534",` |
@@ -526,19 +309,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/brand.py:43` | `MIDNIGHT = "#171447"` |
 | `src/getmoredone/brand.py:88` | `800: "#42386D", 900: "#292256", 950: "#171447",` |
 | `themes/davipa.json:19` | `"#171447"` |
-
-### `#1a2b3c`
-
-| File:Line | Snippet |
-|---|---|
-| `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:94` | `canonical**, not only one that is unreadable: a row holding `#1a2b3c` is` |
-| `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:95` | `rewritten to `#1A2B3C` on the first read after this change, and a row` |
-| `tests/test_segment_colour_validation.py:692` | `row, var = VisionSegmentsScreen._color_input(None, root, "#1a2b3c")` |
-| `tests/test_segment_colour_validation.py:693` | `assert row.winfo_children()[0].cget("fg_color") == "#1A2B3C"` |
-| `tests/test_segment_colour_validation.py:694` | `assert var.get() == "#1a2b3c", "a readable colour was rewritten in the entry"` |
-| `tests/test_segment_colour_validation.py:942` | `row, var = vs.VisionSegmentsScreen._color_input(None, root, "#1a2b3c")` |
-| `tests/test_segment_colour_validation.py:944` | `assert captured["initialcolor"] == "#1A2B3C"` |
-| `tests/test_vps_segments.py:173` | `@pytest.mark.parametrize("value", ["#000000", "#ffffff", "#AABBCC", "#1a2b3c"])` |
 
 ### `#1b6b49`
 
@@ -576,13 +346,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/apple_grey.json:194` | `"#1D1D1F",` |
 | `themes/apple_grey.json:205` | `"#1D1D1F",` |
 | `themes/apple_grey.json:274` | `"#1D1D1F",` |
-| `tools/generate_ctk_themes.py:52` | `APPLE_GREY_ANCHOR = ["#1D1D1F", "#D2D2D7"]` |
-| `tools/generate_ctk_themes.py:54` | `APPLE_GREY_BUTTON_TEXT = ["#FFFFFF", "#1D1D1F"]` |
-| `tools/generate_ctk_themes.py:63` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:64` | `("CTkFrame", "top_fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:66` | `("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
-| `tools/generate_ctk_themes.py:67` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:69` | `("CTkEntry", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
 
 ### `#1d2531`
 
@@ -633,7 +396,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/blue.json:195` | `"#1F6AA5"` |
 | `themes/blue.json:206` | `"#1F6AA5"` |
 | `themes/blue.json:275` | `"#1F6AA5"` |
-| `tools/generate_ctk_themes.py:48` | `"blue": ["#3B8ED0", "#1F6AA5"],` |
 
 ### `#21527b`
 
@@ -658,24 +420,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/vps_schema.py:1160` | `('seg-2', 'Purposeful Activity', 'Career, work, and meaningful projects', '#2196F3', 2),` |
 
-### `#222222`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_rename_safe_links.py:2228` | `second = vps.create_segment("SANTÉ", "d", "#222222", 91)` |
-| `tests/test_vps_segments.py:399` | `parents = vps.create_segment("Parents", "desc", "#222222", 89)` |
-
 ### `#223247`
 
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:135` | `"selected_tint": "#E6EEF8" if mode == "light" else "#223247",` |
-
-### `#22d3ee`
-
-| File:Line | Snippet |
-|---|---|
-| `docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md:184` | `(`#4B5563` light / `#9CA3AF` dark); only `break` differs (`#155E75` / `#22D3EE`).` |
 
 ### `#233b53`
 
@@ -755,7 +504,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/green.json:194` | `"#2CC985",` |
 | `themes/green.json:205` | `"#2CC985",` |
 | `themes/green.json:274` | `"#2CC985",` |
-| `tools/generate_ctk_themes.py:44` | `"green": ["#2CC985", "#2FA572"],` |
 
 ### `#2e1c8f`
 
@@ -806,7 +554,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/green.json:195` | `"#2FA572"` |
 | `themes/green.json:206` | `"#2FA572"` |
 | `themes/green.json:275` | `"#2FA572"` |
-| `tools/generate_ctk_themes.py:44` | `"green": ["#2CC985", "#2FA572"],` |
 
 ### `#30343b`
 
@@ -842,20 +589,10 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/brand.py:68` | `800: "#691E71", 900: "#4E0157", 950: "#330039",` |
 
-### `#333333`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_vps_segments.py:400` | `target = vps.create_segment("Target", "desc", "#333333", 88)` |
-
 ### `#334155`
 
 | File:Line | Snippet |
 |---|---|
-| `BACKLOG.md:389` | `(`:1406`) both return `row["color_hex"] or "#334155"`, i.e. whatever the` |
-| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:110` | `slate `#334155` and the text is the stored value. Before 2026-11-11` |
-| `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:145` | `stored colour is malformed, the swatch is slate `#334155` and the text is` |
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:103` | ``(row["color_hex"] or "").strip() or "#334155"`, i.e. the raw stored value.` |
 | `src/getmoredone/screens/segment_color_utils.py:10` | `DEFAULT_SEGMENT_COLOR = "#334155"` |
 | `src/getmoredone/screens/settings_vsp_segments.py:13` | `DEFAULT_INDICATOR_COLOR = "#334155"` |
 | `src/getmoredone/screens/vision_segments.py:13` | `DEFAULT_SWATCH_COLOR = "#334155"` |
@@ -863,8 +600,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/vps_manager.py:1433` | `color_map[name] = row["color_hex"] or "#334155"` |
 | `src/getmoredone/vps_manager.py:1443` | `color = (row["color_hex"] or "").strip() or "#334155"` |
 | `src/getmoredone/vps_manager_taxonomy.py:1010` | `COALESCE(sd.color_hex, '#334155') AS color_hex,` |
-| `tests/test_priority_level_colors.py:1553` | `for colour in ("#DCFCE7", "#334155", "#F8FAFC", "#0F172A"):` |
-| `tests/test_segment_colour_validation.py:862` | ```fg_color=row.get("color_hex") or "#334155"`` straight from` |
 | `themes/grey.json:35` | `"#334155"` |
 | `themes/grey.json:87` | `"#334155"` |
 | `themes/grey.json:120` | `"#334155"` |
@@ -873,16 +608,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/grey.json:195` | `"#334155"` |
 | `themes/grey.json:206` | `"#334155"` |
 | `themes/grey.json:275` | `"#334155"` |
-| `tools/generate_ctk_themes.py:47` | `"grey": ["#475569", "#334155"],` |
-
-### `#3366cc`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_unified_panel_design.py:575` | `{"segment": "#3366cc", "subsegment": "#44aa88", "category": "#cc7744"},` |
-| `tests/test_unified_panel_design.py:692` | `{"segment": "#3366cc"},` |
-| `tests/test_unified_panel_design.py:726` | `{"segment": "#3366cc"})` |
-| `tests/test_unified_panel_design.py:751` | `{"segment": "#3366cc"})` |
 
 ### `#343638`
 
@@ -911,15 +636,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/brand.py:58` | `800: "#86000E", 900: "#5D0000", 950: "#350B00",` |
 
-### `#35474a`
-
-| File:Line | Snippet |
-|---|---|
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:30` | `\| `#0b1010` \| `True` \| `#0B1010` \| `#35474A` — correct; six hex digits, not a defect \|` |
-| `tests/test_segment_colour_validation.py:272` | `app. ``#0b1010 -> #35474A`` (the plan's §1 table) and` |
-| `tests/test_segment_colour_validation.py:276` | `assert _derive("#0b1010") == "#35474A"` |
-| `tests/test_segment_colour_validation.py:279` | `assert _derive("  #0B1010 ") == "#35474A"` |
-
 ### `#360031`
 
 | File:Line | Snippet |
@@ -930,7 +646,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md:45` | ``critical_tint` is `#FDECEC` light / `#3A2328` dark (`theme.py:129`).` |
 | `src/getmoredone/theme.py:130` | `"critical_tint": "#FDECEC" if mode == "light" else "#3A2328",` |
 
 ### `#3a7ebf`
@@ -964,7 +679,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/blue.json:194` | `"#3B8ED0",` |
 | `themes/blue.json:205` | `"#3B8ED0",` |
 | `themes/blue.json:274` | `"#3B8ED0",` |
-| `tools/generate_ctk_themes.py:48` | `"blue": ["#3B8ED0", "#1F6AA5"],` |
 
 ### `#3d0005`
 
@@ -1038,8 +752,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `themes/apple_grey.json:27` | `"#424245"` |
 | `themes/apple_grey.json:71` | `"#424245"` |
-| `tools/generate_ctk_themes.py:65` | `("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],` |
-| `tools/generate_ctk_themes.py:68` | `("CTkEntry", "border_color"): ["#D2D2D7", "#424245"],` |
 
 ### `#431407`
 
@@ -1047,48 +759,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/theme.py:375` | `"high": "#431407",` |
 
-### `#445566`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_priority_level_colors.py:318` | `settings.priority_level_color_any_high = "#445566"` |
-| `tests/test_priority_level_colors.py:324` | `assert reloaded.priority_level_color_any_high == "#445566"` |
-| `tests/test_priority_level_colors.py:649` | `segment_color="#445566",` |
-| `tests/test_priority_level_colors.py:651` | `assert segment.fill == "#445566"` |
-| `tests/test_priority_level_colors.py:661` | `segment_color="#445566",` |
-| `tests/test_priority_level_colors.py:1158` | `for colour in ("#DCFCE7", "#FEF3C7", "#445566", "#000000", "#FFFFFF"):` |
-| `tests/test_priority_level_colors.py:1192` | `for colour in ("#DCFCE7", "#FEF3C7", "#445566", "#7F7F7F", "#450A0A"):` |
-| `tests/test_unified_panel_design.py:2721` | `{}, {("purposeful work", "living systems"): "#445566"}, {},` |
-| `tests/test_unified_panel_design.py:2723` | `assert (seg, sub, cat) == ("#112233", "#445566", "#445566")` |
-| `tests/test_unified_panel_design.py:2727` | `{}, {("purposeful work", "living systems"): "#445566"},` |
-
-### `#4477aa`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_unified_panel_design.py:2161` | `screen.subsegment_colors = {("purposeful work", "living systems"): "#4477aa"}` |
-| `tests/test_unified_panel_design.py:2165` | `assert sub == "#4477AA"` |
-
-### `#44aa66`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_weekly_item_filters.py:48` | `(vision_subsegment_id, vision_segment_id, "Books", "#44AA66", now, now),` |
-| `tests/test_weekly_title_cleanup.py:31` | `(vision_subsegment_id, vision_segment_id, "Writing", "#44AA66", now, now),` |
-
-### `#44aa88`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_unified_panel_design.py:575` | `{"segment": "#3366cc", "subsegment": "#44aa88", "category": "#cc7744"},` |
-
 ### `#450a0a`
 
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:374` | `"critical": "#450A0A",` |
-| `tests/test_priority_level_colors.py:696` | `for colour in ("#DCFCE7", "#FEF3C7", "#000000", "#FFFFFF", "#7F7F7F", "#450A0A"):` |
-| `tests/test_priority_level_colors.py:1192` | `for colour in ("#DCFCE7", "#FEF3C7", "#445566", "#7F7F7F", "#450A0A"):` |
 
 ### `#451a03`
 
@@ -1120,7 +795,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/grey.json:194` | `"#475569",` |
 | `themes/grey.json:205` | `"#475569",` |
 | `themes/grey.json:274` | `"#475569",` |
-| `tools/generate_ctk_themes.py:47` | `"grey": ["#475569", "#334155"],` |
 
 ### `#4a4d50`
 
@@ -1159,13 +833,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/screens/vps_segment_editor.py:16` | `DEFAULT_SEGMENT_COLOR = "#4A90E2"` |
-| `tests/test_vision_planning_regressions.py:127` | `{"ai-1": "#4A90E2"},` |
 
 ### `#4ade80`
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-11-07-plan-clear-day-and-marks.md:43` | `fill: a mark nobody could see. The shipped pair is #166534/#4ADE80 (scheduled)` |
 | `src/getmoredone/theme.py:150` | `"scheduled_mark": "#166534" if mode == "light" else "#4ADE80",` |
 | `src/getmoredone/theme.py:313` | `"low": "#4ADE80",` |
 
@@ -1179,21 +851,14 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md:184` | `(`#4B5563` light / `#9CA3AF` dark); only `break` differs (`#155E75` / `#22D3EE`).` |
 | `src/getmoredone/theme.py:440` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
 | `themes/black_white.json:27` | `"#4B5563"` |
-| `tools/generate_ctk_themes.py:78` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
 
 ### `#4caf50`
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-08-20-rename-safe-links-acceptance.md:295` | `colour after: #4CAF50 (wanted #FF0000)` |
 | `src/getmoredone/vps_schema.py:1159` | `('seg-1', 'Health', 'Physical and mental wellbeing', '#4CAF50', 1),` |
-| `tests/test_rename_safe_links.py:2120` | `(seg_id, name, "", "#4CAF50", order, now, now),` |
-| `tests/test_rename_safe_links.py:2377` | `(ids[key], name, "", "#4CAF50", order, now, now),` |
-| `tests/test_vps_legacy_migration.py:32` | `("seg-health", "Health", "Legacy test segment", "#4CAF50", 1, now, now),` |
-| `tests/test_vps_legacy_migration.py:162` | `(seg_id, name, "", "#4CAF50", order, now, now),` |
 
 ### `#4e0157`
 
@@ -1322,28 +987,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/spec_coverage.md:1964` | `\| SCV-M2.1 \| `_derive_subsegment_color` raises for nothing a caller can hold, and falls back to `#64748B` where it cannot read a base \| `vps_manager.py::VPSManager._derive_subse` |
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:56` | `\| `#64748B` slate \| **white** \| 4.76 \| 3.71 \| 3.66 \|` |
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:81` | `### 3 · A slate `#64748B` row flips to white text in the light theme` |
-| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:59` | `3. **A slate `#64748B` row, light theme:** text flips to **white**. The` |
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:60` | `\| SCV-M2.1 \| `_derive_subsegment_color` raises nothing for any string, and falls back to `#64748B` where it cannot read one \| `::test_scvm21_deriving_from_a_malformed_colour_fal` |
 | `src/getmoredone/screens/settings_vsp_segments.py:250` | `color_hex = subsegment.get("color_hex") or "#64748B"` |
 | `src/getmoredone/screens/settings_vsp_segments.py:280` | `initial = subsegment.get("color_hex") or "#64748B"` |
 | `src/getmoredone/vps_manager.py:160` | `DEFAULT_SUBSEGMENT_BASE = "#64748B"` |
 | `src/getmoredone/vps_manager.py:1511` | `return "#64748B"` |
 | `src/getmoredone/vps_manager_taxonomy.py:396` | `sub_color = (sub_row["color_hex"] if sub_row else "") or "#64748B"` |
-| `tests/test_segment_colour_validation.py:28` | `FALLBACK_BASE = "#64748B"` |
-| `tests/test_segment_colour_validation.py:273` | ```#64748B -> #9399AE`` are the values measured against the ``6963d0a``` |
-| `tests/test_segment_colour_validation.py:802` | ```#64748B`` for a segment with no ``segment_descriptions`` row at all.` |
-| `tests/test_segment_colour_validation.py:957` | ```False``, ``_derive_subsegment_color`` fell back to ``#64748B``, and that` |
-
-### `#654321`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_priority_level_colors.py:490` | `settings.priority_level_color_no_high_or_critical = "#654321"` |
-| `tests/test_vps_segments.py:220` | `segment_id, name="Renamed", color_hex="#654321", order_index=98) is True` |
-| `tests/test_vps_segments.py:223` | `assert stored["color_hex"] == "#654321"` |
 
 ### `#67220b`
 
@@ -1406,8 +1054,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `themes/black_white.json:71` | `"#6B7280"` |
 | `themes/black_white.json:78` | `"#6B7280",` |
-| `tools/generate_ctk_themes.py:81` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
-| `tools/generate_ctk_themes.py:83` | `("CTkEntry", "placeholder_text_color"): ["#6B7280", "#9CA3AF"],` |
 
 ### `#6bcb77`
 
@@ -1440,8 +1086,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:222` | `"#6E6E73"` |
 | `themes/black_white.json:250` | `"#6E6E73"` |
 | `themes/black_white.json:295` | `"#6E6E73"` |
-| `tools/generate_ctk_themes.py:70` | `("CTkEntry", "placeholder_text_color"): ["#6E6E73", "#A1A1A6"],` |
-| `tools/generate_ctk_themes.py:176` | `widget_cfg["text_color_disabled"] = ["#86868B", "#6E6E73"]` |
 
 ### `#6e7174`
 
@@ -1470,30 +1114,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/theme.py:344` | `"unscored": "#71717A",` |
 
-### `#767676`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_color_contrast.py:26` | `assert meets_wcag("#767676", "#FFFFFF", large_text=False)` |
-| `tests/test_color_contrast.py:27` | `assert meets_wcag("#767676", "#FFFFFF", large_text=True)` |
-
-### `#777777`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_color_contrast.py:21` | `assert math.isclose(contrast_ratio("#777777", "#FFFFFF"), 4.48, rel_tol=0.0, abs_tol=0.03)` |
-| `tests/test_color_contrast.py:28` | `assert not meets_wcag("#777777", "#FFFFFF", large_text=False)` |
-| `tests/test_color_contrast.py:34` | `first = pick_text_color_with_meta("#7A7A7A", light="#888888", dark="#777777")` |
-| `tests/test_color_contrast.py:35` | `second = pick_text_color_with_meta("#7A7A7A", light="#888888", dark="#777777")` |
-| `tests/test_color_contrast.py:38` | `assert first.text_color in {"#888888", "#777777"}` |
-
-### `#778899`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_priority_level_colors.py:319` | `settings.priority_level_color_no_high_or_critical = "#778899"` |
-| `tests/test_priority_level_colors.py:325` | `assert reloaded.priority_level_color_no_high_or_critical == "#778899"` |
-
 ### `#78006e`
 
 | File:Line | Snippet |
@@ -1516,13 +1136,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/pink.json:198` | `"#7A173D",` |
 | `themes/pink.json:209` | `"#7A173D",` |
 | `themes/pink.json:278` | `"#7A173D",` |
-
-### `#7a7a7a`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_color_contrast.py:34` | `first = pick_text_color_with_meta("#7A7A7A", light="#888888", dark="#777777")` |
-| `tests/test_color_contrast.py:35` | `second = pick_text_color_with_meta("#7A7A7A", light="#888888", dark="#777777")` |
 
 ### `#7a848d`
 
@@ -1554,8 +1167,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:453` | `"TL Vision": "#7C3AED",` |
-| `tests/test_vps_subsegment_colors.py:35` | `ok = manager.update_vision_subsegment_color(row["id"], "#7C3AED")` |
-| `tests/test_vps_subsegment_colors.py:38` | `assert updated["color_hex"] == "#7C3AED"` |
 | `themes/purple.json:35` | `"#7C3AED"` |
 | `themes/purple.json:87` | `"#7C3AED"` |
 | `themes/purple.json:120` | `"#7C3AED"` |
@@ -1564,21 +1175,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/purple.json:195` | `"#7C3AED"` |
 | `themes/purple.json:206` | `"#7C3AED"` |
 | `themes/purple.json:275` | `"#7C3AED"` |
-| `tools/generate_ctk_themes.py:49` | `"purple": ["#8B5CF6", "#7C3AED"],` |
-
-### `#7f7f7f`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_priority_level_colors.py:696` | `for colour in ("#DCFCE7", "#FEF3C7", "#000000", "#FFFFFF", "#7F7F7F", "#450A0A"):` |
-| `tests/test_priority_level_colors.py:1192` | `for colour in ("#DCFCE7", "#FEF3C7", "#445566", "#7F7F7F", "#450A0A"):` |
-
-### `#808080`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_drag_schedule_support.py:30` | `assert interpolate_hex_color("#000000", "#FFFFFF", 0.5) == "#808080"` |
-| `tests/test_vps_integration.py:1589` | `color_hex="#808080",` |
 
 ### `#813389`
 
@@ -1638,14 +1234,12 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:221` | `"#86868B",` |
 | `themes/black_white.json:249` | `"#86868B",` |
 | `themes/black_white.json:294` | `"#86868B",` |
-| `tools/generate_ctk_themes.py:176` | `widget_cfg["text_color_disabled"] = ["#86868B", "#6E6E73"]` |
 
 ### `#86efac`
 
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:262` | `"date_today": "#86EFAC",` |
-| `tests/test_vision_planning_regressions.py:54` | `assert screen._date_background_for(today.strftime("%Y-%m-%d")) == "#86EFAC"` |
 
 ### `#888888`
 
@@ -1654,9 +1248,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/vision_planning.py:280` | `color = item.get('segment_color') or "#888888"` |
 | `src/getmoredone/screens/vision_planning.py:542` | `color = item.get('segment_color') or "#888888"` |
 | `src/getmoredone/screens/vision_planning.py:561` | `color = item.get('segment_color') or "#888888"` |
-| `tests/test_color_contrast.py:34` | `first = pick_text_color_with_meta("#7A7A7A", light="#888888", dark="#777777")` |
-| `tests/test_color_contrast.py:35` | `second = pick_text_color_with_meta("#7A7A7A", light="#888888", dark="#777777")` |
-| `tests/test_color_contrast.py:38` | `assert first.text_color in {"#888888", "#777777"}` |
 
 ### `#897cb2`
 
@@ -1664,17 +1255,10 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/brand.py:87` | `400: "#A396CB", 500: "#897CB2", 600: "#71659B", 700: "#5A4F85",` |
 
-### `#8b0000`
-
-| File:Line | Snippet |
-|---|---|
-| `docs/VPS_DELETION_SAFETY.md:98` | `- Red warning box (color: `#8B0000`)` |
-
 ### `#8b5cf6`
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:53` | `\| `#8B5CF6` violet \| black \| 4.96 \| 3.30 \| 4.11 \|` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
 | `themes/purple.json:34` | `"#8B5CF6",` |
 | `themes/purple.json:86` | `"#8B5CF6",` |
@@ -1684,7 +1268,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/purple.json:194` | `"#8B5CF6",` |
 | `themes/purple.json:205` | `"#8B5CF6",` |
 | `themes/purple.json:274` | `"#8B5CF6",` |
-| `tools/generate_ctk_themes.py:49` | `"purple": ["#8B5CF6", "#7C3AED"],` |
 
 ### `#8bc34a`
 
@@ -1708,15 +1291,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md:40` | ``#92400E`, `#166534`) so they clear **4.5:1** against `surface_subtle`. The` |
 | `src/getmoredone/theme.py:305` | `"medium": "#92400E",` |
-
-### `#9399ae`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_segment_colour_validation.py:273` | ```#64748B -> #9399AE`` are the values measured against the ``6963d0a``` |
-| `tests/test_segment_colour_validation.py:277` | `assert _derive(FALLBACK_BASE) == "#9399AE"` |
 
 ### `#939ba2`
 
@@ -1856,8 +1431,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-11-05-time-blocks.md:112` | `changed to `#991B1B` (5.33). The earlier measurement had used the lighter` |
-| `docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md:39` | `The light theme's band colours are deliberately dark (`#991B1B`, `#9A3412`,` |
 | `src/getmoredone/theme.py:132` | `"danger_hover": "#991B1B",` |
 | `src/getmoredone/theme.py:303` | `"critical": "#991B1B",` |
 
@@ -1865,7 +1438,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md:39` | `The light theme's band colours are deliberately dark (`#991B1B`, `#9A3412`,` |
 | `src/getmoredone/theme.py:304` | `"high": "#9A3412",` |
 | `themes/orange.json:35` | `"#9A3412"` |
 | `themes/orange.json:87` | `"#9A3412"` |
@@ -1875,7 +1447,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/orange.json:195` | `"#9A3412"` |
 | `themes/orange.json:206` | `"#9A3412"` |
 | `themes/orange.json:275` | `"#9A3412"` |
-| `tools/generate_ctk_themes.py:45` | `"orange": ["#C2410C", "#9A3412"],` |
 
 ### `#9c27b0`
 
@@ -1893,12 +1464,9 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md:184` | `(`#4B5563` light / `#9CA3AF` dark); only `break` differs (`#155E75` / `#22D3EE`).` |
 | `src/getmoredone/theme.py:440` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
 | `themes/black_white.json:70` | `"#9CA3AF",` |
 | `themes/black_white.json:79` | `"#9CA3AF"` |
-| `tools/generate_ctk_themes.py:81` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
-| `tools/generate_ctk_themes.py:83` | `("CTkEntry", "placeholder_text_color"): ["#6B7280", "#9CA3AF"],` |
 
 ### `#9d174d`
 
@@ -1912,7 +1480,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/pink.json:195` | `"#9D174D"` |
 | `themes/pink.json:206` | `"#9D174D"` |
 | `themes/pink.json:275` | `"#9D174D"` |
-| `tools/generate_ctk_themes.py:46` | `"pink": ["#BE185D", "#9D174D"],` |
 
 ### `#a098c9`
 
@@ -1920,18 +1487,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/brand.py:92` | `400: "#A098C9", 500: "#867DAF", 600: "#6E6799", 700: "#575183",` |
 
-### `#a0b0c0`
-
-| File:Line | Snippet |
-|---|---|
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:195` | `(`#AABBCC`) while Tk draws the X11 one (`#A0B0C0`). Same black/white answer` |
-
 ### `#a1a1a6`
 
 | File:Line | Snippet |
 |---|---|
 | `themes/apple_grey.json:79` | `"#A1A1A6"` |
-| `tools/generate_ctk_themes.py:70` | `("CTkEntry", "placeholder_text_color"): ["#6E6E73", "#A1A1A6"],` |
 
 ### `#a396cb`
 
@@ -1959,108 +1519,16 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/pink.json:191` | `"#AAB0B5"` |
 | `themes/purple.json:191` | `"#AAB0B5"` |
 
-### `#aabbcc`
-
-| File:Line | Snippet |
-|---|---|
-| `docs/DOCUMENTATION_INDEX.md:456` | `and only together with storing the normalised `#AABBCC`` |
-| `docs/USER_GUIDE.md:929` | `and saved as `#AABBCC`, and the field refuses anything that is not six hex` |
-| `docs/spec_coverage.md:1963` | `\| SCV-M1.3 \| The editor stores the normalised form, so `#abc` lands as `#AABBCC` \| `screens/vps_segment_editor.py::VPSSegmentEditorDialog.save_segment` \| `::test_scvm13_the_edi` |
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:195` | `(`#AABBCC`) while Tk draws the X11 one (`#A0B0C0`). Same black/white answer` |
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:199` | `now the normalised `#AABBCC`, so Tk draws what the text colour was derived` |
-| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:105` | `closes, and re-opening the editor on that segment shows `#AABBCC`.` |
-| `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:96` | `holding `#abc` to `#AABBCC`. One write per such row, once; the condition is` |
-| `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:131` | `closes, and re-opening the editor on that segment shows `#AABBCC` in the` |
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:91` | `decided it — but only together with storing the normalised `#AABBCC`. Accepting` |
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:115` | `2. Type `#abc` and save: accepted, and the stored value reads back `#AABBCC`.` |
-| `tests/test_priority_level_colors.py:397` | `assert level_color(settings, LEVEL_ANY_HIGH) == "#AABBCC"` |
-| `tests/test_priority_level_colors.py:1229` | `assert short.text_color == pick_text_color("#AABBCC")` |
-| `tests/test_priority_level_colors.py:1606` | `("#ABC", "#AABBCC"), ("#abc", "#AABBCC")):` |
-| `tests/test_segment_colour_validation.py:159` | `("#abc", "#AABBCC"),` |
-| `tests/test_segment_colour_validation.py:367` | ```#AABBCC`` by the read that checked it. Corrected 2026-11-11 after a cold` |
-| `tests/test_segment_colour_validation.py:385` | `assert stored("vision_subsegments", sub["id"]) == "#AABBCC"` |
-| `tests/test_segment_colour_validation.py:393` | `assert stored("vision_categories", cat["id"]) == "#AABBCC"` |
-| `tests/test_segment_colour_validation.py:431` | `assert manager.get_segment(created)["color_hex"] == "#AABBCC"` |
-| `tests/test_segment_colour_validation.py:471` | `assert colours["scv admin"] == "#AABBCC"` |
-| `tests/test_segment_colour_validation.py:476` | `assert manager.get_segment_color_map()["scv admin"] == "#AABBCC"` |
-| `tests/test_segment_colour_validation.py:543` | `assert stored["Scv Short"] == "#AABBCC", stored` |
-| `tests/test_segment_colour_validation.py:566` | `assert stored["Scv Short"] == "#AABBCC", stored` |
-| `tests/test_segment_colour_validation.py:654` | `assert _normalize_color("#abc") == "#AABBCC"` |
-| `tests/test_segment_colour_validation.py:655` | `assert _normalize_color("  #aabbcc  ") == "#AABBCC"` |
-| `tests/test_vps_segments.py:173` | `@pytest.mark.parametrize("value", ["#000000", "#ffffff", "#AABBCC", "#1a2b3c"])` |
-| `tests/test_vps_segments.py:192` | `stores the normalised ``#AABBCC``, asserted by` |
-
 ### `#abc`
 
 | File:Line | Snippet |
 |---|---|
-| `docs/DOCUMENTATION_INDEX.md:455` | `- Delegating widens the segment editor to accept `#abc`, taken deliberately` |
-| `docs/USER_GUIDE.md:928` | `Upcoming and All Items. Since 2026-11-11 the short form `#abc` is accepted` |
-| `docs/spec_coverage.md:1963` | `\| SCV-M1.3 \| The editor stores the normalised form, so `#abc` lands as `#AABBCC` \| `screens/vps_segment_editor.py::VPSSegmentEditorDialog.save_segment` \| `::test_scvm13_the_edi` |
-| `docs/spec_coverage.md:2009` | `no longer lists `#abc` and `aabbcc` as refusals (SCV-M1.3, plan §4), and` |
-| `docs/spec_coverage.md:2050` | `was mutation-proved red at `#ABC`. `::test_scvm66_the_category_pass_does_not_requery_per_row`` |
-| `docs/unused-docs/changes/2026-11-08-priority-level-colours.md:51` | `rather than raises and expands `#ABC`` |
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:194` | `- A 3-digit segment colour (`#ABC`) derives its text from the CSS expansion` |
-| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:104` | `11. **Same dialog, type `#abc` and Save.** Expect: accepted, the dialog` |
-| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:106` | `Before 2026-11-11 `#abc` was refused.` |
-| `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:96` | `holding `#abc` to `#AABBCC`. One write per such row, once; the condition is` |
-| `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:130` | `2. **Same dialog, type `#abc` and Save.** Expected: accepted, the dialog` |
-| `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:132` | `field. Before 2026-11-11 `#abc` was refused.` |
-| `docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md:227` | `three-digit `#ABC` is expanded; a value that is still not `#RRGGBB` is` |
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:59` | `\| SCV-M1.3 \| What the editor **stores** is the normalised form, not the typed text, so `#abc` and `#AbC123` land as `#RRGGBB` \| `::test_scvm13_the_editor_stores_the_normalised_f` |
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:88` | ``len() == 7` today, so `#abc` is refused; `normalize_hex_color` expands the` |
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:89` | `three-digit form. Delegating therefore makes `#abc` valid. That is accepted` |
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:115` | `2. Type `#abc` and save: accepted, and the stored value reads back `#AABBCC`.` |
 | `src/getmoredone/color_contrast.py:50` | `exception. A three-digit ``#ABC`` is expanded, because that is a form people` |
 | `src/getmoredone/screens/vps_segment_editor.py:216` | `Accepts ``#abc`` and a missing ``#``, which the old check refused --` |
 | `src/getmoredone/screens/vps_segment_editor.py:242` | `# text. ``validate_color`` accepts ``#abc`` and a missing ``#``, and` |
 | `src/getmoredone/vps_manager.py:206` | ```normalize_hex_color`` expands ``#abc`` and supplies a missing ``#``.` |
 | `src/getmoredone/vps_manager_taxonomy.py:356` | `# typed; once that gate reads ``#abc`` and ``abcdef``, both became` |
 | `src/getmoredone/vps_manager_taxonomy.py:449` | `gate reads ``#abc``, storing the text as given would write a` |
-| `tests/test_priority_level_colors.py:394` | `settings_field_name(LEVEL_ANY_HIGH): "#abc",` |
-| `tests/test_priority_level_colors.py:1227` | `segment_color="#ABC",` |
-| `tests/test_priority_level_colors.py:1606` | `("#ABC", "#AABBCC"), ("#abc", "#AABBCC")):` |
-| `tests/test_segment_colour_validation.py:159` | `("#abc", "#AABBCC"),` |
-| `tests/test_segment_colour_validation.py:168` | `Delegating to ``normalize_hex_color`` widens the editor: ``#abc`` was` |
-| `tests/test_segment_colour_validation.py:261` | `for value in ("#abc", "\t#123456\n", "AABBCC"):` |
-| `tests/test_segment_colour_validation.py:358` | ```(color_hex or "").strip().upper()``. Delegating the gate makes ``#abc``` |
-| `tests/test_segment_colour_validation.py:359` | `pass it, so without this the three of them would write ``#ABC`` -- a` |
-| `tests/test_segment_colour_validation.py:366` | ```.strip().upper()``, because the ``#ABC`` they stored was rewritten to` |
-| `tests/test_segment_colour_validation.py:384` | `assert manager.update_vision_subsegment_color(sub["id"], "#abc") is True` |
-| `tests/test_segment_colour_validation.py:392` | `cat["id"], "Scv Cat", "#abc", "", "") is True` |
-| `tests/test_segment_colour_validation.py:430` | `created = manager.create_segment("Scv Store", "desc", "#abc", 97)` |
-| `tests/test_segment_colour_validation.py:467` | `"Scv Admin", "desc", "#abc", "vision")` |
-| `tests/test_segment_colour_validation.py:519` | `gate to ``normalize_hex_color`` turned them from "reject ``#abc``, use the` |
-| `tests/test_segment_colour_validation.py:520` | `derived default" into "accept ``#abc``, write it verbatim" -- a regression` |
-| `tests/test_segment_colour_validation.py:532` | `manager.create_vision_subsegment(seg_name, "Scv Short", color_hex="#abc")` |
-| `tests/test_segment_colour_validation.py:561` | `manager.create_vision_category(seg_name, "Scv Sub", "Scv Short", color_hex="#abc")` |
-| `tests/test_segment_colour_validation.py:634` | `apply_segment_accent(frame, "#abc")` |
-| `tests/test_segment_colour_validation.py:654` | `assert _normalize_color("#abc") == "#AABBCC"` |
-| `tests/test_vps_segments.py:189` | ```"#abc"``, the three-digit form the normaliser expands, and ``"aabbcc"``,` |
-| `tests/test_vps_segments.py:198` | `@pytest.mark.parametrize("value", ["#abc", "aabbcc"])` |
-
-### `#abc123`
-
-| File:Line | Snippet |
-|---|---|
-| `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:59` | `\| SCV-M1.3 \| What the editor **stores** is the normalised form, not the typed text, so `#abc` and `#AbC123` land as `#RRGGBB` \| `::test_scvm13_the_editor_stores_the_normalised_f` |
-| `tests/test_segment_colour_validation.py:160` | `("#AbC123", "#ABC123"),` |
-| `tests/test_segment_colour_validation.py:161` | `("  #abc123  ", "#ABC123"),` |
-| `tests/test_segment_colour_validation.py:433` | `assert manager.update_segment(created, color_hex="#AbC123") is True` |
-| `tests/test_segment_colour_validation.py:434` | `assert manager.get_segment(created)["color_hex"] == "#ABC123"` |
-| `tests/test_segment_colour_validation.py:442` | `assert manager.get_segment(created)["color_hex"] == "#ABC123"` |
-| `tests/test_segment_colour_validation.py:446` | `assert manager.get_segment(created)["color_hex"] == "#ABC123"` |
-
-### `#abcdef`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_drag_schedule_support.py:20` | `assert normalized_date_text_color("#ABCDEF") == "#ABCDEF"` |
-| `tests/test_priority_level_colors.py:1111` | `stub.priority_level_color_vars[LEVEL_ANY_CRITICAL].set("#abcdef")` |
-| `tests/test_priority_level_colors.py:1115` | `assert seen["color"] == "#ABCDEF"` |
-| `tests/test_segment_colour_validation.py:544` | `assert stored["Scv Bare"] == "#ABCDEF", stored` |
-| `tests/test_segment_colour_validation.py:567` | `assert stored["Scv Bare"] == "#ABCDEF", stored` |
-| `tests/test_vps_integration.py:1634` | `valid_colors = ["#FF0000", "#00FF00", "#0000FF", "#ABCDEF", "#123456"]` |
 
 ### `#ac5515`
 
@@ -2115,7 +1583,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/backlog_archive_2026-11-09.md:1628` | `keeps `checkmark_color`, so apple_grey's dark hover `#B3B3BC` against a` |
 | `themes/apple_grey.json:95` | `"#B3B3BC"` |
 | `themes/apple_grey.json:153` | `"#B3B3BC"` |
 | `themes/apple_grey.json:199` | `"#B3B3BC"` |
@@ -2133,10 +1600,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-11-05-time-blocks.md:110` | `- Reverting the light-theme `critical` band to `#B91C1C` turned the contrast` |
-| `docs/unused-docs/changes/2026-11-07-plan-clear-day-and-marks.md:44` | `and #B91C1C/#FCA5A5 (unscheduled), and a test holds every combination of theme` |
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:111` | `red now, in the same red (`danger`, `#B91C1C`).` |
-| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:72` | ``#B91C1C`). The condition changed; for every value the UI can produce` |
 | `src/getmoredone/screens/project_boards.py:1268` | `text_color="#B91C1C",` |
 | `src/getmoredone/theme.py:131` | `"danger": "#B91C1C",` |
 | `src/getmoredone/theme.py:151` | `"unscheduled_mark": "#B91C1C" if mode == "light" else "#FCA5A5",` |
@@ -2159,7 +1622,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/pink.json:194` | `"#BE185D",` |
 | `themes/pink.json:205` | `"#BE185D",` |
 | `themes/pink.json:274` | `"#BE185D",` |
-| `tools/generate_ctk_themes.py:46` | `"pink": ["#BE185D", "#9D174D"],` |
 
 ### `#beb1e5`
 
@@ -2180,7 +1642,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/orange.json:194` | `"#C2410C",` |
 | `themes/orange.json:205` | `"#C2410C",` |
 | `themes/orange.json:274` | `"#C2410C",` |
-| `tools/generate_ctk_themes.py:45` | `"orange": ["#C2410C", "#9A3412"],` |
 
 ### `#c7aaff`
 
@@ -2208,28 +1669,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/brand.py:77` | `400: "#FF6F77", 500: "#F55161", 600: "#CB3046", 700: "#AD1233",` |
 
-### `#cc7744`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_unified_panel_design.py:575` | `{"segment": "#3366cc", "subsegment": "#44aa88", "category": "#cc7744"},` |
-| `tests/test_unified_panel_design.py:877` | `{"segment": "", "subsegment": "", "category": "#cc7744"},` |
-| `tests/test_unified_panel_design.py:881` | `assert cells["category"].cget("fg_color") == "#cc7744"` |
-| `tests/test_unified_panel_design.py:914` | `{"segment": "", "category": "#cc7744"},` |
-| `tests/test_unified_panel_design.py:919` | `assert cells["category"].cget("text_color") == pick_text_color("#cc7744")` |
-| `tests/test_unified_panel_design.py:2169` | `("purposeful work", "living systems", "blog"): "#cc7744"}` |
-| `tests/test_unified_panel_design.py:2172` | `assert cat == "#CC7744"` |
-| `tests/test_unified_panel_design.py:2728` | `{("purposeful work", "living systems", "blog"): "#cc7744"},` |
-| `tests/test_unified_panel_design.py:2730` | `assert cat == "#CC7744"` |
-
-### `#cc8844`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_weekly_item_filters.py:55` | `(vision_category_id, vision_subsegment_id, "Learning", "#CC8844", now, now),` |
-| `tests/test_weekly_item_filters.py:147` | `assert color == "#CC8844"` |
-| `tests/test_weekly_title_cleanup.py:38` | `(vision_category_id, vision_subsegment_id, "APW Book", "#CC8844", now, now),` |
-
 ### `#cdcdcd`
 
 | File:Line | Snippet |
@@ -2254,7 +1693,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `themes/black_white.json:26` | `"#D1D5DB",` |
-| `tools/generate_ctk_themes.py:78` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
 
 ### `#d1d5de`
 
@@ -2280,9 +1718,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/apple_grey.json:195` | `"#D2D2D7"` |
 | `themes/apple_grey.json:206` | `"#D2D2D7"` |
 | `themes/apple_grey.json:275` | `"#D2D2D7"` |
-| `tools/generate_ctk_themes.py:52` | `APPLE_GREY_ANCHOR = ["#1D1D1F", "#D2D2D7"]` |
-| `tools/generate_ctk_themes.py:65` | `("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],` |
-| `tools/generate_ctk_themes.py:68` | `("CTkEntry", "border_color"): ["#D2D2D7", "#424245"],` |
 
 ### `#d5d9de`
 
@@ -2326,10 +1761,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:47` | `\| Segment colour \| New text \| Ratio \| Was, dark (`#DCE4EE`) \| Was, light (`gray10`) \|` |
 | `src/getmoredone/theme.py:110` | `"on_primary": _theme_value("CTkButton", "text_color", "#DCE4EE"),` |
-| `tests/test_priority_level_colors.py:96` | `PALETTE = {"success_tint": "#E8F5EE", "row_text": "#DCE4EE"}` |
-| `tests/test_unified_panel_design.py:903` | `light/dark list (`['gray10', '#DCE4EE']` on the active theme), so comparing` |
 | `themes/apple_grey.json:98` | `"#DCE4EE",` |
 | `themes/apple_grey.json:217` | `"#DCE4EE",` |
 | `themes/apple_grey.json:218` | `"#DCE4EE"` |
@@ -2391,34 +1823,10 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `NOTES.md:516` | `- ✅ **Any Critical defaults to green** (`#DCFCE7`), Any High to amber` |
-| `docs/USER_GUIDE.md:801` | `- **Any Critical** — Importance *or* Urgency is Critical. Default `#DCFCE7`,` |
-| `docs/unused-docs/backlog_archive_2026-11-09.md:1629` | ``#DCFCE7` checkmark is about 1.3:1 — the tick disappears while the pointer is` |
-| `docs/unused-docs/changes/2026-11-08-priority-level-colours.md:11` | `Colours**. Any Critical defaults to green `#DCFCE7`, Any High to amber` |
-| `docs/unused-docs/cycles/2026-11-08_wtp-plc-upd-pd-qa-gate.md:61` | `found only the two centralized defaults `#DCFCE7`/`#FEF3C7` (app_settings` |
-| `docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md:129` | `priority_level_color_any_critical: str = "#DCFCE7"   # green` |
-| `docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md:166` | `- PLC-M2.3 Any Critical defaults to `#DCFCE7`, Any High to `#FEF3C7`, the third` |
-| `docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md:199` | `Any Critical                 [#DCFCE7] [Pick Colour] [swatch]` |
 | `src/getmoredone/app_settings.py:82` | `priority_level_color_any_critical: str = "#DCFCE7"` |
 | `src/getmoredone/theme.py:137` | `"on_strong": "#ECFDF5" if mode == "light" else "#DCFCE7",` |
 | `src/getmoredone/theme.py:370` | `"low": "#DCFCE7",` |
 | `src/getmoredone/theme.py:419` | `LEVEL_ANY_CRITICAL: "#DCFCE7",` |
-| `tests/test_priority_level_colors.py:289` | `assert defaults[LEVEL_ANY_CRITICAL] == "#DCFCE7"` |
-| `tests/test_priority_level_colors.py:366` | `assert level_color(settings, LEVEL_ANY_CRITICAL) == "#DCFCE7"` |
-| `tests/test_priority_level_colors.py:396` | `assert level_color(settings, LEVEL_ANY_CRITICAL) == "#DCFCE7"` |
-| `tests/test_priority_level_colors.py:696` | `for colour in ("#DCFCE7", "#FEF3C7", "#000000", "#FFFFFF", "#7F7F7F", "#450A0A"):` |
-| `tests/test_priority_level_colors.py:1158` | `for colour in ("#DCFCE7", "#FEF3C7", "#445566", "#000000", "#FFFFFF"):` |
-| `tests/test_priority_level_colors.py:1192` | `for colour in ("#DCFCE7", "#FEF3C7", "#445566", "#7F7F7F", "#450A0A"):` |
-| `tests/test_priority_level_colors.py:1253` | `segment_color="#DCFCE7",` |
-| `tests/test_priority_level_colors.py:1258` | `assert segment.text_color == pick_text_color("#DCFCE7")` |
-| `tests/test_priority_level_colors.py:1553` | `for colour in ("#DCFCE7", "#334155", "#F8FAFC", "#0F172A"):` |
-| `tests/test_priority_level_colors.py:1605` | `for typed, normalised in (("#DCFCE7", "#DCFCE7"), ("#dcfce7", "#DCFCE7"),` |
-
-### `#ddeeff`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_segment_colour_validation.py:389` | `assert stored("vision_subsegments", sub["id"]) == "#DDEEFF"` |
 
 ### `#de1b24`
 
@@ -2434,12 +1842,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/davipa.json:145` | `"#DE1B24"` |
 | `themes/davipa.json:194` | `"#DE1B24",` |
 | `themes/davipa.json:195` | `"#DE1B24"` |
-
-### `#def`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_segment_colour_validation.py:388` | `sub["id"], "Scv Sub", "#def", "", "") is True` |
 
 ### `#dfccff`
 
@@ -2472,7 +1874,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:129` | `"success_tint": "#E8F5EE" if mode == "light" else "#1F2B24",` |
-| `tests/test_priority_level_colors.py:96` | `PALETTE = {"success_tint": "#E8F5EE", "row_text": "#DCE4EE"}` |
 
 ### `#e91e63`
 
@@ -2544,7 +1945,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:52` | `\| `#EF4444` red \| black \| 5.58 \| 2.93 \| 4.62 \|` |
 | `src/getmoredone/theme.py:465` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
 
@@ -2589,7 +1989,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:195` | `"#F3F4F6"` |
 | `themes/black_white.json:206` | `"#F3F4F6"` |
 | `themes/black_white.json:275` | `"#F3F4F6"` |
-| `tools/generate_ctk_themes.py:56` | `BLACK_WHITE_ANCHOR = ["#111111", "#F3F4F6"]` |
 
 ### `#f43e37`
 
@@ -2620,9 +2019,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:51` | `\| `#F59E0B` amber \| black \| 9.78 \| **1.67** \| 8.10 \|` |
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:70` | ``#F59E0B` was 1.67:1, which is near-invisible. If the row text still looks` |
-| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:56` | `amber `#F59E0B` measured 1.67:1 before, which is near-invisible.` |
 | `src/getmoredone/theme.py:456` | `"Annual Initiative": "#F59E0B",` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
 
@@ -2641,11 +2037,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/apple_grey.json:39` | `"#F5F5F7"` |
 | `themes/apple_grey.json:59` | `"#F5F5F7"` |
 | `themes/apple_grey.json:75` | `"#F5F5F7"` |
-| `tools/generate_ctk_themes.py:53` | `APPLE_GREY_HOVER = ["#000000", "#F5F5F7"]` |
-| `tools/generate_ctk_themes.py:61` | `("CTk", "fg_color"): ["#F5F5F7", "#000000"],` |
-| `tools/generate_ctk_themes.py:62` | `("CTkToplevel", "fg_color"): ["#F5F5F7", "#000000"],` |
-| `tools/generate_ctk_themes.py:66` | `("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
-| `tools/generate_ctk_themes.py:69` | `("CTkEntry", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
 
 ### `#f7f5ff`
 
@@ -2665,19 +2056,10 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/brand.py:86` | `50: "#F8F5FF", 100: "#EEE8FF", 200: "#DACDFF", 300: "#BEB1E5",` |
 
-### `#f8fafc`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_priority_level_colors.py:1185` | `pale = text_for("#F8FAFC")` |
-| `tests/test_priority_level_colors.py:1188` | `assert contrast_ratio("#F8FAFC", pale) >= MIN_TEXT_CONTRAST` |
-| `tests/test_priority_level_colors.py:1553` | `for colour in ("#DCFCE7", "#334155", "#F8FAFC", "#0F172A"):` |
-
 ### `#f97316`
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:55` | `\| `#F97316` orange \| black \| 7.49 \| 2.19 \| 6.21 \|` |
 | `src/getmoredone/theme.py:465` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
 
@@ -2733,10 +2115,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-11-07-plan-clear-day-and-marks.md:44` | `and #B91C1C/#FCA5A5 (unscheduled), and a test holds every combination of theme` |
 | `src/getmoredone/theme.py:151` | `"unscheduled_mark": "#B91C1C" if mode == "light" else "#FCA5A5",` |
 | `src/getmoredone/theme.py:261` | `"date_overdue": "#FCA5A5",` |
-| `tests/test_vision_planning_regressions.py:53` | `assert screen._date_background_for((today - timedelta(days=1)).strftime("%Y-%m-%d")) == "#FCA5A5"` |
 
 ### `#fcc1ff`
 
@@ -2764,13 +2144,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:263` | `"date_future": "#FDE68A",` |
-| `tests/test_vision_planning_regressions.py:55` | `assert screen._date_background_for((today + timedelta(days=1)).strftime("%Y-%m-%d")) == "#FDE68A"` |
 
 ### `#fdecec`
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md:45` | ``critical_tint` is `#FDECEC` light / `#3A2328` dark (`theme.py:129`).` |
 | `src/getmoredone/theme.py:130` | `"critical_tint": "#FDECEC" if mode == "light" else "#3A2328",` |
 
 ### `#fee2e2`
@@ -2784,50 +2162,9 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `NOTES.md:517` | `(`#FEF3C7`), the third level to no fill. Asked for directly, and confirmed` |
-| `docs/USER_GUIDE.md:804` | `Critical. Default `#FEF3C7`, an amber. This tier is new; before` |
-| `docs/unused-docs/changes/2026-11-08-priority-level-colours.md:12` | ``#FEF3C7`, the third level to no fill.` |
-| `docs/unused-docs/cycles/2026-11-08_wtp-plc-upd-pd-qa-gate.md:61` | `found only the two centralized defaults `#DCFCE7`/`#FEF3C7` (app_settings` |
-| `docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md:130` | `priority_level_color_any_high: str = "#FEF3C7"       # amber` |
-| `docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md:166` | `- PLC-M2.3 Any Critical defaults to `#DCFCE7`, Any High to `#FEF3C7`, the third` |
-| `docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md:200` | `Any High, but no Critical    [#FEF3C7] [Pick Colour] [swatch]` |
 | `src/getmoredone/app_settings.py:83` | `priority_level_color_any_high: str = "#FEF3C7"` |
 | `src/getmoredone/theme.py:369` | `"medium": "#FEF3C7",` |
 | `src/getmoredone/theme.py:420` | `LEVEL_ANY_HIGH: "#FEF3C7",` |
-| `tests/test_priority_level_colors.py:290` | `assert defaults[LEVEL_ANY_HIGH] == "#FEF3C7"` |
-| `tests/test_priority_level_colors.py:547` | `LEVEL_ANY_HIGH: "#FEF3C7",` |
-| `tests/test_priority_level_colors.py:696` | `for colour in ("#DCFCE7", "#FEF3C7", "#000000", "#FFFFFF", "#7F7F7F", "#450A0A"):` |
-| `tests/test_priority_level_colors.py:1158` | `for colour in ("#DCFCE7", "#FEF3C7", "#445566", "#000000", "#FFFFFF"):` |
-| `tests/test_priority_level_colors.py:1192` | `for colour in ("#DCFCE7", "#FEF3C7", "#445566", "#7F7F7F", "#450A0A"):` |
-
-### `#ff0000`
-
-| File:Line | Snippet |
-|---|---|
-| `docs/unused-docs/changes/2026-08-20-rename-safe-links-acceptance.md:295` | `colour after: #4CAF50 (wanted #FF0000)` |
-| `tests/test_color_contrast.py:29` | `assert not meets_wcag("#FF0000", "#FFFFFF", large_text=False)` |
-| `tests/test_color_contrast.py:30` | `assert meets_wcag("#FF0000", "#FFFFFF", large_text=True)` |
-| `tests/test_rename_safe_links.py:2146` | `assert vps.update_segment(first, name="Kappa", color_hex="#FF0000") is True, (` |
-| `tests/test_rename_safe_links.py:2160` | `assert stored["color_hex"] == "#FF0000", "the colour never reached the row"` |
-| `tests/test_rename_safe_links.py:2452` | `vps.update_segment(second, color_hex="#FF0000")` |
-| `tests/test_rename_safe_links.py:2499` | `vps.update_segment(seg, color_hex="#FF0000")` |
-| `tests/test_vps_data_integrity.py:35` | `color_hex="#FF0000",` |
-| `tests/test_vps_integration.py:1530` | `color_hex="#FF0000",` |
-| `tests/test_vps_integration.py:1634` | `valid_colors = ["#FF0000", "#00FF00", "#0000FF", "#ABCDEF", "#123456"]` |
-
-### `#ff00ff`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_vps_data_integrity.py:385` | `color_hex="#FF00FF",` |
-| `tests/test_vps_integration.py:1653` | `color_hex="#FF00FF",` |
-
-### `#ff5733`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_vps_integration.py:1462` | `color_hex="#FF5733",` |
-| `tests/test_vps_integration.py:1474` | `assert segment['color_hex'] == "#FF5733"` |
 
 ### `#ff5a8a`
 
@@ -2956,12 +2293,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/theme.py:368` | `"high": "#FFEDD5",` |
 
-### `#fff`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_weekly_tactic_parent.py:738` | `palette={"primary": "#000", "on_primary": "#fff", "body_text": "#111"},` |
-
 ### `#fff3fc`
 
 | File:Line | Snippet |
@@ -2992,18 +2323,10 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/brand.py:76` | `50: "#FFF4F4", 100: "#FFE5E4", 200: "#FFC7C5", 300: "#FF9E9E",` |
 
-### `#ffff00`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_color_contrast.py:13` | `assert pick_text_color("#FFFF00") == "#000000"  # bright yellow -> black` |
-
 ### `#ffffff`
 
 | File:Line | Snippet |
 |---|---|
-| `docs/USER_GUIDE.md:786` | `- **Drag Schedule date text color** — What: Hex color for date-box text (default `#FFFFFF`). Why: Improve readability across box colors.` |
-| `docs/unused-docs/changes/2026-03-02-wcag-auto-text-contrast.md:12` | `- `pick_text_color(bg_hex, light="#FFFFFF", dark="#000000")`` |
 | `src/getmoredone/app_settings.py:127` | `drag_schedule_date_text_color: str = "#FFFFFF"` |
 | `src/getmoredone/brand.py:48` | `ON_DARK = "#FFFFFF"` |
 | `src/getmoredone/color_contrast.py:160` | `light: str = "#FFFFFF",` |
@@ -3020,32 +2343,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/settings.py:717` | `color_value = "#FFFFFF"` |
 | `src/getmoredone/screens/settings.py:741` | `initial = self.drag_schedule_text_color_var.get().strip() or "#FFFFFF"` |
 | `src/getmoredone/screens/settings_priority_colors.py:199` | ```#FFFFFF``, and a user who typed a colour they meant has no way to` |
-| `tests/test_color_contrast.py:14` | `assert pick_text_color("#003366") == "#FFFFFF"  # dark blue -> white` |
-| `tests/test_color_contrast.py:19` | `assert math.isclose(contrast_ratio("#000000", "#FFFFFF"), 21.0, rel_tol=0.0, abs_tol=0.01)` |
-| `tests/test_color_contrast.py:21` | `assert math.isclose(contrast_ratio("#777777", "#FFFFFF"), 4.48, rel_tol=0.0, abs_tol=0.03)` |
-| `tests/test_color_contrast.py:22` | `assert math.isclose(contrast_ratio("#0000FF", "#FFFFFF"), 8.59, rel_tol=0.0, abs_tol=0.03)` |
-| `tests/test_color_contrast.py:26` | `assert meets_wcag("#767676", "#FFFFFF", large_text=False)` |
-| `tests/test_color_contrast.py:27` | `assert meets_wcag("#767676", "#FFFFFF", large_text=True)` |
-| `tests/test_color_contrast.py:28` | `assert not meets_wcag("#777777", "#FFFFFF", large_text=False)` |
-| `tests/test_color_contrast.py:29` | `assert not meets_wcag("#FF0000", "#FFFFFF", large_text=False)` |
-| `tests/test_color_contrast.py:30` | `assert meets_wcag("#FF0000", "#FFFFFF", large_text=True)` |
-| `tests/test_color_contrast.py:45` | `assert math.isclose(relative_luminance("#FFFFFF"), 1.0, rel_tol=0.0, abs_tol=1e-9)` |
-| `tests/test_drag_schedule_support.py:19` | `assert normalized_date_text_color("ffffff") == "#ffffff"` |
-| `tests/test_drag_schedule_support.py:21` | `assert normalized_date_text_color("bad") == "#FFFFFF"` |
-| `tests/test_drag_schedule_support.py:30` | `assert interpolate_hex_color("#000000", "#FFFFFF", 0.5) == "#808080"` |
-| `tests/test_future_dates.py:82` | `original_color = getattr(settings, "drag_schedule_date_text_color", "#FFFFFF")` |
-| `tests/test_future_dates.py:85` | `settings.drag_schedule_date_text_color = "#FFFFFF"` |
-| `tests/test_future_dates.py:89` | `assert reloaded.drag_schedule_date_text_color == "#FFFFFF"` |
-| `tests/test_plan_settings.py:656` | `drag_schedule_text_color_var=SimpleNamespace(get=lambda: "#FFFFFF"),` |
-| `tests/test_priority_level_colors.py:338` | `["#FFFFFF"],` |
-| `tests/test_priority_level_colors.py:539` | ```#FFFFFF``, and a user who meant what they typed is never told.` |
-| `tests/test_priority_level_colors.py:696` | `for colour in ("#DCFCE7", "#FEF3C7", "#000000", "#FFFFFF", "#7F7F7F", "#450A0A"):` |
-| `tests/test_priority_level_colors.py:1158` | `for colour in ("#DCFCE7", "#FEF3C7", "#445566", "#000000", "#FFFFFF"):` |
-| `tests/test_settings_week_rule_ui.py:29` | `drag_schedule_text_color_var=SimpleNamespace(get=lambda: "#FFFFFF"),` |
-| `tests/test_vision_planning_regressions.py:39` | `screen.settings = SimpleNamespace(drag_schedule_date_text_color="#FFFFFF")` |
-| `tests/test_vision_planning_regressions.py:40` | `assert screen._get_date_text_color() == "#FFFFFF"` |
-| `tests/test_vision_planning_regressions.py:46` | `assert screen._get_date_text_color() == "#FFFFFF"` |
-| `tests/test_vps_segments.py:173` | `@pytest.mark.parametrize("value", ["#000000", "#ffffff", "#AABBCC", "#1a2b3c"])` |
 | `themes/apple_grey.json:18` | `"#FFFFFF",` |
 | `themes/apple_grey.json:22` | `"#FFFFFF",` |
 | `themes/apple_grey.json:46` | `"#FFFFFF",` |
@@ -3073,29 +2370,12 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/davipa.json:290` | `"#FFFFFF",` |
 | `themes/davipa.json:291` | `"#FFFFFF"` |
 | `themes/davipa.json:302` | `"#FFFFFF",` |
-| `tools/generate_ctk_themes.py:54` | `APPLE_GREY_BUTTON_TEXT = ["#FFFFFF", "#1D1D1F"]` |
-| `tools/generate_ctk_themes.py:57` | `BLACK_WHITE_HOVER = ["#000000", "#FFFFFF"]` |
-| `tools/generate_ctk_themes.py:58` | `BLACK_WHITE_BUTTON_TEXT = ["#FFFFFF", "#111111"]` |
-| `tools/generate_ctk_themes.py:63` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:64` | `("CTkFrame", "top_fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:67` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:74` | `("CTk", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:75` | `("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:76` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:77` | `("CTkFrame", "top_fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:79` | `("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],` |
-| `tools/generate_ctk_themes.py:80` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],` |
-| `tools/generate_ctk_themes.py:82` | `("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],` |
 
 ### `black`
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-03-19-theme-token-cleanup.md:98` | `- Command: `rg -n 'text_color="black"\|fg_color="white"\|dropdown_fg_color="white"\|button_hover_color="white"\|dropdown_text_color="black"\|button_color="white"\|text_color="#00C8` |
-| `docs/unused-docs/changes/2026-03-19-theme-token-cleanup.md:100` | `- Command: `rg -n 'text_color="(green\|red\|gray\|white\|black)"\|fg_color="(white\|black\|gray[0-9]+)"\|button_hover_color="white"\|dropdown_fg_color="white"\|dropdown_text_color=` |
 | `src/getmoredone/screens/item_editor_weekly_tactic_dialog.py:393` | `return "black" if luminance > 160 else "white"` |
-| `tests/test_date_picker.py:331` | `"white", "black", "darkblue", "lightblue", "lightgray", "lightgrey",` |
-| `tests/test_release_licensing.py:70` | `"flake8", "pylint", "ruff", "mypy", "black", "isort", "bandit",` |
 
 ### `blue`
 
@@ -3104,21 +2384,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/timer_window.py:892` | `status_color = "green" if self.timer_state == self.RUNNING else "blue"` |
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:248` | `"blue": palette["primary"],` |
-| `tests/test_date_picker.py:332` | `"gray", "grey", "red", "green", "blue", "yellow", "orange", "pink",` |
-| `tests/test_theme_settings.py:72` | `assert status_text_color("blue")` |
-| `tools/generate_ctk_themes.py:48` | `"blue": ["#3B8ED0", "#1F6AA5"],` |
-
-### `cyan`
-
-| File:Line | Snippet |
-|---|---|
-| `tests/test_date_picker.py:333` | `"purple", "cyan", "magenta",` |
 
 ### `gray`
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-03-19-theme-token-cleanup.md:98` | `- Command: `rg -n 'text_color="black"\|fg_color="white"\|dropdown_fg_color="white"\|button_hover_color="white"\|dropdown_text_color="black"\|button_color="white"\|text_color="#00C8` |
 | `src/getmoredone/screens/vision_planning.py:83` | `fg_color="gray", width=120).pack(side="left", padx=5)` |
 | `src/getmoredone/screens/vision_planning.py:171` | `text_color="gray"` |
 | `src/getmoredone/screens/vision_planning.py:227` | `toolbar, text="Refresh", width=80, fg_color="gray",` |
@@ -3130,8 +2400,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/vision_planning.py:629` | `text_color="gray"` |
 | `src/getmoredone/screens/vps_editors.py:1289` | `separator = ctk.CTkFrame(main_frame, height=2, fg_color="gray")` |
 | `src/getmoredone/theme.py:250` | `"gray": palette["muted_text"],` |
-| `tests/test_date_picker.py:332` | `"gray", "grey", "red", "green", "blue", "yellow", "orange", "pink",` |
-| `tests/test_theme_settings.py:71` | `assert status_text_color("gray")` |
 | `themes/apple_grey.json:176` | `"gray",` |
 | `themes/apple_grey.json:177` | `"gray"` |
 | `themes/base_dark_blue.json:73` | `"border_color": ["gray", "gray"]` |
@@ -3156,9 +2424,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/action-timer-requirements.md:587` | `color = "green"  # Warning color` |
-| `docs/unused-docs/changes/2026-03-19-theme-token-cleanup.md:98` | `- Command: `rg -n 'text_color="black"\|fg_color="white"\|dropdown_fg_color="white"\|button_hover_color="white"\|dropdown_text_color="black"\|button_color="white"\|text_color="#00C8` |
-| `docs/unused-docs/changes/2026-11-05-demo-install.md:282` | `batch's, but they make CI unable to say "green" for anyone, which is the` |
 | `src/getmoredone/screens/timer_window.py:847` | `self._update_status_label("Working...", "green")` |
 | `src/getmoredone/screens/timer_window.py:892` | `status_color = "green" if self.timer_state == self.RUNNING else "blue"` |
 | `src/getmoredone/screens/timer_window.py:1059` | `self._update_status_label("Recording...", "green")` |
@@ -3167,20 +2432,12 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/vision_planning.py:376` | `ctrl, text="Save", width=70, fg_color="green",` |
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:240` | `"green": palette["success_strong"],` |
-| `tests/test_date_picker.py:332` | `"gray", "grey", "red", "green", "blue", "yellow", "orange", "pink",` |
-| `tests/test_reward_protocol_timer.py:1572` | `timer._update_status_label("Working...", "green")` |
-| `tests/test_theme_settings.py:26` | `assert normalize_theme_name("GREEN") == "green"` |
-| `tests/test_theme_settings.py:32` | `assert theme_path_for("green").name == "green.json"` |
-| `tests/test_theme_settings.py:69` | `assert status_text_color("green")` |
-| `tools/generate_ctk_themes.py:44` | `"green": ["#2CC985", "#2FA572"],` |
 
 ### `grey`
 
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
-| `tests/test_date_picker.py:332` | `"gray", "grey", "red", "green", "blue", "yellow", "orange", "pink",` |
-| `tools/generate_ctk_themes.py:47` | `"grey": ["#475569", "#334155"],` |
 
 ### `orange`
 
@@ -3190,15 +2447,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/timer_window.py:1025` | `self._update_status_label("Resting — Resume starts another block", "orange")` |
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:245` | `"orange": palette["warning"],` |
-| `tests/test_date_picker.py:332` | `"gray", "grey", "red", "green", "blue", "yellow", "orange", "pink",` |
-| `tools/generate_ctk_themes.py:45` | `"orange": ["#C2410C", "#9A3412"],` |
 
 ### `red`
 
 | File:Line | Snippet |
 |---|---|
-| `docs/unused-docs/changes/2026-03-19-theme-token-cleanup.md:98` | `- Command: `rg -n 'text_color="black"\|fg_color="white"\|dropdown_fg_color="white"\|button_hover_color="white"\|dropdown_text_color="black"\|button_color="white"\|text_color="#00C8` |
-| `docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md:173` | ``"red"`, `"#GGG"`, `"#12345"` or a non-string is ignored per-level, the theme` |
 | `src/getmoredone/color_contrast.py:51` | `type and every browser accepts; a named colour such as ``"red"`` is not,` |
 | `src/getmoredone/screens/timer_window.py:919` | `self._update_status_label("Stopped", "red")` |
 | `src/getmoredone/screens/timer_window.py:971` | `self._update_status_label("⏰ BREAK OVER! ⏰", "red")` |
@@ -3206,24 +2459,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/vision_planning.py:315` | `fg_color="darkred", hover_color="red",` |
 | `src/getmoredone/screens/vision_planning.py:577` | `fg_color="darkred", hover_color="red",` |
 | `src/getmoredone/theme.py:243` | `"red": palette["danger"],` |
-| `tests/test_date_picker.py:332` | `"gray", "grey", "red", "green", "blue", "yellow", "orange", "pink",` |
-| `tests/test_priority_level_colors.py:332` | `"red",` |
-| `tests/test_priority_level_colors.py:1216` | `for colour in ("navy", "red", "not-a-colour", "#GGHHII"):` |
-| `tests/test_priority_level_colors.py:1597` | `for colour in ("navy", "red", "not-a-colour", "#GGHHII", "#0X1234",` |
-| `tests/test_theme_settings.py:70` | `assert status_text_color("red")` |
 
 ### `white`
 
 | File:Line | Snippet |
 |---|---|
-| `assets/icons/music_note.svg:1` | `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">` |
-| `assets/icons/pause.svg:1` | `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">` |
-| `assets/icons/play.svg:1` | `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">` |
-| `assets/icons/stop.svg:1` | `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">` |
-| `assets/icons/volume.svg:1` | `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">` |
-| `docs/action-timer-requirements.md:589` | `color = "white"  # Normal color` |
-| `docs/unused-docs/changes/2026-03-19-theme-token-cleanup.md:98` | `- Command: `rg -n 'text_color="black"\|fg_color="white"\|dropdown_fg_color="white"\|button_hover_color="white"\|dropdown_text_color="black"\|button_color="white"\|text_color="#00C8` |
-| `docs/unused-docs/changes/2026-03-19-theme-token-cleanup.md:100` | `- Command: `rg -n 'text_color="(green\|red\|gray\|white\|black)"\|fg_color="(white\|black\|gray[0-9]+)"\|button_hover_color="white"\|dropdown_fg_color="white"\|dropdown_text_color=` |
 | `src/getmoredone/screens/item_editor_weekly_tactic_dialog.py:393` | `return "black" if luminance > 160 else "white"` |
 | `src/getmoredone/screens/item_editor_weekly_tactic_dialog.py:396` | `return "white"` |
 | `src/getmoredone/screens/vision_planning.py:285` | `text_color="white", width=130, height=28, corner_radius=6,` |
@@ -3233,8 +2473,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/vision_planning.py:566` | `text_color="white", width=120, height=28, corner_radius=6,` |
 | `src/getmoredone/theme.py:120` | `"chip_text": "white",` |
 | `src/getmoredone/theme.py:253` | `"white": palette["body_text"],` |
-| `tests/test_date_picker.py:329` | `# 'white' and 'lightgray', which a hex-only check would wave straight through.` |
-| `tests/test_date_picker.py:331` | `"white", "black", "darkblue", "lightblue", "lightgray", "lightgrey",` |
 
 ### `yellow`
 
@@ -3242,35 +2480,13 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/screens/timer_window.py:954` | `self._update_status_label("⏰ BREAK TIME! ⏰", "yellow")` |
 | `src/getmoredone/theme.py:246` | `"yellow": palette["warning"],` |
-| `tests/test_date_picker.py:332` | `"gray", "grey", "red", "green", "blue", "yellow", "orange", "pink",` |
 
 ### Theme API Occurrences
 
 | File:Line | Snippet |
 |---|---|
-| `AGENTS.md:84` | `customtkinter.set_default_color_theme("path/to/theme.json")` |
-| `AGENTS.md:94` | `- call set_appearance_mode(settings.appearance_mode)` |
-| `AGENTS.md:95` | `- call set_default_color_theme(path_for_theme_name)` |
 | `src/getmoredone/theme.py:57` | `ctk.set_appearance_mode(mode)` |
 | `src/getmoredone/theme.py:65` | `ctk.set_default_color_theme(str(theme_path))` |
-| `tests/test_plan_screen.py:160` | `ctk.set_appearance_mode("light")` |
-| `tests/test_plan_screen.py:164` | `ctk.set_appearance_mode("system" if was_system else previous)` |
-| `tests/test_priority_level_colors.py:130` | `ctk.set_appearance_mode("system" if was_system else original)` |
-| `tests/test_priority_level_colors.py:307` | `ctk.set_appearance_mode(mode)` |
-| `tests/test_priority_level_colors.py:742` | `ctk.set_appearance_mode(mode)` |
-| `tests/test_time_block_colors.py:98` | `ctk.set_appearance_mode("system" if was_system else original)` |
-| `tests/test_time_block_colors.py:110` | `ctk.set_appearance_mode(mode)` |
-| `tests/test_time_block_colors.py:124` | `ctk.set_appearance_mode(mode)` |
-| `tests/test_time_block_colors.py:147` | `ctk.set_appearance_mode(mode)` |
-| `tests/test_time_block_colors.py:166` | `ctk.set_appearance_mode(mode)` |
-| `tests/test_time_block_colors.py:184` | `ctk.set_appearance_mode(mode)` |
-| `tests/test_time_block_colors.py:266` | `ctk.set_appearance_mode(mode)` |
-| `tests/test_time_block_colors.py:283` | `ctk.set_appearance_mode(mode)` |
-| `tests/test_time_block_colors.py:301` | `ctk.set_appearance_mode("Light")` |
-| `tests/test_time_block_colors.py:318` | `ctk.set_appearance_mode("Dark")` |
-| `tests/test_time_block_colors.py:337` | `ctk.set_appearance_mode(mode)` |
-| `tests/test_time_block_colors.py:362` | `ctk.set_appearance_mode(mode)` |
-| `tests/test_time_block_colors.py:395` | `ctk.set_appearance_mode(mode)` |
 
 ### Tuple / Appearance Tuple Occurrences
 
