@@ -329,7 +329,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `BACKLOG.md:374` | `it as "correct already", which is wrong: it reads `#+12345` as `#0B368D` by the` |
+| `BACKLOG.md:408` | `it as "correct already", which is wrong: it reads `#+12345` as `#0B368D` by the` |
 | `docs/DOCUMENTATION_INDEX.md:451` | ``#0B368D` from a misread slice` |
 | `docs/spec_coverage.md:1965` | `\| SCV-M2.2 \| `#+12345` falls back rather than deriving `#0B368D` from a misread slice \| same \| `::test_scvm22_a_colour_that_parses_wrongly_is_not_derived_from` \| done \|` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:29` | `\| `#+12345` \| `True` \| `None` \| `#0B368D` — no error, a colour derived from garbage \|` |
@@ -852,7 +852,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `BACKLOG.md:355` | `(`:1406`) both return `row["color_hex"] or "#334155"`, i.e. whatever the` |
+| `BACKLOG.md:389` | `(`:1406`) both return `row["color_hex"] or "#334155"`, i.e. whatever the` |
 | `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:110` | `slate `#334155` and the text is the stored value. Before 2026-11-11` |
 | `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:145` | `stored colour is malformed, the swatch is slate `#334155` and the text is` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:103` | ``(row["color_hex"] or "").strip() or "#334155"`, i.e. the raw stored value.` |

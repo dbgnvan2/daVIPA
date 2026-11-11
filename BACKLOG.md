@@ -224,6 +224,40 @@ Two things the plan step has to settle, both recorded in the spec:
 **Priority:** Next feature
 **Effort:** High (two batches)
 
+## Open decision — the colour inventory's scan scope (CIV, filed 2026-11-11)
+
+Raised as high severity by two independent cold passes over the batch that
+made `tools/color_audit.py` deterministic and gated it with
+`tests/test_color_inventory_sync.py`. It is a decision about what the document
+is for, not a defect, so it was left for the repo owner rather than settled in
+the batch.
+
+### CIV-A1 — the scan covers the whole repository, not just UI code (high — a decision)
+
+`SCAN_COMMANDS` passes `.`, excluding only the report itself, `themes/**`
+(scanned once by `theme_files`) and the gate's own fixture file. So every
+colour literal in every document, spec, plan, archive and test counts as UI
+colour usage, which has four measured consequences:
+
+- Test files are reported as the app's colours. Measured 2026-11-11: of the
+  `tuples` scan's 5 lines, 3 came from the gate's own fixtures — fixed for
+  that one file by `_NOT_GATE`, but other test files still contribute.
+- A docs-only edit turns the suite red. The occurrence rows quote the matched
+  line and cite it by number, so editing a comment that mentions a colour, or
+  inserting lines above one, makes the committed report stale. This happened
+  twice inside the batch. It sits against this repo's own rule that a document
+  alone earns no sweep.
+- 143 occurrence rows are malformed markdown, from backticks inside snippets
+  taken from `.md` files.
+- Section 1's own "Hard Rule" is about hard-coded colours in UI code, which is
+  not what the scan measures.
+
+Narrowing to `src/` and `themes/` fixes all four and matches that Hard Rule.
+It also drops roughly a third of the document's content, which is why it is a
+decision: the question is whether the inventory is a UI-code audit or a
+repository-wide census. Either answer is implementable in `SCAN_COMMANDS`
+alone; the gate, the determinism tests and the CI wiring are unaffected.
+
 ## Adjacent issues — CI green (CIG, 2026-11-09)
 
 Found while building `CIG-M1` to `CIG-M4`. Flagged per rule 10, not fixed: each
