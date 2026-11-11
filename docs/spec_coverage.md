@@ -1967,12 +1967,20 @@ Closes `LRR-A1`, medium, filed 2026-11-10. Tests are in
 | SCV-M4.1 | `row_fill` returns a `#RRGGBB` fill or none at all, never the raw stored value | `priority_levels.py::row_fill` | `tests/test_priority_level_colors.py::test_scvm41_a_malformed_segment_colour_does_not_become_a_fill` | done |
 | SCV-M5.1 | `segment_descriptions.color_hex` is gated where it is written, not only in the dialog; the shipped seeds are already normalised | `vps_manager.py::VPSManager._segment_color_to_store`, called from `::create_segment` and `::update_segment` | `::test_scvm51_the_segment_writers_refuse_and_normalise_a_colour`, `::test_scvm51_the_vsp_admin_writers_cannot_store_a_bad_colour`, `::test_scvm51_the_seeded_segments_are_already_normalised` | done |
 
+| SCV-M6.1 | `_create_or_get_vision_subsegment` / `_create_or_get_vision_category` store the normalised colour rather than the text as typed | `vps_manager_taxonomy.py::_create_or_get_vision_subsegment`, `::_create_or_get_vision_category` | `::test_scvm61_the_create_helpers_store_a_normalised_colour`, `::test_scvm61_the_category_helper_stores_a_normalised_colour` | done |
+| SCV-M6.2 | The segment editor opens on a malformed stored colour, with the stored text in the entry and a readable swatch | `screens/vps_segment_editor.py::VPSSegmentEditorDialog.__init__`, `::load_segment_data` | `::test_scvm62_the_segment_editor_opens_on_a_malformed_stored_colour` | done |
+| SCV-M6.3 | Every remaining site that hands a stored colour to `ctk.CTkFrame(fg_color=…)` is gated: the accent stripe, the screens' colour owner, the category chip and the Vision Elements swatch | `theme.py::apply_segment_accent`, `screens/segment_color_utils.py::_normalize_color`, `::resolve_chip_colors`, `screens/vision_segments.py::VisionSegmentsScreen._color_input` | `::test_scvm63_the_accent_stripe_refuses_an_unreadable_colour`, `::test_scvm63_the_colour_maps_normalise_what_they_hand_out`, `::test_scvm63_the_colour_dialogs_open_on_a_malformed_stored_colour` | done |
+| SCV-M6.5 | A repair pass logs what it rewrote, "N of M", naming the replaced values | `vps_manager_taxonomy.py::VPSTaxonomyMixin._report_colour_repair` | `::test_scvm65_the_repair_pass_says_what_it_rewrote` | done |
+| SCV-M6.6 | The category pass queries the subsegments and the colour map at most once per call, not once per bad row | `vps_manager_taxonomy.py::get_vision_categories`, `::get_vision_subsegments` | `::test_scvm66_the_category_pass_does_not_requery_per_row` | done |
+| SCV-M6.7 | A colour guessed for a segment with no Settings entry is shown and not stored | `vps_manager.py::VPSManager.match_segment_color`, `vps_manager_taxonomy.py::get_vision_subsegments` | `::test_scvm67_an_unloaded_segment_colour_is_not_persisted` | done |
+
 One item is not code-testable and is reported as a three-step manual
 checklist instead: what the segment editor and the VSP screens do on screen
 (plan §6). Two adjacent issues are filed rather than swept, as `BACKLOG.md`'s
-`SCV-A1` and `SCV-A2`; a third, already correct, is recorded in
-`::test_scvm11_no_hand_rolled_hex_validator_survives`'s docstring as `SCV-A3`
-so the next reader does not "fix" it.
+`SCV-A1` and `SCV-A2`. A third is `SCV-A3`, which the plan's §5 recorded as
+"correct already" and which is not: `_text_color_for_background` misreads the
+same sign/prefix family, with a cosmetic consequence and no live caller that
+reaches it. Filed with that correction rather than fixed.
 
 **SCV-M5.1 was not in the approved plan.** It is a medium finding from a cold
 pass over the plan and the working tree, run by another session on 2026-11-11,
@@ -1996,3 +2004,18 @@ no longer asserts the raw value is the fill (SCV-M4.1), and
 no longer lists `#abc` and `aabbcc` as refusals (SCV-M1.3, plan §4), and
 `::test_bc3_the_editor_seeds_its_colour_from_the_segment` asserts the stored
 `#0A1B2C` rather than the `#0a1b2c` it was created with (SCV-M5.1).
+
+**SCV-M6 is the cold pass's own findings.** The required cold `learning-qa`
+pass over `1b23d92` returned seven, two of them high, and `CLAUDE.md` fixes
+medium-or-higher in the session that finds them. SCV-M6.4 has no row because
+that finding was a docstring overclaim, not a defect: `hex_to_rgb` said it was
+"the one place in the app" that slices a colour, and `row_fill` said it was
+"the last gate before `ctk.CTkFrame(fg_color=…)`". Both are corrected in
+place, and SCV-M6.3 is what the second one being false actually cost.
+
+Two further tests changed for SCV-M6.3, both reason (b):
+`tests/test_unified_panel_design.py::test_updm56_a_row_with_no_category_colour_takes_the_subsegments`
+and `::test_updm62_a_row_with_no_category_colour_takes_the_subsegments` now
+expect the canonical `#RRGGBB` from the chip resolver. No consumer in `src/`
+compares one of those values by equality; the repair pass's own `color ==
+stored` compares against the database, not against a resolved colour.

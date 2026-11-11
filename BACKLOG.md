@@ -294,8 +294,8 @@ be the third design for these tests in one day.
 
 Found while building PLC-M1 to PLC-M5. Flagged, not fixed (global rule 10):
 each is real, none is what was asked for, and a fix for any of them would be a
-silent sweep of behaviour nobody asked about. `SCV-A1` and `SCV-A2` were added
-2026-11-11 on the same terms, by the batch that closed `LRR-A1`.
+silent sweep of behaviour nobody asked about. `SCV-A1`, `SCV-A2` and `SCV-A3` were
+added 2026-11-11 on the same terms, by the batch that closed `LRR-A1`.
 
 ### SCV-A1 — `interpolate_hex_color` slices into `int(…, 16)` with no guard (low)
 
@@ -319,13 +319,32 @@ counts it, so it cannot multiply unnoticed.
 database holds. The by-name one is the load-bearing half — it feeds
 `resolve_segment_color`, and so `_derive_subsegment_color` and `row_fill`.
 
-`SCV-M4` closed the row-fill reader and `SCV-M5` gated every writer of
-`segment_descriptions.color_hex`, so a malformed value has to predate
-2026-11-11 to be in there at all, and no code path can add one. What is left is
-a survey of the maps' other readers, which is the work here — not a normalising
-wrapper on the maps, which would hide which readers needed one.
+`SCV-M4` closed the row-fill reader, `SCV-M6.3` closed the accent stripe and
+the screens' own `segment_color_utils._normalize_color`, and `SCV-M5` gated
+every writer of `segment_descriptions.color_hex`, so a malformed value has to
+predate 2026-11-11 to be in there at all and no code path can add one. What is
+left is a survey of the maps' *other* readers, which is the work here — not a
+normalising wrapper on the maps, which would hide which readers needed one.
 
 **Priority:** Medium
+**Effort:** Low
+
+### SCV-A3 — `_text_color_for_background` misreads the `int(…, 16)` family (low)
+
+`color_contrast.py`'s private `_text_color_for_background` slices and parses
+its argument without going through `_HEX_COLOR_RE`, so it is the third member
+of the family `SCV-M1` removed from the other two. The SCV plan's §5 recorded
+it as "correct already", which is wrong: it reads `#+12345` as `#0B368D` by the
+same misread slice `_derive_subsegment_color` did, and answers for the wrong
+background.
+
+Left as low because the consequence is cosmetic and bounded — one text colour
+on one widget, no raise and no stored value — and because every caller now
+reaches it through a normalised colour, so the misread needs a new caller to
+become visible. Fixing it inside the SCV batch would have meant touching the
+authority module's maths for a case no live path produces.
+
+**Priority:** Low
 **Effort:** Low
 
 ### PLC-A2 — Hierarchical and Completed ignore their own segment colour for the fill (low)

@@ -5,12 +5,20 @@
 
 ## Summary
 
-SCV-M1 to SCV-M4, closing `BACKLOG.md`'s `LRR-A1`. Both hand-rolled hex
+SCV-M1 to SCV-M6, closing `BACKLOG.md`'s `LRR-A1`. Both hand-rolled hex
 validators now answer from `color_contrast`; `color_contrast.hex_to_rgb` is the
-one place in the app that slices a colour string into `int(..., 16)`.
+one place in the segment-colour path that slices a colour string into
+`int(..., 16)`.
 
-This note exists for the three on-screen checks no test covers, and for one
-claim this batch did not re-measure.
+SCV-M6 is the required cold `learning-qa` pass's own seven findings, two of
+them high, fixed in this batch because `CLAUDE.md` fixes medium-or-higher in
+the session that finds them. The high ones both say the same thing: the gate
+was narrower than the claim made for it. `row_fill` said it was the last gate
+before `ctk.CTkFrame(fg_color=…)`; four more sites took a stored colour there,
+including `apply_segment_accent` on the next line of all five row builders.
+
+This note exists for the on-screen checks no test covers, and for one claim
+this batch set out not to re-measure and then measured by accident.
 
 ## Files changed
 
@@ -25,7 +33,11 @@ claim this batch did not re-measure.
   `update_vision_subsegment_color`, `update_vision_subsegment`,
   `update_vision_category`
 - `src/getmoredone/screens/vps_segment_editor.py` — `validate_color`,
-  `save_segment`
+  `save_segment`, and `__init__` / `load_segment_data` (SCV-M6.2)
+- `src/getmoredone/theme.py` — `apply_segment_accent` (SCV-M6.3)
+- `src/getmoredone/screens/segment_color_utils.py` — `_normalize_color`,
+  `resolve_chip_colors` (SCV-M6.3)
+- `src/getmoredone/screens/vision_segments.py` — `_color_input` (SCV-M6.3)
 - `src/getmoredone/priority_levels.py` — `row_fill`, `RowFill`'s docstring,
   `_warn_unreadable_segment_color`'s message
 - `tests/test_segment_colour_validation.py` (new),
@@ -53,17 +65,18 @@ claim this batch did not re-measure.
 
 ## Risks / Known gaps
 
-- **The `TclError` half of `LRR-A1` was never measured, by that filing or by
-  this batch.** `LRR-A1` asserted that a raw value reaching
-  `ctk.CTkFrame(fg_color=…)` raises `TclError` part-way through a refresh and
-  takes the list screen down. No session has put a widget on screen to confirm
-  it. SCV-M4.1 is written so the value never gets there, which does not depend
-  on the claim being exact. Two things found while building do support it,
-  without closing it: `color_contrast`'s module docstring states that
-  `int("0X1234", 16)` succeeds while Tk raises on `#0X1234`, and
-  `tests/test_priority_level_colors.py::test_plcm3_the_section_builds_on_real_widgets`
-  exercises the Tk side of `normalize_hex_color` for the priority-level
-  colours. Nothing found contradicts it.
+- **The `TclError` half of `LRR-A1` is now measured, and it holds.** Neither
+  that filing nor the SCV plan measured it: `LRR-A1` asserted that a raw value
+  reaching `ctk.CTkFrame(fg_color=…)` raises `TclError` part-way through a
+  refresh and takes the list screen down, and no session had put a widget on
+  screen to confirm it. Mutation-proving SCV-M6.3's dialog test did: with the
+  verbatim pre-fix body of `vision_segments._color_input` restored,
+  `ctk.CTkFrame(..., fg_color="#0X1234")` raised
+  `_tkinter.TclError: invalid color name "#0X1234"` from `tkinter/__init__.py`
+  at widget construction. What is still not measured is the *consequence* —
+  that the raise blanks the screen rather than losing one row — because that
+  depends on where the caller's own try/except sits, and none of the five row
+  builders has one around the row loop.
 - **The repair pass now rewrites a stored colour that is merely not
   canonical**, not only one that is unreadable: a row holding `#1a2b3c` is
   rewritten to `#1A2B3C` on the first read after this change, and a row
@@ -78,8 +91,17 @@ claim this batch did not re-measure.
   malformed one has to predate 2026-11-11. Correcting it means re-setting the
   colour in the editor. Checklist item 3 below says so.
 - **Both segment colour maps still hand callers the raw stored value**
-  (`BACKLOG.md`'s `SCV-A2`, which now names the pair). `row_fill` is
-  protected; the maps' other readers were not surveyed.
+  (`BACKLOG.md`'s `SCV-A2`, which now names the pair). `row_fill`,
+  `apply_segment_accent` and the screens' own `_normalize_color` are all
+  gated, so the drawing path is covered; the maps' other readers were not
+  surveyed.
+- **A repair pass now writes a line to `app.log` saying what it rewrote.** The
+  first read after this change canonicalises every subsegment and category row
+  whose colour is not already upper-case `#RRGGBB`, so that line will name a
+  lot of rows once, then nothing. It is a `WARNING` because overwriting a
+  stored value the user set is worth seeing; if the one-time volume is a
+  nuisance it should become `INFO` for the already-readable case and stay
+  `WARNING` for the unreadable one, which is not done here.
 
 ## Next agent actions
 
@@ -105,3 +127,15 @@ in rather than to a value the test supplied.
    repaired ones). The **segment's own** colour is not repaired — it still
    reads back malformed in the editor, and `app.log` still names it on each
    fresh launch. Re-set it in the editor to clear it.
+4. **VSP → Vision Elements → edit a subsegment, then a category.** Both
+   dialogs open, each showing a swatch and the stored text. If either one's
+   stored colour is malformed, the swatch is slate `#334155` and the text is
+   the stored value; before 2026-11-11 the dialog raised on opening, which is
+   SCV-M6.3's half of the same defect as item 1's.
+5. **Open Today or All Items on a segment whose colour is malformed, and look
+   at the left edge of its rows.** Expected: no accent stripe and no fill,
+   and the screen renders. Before 2026-11-11 `row_fill` dropped the fill and
+   `apply_segment_accent` raised on the next line with the same value, so
+   dropping the fill bought nothing. This is the check that the two gates are
+   both in place; it cannot be read off the tests, which drive the two
+   functions separately.

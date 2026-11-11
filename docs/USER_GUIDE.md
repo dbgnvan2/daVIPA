@@ -827,10 +827,12 @@ Priority Colours (added 2026-11-08):
   dark theme instead of keeping the theme's near-white row text.
   - Since 2026-11-11 a segment colour that is **not** a `#RRGGBB` value draws
     no fill at all, so those rows look as they would with no segment colour
-    set, and `app.log` names the value once. Before that the value was passed
-    to the row as given and could blank the screen it was drawn on. A colour
-    set in the segment editor is always a `#RRGGBB` value, so this applies
-    only to one left behind by an earlier version.
+    set, and `app.log` names the value once. The narrow accent stripe at the
+    left edge of the row is dropped for the same value, so a row with an
+    unreadable segment colour has neither. Before that the value was passed to
+    the row as given and could blank the screen it was drawn on. A colour set
+    in the segment editor is always a `#RRGGBB` value, so this applies only to
+    one left behind by an earlier version.
 - A saved colour shows the next time you open one of those screens; no relaunch
   is needed.
 - These are **not** the Plan screen's priority bands. A band comes from the
@@ -928,7 +930,13 @@ VSP Life Segments:
   digits — `#0X1234`, `#1_2345`, `#+12345`, `# 12345` and `#-12345` were all
   accepted before that and could not be drawn. The same refusal now applies
   wherever a segment colour is saved, including VSP → Vision Elements' segment
-  admin, which had no check of its own.
+  admin, which had no check of its own. The editor also **opens** on a colour
+  left behind by an earlier version: the field shows the stored value so you
+  can see what to correct, and the swatch beside it shows a neutral slate
+  instead. Before 2026-11-11 the dialog failed to open at all on such a value,
+  which made it the one screen that could not repair what only it could
+  repair. The same is true of the subsegment and category colour dialogs on
+  VSP → Vision Elements.
 - **Refresh** — What: Reloads the list. Why: See recent changes.
 - **Edit** — What: Modify segment details. Why: Keep segments accurate.
 - **Delete** — What: Deletes a segment if no linked VSP records exist. Why: Clean up unused segments.
