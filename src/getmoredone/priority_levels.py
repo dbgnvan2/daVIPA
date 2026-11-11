@@ -204,14 +204,14 @@ _warned_segment_colors: set = set()
 
 
 def _warn_unreadable_segment_color(value: Any) -> None:
-    """Log a segment colour no contrast can be derived from, once per value."""
+    """Log a segment colour that cannot be drawn, once per value."""
     key = repr(value)
     if key in _warned_segment_colors:
         return
     _warned_segment_colors.add(key)
     logger.warning(
-        "Segment colour %r is not a #RRGGBB value, so a row filled with it "
-        "keeps the theme's text colour and may be hard to read. Set it again "
+        "Segment colour %r is not a #RRGGBB value, so rows in that segment "
+        "are drawn with no fill rather than risking a Tk error. Set it again "
         "in Vision Planning > Vision Elements.",
         value,
     )
@@ -279,9 +279,10 @@ class RowFill:
     means "leave the screen's own ``row_text`` alone". A ``level`` or
     ``segment`` fill carries one, because both are colours the user chose with
     no theme behind them: a pale green row in the dark theme needs dark text,
-    and the theme's ``row_text`` there is near-white. A ``segment`` fill
-    Tk accepts but ``normalize_hex_color`` cannot read is the one exception --
-    there is nothing to derive from, so it falls back to ``None`` (LRR-M2.1).
+    and the theme's ``row_text`` there is near-white. A segment colour
+    ``normalize_hex_color`` cannot read is the one exception: it yields no
+    fill and no text colour at all, so the row draws exactly as it would with
+    no segment colour set (LRR-M2.1, then SCV-M4.1 for the fill).
 
     The completed tint keeps the theme's text colour, and that is a decision
     rather than an omission: ``success_tint`` is a theme token, paired in the
@@ -328,17 +329,24 @@ def row_fill(
 
     A segment fill derives its text colour the same way a level fill does, so
     a pale VSP segment colour no longer draws the dark theme's near-white
-    ``row_text`` on itself (LRR-M2.1, closing ``PLC-A1``). The fill itself is
-    passed through exactly as given, including a value ``normalize_hex_color``
-    rejects: what colour a row draws is not what ``PLC-A1`` was about, and
-    changing it here would be the silent sweep that filing it avoided.
+    ``row_text`` on itself (LRR-M2.1, closing ``PLC-A1``).
+
+    **The fill is the normalised value, or no fill at all (SCV-M4.1).** It
+    used to be the raw stored value, passed through exactly as given --
+    including a value ``normalize_hex_color`` rejects -- on the grounds that
+    what colour a row draws was not what ``PLC-A1`` named. ``LRR-A1`` then
+    filed the consequence: this is the last gate before
+    ``ctk.CTkFrame(fg_color=…)`` in five row builders, and a value Tk cannot
+    parse raises ``TclError`` part-way through a refresh and takes the list
+    screen down. A row with no fill is a row that looks like it did before the
+    user set a colour; a raised ``TclError`` is a blank screen.
     """
     if segment_color:
-        # Derived only from a value that can be read. ``pick_text_color``
-        # answers black for anything it cannot parse, and black on an unknown
-        # background can be worse than the theme's own row text -- black on
-        # ``navy`` is about 1.3:1 -- so an unreadable colour keeps today's
-        # behaviour instead of being guessed at.
+        # ``pick_text_color`` answers black for anything it cannot parse, and
+        # black on an unknown background can be worse than the theme's own row
+        # text -- black on ``navy`` is about 1.3:1 -- so an unreadable colour
+        # gets no derived text colour either. The source stays ``segment``:
+        # the precedence decision was made, and only the colour is missing.
         readable = normalize_hex_color(segment_color)
         if readable is None:
             # Said once per value, not once per row: five list screens call
@@ -347,7 +355,7 @@ def row_fill(
             # from "a colour nobody could read" in app.log.
             _warn_unreadable_segment_color(segment_color)
         return RowFill(
-            segment_color,
+            readable,
             pick_text_color(readable) if readable else None,
             SOURCE_SEGMENT,
         )

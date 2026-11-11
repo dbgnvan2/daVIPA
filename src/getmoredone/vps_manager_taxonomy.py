@@ -6,6 +6,7 @@ import sqlite3
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
+from .color_contrast import normalize_hex_color
 from .link_integrity import resolve_segment_id_exact
 
 
@@ -125,12 +126,21 @@ class VPSTaxonomyMixin:
         query += " ORDER BY s.name COLLATE NOCASE ASC, ss.name COLLATE NOCASE ASC"
         cursor = self.db.conn.execute(query, params)
         rows = [dict(row) for row in cursor.fetchall()]
+        # SCV-M3.1: the gate was ``_is_valid_hex_color``, which called
+        # ``#0X1234`` valid, so the pass that exists to replace a bad colour
+        # skipped exactly the class of bad colour that then crashed the read.
+        # It now asks ``normalize_hex_color``, and writes whenever the stored
+        # text is not already the form it should be stored in.
+        # Tests: tests/test_segment_colour_validation.py::test_scvm31_the_repair_pass_sees_a_malformed_stored_colour
         changed = False
         for row in rows:
-            if self._is_valid_hex_color(row.get("color_hex")):
+            stored = row.get("color_hex")
+            color = normalize_hex_color(stored)
+            if color is None:
+                parent = self.resolve_segment_color(row.get("segment_name", ""), self.get_segment_color_map())
+                color = self._derive_subsegment_color(parent)
+            if color == stored:
                 continue
-            parent = self.resolve_segment_color(row.get("segment_name", ""), self.get_segment_color_map())
-            color = self._derive_subsegment_color(parent)
             row["color_hex"] = color
             self.db.conn.execute(
                 "UPDATE vision_subsegments SET color_hex = ?, updated_at = ? WHERE id = ?",
@@ -160,16 +170,21 @@ class VPSTaxonomyMixin:
         query += " ORDER BY s.name COLLATE NOCASE ASC, ss.name COLLATE NOCASE ASC, c.name COLLATE NOCASE ASC"
         cursor = self.db.conn.execute(query, params)
         rows = [dict(row) for row in cursor.fetchall()]
+        # SCV-M3.1, as in ``get_vision_subsegments`` above. The inner
+        # ``if not self._is_valid_hex_color(sub_color)`` that stood here was
+        # dead: ``sub_color`` was this row's own colour, which the outer gate
+        # had already declared invalid, so the condition was always true.
         changed = False
         for row in rows:
-            if self._is_valid_hex_color(row.get("color_hex")):
-                continue
-            sub_color = (row.get("color_hex") or "").strip()
-            if not self._is_valid_hex_color(sub_color):
+            stored = row.get("color_hex")
+            color = normalize_hex_color(stored)
+            if color is None:
                 subsegments = self.get_vision_subsegments(row.get("segment_name"))
                 sub = next((s for s in subsegments if (s.get("name") or "").lower() == (row.get("subsegment_name") or "").lower()), None)
                 sub_color = (sub or {}).get("color_hex") or self.default_subsegment_color_for_segment(row.get("segment_name") or "")
-            color = self._derive_subsegment_color(sub_color)
+                color = self._derive_subsegment_color(sub_color)
+            if color == stored:
+                continue
             row["color_hex"] = color
             self.db.conn.execute(
                 "UPDATE vision_categories SET color_hex = ?, updated_at = ? WHERE id = ?",
@@ -321,9 +336,15 @@ class VPSTaxonomyMixin:
         return ve_id
 
     def update_vision_subsegment_color(self, subsegment_id: str, color_hex: str) -> bool:
-        """Update a subsegment color."""
-        value = (color_hex or "").strip().upper()
-        if not self._is_valid_hex_color(value):
+        """Update a subsegment color.
+
+        SCV-M1.1/M3.1: the normalised form is what is stored. The gate used to
+        be ``_is_valid_hex_color`` over ``.strip().upper()``, and now that the
+        gate reads ``#abc``, storing the text as given would write a
+        four-character colour to the table.
+        """
+        value = normalize_hex_color(color_hex)
+        if value is None:
             raise ValueError("Invalid color. Use format #RRGGBB.")
         cur = self.db.conn.execute(
             "UPDATE vision_subsegments SET color_hex = ?, updated_at = ? WHERE id = ?",
@@ -1023,7 +1044,10 @@ class VPSTaxonomyMixin:
         new_name = (name or "").strip()
         if not new_name:
             raise ValueError("SubSegment name is required.")
-        if color_hex and not self._is_valid_hex_color(color_hex):
+        # SCV-M1.1/M3.1: validate and normalise in one call, and store what it
+        # returns rather than the text as typed.
+        stored_color = normalize_hex_color(color_hex) if color_hex else None
+        if color_hex and stored_color is None:
             raise ValueError("Invalid color. Use #RRGGBB.")
 
         row = self.db.conn.execute(
@@ -1036,7 +1060,7 @@ class VPSTaxonomyMixin:
             self.rename_vision_subsegment(subsegment_id, new_name)
         cur = self.db.conn.execute(
             "UPDATE vision_subsegments SET color_hex = ?, description = ?, vision_text = ?, updated_at = ? WHERE id = ?",
-            ((color_hex or "").strip().upper() if color_hex else None, (description or "").strip(), (vision_text or "").strip(), datetime.now().isoformat(), subsegment_id),
+            (stored_color, (description or "").strip(), (vision_text or "").strip(), datetime.now().isoformat(), subsegment_id),
         )
         self.db.conn.commit()
         return cur.rowcount > 0
@@ -1052,7 +1076,9 @@ class VPSTaxonomyMixin:
         new_name = (name or "").strip()
         if not new_name:
             raise ValueError("Category name is required.")
-        if color_hex and not self._is_valid_hex_color(color_hex):
+        # SCV-M1.1/M3.1, as in ``update_vision_subsegment``.
+        stored_color = normalize_hex_color(color_hex) if color_hex else None
+        if color_hex and stored_color is None:
             raise ValueError("Invalid color. Use #RRGGBB.")
         row = self.db.conn.execute(
             "SELECT id, name FROM vision_categories WHERE id = ?",
@@ -1064,7 +1090,7 @@ class VPSTaxonomyMixin:
             self.rename_vision_category(category_id, new_name)
         cur = self.db.conn.execute(
             "UPDATE vision_categories SET color_hex = ?, description = ?, vision_text = ?, updated_at = ? WHERE id = ?",
-            ((color_hex or "").strip().upper() if color_hex else None, (description or "").strip(), (vision_text or "").strip(), datetime.now().isoformat(), category_id),
+            (stored_color, (description or "").strip(), (vision_text or "").strip(), datetime.now().isoformat(), category_id),
         )
         self.db.conn.commit()
         return cur.rowcount > 0

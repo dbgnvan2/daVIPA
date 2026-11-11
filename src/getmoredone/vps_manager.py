@@ -12,6 +12,7 @@ from typing import Optional, List, Dict, Any, Tuple
 from uuid import uuid4
 from calendar import monthrange
 
+from .color_contrast import hex_to_rgb, normalize_hex_color
 from .database import Database
 from .db_manager import DatabaseManager
 from .link_integrity import (
@@ -155,26 +156,50 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
             self.db.conn.commit()
         return updated
 
+    #: Where a derived colour starts when its base cannot be read.
+    DEFAULT_SUBSEGMENT_BASE = "#64748B"
+
     @staticmethod
     def _is_valid_hex_color(value: Optional[str]) -> bool:
-        text = (value or "").strip()
-        if len(text) != 7 or not text.startswith("#"):
-            return False
-        try:
-            int(text[1:], 16)
-            return True
-        except ValueError:
-            return False
+        """Whether ``value`` is a colour ``color_contrast`` can read.
+
+        Purpose: SCV-M1.1 -- one authority for "is this a colour". This was
+                 three hand-written checks ending in ``int(text[1:], 16)``,
+                 which accepts a leading sign, an ``0x`` prefix and PEP-515
+                 underscores, so ``#0X1234`` passed a validator written to
+                 mean "six hex digits" and then raised in ``Tk`` and in
+                 ``_derive_subsegment_color``.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m1
+        Tests:   tests/test_segment_colour_validation.py::test_scvm12_the_validators_refuse_what_int_base_16_allows
+
+        Wider than the old check in one direction, deliberately (plan §4):
+        ``normalize_hex_color`` expands ``#abc`` and supplies a missing ``#``.
+        Every caller that *stores* the value therefore stores the normalised
+        form, never the text it was handed.
+        """
+        return normalize_hex_color(value) is not None
 
     @staticmethod
     def _derive_subsegment_color(segment_color: str) -> str:
-        """Return a lighter related hue for subsegments."""
-        base = (segment_color or "").strip()
-        if not VPSManager._is_valid_hex_color(base):
-            base = "#64748B"
-        r = int(base[1:3], 16) / 255.0
-        g = int(base[3:5], 16) / 255.0
-        b = int(base[5:7], 16) / 255.0
+        """Return a lighter related hue for subsegments.
+
+        Purpose: SCV-M2 -- this is the measured crash. It asked its own gate
+                 whether the base was a colour, was told yes, and then sliced
+                 ``base[1:3]`` into ``int(…, 16)``: ``#0X1234`` raised
+                 ``ValueError`` inside ``get_vision_subsegments()``, and
+                 ``#+12345`` raised nothing and derived ``#0B368D`` from a
+                 misread slice, which is worse.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m2
+        Tests:   tests/test_segment_colour_validation.py::test_scvm21_deriving_from_a_malformed_colour_falls_back,
+                 ::test_scvm22_a_colour_that_parses_wrongly_is_not_derived_from
+
+        Normalising first means ``hex_to_rgb`` is reached only with a value
+        ``_HEX_COLOR_RE`` matched, so it cannot raise here and there is no
+        slice left outside the authority. Callers hand this whatever the
+        database holds, including ``None``, so it answers for every input.
+        """
+        base = normalize_hex_color(segment_color) or VPSManager.DEFAULT_SUBSEGMENT_BASE
+        r, g, b = (channel / 255.0 for channel in hex_to_rgb(base))
         h, l, s = colorsys.rgb_to_hls(r, g, b)
         h = (h + (10.0 / 360.0)) % 1.0
         s = min(1.0, max(0.0, s * 0.88))

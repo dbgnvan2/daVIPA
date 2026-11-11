@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 from tkinter import messagebox, colorchooser
 
+from ..color_contrast import normalize_hex_color
 from ..theme import button_style
 
 if TYPE_CHECKING:
@@ -175,16 +176,21 @@ class VPSSegmentEditorDialog(ctk.CTkToplevel):
             self.color_preview.configure(fg_color=self.selected_color)
 
     def validate_color(self, color_hex: str) -> bool:
-        """Validate that color_hex is a valid hex color."""
-        if not color_hex.startswith('#'):
-            return False
-        if len(color_hex) != 7:
-            return False
-        try:
-            int(color_hex[1:], 16)
-            return True
-        except ValueError:
-            return False
+        """Validate that color_hex is a colour ``color_contrast`` can read.
+
+        Purpose: SCV-M1.1 -- one authority for "is this a colour". This was
+                 ``startswith("#")``, ``len() == 7`` and
+                 ``int(color_hex[1:], 16)``, so ``#0X1234``, ``#1_2345`` and
+                 ``#+12345`` all passed and went on to reach
+                 ``ctk.CTkFrame(fg_color=…)`` in five row builders.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m1
+        Tests:   tests/test_segment_colour_validation.py::test_scvm12_the_validators_refuse_what_int_base_16_allows
+
+        Accepts ``#abc`` and a missing ``#``, which the old check refused --
+        see plan §4. ``save_segment`` stores what ``normalize_hex_color``
+        returns, so the widening never puts a short form in the database.
+        """
+        return normalize_hex_color(color_hex) is not None
 
     def save_segment(self):
         """Validate and save the segment."""
@@ -197,13 +203,18 @@ class VPSSegmentEditorDialog(ctk.CTkToplevel):
         description = self.description_text.get("1.0", "end-1c").strip()
 
         # Get color from entry field (user might have typed it)
-        color_hex = self.color_entry.get().strip()
-        if not self.validate_color(color_hex):
+        typed_color = self.color_entry.get()
+        if not self.validate_color(typed_color):
             messagebox.showerror(
                 "Validation Error",
                 "Invalid color code. Must be in format #RRGGBB (e.g., #4A90E2)"
             )
             return
+        # SCV-M1.3: the normalised form is what is stored, never the typed
+        # text. ``validate_color`` accepts ``#abc`` and a missing ``#``, and
+        # storing either as typed would put a value in the database that every
+        # reader has to expand again.
+        color_hex = normalize_hex_color(typed_color)
 
         try:
             order_index = int(self.order_entry.get().strip())

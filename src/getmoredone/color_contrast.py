@@ -72,12 +72,28 @@ def _srgb_channel_to_linear(channel: int) -> float:
     return ((c_srgb + 0.055) / 1.055) ** 2.4
 
 
+def hex_to_rgb(hex_color: str) -> "tuple[int, int, int]":
+    """The three 0-255 channels of a ``#RRGGBB`` colour.
+
+    Purpose: SCV-M1.1 -- the one place in the app that slices a colour string
+             into ``int(…, 16)``, so that parse can never be mistaken for a
+             validator again. See this module's ``_HEX_COLOR_RE`` note for
+             why it must not be one.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m1
+    Tests:   tests/test_segment_colour_validation.py::test_scvm11_no_hand_rolled_hex_validator_survives
+
+    Raises ``ValueError`` for anything ``_HEX_COLOR_RE`` does not match, which
+    is deliberate: a caller holding a value that might be malformed asks
+    ``normalize_hex_color`` first and falls back on ``None``, and a caller
+    that has already done so cannot reach the raise.
+    """
+    color = _normalize_hex(hex_color)
+    return int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
+
+
 def relative_luminance(hex_color: str) -> float:
     """Compute WCAG relative luminance for #RRGGBB."""
-    color = _normalize_hex(hex_color)
-    r = int(color[1:3], 16)
-    g = int(color[3:5], 16)
-    b = int(color[5:7], 16)
+    r, g, b = hex_to_rgb(hex_color)
     r_lin = _srgb_channel_to_linear(r)
     g_lin = _srgb_channel_to_linear(g)
     b_lin = _srgb_channel_to_linear(b)
