@@ -21,36 +21,26 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = REPO_ROOT / "docs" / "ui_color_inventory.md"
 
 HEX_PATTERN = "#[0-9a-fA-F]{6}\\b|#[0-9a-fA-F]{3}\\b"
-NAMED_PATTERN = (
-    r'"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)"'
-    r"|'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)'"
+# CustomTkinter's grays carry a lightness suffix (`gray95`), which a bare-word
+# list missed: 539 of the 544 lines holding one, 527 of them in themes/ with no
+# other colour, so they appeared nowhere at all. Measured 2026-11-11.
+# Tests: tests/test_color_inventory_sync.py::test_civm15_gray_scale_literals_reach_the_named_tables
+_NAMED_WORDS = (
+    "darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black"
+    "|gray[0-9]{0,3}|grey[0-9]{0,3}"
 )
+NAMED_PATTERN = rf'"({_NAMED_WORDS})"' + rf"|'({_NAMED_WORDS})'"
 
-# The scan covers the UI code and the themes it loads, and nothing else.
-# Decided by the repo owner as CIV-A1 on 2026-11-11, after two cold passes
-# raised the repo-root scan as a high severity finding. That scan counted
-# every document, spec, plan, archive and test fixture mentioning a colour as
-# the app's colour usage, which cost three things. A docs-only edit made the
-# committed report stale, because the occurrence rows cite the matched line by
-# number -- against this repo's own rule that a document alone earns no sweep.
-# 3 of the 5 lines the `tuples` scan returned came from the staleness gate's
-# fixture file, so `scan_all`'s refusal of an empty scan, the only guard
-# against a scan going blind, could be satisfied by test data. And section 1's
-# Hard Rule is about hard-coded colours in UI code, which is not what a
-# repository-wide census measures. Narrowing dropped 437 of 1953 occurrences.
-#
-# Two places outside these two trees do hold real UI colour and are therefore
-# no longer inventoried: `tools/generate_ctk_themes.py`, which writes the
-# files in `themes/`, and the named colours inside `assets/icons/*.svg`.
-# Widening to either is a one-line change here.
-#
-# These paths are also why this file carries no exclusion globs any more. The
-# repo-root scan needed three -- the report itself, `themes/**` so its colours
-# were not counted twice, and the gate's own fixtures -- and none of the three
-# is reachable from `src`.
-# Tests: tests/test_color_inventory_sync.py::test_civm14_every_scan_stays_inside_src_and_themes
+# Scope (CIV-A1, 2026-11-11): the UI code, the themes it loads, and the tool
+# that writes them. A repo-root scan counted documents and this gate's own
+# fixtures as the app's colour usage; narrowing dropped 437 of 1953
+# occurrences and the generator put 37 back. Named as a file, not as `tools`,
+# because color_audit.py's own regexes match HEX_PATTERN. `assets/icons/*.svg`
+# stays uninventoried. Why, in full:
+# docs/unused-docs/changes/2026-11-11-colour-inventory-scope.md
+# Tests: tests/test_color_inventory_sync.py::test_civm14_every_scan_stays_inside_the_declared_paths
 # Tests: tests/test_color_inventory_sync.py::test_civm5_the_scans_feeding_one_count_do_not_overlap
-UI_CODE_ROOT = "src"
+UI_CODE_PATHS = ("src", "tools/generate_ctk_themes.py")
 
 
 def _rg(*args: str) -> List[str]:
@@ -76,17 +66,17 @@ def _rg(*args: str) -> List[str]:
 SCAN_COMMANDS: Dict[str, List[str]] = {
     "widget": _rg(
         "fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=",
-        UI_CODE_ROOT,
+        *UI_CODE_PATHS,
     ),
-    "hex": _rg(HEX_PATTERN, UI_CODE_ROOT),
-    "named": _rg("-i", NAMED_PATTERN, UI_CODE_ROOT),
+    "hex": _rg(HEX_PATTERN, *UI_CODE_PATHS),
+    "named": _rg("-i", NAMED_PATTERN, *UI_CODE_PATHS),
     "theme_api": _rg(
         "set_default_color_theme\\(|set_appearance_mode\\(",
-        UI_CODE_ROOT,
+        *UI_CODE_PATHS,
     ),
     "tuples": _rg(
         "(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\\s*=\\s*(\\(|\\[)",
-        UI_CODE_ROOT,
+        *UI_CODE_PATHS,
     ),
     "app_settings": _rg(
         "color|theme|appearance_mode|theme_name|drag_schedule_date_text_color|color_hex",
@@ -95,10 +85,13 @@ SCAN_COMMANDS: Dict[str, List[str]] = {
     "theme_files": _rg(f"{HEX_PATTERN}|{NAMED_PATTERN}", "themes", "-g", "*.json"),
 }
 
-HEX_RE = re.compile(r"#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b")
-NAMED_RE = re.compile(
-    r"(?i)(?:\"|')(?P<c>darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)(?:\"|')"
-)
+# Compiled from the same source as the scan patterns, not retyped. They were
+# separate literals, and the gray-scale fix to NAMED_PATTERN left this one on
+# bare words: all 527 theme lines were returned and 0 of their 30 values were
+# ranked (2026-11-11). One operation, one definition (global rule 5).
+# Tests: tests/test_color_inventory_sync.py::test_civm16_the_search_pattern_and_the_extractor_agree
+HEX_RE = re.compile(HEX_PATTERN)
+NAMED_RE = re.compile(rf"""(?i)["'](?P<c>{_NAMED_WORDS})["']""")
 WIDGET_PROP_RE = re.compile(
     r"(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|corner_radius|highlight_color)="
 )
@@ -113,28 +106,16 @@ class Entry:
 
 RG_TIMEOUT_SECONDS = 120
 
-# Defensive, not load bearing. Measured with rg 14.1.1 on 2026-11-11: a
-# recursive scan skips a binary file in silence, and an explicit binary
-# argument writes `binary file matches (...)` to *stdout* with no WARNING
-# prefix -- so no rg checked here puts this on stderr at all. It stays because
-# all seven scans share run_rg, and on a version that does emit a benign
-# notice one matching binary file would abort every one of them with a message
-# blaming a partial scan.
+# Defensive, not load bearing: measured with rg 14.1.1 on 2026-11-11, no scan
+# here puts a binary-file notice on stderr at all. Kept because a version that
+# did would abort all seven over one matching binary file.
 RG_BENIGN_STDERR = re.compile(r"^WARNING: stopped searching binary file ")
 
-# Scans allowed to return nothing, by name. Declaring one is a reviewable
-# one-line change here rather than an edit to scan_all's logic (global rule 8).
-# `tuples` and `theme_api` both return 2 lines after the CIV-A1 narrowing, and
-# the per-scan table of the generated report carries the current counts, which
-# are the figures to read rather than ones copied out of it to here -- a line
-# stating 5 survived here after the gate's own fixtures stopped being counted,
-# which had taken `tuples` to 2. `theme_api`'s two are the single
-# `set_appearance_mode` and `set_default_color_theme` call sites in
-# `theme.py`, which are not going anywhere. `tuples` is the one at risk: on
-# 2026-11-11 one of its two lines was a false positive on a parenthesised
-# assignment, so migrating the single real colour tuple -- which section 3 of
-# the report recommends -- is what would empty a scan and make a declaration
-# here necessary.
+# Scans allowed to return nothing, by name. A declaration here is a reviewable
+# one-line change rather than an edit to scan_all's logic (global rule 8). Read
+# the report's per-scan table for current counts, not a figure copied to here.
+# `tuples` holds 2 lines, one a false positive on a parenthesised assignment
+# that is not going away, so migrating the real tuple leaves 1, not 0.
 SCANS_ALLOWED_EMPTY: set = set()
 
 
@@ -145,11 +126,8 @@ def run_rg(cmd: Sequence[str]) -> List[str]:
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
-            # Without an explicit encoding, text=True decodes through the
-            # locale -- cp1252 on Windows, which this repo supports, and ASCII
-            # under LC_ALL=C. 22 lines of the inventory are non-ASCII, so that
-            # is a UnicodeDecodeError or mojibake, and the gate would then fail
-            # for the environment while its message blamed staleness.
+            # Without this, text=True decodes through the locale (cp1252 on
+            # Windows, ASCII under LC_ALL=C); 22 inventory lines are non-ASCII.
             encoding="utf-8",
             errors="replace",
             timeout=RG_TIMEOUT_SECONDS,
@@ -162,35 +140,27 @@ def run_rg(cmd: Sequence[str]) -> List[str]:
             "an unsorted one."
         ) from exc
     except FileNotFoundError as exc:
-        # A bare FileNotFoundError names the binary and not the remedy, and
-        # this generator is the only thing in the repo that needs ripgrep.
+        # A bare FileNotFoundError names the binary, not the remedy.
         # Tests: tests/test_color_inventory_sync.py::test_civm3_the_generator_names_the_scanner_when_it_is_missing
         raise RuntimeError(
             f"{cmd[0]!r} is not on PATH. tools/color_audit.py scans with "
             "ripgrep: install it (`brew install ripgrep`, or `apt-get install "
             "ripgrep`) and run this again."
         ) from exc
-    # rg returns 1 for no matches, which is fine, and 2 for a search error.
-    # Measured with rg 14.1.1 on 2026-11-11: an unreadable file in a recursive
-    # scan exits 2 and so arrives *here*, not at the stderr branch below.
-    # A symlink is not that case. rg does not follow one without -L, so in a
-    # recursive scan a symlink -- broken or working -- is skipped in silence
-    # at exit 0 and reaches neither branch; only naming one as the search
-    # argument exits 2. No scan here passes -L and the repo tracks no symlink
-    # (`git ls-files -s` holds no mode 120000), so nothing is missing from the
-    # inventory today, but a symlink added under a scanned path would be
-    # dropped without a word.
+    # rg returns 1 for no matches, 2 for a search error. Measured with rg
+    # 14.1.1 on 2026-11-11: an unreadable file in a recursive scan exits 2 and
+    # arrives here, not at the stderr branch below. Symlinks: without -L one
+    # inside a scanned tree is skipped silently at exit 0, while a *working*
+    # one named as a search path is followed -- so a symlinked `src` would be
+    # scanned through with test_civm14 green. The repo tracks none today.
     if result.returncode not in (0, 1):
         raise RuntimeError(
             f"Command failed ({result.returncode}): {shlex.join(list(cmd))}\n"
             f"{result.stderr.strip()}"
         )
-    # A per-file complaint that arrives with a *successful* exit must not be
-    # dropped: discarding it made a partial scan look like a clean one, which
-    # is a shorter inventory with no signal attached. rg 14.1.1 exits 2 for
-    # the unreadable-file case, so it is the branch above that catches that
-    # today; this one is here because rg has already changed its exit code for
-    # a per-file error once, and a silent partial scan is the costly failure.
+    # A per-file complaint on a *successful* exit must not be dropped: it made
+    # a partial scan look clean, a shorter inventory with no signal attached.
+    # rg has changed its exit code for a per-file error once before.
     complaints = [
         line for line in result.stderr.splitlines()
         if line.strip() and not RG_BENIGN_STDERR.match(line.strip())
@@ -324,18 +294,14 @@ def build_report(lines: Dict[str, List[str]]) -> str:
     out.append("# UI Color Inventory")
     out.append("")
     out.append(
-        "Generated via deterministic `rg` scans of `src/` and `themes/`: the "
-        "UI code and the themes it loads."
+        "Generated via deterministic `rg` scans of `src/`, `themes/` and "
+        "`tools/generate_ctk_themes.py`: the UI code, the themes it loads, "
+        "and the tool that writes them (CIV-A1, 2026-11-11)."
     )
     out.append("")
     out.append(
-        "Not covered, by the CIV-A1 decision of 2026-11-11: the tests, "
-        "documents and plans that mention colours, and two places outside "
-        "those trees that do hold real UI colour -- "
-        "`tools/generate_ctk_themes.py`, which writes the files in "
-        "`themes/`, and the named colours inside `assets/icons/*.svg`. "
-        "Section 1's Hard Rule is about hard-coded colours in UI code, and "
-        "this is the scan that matches it."
+        "Not covered: the tests, documents and plans that mention colours, "
+        "and the named colours inside `assets/icons/*.svg`."
     )
     out.append("")
     out.append("## Scan Commands")
