@@ -292,11 +292,20 @@ be the third design for these tests in one day.
 
 ### CIG-A4 — the real-database guard fires on the running app, not on a test (medium)
 
-`conftest.py`'s guard prints "the user's real database file changed during this
-run: ~/Library/Application Support/GetMoreDone/getmoredone.db", and for the
-content case adds "a test wrote it, or it was edited. If a test did it:
-something bypassed the isolation in conftest.py". Measured 2026-11-11: that
-is the packaged app, not a test.
+`conftest.py`'s guard (repo root, not `tests/`) prints "the user's real
+database file changed during this run: ~/Library/Application
+Support/GetMoreDone/getmoredone.db". Measured 2026-11-11: that is the packaged
+app, not a test.
+
+**Both branches cry wolf, and the fix has to touch the closing line.** Only
+the content branch carries "a test wrote it, or it was edited"; the
+timestamp-only branch says "most likely the GetMoreDone app is running ...
+which is harmless". But `conftest.py:209-211` appends "If a test did it:
+something bypassed the isolation in conftest.py" *outside* both the
+`for key in touched` loop and the if/else that chooses between those two
+texts, so the branch written to say "harmless" ends by accusing a test anyway.
+Whoever takes this should not go looking for the accusation inside the content
+branch.
 
 Method and figures. With `/Applications/daVIPA.app` running (`pgrep -fl
 daVIPA` gave pid 44389) and **no tests running at all**, the file's SHA-256
@@ -305,11 +314,13 @@ idle. Each of the five files run that session — `test_segment_colour_validatio
 `test_traceability_refs`, `test_repo_hygiene`, `test_docs_sync_rule`,
 `test_ci_contract` — left the hash unchanged when run on its own. The guard had
 fired twice on the combined run, once for timestamp only and once for content.
+Both outputs ended in the isolation line.
 
 So the warning names the wrong cause and names it accusingly, on a repo whose
 own rule is that a red build nobody reads is worse than no CI. The honest
 options are to narrow the guard to a change a test could have caused, or to
-check for the running app and say so in the warning text instead. Filed, not
+check for the running app and say so in the warning text instead -- in either
+case moving the closing line inside the content branch, or dropping it. Filed, not
 fixed: it is a change to the test harness at the end of a batch about segment
 colours, and the measurement is the part that was missing.
 
