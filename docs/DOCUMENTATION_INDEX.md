@@ -86,6 +86,25 @@ Feature backlog and task tracking:
 - Pending enhancements
 - Known issues
 
+### docs/ui_color_inventory.md (generated)
+
+Every colour literal found in the repository, with the file and line of each
+occurrence and frequency tables for the hex and named colours. **Generated --
+never hand-edit it** (global rule 2: fix the code, don't fake the state).
+Regenerate with:
+
+```bash
+./venv/bin/python tools/color_audit.py
+```
+
+`tests/test_color_inventory_sync.py` regenerates the report during the suite
+and fails while the committed file differs from a fresh run, so any change
+that adds or removes a colour literal needs the regenerated file committed
+with it. That scan reads the **working tree, not `HEAD`**, so regenerate only
+once the tree holds what you mean to commit. The generator shells out to
+ripgrep, which `.github/workflows/tests.yml` installs for CI and which a
+local run needs on `PATH`.
+
 ### The multi-agent workflow document and the PR template (deleted 2026-11-09)
 
 Both had entries here. The workflow document described the three-agent branch

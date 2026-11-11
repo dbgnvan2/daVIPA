@@ -332,7 +332,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `BACKLOG.md:374` | `it as "correct already", which is wrong: it reads `#+12345` as `#0B368D` by the` |
-| `docs/DOCUMENTATION_INDEX.md:432` | ``#0B368D` from a misread slice` |
+| `docs/DOCUMENTATION_INDEX.md:451` | ``#0B368D` from a misread slice` |
 | `docs/spec_coverage.md:1965` | `\| SCV-M2.2 \| `#+12345` falls back rather than deriving `#0B368D` from a misread slice \| same \| `::test_scvm22_a_colour_that_parses_wrongly_is_not_derived_from` \| done \|` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:29` | `\| `#+12345` \| `True` \| `None` \| `#0B368D` — no error, a colour derived from garbage \|` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:61` | `\| SCV-M2.2 \| `#+12345` falls back rather than deriving `#0B368D` from a misread slice \| `::test_scvm22_a_colour_that_parses_wrongly_is_not_derived_from` — adversarial (P7): look` |
@@ -1965,7 +1965,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/DOCUMENTATION_INDEX.md:437` | `and only together with storing the normalised `#AABBCC`` |
+| `docs/DOCUMENTATION_INDEX.md:456` | `and only together with storing the normalised `#AABBCC`` |
 | `docs/USER_GUIDE.md:929` | `and saved as `#AABBCC`, and the field refuses anything that is not six hex` |
 | `docs/spec_coverage.md:1963` | `\| SCV-M1.3 \| The editor stores the normalised form, so `#abc` lands as `#AABBCC` \| `screens/vps_segment_editor.py::VPSSegmentEditorDialog.save_segment` \| `::test_scvm13_the_edi` |
 | `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:195` | `(`#AABBCC`) while Tk draws the X11 one (`#A0B0C0`). Same black/white answer` |
@@ -2000,7 +2000,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/DOCUMENTATION_INDEX.md:436` | `- Delegating widens the segment editor to accept `#abc`, taken deliberately` |
+| `docs/DOCUMENTATION_INDEX.md:455` | `- Delegating widens the segment editor to accept `#abc`, taken deliberately` |
 | `docs/USER_GUIDE.md:928` | `Upcoming and All Items. Since 2026-11-11 the short form `#abc` is accepted` |
 | `docs/spec_coverage.md:1963` | `\| SCV-M1.3 \| The editor stores the normalised form, so `#abc` lands as `#AABBCC` \| `screens/vps_segment_editor.py::VPSSegmentEditorDialog.save_segment` \| `::test_scvm13_the_edi` |
 | `docs/spec_coverage.md:2009` | `no longer lists `#abc` and `aabbcc` as refusals (SCV-M1.3, plan §4), and` |
