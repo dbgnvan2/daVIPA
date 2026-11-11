@@ -170,6 +170,15 @@ it did.
   part-way through a row build, taking the list screen down. Pre-existing, not
   a regression — `row_fill` passes the raw value through as the fill exactly as
   before. Item 9 is how you would notice it in your own data.
+  **Planned since, by another session:**
+  `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md`
+  (SCV, draft, approved by nobody at the time of writing). It adds something
+  this filing missed — `VPSManager._is_valid_hex_color` is a *second* copy of
+  the same three checks, and it gates the colour-repair pass inside
+  `get_vision_subsegments` and `get_vision_categories`, so the pass that
+  exists to replace a bad colour is blind to this class of bad colour. Its
+  SCV-M4 would also stop `row_fill` returning a raw value at all, which would
+  supersede the paragraph in `row_fill`'s docstring explaining why it does.
 - A 3-digit segment colour (`#ABC`) derives its text from the CSS expansion
   (`#AABBCC`) while Tk draws the X11 one (`#A0B0C0`). Same black/white answer
   either way, so the consequence is a wrong contrast figure rather than a
