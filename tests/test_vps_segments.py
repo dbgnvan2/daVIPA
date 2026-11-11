@@ -101,8 +101,15 @@ def test_bc3_the_editor_seeds_its_colour_from_the_segment(vps):
     root.withdraw()
     try:
         dialog = VPSSegmentEditorDialog(root, vps, segment)
-        assert dialog.selected_color == "#0a1b2c", (
+        # Changed 2026-11-11 (SCV-M5.1), reason (b) -- the behaviour changed
+        # intentionally. This read `== "#0a1b2c"`, the literal handed to
+        # `create_segment`. That writer now normalises, so the stored value is
+        # `#0A1B2C`. The claim here is "seeded from the segment", so it is
+        # asserted against what the segment holds, with the normalised form
+        # named as well so the change is visible rather than implied.
+        assert dialog.selected_color == segment["color_hex"], (
             "the editor did not seed its colour from the segment")
+        assert dialog.selected_color == "#0A1B2C"
 
         blank = VPSSegmentEditorDialog(root, vps)
         assert blank.selected_color.startswith("#"), (

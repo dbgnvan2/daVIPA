@@ -27,10 +27,22 @@ SRC_ROOT = Path(__file__).resolve().parents[1] / "src" / "getmoredone"
 #: The fallback ``_derive_subsegment_color`` uses when it cannot read its base.
 FALLBACK_BASE = "#64748B"
 
-#: The §1 table: what ``int(…, 16)`` let through, and the one six-digit value
-#: in the same family that must keep working. ``#0b1010`` is not a defect --
-#: it is six hex digits that merely *look* like a Python literal.
-INT_BASE_16_ACCEPTS = ("#0X1234", "#1_2345", "#+12345")
+#: What ``int(…, 16)`` let through, and the one six-digit value in the same
+#: family that must keep working. ``#0b1010`` is not a defect -- it is six hex
+#: digits that merely *look* like a Python literal.
+#:
+#: The plan's §1 table measured the first three. The last two were measured
+#: the same way after a cold pass pointed out that three values are examples
+#: and the family is the thing: ``int()`` also strips surrounding whitespace
+#: and takes a minus sign, so ``"# 12345"`` derived ``#0B368D`` and
+#: ``"#-12345"`` derived ``#07368F``, both silently. One regex refuses all
+#: five, so naming all five costs nothing and is what the fix actually claims.
+INT_BASE_16_ACCEPTS = ("#0X1234", "#1_2345", "#+12345", "# 12345", "#-12345")
+
+#: The three above that raised nothing and produced a colour from a misread
+#: slice, with what they produced at ``6963d0a``. These are the adversarial
+#: half: a crash is visible, and these were not.
+SILENTLY_MISREAD = {"#+12345": "#0B368D", "# 12345": "#0B368D", "#-12345": "#07368F"}
 STILL_VALID = "#0b1010"
 
 
@@ -207,19 +219,25 @@ def test_scvm21_deriving_from_a_malformed_colour_falls_back(value):
     assert _derive(value) == _derive(FALLBACK_BASE), value
 
 
-def test_scvm22_a_colour_that_parses_wrongly_is_not_derived_from():
-    """SCV-M2.2 — ``#+12345`` must not derive ``#0B368D`` from a misread slice.
+@pytest.mark.parametrize("value,was", sorted(SILENTLY_MISREAD.items()))
+def test_scvm22_a_colour_that_parses_wrongly_is_not_derived_from(value, was):
+    """SCV-M2.2 — a misread slice must not become a colour.
 
     Spec:  docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m2
 
     P7, the adversarial case, and the one that matters more than the two
-    crashes above: this value raised nothing. ``int("+1", 16)`` is 1,
-    ``int("23", 16)`` is 35, ``int("45", 16)`` is 69, so a colour was derived
-    and drawn and nobody was told. A crash is visible; this is not.
+    crashes above: these three raised nothing. For ``#+12345``,
+    ``int("+1", 16)`` is 1, ``int("23", 16)`` is 35 and ``int("45", 16)`` is
+    69, so a colour was derived and drawn and nobody was told. A crash is
+    visible; this is not.
+
+    The old output is asserted by value, not just "not the fallback": a fix
+    that happened to land on ``#0B368D`` by another route would pass a
+    fallback-only check.
     """
-    assert _derive("#+12345") != "#0B368D", (
-        "a colour is still being derived from a misread slice")
-    assert _derive("#+12345") == _derive(FALLBACK_BASE)
+    assert _derive(value) != was, (
+        f"a colour is still being derived from a misread slice: {was}")
+    assert _derive(value) == _derive(FALLBACK_BASE)
 
 
 def test_scvm21_deriving_answers_for_anything_a_caller_can_hold():
@@ -368,5 +386,104 @@ def test_scvm31_the_taxonomy_writers_store_the_normalised_form(tmp_path):
                 manager.update_vision_subsegment(sub["id"], "Scv Sub", value, "", "")
             with pytest.raises(ValueError):
                 manager.update_vision_category(cat["id"], "Scv Cat", value, "", "")
+    finally:
+        manager.close()
+
+
+# ======================================================================
+# SCV-M5 — the segment table is gated at the store, not only at the dialog
+# ======================================================================
+
+def test_scvm51_the_segment_writers_refuse_and_normalise_a_colour(tmp_path):
+    """SCV-M5.1 — `create_segment` and `update_segment` gate the colour.
+
+    Spec:  docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m1
+    Found by a cold pass over the plan, 2026-11-11, medium.
+
+    P25 — the guard has to be on the funnel, not on one surface. SCV-M1.3 put
+    the normalisation in ``VPSSegmentEditorDialog.save_segment``, and these two
+    methods wrote ``segment_descriptions.color_hex`` with no colour check of
+    any kind. Two *other* user-facing writers go through them with nothing but
+    ``.strip().upper()`` -- ``create_vision_segment_admin`` and
+    ``update_vision_segment_admin`` -- so the VSP admin screen could still
+    store ``#0X1234`` after SCV-M1.3, and ``segment_descriptions`` is the one
+    table whose colour ``row_fill`` ever draws.
+
+    Normalised, not merely refused: the short form has to expand here for the
+    same reason it does in the dialog (plan §4).
+    """
+    manager = VPSManager(str(tmp_path / "scv_segment_writers.db"))
+    try:
+        created = manager.create_segment("Scv Store", "desc", "#abc", 97)
+        assert manager.get_segment(created)["color_hex"] == "#AABBCC"
+
+        assert manager.update_segment(created, color_hex="#AbC123") is True
+        assert manager.get_segment(created)["color_hex"] == "#ABC123"
+
+        for value in INT_BASE_16_ACCEPTS:
+            with pytest.raises(ValueError):
+                manager.create_segment(f"Scv Bad {value}", "", value, 98)
+            with pytest.raises(ValueError):
+                manager.update_segment(created, color_hex=value)
+        # The refusal left the good value in place rather than half-writing.
+        assert manager.get_segment(created)["color_hex"] == "#ABC123"
+
+        # An update that names no colour is untouched by the gate.
+        assert manager.update_segment(created, description="still fine") is True
+        assert manager.get_segment(created)["color_hex"] == "#ABC123"
+    finally:
+        manager.close()
+
+
+def test_scvm51_the_vsp_admin_writers_cannot_store_a_bad_colour(tmp_path):
+    """SCV-M5.1 — the two admin writers inherit the gate.
+
+    They are the surface a person uses (VSP > Vision Elements > segment
+    admin), and they pass ``color_hex.strip().upper()`` straight into
+    ``create_segment`` / ``update_segment``. Asserted here rather than left to
+    the funnel's own test, because the funnel is only load-bearing if these
+    actually route through it.
+    """
+    manager = VPSManager(str(tmp_path / "scv_admin_writers.db"))
+    try:
+        with pytest.raises(ValueError):
+            manager.create_vision_segment_admin(
+                "Scv Admin Bad", "desc", "#0X1234", "vision")
+
+        segment_id = manager.create_vision_segment_admin(
+            "Scv Admin", "desc", "#abc", "vision")
+        assert segment_id
+
+        colours = manager.get_segment_color_map()
+        assert colours["scv admin"] == "#AABBCC"
+
+        with pytest.raises(ValueError):
+            manager.update_vision_segment_admin(
+                segment_id, "Scv Admin", "desc", "#+12345", "vision")
+        assert manager.get_segment_color_map()["scv admin"] == "#AABBCC"
+    finally:
+        manager.close()
+
+
+def test_scvm51_the_seeded_segments_are_already_normalised(tmp_path):
+    """SCV-M5.1 — the one writer that bypasses the funnel seeds good values.
+
+    ``vps_schema.py`` inserts the nine shipped segments with literal colours
+    straight into ``segment_descriptions``, so the funnel's gate never sees
+    them. All nine are `#RRGGBB` today (measured, not assumed); asserted
+    through a real database rather than by reading the source, so a seed
+    changed anywhere in that path is caught.
+
+    This is the last unguarded write to the one table whose colour
+    ``row_fill`` draws.
+    """
+    manager = VPSManager(str(tmp_path / "scv_seeds.db"))
+    try:
+        segments = manager.get_all_segments(active_only=False)
+        assert len(segments) == 9, [s["name"] for s in segments]
+        for segment in segments:
+            colour = segment["color_hex"]
+            assert normalize_hex_color(colour) == colour, (
+                f"{segment['name']} is seeded with {colour!r}")
     finally:
         manager.close()
