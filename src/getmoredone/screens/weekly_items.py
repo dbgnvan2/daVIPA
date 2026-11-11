@@ -27,6 +27,7 @@ from .segment_color_utils import (
     resolve_chip_colors,
 )
 from .split_panel import SPLITTER_WIDTH, SplitPanel
+from .week_collision_notice import notify_weekly_tactic_changes
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
@@ -593,17 +594,24 @@ class WeeklyItemsScreen(ctk.CTkFrame):
             who=weekly.get("who") or "",
             title=title,
             description=f"Related to weekly item: {weekly.get('title') or ''}",
-            parent_id=weekly["id"],
-            # AWA-A1 — both columns name the tactic. `parent_id` alone left
+            # AWA-A1 — the link is `weekly_tactic_id`, as the APE Week Actions
+            # tab's own Add writes it. `parent_id` alone left
             # `weekly_tactic.tactic_of` — the one predicate WT-M3.D.1 names as
             # the authority on "is this item week-filed" — answering no for
-            # every row this button made, while the APE Week Actions tab's own
-            # Add wrote `weekly_tactic_id`: two buttons, two row shapes, one
-            # relationship. `parent_of` still answers the tactic either way
-            # (WTP-D3: `parent_id` wins when both are set), so the tree is
+            # every row this button made, so two buttons on two tabs produced
+            # two row shapes for one relationship. `parent_of` still answers
+            # the tactic, because it falls back to `tactic_of`, so the tree is
             # unchanged. Closes AWA-A3's remainder.
+            #
+            # Not *both* columns, which is what the spec's recommendation and
+            # the backlog entry proposed: `migrate_parent_links_to_weekly_tactic`
+            # runs from `Database.initialize_schema` on every launch and clears
+            # `parent_id` on a row that already names a tactic explicitly
+            # (`kept_explicit_link`), so a row written with both is rewritten
+            # at the next launch and logs a write to the user's data for every
+            # item this button ever made. One column is the shape the app keeps.
             # Spec:  docs/spec_2026-11-07_ape_week_actions.md#awa-m5
-            # Tests: tests/test_weekly_items_tactic_link.py::test_awaa1_the_add_button_sets_both_link_columns
+            # Tests: tests/test_weekly_items_tactic_link.py::test_awaa1_the_add_button_links_by_weekly_tactic_id
             weekly_tactic_id=weekly["id"],
             start_date=weekly.get("start_date"),
             due_date=weekly.get("start_date"),
@@ -612,6 +620,14 @@ class WeeklyItemsScreen(ctk.CTkFrame):
             item_type="daily",
         )
         self.app.db_manager.create_action_item(item, apply_defaults=False)
+        # Writing the tactic link puts this create on the re-file cascade
+        # (`create_action_item`'s `refile` defaults True, and it acts when
+        # `tactic_of` answers), which can refuse a week or build plan records
+        # and records what it did on the manager. Fourteen other screens
+        # report that; this one had nothing to report because it never
+        # re-filed, and reporting success over a swept-away report is the
+        # defect its sibling in `week_actions.py` already fixed (P5, P2).
+        notify_weekly_tactic_changes(self.app.db_manager, self)
         self.status_label.configure(text="Added a related Action Item for the selected weekly tactic.")
 
     def open_selected_weekly_item(self):

@@ -275,6 +275,36 @@ def _new_event_id() -> str:
     return f"gmd{uuid.uuid4().hex}"
 
 
+def _merged_attendees(held: list, wanted: list) -> list:
+    """The guest list a caller asked for, keeping what Google knows about each.
+
+    Purpose: CE-A1 -- ``events().update`` writes the whole body, so a list
+             rebuilt from bare email addresses would discard every other key
+             the stored entry carries: ``responseStatus`` (who has accepted),
+             ``displayName``, ``optional``, ``organizer``. A caller that adds
+             one guest would silently reset the replies of everyone it
+             re-sent.
+    Tests:   tests/test_google_calendar_export_calls.py::test_cea1c_an_attendee_kept_in_the_list_keeps_their_reply
+
+    A guest the caller does not name again is not in the new list, because
+    this is the list and not an addition to it. Entries may be plain
+    addresses or whole attendee dicts, and what the caller gives wins over
+    what was stored.
+    """
+    by_email = {}
+    for entry in held:
+        if isinstance(entry, dict) and entry.get('email'):
+            by_email[str(entry['email']).strip().lower()] = dict(entry)
+
+    merged = []
+    for entry in wanted:
+        guest = dict(entry) if isinstance(entry, dict) else {'email': entry}
+        kept = by_email.get(str(guest.get('email') or '').strip().lower(), {})
+        kept.update(guest)
+        merged.append(kept)
+    return merged
+
+
 def _say(*parts) -> None:
     """print() that cannot abort the caller.
 
@@ -690,11 +720,15 @@ class GoogleCalendarManager:
 
         CE-A1 -- ``location`` and ``attendees`` are writable here, as they
         already are on ``create_event``. Without them the only reachable
-        outcome was whatever the fetched body held, so a meeting made with a
-        room and a guest list could never have either changed. ``None`` leaves
-        the field as it came; an empty value clears it, the same rule
-        ``description`` follows, because a caller that means to drop the room
-        has to be able to say so.
+        outcome was whatever the fetched body held. ``None`` leaves the field
+        as it came; an empty value clears it, the same rule ``description``
+        follows, because a caller that means to drop the room has to be able
+        to say so.
+
+        **No caller passes either yet** (P21): the Plan day export must not
+        touch them, and ``screens/calendar_dialog.py`` only ever creates. This
+        is the symmetry with ``create_event``, ahead of the first code that
+        edits a meeting -- not a defect closed on a path a user can reach.
         Tests: tests/test_google_calendar_export_calls.py::test_cea1_update_can_change_the_location_and_the_attendees
 
         Raises:
@@ -719,7 +753,8 @@ class GoogleCalendarManager:
         if location is not None:
             event['location'] = location
         if attendees is not None:
-            event['attendees'] = [{'email': email} for email in attendees]
+            event['attendees'] = _merged_attendees(
+                event.get('attendees') or [], attendees)
         if start_datetime and duration_minutes:
             end_datetime = start_datetime + timedelta(minutes=duration_minutes)
             local_tz = self._get_local_timezone()
@@ -737,7 +772,14 @@ class GoogleCalendarManager:
             lambda: self.service.events().update(
                 calendarId=calendar_id,
                 eventId=event_id,
-                body=event
+                body=event,
+                # CE-A1 -- stated rather than inherited from whatever the API
+                # defaults to, and the same answer create_event gives (P5).
+                # Now that attendees are writable the two readings are
+                # opposite and both user-visible: no invitation at all for a
+                # guest just added, or mail to every attendee each time the
+                # Plan day export re-updates their event.
+                sendUpdates='none',
             ).execute(),
         )
 
