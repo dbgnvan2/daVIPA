@@ -158,6 +158,27 @@ def test_civm12_every_scan_command_asks_ripgrep_to_sort():
     )
 
 
+def test_civm12_every_scan_command_asks_ripgrep_for_the_filename():
+    """A scan given one explicit file omits the path, and then nothing parses.
+
+    rg prints the filename only when it is searching more than one file, so
+    `app_settings` -- the only scan that passes an explicit path -- came back
+    as `55:    appearance_mode: str = "dark"`. parse_line returned None for
+    all 26 of its lines, scan_line_key fell back to ordering the raw string,
+    and the AppSettings block came out in lexical order: 445, 446, 447, 55,
+    56, 626. Measured with rg 14.1.1 on 2026-11-11.
+    """
+    without_filename = [
+        name for name, cmd in color_audit.SCAN_COMMANDS.items()
+        if "-H" not in cmd and "--with-filename" not in cmd
+    ]
+    assert without_filename == [], (
+        f"these scans do not ask rg for the filename: {without_filename}. "
+        "Given one explicit file rg emits 'line:text', and every line of "
+        "that scan fails parse_line while the report still builds."
+    )
+
+
 # --------------------------------------------------------------------------
 # CIV-M2 — a stale inventory fails the suite
 # --------------------------------------------------------------------------
@@ -185,7 +206,11 @@ def test_civm2_the_committed_inventory_matches_a_fresh_generation():
             "and commit the result. It is generated -- do not edit it by hand.\n"
             "Note the scan reads the WORKING TREE, not HEAD: uncommitted or "
             "untracked files of your own, or another session's, are included, "
-            "so regenerate only once the tree holds what you mean to commit."
+            "so regenerate only once the tree holds what you mean to commit.\n"
+            "If this fails only on CI, compare `rg --version` there with "
+            "yours: the report is a byte comparison against the output of an "
+            "unpinned third-party binary, and rg has changed observable "
+            "behaviour between releases."
         )
 
 
@@ -215,6 +240,70 @@ def test_civm5_the_scans_feeding_one_count_do_not_overlap():
             f"frequency table and cover {len(overlap)} of the same file-lines, "
             f"so every match there is counted twice. Example: {sorted(overlap)[:3]}"
         )
+
+
+# --------------------------------------------------------------------------
+# CIV-M13 — the report's content, not just its stability
+# --------------------------------------------------------------------------
+
+def _frequency_rows(report: str, heading: str) -> list[tuple[str, int]]:
+    """The `| `value` | count |` rows of one table, in the order written."""
+    lines = report.splitlines()
+    start = lines.index(heading)
+    rows = []
+    for line in lines[start + 1:]:
+        match = re.match(r"^\| `([^`]+)` \| (\d+) \|$", line)
+        if match:
+            rows.append((match.group(1), int(match.group(2))))
+        elif rows:
+            break
+    return rows
+
+
+def test_civm13_both_frequency_tables_count_the_theme_files_scan():
+    """Every assertion here was a self-comparison before this test.
+
+    The gate regenerates and diffs, and the determinism tests compare two
+    generations of one fixture, so nothing said what a given input should
+    produce. Drop `theme_files` from either frequency loop and both stay
+    green: the report is still deterministic, and the gate agrees with
+    itself once the shorter report is regenerated and committed. What is lost
+    is every theme colour -- 765 lines of the real scan -- from the tables a
+    reader ranks by.
+
+    The fixture's theme lines are `#abcdef` and `teal`, which appear in no
+    other scan, so their presence here can only have come through
+    `theme_files`.
+    """
+    report = color_audit.build_report(SCAN_FIXTURE)
+    hex_rows = _frequency_rows(report, "Hex top values:")
+    named_rows = _frequency_rows(report, "Named top values:")
+
+    assert ("#abcdef", 1) in hex_rows, (
+        f"the hex table does not count the theme_files scan: {hex_rows}"
+    )
+    assert ("teal", 1) in named_rows, (
+        f"the named table does not count the theme_files scan: {named_rows}"
+    )
+
+
+def test_civm13_the_frequency_tables_hold_every_colour_and_rank_them():
+    """Exact rows, in order: a truncated table would otherwise pass.
+
+    `by_count_then_name(...)[:20]` caps the hex table. Narrow that cap and
+    the report stays deterministic and self-consistent, so only an assertion
+    on the rows themselves can see it. The fixture's ties (#aabbcc/#ddeeff
+    at 2, blue/red at 2) also pin the documented order -- count descending,
+    then name -- rather than merely "sorted somehow".
+    """
+    report = color_audit.build_report(SCAN_FIXTURE)
+
+    assert _frequency_rows(report, "Hex top values:") == [
+        ("#aabbcc", 2), ("#ddeeff", 2), ("#abcdef", 1),
+    ], _frequency_rows(report, "Hex top values:")
+    assert _frequency_rows(report, "Named top values:") == [
+        ("blue", 2), ("red", 2), ("teal", 1),
+    ], _frequency_rows(report, "Named top values:")
 
 
 # --------------------------------------------------------------------------
@@ -291,7 +380,15 @@ def test_civm7_a_timeout_is_reported_as_a_timeout(monkeypatch):
 
 
 def test_civm7_stderr_on_a_successful_exit_is_not_discarded(monkeypatch):
-    """rg reports an unreadable file on stderr and still exits 0."""
+    """White-box cover for the complaints branch, on a synthetic result.
+
+    Measured with rg 14.1.1 on 2026-11-11: an unreadable file in a recursive
+    scan exits **2**, so that case lands in the returncode branch above and
+    not here. This branch covers a per-file complaint that arrives with a
+    successful exit, which must not be dropped -- a partial scan is a
+    shorter inventory with no signal attached -- and rg's exit code for this
+    is something it has changed before.
+    """
     monkeypatch.setattr(
         color_audit.subprocess, "run",
         lambda *a, **k: _FakeCompleted(
@@ -304,12 +401,18 @@ def test_civm7_stderr_on_a_successful_exit_is_not_discarded(monkeypatch):
     assert "Permission denied" in str(excinfo.value), str(excinfo.value)
 
 
-def test_civm7_the_binary_file_notice_does_not_abort_the_scan(monkeypatch):
-    """It is emitted on a *successful* search, so raising would red the suite.
+def test_civm7_a_benign_notice_on_stderr_does_not_abort_the_scan(monkeypatch):
+    """White-box cover for the allowlist, on a synthetic result.
 
-    Every caller shares run_rg, so one binary file that happens to match
-    would take down the gate, the overlap test and the rg preflight together,
-    with a message blaming a partial scan and no way to proceed.
+    Measured with rg 14.1.1 on 2026-11-11: a recursive scan skips a binary
+    file in silence, and an explicit binary argument writes `binary file
+    matches (...)` to **stdout** with no WARNING prefix. So no rg checked
+    here puts this on stderr, and the allowlist is defensive rather than
+    load bearing. It stays because all seven scans share run_rg: on a
+    version that does emit a benign notice, one matching binary file would
+    otherwise take down the gate, the overlap test and the rg preflight
+    together, with a message blaming a partial scan. The input below is
+    synthetic for that reason.
     """
     notice = (
         'WARNING: stopped searching binary file ./x.bin after match '
@@ -336,19 +439,55 @@ def test_civm7_the_scan_is_decoded_as_utf8_and_bounded(monkeypatch):
     assert seen.get("timeout") == color_audit.RG_TIMEOUT_SECONDS, seen
 
 
-def test_civm7_every_line_the_real_scan_returns_can_be_parsed():
-    """Covers -n and --no-config behaviourally, which no flag check can.
+def test_civm7_every_line_of_every_real_scan_can_be_parsed():
+    """Covers -n, -H and --no-config behaviourally, which no flag check can.
 
-    Drop -n, or let a developer's ~/.ripgreprc set --heading or
-    --no-line-number, and parse_line returns None for every line. The
-    occurrence table and both frequency tables survive that silently: the
-    report comes out structurally valid and almost entirely empty.
+    Drop -n or -H, or let a developer's ~/.ripgreprc set --heading or
+    --no-line-number, and parse_line returns None for every line of the
+    affected scan. The occurrence table and both frequency tables survive
+    that silently: the report comes out structurally valid and short.
+
+    Every scan, not just one: the hex scan passes "." and so always carried a
+    path, while `app_settings` passes a single file and parsed 0 of 26. The
+    one scan that was broken was the one outside the earlier version of this
+    test.
     """
-    lines = color_audit.run_rg(color_audit.SCAN_COMMANDS["hex"])
-    unparsed = [line for line in lines if color_audit.parse_line(line) is None]
-    assert len(unparsed) == 0, (
-        f"{len(unparsed)} of {len(lines)} scan lines did not parse. "
-        f"First: {unparsed[:2]}"
+    failures = {}
+    for name, cmd in color_audit.SCAN_COMMANDS.items():
+        lines = color_audit.run_rg(cmd)
+        unparsed = [ln for ln in lines if color_audit.parse_line(ln) is None]
+        if unparsed:
+            failures[name] = (len(unparsed), len(lines), unparsed[:2])
+    assert failures == {}, (
+        "these scans returned lines parse_line could not read, as "
+        "{scan: (unparsed, total, examples)}: "
+        f"{failures}"
+    )
+
+
+def test_civm7_no_scan_reads_this_gate_s_own_fixtures():
+    """SCAN_FIXTURE's stand-in lines are rg output, not UI colour usage.
+
+    They were being counted as real occurrences: 3 of the `tuples` scan's 5
+    lines came from this file, so `scan_all`'s refusal of an empty scan --
+    the one mechanism here meant to catch a scan going blind -- could be
+    satisfied by this file's own test data. Migrate the two remaining real
+    tuple colours, which section 3 of the report recommends, and the scan
+    would still return 3 and nothing would go red.
+    """
+    this_file = "tests/test_color_inventory_sync.py"
+    offenders = {}
+    for name, cmd in color_audit.SCAN_COMMANDS.items():
+        hits = [
+            ln for ln in color_audit.run_rg(cmd)
+            if (entry := color_audit.parse_line(ln)) and entry.path == this_file
+        ]
+        if hits:
+            offenders[name] = len(hits)
+    assert offenders == {}, (
+        f"{this_file} is inside its own scans, as {{scan: lines}}: "
+        f"{offenders}. Its fixtures are stand-ins for rg output, so counting "
+        "them reports test data as the app's colour usage."
     )
 
 
