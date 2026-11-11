@@ -1,8 +1,8 @@
 # UI Color Inventory
 
-Generated via deterministic `rg` scans of `src/` and `themes/`: the UI code and the themes it loads.
+Generated via deterministic `rg` scans of `src/`, `themes/` and `tools/generate_ctk_themes.py`: the UI code, the themes it loads, and the tool that writes them (CIV-A1, 2026-11-11).
 
-Not covered, by the CIV-A1 decision of 2026-11-11: the tests, documents and plans that mention colours, and two places outside those trees that do hold real UI colour -- `tools/generate_ctk_themes.py`, which writes the files in `themes/`, and the named colours inside `assets/icons/*.svg`. Section 1's Hard Rule is about hard-coded colours in UI code, and this is the scan that matches it.
+Not covered: the tests, documents and plans that mention colours, and the named colours inside `assets/icons/*.svg`.
 
 ## Scan Commands
 
@@ -10,25 +10,25 @@ Rendered from `SCAN_COMMANDS` in `tools/color_audit.py`, so what is printed here
 
 ```bash
 # widget
-rg --sort path --no-config -n -H 'fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=' src
+rg --sort path --no-config -n -H 'fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=' src tools/generate_ctk_themes.py
 # hex
-rg --sort path --no-config -n -H '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b' src
+rg --sort path --no-config -n -H '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b' src tools/generate_ctk_themes.py
 # named
-rg --sort path --no-config -n -H -i '"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)'"'"'' src
+rg --sort path --no-config -n -H -i '"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray[0-9]{0,3}|grey[0-9]{0,3})"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray[0-9]{0,3}|grey[0-9]{0,3})'"'"'' src tools/generate_ctk_themes.py
 # theme_api
-rg --sort path --no-config -n -H 'set_default_color_theme\(|set_appearance_mode\(' src
+rg --sort path --no-config -n -H 'set_default_color_theme\(|set_appearance_mode\(' src tools/generate_ctk_themes.py
 # tuples
-rg --sort path --no-config -n -H '(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\s*=\s*(\(|\[)' src
+rg --sort path --no-config -n -H '(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\s*=\s*(\(|\[)' src tools/generate_ctk_themes.py
 # app_settings
 rg --sort path --no-config -n -H 'color|theme|appearance_mode|theme_name|drag_schedule_date_text_color|color_hex' src/getmoredone/app_settings.py
 # theme_files
-rg --sort path --no-config -n -H '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)'"'"'' themes -g '*.json'
+rg --sort path --no-config -n -H '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray[0-9]{0,3}|grey[0-9]{0,3})"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray[0-9]{0,3}|grey[0-9]{0,3})'"'"'' themes -g '*.json'
 ```
 
 ## 1) Summary Counts By Type
 
-- Hex colors (match count): **1022**
-- Named colors (match count): **66**
+- Hex colors (match count): **1088**
+- Named colors (match count): **647**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
 - Widget explicit overrides (line count): **526**
@@ -41,10 +41,10 @@ and theme_files line counts.
 | Scan | Lines |
 |---|---:|
 | `app_settings` | 26 |
-| `hex` | 154 |
-| `named` | 41 |
+| `hex` | 187 |
+| `named` | 57 |
 | `theme_api` | 2 |
-| `theme_files` | 765 |
+| `theme_files` | 1292 |
 | `tuples` | 2 |
 | `widget` | 526 |
 
@@ -94,39 +94,69 @@ Hex top values:
 | Color | Count |
 |---|---:|
 | `#dce4ee` | 60 |
+| `#ffffff` | 56 |
 | `#979da2` | 52 |
-| `#ffffff` | 43 |
+| `#000000` | 35 |
 | `#565b5e` | 34 |
 | `#3e454a` | 27 |
 | `#4a4d50` | 27 |
 | `#939ba2` | 27 |
 | `#949a9f` | 27 |
-| `#000000` | 25 |
+| `#1d1d1f` | 21 |
 | `#2e1c8f` | 21 |
+| `#6e6e73` | 17 |
+| `#334155` | 16 |
 | `#343638` | 16 |
 | `#f9f9fa` | 16 |
-| `#334155` | 15 |
-| `#6e6e73` | 15 |
-| `#1d1d1f` | 14 |
-| `#86868b` | 14 |
+| `#86868b` | 15 |
+| `#111111` | 13 |
+| `#d2d2d7` | 13 |
 | `#f0e7ff` | 12 |
 | `#42386d` | 11 |
-| `#813389` | 11 |
-| `#111111` | 10 |
 
 Named top values:
 
 | Color | Count |
 |---|---:|
+| `gray84` | 69 |
+| `gray14` | 68 |
+| `gray60` | 48 |
+| `gray45` | 32 |
 | `gray` | 31 |
+| `gray20` | 29 |
+| `gray40` | 28 |
+| `gray41` | 28 |
+| `gray90` | 25 |
+| `gray74` | 24 |
+| `gray53` | 19 |
+| `gray55` | 19 |
+| `gray100` | 18 |
+| `gray28` | 18 |
+| `gray29` | 18 |
+| `gray10` | 14 |
+| `gray95` | 14 |
+| `gray70` | 11 |
+| `gray21` | 10 |
+| `gray36` | 9 |
+| `gray62` | 9 |
+| `gray75` | 9 |
+| `gray80` | 9 |
+| `green` | 9 |
 | `white` | 9 |
-| `green` | 8 |
+| `gray16` | 8 |
+| `gray50` | 8 |
+| `gray52` | 8 |
+| `gray13` | 7 |
+| `gray65` | 7 |
+| `gray85` | 7 |
 | `red` | 7 |
-| `orange` | 4 |
-| `blue` | 3 |
+| `orange` | 5 |
+| `blue` | 4 |
+| `gray30` | 3 |
+| `grey` | 2 |
 | `yellow` | 2 |
 | `black` | 1 |
-| `grey` | 1 |
+| `gray17` | 1 |
 
 ## 2) Complete Occurrence Table (Grouped by Color Value, then File)
 
@@ -161,6 +191,16 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:209` | `"#000000",` |
 | `themes/black_white.json:213` | `"#000000",` |
 | `themes/black_white.json:278` | `"#000000",` |
+| `tools/generate_ctk_themes.py:53` | `APPLE_GREY_HOVER = ["#000000", "#F5F5F7"]` |
+| `tools/generate_ctk_themes.py:57` | `BLACK_WHITE_HOVER = ["#000000", "#FFFFFF"]` |
+| `tools/generate_ctk_themes.py:61` | `("CTk", "fg_color"): ["#F5F5F7", "#000000"],` |
+| `tools/generate_ctk_themes.py:62` | `("CTkToplevel", "fg_color"): ["#F5F5F7", "#000000"],` |
+| `tools/generate_ctk_themes.py:74` | `("CTk", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:75` | `("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:76` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:77` | `("CTkFrame", "top_fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:79` | `("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],` |
+| `tools/generate_ctk_themes.py:82` | `("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],` |
 
 ### `#000365`
 
@@ -252,6 +292,9 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:194` | `"#111111",` |
 | `themes/black_white.json:205` | `"#111111",` |
 | `themes/black_white.json:274` | `"#111111",` |
+| `tools/generate_ctk_themes.py:56` | `BLACK_WHITE_ANCHOR = ["#111111", "#F3F4F6"]` |
+| `tools/generate_ctk_themes.py:58` | `BLACK_WHITE_BUTTON_TEXT = ["#FFFFFF", "#111111"]` |
+| `tools/generate_ctk_themes.py:80` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],` |
 
 ### `#14375e`
 
@@ -346,6 +389,13 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/apple_grey.json:194` | `"#1D1D1F",` |
 | `themes/apple_grey.json:205` | `"#1D1D1F",` |
 | `themes/apple_grey.json:274` | `"#1D1D1F",` |
+| `tools/generate_ctk_themes.py:52` | `APPLE_GREY_ANCHOR = ["#1D1D1F", "#D2D2D7"]` |
+| `tools/generate_ctk_themes.py:54` | `APPLE_GREY_BUTTON_TEXT = ["#FFFFFF", "#1D1D1F"]` |
+| `tools/generate_ctk_themes.py:63` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
+| `tools/generate_ctk_themes.py:64` | `("CTkFrame", "top_fg_color"): ["#FFFFFF", "#1D1D1F"],` |
+| `tools/generate_ctk_themes.py:66` | `("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
+| `tools/generate_ctk_themes.py:67` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
+| `tools/generate_ctk_themes.py:69` | `("CTkEntry", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
 
 ### `#1d2531`
 
@@ -396,6 +446,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/blue.json:195` | `"#1F6AA5"` |
 | `themes/blue.json:206` | `"#1F6AA5"` |
 | `themes/blue.json:275` | `"#1F6AA5"` |
+| `tools/generate_ctk_themes.py:48` | `"blue": ["#3B8ED0", "#1F6AA5"],` |
 
 ### `#21527b`
 
@@ -504,6 +555,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/green.json:194` | `"#2CC985",` |
 | `themes/green.json:205` | `"#2CC985",` |
 | `themes/green.json:274` | `"#2CC985",` |
+| `tools/generate_ctk_themes.py:44` | `"green": ["#2CC985", "#2FA572"],` |
 
 ### `#2e1c8f`
 
@@ -554,6 +606,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/green.json:195` | `"#2FA572"` |
 | `themes/green.json:206` | `"#2FA572"` |
 | `themes/green.json:275` | `"#2FA572"` |
+| `tools/generate_ctk_themes.py:44` | `"green": ["#2CC985", "#2FA572"],` |
 
 ### `#30343b`
 
@@ -608,6 +661,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/grey.json:195` | `"#334155"` |
 | `themes/grey.json:206` | `"#334155"` |
 | `themes/grey.json:275` | `"#334155"` |
+| `tools/generate_ctk_themes.py:47` | `"grey": ["#475569", "#334155"],` |
 
 ### `#343638`
 
@@ -679,6 +733,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/blue.json:194` | `"#3B8ED0",` |
 | `themes/blue.json:205` | `"#3B8ED0",` |
 | `themes/blue.json:274` | `"#3B8ED0",` |
+| `tools/generate_ctk_themes.py:48` | `"blue": ["#3B8ED0", "#1F6AA5"],` |
 
 ### `#3d0005`
 
@@ -752,6 +807,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `themes/apple_grey.json:27` | `"#424245"` |
 | `themes/apple_grey.json:71` | `"#424245"` |
+| `tools/generate_ctk_themes.py:65` | `("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],` |
+| `tools/generate_ctk_themes.py:68` | `("CTkEntry", "border_color"): ["#D2D2D7", "#424245"],` |
 
 ### `#431407`
 
@@ -795,6 +852,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/grey.json:194` | `"#475569",` |
 | `themes/grey.json:205` | `"#475569",` |
 | `themes/grey.json:274` | `"#475569",` |
+| `tools/generate_ctk_themes.py:47` | `"grey": ["#475569", "#334155"],` |
 
 ### `#4a4d50`
 
@@ -853,6 +911,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/theme.py:440` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
 | `themes/black_white.json:27` | `"#4B5563"` |
+| `tools/generate_ctk_themes.py:78` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
 
 ### `#4caf50`
 
@@ -1054,6 +1113,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `themes/black_white.json:71` | `"#6B7280"` |
 | `themes/black_white.json:78` | `"#6B7280",` |
+| `tools/generate_ctk_themes.py:81` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
+| `tools/generate_ctk_themes.py:83` | `("CTkEntry", "placeholder_text_color"): ["#6B7280", "#9CA3AF"],` |
 
 ### `#6bcb77`
 
@@ -1086,6 +1147,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:222` | `"#6E6E73"` |
 | `themes/black_white.json:250` | `"#6E6E73"` |
 | `themes/black_white.json:295` | `"#6E6E73"` |
+| `tools/generate_ctk_themes.py:70` | `("CTkEntry", "placeholder_text_color"): ["#6E6E73", "#A1A1A6"],` |
+| `tools/generate_ctk_themes.py:176` | `widget_cfg["text_color_disabled"] = ["#86868B", "#6E6E73"]` |
 
 ### `#6e7174`
 
@@ -1175,6 +1238,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/purple.json:195` | `"#7C3AED"` |
 | `themes/purple.json:206` | `"#7C3AED"` |
 | `themes/purple.json:275` | `"#7C3AED"` |
+| `tools/generate_ctk_themes.py:49` | `"purple": ["#8B5CF6", "#7C3AED"],` |
 
 ### `#813389`
 
@@ -1234,6 +1298,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:221` | `"#86868B",` |
 | `themes/black_white.json:249` | `"#86868B",` |
 | `themes/black_white.json:294` | `"#86868B",` |
+| `tools/generate_ctk_themes.py:176` | `widget_cfg["text_color_disabled"] = ["#86868B", "#6E6E73"]` |
 
 ### `#86efac`
 
@@ -1268,6 +1333,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/purple.json:194` | `"#8B5CF6",` |
 | `themes/purple.json:205` | `"#8B5CF6",` |
 | `themes/purple.json:274` | `"#8B5CF6",` |
+| `tools/generate_ctk_themes.py:49` | `"purple": ["#8B5CF6", "#7C3AED"],` |
 
 ### `#8bc34a`
 
@@ -1447,6 +1513,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/orange.json:195` | `"#9A3412"` |
 | `themes/orange.json:206` | `"#9A3412"` |
 | `themes/orange.json:275` | `"#9A3412"` |
+| `tools/generate_ctk_themes.py:45` | `"orange": ["#C2410C", "#9A3412"],` |
 
 ### `#9c27b0`
 
@@ -1467,6 +1534,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/theme.py:440` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
 | `themes/black_white.json:70` | `"#9CA3AF",` |
 | `themes/black_white.json:79` | `"#9CA3AF"` |
+| `tools/generate_ctk_themes.py:81` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
+| `tools/generate_ctk_themes.py:83` | `("CTkEntry", "placeholder_text_color"): ["#6B7280", "#9CA3AF"],` |
 
 ### `#9d174d`
 
@@ -1480,6 +1549,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/pink.json:195` | `"#9D174D"` |
 | `themes/pink.json:206` | `"#9D174D"` |
 | `themes/pink.json:275` | `"#9D174D"` |
+| `tools/generate_ctk_themes.py:46` | `"pink": ["#BE185D", "#9D174D"],` |
 
 ### `#a098c9`
 
@@ -1492,6 +1562,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `themes/apple_grey.json:79` | `"#A1A1A6"` |
+| `tools/generate_ctk_themes.py:70` | `("CTkEntry", "placeholder_text_color"): ["#6E6E73", "#A1A1A6"],` |
 
 ### `#a396cb`
 
@@ -1622,6 +1693,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/pink.json:194` | `"#BE185D",` |
 | `themes/pink.json:205` | `"#BE185D",` |
 | `themes/pink.json:274` | `"#BE185D",` |
+| `tools/generate_ctk_themes.py:46` | `"pink": ["#BE185D", "#9D174D"],` |
 
 ### `#beb1e5`
 
@@ -1642,6 +1714,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/orange.json:194` | `"#C2410C",` |
 | `themes/orange.json:205` | `"#C2410C",` |
 | `themes/orange.json:274` | `"#C2410C",` |
+| `tools/generate_ctk_themes.py:45` | `"orange": ["#C2410C", "#9A3412"],` |
 
 ### `#c7aaff`
 
@@ -1693,6 +1766,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `themes/black_white.json:26` | `"#D1D5DB",` |
+| `tools/generate_ctk_themes.py:78` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
 
 ### `#d1d5de`
 
@@ -1718,6 +1792,9 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/apple_grey.json:195` | `"#D2D2D7"` |
 | `themes/apple_grey.json:206` | `"#D2D2D7"` |
 | `themes/apple_grey.json:275` | `"#D2D2D7"` |
+| `tools/generate_ctk_themes.py:52` | `APPLE_GREY_ANCHOR = ["#1D1D1F", "#D2D2D7"]` |
+| `tools/generate_ctk_themes.py:65` | `("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],` |
+| `tools/generate_ctk_themes.py:68` | `("CTkEntry", "border_color"): ["#D2D2D7", "#424245"],` |
 
 ### `#d5d9de`
 
@@ -1989,6 +2066,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:195` | `"#F3F4F6"` |
 | `themes/black_white.json:206` | `"#F3F4F6"` |
 | `themes/black_white.json:275` | `"#F3F4F6"` |
+| `tools/generate_ctk_themes.py:56` | `BLACK_WHITE_ANCHOR = ["#111111", "#F3F4F6"]` |
 
 ### `#f43e37`
 
@@ -2037,6 +2115,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/apple_grey.json:39` | `"#F5F5F7"` |
 | `themes/apple_grey.json:59` | `"#F5F5F7"` |
 | `themes/apple_grey.json:75` | `"#F5F5F7"` |
+| `tools/generate_ctk_themes.py:53` | `APPLE_GREY_HOVER = ["#000000", "#F5F5F7"]` |
+| `tools/generate_ctk_themes.py:61` | `("CTk", "fg_color"): ["#F5F5F7", "#000000"],` |
+| `tools/generate_ctk_themes.py:62` | `("CTkToplevel", "fg_color"): ["#F5F5F7", "#000000"],` |
+| `tools/generate_ctk_themes.py:66` | `("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
+| `tools/generate_ctk_themes.py:69` | `("CTkEntry", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
 
 ### `#f7f5ff`
 
@@ -2370,6 +2453,19 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/davipa.json:290` | `"#FFFFFF",` |
 | `themes/davipa.json:291` | `"#FFFFFF"` |
 | `themes/davipa.json:302` | `"#FFFFFF",` |
+| `tools/generate_ctk_themes.py:54` | `APPLE_GREY_BUTTON_TEXT = ["#FFFFFF", "#1D1D1F"]` |
+| `tools/generate_ctk_themes.py:57` | `BLACK_WHITE_HOVER = ["#000000", "#FFFFFF"]` |
+| `tools/generate_ctk_themes.py:58` | `BLACK_WHITE_BUTTON_TEXT = ["#FFFFFF", "#111111"]` |
+| `tools/generate_ctk_themes.py:63` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
+| `tools/generate_ctk_themes.py:64` | `("CTkFrame", "top_fg_color"): ["#FFFFFF", "#1D1D1F"],` |
+| `tools/generate_ctk_themes.py:67` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
+| `tools/generate_ctk_themes.py:74` | `("CTk", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:75` | `("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:76` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:77` | `("CTkFrame", "top_fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:79` | `("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],` |
+| `tools/generate_ctk_themes.py:80` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],` |
+| `tools/generate_ctk_themes.py:82` | `("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],` |
 
 ### `black`
 
@@ -2384,6 +2480,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/timer_window.py:892` | `status_color = "green" if self.timer_state == self.RUNNING else "blue"` |
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:248` | `"blue": palette["primary"],` |
+| `tools/generate_ctk_themes.py:48` | `"blue": ["#3B8ED0", "#1F6AA5"],` |
 
 ### `gray`
 
@@ -2420,6 +2517,733 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/purple.json:176` | `"gray",` |
 | `themes/purple.json:177` | `"gray"` |
 
+### `gray10`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/base_dark_blue.json:3` | `"fg_color": ["gray95", "gray10"]` |
+| `themes/base_dark_blue.json:6` | `"fg_color": ["gray95", "gray10"]` |
+| `themes/blue.json:5` | `"gray10"` |
+| `themes/blue.json:11` | `"gray10"` |
+| `themes/green.json:5` | `"gray10"` |
+| `themes/green.json:11` | `"gray10"` |
+| `themes/grey.json:5` | `"gray10"` |
+| `themes/grey.json:11` | `"gray10"` |
+| `themes/orange.json:5` | `"gray10"` |
+| `themes/orange.json:11` | `"gray10"` |
+| `themes/pink.json:5` | `"gray10"` |
+| `themes/pink.json:11` | `"gray10"` |
+| `themes/purple.json:5` | `"gray10"` |
+| `themes/purple.json:11` | `"gray10"` |
+
+### `gray100`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/apple_grey.json:128` | `"gray100"` |
+| `themes/apple_grey.json:302` | `"gray100",` |
+| `themes/base_dark_blue.json:54` | `"button_hover_color": ["gray20", "gray100"],` |
+| `themes/base_dark_blue.json:124` | `"fg_color": ["gray100", "gray20"],` |
+| `themes/black_white.json:128` | `"gray100"` |
+| `themes/black_white.json:302` | `"gray100",` |
+| `themes/blue.json:128` | `"gray100"` |
+| `themes/blue.json:302` | `"gray100",` |
+| `themes/green.json:128` | `"gray100"` |
+| `themes/green.json:302` | `"gray100",` |
+| `themes/grey.json:128` | `"gray100"` |
+| `themes/grey.json:302` | `"gray100",` |
+| `themes/orange.json:128` | `"gray100"` |
+| `themes/orange.json:302` | `"gray100",` |
+| `themes/pink.json:128` | `"gray100"` |
+| `themes/pink.json:302` | `"gray100",` |
+| `themes/purple.json:128` | `"gray100"` |
+| `themes/purple.json:302` | `"gray100",` |
+
+### `gray13`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/base_dark_blue.json:11` | `"fg_color": ["gray90", "gray13"],` |
+| `themes/blue.json:19` | `"gray13"` |
+| `themes/green.json:19` | `"gray13"` |
+| `themes/grey.json:19` | `"gray13"` |
+| `themes/orange.json:19` | `"gray13"` |
+| `themes/pink.json:19` | `"gray13"` |
+| `themes/purple.json:19` | `"gray13"` |
+
+### `gray14`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/apple_grey.json:102` | `"gray14",` |
+| `themes/apple_grey.json:131` | `"gray14",` |
+| `themes/apple_grey.json:156` | `"gray14",` |
+| `themes/apple_grey.json:245` | `"gray14",` |
+| `themes/apple_grey.json:310` | `"gray14",` |
+| `themes/apple_grey.json:338` | `"gray14",` |
+| `themes/base_dark_blue.json:27` | `"text_color": ["gray14", "gray84"]` |
+| `themes/base_dark_blue.json:34` | `"text_color": ["gray14", "gray84"],` |
+| `themes/base_dark_blue.json:44` | `"text_color": ["gray14", "gray84"],` |
+| `themes/base_dark_blue.json:55` | `"text_color": ["gray14", "gray84"],` |
+| `themes/base_dark_blue.json:65` | `"text_color": ["gray14", "gray84"],` |
+| `themes/base_dark_blue.json:100` | `"text_color": ["gray14", "gray84"],` |
+| `themes/base_dark_blue.json:126` | `"text_color": ["gray14", "gray84"],` |
+| `themes/base_dark_blue.json:136` | `"text_color": ["gray14", "gray84"]` |
+| `themes/black_white.json:102` | `"gray14",` |
+| `themes/black_white.json:131` | `"gray14",` |
+| `themes/black_white.json:156` | `"gray14",` |
+| `themes/black_white.json:245` | `"gray14",` |
+| `themes/black_white.json:310` | `"gray14",` |
+| `themes/black_white.json:338` | `"gray14",` |
+| `themes/blue.json:58` | `"gray14",` |
+| `themes/blue.json:74` | `"gray14",` |
+| `themes/blue.json:102` | `"gray14",` |
+| `themes/blue.json:131` | `"gray14",` |
+| `themes/blue.json:156` | `"gray14",` |
+| `themes/blue.json:245` | `"gray14",` |
+| `themes/blue.json:310` | `"gray14",` |
+| `themes/blue.json:338` | `"gray14",` |
+| `themes/green.json:58` | `"gray14",` |
+| `themes/green.json:74` | `"gray14",` |
+| `themes/green.json:102` | `"gray14",` |
+| `themes/green.json:131` | `"gray14",` |
+| `themes/green.json:156` | `"gray14",` |
+| `themes/green.json:245` | `"gray14",` |
+| `themes/green.json:310` | `"gray14",` |
+| `themes/green.json:338` | `"gray14",` |
+| `themes/grey.json:58` | `"gray14",` |
+| `themes/grey.json:74` | `"gray14",` |
+| `themes/grey.json:102` | `"gray14",` |
+| `themes/grey.json:131` | `"gray14",` |
+| `themes/grey.json:156` | `"gray14",` |
+| `themes/grey.json:245` | `"gray14",` |
+| `themes/grey.json:310` | `"gray14",` |
+| `themes/grey.json:338` | `"gray14",` |
+| `themes/orange.json:58` | `"gray14",` |
+| `themes/orange.json:74` | `"gray14",` |
+| `themes/orange.json:102` | `"gray14",` |
+| `themes/orange.json:131` | `"gray14",` |
+| `themes/orange.json:156` | `"gray14",` |
+| `themes/orange.json:245` | `"gray14",` |
+| `themes/orange.json:310` | `"gray14",` |
+| `themes/orange.json:338` | `"gray14",` |
+| `themes/pink.json:58` | `"gray14",` |
+| `themes/pink.json:74` | `"gray14",` |
+| `themes/pink.json:102` | `"gray14",` |
+| `themes/pink.json:131` | `"gray14",` |
+| `themes/pink.json:156` | `"gray14",` |
+| `themes/pink.json:245` | `"gray14",` |
+| `themes/pink.json:310` | `"gray14",` |
+| `themes/pink.json:338` | `"gray14",` |
+| `themes/purple.json:58` | `"gray14",` |
+| `themes/purple.json:74` | `"gray14",` |
+| `themes/purple.json:102` | `"gray14",` |
+| `themes/purple.json:131` | `"gray14",` |
+| `themes/purple.json:156` | `"gray14",` |
+| `themes/purple.json:245` | `"gray14",` |
+| `themes/purple.json:310` | `"gray14",` |
+| `themes/purple.json:338` | `"gray14",` |
+
+### `gray16`
+
+| File:Line | Snippet |
+|---|---|
+| `src/getmoredone/screens/chip_table.py:348` | `# themes ("gray16" in dark mode), which pick_text_color` |
+| `themes/base_dark_blue.json:12` | `"top_fg_color": ["gray85", "gray16"],` |
+| `themes/blue.json:23` | `"gray16"` |
+| `themes/green.json:23` | `"gray16"` |
+| `themes/grey.json:23` | `"gray16"` |
+| `themes/orange.json:23` | `"gray16"` |
+| `themes/pink.json:23` | `"gray16"` |
+| `themes/purple.json:23` | `"gray16"` |
+
+### `gray17`
+
+| File:Line | Snippet |
+|---|---|
+| `src/getmoredone/theme.py:104` | `"surface": _theme_value("CTkFrame", "fg_color", "gray17"),` |
+
+### `gray20`
+
+| File:Line | Snippet |
+|---|---|
+| `src/getmoredone/screens/item_editor_weekly_tactic_dialog.py:281` | `) or subsegment_color or self.segment_colors_by_id.get(segment_id, "gray20")` |
+| `src/getmoredone/theme.py:95` | `input_surface = _theme_value("CTkComboBox", "fg_color", _theme_value("CTkEntry", "fg_color", "gray20"))` |
+| `themes/apple_grey.json:127` | `"gray20",` |
+| `themes/apple_grey.json:303` | `"gray20"` |
+| `themes/apple_grey.json:331` | `"gray20"` |
+| `themes/base_dark_blue.json:54` | `"button_hover_color": ["gray20", "gray100"],` |
+| `themes/base_dark_blue.json:124` | `"fg_color": ["gray100", "gray20"],` |
+| `themes/base_dark_blue.json:134` | `"fg_color": ["gray90", "gray20"],` |
+| `themes/black_white.json:127` | `"gray20",` |
+| `themes/black_white.json:303` | `"gray20"` |
+| `themes/black_white.json:331` | `"gray20"` |
+| `themes/blue.json:127` | `"gray20",` |
+| `themes/blue.json:303` | `"gray20"` |
+| `themes/blue.json:331` | `"gray20"` |
+| `themes/green.json:127` | `"gray20",` |
+| `themes/green.json:303` | `"gray20"` |
+| `themes/green.json:331` | `"gray20"` |
+| `themes/grey.json:127` | `"gray20",` |
+| `themes/grey.json:303` | `"gray20"` |
+| `themes/grey.json:331` | `"gray20"` |
+| `themes/orange.json:127` | `"gray20",` |
+| `themes/orange.json:303` | `"gray20"` |
+| `themes/orange.json:331` | `"gray20"` |
+| `themes/pink.json:127` | `"gray20",` |
+| `themes/pink.json:303` | `"gray20"` |
+| `themes/pink.json:331` | `"gray20"` |
+| `themes/purple.json:127` | `"gray20",` |
+| `themes/purple.json:303` | `"gray20"` |
+| `themes/purple.json:331` | `"gray20"` |
+
+### `gray21`
+
+| File:Line | Snippet |
+|---|---|
+| `src/getmoredone/theme.py:117` | `"surface_subtle": _theme_value("CTkFrame", "top_fg_color", "gray21"),` |
+| `themes/apple_grey.json:325` | `"gray21"` |
+| `themes/base_dark_blue.json:131` | `"label_fg_color": ["gray80", "gray21"]` |
+| `themes/black_white.json:325` | `"gray21"` |
+| `themes/blue.json:325` | `"gray21"` |
+| `themes/green.json:325` | `"gray21"` |
+| `themes/grey.json:325` | `"gray21"` |
+| `themes/orange.json:325` | `"gray21"` |
+| `themes/pink.json:325` | `"gray21"` |
+| `themes/purple.json:325` | `"gray21"` |
+
+### `gray28`
+
+| File:Line | Snippet |
+|---|---|
+| `src/getmoredone/theme.py:105` | `"ghost_hover": _theme_value("DropdownMenu", "hover_color", "gray28"),` |
+| `src/getmoredone/theme.py:106` | `"border": _theme_value("CTkFrame", "border_color", "gray28"),` |
+| `themes/apple_grey.json:335` | `"gray28"` |
+| `themes/base_dark_blue.json:13` | `"border_color": ["gray65", "gray28"]` |
+| `themes/base_dark_blue.json:135` | `"hover_color": ["gray75", "gray28"],` |
+| `themes/black_white.json:335` | `"gray28"` |
+| `themes/blue.json:27` | `"gray28"` |
+| `themes/blue.json:335` | `"gray28"` |
+| `themes/green.json:27` | `"gray28"` |
+| `themes/green.json:335` | `"gray28"` |
+| `themes/grey.json:27` | `"gray28"` |
+| `themes/grey.json:335` | `"gray28"` |
+| `themes/orange.json:27` | `"gray28"` |
+| `themes/orange.json:335` | `"gray28"` |
+| `themes/pink.json:27` | `"gray28"` |
+| `themes/pink.json:335` | `"gray28"` |
+| `themes/purple.json:27` | `"gray28"` |
+| `themes/purple.json:335` | `"gray28"` |
+
+### `gray29`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/apple_grey.json:271` | `"gray29"` |
+| `themes/apple_grey.json:283` | `"gray29"` |
+| `themes/base_dark_blue.json:113` | `"fg_color": ["#979DA2", "gray29"],` |
+| `themes/base_dark_blue.json:116` | `"unselected_color": ["#979DA2", "gray29"],` |
+| `themes/black_white.json:271` | `"gray29"` |
+| `themes/black_white.json:283` | `"gray29"` |
+| `themes/blue.json:271` | `"gray29"` |
+| `themes/blue.json:283` | `"gray29"` |
+| `themes/green.json:271` | `"gray29"` |
+| `themes/green.json:283` | `"gray29"` |
+| `themes/grey.json:271` | `"gray29"` |
+| `themes/grey.json:283` | `"gray29"` |
+| `themes/orange.json:271` | `"gray29"` |
+| `themes/orange.json:283` | `"gray29"` |
+| `themes/pink.json:271` | `"gray29"` |
+| `themes/pink.json:283` | `"gray29"` |
+| `themes/purple.json:271` | `"gray29"` |
+| `themes/purple.json:283` | `"gray29"` |
+
+### `gray30`
+
+| File:Line | Snippet |
+|---|---|
+| `src/getmoredone/screens/column_resize.py:280` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
+| `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
+| `src/getmoredone/theme.py:119` | `"chip_bg": "gray30",` |
+
+### `gray36`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/apple_grey.json:123` | `"gray36",` |
+| `themes/base_dark_blue.json:53` | `"button_color": ["gray36", "#D5D9DE"],` |
+| `themes/black_white.json:123` | `"gray36",` |
+| `themes/blue.json:123` | `"gray36",` |
+| `themes/green.json:123` | `"gray36",` |
+| `themes/grey.json:123` | `"gray36",` |
+| `themes/orange.json:123` | `"gray36",` |
+| `themes/pink.json:123` | `"gray36",` |
+| `themes/purple.json:123` | `"gray36",` |
+
+### `gray40`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/apple_grey.json:190` | `"gray40",` |
+| `themes/apple_grey.json:262` | `"gray40",` |
+| `themes/apple_grey.json:318` | `"gray40",` |
+| `themes/base_dark_blue.json:81` | `"progress_color": ["gray40", "#AAB0B5"],` |
+| `themes/base_dark_blue.json:108` | `"button_hover_color": ["gray40", "gray53"]` |
+| `themes/base_dark_blue.json:128` | `"scrollbar_button_hover_color": ["gray40", "gray53"]` |
+| `themes/black_white.json:190` | `"gray40",` |
+| `themes/black_white.json:262` | `"gray40",` |
+| `themes/black_white.json:318` | `"gray40",` |
+| `themes/blue.json:190` | `"gray40",` |
+| `themes/blue.json:262` | `"gray40",` |
+| `themes/blue.json:318` | `"gray40",` |
+| `themes/davipa.json:318` | `"gray40",` |
+| `themes/green.json:190` | `"gray40",` |
+| `themes/green.json:262` | `"gray40",` |
+| `themes/green.json:318` | `"gray40",` |
+| `themes/grey.json:190` | `"gray40",` |
+| `themes/grey.json:262` | `"gray40",` |
+| `themes/grey.json:318` | `"gray40",` |
+| `themes/orange.json:190` | `"gray40",` |
+| `themes/orange.json:262` | `"gray40",` |
+| `themes/orange.json:318` | `"gray40",` |
+| `themes/pink.json:190` | `"gray40",` |
+| `themes/pink.json:262` | `"gray40",` |
+| `themes/pink.json:318` | `"gray40",` |
+| `themes/purple.json:190` | `"gray40",` |
+| `themes/purple.json:262` | `"gray40",` |
+| `themes/purple.json:318` | `"gray40",` |
+
+### `gray41`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/apple_grey.json:259` | `"gray41"` |
+| `themes/apple_grey.json:287` | `"gray41"` |
+| `themes/apple_grey.json:315` | `"gray41"` |
+| `themes/base_dark_blue.json:107` | `"button_color": ["gray55", "gray41"],` |
+| `themes/base_dark_blue.json:117` | `"unselected_hover_color": ["gray70", "gray41"],` |
+| `themes/base_dark_blue.json:127` | `"scrollbar_button_color": ["gray55", "gray41"],` |
+| `themes/black_white.json:259` | `"gray41"` |
+| `themes/black_white.json:287` | `"gray41"` |
+| `themes/black_white.json:315` | `"gray41"` |
+| `themes/blue.json:259` | `"gray41"` |
+| `themes/blue.json:287` | `"gray41"` |
+| `themes/blue.json:315` | `"gray41"` |
+| `themes/davipa.json:315` | `"gray41"` |
+| `themes/green.json:259` | `"gray41"` |
+| `themes/green.json:287` | `"gray41"` |
+| `themes/green.json:315` | `"gray41"` |
+| `themes/grey.json:259` | `"gray41"` |
+| `themes/grey.json:287` | `"gray41"` |
+| `themes/grey.json:315` | `"gray41"` |
+| `themes/orange.json:259` | `"gray41"` |
+| `themes/orange.json:287` | `"gray41"` |
+| `themes/orange.json:315` | `"gray41"` |
+| `themes/pink.json:259` | `"gray41"` |
+| `themes/pink.json:287` | `"gray41"` |
+| `themes/pink.json:315` | `"gray41"` |
+| `themes/purple.json:259` | `"gray41"` |
+| `themes/purple.json:287` | `"gray41"` |
+| `themes/purple.json:315` | `"gray41"` |
+
+### `gray45`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/base_dark_blue.json:45` | `"text_color_disabled": ["gray60", "gray45"]` |
+| `themes/base_dark_blue.json:56` | `"text_color_disabled": ["gray60", "gray45"]` |
+| `themes/base_dark_blue.json:66` | `"text_color_disabled": ["gray60", "gray45"]` |
+| `themes/base_dark_blue.json:101` | `"text_color_disabled": ["gray50", "gray45"]` |
+| `themes/blue.json:107` | `"gray45"` |
+| `themes/blue.json:136` | `"gray45"` |
+| `themes/blue.json:161` | `"gray45"` |
+| `themes/blue.json:250` | `"gray45"` |
+| `themes/davipa.json:107` | `"gray45"` |
+| `themes/davipa.json:136` | `"gray45"` |
+| `themes/davipa.json:161` | `"gray45"` |
+| `themes/davipa.json:250` | `"gray45"` |
+| `themes/green.json:107` | `"gray45"` |
+| `themes/green.json:136` | `"gray45"` |
+| `themes/green.json:161` | `"gray45"` |
+| `themes/green.json:250` | `"gray45"` |
+| `themes/grey.json:107` | `"gray45"` |
+| `themes/grey.json:136` | `"gray45"` |
+| `themes/grey.json:161` | `"gray45"` |
+| `themes/grey.json:250` | `"gray45"` |
+| `themes/orange.json:107` | `"gray45"` |
+| `themes/orange.json:136` | `"gray45"` |
+| `themes/orange.json:161` | `"gray45"` |
+| `themes/orange.json:250` | `"gray45"` |
+| `themes/pink.json:107` | `"gray45"` |
+| `themes/pink.json:136` | `"gray45"` |
+| `themes/pink.json:161` | `"gray45"` |
+| `themes/pink.json:250` | `"gray45"` |
+| `themes/purple.json:107` | `"gray45"` |
+| `themes/purple.json:136` | `"gray45"` |
+| `themes/purple.json:161` | `"gray45"` |
+| `themes/purple.json:250` | `"gray45"` |
+
+### `gray50`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/base_dark_blue.json:101` | `"text_color_disabled": ["gray50", "gray45"]` |
+| `themes/blue.json:249` | `"gray50",` |
+| `themes/davipa.json:249` | `"gray50",` |
+| `themes/green.json:249` | `"gray50",` |
+| `themes/grey.json:249` | `"gray50",` |
+| `themes/orange.json:249` | `"gray50",` |
+| `themes/pink.json:249` | `"gray50",` |
+| `themes/purple.json:249` | `"gray50",` |
+
+### `gray52`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/base_dark_blue.json:35` | `"placeholder_text_color": ["gray52", "gray62"]` |
+| `themes/blue.json:78` | `"gray52",` |
+| `themes/davipa.json:78` | `"gray52",` |
+| `themes/green.json:78` | `"gray52",` |
+| `themes/grey.json:78` | `"gray52",` |
+| `themes/orange.json:78` | `"gray52",` |
+| `themes/pink.json:78` | `"gray52",` |
+| `themes/purple.json:78` | `"gray52",` |
+
+### `gray53`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/apple_grey.json:263` | `"gray53"` |
+| `themes/apple_grey.json:319` | `"gray53"` |
+| `themes/base_dark_blue.json:108` | `"button_hover_color": ["gray40", "gray53"]` |
+| `themes/base_dark_blue.json:128` | `"scrollbar_button_hover_color": ["gray40", "gray53"]` |
+| `themes/black_white.json:263` | `"gray53"` |
+| `themes/black_white.json:319` | `"gray53"` |
+| `themes/blue.json:263` | `"gray53"` |
+| `themes/blue.json:319` | `"gray53"` |
+| `themes/davipa.json:319` | `"gray53"` |
+| `themes/green.json:263` | `"gray53"` |
+| `themes/green.json:319` | `"gray53"` |
+| `themes/grey.json:263` | `"gray53"` |
+| `themes/grey.json:319` | `"gray53"` |
+| `themes/orange.json:263` | `"gray53"` |
+| `themes/orange.json:319` | `"gray53"` |
+| `themes/pink.json:263` | `"gray53"` |
+| `themes/pink.json:319` | `"gray53"` |
+| `themes/purple.json:263` | `"gray53"` |
+| `themes/purple.json:319` | `"gray53"` |
+
+### `gray55`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/apple_grey.json:258` | `"gray55",` |
+| `themes/apple_grey.json:314` | `"gray55",` |
+| `themes/base_dark_blue.json:107` | `"button_color": ["gray55", "gray41"],` |
+| `themes/base_dark_blue.json:127` | `"scrollbar_button_color": ["gray55", "gray41"],` |
+| `themes/black_white.json:258` | `"gray55",` |
+| `themes/black_white.json:314` | `"gray55",` |
+| `themes/blue.json:258` | `"gray55",` |
+| `themes/blue.json:314` | `"gray55",` |
+| `themes/davipa.json:314` | `"gray55",` |
+| `themes/green.json:258` | `"gray55",` |
+| `themes/green.json:314` | `"gray55",` |
+| `themes/grey.json:258` | `"gray55",` |
+| `themes/grey.json:314` | `"gray55",` |
+| `themes/orange.json:258` | `"gray55",` |
+| `themes/orange.json:314` | `"gray55",` |
+| `themes/pink.json:258` | `"gray55",` |
+| `themes/pink.json:314` | `"gray55",` |
+| `themes/purple.json:258` | `"gray55",` |
+| `themes/purple.json:314` | `"gray55",` |
+
+### `gray60`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/base_dark_blue.json:22` | `"text_color_disabled": ["gray74", "gray60"]` |
+| `themes/base_dark_blue.json:45` | `"text_color_disabled": ["gray60", "gray45"]` |
+| `themes/base_dark_blue.json:56` | `"text_color_disabled": ["gray60", "gray45"]` |
+| `themes/base_dark_blue.json:66` | `"text_color_disabled": ["gray60", "gray45"]` |
+| `themes/base_dark_blue.json:91` | `"text_color_disabled": ["gray74", "gray60"]` |
+| `themes/base_dark_blue.json:119` | `"text_color_disabled": ["gray74", "gray60"]` |
+| `themes/blue.json:51` | `"gray60"` |
+| `themes/blue.json:106` | `"gray60",` |
+| `themes/blue.json:135` | `"gray60",` |
+| `themes/blue.json:160` | `"gray60",` |
+| `themes/blue.json:222` | `"gray60"` |
+| `themes/blue.json:295` | `"gray60"` |
+| `themes/davipa.json:51` | `"gray60"` |
+| `themes/davipa.json:106` | `"gray60",` |
+| `themes/davipa.json:135` | `"gray60",` |
+| `themes/davipa.json:160` | `"gray60",` |
+| `themes/davipa.json:222` | `"gray60"` |
+| `themes/davipa.json:295` | `"gray60"` |
+| `themes/green.json:51` | `"gray60"` |
+| `themes/green.json:106` | `"gray60",` |
+| `themes/green.json:135` | `"gray60",` |
+| `themes/green.json:160` | `"gray60",` |
+| `themes/green.json:222` | `"gray60"` |
+| `themes/green.json:295` | `"gray60"` |
+| `themes/grey.json:51` | `"gray60"` |
+| `themes/grey.json:106` | `"gray60",` |
+| `themes/grey.json:135` | `"gray60",` |
+| `themes/grey.json:160` | `"gray60",` |
+| `themes/grey.json:222` | `"gray60"` |
+| `themes/grey.json:295` | `"gray60"` |
+| `themes/orange.json:51` | `"gray60"` |
+| `themes/orange.json:106` | `"gray60",` |
+| `themes/orange.json:135` | `"gray60",` |
+| `themes/orange.json:160` | `"gray60",` |
+| `themes/orange.json:222` | `"gray60"` |
+| `themes/orange.json:295` | `"gray60"` |
+| `themes/pink.json:51` | `"gray60"` |
+| `themes/pink.json:106` | `"gray60",` |
+| `themes/pink.json:135` | `"gray60",` |
+| `themes/pink.json:160` | `"gray60",` |
+| `themes/pink.json:222` | `"gray60"` |
+| `themes/pink.json:295` | `"gray60"` |
+| `themes/purple.json:51` | `"gray60"` |
+| `themes/purple.json:106` | `"gray60",` |
+| `themes/purple.json:135` | `"gray60",` |
+| `themes/purple.json:160` | `"gray60",` |
+| `themes/purple.json:222` | `"gray60"` |
+| `themes/purple.json:295` | `"gray60"` |
+
+### `gray62`
+
+| File:Line | Snippet |
+|---|---|
+| `src/getmoredone/theme.py:93` | `muted_text = _theme_value("CTkEntry", "placeholder_text_color", "gray62")` |
+| `themes/base_dark_blue.json:35` | `"placeholder_text_color": ["gray52", "gray62"]` |
+| `themes/blue.json:79` | `"gray62"` |
+| `themes/davipa.json:79` | `"gray62"` |
+| `themes/green.json:79` | `"gray62"` |
+| `themes/grey.json:79` | `"gray62"` |
+| `themes/orange.json:79` | `"gray62"` |
+| `themes/pink.json:79` | `"gray62"` |
+| `themes/purple.json:79` | `"gray62"` |
+
+### `gray65`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/base_dark_blue.json:13` | `"border_color": ["gray65", "gray28"]` |
+| `themes/blue.json:26` | `"gray65",` |
+| `themes/green.json:26` | `"gray65",` |
+| `themes/grey.json:26` | `"gray65",` |
+| `themes/orange.json:26` | `"gray65",` |
+| `themes/pink.json:26` | `"gray65",` |
+| `themes/purple.json:26` | `"gray65",` |
+
+### `gray70`
+
+| File:Line | Snippet |
+|---|---|
+| `src/getmoredone/screens/column_resize.py:280` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
+| `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
+| `themes/apple_grey.json:286` | `"gray70",` |
+| `themes/base_dark_blue.json:117` | `"unselected_hover_color": ["gray70", "gray41"],` |
+| `themes/black_white.json:286` | `"gray70",` |
+| `themes/blue.json:286` | `"gray70",` |
+| `themes/green.json:286` | `"gray70",` |
+| `themes/grey.json:286` | `"gray70",` |
+| `themes/orange.json:286` | `"gray70",` |
+| `themes/pink.json:286` | `"gray70",` |
+| `themes/purple.json:286` | `"gray70",` |
+
+### `gray74`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/base_dark_blue.json:22` | `"text_color_disabled": ["gray74", "gray60"]` |
+| `themes/base_dark_blue.json:91` | `"text_color_disabled": ["gray74", "gray60"]` |
+| `themes/base_dark_blue.json:119` | `"text_color_disabled": ["gray74", "gray60"]` |
+| `themes/blue.json:50` | `"gray74",` |
+| `themes/blue.json:221` | `"gray74",` |
+| `themes/blue.json:294` | `"gray74",` |
+| `themes/davipa.json:50` | `"gray74",` |
+| `themes/davipa.json:221` | `"gray74",` |
+| `themes/davipa.json:294` | `"gray74",` |
+| `themes/green.json:50` | `"gray74",` |
+| `themes/green.json:221` | `"gray74",` |
+| `themes/green.json:294` | `"gray74",` |
+| `themes/grey.json:50` | `"gray74",` |
+| `themes/grey.json:221` | `"gray74",` |
+| `themes/grey.json:294` | `"gray74",` |
+| `themes/orange.json:50` | `"gray74",` |
+| `themes/orange.json:221` | `"gray74",` |
+| `themes/orange.json:294` | `"gray74",` |
+| `themes/pink.json:50` | `"gray74",` |
+| `themes/pink.json:221` | `"gray74",` |
+| `themes/pink.json:294` | `"gray74",` |
+| `themes/purple.json:50` | `"gray74",` |
+| `themes/purple.json:221` | `"gray74",` |
+| `themes/purple.json:294` | `"gray74",` |
+
+### `gray75`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/apple_grey.json:334` | `"gray75",` |
+| `themes/base_dark_blue.json:135` | `"hover_color": ["gray75", "gray28"],` |
+| `themes/black_white.json:334` | `"gray75",` |
+| `themes/blue.json:334` | `"gray75",` |
+| `themes/green.json:334` | `"gray75",` |
+| `themes/grey.json:334` | `"gray75",` |
+| `themes/orange.json:334` | `"gray75",` |
+| `themes/pink.json:334` | `"gray75",` |
+| `themes/purple.json:334` | `"gray75",` |
+
+### `gray80`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/apple_grey.json:324` | `"gray80",` |
+| `themes/base_dark_blue.json:131` | `"label_fg_color": ["gray80", "gray21"]` |
+| `themes/black_white.json:324` | `"gray80",` |
+| `themes/blue.json:324` | `"gray80",` |
+| `themes/green.json:324` | `"gray80",` |
+| `themes/grey.json:324` | `"gray80",` |
+| `themes/orange.json:324` | `"gray80",` |
+| `themes/pink.json:324` | `"gray80",` |
+| `themes/purple.json:324` | `"gray80",` |
+
+### `gray84`
+
+| File:Line | Snippet |
+|---|---|
+| `src/getmoredone/theme.py:94` | `label_text = _theme_value("CTkLabel", "text_color", "gray84")` |
+| `themes/apple_grey.json:103` | `"gray84"` |
+| `themes/apple_grey.json:132` | `"gray84"` |
+| `themes/apple_grey.json:157` | `"gray84"` |
+| `themes/apple_grey.json:246` | `"gray84"` |
+| `themes/apple_grey.json:311` | `"gray84"` |
+| `themes/apple_grey.json:339` | `"gray84"` |
+| `themes/base_dark_blue.json:27` | `"text_color": ["gray14", "gray84"]` |
+| `themes/base_dark_blue.json:34` | `"text_color": ["gray14", "gray84"],` |
+| `themes/base_dark_blue.json:44` | `"text_color": ["gray14", "gray84"],` |
+| `themes/base_dark_blue.json:55` | `"text_color": ["gray14", "gray84"],` |
+| `themes/base_dark_blue.json:65` | `"text_color": ["gray14", "gray84"],` |
+| `themes/base_dark_blue.json:100` | `"text_color": ["gray14", "gray84"],` |
+| `themes/base_dark_blue.json:126` | `"text_color": ["gray14", "gray84"],` |
+| `themes/base_dark_blue.json:136` | `"text_color": ["gray14", "gray84"]` |
+| `themes/black_white.json:103` | `"gray84"` |
+| `themes/black_white.json:132` | `"gray84"` |
+| `themes/black_white.json:157` | `"gray84"` |
+| `themes/black_white.json:246` | `"gray84"` |
+| `themes/black_white.json:311` | `"gray84"` |
+| `themes/black_white.json:339` | `"gray84"` |
+| `themes/blue.json:59` | `"gray84"` |
+| `themes/blue.json:75` | `"gray84"` |
+| `themes/blue.json:103` | `"gray84"` |
+| `themes/blue.json:132` | `"gray84"` |
+| `themes/blue.json:157` | `"gray84"` |
+| `themes/blue.json:246` | `"gray84"` |
+| `themes/blue.json:311` | `"gray84"` |
+| `themes/blue.json:339` | `"gray84"` |
+| `themes/green.json:59` | `"gray84"` |
+| `themes/green.json:75` | `"gray84"` |
+| `themes/green.json:103` | `"gray84"` |
+| `themes/green.json:132` | `"gray84"` |
+| `themes/green.json:157` | `"gray84"` |
+| `themes/green.json:246` | `"gray84"` |
+| `themes/green.json:311` | `"gray84"` |
+| `themes/green.json:339` | `"gray84"` |
+| `themes/grey.json:59` | `"gray84"` |
+| `themes/grey.json:75` | `"gray84"` |
+| `themes/grey.json:103` | `"gray84"` |
+| `themes/grey.json:132` | `"gray84"` |
+| `themes/grey.json:157` | `"gray84"` |
+| `themes/grey.json:246` | `"gray84"` |
+| `themes/grey.json:311` | `"gray84"` |
+| `themes/grey.json:339` | `"gray84"` |
+| `themes/orange.json:59` | `"gray84"` |
+| `themes/orange.json:75` | `"gray84"` |
+| `themes/orange.json:103` | `"gray84"` |
+| `themes/orange.json:132` | `"gray84"` |
+| `themes/orange.json:157` | `"gray84"` |
+| `themes/orange.json:246` | `"gray84"` |
+| `themes/orange.json:311` | `"gray84"` |
+| `themes/orange.json:339` | `"gray84"` |
+| `themes/pink.json:59` | `"gray84"` |
+| `themes/pink.json:75` | `"gray84"` |
+| `themes/pink.json:103` | `"gray84"` |
+| `themes/pink.json:132` | `"gray84"` |
+| `themes/pink.json:157` | `"gray84"` |
+| `themes/pink.json:246` | `"gray84"` |
+| `themes/pink.json:311` | `"gray84"` |
+| `themes/pink.json:339` | `"gray84"` |
+| `themes/purple.json:59` | `"gray84"` |
+| `themes/purple.json:75` | `"gray84"` |
+| `themes/purple.json:103` | `"gray84"` |
+| `themes/purple.json:132` | `"gray84"` |
+| `themes/purple.json:157` | `"gray84"` |
+| `themes/purple.json:246` | `"gray84"` |
+| `themes/purple.json:311` | `"gray84"` |
+| `themes/purple.json:339` | `"gray84"` |
+
+### `gray85`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/base_dark_blue.json:12` | `"top_fg_color": ["gray85", "gray16"],` |
+| `themes/blue.json:22` | `"gray85",` |
+| `themes/green.json:22` | `"gray85",` |
+| `themes/grey.json:22` | `"gray85",` |
+| `themes/orange.json:22` | `"gray85",` |
+| `themes/pink.json:22` | `"gray85",` |
+| `themes/purple.json:22` | `"gray85",` |
+
+### `gray90`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/apple_grey.json:99` | `"gray90"` |
+| `themes/apple_grey.json:330` | `"gray90",` |
+| `themes/base_dark_blue.json:11` | `"fg_color": ["gray90", "gray13"],` |
+| `themes/base_dark_blue.json:43` | `"checkmark_color": ["#DCE4EE", "gray90"],` |
+| `themes/base_dark_blue.json:134` | `"fg_color": ["gray90", "gray20"],` |
+| `themes/black_white.json:99` | `"gray90"` |
+| `themes/black_white.json:330` | `"gray90",` |
+| `themes/blue.json:18` | `"gray90",` |
+| `themes/blue.json:99` | `"gray90"` |
+| `themes/blue.json:330` | `"gray90",` |
+| `themes/green.json:18` | `"gray90",` |
+| `themes/green.json:99` | `"gray90"` |
+| `themes/green.json:330` | `"gray90",` |
+| `themes/grey.json:18` | `"gray90",` |
+| `themes/grey.json:99` | `"gray90"` |
+| `themes/grey.json:330` | `"gray90",` |
+| `themes/orange.json:18` | `"gray90",` |
+| `themes/orange.json:99` | `"gray90"` |
+| `themes/orange.json:330` | `"gray90",` |
+| `themes/pink.json:18` | `"gray90",` |
+| `themes/pink.json:99` | `"gray90"` |
+| `themes/pink.json:330` | `"gray90",` |
+| `themes/purple.json:18` | `"gray90",` |
+| `themes/purple.json:99` | `"gray90"` |
+| `themes/purple.json:330` | `"gray90",` |
+
+### `gray95`
+
+| File:Line | Snippet |
+|---|---|
+| `themes/base_dark_blue.json:3` | `"fg_color": ["gray95", "gray10"]` |
+| `themes/base_dark_blue.json:6` | `"fg_color": ["gray95", "gray10"]` |
+| `themes/blue.json:4` | `"gray95",` |
+| `themes/blue.json:10` | `"gray95",` |
+| `themes/green.json:4` | `"gray95",` |
+| `themes/green.json:10` | `"gray95",` |
+| `themes/grey.json:4` | `"gray95",` |
+| `themes/grey.json:10` | `"gray95",` |
+| `themes/orange.json:4` | `"gray95",` |
+| `themes/orange.json:10` | `"gray95",` |
+| `themes/pink.json:4` | `"gray95",` |
+| `themes/pink.json:10` | `"gray95",` |
+| `themes/purple.json:4` | `"gray95",` |
+| `themes/purple.json:10` | `"gray95",` |
+
 ### `green`
 
 | File:Line | Snippet |
@@ -2432,12 +3256,14 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/vision_planning.py:376` | `ctrl, text="Save", width=70, fg_color="green",` |
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:240` | `"green": palette["success_strong"],` |
+| `tools/generate_ctk_themes.py:44` | `"green": ["#2CC985", "#2FA572"],` |
 
 ### `grey`
 
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
+| `tools/generate_ctk_themes.py:47` | `"grey": ["#475569", "#334155"],` |
 
 ### `orange`
 
@@ -2447,6 +3273,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/timer_window.py:1025` | `self._update_status_label("Resting — Resume starts another block", "orange")` |
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:245` | `"orange": palette["warning"],` |
+| `tools/generate_ctk_themes.py:45` | `"orange": ["#C2410C", "#9A3412"],` |
 
 ### `red`
 
