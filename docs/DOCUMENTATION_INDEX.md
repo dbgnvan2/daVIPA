@@ -382,6 +382,18 @@ five screens; no handoff note, the commit messages being the record:
   unknown background can be worse than what it replaced
 - `PLC-A3` is left filed, its colour half still open: the chip's `danger` is a
   product decision about what critical looks like, not a copy to sweep
+- One cold pass found three mediums, all fixed, and the first of them
+  falsified the batch's own guard: the I and U **factor** chips asked
+  `str(value).strip() == "20"` over a tuple-bound factor in four screens, a
+  form the AST walk could not see while being named for banning it. The walk
+  now has a second half that asks the blunter question. `row_control_kwargs`
+  was gating on `source == SOURCE_LEVEL`, a proxy for "this fill brought a
+  text colour" that LRR-M2.1 made false, so a segment row's text moved and
+  its checkbox did not
+- One medium was pre-existing and is filed as `LRR-A1` rather than swept:
+  `vps_segment_editor.validate_color` accepts `#0X1234`, which reaches Tk and
+  raises mid-refresh. Three below-medium findings were dropped per the sweep
+  budget; one of them, a silent fallback, was taken because it shared an edit
 
 ### docs/unused-docs/implementation_plan_2026-11-09_ci_green.md
 

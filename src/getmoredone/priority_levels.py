@@ -129,6 +129,38 @@ def priority_level_for_item(item: Any) -> str:
     )
 
 
+#: The two factors a priority *level* is a rule on, under the one-letter labels
+#: the list screens draw them with in the expandable I/U/E/V factor row. ``E``
+#: and ``V`` are Size and Value: they are in the priority *score*, and in no
+#: level, so they are deliberately absent and a lookup for them misses.
+#:
+#: Each label maps to its own scale rather than to one shared dict, because the
+#: two holding identical values today is a fact about this build and not a rule
+#: -- the same reason ``priority_level`` compares each factor against its own.
+LEVEL_FACTOR_SCALES: Dict[str, Mapping[str, int]] = {
+    "I": PriorityFactors.IMPORTANCE,
+    "U": PriorityFactors.URGENCY,
+}
+
+
+def is_critical_factor(label: str, value: Any) -> bool:
+    """Is the single factor drawn under ``label`` at its own Critical step?
+
+    Purpose: LRR-M1.2 -- the four list screens painted one factor chip red on
+             ``label in ("I", "U") and str(value).strip() == "20"``, which is
+             the question ``priority_level`` answers for the pair, asked badly
+             for one. It read an importance of ``25`` as not critical while the
+             row's own ``P:`` badge read it as critical, and it held urgency to
+             importance's threshold.
+    Tests:   tests/test_priority_level_colors.py::test_lrr_cold_the_factor_chips_ask_the_authority_too
+
+    A label that is not a level factor is simply not critical, rather than an
+    error: the screens loop over all four chips and ask about each.
+    """
+    scale = LEVEL_FACTOR_SCALES.get(label)
+    return scale is not None and _at_least(value, scale, "Critical")
+
+
 def level_color(settings: Any, level: str) -> str:
     """This level's colour: the user's if it is usable, else the theme default.
 
@@ -163,6 +195,28 @@ def level_color(settings: Any, level: str) -> str:
     return normalized
 
 
+#: Segment colours already warned about, so a list of 300 rows logs once per
+#: bad value rather than 300 times. Unbounded in principle and bounded in
+#: practice by the number of segments a user has; it holds the value, not the
+#: row, so a redraw after the colour is corrected warns again if it is still
+#: wrong.
+_warned_segment_colors: set = set()
+
+
+def _warn_unreadable_segment_color(value: Any) -> None:
+    """Log a segment colour no contrast can be derived from, once per value."""
+    key = repr(value)
+    if key in _warned_segment_colors:
+        return
+    _warned_segment_colors.add(key)
+    logger.warning(
+        "Segment colour %r is not a #RRGGBB value, so a row filled with it "
+        "keeps the theme's text colour and may be hard to read. Set it again "
+        "in Vision Planning > Vision Elements.",
+        value,
+    )
+
+
 def row_control_kwargs(fill: "RowFill") -> Dict[str, str]:
     """Widget options that keep a row's controls legible on its fill.
 
@@ -174,15 +228,24 @@ def row_control_kwargs(fill: "RowFill") -> Dict[str, str]:
              under the 3:1 bar for a non-text control. PLC-M4.4 fixed the row
              text and left the controls behind.
     Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m4
-    Tests:   tests/test_priority_level_colors.py::test_plcm49_controls_follow_a_level_fill
+    Tests:   tests/test_priority_level_colors.py::test_plcm49_controls_follow_a_level_fill,
+             ::test_lrr_cold_a_segment_fill_carries_its_controls_too
 
-    Empty for every other fill, so a segment-coloured or completed row keeps
-    the theme's own controls exactly as before. ``text_color`` already clears
-    4.5:1 against the fill (PLC-M4.4), so a control drawn in it clears the 3:1
-    non-text bar by construction, and a checkmark drawn in the fill itself sits
-    inside a box of that same colour.
+    The condition is "this fill brought a text colour with it", and nothing
+    narrower. It used to also require ``source == SOURCE_LEVEL``, which was the
+    same question while a level fill was the only source that derived one;
+    LRR-M2.1 made a segment fill derive one too and left that test behind,
+    so on the three screens that fill a row from its segment the row text moved
+    and the checkbox did not (found by a cold pass, 2026-11-10).
+
+    Empty for a fill with no text colour of its own -- the completed tint, no
+    fill, and a segment colour too malformed to derive one from -- so those
+    rows keep the theme's controls exactly as before. ``text_color`` already
+    clears 4.5:1 against the fill (PLC-M4.4), so a control drawn in it clears
+    the 3:1 non-text bar by construction, and a checkmark drawn in the fill
+    itself sits inside a box of that same colour.
     """
-    if fill.source != SOURCE_LEVEL or not fill.text_color or not fill.fill:
+    if not fill.text_color or not fill.fill:
         return {}
     return {
         "border_color": fill.text_color,
@@ -277,6 +340,12 @@ def row_fill(
         # ``navy`` is about 1.3:1 -- so an unreadable colour keeps today's
         # behaviour instead of being guessed at.
         readable = normalize_hex_color(segment_color)
+        if readable is None:
+            # Said once per value, not once per row: five list screens call
+            # this for every row they draw. ``level_color`` logs its own bad
+            # values the same way, so "no colour given" stays distinguishable
+            # from "a colour nobody could read" in app.log.
+            _warn_unreadable_segment_color(segment_color)
         return RowFill(
             segment_color,
             pick_text_color(readable) if readable else None,

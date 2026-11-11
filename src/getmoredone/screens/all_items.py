@@ -10,6 +10,7 @@ from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
 from ..priority_levels import (
     LEVEL_ANY_CRITICAL,
+    is_critical_factor,
     priority_level_for_item,
     row_control_kwargs,
     row_fill,
@@ -423,7 +424,7 @@ class AllItemsScreen(ctk.CTkFrame):
                             "font": list_row_font(),
                             "text_color": row_text,
                         }
-                        if label in ("I", "U") and str(value).strip() == "20":
+                        if is_critical_factor(label, value):
                             label_kwargs["fg_color"] = palette["danger"]
                             label_kwargs["text_color"] = pick_text_color(palette["danger"])
                             label_kwargs["corner_radius"] = 6

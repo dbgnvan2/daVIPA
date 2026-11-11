@@ -294,7 +294,35 @@ be the third design for these tests in one day.
 
 Found while building PLC-M1 to PLC-M5. Flagged, not fixed (global rule 10):
 each is real, none is what was asked for, and a fix for any of them would be a
-silent sweep of behaviour nobody asked about.
+silent sweep of behaviour nobody asked about. `LRR-A1` was added 2026-11-10 by
+the LRR batch's cold pass, on the same terms.
+
+### LRR-A1 — a segment colour the Settings validator accepts can crash a row build (medium)
+
+`vps_segment_editor.validate_color` checks `startswith("#")`, `len() == 7`, and
+`int(color_hex[1:], 16)`. Python's `int(x, 16)` accepts an `0x` prefix and
+underscore separators, so `#0X1234`, `#1_2345` and `#+12345` all pass a
+validator written to mean "six hex digits". `vps_manager.create_segment` and
+`update_segment` add no check of their own, and `segment_color_utils`'
+normaliser only strips whitespace.
+
+Such a value reaches `ctk.CTkFrame(..., fg_color=bg_color)` in the row builders
+of Today, Upcoming and All Items, where Tk raises `TclError` part-way through a
+refresh and takes the list screen down with it. `color_contrast.normalize_hex_color`
+exists precisely to stop this for the priority-level colours (PLC-M2.5); the
+segment path never got the same treatment.
+
+`row_fill` now computes the normalised form to derive a segment row's text
+colour and deliberately passes the *raw* value through as the fill, because
+changing what colour a row draws is outside what `PLC-A1` named. The one-line
+fix is therefore already in reach of the value in hand — either fall back to a
+theme colour, or tighten `validate_color` to the `#RRGGBB` regex
+`color_contrast` already has. `priority_levels` logs the unreadable value once
+per colour as of 2026-11-10, so the case is visible in `app.log` rather than
+silent.
+
+**Priority:** Medium
+**Effort:** Low
 
 ### PLC-A2 — Hierarchical and Completed ignore their own segment colour for the fill (low)
 

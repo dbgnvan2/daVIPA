@@ -1931,3 +1931,20 @@ Closes `PRI-A1` and `PLC-A1`, both medium, both filed 2026-11-08. Tests are in
 Not code-testable: how the change looks on the user's own segment colours.
 That went to the manual checklist in the plan's §5, reported with the batch
 rather than asserted.
+
+Three further rows from the cold `learning-qa` pass, all medium, all fixed in
+the same batch. They are criteria the plan did not have, so they carry the
+finding rather than a plan ID:
+
+| Criterion | Implementation | Test | Status |
+|---|---|---|---|
+| LRR-M1.1 (second half) | The first guard required an `importance`/`urgency` attribute beside an `int` literal, so it could not see the factor chips' `str(value).strip() == "20"` over a tuple-bound factor — four surviving copies under a test named for banning them | a second AST walk, over every comparison against `20` or `"20"` in `screens/` | `::test_lrr_cold_no_screen_compares_anything_to_twenty` | done |
+| LRR-M1.2 (second half) | The I and U factor chips ask the authority per factor, each against its own scale | `priority_levels.py::is_critical_factor`, `::LEVEL_FACTOR_SCALES`; four call sites (Hierarchical draws no factor row) | `::test_lrr_cold_the_factor_chips_ask_the_authority_too` | done |
+| LRR-M2.1 (consequence) | A segment-filled row's checkbox and grip follow the fill, as the row text now does; `row_control_kwargs` no longer gates on `source == SOURCE_LEVEL` | `priority_levels.py::row_control_kwargs` | `::test_lrr_cold_a_segment_fill_carries_its_controls_too` | done |
+
+Three below-medium findings were dropped under the sweep budget in
+`CLAUDE.md`, and one — a silent fallback — was taken anyway because it shared
+an edit with the above: `row_fill` now warns once per unreadable segment
+colour. The remaining two are noted in the batch's commit message. One
+medium finding was pre-existing rather than a regression and is filed as
+`BACKLOG.md`'s `LRR-A1` instead of being swept.
