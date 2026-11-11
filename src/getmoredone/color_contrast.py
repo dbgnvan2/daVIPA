@@ -75,10 +75,14 @@ def _srgb_channel_to_linear(channel: int) -> float:
 def hex_to_rgb(hex_color: str) -> "tuple[int, int, int]":
     """The three 0-255 channels of a ``#RRGGBB`` colour.
 
-    Purpose: SCV-M1.1 -- the one place in the app that slices a colour string
-             into ``int(…, 16)``, so that parse can never be mistaken for a
-             validator again. See this module's ``_HEX_COLOR_RE`` note for
-             why it must not be one.
+    Purpose: SCV-M1.1 -- the one place in the segment-colour path that slices
+             a colour string into ``int(…, 16)``, so that parse can never be
+             mistaken for a validator again. See this module's
+             ``_HEX_COLOR_RE`` note for why it must not be one. Not the one
+             place in the app: ``screens/drag_schedule_support.py``,
+             ``screens/item_editor_weekly_tactic_dialog.py`` and
+             ``_text_color_for_background`` below still slice their own, and
+             are filed as ``SCV-A1`` / ``SCV-A3`` rather than fixed here.
     Spec:    docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m1
     Tests:   tests/test_segment_colour_validation.py::test_scvm11_no_hand_rolled_hex_validator_survives
 

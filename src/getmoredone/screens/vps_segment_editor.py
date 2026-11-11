@@ -10,6 +10,11 @@ from tkinter import messagebox, colorchooser
 from ..color_contrast import normalize_hex_color
 from ..theme import button_style
 
+#: The colour a new segment starts from, and the swatch's fallback when a
+#: stored colour cannot be read (SCV-M6.2). Named once rather than written out
+#: at each of the three places that used the literal.
+DEFAULT_SEGMENT_COLOR = "#4A90E2"
+
 if TYPE_CHECKING:
     from ..vps_manager import VPSManager
 
@@ -22,7 +27,14 @@ class VPSSegmentEditorDialog(ctk.CTkToplevel):
 
         self.vps_manager = vps_manager
         self.segment = segment
-        self.selected_color = segment['color_hex'] if segment else "#4A90E2"
+        # SCV-M6.2: normalised here, not in ``load_segment_data``.
+        # ``create_form`` runs first and builds ``color_preview`` with
+        # ``fg_color=self.selected_color``, so a stored ``#0X1234`` raised
+        # ``TclError`` at widget construction -- before the loader this used
+        # to be fixed in ever ran.
+        self.selected_color = (
+            normalize_hex_color(segment['color_hex']) if segment else None
+        ) or DEFAULT_SEGMENT_COLOR
 
         # Set title
         if segment:
@@ -152,13 +164,28 @@ class VPSSegmentEditorDialog(ctk.CTkToplevel):
         ).pack(side="left", padx=5)
 
     def load_segment_data(self):
-        """Load existing segment data into form."""
+        """Load existing segment data into form.
+
+        Purpose: SCV-M6.2 -- this dialog is the only UI that can correct a
+                 malformed segment colour, and it could not open on one.
+                 ``segment_descriptions`` has no repair pass, so a value
+                 written by the pre-2026-11-11 validator is still there. The
+                 raise was in ``__init__``, where ``selected_color`` is set
+                 before ``create_form`` builds the swatch from it; this loader
+                 only has to leave the stored text in the entry.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m1
+        Tests:   tests/test_segment_colour_validation.py::test_scvm62_the_segment_editor_opens_on_a_malformed_stored_colour
+
+        The entry shows the stored text and the swatch shows the fallback: the
+        user has to see the value they are being asked to correct, and
+        substituting a readable one in the field would hide it.
+        """
         self.name_entry.insert(0, self.segment['name'])
         if self.segment['description']:
             self.description_text.insert("1.0", self.segment['description'])
+        stored_color = self.segment['color_hex']
         self.color_entry.delete(0, 'end')
-        self.color_entry.insert(0, self.segment['color_hex'])
-        self.selected_color = self.segment['color_hex']
+        self.color_entry.insert(0, stored_color or "")
         self.color_preview.configure(fg_color=self.selected_color)
 
     def pick_color(self):
@@ -207,7 +234,8 @@ class VPSSegmentEditorDialog(ctk.CTkToplevel):
         if not self.validate_color(typed_color):
             messagebox.showerror(
                 "Validation Error",
-                "Invalid color code. Must be in format #RRGGBB (e.g., #4A90E2)"
+                "Invalid color code. Must be in format #RRGGBB "
+                f"(e.g., {DEFAULT_SEGMENT_COLOR})"
             )
             return
         # SCV-M1.3: the normalised form is what is stored, never the typed

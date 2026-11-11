@@ -1454,17 +1454,27 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
         ).fetchone()
         return row["id"] if row else None
 
-    def resolve_segment_color(self, segment_name: str, color_map: Optional[Dict[str, str]] = None) -> str:
-        """
-        Resolve a segment color by exact/fuzzy match against settings segments.
-        Falls back to a deterministic palette color.
+    def match_segment_color(self, segment_name: str,
+                            color_map: Optional[Dict[str, str]] = None) -> Optional[str]:
+        """The colour a real segment entry gives this name, or ``None``.
+
+        Purpose: SCV-M6.7 -- ``resolve_segment_color`` always answers with a
+                 colour, so a caller could not tell a configured segment
+                 colour from the deterministic guess made for a name with no
+                 ``segment_descriptions`` row. The repair pass needs that
+                 difference: it may show a guess, and must not store one.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m3
+        Tests:   tests/test_segment_colour_validation.py::test_scvm67_an_unloaded_segment_colour_is_not_persisted
+
+        One copy of the exact-then-fuzzy rule, which
+        ``resolve_segment_color`` now calls rather than repeating.
         """
         if color_map is None:
             color_map = self.get_segment_color_map()
 
         raw = (segment_name or "").strip()
         if not raw:
-            return "#64748B"
+            return None
 
         key = raw.lower()
         if key in color_map:
@@ -1472,7 +1482,7 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
 
         norm = re.sub(r"[^a-z0-9]", "", key)
         if not norm:
-            return "#64748B"
+            return None
 
         # Fuzzy match: normalized equality / prefix / containment
         for existing_name, color in color_map.items():
@@ -1483,6 +1493,22 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
                 return color
             if norm in existing_norm or existing_norm in norm:
                 return color
+
+        return None
+
+    def resolve_segment_color(self, segment_name: str, color_map: Optional[Dict[str, str]] = None) -> str:
+        """
+        Resolve a segment color by exact/fuzzy match against settings segments.
+        Falls back to a deterministic palette color.
+        """
+        matched = self.match_segment_color(segment_name, color_map)
+        if matched is not None:
+            return matched
+
+        raw = (segment_name or "").strip()
+        norm = re.sub(r"[^a-z0-9]", "", raw.lower())
+        if not norm:
+            return "#64748B"
 
         # Deterministic fallback by segment name hash
         palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]

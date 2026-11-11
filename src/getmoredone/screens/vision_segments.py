@@ -5,7 +5,12 @@ import customtkinter as ctk
 from typing import TYPE_CHECKING, Optional
 
 from ..theme import button_style, status_text_color
-from ..color_contrast import pick_text_color
+from ..color_contrast import normalize_hex_color, pick_text_color
+
+#: The swatch's fallback when a stored colour cannot be read (SCV-M6.3).
+#: Slate, the same neutral the segment dialog already defaults to, so an
+#: unreadable value does not look like a deliberate choice.
+DEFAULT_SWATCH_COLOR = "#334155"
 
 if TYPE_CHECKING:
     from ..vps_manager import VPSManager
@@ -286,10 +291,28 @@ class VisionSegmentsScreen(ctk.CTkFrame):
         return text[:limit - 1].rstrip() + "…"
 
     def _color_input(self, parent, initial: str):
-        var = ctk.StringVar(value=initial)
+        """A swatch, an entry and a picker for one stored colour.
+
+        Purpose: SCV-M6.3 -- the swatch was built with the stored value, so
+                 the three dialogs that edit a segment, subsegment or category
+                 colour could not open on one Tk refuses, which is the only
+                 place the user can correct it.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m1
+        Tests:   tests/test_segment_colour_validation.py::test_scvm63_the_colour_dialogs_open_on_a_malformed_stored_colour
+
+        The entry keeps the stored text and the swatch falls back, for the
+        reason ``vps_segment_editor.load_segment_data`` gives: the user has to
+        see the value they are being asked to correct.
+        """
+        var = ctk.StringVar(value=initial or "")
         row = ctk.CTkFrame(parent, fg_color="transparent")
         row.grid_columnconfigure(1, weight=1)
-        swatch = ctk.CTkFrame(row, width=20, height=20, fg_color=initial)
+        swatch = ctk.CTkFrame(
+            row,
+            width=20,
+            height=20,
+            fg_color=normalize_hex_color(initial) or DEFAULT_SWATCH_COLOR,
+        )
         swatch.grid(row=0, column=0, padx=(0, 6))
         entry = ctk.CTkEntry(row, textvariable=var)
         entry.grid(row=0, column=1, sticky="ew")

@@ -335,11 +335,18 @@ def row_fill(
     used to be the raw stored value, passed through exactly as given --
     including a value ``normalize_hex_color`` rejects -- on the grounds that
     what colour a row draws was not what ``PLC-A1`` named. ``LRR-A1`` then
-    filed the consequence: this is the last gate before
-    ``ctk.CTkFrame(fg_color=…)`` in five row builders, and a value Tk cannot
-    parse raises ``TclError`` part-way through a refresh and takes the list
-    screen down. A row with no fill is a row that looks like it did before the
-    user set a colour; a raised ``TclError`` is a blank screen.
+    filed the consequence: a value Tk cannot parse raises ``TclError``
+    part-way through a refresh and takes the list screen down, measured as
+    ``invalid color name "#0X1234"`` from ``ctk.CTkFrame(fg_color=…)``. A row
+    with no fill is a row that looks like it did before the user set a colour;
+    a raised ``TclError`` is a blank screen.
+
+    This is **not** the last gate before ``ctk.CTkFrame(fg_color=…)``, and an
+    earlier draft of this docstring said it was. Each of the five row builders
+    calls ``theme.apply_segment_accent`` on the next line with the same raw
+    value, and ``screens.segment_color_utils`` owns the value both of them are
+    given. Those two gate it as well (SCV-M6.3); dropping the fill here would
+    have bought nothing on its own.
     """
     if segment_color:
         # ``pick_text_color`` answers black for anything it cannot parse, and

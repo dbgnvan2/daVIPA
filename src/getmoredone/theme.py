@@ -8,6 +8,7 @@ from typing import Dict, Tuple
 import customtkinter as ctk
 
 from .paths import resolve_theme_path
+from .color_contrast import normalize_hex_color
 
 APPEARANCE_MODES = ("system", "dark", "light")
 # "davipa" is the brand theme, built from brand.py and the colour system
@@ -152,10 +153,27 @@ def semantic_colors() -> Dict[str, str]:
 
 
 def apply_segment_accent(frame: ctk.CTkFrame, segment_color: str | None):
-    """Apply a narrow accent stripe; segment colors should not fill full rows."""
-    if not segment_color:
+    """Apply a narrow accent stripe; segment colors should not fill full rows.
+
+    Purpose: SCV-M6.3 -- ``row_fill`` claimed to be the last gate before
+             ``fg_color`` in the five row builders, and it is not: every one of
+             them calls this on the next line with the same raw value. A
+             colour Tk cannot parse raised here instead, taking down the same
+             refresh, so dropping the fill bought none of the safety it was
+             for.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m4
+    Tests:   tests/test_segment_colour_validation.py::test_scvm63_the_accent_stripe_refuses_an_unreadable_colour
+
+    No stripe rather than a substituted colour: the stripe says "this row
+    belongs to that segment", and drawing it in a colour the segment does not
+    have would say something false. ``normalize_hex_color`` logs nothing here
+    because ``priority_levels`` already warns once per bad value on the same
+    screens.
+    """
+    readable = normalize_hex_color(segment_color)
+    if not readable:
         return
-    accent = ctk.CTkFrame(frame, width=5, fg_color=segment_color, corner_radius=0)
+    accent = ctk.CTkFrame(frame, width=5, fg_color=readable, corner_radius=0)
     accent.place(x=0, y=0, relheight=1)
 
 

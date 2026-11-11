@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Tuple
 
 from ..models import ActionItem
+from ..color_contrast import normalize_hex_color
 
 DEFAULT_SEGMENT_COLOR = "#334155"
 
@@ -96,13 +97,18 @@ def resolve_chip_colors(
         segment_name, subsegment_name, vps_manager, segment_colors,
         subsegment_colors,
     )
-    category_color = category_colors.get(
-        (
-            (segment_name or "").strip().lower(),
-            (subsegment_name or "").strip().lower(),
-            (category_name or "").strip().lower(),
-        ),
-        "",
+    # SCV-M6.3: the category colour went out raw while the other two went
+    # through ``_normalize_color``, so the one chip of the three that is drawn
+    # from the category table was the one with no gate on it.
+    category_color = _normalize_color(
+        category_colors.get(
+            (
+                (segment_name or "").strip().lower(),
+                (subsegment_name or "").strip().lower(),
+                (category_name or "").strip().lower(),
+            ),
+            "",
+        )
     ) or subsegment_color
     return segment_color, subsegment_color, category_color
 
@@ -167,11 +173,25 @@ def resolve_segment_color_for_item(
 
 
 def _normalize_color(color: Optional[str]) -> Optional[str]:
-    """Ensure we return a non-empty hex color when available."""
+    """The ``#RRGGBB`` form of a stored colour, or ``None`` if it has none.
+
+    Purpose: SCV-M6.3 -- this is the owner of the colours the five list
+             screens and Vision Elements draw with, as both a fill and an
+             accent stripe, and it only stripped whitespace. A fourth function
+             named "normalize" that validated nothing, so every consumer
+             downstream of it held a value Tk might refuse.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m4
+    Tests:   tests/test_segment_colour_validation.py::test_scvm63_the_colour_maps_normalise_what_they_hand_out
+
+    ``None`` rather than ``DEFAULT_SEGMENT_COLOR`` for an unreadable value:
+    the callers here fall back to a colour of their own choosing -- a
+    subsegment to its segment's, a segment to the default -- and answering
+    with the default would make "no colour set" and "a colour nobody could
+    read" the same thing on screen. ``priority_levels`` logs the second case.
+    """
     if not color:
         return None
-    stripped = color.strip()
-    return stripped or DEFAULT_SEGMENT_COLOR
+    return normalize_hex_color(color)
 
 
 def _color_from_segment_id(segment_id: Optional[str], segment_colors: Dict[str, str]) -> Optional[str]:

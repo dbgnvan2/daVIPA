@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 from .color_contrast import normalize_hex_color
 from .link_integrity import resolve_segment_id_exact
+
+
+logger = logging.getLogger(__name__)
 
 
 class VisionElementHasDependentsError(Exception):
@@ -27,6 +31,41 @@ class VisionElementHasDependentsError(Exception):
 
 
 class VPSTaxonomyMixin:
+    @staticmethod
+    def _report_colour_repair(table: str, read: int,
+                              rewritten: "List[tuple]",
+                              shown_only: "List[tuple]") -> None:
+        """Say what a colour repair pass changed, and what it would not write.
+
+        Purpose: SCV-M6.5 -- the pass overwrote a stored colour and said
+                 nothing: no line, no count. ``row_fill`` warns when it
+                 *refuses* a colour, so the only silent step was the one that
+                 destroyed the value. Global rule 6 and P2: "N of M", and
+                 name what was excluded.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m3
+        Tests:   tests/test_segment_colour_validation.py::test_scvm65_the_repair_pass_says_what_it_rewrote
+
+        One line per pass rather than one per row: the first read after an
+        upgrade canonicalises every row whose colour is not already upper-case
+        ``#RRGGBB``, and a line each would be the whole log.
+        """
+        if rewritten:
+            logger.warning(
+                "%s colour repair: rewrote %d of %d row(s) read -- %s",
+                table, len(rewritten), read,
+                "; ".join(f"{row_id}: {stored!r} -> {new}"
+                          for row_id, stored, new in rewritten),
+            )
+        if shown_only:
+            logger.warning(
+                "%s colour repair: %d of %d row(s) read were shown a fallback "
+                "and left as stored, because their segment has no Settings "
+                "entry to take a colour from -- %s",
+                table, len(shown_only), read,
+                "; ".join(f"{row_id}: {stored!r} shown as {new}"
+                          for row_id, stored, new in shown_only),
+            )
+
     def sync_vision_elements_with_taxonomy(self):
         """Ensure every Segment/SubSegment/Category row has a Vision Element key row."""
         rows = self.db.conn.execute(
@@ -132,23 +171,40 @@ class VPSTaxonomyMixin:
         # It now asks ``normalize_hex_color``, and writes whenever the stored
         # text is not already the form it should be stored in.
         # Tests: tests/test_segment_colour_validation.py::test_scvm31_the_repair_pass_sees_a_malformed_stored_colour
-        changed = False
+        #
+        # SCV-M6.6: the colour map is fetched at most once per call, not once
+        # per row that needs a derived colour.
+        # SCV-M6.7: a colour derived from a segment with no Settings entry is
+        # shown and not stored -- see ``_report_colour_repair``.
+        color_map: Optional[Dict[str, str]] = None
+        rewritten: List[tuple] = []
+        shown_only: List[tuple] = []
         for row in rows:
             stored = row.get("color_hex")
             color = normalize_hex_color(stored)
+            guessed = False
             if color is None:
-                parent = self.resolve_segment_color(row.get("segment_name", ""), self.get_segment_color_map())
+                if color_map is None:
+                    color_map = self.get_segment_color_map()
+                parent = self.match_segment_color(row.get("segment_name", ""), color_map)
+                guessed = parent is None
+                if parent is None:
+                    parent = self.resolve_segment_color(row.get("segment_name", ""), color_map)
                 color = self._derive_subsegment_color(parent)
             if color == stored:
                 continue
             row["color_hex"] = color
+            if guessed:
+                shown_only.append((row["id"], stored, color))
+                continue
             self.db.conn.execute(
                 "UPDATE vision_subsegments SET color_hex = ?, updated_at = ? WHERE id = ?",
                 (color, datetime.now().isoformat(), row["id"]),
             )
-            changed = True
-        if changed:
+            rewritten.append((row["id"], stored, color))
+        if rewritten:
             self.db.conn.commit()
+        self._report_colour_repair("vision_subsegments", len(rows), rewritten, shown_only)
         return rows
 
     def get_vision_categories(self, segment_name: Optional[str] = None,
@@ -174,25 +230,60 @@ class VPSTaxonomyMixin:
         # ``if not self._is_valid_hex_color(sub_color)`` that stood here was
         # dead: ``sub_color`` was this row's own colour, which the outer gate
         # had already declared invalid, so the condition was always true.
-        changed = False
+        #
+        # SCV-M6.6: ``get_vision_subsegments`` and the colour map are fetched
+        # at most once per call. They stood inside the loop, so three bad rows
+        # meant three subsegment queries -- each one a repair pass of its own
+        # ending in ``commit()``, which committed this loop's half-applied
+        # UPDATEs as a side effect. SCV-M3.1 widened which rows take this
+        # branch, so the nesting fires where it did not before.
+        # SCV-M6.7: a colour derived from a segment with no Settings entry is
+        # shown and not stored.
+        subsegments: Optional[List[Dict[str, Any]]] = None
+        color_map: Optional[Dict[str, str]] = None
+        rewritten: List[tuple] = []
+        shown_only: List[tuple] = []
         for row in rows:
             stored = row.get("color_hex")
             color = normalize_hex_color(stored)
+            guessed = False
             if color is None:
-                subsegments = self.get_vision_subsegments(row.get("segment_name"))
-                sub = next((s for s in subsegments if (s.get("name") or "").lower() == (row.get("subsegment_name") or "").lower()), None)
-                sub_color = (sub or {}).get("color_hex") or self.default_subsegment_color_for_segment(row.get("segment_name") or "")
+                if subsegments is None:
+                    # ``None``, not this row's segment: when the caller gave no
+                    # segment the rows span several, and one unfiltered read is
+                    # a superset of every per-row read it replaces.
+                    subsegments = self.get_vision_subsegments(segment_name)
+                sub = next(
+                    (s for s in subsegments
+                     if (s.get("name") or "").lower() == (row.get("subsegment_name") or "").lower()
+                     and (s.get("segment_name") or "").lower() == (row.get("segment_name") or "").lower()),
+                    None,
+                )
+                sub_color = normalize_hex_color((sub or {}).get("color_hex"))
+                if sub_color is None:
+                    if color_map is None:
+                        color_map = self.get_segment_color_map()
+                    seg = row.get("segment_name") or ""
+                    parent = self.match_segment_color(seg, color_map)
+                    guessed = parent is None
+                    if parent is None:
+                        parent = self.resolve_segment_color(seg, color_map)
+                    sub_color = self._derive_subsegment_color(parent)
                 color = self._derive_subsegment_color(sub_color)
             if color == stored:
                 continue
             row["color_hex"] = color
+            if guessed:
+                shown_only.append((row["id"], stored, color))
+                continue
             self.db.conn.execute(
                 "UPDATE vision_categories SET color_hex = ?, updated_at = ? WHERE id = ?",
                 (color, datetime.now().isoformat(), row["id"]),
             )
-            changed = True
-        if changed:
+            rewritten.append((row["id"], stored, color))
+        if rewritten:
             self.db.conn.commit()
+        self._report_colour_repair("vision_categories", len(rows), rewritten, shown_only)
         return rows
 
     def _create_or_get_vision_segment(self, name: str) -> str:
@@ -250,9 +341,13 @@ class VPSTaxonomyMixin:
         seg_name = (seg_row["name"] if seg_row else "").strip()
         base_color = self.resolve_segment_color(seg_name, self.get_segment_color_map())
         default_color = self._derive_subsegment_color(base_color)
-        chosen_color = color_hex.strip() if color_hex else default_color
-        if not self._is_valid_hex_color(chosen_color):
-            chosen_color = default_color
+        # SCV-M6.1: normalise, do not gate-then-store-raw. This read
+        # ``if not self._is_valid_hex_color(chosen_color)`` over the text as
+        # typed; once that gate reads ``#abc`` and ``abcdef``, both became
+        # "valid" and were written verbatim to a column that
+        # ``db_manager_project_boards`` selects directly, bypassing the repair
+        # pass, on its way to ``fg_color``.
+        chosen_color = normalize_hex_color(color_hex) or default_color
 
         sub_id = f"vss-{uuid4().hex[:8]}"
         self.db.conn.execute(
@@ -290,9 +385,10 @@ class VPSTaxonomyMixin:
         ).fetchone()
         sub_color = (sub_row["color_hex"] if sub_row else "") or "#64748B"
         default_color = self._derive_subsegment_color(sub_color)
-        chosen_color = (color_hex or "").strip() or default_color
-        if not self._is_valid_hex_color(chosen_color):
-            chosen_color = default_color
+        # SCV-M6.1, as in ``_create_or_get_vision_subsegment`` above. The
+        # category path has no follow-up ``update_vision_category`` to
+        # normalise after the fact, so this is the only gate it gets.
+        chosen_color = normalize_hex_color(color_hex) or default_color
         cat_id = f"vct-{uuid4().hex[:8]}"
         self.db.conn.execute(
             "INSERT INTO vision_categories (id, subsegment_id, name, color_hex, description, vision_text, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
