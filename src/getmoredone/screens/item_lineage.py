@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from ..models import ActionItem
-from ..weekly_tactic import parent_of
 from .title_format import split_action_item_title
 
 
@@ -35,11 +34,16 @@ def lineage_for_item(
     if depth < 2:
         # AWA-A1/AWA-A3 — `parent_of`, not `parent_id`: a week-filed item's
         # parent is its Weekly Tactic, named in `weekly_tactic_id`. Reading the
-        # column directly meant every item created by the APE Week Actions
-        # button, and now by APE Week Assignment's, lost this fallback — so an
-        # item whose Annual Plan Element is detached showed no lineage chips at
-        # all, though its tactic could answer for it.
+        # column directly meant an item with no Annual Plan Element of its own
+        # — one attached to a tactic in the editor, or a legacy row the link
+        # migration moved — showed no lineage chips at all, though its tactic
+        # could answer for it. Both Add buttons copy the tactic's APE onto the
+        # item, so they are not that shape; the editor's attach is.
+        # Imported here rather than at module scope: `weekly_tactic` opens a
+        # log file in the real application-support directory at import time,
+        # and this helper is a pure function that tools and tests import alone.
         # Tests: tests/test_weekly_items_title.py::test_bp6_lineage_survives_even_with_the_annual_plan_element_missing
+        from ..weekly_tactic import parent_of
         parent_id = parent_of(item)
         if parent_id:
             parent_item = db_manager.get_action_item(parent_id)

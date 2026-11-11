@@ -1111,13 +1111,16 @@ class VPSManager(VPSPlanningMixin, VPSTaxonomyMixin):
         """Return the Action Items linked to one Weekly Tactic.
 
         Purpose: one home for "linked to this weekly tactic", because the
-                 codebase writes that link two ways. The re-filing cascade
-                 sets ``weekly_tactic_id``; the APE Week Assignment screen's
-                 Add Action Item button sets ``parent_id``. Counted on
-                 2026-11-07, the main database held 49 children linked the
-                 first way and none the second, the demo database 1 the second
-                 way and none the first — so a reader of either column alone
-                 renders an empty panel on one of the two machines.
+                 link exists in the data two ways. Every live writer sets
+                 ``weekly_tactic_id`` — the re-filing cascade, and both Add
+                 Action Item buttons since AWA-A1 was fixed on 2026-11-10;
+                 ``parent_id`` rows are what the APE Week Assignment button
+                 wrote before that, and they stay until the launch migration
+                 moves them. Counted on 2026-11-07, the main database held 49
+                 children linked the first way and none the second, the demo
+                 database 1 the second way and none the first — so a reader of
+                 either column alone renders an empty panel on one of the two
+                 machines.
         Spec:    docs/spec_2026-11-07_ape_week_actions.md#awa-m2
         Tests:   tests/test_ape_week_actions.py::test_awam21_both_link_shapes_are_returned
 

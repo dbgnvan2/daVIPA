@@ -146,8 +146,13 @@ def resolve_segment_color_for_item(
         return color
 
     # 4) Segment from parent Weekly item (cached)
+    # AWA-A1 — `parent_of`, so this step still fires for an item whose link to
+    # its Weekly Tactic is `weekly_tactic_id`, which is what both Add buttons
+    # write. Imported in the function because `weekly_tactic` opens a log file
+    # in the real application-support directory at import time.
+    from ..weekly_tactic import parent_of
     color = _color_from_parent(
-        getattr(item, "parent_id", None),
+        parent_of(item),
         segment_colors_by_id,
         segment_colors_by_name,
         db_manager,

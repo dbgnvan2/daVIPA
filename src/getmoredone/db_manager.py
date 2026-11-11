@@ -13,7 +13,7 @@ import re
 from .database import Database
 from .link_integrity import resolve_segment_id_exact
 from .db_manager_project_boards import DBManagerProjectBoardsMixin
-from .weekly_tactic import LINK_PREDICATE_SQL, tactic_of
+from .weekly_tactic import LINK_PREDICATE_SQL, parent_of, tactic_of
 from .models import (
     ActionItem, ItemLink, ContactLink, Defaults, RescheduleHistory,
     TimeBlock, WorkLog, Status, Contact, ProjectBoard, ProjectBoardStatus, ProjectBoardLink,
@@ -2221,8 +2221,15 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         if item.segment_description_id:
             return
 
+        # AWA-A1 — `parent_of`, so the parent branch reaches a Weekly Tactic
+        # named in `weekly_tactic_id`. Both Add buttons write that column now,
+        # and with `item.parent_id` the only remaining route was the item's own
+        # Annual Plan Element: a tactic whose APE row has been deleted (there
+        # is no foreign key, and both week panels list such a tactic on
+        # purpose) left every item added under it with no segment at all, and
+        # so with no segment accent on any screen.
         segment_id = self._derive_segment_id(
-            item.week_action_id, item.parent_id, item.annual_plan_element_id
+            item.week_action_id, parent_of(item), item.annual_plan_element_id
         )
 
         if segment_id:
@@ -2368,7 +2375,8 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         """Populate missing segment ids and normalize weekly dates on historical action items."""
         rows = self.db.conn.execute(
             """
-            SELECT id, week_action_id, parent_id, annual_plan_element_id,
+            SELECT id, week_action_id, parent_id, weekly_tactic_id,
+                   annual_plan_element_id,
                    item_type, start_date, due_date, segment_description_id
             FROM action_items
             """
@@ -2383,7 +2391,10 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             if not row["segment_description_id"]:
                 segment_id = self._derive_segment_id(
                     row["week_action_id"],
-                    row["parent_id"],
+                    # AWA-A1 — the same relationship the stamp above reads, so
+                    # the repair can reach rows whose only parent is a Weekly
+                    # Tactic. `parent_id` first, as `parent_of` has it.
+                    row["parent_id"] or row["weekly_tactic_id"],
                     row["annual_plan_element_id"],
                 )
                 if segment_id:

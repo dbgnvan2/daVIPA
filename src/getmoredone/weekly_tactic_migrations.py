@@ -146,8 +146,9 @@ def migrate_parent_links_to_weekly_tactic(conn: sqlite3.Connection) -> Dict[str,
     ``weekly_tactic_id`` with the ``parent_id`` tactic for every row whose
     parent was a week item. An item can hold a different tactic in each
     column without leaving supported UI - added from APE Week Assignment,
-    whose button writes ``parent_id``, then pointed at another Weekly Tactic
-    in the editor, which sets ``weekly_tactic_id`` and leaves ``parent_id``
+    whose button wrote ``parent_id`` until AWA-A1 was fixed on 2026-11-10,
+    then pointed at another Weekly Tactic in the editor, which sets
+    ``weekly_tactic_id`` and leaves ``parent_id``
     alone - and for that item the next launch silently replaced the user's
     own last choice with the older link, nulled ``parent_id`` so nothing
     recorded that it had happened, and then let the invariant repair move the

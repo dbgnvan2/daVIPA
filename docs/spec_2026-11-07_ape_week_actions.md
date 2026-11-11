@@ -651,6 +651,19 @@ They are **not** fixed by this spec, and none is a prerequisite.
   the inconsistency user-visible for the first time. It is listed here rather
   than folded into §3 because it is beyond what was asked, and it is the user's
   call. A one-line change plus a test.
+
+  **Fixed 2026-11-10.** The button writes `weekly_tactic_id` *instead of*
+  `parent_id`, not as well as it: `migrate_parent_links_to_weekly_tactic` runs
+  on every launch and clears `parent_id` on a row that already names a tactic,
+  so the both-columns shape this recommendation proposed is one the app
+  rewrites. The sweep also moved the four readers that resolved an item's
+  parent from `parent_id` directly — `item_lineage.lineage_for_item`,
+  `DragScheduleScreen._lineage_for_item`,
+  `segment_color_utils.resolve_segment_color_for_item` and
+  `db_manager._stamp_segment_from_relationships` — onto `parent_of`, without
+  which a week-filed item with no Annual Plan Element of its own lost its
+  chips, its segment accent and Plan Day's Segment filter.
+  Tests: `tests/test_weekly_items_tactic_link.py`.
 - **AWA-A2 — a second "APE Weekly" label in dead code.**
   `screens/vision_planning.py:186` captions a placeholder tab `"APE Weekly"`.
   `VisionPlanningScreen` is reachable only through `app.show_vision_planning`,
@@ -689,6 +702,12 @@ They are **not** fixed by this spec, and none is a prerequisite.
   the object-level question from `weekly_tactic_id` alone because WT-INV6 depends
   on it, and so still returns None for a `parent_id`-only child. That is AWA-A1's
   subject: closing this entry means fixing AWA-A1.
+
+  **Closed 2026-11-10** with AWA-A1. `tactic_of` still answers from one column,
+  as WT-INV6 requires; what changed is that no writer makes a `parent_id`-only
+  child any more, so the readers agree about every row the app can now create.
+  Rows written before the fix survive until the launch migration moves them,
+  which is why the dual-column predicates stay.
 
 ---
 

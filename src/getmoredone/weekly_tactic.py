@@ -197,9 +197,12 @@ def parent_of(item: Optional[ActionItem]) -> Optional[str]:
 # alone, because WT-INV6 turns on that and a `parent_id`-only child must not
 # be moved by a rule it never opted into. This predicate answers which panel
 # shows the row, and includes those children so they are not stranded
-# unreachable. The consequence is AWA-A1's: such a child is listed but is not
+# unreachable. The consequence was AWA-A1's: such a child is listed but is not
 # week-filed, so it does not cascade when its date is edited, while the row
-# beside it does. Fixing AWA-A1 collapses the two questions into one.
+# beside it does. No writer makes that shape since AWA-A1 was fixed on
+# 2026-11-10 — both Add buttons write `weekly_tactic_id` — but rows written
+# before it survive until the launch migration moves them, so the two
+# questions stay separate.
 #
 # Purpose: AWA-M2.3 — one home for the SQL form. It was written twice: once in
 #          `vps_manager.get_action_items_for_weekly_tactic` and once in
@@ -210,12 +213,13 @@ def parent_of(item: Optional[ActionItem]) -> Optional[str]:
 # Spec:    docs/spec_2026-11-07_ape_week_actions.md#awa-m2
 # Tests:   tests/test_ape_week_actions.py::test_awam23_one_home_for_the_link_predicate
 #
-# `weekly_tactic_id` wins when it is set. Both columns carry the link —
-# the re-filing cascade writes the first, the APE Week Assignment screen's
-# Add button writes the second (AWA-A1) — and an item can end up with one
-# tactic in each: add it from that screen, then pick a different Weekly
-# Tactic in the editor, which sets `weekly_tactic_id` and by design leaves
-# `parent_id` alone. A plain `OR` listed that item under *both* tactics.
+# `weekly_tactic_id` wins when it is set. Both columns carry the link in the
+# data — the re-filing cascade writes the first, and the APE Week Assignment
+# Add button wrote the second until AWA-A1 was fixed on 2026-11-10 — and such
+# an item can hold one tactic in each: added from that screen before the fix,
+# then pointed at a different Weekly Tactic in the editor, which sets
+# `weekly_tactic_id` and by design leaves `parent_id` alone. A plain `OR`
+# listed that item under *both* tactics.
 # Preferring the explicit column lists it under the one last chosen, and
 # leaves a `parent_id`-only child reachable.
 #

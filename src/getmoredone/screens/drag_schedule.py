@@ -783,7 +783,13 @@ class DragScheduleScreen(ctk.CTkFrame):
             return lineage
 
         if depth < 2:
-            parent_id = getattr(item, "parent_id", None)
+            # AWA-A1/AWA-A3 — `parent_of`, for the reason item_lineage.py
+            # gives. This is a private copy of `lineage_for_item`, so a fix to
+            # one of them and not the other leaves Plan Day's chips and its
+            # Segment filter disagreeing with Today, Upcoming, All Items and
+            # Hierarchical about the same row (P5).
+            from ..weekly_tactic import parent_of
+            parent_id = parent_of(item)
             if parent_id:
                 parent_item = self.db_manager.get_action_item(parent_id)
                 if parent_item:
