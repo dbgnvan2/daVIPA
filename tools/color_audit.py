@@ -40,7 +40,8 @@ _NOT_SELF = ("-g", "!docs/ui_color_inventory.md")
 _NOT_THEMES = ("-g", "!themes/**")
 # The staleness gate's fixtures are hand-written stand-ins for rg output, so
 # they look exactly like colour usage to these scans and were counted as it:
-# 3 of the 5 lines the `tuples` scan returned came from that one file, which
+# measured on 2026-11-11, before this exclusion, 3 of the 5 lines the
+# `tuples` scan returned came from that one file, which
 # meant `scan_all`'s refusal of an empty scan -- the only guard here against a
 # scan going blind -- could be held above zero by test data alone. This is the
 # same self-reference as `_NOT_SELF`, not a narrowing of what the scan covers.
@@ -119,8 +120,13 @@ RG_BENIGN_STDERR = re.compile(r"^WARNING: stopped searching binary file ")
 
 # Scans allowed to return nothing, by name. Declaring one is a reviewable
 # one-line change here rather than an edit to scan_all's logic (global rule 8).
-# `tuples` is the near one: 5 lines today, and section 3 of the report
-# recommends migrating the real ones.
+# `tuples` is the scan nearest to empty. Its current count is in the per-scan
+# table of the generated report, which is the figure to read rather than one
+# copied out of it to here -- adding `_NOT_GATE` below took it from 5 to 2 and
+# left this line stating 5. On 2026-11-11 it returned two lines, one of them a
+# false positive on a parenthesised assignment, so migrating the single real
+# colour tuple -- which section 3 of the report recommends -- is what would
+# empty this scan and make a declaration here necessary.
 SCANS_ALLOWED_EMPTY: set = set()
 
 
@@ -156,9 +162,16 @@ def run_rg(cmd: Sequence[str]) -> List[str]:
             "ripgrep: install it (`brew install ripgrep`, or `apt-get install "
             "ripgrep`) and run this again."
         ) from exc
-    # rg returns 1 for no matches, which is fine, and 2 for a search error --
-    # an unreadable file or a broken symlink reaches *here*, not the stderr
-    # branch below (measured, rg 14.1.1, 2026-11-11).
+    # rg returns 1 for no matches, which is fine, and 2 for a search error.
+    # Measured with rg 14.1.1 on 2026-11-11: an unreadable file in a recursive
+    # scan exits 2 and so arrives *here*, not at the stderr branch below.
+    # A symlink is not that case. rg does not follow one without -L, so in a
+    # recursive scan a symlink -- broken or working -- is skipped in silence
+    # at exit 0 and reaches neither branch; only naming one as the search
+    # argument exits 2. No scan here passes -L and the repo tracks no symlink
+    # (`git ls-files -s` holds no mode 120000), so nothing is missing from the
+    # inventory today, but a symlink added under a scanned path would be
+    # dropped without a word.
     if result.returncode not in (0, 1):
         raise RuntimeError(
             f"Command failed ({result.returncode}): {shlex.join(list(cmd))}\n"
