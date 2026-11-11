@@ -312,14 +312,18 @@ counts it, so it cannot multiply unnoticed.
 **Priority:** Low
 **Effort:** Low
 
-### SCV-A2 — `get_segment_colors_by_id` hands callers the raw stored value (medium)
+### SCV-A2 — the two segment colour maps hand callers the raw stored value (medium)
 
-`vps_manager.py` returns `(row["color_hex"] or "").strip() or "#334155"`, i.e.
-whatever the database holds. `SCV-M4` closed the row-fill reader specifically,
-and the taxonomy writers and the segment editor now store only `#RRGGBB`, so a
-malformed value has to predate 2026-11-11 to be in there at all. The map's
-other readers were not surveyed in that batch, and a survey is the work here —
-not a normalising wrapper, which would hide which readers needed one.
+`get_segment_color_map` (`vps_manager.py:1394`) and `get_segment_colors_by_id`
+(`:1406`) both return `row["color_hex"] or "#334155"`, i.e. whatever the
+database holds. The by-name one is the load-bearing half — it feeds
+`resolve_segment_color`, and so `_derive_subsegment_color` and `row_fill`.
+
+`SCV-M4` closed the row-fill reader and `SCV-M5` gated every writer of
+`segment_descriptions.color_hex`, so a malformed value has to predate
+2026-11-11 to be in there at all, and no code path can add one. What is left is
+a survey of the maps' other readers, which is the work here — not a normalising
+wrapper on the maps, which would hide which readers needed one.
 
 **Priority:** Medium
 **Effort:** Low

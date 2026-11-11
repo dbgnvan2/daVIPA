@@ -425,6 +425,9 @@ screen, reported as a three-step manual checklist)** - per-criterion status in
 - Delegating widens the segment editor to accept `#abc`, taken deliberately
   and only together with storing the normalised `#AABBCC`
 - Two adjacent issues stay filed rather than swept, as `SCV-A1` and `SCV-A2`
+- A cold pass over the plan by another session added `SCV-M5`, a medium: the
+  segment table was gated only in the dialog, so the VSP segment admin screen
+  could still store `#0X1234` into the one table `row_fill` draws from
 
 Handoff note: `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md`,
 which is listed here only inside this entry rather than as an entry of its own,

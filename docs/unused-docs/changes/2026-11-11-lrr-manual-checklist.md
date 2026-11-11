@@ -179,11 +179,18 @@ it did.
   exists to replace a bad colour is blind to this class of bad colour. Its
   SCV-M4 would also stop `row_fill` returning a raw value at all, which would
   supersede the paragraph in `row_fill`'s docstring explaining why it does.
+  **Built and closed 2026-11-11** (SCV, 7 of 7 criteria `done`): `LRR-A1` is
+  gone from `BACKLOG.md`, `row_fill` returns the normalised value or no fill,
+  and that docstring paragraph is replaced. Item 9 below is superseded — a
+  malformed segment colour now draws no fill rather than reaching Tk.
 - A 3-digit segment colour (`#ABC`) derives its text from the CSS expansion
   (`#AABBCC`) while Tk draws the X11 one (`#A0B0C0`). Same black/white answer
   either way, so the consequence is a wrong contrast figure rather than a
   wrong colour. Below-medium, dropped, reachable only from a hand-edited
-  database.
+  database. **Closed 2026-11-11** as a side effect of SCV-M4.1: the fill is
+  now the normalised `#AABBCC`, so Tk draws what the text colour was derived
+  from. Asserted by
+  `tests/test_priority_level_colors.py::test_scvm41_a_malformed_segment_colour_does_not_become_a_fill`.
 - Sixteen other screen modules still call `pick_text_color` on a raw colour,
   so black-on-unparseable remains the house rule everywhere except `row_fill`.
   Nothing records which of the two is now intended. Below-medium, dropped.

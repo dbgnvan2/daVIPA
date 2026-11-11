@@ -925,8 +925,10 @@ VSP Life Segments:
   **Pick Color** button beside it. Why: Colour a segment's rows on Today,
   Upcoming and All Items. Since 2026-11-11 the short form `#abc` is accepted
   and saved as `#AABBCC`, and the field refuses anything that is not six hex
-  digits — `#0X1234` and `#1_2345` were accepted before that and could not be
-  drawn.
+  digits — `#0X1234`, `#1_2345`, `#+12345`, `# 12345` and `#-12345` were all
+  accepted before that and could not be drawn. The same refusal now applies
+  wherever a segment colour is saved, including VSP → Vision Elements' segment
+  admin, which had no check of its own.
 - **Refresh** — What: Reloads the list. Why: See recent changes.
 - **Edit** — What: Modify segment details. Why: Keep segments accurate.
 - **Delete** — What: Deletes a segment if no linked VSP records exist. Why: Clean up unused segments.

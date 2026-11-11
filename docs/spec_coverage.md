@@ -1965,6 +1965,7 @@ Closes `LRR-A1`, medium, filed 2026-11-10. Tests are in
 | SCV-M2.2 | `#+12345` falls back rather than deriving `#0B368D` from a misread slice | same | `::test_scvm22_a_colour_that_parses_wrongly_is_not_derived_from` | done |
 | SCV-M3.1 | The repair pass repairs a row holding `#0X1234` instead of skipping it, the repair persists, and the three taxonomy writers store the normalised form | `vps_manager_taxonomy.py::get_vision_subsegments`, `::get_vision_categories`, `::update_vision_subsegment_color`, `::update_vision_subsegment`, `::update_vision_category` | `::test_scvm31_the_repair_pass_sees_a_malformed_stored_colour`, `::test_scvm31_the_taxonomy_writers_store_the_normalised_form` | done |
 | SCV-M4.1 | `row_fill` returns a `#RRGGBB` fill or none at all, never the raw stored value | `priority_levels.py::row_fill` | `tests/test_priority_level_colors.py::test_scvm41_a_malformed_segment_colour_does_not_become_a_fill` | done |
+| SCV-M5.1 | `segment_descriptions.color_hex` is gated where it is written, not only in the dialog; the shipped seeds are already normalised | `vps_manager.py::VPSManager._segment_color_to_store`, called from `::create_segment` and `::update_segment` | `::test_scvm51_the_segment_writers_refuse_and_normalise_a_colour`, `::test_scvm51_the_vsp_admin_writers_cannot_store_a_bad_colour`, `::test_scvm51_the_seeded_segments_are_already_normalised` | done |
 
 One item is not code-testable and is reported as a three-step manual
 checklist instead: what the segment editor and the VSP screens do on screen
@@ -1973,9 +1974,25 @@ checklist instead: what the segment editor and the VSP screens do on screen
 `::test_scvm11_no_hand_rolled_hex_validator_survives`'s docstring as `SCV-A3`
 so the next reader does not "fix" it.
 
-Two existing tests changed, each with its reason stated in its own docstring
-and both reason (b), the behaviour changed intentionally:
+**SCV-M5.1 was not in the approved plan.** It is a medium finding from a cold
+pass over the plan and the working tree, run by another session on 2026-11-11,
+and it is in this batch because `CLAUDE.md` fixes medium-or-higher findings in
+the session that finds them. The same pass found two other mediums that are
+corrections to the plan's own text rather than to the code, and they are
+recorded here rather than by editing a dated record: §7's verification command
+names `tests/test_vps_integration.py`, which references nothing this batch
+touches, while the three files that do reference it are absent (the batch was
+verified against those, named in the handoff note); and SCV-M1.1's "exact count
+0" is unsatisfiable as worded and contradicts §5 of the same plan — there are
+11 such sites in `src/` and this batch's scope removes 5. The criterion as
+tested is the per-module exact counts in the row above, which is what
+`test_scvm11_no_hand_rolled_hex_validator_survives` asserts.
+
+Three existing tests changed, each with its reason stated in its own docstring
+and all three reason (b), the behaviour changed intentionally:
 `tests/test_priority_level_colors.py::test_lrrm21_an_unreadable_segment_colour_keeps_the_themes_text`
 no longer asserts the raw value is the fill (SCV-M4.1), and
 `tests/test_vps_segments.py::test_bc3_validate_color_rejects_everything_else`
-no longer lists `#abc` and `aabbcc` as refusals (SCV-M1.3, plan §4).
+no longer lists `#abc` and `aabbcc` as refusals (SCV-M1.3, plan §4), and
+`::test_bc3_the_editor_seeds_its_colour_from_the_segment` asserts the stored
+`#0A1B2C` rather than the `#0a1b2c` it was created with (SCV-M5.1).

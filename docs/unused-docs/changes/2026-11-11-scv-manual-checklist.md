@@ -17,7 +17,9 @@ claim this batch did not re-measure.
 - `src/getmoredone/color_contrast.py` — new `hex_to_rgb`; `relative_luminance`
   now calls it
 - `src/getmoredone/vps_manager.py` — `_is_valid_hex_color`,
-  `_derive_subsegment_color`, `DEFAULT_SUBSEGMENT_BASE`
+  `_derive_subsegment_color`, `DEFAULT_SUBSEGMENT_BASE`,
+  `_segment_color_to_store` and its two call sites `create_segment` /
+  `update_segment` (SCV-M5.1, from the cold pass over the plan)
 - `src/getmoredone/vps_manager_taxonomy.py` — the repair pass in
   `get_vision_subsegments` / `get_vision_categories`, and the three writers
   `update_vision_subsegment_color`, `update_vision_subsegment`,
@@ -37,6 +39,12 @@ claim this batch did not re-measure.
 - Result: PASS (272 passed, 1 skipped)
 - Command: `./venv/bin/python tools/agents/check_docs_sync.py`
 - Result: PASS (documentation changed with the code)
+- The plan's §7 command is wrong and was not what was run:
+  `tests/test_vps_integration.py` references nothing this batch touches. The
+  command above is the real one — `test_vps_subsegment_colors.py` is the only
+  file asserting what `_derive_subsegment_color` produces,
+  `test_unified_panel_design.py` and `test_rename_safe_links.py` reach the
+  repair pass. Found by a cold pass over the plan, 2026-11-11.
 - Each of the seven criteria's tests was confirmed red against `6963d0a`
   before its fix. The three written or strengthened after the fix were
   mutation-proved instead: the verbatim `6963d0a` bodies of
@@ -62,9 +70,16 @@ claim this batch did not re-measure.
   holding `#abc` to `#AABBCC`. One write per such row, once; the condition is
   `color == stored`, so the second read writes nothing. It is the same
   invariant the writers now keep, applied to rows that predate them.
-- **`get_segment_colors_by_id` still hands callers the raw stored value**
-  (`BACKLOG.md`'s `SCV-A2`). `row_fill` is protected; the map's other readers
-  were not surveyed.
+- **A segment's own stored colour is never repaired on read.** The repair pass
+  covers `vision_subsegments` and `vision_categories` only; there is none for
+  `segment_descriptions`, and none was added — the readers are safe
+  (`row_fill` normalises or draws nothing, `_derive_subsegment_color` falls
+  back) and `SCV-M5` means no code path can write a bad value any more, so a
+  malformed one has to predate 2026-11-11. Correcting it means re-setting the
+  colour in the editor. Checklist item 3 below says so.
+- **Both segment colour maps still hand callers the raw stored value**
+  (`BACKLOG.md`'s `SCV-A2`, which now names the pair). `row_fill` is
+  protected; the maps' other readers were not surveyed.
 
 ## Next agent actions
 
@@ -85,6 +100,8 @@ in rather than to a value the test supplied.
    Upcoming or All Items: expected, the rows in that segment draw with no fill
    — the theme's own background, as they would with no segment colour set —
    and the screen does not blank. Then open VSP → Vision Elements for that
-   segment: its subsegment and category lists open, and their colours are
+   segment: its subsegment and category lists open, and *their* colours are
    repaired on that read (check by reopening the screen; the colours stay the
-   repaired ones).
+   repaired ones). The **segment's own** colour is not repaired — it still
+   reads back malformed in the editor, and `app.log` still names it on each
+   fresh launch. Re-set it in the editor to clear it.
