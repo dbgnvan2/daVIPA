@@ -71,11 +71,14 @@ Strategic planning hierarchy: vision → annual plans → quarterly → monthly 
 
 CustomTkinter JSON themes in `/themes/`. Loaded at startup via `AppSettings` before any widgets are created.
 
-**Rules — enforce these when writing or reviewing UI code:**
-- No hard-coded hex or named colors in widgets. Use theme defaults or semantic tokens from `theme.py`.
-- Segment/category colors from DB (`segment_descriptions.color_hex`) are allowed **only** as small accents (chip/stripe/icon), never as full-row fills.
-- Only one "primary" color for main action emphasis; success/warning/danger colors are for status only.
-- To add a semantic color, centralize it in `theme.py` — do not scatter one-off constants across screen files.
+The colour rules are `AGENTS.md`'s *Semantic color rules* and *Refactor
+policy* — one primary, status colours for status only, segment colours as
+accents, no new hard-coded colours in widgets — and are not restated here. Two
+corrections to that file apply: the semantic helper is `theme.py`, not
+`ui/theme_tokens.py`, and *never as full-row fills* is contradicted by the code
+as shipped, since `priority_levels.row_fill` makes a segment colour the row
+fill on Today, Upcoming and All Items. Unresolved: either the rule is stale or
+those three screens are out of policy.
 
 ## Working agreements
 
@@ -105,14 +108,9 @@ not a thing the work exists to maintain.
   and for history, and **no test reads them**. A record says what was true on
   its date; a pointer in it to something since deleted is history, not a
   defect.
-- **`BACKLOG.md` holds open work and nothing else.** Not sweep sections, not a
-  running "Last Updated" narrative, not items that record their own closure. An
-  item is a thing someone would do; when it is done or moot it leaves, with the
-  reason, to `docs/unused-docs/`.
-- **A commit message is a subject and up to about five lines.** What changed,
-  and the measurement if one decided it. Not an account of what an earlier
-  draft of the same message, document or batch got wrong. Correct the thing;
-  do not narrate the correction.
+- **`BACKLOG.md` holds open work and nothing else**, and a commit message is a
+  subject and about five lines — both `effort-budget.md`. Here: an item that is
+  done or moot leaves, with the reason, to `docs/unused-docs/`.
 - **No guard reads prose.** **Nothing in this repo asserts on English — not on
   a document, not on a commit message, not on a docstring's wording.** What
   survives is about code, not writing: `tests/test_repo_hygiene.py` (no stray
@@ -178,26 +176,14 @@ as you found it.
 
 ## Review sweeps
 
-A sweep is a review pass over a batch before it is pushed. The rules exist
-because passes are not free: every fix is new unreviewed surface, and a fix
-pass has been measured introducing defects at roughly the rate it removes them.
+A sweep is a review pass over a batch before it is pushed. Which tier a change
+earns, that below-medium findings are dropped, and when to stop, are
+`~/.claude/standards/effort-budget.md` — read on every task, and not restated
+here. For this repo: `src/`, a data path, a status machine, an external call or
+a scoring function earns the full budget; tests, config or a document alone
+earns no sweep at all; mixed, sweep the `src/` half.
 
-**The pass that matters is a cold one, not an extra warm one.** A warm pass is
-run by the context that wrote the code and inherits its blind spots — it runs
-out of new assumptions to question long before it runs out of defects. A cold
-pass gets the diff and the range and none of the narrative.
-
-**The weight of the sweep scales to what the change can break:**
-
-- **`src/` or a data path, status machine, external call or scoring function:**
-  the full budget below, cold pass included.
-- **Tests only, config only, or a document:** no sweep. Run the tests the
-  change touches, read the diff once, push. A wrong sentence in `BACKLOG.md`
-  costs a re-read; a review pass over it costs an hour and produces more
-  sentences to review.
-- **Mixed:** sweep the `src/` half.
-
-The budget:
+Four rules are this repo's own and are not in that standard:
 
 - **At most 2 warm passes per batch.** Beyond two they converge on the
   reviewer's blind spots, not on correctness, and the falling finding count
@@ -207,23 +193,12 @@ The budget:
 - **A further pass only if the previous one produced a high-severity finding.**
   Make it cold too, and prefer a *different failure family* (correctness, UI
   contract, test quality) over repeating the same sweep.
-- **Stop when a pass yields no finding of medium or higher severity.**
-- **Every finding gets a severity before any fix is written.** Below-medium
-  findings are **dropped** — not fixed in-loop, because a cosmetic fix buys
-  none of the safety it costs, and not filed either. Filing them is what made
-  `BACKLOG.md` 5,615 lines. A below-medium finding worth keeping is worth a
-  line in the commit message that ships beside it; anything less is noise with
-  a tracking cost.
-- **A sweep's own record is the commit message.** No sweep section in
-  `BACKLOG.md`, no pass-by-pass write-up, no running account of what an earlier
-  pass got wrong.
 - **Every in-loop fix is itself in scope for the next pass.** The fix commit is
   the least-reviewed code in any change — written last, fastest, and in the
   most anchored state.
 
-Evidence for the shape of this, both directions — the batch that ran to twelve
-warm passes and the one that capped them and ran cold passes instead — is in
-`~/.claude/standards/learnings.md` P26.
+Evidence both directions — the batch that ran to twelve warm passes and the one
+that capped them and ran cold passes instead — is `learnings.md` P26.
 
 ## Test rules
 

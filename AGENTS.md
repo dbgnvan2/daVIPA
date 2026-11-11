@@ -21,7 +21,10 @@ worktrees fixed the shared index and not
 the thing that cost more: work finished and left on a branch, with `main`
 holding the tests for code it did not contain. The rule, and what four
 concurrent batches cost that day, are in `CLAUDE.md` under *Working agreements
-→ One build batch at a time* and *Why the worktree exception was withdrawn*.
+→ One build batch at a time*, which carries the withdrawal as one of its
+bullets. The heading *Why the worktree exception was withdrawn* that this
+pointer used to name is gone; its measurements are filed in
+`docs/unused-docs/changes/2026-11-10-claude-md-narrative.md`.
 
 ## Handoff notes
 
