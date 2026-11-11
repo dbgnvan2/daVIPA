@@ -25,21 +25,22 @@ rg --sort path --no-config -n '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkgreen|g
 
 ## 1) Summary Counts By Type
 
-- Hex colors (match count): **1508**
-- Named colors (match count): **117**
+- Hex colors (match count): **1509**
+- Named colors (match count): **118**
 - Tuple colors / appearance tuples (match count): **5**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **25**
 - Widget explicit overrides (line count): **569**
 
-Lines returned per scan. A scan that has gone blind returns
-nothing and rg still exits successfully, so these are recorded
-here where the staleness gate compares them.
+Lines returned per scan. `scan_all` refuses an empty scan, so
+this table is not the blindness check -- it is here to localise
+a diff to one scan, and because section 1 omits the hex, named
+and theme_files line counts.
 
 | Scan | Lines |
 |---|---:|
 | `app_settings` | 26 |
-| `hex` | 520 |
-| `named` | 72 |
+| `hex` | 521 |
+| `named` | 73 |
 | `theme_api` | 25 |
 | `theme_files` | 765 |
 | `tuples` | 5 |
@@ -129,6 +130,7 @@ Named top values:
 | `grey` | 3 |
 | `yellow` | 3 |
 | `cyan` | 1 |
+| `teal` | 1 |
 
 ## 2) Complete Occurrence Table (Grouped by Color Value, then File)
 
@@ -155,7 +157,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `tests/test_color_contrast.py:13` | `assert pick_text_color("#FFFF00") == "#000000"  # bright yellow -> black` |
 | `tests/test_color_contrast.py:19` | `assert math.isclose(contrast_ratio("#000000", "#FFFFFF"), 21.0, rel_tol=0.0, abs_tol=0.01)` |
 | `tests/test_color_contrast.py:44` | `assert math.isclose(relative_luminance("#000000"), 0.0, rel_tol=0.0, abs_tol=1e-9)` |
-| `tests/test_color_inventory_sync.py:188` | ``hex` and `named` had already counted: the table read `#000000` 79, which` |
+| `tests/test_color_inventory_sync.py:197` | `the table read `#000000` 79 against 57 rows in the occurrence table below` |
 | `tests/test_drag_schedule_support.py:30` | `assert interpolate_hex_color("#000000", "#FFFFFF", 0.5) == "#808080"` |
 | `tests/test_priority_level_colors.py:568` | `settings.priority_level_color_any_critical = "#000000"` |
 | `tests/test_priority_level_colors.py:569` | `stub = _StubSettingsScreen(settings, {LEVEL_ANY_CRITICAL: "#000000"})` |
@@ -192,7 +194,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:209` | `"#000000",` |
 | `themes/black_white.json:213` | `"#000000",` |
 | `themes/black_white.json:278` | `"#000000",` |
-| `tools/color_audit.py:33` | `# theme colour reaches the frequency tables twice -- #000000 read 79, which is` |
+| `tools/color_audit.py:34` | `# the fix: `#000000` read 79 in the frequency table against 57 rows in the` |
 | `tools/generate_ctk_themes.py:53` | `APPLE_GREY_HOVER = ["#000000", "#F5F5F7"]` |
 | `tools/generate_ctk_themes.py:57` | `BLACK_WHITE_HOVER = ["#000000", "#FFFFFF"]` |
 | `tools/generate_ctk_themes.py:61` | `("CTk", "fg_color"): ["#F5F5F7", "#000000"],` |
@@ -1973,10 +1975,10 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:131` | `closes, and re-opening the editor on that segment shows `#AABBCC` in the` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:91` | `decided it — but only together with storing the normalised `#AABBCC`. Accepting` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:115` | `2. Type `#abc` and save: accepted, and the stored value reads back `#AABBCC`.` |
-| `tests/test_color_inventory_sync.py:38` | `#   * `#aabbcc` and `#ddeeff` tie at two hex occurrences each` |
-| `tests/test_color_inventory_sync.py:45` | `"src/b.py:10:    fg_color=\"#aabbcc\"",` |
-| `tests/test_color_inventory_sync.py:47` | `"src/c.py:5:     border_color=\"#aabbcc\"",` |
-| `tests/test_color_inventory_sync.py:58` | `"src/b.py:10:    fg_color=\"#aabbcc\"",` |
+| `tests/test_color_inventory_sync.py:39` | `#   * `#aabbcc` and `#ddeeff` tie at two hex occurrences each` |
+| `tests/test_color_inventory_sync.py:46` | `"src/b.py:10:    fg_color=\"#aabbcc\"",` |
+| `tests/test_color_inventory_sync.py:48` | `"src/c.py:5:     border_color=\"#aabbcc\"",` |
+| `tests/test_color_inventory_sync.py:66` | `"src/b.py:10:    fg_color=\"#aabbcc\"",` |
 | `tests/test_priority_level_colors.py:397` | `assert level_color(settings, LEVEL_ANY_HIGH) == "#AABBCC"` |
 | `tests/test_priority_level_colors.py:1229` | `assert short.text_color == pick_text_color("#AABBCC")` |
 | `tests/test_priority_level_colors.py:1606` | `("#ABC", "#AABBCC"), ("#abc", "#AABBCC")):` |
@@ -2059,7 +2061,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `tests/test_color_inventory_sync.py:229` | `one_line = ['x.py:1:fg_color="#abcdef"']` |
+| `tests/test_color_inventory_sync.py:62` | `'themes/t.json:2:      "#abcdef",',` |
+| `tests/test_color_inventory_sync.py:244` | `one_line = ['x.py:1:fg_color="#abcdef"']` |
 | `tests/test_drag_schedule_support.py:20` | `assert normalized_date_text_color("#ABCDEF") == "#ABCDEF"` |
 | `tests/test_priority_level_colors.py:1111` | `stub.priority_level_color_vars[LEVEL_ANY_CRITICAL].set("#abcdef")` |
 | `tests/test_priority_level_colors.py:1115` | `assert seen["color"] == "#ABCDEF"` |
@@ -2423,10 +2426,10 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `tests/test_color_inventory_sync.py:38` | `#   * `#aabbcc` and `#ddeeff` tie at two hex occurrences each` |
-| `tests/test_color_inventory_sync.py:46` | `"src/a.py:20:    fg_color=\"#ddeeff\"",` |
-| `tests/test_color_inventory_sync.py:48` | `"src/a.py:3:     text_color=\"#ddeeff\"",` |
-| `tests/test_color_inventory_sync.py:59` | `"src/a.py:20:    hover_color=\"#ddeeff\"",` |
+| `tests/test_color_inventory_sync.py:39` | `#   * `#aabbcc` and `#ddeeff` tie at two hex occurrences each` |
+| `tests/test_color_inventory_sync.py:47` | `"src/a.py:20:    fg_color=\"#ddeeff\"",` |
+| `tests/test_color_inventory_sync.py:49` | `"src/a.py:3:     text_color=\"#ddeeff\"",` |
+| `tests/test_color_inventory_sync.py:67` | `"src/a.py:20:    hover_color=\"#ddeeff\"",` |
 | `tests/test_segment_colour_validation.py:389` | `assert stored("vision_subsegments", sub["id"]) == "#DDEEFF"` |
 
 ### `#de1b24`
@@ -3113,7 +3116,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/timer_window.py:892` | `status_color = "green" if self.timer_state == self.RUNNING else "blue"` |
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:248` | `"blue": palette["primary"],` |
-| `tests/test_color_inventory_sync.py:39` | `#   * "red" and "blue" tie at two named occurrences each` |
+| `tests/test_color_inventory_sync.py:40` | `#   * "red" and "blue" tie at two named occurrences each` |
 | `tests/test_date_picker.py:332` | `"gray", "grey", "red", "green", "blue", "yellow", "orange", "pink",` |
 | `tests/test_theme_settings.py:72` | `assert status_text_color("blue")` |
 | `tools/generate_ctk_themes.py:48` | `"blue": ["#3B8ED0", "#1F6AA5"],` |
@@ -3216,12 +3219,18 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/vision_planning.py:315` | `fg_color="darkred", hover_color="red",` |
 | `src/getmoredone/screens/vision_planning.py:577` | `fg_color="darkred", hover_color="red",` |
 | `src/getmoredone/theme.py:243` | `"red": palette["danger"],` |
-| `tests/test_color_inventory_sync.py:39` | `#   * "red" and "blue" tie at two named occurrences each` |
+| `tests/test_color_inventory_sync.py:40` | `#   * "red" and "blue" tie at two named occurrences each` |
 | `tests/test_date_picker.py:332` | `"gray", "grey", "red", "green", "blue", "yellow", "orange", "pink",` |
 | `tests/test_priority_level_colors.py:332` | `"red",` |
 | `tests/test_priority_level_colors.py:1216` | `for colour in ("navy", "red", "not-a-colour", "#GGHHII"):` |
 | `tests/test_priority_level_colors.py:1597` | `for colour in ("navy", "red", "not-a-colour", "#GGHHII", "#0X1234",` |
 | `tests/test_theme_settings.py:70` | `assert status_text_color("red")` |
+
+### `teal`
+
+| File:Line | Snippet |
+|---|---|
+| `tests/test_color_inventory_sync.py:63` | `'themes/t.json:9:      "teal",',` |
 
 ### `white`
 
@@ -3264,8 +3273,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `AGENTS.md:95` | `- call set_default_color_theme(path_for_theme_name)` |
 | `src/getmoredone/theme.py:57` | `ctk.set_appearance_mode(mode)` |
 | `src/getmoredone/theme.py:65` | `ctk.set_default_color_theme(str(theme_path))` |
-| `tests/test_color_inventory_sync.py:62` | `"src/z.py:9:     set_appearance_mode(\"dark\")",` |
-| `tests/test_color_inventory_sync.py:63` | `"src/a.py:1:     set_default_color_theme(\"blue\")",` |
+| `tests/test_color_inventory_sync.py:70` | `"src/z.py:9:     set_appearance_mode(\"dark\")",` |
+| `tests/test_color_inventory_sync.py:71` | `"src/a.py:1:     set_default_color_theme(\"blue\")",` |
 | `tests/test_plan_screen.py:160` | `ctk.set_appearance_mode("light")` |
 | `tests/test_plan_screen.py:164` | `ctk.set_appearance_mode("system" if was_system else previous)` |
 | `tests/test_priority_level_colors.py:130` | `ctk.set_appearance_mode("system" if was_system else original)` |
@@ -3291,9 +3300,9 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
 | `src/getmoredone/screens/vps_segment_editor.py:35` | `self.selected_color = (` |
-| `tests/test_color_inventory_sync.py:66` | `"src/z.py:40:    fg_color=(\"white\", \"black\")",` |
-| `tests/test_color_inventory_sync.py:67` | `"src/a.py:2:     text_color=(\"black\", \"white\")",` |
-| `tests/test_color_inventory_sync.py:68` | `"src/m.py:7:     border_color=(\"gray\", \"grey\")",` |
+| `tests/test_color_inventory_sync.py:74` | `"src/z.py:40:    fg_color=(\"white\", \"black\")",` |
+| `tests/test_color_inventory_sync.py:75` | `"src/a.py:2:     text_color=(\"black\", \"white\")",` |
+| `tests/test_color_inventory_sync.py:76` | `"src/m.py:7:     border_color=(\"gray\", \"grey\")",` |
 
 ## 3) Replace Plan
 
