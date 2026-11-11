@@ -24,6 +24,7 @@ import inspect
 import logging
 import textwrap
 from dataclasses import fields
+from pathlib import Path
 from tkinter import colorchooser
 from types import SimpleNamespace
 from unittest import mock
@@ -84,6 +85,8 @@ from tests.source_asserts import (
 # WCAG AA for normal text. A level fill sits behind every label in the row, so
 # it is held to the text bar and not the 3:1 non-text one.
 MIN_TEXT_CONTRAST = 4.5
+
+_SRC = Path(__file__).resolve().parents[1] / "src" / "getmoredone"
 
 CRITICAL = PriorityFactors.IMPORTANCE["Critical"]
 HIGH = PriorityFactors.IMPORTANCE["High"]
@@ -701,16 +704,24 @@ def test_plcm44_level_fill_text_clears_the_contrast_bar():
 
 
 def test_plcm45_a_non_priority_fill_leaves_row_text_alone():
-    """PLC-M4.5 — segment, completed and no fill keep the screen's own text.
+    """PLC-M4.5 — the completed tint and no fill keep the screen's own text.
 
-    Their contrast is a real problem and a pre-existing one (BACKLOG); fixing
-    it here would be a silent sweep of behaviour nobody asked about.
+    **Narrowed on 2026-11-10 (LRR-M2.1), because the behaviour changed on
+    purpose.** This test used to include a segment fill, on the grounds that
+    its contrast was a pre-existing problem filed in ``BACKLOG.md`` and that
+    fixing it alongside PLC-M4 would have been a silent sweep. ``PLC-A1`` is
+    that filing, and this batch closes it: a segment fill now derives its own
+    text colour. The segment clause therefore moved to
+    ``test_lrrm21_a_segment_fill_carries_its_own_text_colour``, which asserts
+    the new behaviour, and ``test_lrrm23_the_completed_tint_keeps_the_themes_text_colour``
+    holds the boundary between the two.
+
+    What survives here is the rest of PLC-M4.5, unchanged and still true: a
+    fill the *theme* chose keeps the text colour the theme designed for it.
     """
     settings = AppSettings()
     item = _item(CRITICAL, CRITICAL)
     for fill in (
-        row_fill(settings, PALETTE, item=item, use_completed_tint=False,
-                 segment_color="#445566"),
         row_fill(settings, PALETTE, item=item, use_completed_tint=True),
         row_fill(settings, PALETTE, item=_item(LOW, LOW), use_completed_tint=False),
     ):
@@ -758,9 +769,14 @@ def test_plcm47_no_screen_still_inlines_the_critical_rule():
     exact count of one, never a floor: a floor would pass on a screen that had
     grown its branches back.
 
-    Deliberately *not* a ban on comparing ``importance`` to a constant —
-    ``today.py`` and the other four still do that for the red ``P:`` chip,
-    which the user asked to leave alone.
+    Deliberately *not* a ban on comparing ``importance`` to a constant: this
+    one is about where a row's *fill* comes from, and nothing more. When it was
+    written the five screens did still compare to a literal, for the red ``P:``
+    chip. They no longer do — ``PRI-A1`` closed on 2026-11-10 — and the ban
+    that replaced it is
+    ``test_lrrm11_no_screen_tests_importance_against_a_literal``, a separate
+    check with a separate reason, so that neither claim can be satisfied by
+    the other passing.
     """
     for name, builder in ROW_BUILDERS:
         values = local_assignments(builder, "bg_color")
@@ -1117,3 +1133,246 @@ def test_plc_cold_the_week_panel_inherits_todays_rows_and_reload():
     assert "create_item_row" not in panel.__dict__
     assert panel.refresh is today.TodayScreen.refresh
     assert panel.create_item_row is today.TodayScreen.create_item_row
+
+
+# =========================================================================
+# LRR-M2 — a segment fill brings its own text colour (PLC-A1)
+# =========================================================================
+
+def test_lrrm21_a_segment_fill_carries_its_own_text_colour():
+    """LRR-M2.1 — the segment fill is derived with ``pick_text_color`` too.
+
+    This is the defect ``PLC-A1`` named: the five screens draw the row in a
+    VSP segment colour read from ``segment_descriptions.color_hex`` and then
+    leave the theme's ``row_text`` on it, which in the dark theme is near
+    white. A pale segment colour is the common case, so the row that is
+    hardest to read is the one the user coloured on purpose.
+
+    Asserted against ``pick_text_color`` itself rather than a hard-coded pair,
+    so the two cannot drift: the whole point is that this is the same
+    derivation the level fill already uses (PLC-M4.4).
+    """
+    settings = AppSettings()
+    item = _item(CRITICAL, CRITICAL)
+    for colour in ("#DCFCE7", "#FEF3C7", "#445566", "#000000", "#FFFFFF"):
+        fill = row_fill(
+            settings, PALETTE, item=item, use_completed_tint=False,
+            segment_color=colour,
+        )
+        assert fill.source == SOURCE_SEGMENT
+        assert fill.fill == colour
+        assert fill.text_color == pick_text_color(colour), colour
+
+
+def test_lrrm22_the_segment_text_colour_follows_the_fill():
+    """LRR-M2.2 — a pale fill gets dark text and a dark fill light text.
+
+    Both directions, so the assertion cannot be satisfied by a constant: a
+    ``return RowFill(segment_color, "#000000", ...)`` passes the pale half and
+    fails here. Every colour is also held to the 4.5:1 text bar, which is what
+    "legible" means for a label drawn on the row.
+    """
+    settings = AppSettings()
+    item = _item(MEDIUM, MEDIUM)
+
+    def text_for(colour):
+        return row_fill(
+            settings, PALETTE, item=item, use_completed_tint=False,
+            segment_color=colour,
+        ).text_color
+
+    pale = text_for("#F8FAFC")
+    dark = text_for("#0F172A")
+    assert pale != dark, f"pale and dark segments both got {pale}"
+    assert contrast_ratio("#F8FAFC", pale) >= MIN_TEXT_CONTRAST
+    assert contrast_ratio("#0F172A", dark) >= MIN_TEXT_CONTRAST
+
+    # And across the range, not only at the two ends.
+    for colour in ("#DCFCE7", "#FEF3C7", "#445566", "#7F7F7F", "#450A0A"):
+        ratio = contrast_ratio(colour, text_for(colour))
+        assert ratio >= MIN_TEXT_CONTRAST, f"{colour} -> {text_for(colour)} is {ratio:.2f}"
+
+
+def test_lrrm21_an_unreadable_segment_colour_keeps_the_themes_text():
+    """LRR-M2.1 — a segment colour Tk-but-not-hex falls back to ``None``.
+
+    ``pick_text_color`` answers ``#000000`` for anything it cannot parse, and
+    black on an unknown background can be worse than the theme's own
+    ``row_text`` -- black on ``navy`` is about 1.3:1. So the derivation is
+    attempted only on a value ``normalize_hex_color`` accepts, and anything
+    else keeps exactly the behaviour it has today. The *fill* is still passed
+    through unchanged: what a row draws is not what ``PLC-A1`` is about.
+    """
+    settings = AppSettings()
+    item = _item(MEDIUM, MEDIUM)
+    for colour in ("navy", "red", "not-a-colour", "#GGHHII"):
+        fill = row_fill(
+            settings, PALETTE, item=item, use_completed_tint=False,
+            segment_color=colour,
+        )
+        assert fill.source == SOURCE_SEGMENT
+        assert fill.fill == colour
+        assert fill.text_color is None, f"{colour} -> {fill.text_color}"
+
+    # A three-digit hex is a form the normaliser accepts, so it is derived.
+    short = row_fill(
+        settings, PALETTE, item=item, use_completed_tint=False,
+        segment_color="#ABC",
+    )
+    assert short.text_color == pick_text_color("#AABBCC")
+
+
+def test_lrrm23_the_completed_tint_keeps_the_themes_text_colour():
+    """LRR-M2.3 — the tint is not widened along with the segment fill.
+
+    ``PLC-A1`` names the segment fill, and only the segment fill. The completed
+    tint is a theme token (``success_tint``), chosen in the theme against that
+    same theme's ``row_text``; deriving a text colour for it would override a
+    pairing that was designed rather than inherited.
+
+    The two are asserted in one place on purpose. Taken apart, "the tint is
+    ``None``" also passes on a build where M2.1 was never made and
+    "the segment fill is derived" also passes on a build that widened the rule
+    to every fill. Together they hold the line in both directions, which is
+    what M2.3 is for. ``test_plcm45_a_non_priority_fill_leaves_row_text_alone``
+    is the same claim for the tint on its own, kept as PLC-M4.5's own record.
+    """
+    settings = AppSettings()
+    item = _item(CRITICAL, CRITICAL)
+
+    done = row_fill(settings, PALETTE, item=item, use_completed_tint=True)
+    segment = row_fill(
+        settings, PALETTE, item=item, use_completed_tint=True,
+        segment_color="#DCFCE7",
+    )
+    assert done.source == SOURCE_COMPLETED
+    assert segment.source == SOURCE_SEGMENT
+    assert done.text_color is None
+    assert segment.text_color == pick_text_color("#DCFCE7")
+
+
+# =========================================================================
+# LRR-M1 — the `P:` chip asks the authority, not a literal 20 (PRI-A1)
+# =========================================================================
+
+_PRIORITY_FACTOR_ATTRS = ("importance", "urgency")
+
+
+def _factor_literal_comparisons(path):
+    """Every ``<...>.importance|urgency <op> <int literal>`` in one module.
+
+    Returns ``(lineno, dump)`` per hit so a failure names the line rather than
+    only a count. Parsed, not greped: the string ``"importance == 20"`` in a
+    docstring, a ``BACKLOG.md`` quotation pasted into a comment, or a variable
+    of that name contributes nothing, which is the whole reason
+    ``tests/source_asserts.py`` exists.
+
+    Any comparison operator counts, not only ``==``. A literal threshold on a
+    priority factor is the P4 defect whichever way it is written, and nothing
+    in ``screens/`` compares these two attributes to a literal legitimately --
+    the scale lives in ``PriorityFactors``, so a real comparison names it and
+    reaches the AST as a ``Name``, not a ``Constant``.
+    """
+    hits = []
+    for node in ast.walk(ast.parse(path.read_text())):
+        if not isinstance(node, ast.Compare):
+            continue
+        sides = [node.left, *node.comparators]
+        names_a_factor = any(
+            isinstance(side, ast.Attribute) and side.attr in _PRIORITY_FACTOR_ATTRS
+            for side in sides
+        )
+        has_int_literal = any(
+            isinstance(side, ast.Constant) and isinstance(side.value, int)
+            and not isinstance(side.value, bool)
+            for side in sides
+        )
+        if names_a_factor and has_int_literal:
+            hits.append((node.lineno, ast.dump(node)))
+    return hits
+
+
+def test_lrrm11_no_screen_tests_importance_against_a_literal():
+    """LRR-M1.1 — the literal 20 is gone from ``screens/``, and stays gone.
+
+    ``PRI-A1``: ``item.importance == 20 or item.urgency == 20``, written out by
+    hand in all five list screens for the red ``P:`` chip, while
+    ``priority_levels.priority_level_for_item`` already answered exactly that
+    question from ``PriorityFactors``. The literal is P4 -- renumbering the
+    scale would have left five screens behind -- and the two rules had already
+    come apart on real inputs (see ``test_lrrm12``).
+
+    Scoped to the whole of ``screens/``, not to the five files that had the
+    defect, so a sixth screen growing its own copy fails here. Asserted as an
+    exact count of zero, never a floor: a floor is what hides the narrowing a
+    guard was written to catch.
+    """
+    screens = sorted((_SRC / "screens").glob("*.py"))
+    assert len(screens) > 40, f"only {len(screens)} screen modules found"
+
+    hits = {
+        path.name: found
+        for path in screens
+        if (found := _factor_literal_comparisons(path))
+    }
+    assert hits == {}, "a priority factor is compared to a literal in " + ", ".join(
+        f"{name}:{lineno}" for name, found in hits.items() for lineno, _ in found
+    )
+
+
+def _chip_condition(builder):
+    """The row builder's own ``is_priority_critical`` expression, compiled.
+
+    Returns a one-argument callable that evaluates the *real* expression from
+    the screen's source against an item, in that screen module's own globals.
+    So this is not a source-text assertion standing in for behaviour: the
+    screen's condition is what runs, and it resolves the same names it will
+    resolve at runtime.
+
+    Needed because the condition is a local inside a several-hundred-line
+    builder that cannot be called without a Tk root, a ``DatabaseManager``, a
+    scroll frame and four lineage caches. Lifting the one expression out is a
+    far smaller fiction than a stub of all of that.
+    """
+    values = local_assignments(builder, "is_priority_critical")
+    assert len(values) == 1, f"is_priority_critical assigned {len(values)} times"
+    expression = ast.fix_missing_locations(ast.Expression(body=values[0]))
+    code = compile(expression, "<chip-condition>", "eval")
+    module_globals = vars(inspect.getmodule(builder))
+    return lambda item: eval(code, module_globals, {"item": item})  # noqa: S307
+
+
+def test_lrrm12_an_off_scale_critical_is_still_critical():
+    """LRR-M1.2 — the two inputs the literal got wrong (P7, adversarial).
+
+    Both look right and are wrong under ``== 20``:
+
+    * **importance 25** -- off the top of the scale, from a hand-edited
+      database or a scale that gains a step. ``_at_least`` uses ``>=``, so the
+      authority calls it critical; ``== 20`` calls it not critical, which is
+      the dangerous direction to be wrong in. It under-reports the priority of
+      the most urgent item the user has.
+    * **the string ``"20"``** -- SQLite's column types are advisory, so a
+      factor can come back as text. ``_at_least`` coerces with ``int()``;
+      ``== 20`` is simply ``False`` against a string.
+
+    An ordinary critical item and an ordinary medium one are asserted beside
+    them, so the test cannot pass on a condition that is always true.
+    """
+    off_scale = _item(CRITICAL + 5, None)
+    stringly = _item("20", None)
+    ordinary = _item(CRITICAL, MEDIUM)
+    not_critical = _item(MEDIUM, MEDIUM)
+
+    # The authority's answers, which are what the screens must now give.
+    assert priority_level_for_item(off_scale) == LEVEL_ANY_CRITICAL
+    assert priority_level_for_item(stringly) == LEVEL_ANY_CRITICAL
+    assert priority_level_for_item(ordinary) == LEVEL_ANY_CRITICAL
+    assert priority_level_for_item(not_critical) != LEVEL_ANY_CRITICAL
+
+    for name, builder in ROW_BUILDERS:
+        is_critical = _chip_condition(builder)
+        assert is_critical(off_scale), f"{name}: importance {CRITICAL + 5} is not critical"
+        assert is_critical(stringly), f"{name}: importance '20' is not critical"
+        assert is_critical(ordinary), f"{name}: an ordinary critical item is not critical"
+        assert not is_critical(not_critical), f"{name}: a medium item is critical"
