@@ -2147,6 +2147,13 @@ def test_updm56_a_row_with_no_category_colour_takes_the_subsegments():
     one copy and not the other. `_row_colors` is that code once; this drives
     it through both panels and asserts the fallback, which is the branch a
     typo'd key would silently take on every row.
+
+    Changed 2026-11-11 for SCV-M6.3, reason (b), the behaviour changed
+    intentionally: ``_normalize_color`` returns the canonical ``#RRGGBB``
+    form, where it used to return the stored text with whitespace stripped.
+    What this test is about is which key the lookup takes, not the case the
+    colour comes back in, and no consumer in ``src/`` compares one of these
+    values by equality.
     """
     root, screen = _week_screen(left_rows=[_ape_row(1)], right_rows=[_weekly_row(1)])
     try:
@@ -2155,14 +2162,14 @@ def test_updm56_a_row_with_no_category_colour_takes_the_subsegments():
         screen.category_colors = {}
         seg, sub, cat = screen._row_colors(
             "Purposeful Work", "Living Systems", "Blog")
-        assert sub == "#4477aa"
+        assert sub == "#4477AA"
         assert cat == sub, "a category with no colour of its own takes the subsegment's"
 
         screen.category_colors = {
             ("purposeful work", "living systems", "blog"): "#cc7744"}
         _seg, _sub, cat = screen._row_colors(
             "Purposeful Work", "Living Systems", "Blog")
-        assert cat == "#cc7744"
+        assert cat == "#CC7744"
     finally:
         root.destroy()
 
@@ -2695,6 +2702,11 @@ def test_updm62_a_row_with_no_category_colour_takes_the_subsegments(tmp_path):
     rendering as a hole, which is `resolve_chip_colors`' contract and the
     reason `week_actions` calls it instead of writing a sixth copy of the
     three-part lookup.
+
+    Changed 2026-11-11 for SCV-M6.3, reason (b), the behaviour changed
+    intentionally: the category colour now goes through `_normalize_color`
+    like the other two, so it comes back as the canonical `#RRGGBB`. Which
+    key the lookup takes, and what it falls back to, are unchanged.
     """
     from src.getmoredone.screens.segment_color_utils import resolve_chip_colors
 
@@ -2715,7 +2727,7 @@ def test_updm62_a_row_with_no_category_colour_takes_the_subsegments(tmp_path):
         {}, {("purposeful work", "living systems"): "#445566"},
         {("purposeful work", "living systems", "blog"): "#cc7744"},
     )
-    assert cat == "#cc7744"
+    assert cat == "#CC7744"
 
 
 # ------------------------------------- UPD-M7: it holds together on screen
