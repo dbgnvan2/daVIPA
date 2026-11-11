@@ -485,7 +485,7 @@ measurement of the `TclError` claim this batch set out not to re-measure.
 
 Implementation plan for the six VSP Planning tabs' left-to-right filter and the
 bottom Add New (VTF-M1 - VTF-M7), from a user report of 2026-11-11. **Draft,
-approved by nobody; no code written.** Touches the five dual-panel tab modules
+approved by nobody; no code written. The four design decisions are settled.** Touches the five dual-panel tab modules
 and `vision_segments.py`:
 
 - The report's first part is **not a regression**: in the whole history of the
@@ -502,7 +502,14 @@ and `vision_segments.py`:
   tick as filter and a bottom Add New as the only way to add. VTF-M4 therefore
   removes four screens' Save buttons, which the plan records as an explicit
   UI-contract approval
-- Four decisions (D1 - D4) are open and block step 1
+- D2 settles which filter belongs to which panel, and reverses what this
+  plan's first draft proposed: the Segment / SubSegment / Category dropdowns
+  filter the **left** panel, and the **right** panel is filtered by what is
+  ticked on the left. Today the dropdowns filter both, so VTF-M2 takes them off
+  the right panel. APE Week Actions already obeys the rule
+- D1 keeps the Vision Elements tab's structure and moves its three New buttons
+  to the bottom; D3 keeps the tick filter on the Quarter and Month tabs, where
+  both panels list the same record type; D4 keeps drag-and-drop
 
 ### docs/unused-docs/implementation_plan_2026-11-09_ci_green.md
 

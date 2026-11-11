@@ -1,8 +1,9 @@
 # Implementation plan — the VSP tabs' left-to-right filter and the bottom Add New (VTF-M1 … VTF-M7)
 
 Date: 2026-11-11
-Status: **draft, approved by nobody.** Planning only; no code is written until
-this is approved.
+Status: **draft, approved by nobody; the four design decisions are settled**
+(2026-11-11, recorded under *Decisions taken*). Planning only; no code is
+written until the plan itself is approved.
 Screens: `src/getmoredone/screens/annual_vision_segments.py`,
 `ape_assignment.py`, `ape_period_view.py`, `weekly_items.py`,
 `week_actions.py`, `vision_segments.py`
@@ -46,10 +47,19 @@ way to add a record is a button at the bottom of the right panel.** So each
 Add New opens a dialog that names its own parent, rather than reading the
 ticks.
 
+**Each panel has exactly one filter, and they are different filters.** The
+user stated the rule on 2026-11-11: the Segment / SubSegment / Category
+dropdowns filter the **left** panel — they narrow the list of candidates — and
+the **right** panel is filtered by what is selected on the left. Today the
+dropdowns filter both panels, so the work is to take them off the right panel,
+not off the left. APE Week Actions already obeys this rule: its dropdowns
+filter the left tactics list only, and the right panel follows the selected
+row.
+
 Drag-and-drop assignment (left row onto the right panel) exists on tabs 2–5 and
 is **kept**: it is an existing affordance, the UI-regression policy keeps it
 unless removal is asked for, and it leaves a second path while the Add New
-dialogs are new. See decision D4.
+dialogs are new.
 
 ## VTF-M1 — The left tick filters the right panel
 
@@ -64,20 +74,22 @@ means no filter, so an untouched screen looks exactly as it does today.
 | VTF-M1.4 | APE Week Assignment: ticking APEs narrows the right panel to tactics whose `annual_plan_element_id` is ticked | `::test_vtfm14_the_week_tab_right_panel_follows_the_ticks` |
 | VTF-M1.5 | No tick ticked = every right-hand row, on all four tabs | `::test_vtfm15_no_tick_is_no_filter` |
 | VTF-M1.6 | The tick takes effect without pressing Load, Save or Refresh | `::test_vtfm16_the_tick_refreshes_without_a_button` |
-| VTF-M1.7 | A tick and a dropdown compose: both must match | `::test_vtfm17_the_tick_and_the_dropdown_are_an_and` |
+| VTF-M1.7 | A dropdown narrows the left list, and so narrows which rows can be ticked; it does not reach the right panel (VTF-M2) | `::test_vtfm17_the_dropdown_does_not_reach_the_right_panel` |
 | VTF-M1.8 | The left panel is not re-rendered by a tick, so a tick cannot hide its own row | `::test_vtfm18_a_tick_leaves_the_left_panel_alone` |
+| VTF-M1.9 | A tick on a row a dropdown has since hidden is ignored, and with no visible tick left the right panel shows every row again (VTF-M1.5) | `::test_vtfm19_a_hidden_tick_stops_filtering` |
 
-## VTF-M2 — The dropdowns stop filtering the left panel
+## VTF-M2 — The dropdowns stop filtering the right panel
 
-**Awaiting decision D2.** On an assignment screen the filter belongs to the
-right panel: today `on_filters_changed` applies `_filtered_rows` to both sides,
-so filtering hides the rows you are trying to assign. Not requested by the
-user; raised in review.
+Decision D2, 2026-11-11: the dropdowns are the **left** panel's filter and the
+left selection is the **right** panel's. Today `on_filters_changed` applies
+`_filtered_rows` to both sides, which gives the right panel two filters and the
+tick nothing to do. This is the half that is removed.
 
 | ID | Criterion | Verified by |
 |---|---|---|
-| VTF-M2.1 | Quarter, Month and Week Assignment: a dropdown narrows the right panel and leaves the left list whole | `::test_vtfm21_the_dropdown_is_a_right_panel_filter` |
-| VTF-M2.2 | The dropdown's option list is still built from the left items, so the options do not collapse as the right panel narrows | `::test_vtfm22_the_options_still_come_from_the_left_items` |
+| VTF-M2.1 | Quarter, Month and Week Assignment: a dropdown narrows the left list and leaves the right panel to the ticks | `::test_vtfm21_the_dropdown_is_a_left_panel_filter` |
+| VTF-M2.2 | The dropdown's option list is still built from the left items | `::test_vtfm22_the_options_still_come_from_the_left_items` |
+| VTF-M2.3 | APE Week Actions is unchanged: its dropdowns already filter the left list only | `::test_vtfm23_week_actions_already_obeys_the_rule` |
 
 ## VTF-M3 — A bottom Add New on every right panel
 
@@ -131,16 +143,19 @@ Actions tab, which already has that button.
 
 ## VTF-M6 — The Vision Elements tab
 
-**Awaiting decision D1.** The tab is three lists shown one at a time, so
-"left filters right" has nowhere to land. Two readings:
+Decision D1, 2026-11-11: **move the buttons only.** The tab is three lists
+shown one at a time, so "left filters right" has nowhere to land, and it keeps
+that structure.
 
-- **D1a (recommended for this batch):** leave the structure alone, and move the
-  existing `+ New Segment / SubSegment / Category` from the top header to a
-  bottom row, for consistency with VTF-M3. Verified by
-  `::test_vtfm61_the_new_buttons_sit_at_the_bottom`.
-- **D1b:** restructure into panels with Segment → SubSegment → Category as a
-  filter chain. That is a larger job than the other five tabs together and
-  belongs in its own batch.
+| ID | Criterion | Verified by |
+|---|---|---|
+| VTF-M6.1 | `+ New Segment`, `+ New SubSegment` and `+ New Category` move from the top header to a bottom row, behaviour unchanged | `::test_vtfm61_the_new_buttons_sit_at_the_bottom` |
+| VTF-M6.2 | Refresh stays in the top header, and the three view-switcher buttons stay where they are | `::test_vtfm62_the_switcher_and_refresh_do_not_move` |
+
+Restructuring the tab into panels with Segment → SubSegment → Category as a
+filter chain was the alternative and was **not** chosen. It is a larger job
+than the other five tabs together; it is not filed, because nobody has asked
+for it.
 
 ## VTF-M7 — A contract test per tab
 
@@ -179,20 +194,26 @@ New, the surviving header buttons, the per-row Edit/Delete where they exist.
 Dependencies: M3 depends on M1 (the tick stops being the assignment selector);
 M4 depends on M3 per tab; M5 contains M3.4; M7 depends on all of them.
 
-## Open decisions — needed before step 1
+## Decisions taken — all four, 2026-11-11
 
-- **D1 — the Vision Elements tab.** D1a (move the New buttons to the bottom) or
-  D1b (restructure into a filter chain, its own batch)?
-- **D2 — VTF-M2.** Should the Segment/Sub/Cat dropdowns stop filtering the left
-  panel? Not requested; raised in review.
-- **D3 — the Quarter and Month tabs.** Left and right hold the same record
-  type there (`annual_plan_elements`), so "the tick filters the right panel"
-  reduces to "show only the ticked rows, if they are assigned". That is a
-  usable answer — tick one APE, see whether it is in the quarter — but it is
-  not the same kind of filter as on the other two tabs, and it is worth
-  confirming it is what you want.
-- **D4 — drag-and-drop.** Kept by this plan. Say so if you want it gone, since
-  "Add New only" could be read as covering it.
+- **D1 — the Vision Elements tab: move the buttons only.** No restructure.
+  VTF-M6.
+- **D2 — the dropdowns filter the left panel; the left selection filters the
+  right.** Stated by the user in these words: *"Only the left panel is
+  filtered. The right panel is filtered by selecting a record on the left
+  panel."* This is the opposite of what the draft of this plan proposed — that
+  draft would have moved the dropdowns onto the right panel — and VTF-M2 is
+  rewritten accordingly.
+- **D3 — Quarter and Month: narrow to the ticked.** Both panels list
+  `annual_plan_elements` there, so ticking an APE shows whether it is in that
+  quarter or month. VTF-M1.2 and VTF-M1.3 stand as written.
+- **D4 — drag-and-drop is kept** on all four assignment tabs.
+
+One rule follows from D2 and D3 together and was not asked about: VTF-M1.9,
+what happens to a tick on a row a dropdown then hides. The plan ignores such a
+tick, because the alternative is a filter the user cannot see, and because
+`week_actions.py` already clears its right panel when the filter hides the
+selected tactic. Say so if you want the other reading.
 
 ## Risks
 
