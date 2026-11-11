@@ -38,6 +38,14 @@ _NOT_SELF = ("-g", "!docs/ui_color_inventory.md")
 # them, this comment included.
 # Tests: tests/test_color_inventory_sync.py::test_civm5_the_scans_feeding_one_count_do_not_overlap
 _NOT_THEMES = ("-g", "!themes/**")
+# The staleness gate's fixtures are hand-written stand-ins for rg output, so
+# they look exactly like colour usage to these scans and were counted as it:
+# 3 of the 5 lines the `tuples` scan returned came from that one file, which
+# meant `scan_all`'s refusal of an empty scan -- the only guard here against a
+# scan going blind -- could be held above zero by test data alone. This is the
+# same self-reference as `_NOT_SELF`, not a narrowing of what the scan covers.
+# Tests: tests/test_color_inventory_sync.py::test_civm7_no_scan_reads_this_gate_s_own_fixtures
+_NOT_GATE = ("-g", "!tests/test_color_inventory_sync.py")
 
 
 def _rg(*args: str) -> List[str]:
@@ -49,21 +57,31 @@ def _rg(*args: str) -> List[str]:
     can set ``--heading`` or ``--no-line-number``, and then ``parse_line``
     returns ``None`` for every line and the report comes out structurally
     valid and almost entirely empty.
+    ``-H``: rg prints the filename only when searching more than one file, so
+    ``app_settings`` -- the one scan given an explicit path -- emitted
+    ``55:    appearance_mode...`` and parsed 0 of its 26 lines. The report
+    still built: ``scan_line_key`` fell back to ordering the raw string and
+    the AppSettings block came out lexical (445, 446, 447, 55, 56, 626),
+    which is the ordering that function exists to prevent.
+    Tests: tests/test_color_inventory_sync.py::test_civm7_every_line_of_every_real_scan_can_be_parsed
     """
-    return ["rg", "--sort", "path", "--no-config", "-n", *args]
+    return ["rg", "--sort", "path", "--no-config", "-n", "-H", *args]
 
 
 SCAN_COMMANDS: Dict[str, List[str]] = {
     "widget": _rg(
         "fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=",
-        ".", *_NOT_SELF,
+        ".", *_NOT_SELF, *_NOT_GATE,
     ),
-    "hex": _rg(HEX_PATTERN, ".", *_NOT_SELF, *_NOT_THEMES),
-    "named": _rg("-i", NAMED_PATTERN, ".", *_NOT_SELF, *_NOT_THEMES),
-    "theme_api": _rg("set_default_color_theme\\(|set_appearance_mode\\(", ".", *_NOT_SELF),
+    "hex": _rg(HEX_PATTERN, ".", *_NOT_SELF, *_NOT_THEMES, *_NOT_GATE),
+    "named": _rg("-i", NAMED_PATTERN, ".", *_NOT_SELF, *_NOT_THEMES, *_NOT_GATE),
+    "theme_api": _rg(
+        "set_default_color_theme\\(|set_appearance_mode\\(",
+        ".", *_NOT_SELF, *_NOT_GATE,
+    ),
     "tuples": _rg(
         "(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\\s*=\\s*(\\(|\\[)",
-        ".", *_NOT_SELF,
+        ".", *_NOT_SELF, *_NOT_GATE,
     ),
     "app_settings": _rg(
         "color|theme|appearance_mode|theme_name|drag_schedule_date_text_color|color_hex",
@@ -90,8 +108,13 @@ class Entry:
 
 RG_TIMEOUT_SECONDS = 120
 
-# rg writes this on a successful search and still exits 0, so it is not a sign
-# of a partial scan. Everything else on stderr is.
+# Defensive, not load bearing. Measured with rg 14.1.1 on 2026-11-11: a
+# recursive scan skips a binary file in silence, and an explicit binary
+# argument writes `binary file matches (...)` to *stdout* with no WARNING
+# prefix -- so no rg checked here puts this on stderr at all. It stays because
+# all seven scans share run_rg, and on a version that does emit a benign
+# notice one matching binary file would abort every one of them with a message
+# blaming a partial scan.
 RG_BENIGN_STDERR = re.compile(r"^WARNING: stopped searching binary file ")
 
 # Scans allowed to return nothing, by name. Declaring one is a reviewable
@@ -133,13 +156,20 @@ def run_rg(cmd: Sequence[str]) -> List[str]:
             "ripgrep: install it (`brew install ripgrep`, or `apt-get install "
             "ripgrep`) and run this again."
         ) from exc
-    # rg returns 1 when no matches; that is fine.
+    # rg returns 1 for no matches, which is fine, and 2 for a search error --
+    # an unreadable file or a broken symlink reaches *here*, not the stderr
+    # branch below (measured, rg 14.1.1, 2026-11-11).
     if result.returncode not in (0, 1):
-        raise RuntimeError(f"Command failed ({result.returncode}): {' '.join(cmd)}\\n{result.stderr}")
-    # rg does not fail a whole run for one unreadable file, a broken symlink
-    # or a non-UTF-8 path: it writes the error here and still exits 0 or 1.
-    # Discarding it made a partial scan look like a clean one, which is a
-    # shorter inventory with no signal attached.
+        raise RuntimeError(
+            f"Command failed ({result.returncode}): {shlex.join(list(cmd))}\n"
+            f"{result.stderr.strip()}"
+        )
+    # A per-file complaint that arrives with a *successful* exit must not be
+    # dropped: discarding it made a partial scan look like a clean one, which
+    # is a shorter inventory with no signal attached. rg 14.1.1 exits 2 for
+    # the unreadable-file case, so it is the branch above that catches that
+    # today; this one is here because rg has already changed its exit code for
+    # a per-file error once, and a silent partial scan is the costly failure.
     complaints = [
         line for line in result.stderr.splitlines()
         if line.strip() and not RG_BENIGN_STDERR.match(line.strip())
