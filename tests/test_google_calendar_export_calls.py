@@ -277,6 +277,66 @@ def test_cem332_update_preserves_the_marker():
     assert body["extendedProperties"]["private"] == {BLOCK_ID_PROPERTY: "block-7"}
 
 
+def test_cea1_update_can_change_the_location_and_the_attendees():
+    """CE-A1 — an edit must be able to set `location` and `attendees`.
+
+    Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m33
+    Tests: this test
+
+    `create_event` writes both, so the meeting dialog can make an event with a
+    room and a guest list. `update_event` had no parameter for either, so the
+    only reachable outcome was whatever the fetched body already held: a moved
+    meeting kept the old room. The attendee list is written in the API's shape,
+    the same one `create_event` builds, because a plain string list is not what
+    Google accepts.
+
+    An empty value clears rather than being ignored (`is not None`, as
+    `description` already does) — a caller that means to drop the room or the
+    guests has to be able to say so.
+    """
+    stored = {
+        "id": "evt-1",
+        "location": "Old room",
+        "attendees": [{"email": "old@example.com"}],
+    }
+    service = FakeService(stored=stored)
+
+    _manager(service).update_event(
+        event_id="evt-1", location="New room", attendees=["new@example.com"],
+    )
+
+    body = service.of_kind("update")[0]["body"]
+    assert body["location"] == "New room"
+    assert body["attendees"] == [{"email": "new@example.com"}]
+
+    service = FakeService(stored=dict(stored))
+    _manager(service).update_event(event_id="evt-1", location="", attendees=[])
+    body = service.of_kind("update")[0]["body"]
+    assert body["location"] == ""
+    assert body["attendees"] == []
+
+
+def test_cea1b_an_update_that_names_neither_keeps_what_the_event_had():
+    """CE-A1 — the pass-through must not become a silent clear.
+
+    Adversarial (P7): a fix written as two unconditional assignments would
+    pass the test above and wipe the room off every event the day export
+    touches, because the export names neither field.
+    """
+    stored = {
+        "id": "evt-1",
+        "location": "Old room",
+        "attendees": [{"email": "old@example.com"}],
+    }
+    service = FakeService(stored=stored)
+
+    _manager(service).update_event(event_id="evt-1", summary="New title")
+
+    body = service.of_kind("update")[0]["body"]
+    assert body["location"] == "Old room"
+    assert body["attendees"] == [{"email": "old@example.com"}]
+
+
 # --- CE-M3.4 — retry, and what must not be retried ------------------------
 
 def test_cem341_a_503_is_retried_then_succeeds(no_real_sleeping):
