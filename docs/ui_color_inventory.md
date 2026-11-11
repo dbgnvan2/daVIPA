@@ -12,37 +12,29 @@ rg -n "set_default_color_theme\(|set_appearance_mode\(" .
 
 ## 1) Summary Counts By Type
 
-- Hex colors (match count): **2267**
-- Named colors (match count): **135**
-- Tuple colors / appearance tuples (match count): **2**
-- CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **23**
-- Widget explicit overrides (line count): **556**
+- Hex colors (match count): **2282**
+- Named colors (match count): **137**
+- Tuple colors / appearance tuples (match count): **5**
+- CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **25**
+- Widget explicit overrides (line count): **569**
 
 Widget override property breakdown:
 
 | Property | Count |
 |---|---:|
-| `border_color` | 16 |
+| `border_color` | 18 |
 | `button_color` | 4 |
 | `corner_radius` | 63 |
-| `fg_color` | 266 |
+| `fg_color` | 271 |
 | `highlight_color` | 2 |
-| `hover_color` | 15 |
+| `hover_color` | 17 |
 | `progress_color` | 2 |
 | `selected_color` | 2 |
-| `text_color` | 234 |
+| `text_color` | 238 |
 
 AppSettings persisted color/theme fields:
 
 ```text
-55:    appearance_mode: str = "dark"  # system | dark | light
-56:    theme_name: str = "apple_grey"
-69:    # tests/test_priority_level_colors.py::test_plcm21_every_level_has_a_settings_field
-73:    # "" means no fill — the row keeps the theme's own background, which is
-78:    # The defaults are duplicated from theme.priority_level_fill_colors(),
-82:    priority_level_color_any_critical: str = "#DCFCE7"
-83:    priority_level_color_any_high: str = "#FEF3C7"
-84:    priority_level_color_no_high_or_critical: str = ""
 126:    # Drag Schedule date box text color (hex)
 127:    drag_schedule_date_text_color: str = "#FFFFFF"
 310:                settings.appearance_mode = cls._normalize_appearance_mode(
@@ -52,8 +44,11 @@ AppSettings persisted color/theme fields:
 445:        self.appearance_mode = self._normalize_appearance_mode(
 446:            self.appearance_mode)
 447:        self.theme_name = self._normalize_theme_name(self.theme_name)
+55:    appearance_mode: str = "dark"  # system | dark | light
+56:    theme_name: str = "apple_grey"
 626:        _normalize_theme_name defers its import for the same reason.
 696:    def _normalize_appearance_mode(value: Optional[str]) -> str:
+69:    # tests/test_priority_level_colors.py::test_plcm21_every_level_has_a_settings_field
 702:    def _normalize_theme_name(value: Optional[str]) -> str:
 703:        """Coerce a persisted theme name, using theme.py's list and no other.
 705:        This held a SECOND hardcoded copy of the theme names. Adding a theme to
@@ -61,6 +56,11 @@ AppSettings persisted color/theme fields:
 711:        Imported inside the function: theme.py pulls in customtkinter, and
 715:        from .theme import normalize_theme_name
 717:        return normalize_theme_name(value)
+73:    # "" means no fill — the row keeps the theme's own background, which is
+78:    # The defaults are duplicated from theme.priority_level_fill_colors(),
+82:    priority_level_color_any_critical: str = "#DCFCE7"
+83:    priority_level_color_any_high: str = "#FEF3C7"
+84:    priority_level_color_no_high_or_critical: str = ""
 ```
 
 Hex top values:
@@ -73,20 +73,20 @@ Hex top values:
 | `#000000` | 79 |
 | `#565b5e` | 68 |
 | `#3e454a` | 54 |
-| `#949a9f` | 54 |
-| `#939ba2` | 54 |
 | `#4a4d50` | 54 |
-| `#abc` | 43 |
+| `#939ba2` | 54 |
+| `#949a9f` | 54 |
+| `#abc` | 45 |
 | `#2e1c8f` | 40 |
 | `#1d1d1f` | 35 |
-| `#6e6e73` | 32 |
-| `#f9f9fa` | 32 |
 | `#343638` | 32 |
-| `#334155` | 29 |
+| `#6e6e73` | 32 |
+| `#aabbcc` | 32 |
+| `#f9f9fa` | 32 |
+| `#334155` | 30 |
 | `#86868b` | 29 |
-| `#aabbcc` | 27 |
-| `#dcfce7` | 25 |
 | `#111111` | 25 |
+| `#dcfce7` | 25 |
 
 Named top values:
 
@@ -95,10 +95,10 @@ Named top values:
 | `gray` | 54 |
 | `white` | 24 |
 | `green` | 18 |
-| `red` | 14 |
-| `orange` | 6 |
-| `blue` | 6 |
+| `red` | 15 |
+| `blue` | 7 |
 | `black` | 6 |
+| `orange` | 6 |
 | `grey` | 3 |
 | `yellow` | 3 |
 | `cyan` | 1 |
@@ -301,7 +301,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `BACKLOG.md:374` | `it as "correct already", which is wrong: it reads `#+12345` as `#0B368D` by the` |
-| `docs/DOCUMENTATION_INDEX.md:425` | ``#0B368D` from a misread slice` |
+| `docs/DOCUMENTATION_INDEX.md:432` | ``#0B368D` from a misread slice` |
 | `docs/spec_coverage.md:1965` | `\| SCV-M2.2 \| `#+12345` falls back rather than deriving `#0B368D` from a misread slice \| same \| `::test_scvm22_a_colour_that_parses_wrongly_is_not_derived_from` \| done \|` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:29` | `\| `#+12345` \| `True` \| `None` \| `#0B368D` — no error, a colour derived from garbage \|` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:61` | `\| SCV-M2.2 \| `#+12345` falls back rather than deriving `#0B368D` from a misread slice \| `::test_scvm22_a_colour_that_parses_wrongly_is_not_derived_from` — adversarial (P7): look` |
@@ -824,6 +824,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `BACKLOG.md:355` | `(`:1406`) both return `row["color_hex"] or "#334155"`, i.e. whatever the` |
+| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:110` | `slate `#334155` and the text is the stored value. Before 2026-11-11` |
 | `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:145` | `stored colour is malformed, the swatch is slate `#334155` and the text is` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:103` | ``(row["color_hex"] or "").strip() or "#334155"`, i.e. the raw stored value.` |
 | `src/getmoredone/screens/segment_color_utils.py:10` | `DEFAULT_SEGMENT_COLOR = "#334155"` |
@@ -1295,6 +1296,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `docs/spec_coverage.md:1964` | `\| SCV-M2.1 \| `_derive_subsegment_color` raises for nothing a caller can hold, and falls back to `#64748B` where it cannot read a base \| `vps_manager.py::VPSManager._derive_subse` |
 | `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:56` | `\| `#64748B` slate \| **white** \| 4.76 \| 3.71 \| 3.66 \|` |
 | `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:81` | `### 3 · A slate `#64748B` row flips to white text in the light theme` |
+| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:59` | `3. **A slate `#64748B` row, light theme:** text flips to **white**. The` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:60` | `\| SCV-M2.1 \| `_derive_subsegment_color` raises nothing for any string, and falls back to `#64748B` where it cannot read one \| `::test_scvm21_deriving_from_a_malformed_colour_fal` |
 | `src/getmoredone/screens/settings_vsp_segments.py:250` | `color_hex = subsegment.get("color_hex") or "#64748B"` |
 | `src/getmoredone/screens/settings_vsp_segments.py:280` | `initial = subsegment.get("color_hex") or "#64748B"` |
@@ -1932,15 +1934,20 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/DOCUMENTATION_INDEX.md:430` | `and only together with storing the normalised `#AABBCC`` |
+| `docs/DOCUMENTATION_INDEX.md:437` | `and only together with storing the normalised `#AABBCC`` |
 | `docs/USER_GUIDE.md:929` | `and saved as `#AABBCC`, and the field refuses anything that is not six hex` |
 | `docs/spec_coverage.md:1963` | `\| SCV-M1.3 \| The editor stores the normalised form, so `#abc` lands as `#AABBCC` \| `screens/vps_segment_editor.py::VPSSegmentEditorDialog.save_segment` \| `::test_scvm13_the_edi` |
 | `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:195` | `(`#AABBCC`) while Tk draws the X11 one (`#A0B0C0`). Same black/white answer` |
 | `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:199` | `now the normalised `#AABBCC`, so Tk draws what the text colour was derived` |
+| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:105` | `closes, and re-opening the editor on that segment shows `#AABBCC`.` |
 | `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:96` | `holding `#abc` to `#AABBCC`. One write per such row, once; the condition is` |
 | `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:131` | `closes, and re-opening the editor on that segment shows `#AABBCC` in the` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:91` | `decided it — but only together with storing the normalised `#AABBCC`. Accepting` |
 | `docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md:115` | `2. Type `#abc` and save: accepted, and the stored value reads back `#AABBCC`.` |
+| `tests/test_color_inventory_sync.py:38` | `#   * `#aabbcc` and `#ddeeff` tie at two hex occurrences each` |
+| `tests/test_color_inventory_sync.py:45` | `"src/b.py:10:    fg_color=\"#aabbcc\"",` |
+| `tests/test_color_inventory_sync.py:47` | `"src/c.py:5:     border_color=\"#aabbcc\"",` |
+| `tests/test_color_inventory_sync.py:58` | `"src/b.py:10:    fg_color=\"#aabbcc\"",` |
 | `tests/test_priority_level_colors.py:397` | `assert level_color(settings, LEVEL_ANY_HIGH) == "#AABBCC"` |
 | `tests/test_priority_level_colors.py:1229` | `assert short.text_color == pick_text_color("#AABBCC")` |
 | `tests/test_priority_level_colors.py:1606` | `("#ABC", "#AABBCC"), ("#abc", "#AABBCC")):` |
@@ -1962,13 +1969,15 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `docs/DOCUMENTATION_INDEX.md:429` | `- Delegating widens the segment editor to accept `#abc`, taken deliberately` |
+| `docs/DOCUMENTATION_INDEX.md:436` | `- Delegating widens the segment editor to accept `#abc`, taken deliberately` |
 | `docs/USER_GUIDE.md:928` | `Upcoming and All Items. Since 2026-11-11 the short form `#abc` is accepted` |
 | `docs/spec_coverage.md:1963` | `\| SCV-M1.3 \| The editor stores the normalised form, so `#abc` lands as `#AABBCC` \| `screens/vps_segment_editor.py::VPSSegmentEditorDialog.save_segment` \| `::test_scvm13_the_edi` |
 | `docs/spec_coverage.md:2009` | `no longer lists `#abc` and `aabbcc` as refusals (SCV-M1.3, plan §4), and` |
 | `docs/spec_coverage.md:2050` | `was mutation-proved red at `#ABC`. `::test_scvm66_the_category_pass_does_not_requery_per_row`` |
 | `docs/unused-docs/changes/2026-11-08-priority-level-colours.md:51` | `rather than raises and expands `#ABC`` |
 | `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:194` | `- A 3-digit segment colour (`#ABC`) derives its text from the CSS expansion` |
+| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:104` | `11. **Same dialog, type `#abc` and Save.** Expect: accepted, the dialog` |
+| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:106` | `Before 2026-11-11 `#abc` was refused.` |
 | `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:96` | `holding `#abc` to `#AABBCC`. One write per such row, once; the condition is` |
 | `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:130` | `2. **Same dialog, type `#abc` and Save.** Expected: accepted, the dialog` |
 | `docs/unused-docs/changes/2026-11-11-scv-manual-checklist.md:132` | `field. Before 2026-11-11 `#abc` was refused.` |
@@ -2102,6 +2111,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `docs/unused-docs/changes/2026-11-05-time-blocks.md:110` | `- Reverting the light-theme `critical` band to `#B91C1C` turned the contrast` |
 | `docs/unused-docs/changes/2026-11-07-plan-clear-day-and-marks.md:44` | `and #B91C1C/#FCA5A5 (unscheduled), and a test holds every combination of theme` |
 | `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:111` | `red now, in the same red (`danger`, `#B91C1C`).` |
+| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:72` | ``#B91C1C`). The condition changed; for every value the UI can produce` |
 | `src/getmoredone/screens/project_boards.py:1268` | `text_color="#B91C1C",` |
 | `src/getmoredone/theme.py:131` | `"danger": "#B91C1C",` |
 | `src/getmoredone/theme.py:151` | `"unscheduled_mark": "#B91C1C" if mode == "light" else "#FCA5A5",` |
@@ -2383,6 +2393,10 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
+| `tests/test_color_inventory_sync.py:38` | `#   * `#aabbcc` and `#ddeeff` tie at two hex occurrences each` |
+| `tests/test_color_inventory_sync.py:46` | `"src/a.py:20:    fg_color=\"#ddeeff\"",` |
+| `tests/test_color_inventory_sync.py:48` | `"src/a.py:3:     text_color=\"#ddeeff\"",` |
+| `tests/test_color_inventory_sync.py:59` | `"src/a.py:20:    hover_color=\"#ddeeff\"",` |
 | `tests/test_segment_colour_validation.py:389` | `assert stored("vision_subsegments", sub["id"]) == "#DDEEFF"` |
 
 ### `#de1b24`
@@ -2587,6 +2601,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:51` | `\| `#F59E0B` amber \| black \| 9.78 \| **1.67** \| 8.10 \|` |
 | `docs/unused-docs/changes/2026-11-11-lrr-manual-checklist.md:70` | ``#F59E0B` was 1.67:1, which is near-invisible. If the row text still looks` |
+| `docs/unused-docs/changes/2026-11-11-manual-walk-four-batches.md:56` | `amber `#F59E0B` measured 1.67:1 before, which is near-invisible.` |
 | `src/getmoredone/theme.py:456` | `"Annual Initiative": "#F59E0B",` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
 
@@ -3068,6 +3083,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/timer_window.py:892` | `status_color = "green" if self.timer_state == self.RUNNING else "blue"` |
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:248` | `"blue": palette["primary"],` |
+| `tests/test_color_inventory_sync.py:39` | `#   * "red" and "blue" tie at two named occurrences each` |
 | `tests/test_date_picker.py:332` | `"gray", "grey", "red", "green", "blue", "yellow", "orange", "pink",` |
 | `tests/test_theme_settings.py:72` | `assert status_text_color("blue")` |
 | `tools/generate_ctk_themes.py:48` | `"blue": ["#3B8ED0", "#1F6AA5"],` |
@@ -3170,6 +3186,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/vision_planning.py:315` | `fg_color="darkred", hover_color="red",` |
 | `src/getmoredone/screens/vision_planning.py:577` | `fg_color="darkred", hover_color="red",` |
 | `src/getmoredone/theme.py:243` | `"red": palette["danger"],` |
+| `tests/test_color_inventory_sync.py:39` | `#   * "red" and "blue" tie at two named occurrences each` |
 | `tests/test_date_picker.py:332` | `"gray", "grey", "red", "green", "blue", "yellow", "orange", "pink",` |
 | `tests/test_priority_level_colors.py:332` | `"red",` |
 | `tests/test_priority_level_colors.py:1216` | `for colour in ("navy", "red", "not-a-colour", "#GGHHII"):` |
@@ -3217,6 +3234,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `AGENTS.md:95` | `- call set_default_color_theme(path_for_theme_name)` |
 | `src/getmoredone/theme.py:57` | `ctk.set_appearance_mode(mode)` |
 | `src/getmoredone/theme.py:65` | `ctk.set_default_color_theme(str(theme_path))` |
+| `tests/test_color_inventory_sync.py:62` | `"src/z.py:9:     set_appearance_mode(\"dark\")",` |
+| `tests/test_color_inventory_sync.py:63` | `"src/a.py:1:     set_default_color_theme(\"blue\")",` |
 | `tests/test_plan_screen.py:160` | `ctk.set_appearance_mode("light")` |
 | `tests/test_plan_screen.py:164` | `ctk.set_appearance_mode("system" if was_system else previous)` |
 | `tests/test_priority_level_colors.py:130` | `ctk.set_appearance_mode("system" if was_system else original)` |
@@ -3240,8 +3259,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/vps_segment_editor.py:35` | `self.selected_color = (` |
 | `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
+| `src/getmoredone/screens/vps_segment_editor.py:35` | `self.selected_color = (` |
+| `tests/test_color_inventory_sync.py:66` | `"src/z.py:40:    fg_color=(\"white\", \"black\")",` |
+| `tests/test_color_inventory_sync.py:67` | `"src/a.py:2:     text_color=(\"black\", \"white\")",` |
+| `tests/test_color_inventory_sync.py:68` | `"src/m.py:7:     border_color=(\"gray\", \"grey\")",` |
 
 ## 3) Replace Plan
 
