@@ -1201,8 +1201,15 @@ def test_lrrm21_an_unreadable_segment_colour_keeps_the_themes_text():
     black on an unknown background can be worse than the theme's own
     ``row_text`` -- black on ``navy`` is about 1.3:1. So the derivation is
     attempted only on a value ``normalize_hex_color`` accepts, and anything
-    else keeps exactly the behaviour it has today. The *fill* is still passed
-    through unchanged: what a row draws is not what ``PLC-A1`` is about.
+    else keeps exactly the behaviour it has today.
+
+    **Changed 2026-11-11 (SCV-M4.1), reason (b) -- the behaviour changed
+    intentionally.** This test also asserted ``fill.fill == colour``, because
+    LRR-M2.1 deliberately passed the raw value through as the fill. SCV-M4.1
+    ends that: the raw value is what reaches ``fg_color`` and raises there.
+    The fill is now asserted by
+    ``test_scvm41_a_malformed_segment_colour_does_not_become_a_fill``, and
+    what is left here is M2.1's own claim, the text colour.
     """
     settings = AppSettings()
     item = _item(MEDIUM, MEDIUM)
@@ -1212,7 +1219,6 @@ def test_lrrm21_an_unreadable_segment_colour_keeps_the_themes_text():
             segment_color=colour,
         )
         assert fill.source == SOURCE_SEGMENT
-        assert fill.fill == colour
         assert fill.text_color is None, f"{colour} -> {fill.text_color}"
 
     # A three-digit hex is a form the normaliser accepts, so it is derived.
@@ -1554,3 +1560,51 @@ def test_lrr_cold_a_segment_fill_carries_its_controls_too():
         assert kwargs["border_color"] == fill.text_color
         assert kwargs["checkmark_color"] == fill.fill
         assert contrast_ratio(kwargs["border_color"], colour) >= 3.0, colour
+
+
+# =========================================================================
+# SCV-M4 — a malformed segment colour never becomes a fill
+# =========================================================================
+
+def test_scvm41_a_malformed_segment_colour_does_not_become_a_fill():
+    """SCV-M4.1 — the fill is a ``#RRGGBB`` value or none at all.
+
+    Spec:  docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m4
+
+    ``LRR-A1`` records that ``row_fill`` deliberately passed the raw stored
+    value through as the fill while computing the normalised form for the text
+    colour, on the grounds that what colour a row draws was not what
+    ``PLC-A1`` named. That is what this closes: ``row_fill`` is the last gate
+    before ``ctk.CTkFrame(fg_color=…)`` in five row builders, and a
+    ``TclError`` raised there takes the whole list screen down part-way
+    through a refresh -- which is the reason ``normalize_hex_color`` exists
+    (PLC-M2.5).
+
+    Both halves are asserted together, because either alone is satisfiable by
+    the wrong build: "unreadable gives no fill" also passes where every
+    segment fill was dropped, and "a readable colour still fills" also passes
+    on today's pass-through.
+    """
+    settings = AppSettings()
+    item = _item(MEDIUM, MEDIUM)
+
+    def fill_for(colour):
+        return row_fill(
+            settings, PALETTE, item=item, use_completed_tint=False,
+            segment_color=colour,
+        )
+
+    for colour in ("navy", "red", "not-a-colour", "#GGHHII", "#0X1234",
+                   "#1_2345", "#+12345", "#aabbccdd"):
+        fill = fill_for(colour)
+        assert fill.source == SOURCE_SEGMENT, colour
+        assert fill.fill is None, f"{colour!r} reached a widget as {fill.fill!r}"
+        assert fill.text_color is None, colour
+
+    # A colour that can be read still fills the row, in the normalised form.
+    for typed, normalised in (("#DCFCE7", "#DCFCE7"), ("#dcfce7", "#DCFCE7"),
+                              ("#ABC", "#AABBCC"), ("#abc", "#AABBCC")):
+        fill = fill_for(typed)
+        assert fill.source == SOURCE_SEGMENT, typed
+        assert fill.fill == normalised, typed
+        assert fill.text_color == pick_text_color(normalised), typed

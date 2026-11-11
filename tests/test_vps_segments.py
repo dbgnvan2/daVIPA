@@ -169,15 +169,33 @@ def test_bc3_validate_color_accepts_a_full_hex_colour(value):
 
 
 @pytest.mark.parametrize("value,reason", [
-    ("aabbcc", "no leading #"),
-    ("#abc", "shorthand is not accepted"),
     ("#aabbccdd", "too long"),
     ("#gggggg", "not hexadecimal"),
     ("#12345z", "one bad digit"),
     ("", "empty"),
 ])
 def test_bc3_validate_color_rejects_everything_else(value, reason):
+    """Changed 2026-11-11 (SCV-M1.3), reason (b) -- intentional widening.
+
+    ``validate_color`` now answers from ``color_contrast.normalize_hex_color``
+    rather than its own ``len() == 7`` check, so two cases left this list:
+    ``"#abc"``, the three-digit form the normaliser expands, and ``"aabbcc"``,
+    which it reads with the ``#`` added. §4 of the SCV plan takes that
+    widening deliberately, and only together with SCV-M1.3 -- the editor
+    stores the normalised ``#AABBCC``, asserted by
+    ``tests/test_segment_colour_validation.py::test_scvm13_the_editor_stores_the_normalised_form``.
+    """
     assert VPSSegmentEditorDialog.validate_color(None, value) is False, reason
+
+
+@pytest.mark.parametrize("value", ["#abc", "aabbcc"])
+def test_scvm13_validate_color_accepts_what_the_normaliser_reads(value):
+    """SCV-M1.3 — the two forms that left the rejection list are accepted here.
+
+    Kept as its own assertion rather than only as a deletion, so the widening
+    is a claim the suite makes rather than a gap it happens to have.
+    """
+    assert VPSSegmentEditorDialog.validate_color(None, value) is True
 
 
 # ------------------------------------------------------------- round trip
