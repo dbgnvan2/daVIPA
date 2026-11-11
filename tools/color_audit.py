@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shlex
 import subprocess
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -19,62 +20,53 @@ from typing import Dict, List, Sequence, Tuple
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = REPO_ROOT / "docs" / "ui_color_inventory.md"
 
+HEX_PATTERN = "#[0-9a-fA-F]{6}\\b|#[0-9a-fA-F]{3}\\b"
+NAMED_PATTERN = (
+    r'"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)"'
+    r"|'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)'"
+)
+
+# The inventory is this scan's own output; feeding it back in would compound.
+_NOT_SELF = ("-g", "!docs/ui_color_inventory.md")
+# themes/*.json is scanned once, by `theme_files`, whose pattern covers hex and
+# named together. Without this the "." scans cover the same bytes and every
+# theme colour reaches the frequency tables twice -- #000000 read 79, which is
+# 57 from here plus the same 22 again from `theme_files`, while the occurrence
+# table (which dedups) listed 57.
+# Tests: tests/test_color_inventory_sync.py::test_civm5_the_scans_feeding_one_count_do_not_overlap
+_NOT_THEMES = ("-g", "!themes/**")
+
+
+def _rg(*args: str) -> List[str]:
+    """A scan command carrying the flags every scan must have.
+
+    ``--sort path``: rg searches in parallel and promises no output order,
+    which the staleness gate cannot tolerate.
+    ``--no-config``: ``RIPGREP_CONFIG_PATH`` or a developer's ``~/.ripgreprc``
+    can set ``--heading`` or ``--no-line-number``, and then ``parse_line``
+    returns ``None`` for every line and the report comes out structurally
+    valid and almost entirely empty.
+    """
+    return ["rg", "--sort", "path", "--no-config", "-n", *args]
+
+
 SCAN_COMMANDS: Dict[str, List[str]] = {
-    "widget": [
-        "rg",
-        "-n",
+    "widget": _rg(
         "fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=",
-        ".",
-        "-g",
-        "!docs/ui_color_inventory.md",
-    ],
-    "hex": [
-        "rg",
-        "-n",
-        "#[0-9a-fA-F]{6}\\b|#[0-9a-fA-F]{3}\\b",
-        ".",
-        "-g",
-        "!docs/ui_color_inventory.md",
-    ],
-    "named": [
-        "rg",
-        "-n",
-        "-i",
-        r'"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)"|\'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)\'',
-        ".",
-        "-g",
-        "!docs/ui_color_inventory.md",
-    ],
-    "theme_api": [
-        "rg",
-        "-n",
-        "set_default_color_theme\\(|set_appearance_mode\\(",
-        ".",
-        "-g",
-        "!docs/ui_color_inventory.md",
-    ],
-    "tuples": [
-        "rg",
-        "-n",
+        ".", *_NOT_SELF,
+    ),
+    "hex": _rg(HEX_PATTERN, ".", *_NOT_SELF, *_NOT_THEMES),
+    "named": _rg("-i", NAMED_PATTERN, ".", *_NOT_SELF, *_NOT_THEMES),
+    "theme_api": _rg("set_default_color_theme\\(|set_appearance_mode\\(", ".", *_NOT_SELF),
+    "tuples": _rg(
         "(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\\s*=\\s*(\\(|\\[)",
-        ".",
-        "-g",
-        "!docs/ui_color_inventory.md",
-    ],
-    "app_settings": [
-        "rg",
-        "-n",
+        ".", *_NOT_SELF,
+    ),
+    "app_settings": _rg(
         "color|theme|appearance_mode|theme_name|drag_schedule_date_text_color|color_hex",
         "src/getmoredone/app_settings.py",
-    ],
-    "theme_files": [
-        "rg",
-        "-n",
-        "#[0-9a-fA-F]{6}\\b|#[0-9a-fA-F]{3}\\b|\"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)\"|\'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)\'",
-        "themes",
-        "-g",
-        "*.json",
-    ],
+    ),
+    "theme_files": _rg(f"{HEX_PATTERN}|{NAMED_PATTERN}", "themes", "-g", "*.json"),
 }
 
 HEX_RE = re.compile(r"#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b")
@@ -93,14 +85,7 @@ class Entry:
     snippet: str
 
 
-# rg searches in parallel and promises no output order, so every scan asks for
-# path order. build_report sorts what it emits as well, and that is what the
-# staleness gate relies on -- this keeps the report's own "deterministic rg
-# scans" claim true at the source, and stops a section added later from being
-# order-dependent by default.
-# Tests: tests/test_color_inventory_sync.py::test_civm12_every_scan_command_asks_ripgrep_to_sort
-for _scan_cmd in SCAN_COMMANDS.values():
-    _scan_cmd[1:1] = ["--sort", "path"]
+RG_TIMEOUT_SECONDS = 120
 
 
 def run_rg(cmd: Sequence[str]) -> List[str]:
@@ -110,8 +95,22 @@ def run_rg(cmd: Sequence[str]) -> List[str]:
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
+            # Without an explicit encoding, text=True decodes through the
+            # locale -- cp1252 on Windows, which this repo supports, and ASCII
+            # under LC_ALL=C. 22 lines of the inventory are non-ASCII, so that
+            # is a UnicodeDecodeError or mojibake, and the gate would then fail
+            # for the environment while its message blamed staleness.
+            encoding="utf-8",
+            errors="replace",
+            timeout=RG_TIMEOUT_SECONDS,
             check=False,
         )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"rg did not finish within {RG_TIMEOUT_SECONDS}s: {shlex.join(list(cmd))}. "
+            "--sort path disables rg's parallelism, so this scan is slower than "
+            "an unsorted one."
+        ) from exc
     except FileNotFoundError as exc:
         # A bare FileNotFoundError names the binary and not the remedy, and
         # this generator is the only thing in the repo that needs ripgrep.
@@ -124,7 +123,45 @@ def run_rg(cmd: Sequence[str]) -> List[str]:
     # rg returns 1 when no matches; that is fine.
     if result.returncode not in (0, 1):
         raise RuntimeError(f"Command failed ({result.returncode}): {' '.join(cmd)}\\n{result.stderr}")
+    if result.stderr.strip():
+        # rg does not fail a whole run for one unreadable file, a broken
+        # symlink or a non-UTF-8 path: it writes the error here and still
+        # exits 0 or 1. Discarding it made a partial scan look like a clean
+        # one, which is a shorter inventory with no signal attached.
+        raise RuntimeError(
+            "rg reported errors, so this scan may be partial:\n"
+            f"{result.stderr.strip()}\ncommand: {shlex.join(list(cmd))}"
+        )
     return [ln for ln in result.stdout.splitlines() if ln.strip()]
+
+
+def scan_all() -> Dict[str, List[str]]:
+    """Run every scan, refusing one that came back empty.
+
+    rg exits 1 both for "no matches" and for "every candidate file was
+    excluded by an ignore rule", and ``run_rg`` treats 1 as success. That
+    makes a scan which has gone blind indistinguishable from one that found
+    nothing. It is a live hazard rather than a hypothetical: ``.gitignore``
+    holds a blanket ``*.json`` off ``themes/`` with two negations, and losing
+    them empties the ``theme_files`` scan, drops 765 lines from the inventory
+    and leaves the staleness gate green from the next regeneration onward.
+    Every scan matches something today.
+
+    Tests: tests/test_color_inventory_sync.py::test_civm6_an_empty_scan_is_refused
+    """
+    results: Dict[str, List[str]] = {}
+    for name, cmd in SCAN_COMMANDS.items():
+        found = run_rg(cmd)
+        if not found:
+            raise RuntimeError(
+                f"the {name!r} scan returned no lines. rg cannot tell "
+                "'nothing matches' apart from 'an ignore rule hid every "
+                "candidate file', so this is either a real emptying -- in "
+                "which case say so here -- or a scan that has gone blind. "
+                f"command: {shlex.join(list(cmd))}"
+            )
+        results[name] = found
+    return results
 
 
 def scan_line_key(line: str) -> Tuple[str, int, str]:
@@ -219,11 +256,18 @@ def build_report(lines: Dict[str, List[str]]) -> str:
     out.append("Generated via deterministic `rg` scans from repo root.")
     out.append("")
     out.append("## Scan Commands")
+    out.append("")
+    out.append(
+        "Rendered from `SCAN_COMMANDS` in `tools/color_audit.py`, so what is "
+        "printed here is what produced this file. The four hand-written lines "
+        "this replaced had drifted: they omitted three of the seven scans and "
+        "every flag."
+    )
+    out.append("")
     out.append("```bash")
-    out.append('rg -n "fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=" .')
-    out.append('rg -n "#[0-9a-fA-F]{6}\\b|#[0-9a-fA-F]{3}\\b" .')
-    out.append(r'rg -n -i "\"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)\"|\'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray|grey)\'" .')
-    out.append('rg -n "set_default_color_theme\\(|set_appearance_mode\\(" .')
+    for name, cmd in SCAN_COMMANDS.items():
+        out.append(f"# {name}")
+        out.append(shlex.join(cmd))
     out.append("```")
     out.append("")
     out.append("## 1) Summary Counts By Type")
@@ -236,6 +280,15 @@ def build_report(lines: Dict[str, List[str]]) -> str:
         f"line count: **{len(lines['theme_api'])}**"
     )
     out.append(f"- Widget explicit overrides (line count): **{len(lines['widget'])}**")
+    out.append("")
+    out.append("Lines returned per scan. A scan that has gone blind returns")
+    out.append("nothing and rg still exits successfully, so these are recorded")
+    out.append("here where the staleness gate compares them.")
+    out.append("")
+    out.append("| Scan | Lines |")
+    out.append("|---|---:|")
+    for name in sorted(lines):
+        out.append(f"| `{name}` | {len(lines[name])} |")
     out.append("")
     out.append("Widget override property breakdown:")
     out.append("")
@@ -327,14 +380,14 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
 
-    scan_results: Dict[str, List[str]] = {}
-    for name, cmd in SCAN_COMMANDS.items():
-        scan_results[name] = run_rg(cmd)
+    scan_results = scan_all()
 
     report = build_report(scan_results)
     output_path = args.output
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(report, encoding="utf-8")
+    # newline="\n": the default translates to CRLF on Windows, which this repo
+    # supports, and the gate compares the bytes.
+    output_path.write_text(report, encoding="utf-8", newline="\n")
 
     print(f"Wrote {output_path}")
     print(f"Hex matches: {len(scan_results['hex'])}")
