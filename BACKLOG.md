@@ -26,9 +26,13 @@ features, and the long-standing bugs, requests and user stories at the end.
 ## Adjacent issues — the Day Plan's lunch and drag moves (LMM, filed 2026-11-12)
 
 Found while building the lunch-block move fix (`3adfc91`) and not fixed, under
-global rule 10. Located by reading the code named in each entry; none of the
-three was reproduced on the running screen, so the mechanism is verified and
-the symptom is predicted.
+global rule 10. None of the three was reproduced on the running screen, and
+they do not rest on the same evidence. LMM-A1's refusal was executed, not only
+read: `can_place` called with `day_span` omitted and a slot outside the
+template span returns `outside_grid`, so its mechanism is observed and only the
+screen-level sequence -- extend the day, drag a block onto the new outer box --
+is predicted. LMM-A2 and LMM-A3 were located by reading and neither was
+executed.
 
 ### LMM-A1 — a block dragged onto an extended slot is refused (medium)
 
