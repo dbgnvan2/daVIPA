@@ -162,6 +162,116 @@ def pytest_sessionstart(session):
         session.config._gmd_db_dir = handle
 
 
+#: Verdicts the real-data guard can reach. The warning text is built from
+#: these, so a test can assert which case fired without reading the sentence.
+GUARD_CONTENT_CHANGED = "content_changed"
+GUARD_APP_RUNNING = "app_running"
+GUARD_TIMESTAMP_ONLY = "timestamp_only"
+GUARD_APP_UNKNOWN = "app_unknown"
+
+#: Matches the packaged build's executable and a source launch. Not the test
+#: run itself: pytest's command line carries neither.
+APP_PROCESS_PATTERN = r"daVIPA\.app/Contents/MacOS|run\.py"
+
+
+def app_is_running(timeout=2.0):
+    """True / False / None (cannot tell) — is an app instance up right now?
+
+    Measured 2026-11-11 (CIG-A4): with the packaged app running and no tests
+    running at all, the real database's digest moved across a 50-second idle.
+    The guard blamed a test for that.
+
+    A false positive here only softens the timestamp-only wording, which never
+    failed a run; a content change fails it whatever this returns.
+    """
+    import shutil
+    import subprocess
+
+    exe = shutil.which("pgrep")
+    if exe is None:
+        return None
+    try:
+        found = subprocess.run(
+            [exe, "-f", APP_PROCESS_PATTERN],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if found.returncode == 0:
+        return bool(found.stdout.strip())
+    if found.returncode == 1:
+        return False
+    return None
+
+
+def guard_verdicts(before, after, app_state):
+    """Per-key ``(key, verdict, path)`` for the changed files. Pure.
+
+    No process lookup of its own: ``app_state`` is passed in, so every case is
+    reachable from a test.
+    """
+    verdicts = []
+    for key in before:
+        old, new = before[key], after[key]
+        if old == new:
+            continue
+        content_changed = (
+            old is None or new is None
+            or old[1] != new[1] or (old[2] is not None and old[2] != new[2])
+        )
+        if content_changed:
+            verdict = GUARD_CONTENT_CHANGED
+        elif app_state is True:
+            verdict = GUARD_APP_RUNNING
+        elif app_state is None:
+            verdict = GUARD_APP_UNKNOWN
+        else:
+            verdict = GUARD_TIMESTAMP_ONLY
+        path = (new or old)[3] if (new or old) else key
+        verdicts.append((key, verdict, path))
+    return verdicts
+
+
+#: The accusation lives in the content case alone. Until 2026-11-11 it was
+#: appended outside the branch, so the line written to say "harmless" ended by
+#: blaming a test anyway (CIG-A4).
+GUARD_EXPLANATIONS = {
+    GUARD_CONTENT_CHANGED: (
+        "  Its CONTENT changed - a test wrote it, or it was edited. If a test "
+        "did it: something bypassed the isolation in conftest.py."
+    ),
+    GUARD_APP_RUNNING: (
+        "  Only its timestamp moved, and a GetMoreDone process is running - it "
+        "saved on a window move or column drag. Harmless; nothing was "
+        "rewritten."
+    ),
+    GUARD_TIMESTAMP_ONLY: (
+        "  Only its timestamp moved and no GetMoreDone process was found. "
+        "Nothing was rewritten, so no test wrote to it."
+    ),
+    GUARD_APP_UNKNOWN: (
+        "  Only its timestamp moved. Whether the app is running could not be "
+        "determined here, so the cause is unknown. Nothing was rewritten."
+    ),
+}
+
+
+def guard_report(verdicts):
+    """The lines the guard prints, one pair per changed file."""
+    lines = []
+    for key, verdict, path in verdicts:
+        lines.append(
+            f"GUARD: the user's real {key} file changed during this run: {path}"
+        )
+        lines.append(GUARD_EXPLANATIONS[verdict])
+    return lines
+
+
+def guard_should_fail(verdicts) -> bool:
+    """Only a content change fails the run. A timestamp is not an escape."""
+    return any(verdict == GUARD_CONTENT_CHANGED for _, verdict, _ in verdicts)
+
+
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session, exitstatus):
     """Report an escape without destroying the test report.
@@ -185,31 +295,12 @@ def pytest_sessionfinish(session, exitstatus):
         return
     after = _user_data_fingerprint()
 
-    touched = [key for key in before if before[key] != after[key]]
-    if not touched:
+    if not [key for key in before if before[key] != after[key]]:
         return
 
-    lines = []
-    for key in touched:
-        old, new = before[key], after[key]
-        path = (new or old)[3] if (new or old) else key
-        content_changed = (
-            old is None or new is None
-            or old[1] != new[1] or (old[2] is not None and old[2] != new[2])
-        )
-        lines.append(
-            f"GUARD: the user's real {key} file changed during this run: {path}"
-        )
-        lines.append(
-            "  Its CONTENT changed — a test wrote it, or it was edited."
-            if content_changed else
-            "  Only its timestamp moved — most likely the GetMoreDone app is "
-            "running and saved on a window move or column drag, which is "
-            "harmless. Re-run with the app closed to be sure."
-        )
-    lines.append(
-        "  If a test did it: something bypassed the isolation in conftest.py."
-    )
+    # The process lookup happens only once something moved.
+    verdicts = guard_verdicts(before, after, app_is_running())
+    lines = guard_report(verdicts)
 
     reporter = session.config.pluginmanager.get_plugin("terminalreporter")
     if reporter is not None:
@@ -218,12 +309,7 @@ def pytest_sessionfinish(session, exitstatus):
     else:
         print("\n".join(lines))
 
-    if any(
-        before[key] is None or after[key] is None
-        or before[key][1] != after[key][1]
-        or (before[key][2] is not None and before[key][2] != after[key][2])
-        for key in touched
-    ):
+    if guard_should_fail(verdicts):
         session.exitstatus = pytest.ExitCode.TESTS_FAILED
 
 
