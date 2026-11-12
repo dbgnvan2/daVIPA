@@ -12,9 +12,11 @@ Tests: this file.
 
 from __future__ import annotations
 
+import pathlib
 import random
 import re
 import subprocess
+import tempfile
 import sys
 from pathlib import Path
 
@@ -233,9 +235,15 @@ def test_civm5_the_scans_feeding_one_count_do_not_overlap():
 # --------------------------------------------------------------------------
 
 def _frequency_rows(report: str, heading: str) -> list[tuple[str, int]]:
-    """The `| `value` | count |` rows of one table, in the order written."""
+    """The `| `value` | count |` rows of one table, in the order written.
+
+    `heading` is matched as a prefix: the hex heading carries its own "N of
+    M" counts, so its exact wording belongs in the one test that asserts it
+    rather than in every caller.
+    """
     lines = report.splitlines()
-    start = lines.index(heading)
+    start = next((i for i, ln in enumerate(lines) if ln.startswith(heading)), None)
+    assert start is not None, f"no frequency table heading starts {heading!r}"
     rows = []
     for line in lines[start + 1:]:
         match = re.match(r"^\| `([^`]+)` \| (\d+) \|$", line)
@@ -257,7 +265,7 @@ def test_civm13_both_frequency_tables_count_the_theme_files_scan():
     here can only have come through `theme_files`.
     """
     report = color_audit.build_report(SCAN_FIXTURE)
-    hex_rows = _frequency_rows(report, "Hex top values:")
+    hex_rows = _frequency_rows(report, "Hex top values")
     named_rows = _frequency_rows(report, "Named top values:")
 
     assert ("#abcdef", 1) in hex_rows, (
@@ -277,9 +285,9 @@ def test_civm13_the_frequency_tables_hold_every_colour_and_rank_them():
     """
     report = color_audit.build_report(SCAN_FIXTURE)
 
-    assert _frequency_rows(report, "Hex top values:") == [
+    assert _frequency_rows(report, "Hex top values") == [
         ("#aabbcc", 2), ("#ddeeff", 2), ("#abcdef", 1),
-    ], _frequency_rows(report, "Hex top values:")
+    ], _frequency_rows(report, "Hex top values")
     assert _frequency_rows(report, "Named top values:") == [
         ("blue", 2), ("red", 2), ("teal", 1),
     ], _frequency_rows(report, "Named top values:")
@@ -464,6 +472,139 @@ def test_civm14_every_scan_stays_inside_the_declared_paths():
 # CIV-M3 — the gate cannot pass vacuously for want of the scanner
 # --------------------------------------------------------------------------
 
+def test_civm17_every_tracked_file_in_scope_is_reachable_by_a_scan():
+    """`git ls-files` is the independent truth the scans cannot fake."""
+    # Every other completeness check here runs the same rg invocations it is
+    # checking, so a file rg cannot see is absent from both sides and the
+    # check passes. `.gitignore` line 26 ignores `*.json`; its
+    # `!src/getmoredone/email_cleaning_rules.json` negation is not applied
+    # when rg's walk root is `src`, so that file was unsearchable while
+    # `git check-ignore` called it tracked. Measured 2026-11-11: 106 tracked,
+    # 105 visible. It holds no colour, so the report was right by luck.
+    def listing(*args):
+        out = subprocess.run(
+            ["rg", "--files", "--sort", "path", "--no-config", *args],
+            cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+        )
+        return set(out.stdout.split())
+
+    def globs(scan):
+        """The -g flags really in that command, not a copy of them here."""
+        cmd = color_audit.SCAN_COMMANDS[scan]
+        return [a for i, a in enumerate(cmd)
+                if a == "-g" or (i and cmd[i - 1] == "-g")]
+
+    visible = (listing(*color_audit.UI_CODE_PATHS, *globs("hex"))
+               | listing("themes", *globs("theme_files")))
+    tracked = subprocess.run(
+        ["git", "ls-files", *color_audit.UI_CODE_PATHS, "themes"],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    )
+    unreachable = sorted(set(tracked.stdout.split()) - visible)
+    assert unreachable == [], (
+        f"{len(unreachable)} tracked files in the declared scope cannot be "
+        f"searched by any scan, so no scan can report them: {unreachable[:5]}. "
+        "The inventory claims every colour literal in those paths."
+    )
+
+
+def test_civm18_every_named_colour_a_widget_sets_is_counted():
+    """A colour word the list lacks is uncounted, not miscounted."""
+    # `NAMED_PATTERN` anchors on the quotes, so `"darkred"` matched no
+    # alternative at all -- the two lines carrying it were returned only
+    # because of their `hover_color="red"`, and `darkred` reached no table
+    # (2026-11-11). This reads the values off the `widget` scan, so a new
+    # hard-coded colour word fails here rather than going quietly missing.
+    not_colours = {"transparent"}  # CustomTkinter's "no fill" sentinel
+    seen = set()
+    for ln in color_audit.run_rg(color_audit.SCAN_COMMANDS["widget"]):
+        if entry := color_audit.parse_line(ln):
+            seen |= set(re.findall(
+                r"""(?:fg|hover|text|border|button|progress|selected|highlight)"""
+                r"""_color=["']([A-Za-z]+[0-9]*)["']""", entry.snippet))
+    assert seen, "no bare-word colour in the widget scan; this would be vacuous"
+    uncounted = sorted(
+        v for v in seen - not_colours
+        if not color_audit.NAMED_RE.search(f'"{v}"')
+    )
+    assert uncounted == [], (
+        f"these colour words are set on widgets but match no alternative in "
+        f"_NAMED_WORDS, so they reach no frequency table: {uncounted}. Add "
+        "them to the word list, or to not_colours above with a reason."
+    )
+
+
+def test_civm19_one_case_policy_across_both_named_scans_and_the_extractor():
+    """`-i` on one scan and not the other is a silent divergence."""
+    # `named` carried `-i`, `theme_files` carried none, and `NAMED_RE` is
+    # `(?i)`: a capitalised colour in a theme file would be extracted but
+    # never searched for. Latent on 2026-11-11 (every literal is lowercase),
+    # which is why only a written sample can show it.
+    def sees(scan, own_paths, sample_file, text):
+        sample_file.write_text(text, encoding="utf-8")
+        cmd = [a for a in color_audit.SCAN_COMMANDS[scan] if a not in own_paths]
+        return bool(color_audit.run_rg(cmd + [str(sample_file)]))
+
+    tmp = pathlib.Path(tempfile.mkdtemp())
+    line = 'x = {"fg_color": "GRAY20"}\n'
+    extracted = color_audit.NAMED_RE.search('"GRAY20"') is not None
+    verdicts = {
+        "named": sees("named", color_audit.UI_CODE_PATHS, tmp / "s.py", line),
+        "theme_files": sees("theme_files", ("themes",), tmp / "s.json", line),
+        "NAMED_RE": extracted,
+    }
+    assert len(set(verdicts.values())) == 1, (
+        f"the two named scans and the extractor disagree on case, as "
+        f"{{stage: sees GRAY20}}: {verdicts}. A value one stage sees and "
+        "another does not is counted inconsistently."
+    )
+
+
+def test_civm20_the_capped_frequency_table_says_how_much_it_hides():
+    """A top-N table that does not say N of M overstates itself."""
+    # The hex table ranks 20 of 244 distinct values under the heading "Hex
+    # top values:" (2026-11-11), against global rule 6's "N of M".
+    report = color_audit.build_report(color_audit.scan_all())
+    heading = next(
+        (ln for ln in report.splitlines() if ln.startswith("Hex top values")),
+        None,
+    )
+    shown = len(_frequency_rows(report, heading or ""))
+    # The distinct total comes from section 2, which gives every value its
+    # own heading -- not from the capped table, where it would equal `shown`
+    # and this assertion would pass on "20 of 20".
+    distinct = len(re.findall(r"^### `#[0-9a-fA-F]{3,6}`$", report, re.MULTILINE))
+    stated = re.match(r"^Hex top values \((\d+) of (\d+) distinct\):$", heading or "")
+    assert stated, (
+        f"the hex frequency heading is {heading!r}; it ranks {shown} of "
+        f"{distinct} distinct values and must say so (global rule 6)."
+    )
+    assert (int(stated.group(1)), int(stated.group(2))) == (shown, distinct), (
+        f"the hex heading claims {stated.group(1)} of {stated.group(2)}, but "
+        f"the table holds {shown} rows and the report {distinct} distinct "
+        "hex values."
+    )
+
+
+def test_civm21_every_occurrence_snippet_renders_as_one_code_span():
+    """A backtick in a snippet breaks the row it is wrapped into."""
+    # 10 of 1735 rows on 2026-11-11: `md_escape` escaped `|` and nothing
+    # else, so a snippet quoting a colour in backticks ended its own span.
+    report = color_audit.build_report(color_audit.scan_all())
+    broken = []
+    for ln in report.splitlines():
+        if m := re.match(r"^\| `[^`]+:\d+` \| (.*) \|$", ln):
+            span = m.group(1)
+            fence = len(span) - len(span.lstrip("`"))
+            body = span[fence:-fence] if fence else span
+            if not fence or not span.endswith("`" * fence) or "`" * fence in body:
+                broken.append(span[:60])
+    assert broken == [], (
+        f"{len(broken)} occurrence rows do not render as a single code span, "
+        f"so the table breaks where they sit: {broken[:3]}"
+    )
+
+
 def test_civm15_gray_scale_literals_reach_the_named_tables():
     """CustomTkinter's grays are colours, and NAMED_PATTERN must see them.
 
@@ -471,9 +612,9 @@ def test_civm15_gray_scale_literals_reach_the_named_tables():
     lines holding one, 527 of them theme lines with no other colour
     (2026-11-11). Only the two scans feeding the named tables are asserted,
     since ``widget`` already lists a ``fg_color=("gray70", ...)`` line while
-    keeping its values out of the ranked table. One probe per tree: rg honours
-    ``.gitignore``'s ``!themes/*.json`` whitelist only when ``themes`` is the
-    sole search path -- 532 lines alone, 1 beside ``src``.
+    keeping its values out of the ranked table. One probe per tree, because
+    each tree needs its own ``-g``: a positive glob overrides ``.gitignore``,
+    which is what makes ``themes/*.json`` searchable at all.
     """
     gray = r"""["']gr[ae]y[0-9]{1,3}["']"""
     want = {
@@ -499,18 +640,22 @@ def test_civm15_gray_scale_literals_reach_the_named_tables():
     # extraction regex are separate, and a line can be returned while its
     # value is dropped. Measured 2026-11-11, the state this caught: all 527
     # theme lines were returned and 0 of their values were ranked.
-    values = {
+    values: set[str] = {
         m.group(0).strip("\"'").lower()
         for cmd in (color_audit._rg(gray, *color_audit.UI_CODE_PATHS),
                     color_audit._rg(gray, "themes", "-g", "*.json"))
         for ln in color_audit.run_rg(cmd)
         for m in re.finditer(r"""["']gr[ae]y[0-9]{1,3}["']""", ln)
     }
-    tables = color_audit.build_report(color_audit.scan_all()).split("## 2)")[0]
-    absent = sorted(v for v in values if v not in tables)
+    # Parsed from the value column, not searched as a substring: `gray1`,
+    # `gray2` and `gray4` all occur inside `| `gray100` | 18 |`, so a
+    # substring check passed for three values that had no row (2026-11-11).
+    report = color_audit.build_report(color_audit.scan_all())
+    ranked = {v.lower() for v, _ in _frequency_rows(report, "Named top values:")}
+    absent = sorted(values - ranked)
     assert absent == [], (
-        f"{len(absent)} of {len(values)} distinct gray-scale values are "
-        f"missing from the frequency tables a reader ranks by: {absent[:5]}"
+        f"{len(absent)} of {len(values)} distinct gray-scale values have no "
+        f"row in the named frequency table a reader ranks by: {absent[:5]}"
     )
 
 
@@ -520,11 +665,11 @@ def test_civm16_the_search_pattern_and_the_extractor_agree():
     `NAMED_PATTERN` searches, `NAMED_RE` extracts the value for the frequency
     tables. They were separate literals until 2026-11-11, when the gray-scale
     fix to the first left the second on bare words: all 527 theme lines were
-    returned and 0 of their 30 values were ranked. Both now derive from
+    returned and none of their values were ranked. Both now derive from
     `_NAMED_WORDS`, and this holds them to it word by word.
     """
     words = color_audit._NAMED_WORDS.split("|")
-    assert len(words) == 12, f"word list is {len(words)} long, expected 12"
+    assert len(words) == 13, f"word list is {len(words)} long, expected 13"
     broken = {}
     for w in words:
         sample = w.replace("[0-9]{0,3}", "42")
