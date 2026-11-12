@@ -420,6 +420,11 @@ def test_wt_m1c3_both_creation_paths_report_collisions(tmp_path):
         status_label=SimpleNamespace(configure=lambda **kw: calls.append(kw["text"])),
         _describe_week_creation=describe,
     )
+    # VTF-M3.4 folded the four lines this method used to hold into
+    # `_create_tactic_for`, shared with the Add New dialog, so the drop path's
+    # stub has to carry it bound (case (b): one write, two callers).
+    stub._create_tactic_for = WeeklyItemsScreen._create_tactic_for.__get__(
+        stub, WeeklyItemsScreen)
     # UPD-M5 moved the drag machinery to screens/row_drag.py; what a dropped
     # row *means* is still the screen's and is still this method. The stub
     # members that only faked the press, the pointer and the descendant walk
@@ -462,6 +467,11 @@ def test_wt_m1c3_drag_reports_a_stale_ape_instead_of_a_traceback(tmp_path):
         refresh=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
     )
+    # VTF-M3.4 folded the four lines this method used to hold into
+    # `_create_tactic_for`, shared with the Add New dialog, so the drop path's
+    # stub has to carry it bound (case (b): one write, two callers).
+    stub._create_tactic_for = WeeklyItemsScreen._create_tactic_for.__get__(
+        stub, WeeklyItemsScreen)
     WeeklyItemsScreen._assign_dragged_row(stub, {"id": "ape-gone"})
     assert any("Could not create" in s for s in said if isinstance(s, str)), said
     assert "refresh" not in said, "a refused create must not claim a redraw"

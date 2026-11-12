@@ -254,36 +254,67 @@ def test_apcm23_save_reports_refused_assignments():
     assert "1 reported assigned but are not in M11" in said, said
 
 
-def test_apcm23_save_button_reaches_the_reporting():
+def test_apcm23_the_add_path_reaches_the_reporting():
     """APC-M2.3 — the wiring, not just the wording (P25).
 
-    Asserting the message in isolation would pass with a Save that never calls
-    it, which is what the screen did before this change: no status surface at
-    all, so a refusal looked exactly like a success.
+    Asserting the message in isolation would pass with a write path that never
+    calls it, which is what this screen did before APC-M2.3: no status surface
+    at all, so a refusal looked exactly like a success.
+
+    VTF-M4 removed the header Save this used to drive and put an Add New
+    dialog under the right panel in its place, so the path is one row at a
+    time now — case (b), the behaviour changed on purpose. Both ends of the
+    new path are asserted, because either one alone leaves the promise unmet:
+    ``_perform_add`` reconciles and returns the sentence, and
+    ``open_add_dialog`` is what hands that method and the status line to the
+    dialog. The dialog's own ``on_confirm`` -> ``report`` link is the one hop
+    no test can reach without putting a window on screen; it is VTF-N2 on the
+    manual walk.
     """
+    from src.getmoredone.screens import ape_period_view
     from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen
 
     said = []
     stub = SimpleNamespace(
         _parse_period=lambda: (2026, 4, 11),
-        left_checks={"ape-ok": SimpleNamespace(get=lambda: True),
-                     "ape-bad": SimpleNamespace(get=lambda: True)},
+        left_items=[{"id": "ape-bad", "segment_name": "S"}],
+        left_checks={},
+        # `_add_default` reads the ticks through the dropdowns, so the three
+        # filter variables the left panel is drawn through have to be here.
+        segment_filter_var=SimpleNamespace(get=lambda: "All"),
+        subsegment_filter_var=SimpleNamespace(get=lambda: "All"),
+        category_filter_var=SimpleNamespace(get=lambda: "All"),
         vps_manager=SimpleNamespace(
             assign_ape_to_month=lambda ape_id, *_a: ape_id == "ape-ok"
         ),
         refresh_lists=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
-        right_items=[{"id": "ape-ok"}],
+        right_items=[],
         _describe_month_assignment=APEPeriodViewScreen._describe_month_assignment,
     )
-    _bind(stub, APEPeriodViewScreen, "_assign_one", "_ids_in_month")
+    _bind(stub, APEPeriodViewScreen, "_assign_one", "_ids_in_month",
+          "_filtered_rows", "_visible_left_items", "_ticked_ape_ids",
+          "_add_options", "_add_default", "_perform_add", "open_add_dialog")
 
-    APEPeriodViewScreen.add_selected(stub)
+    outcome = APEPeriodViewScreen._perform_add(stub, "ape-bad")
 
-    assert "refresh" in said
-    assert any("1 could not be assigned" in s for s in said if isinstance(s, str)), said
+    assert "refresh" in said, "a refused assignment must still redraw the panel"
+    assert "1 could not be assigned" in outcome, outcome
 
+    # The dialog is the only caller of _perform_add, so the sentence reaches
+    # the user only if open_add_dialog passes both the write and the status
+    # line. The stand-in records what it was given instead of opening a window.
+    captured = {}
+    original = ape_period_view.open_pick_record_dialog
+    ape_period_view.open_pick_record_dialog = lambda _parent, **kw: captured.update(kw)
+    try:
+        stub.open_add_dialog()
+    finally:
+        ape_period_view.open_pick_record_dialog = original
 
+    assert captured.get("on_confirm") == stub._perform_add, captured.get("on_confirm")
+    captured["report"]("reported it")
+    assert said[-1] == "reported it", said
 def test_apcm23_drag_path_reaches_the_same_reporting():
     """APC-M2.3 — the drop target reports too (P5: fix the siblings).
 
@@ -715,55 +746,43 @@ def test_apcm32_the_real_month_combobox_holds_only_that_quarters_months(tmp_path
 # --------------------------------------------------------------------------
 
 def test_apcm24_a_raising_assignment_is_counted_not_escaped():
-    """APC-M2.4 — a raise is reported, not allowed out of the loop.
+    """APC-M2.4 — a raise is reported, not allowed out of the write path.
 
     ``assign_ape_to_month`` does not only return ``False``: it raises
     ``ValueError`` when an APE's ``segment_name`` resolves to no segment. The
-    first version of the reporting loop had no ``try``, so the raise skipped
-    both ``refresh_lists`` and the status update and left the previous press's
+    first version of this path had no ``try``, so the raise skipped both
+    ``refresh_lists`` and the status update and left the previous press's
     "Assigned N APE(s)" on screen — a success message for a save that half
-    happened. Three checked, the middle one raising: the line must say two.
+    happened.
+
+    VTF-M4 made the path one row per press (case (b)), so the count is one
+    rather than three; the axis under test is the same one — the raise reaches
+    neither the redraw nor the sentence unless ``_assign_one`` catches it.
     """
     from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen
 
     said = []
-    written = []
 
     def assign(ape_id, _quarter, _month):
-        if ape_id == "ape-raises":
-            raise ValueError("Segment 'Gone' not found.")
-        written.append(ape_id)
-        return True
+        raise ValueError("Segment 'Gone' not found.")
 
     stub = SimpleNamespace(
         _parse_period=lambda: (2026, 4, 11),
-        left_checks={
-            "ape-one": SimpleNamespace(get=lambda: True),
-            "ape-raises": SimpleNamespace(get=lambda: True),
-            "ape-two": SimpleNamespace(get=lambda: True),
-        },
         vps_manager=SimpleNamespace(assign_ape_to_month=assign),
         refresh_lists=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
-        # The raising APE wrote nothing, so the month holds only the two that
-        # succeeded -- "refused", not "partly assigned".
-        right_items=[{"id": "ape-one"}, {"id": "ape-two"}],
+        # The raising APE wrote nothing, so the month holds nothing --
+        # "could not be assigned", not "partly assigned".
+        right_items=[],
         _describe_month_assignment=APEPeriodViewScreen._describe_month_assignment,
     )
     _bind(stub, APEPeriodViewScreen, "_assign_one", "_ids_in_month")
 
-    APEPeriodViewScreen.add_selected(stub)
+    outcome = APEPeriodViewScreen._perform_add(stub, "ape-raises")
 
-    assert written == ["ape-one", "ape-two"], (
-        f"the APEs that did not raise must still be written, got {written}"
-    )
     assert "refresh" in said, "a raise must not skip the redraw"
-    message = [s for s in said if isinstance(s, str) and s != "refresh"]
-    assert message, f"a raise must not skip the status line, got {said}"
-    assert "Assigned 2 APE(s) to M11." in message[-1], message
-    assert "1 could not be assigned" in message[-1], message
-
-
+    assert outcome.startswith("Assigned 0 APE(s) to M11."), outcome
+    assert "1 could not be assigned" in outcome, outcome
 def test_apcm44_month_lookup_guard_refuses_junk_and_normalises_a_float(tmp_path):
     """APC-M4.4 — the junk a caller can reach this with is refused, not raised on.
 
@@ -876,29 +895,43 @@ def test_apcm62_quarter_save_reports_refused_assignments():
     )
 
 
-def test_apcm62_quarter_save_with_nothing_checked_says_so():
-    """APC-M6.2 — the same sentence APE Month gives, not silence."""
+def test_apcm62_quarter_add_with_nothing_to_add_says_so():
+    """APC-M6.2 — the press that can write nothing says so, not silence.
+
+    The header Save this drove refused an empty tick set with a sentence.
+    VTF-M4 removed that button (case (b)); the same promise now sits on the
+    Add New dialog's refusal, which is the one path that opens no window at
+    all — ``open_pick_record_dialog`` reports and returns ``None`` when there
+    is nothing to offer, so this test drives the real dialog function.
+    """
     from src.getmoredone.screens.ape_assignment import APEAssignmentScreen
 
     said = []
     stub = SimpleNamespace(
         _parse_period=lambda: (2026, 4),
-        left_checks={"ape-1": SimpleNamespace(get=lambda: False)},
+        left_items=[],
+        left_checks={},
+        # `_add_default` reads the ticks through the dropdowns, so the three
+        # filter variables the left panel is drawn through have to be here.
+        segment_filter_var=SimpleNamespace(get=lambda: "All"),
+        subsegment_filter_var=SimpleNamespace(get=lambda: "All"),
+        category_filter_var=SimpleNamespace(get=lambda: "All"),
         vps_manager=SimpleNamespace(
-            assign_ape_to_quarter=lambda *_a: pytest.fail("nothing was checked")
+            assign_ape_to_quarter=lambda *_a: pytest.fail("there was nothing to add")
         ),
         refresh_lists=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
         right_items=[],
         _describe_quarter_assignment=APEAssignmentScreen._describe_quarter_assignment,
     )
-    _bind(stub, APEAssignmentScreen, "_assign_one", "_ids_in_quarter")
+    _bind(stub, APEAssignmentScreen, "_assign_one", "_ids_in_quarter",
+          "_filtered_rows", "_visible_left_items", "_ticked_ape_ids",
+          "_add_options", "_add_default", "_perform_add", "open_add_dialog")
 
-    APEAssignmentScreen.add_selected(stub)
-
-    assert said == ["Check one or more APEs on the left first."], said
-
-
+    assert stub.open_add_dialog() is None, "no window opens when nothing can be added"
+    assert said == [
+        "Every Annual Plan Element for this year is already in Q4."
+    ], said
 def test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped():
     """APC-M6.2 — the sibling screen, hardened on the same axis (P5).
 
@@ -906,45 +939,33 @@ def test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped():
     write paths and had no status surface at all, while the month screen was
     hardened on exactly this axis in the same change. The class is four paths
     across two screens, not two paths on one.
+
+    VTF-M4 made the button path one row per press (case (b)); the raise is
+    still the input, and the redraw and the sentence are still what it must
+    not skip.
     """
     from src.getmoredone.screens.ape_assignment import APEAssignmentScreen
 
     said = []
-    written = []
 
-    def assign(ape_id, _quarter):
-        if ape_id == "ape-raises":
-            raise ValueError("Segment 'Gone' not found.")
-        if ape_id == "ape-refused":
-            return False
-        written.append(ape_id)
-        return True
+    def assign(_ape_id, _quarter):
+        raise ValueError("Segment 'Gone' not found.")
 
     stub = SimpleNamespace(
         _parse_period=lambda: (2026, 4),
-        left_checks={
-            "ape-one": SimpleNamespace(get=lambda: True),
-            "ape-raises": SimpleNamespace(get=lambda: True),
-            "ape-refused": SimpleNamespace(get=lambda: True),
-        },
         vps_manager=SimpleNamespace(assign_ape_to_quarter=assign),
         refresh_lists=lambda: said.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
-        right_items=[{"id": "ape-one"}],
+        right_items=[],
         _describe_quarter_assignment=APEAssignmentScreen._describe_quarter_assignment,
     )
     _bind(stub, APEAssignmentScreen, "_assign_one", "_ids_in_quarter")
 
-    APEAssignmentScreen.add_selected(stub)
+    outcome = APEAssignmentScreen._perform_add(stub, "ape-raises")
 
-    assert written == ["ape-one"], written
     assert "refresh" in said, "a raise must not skip the redraw"
-    message = [s for s in said if isinstance(s, str) and s != "refresh"]
-    assert message, f"a raise must not skip the status line, got {said}"
-    assert "Assigned 1 APE(s) to Q4." in message[-1], message
-    assert "2 could not be assigned" in message[-1], message
-
-
+    assert outcome.startswith("Assigned 0 APE(s) to Q4."), outcome
+    assert "1 could not be assigned" in outcome, outcome
 def test_apcm62_quarter_drag_path_reaches_the_same_reporting():
     """APC-M6.2 — the drop target reports too, as the month screen's does.
 
@@ -1026,6 +1047,9 @@ def test_apcm25_a_half_written_assignment_is_reported_as_partial(tmp_path):
     reaches the segment lookup that raises. Both halves are asserted — the row
     really is in M11, and the call really did fail — because a fixture that
     only fails is the one that cannot catch this.
+
+    VTF-M4 moved the press from the header Save to the Add New dialog's write
+    (case (b)); the reconciliation is the same code and the same evidence.
     """
     from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen
 
@@ -1047,7 +1071,6 @@ def test_apcm25_a_half_written_assignment_is_reported_as_partial(tmp_path):
     said = []
     stub = SimpleNamespace(
         _parse_period=lambda: (2026, 4, 11),
-        left_checks={ape_id: SimpleNamespace(get=lambda: True)},
         vps_manager=vps,
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
         right_items=[],
@@ -1060,17 +1083,13 @@ def test_apcm25_a_half_written_assignment_is_reported_as_partial(tmp_path):
     )
     _bind(stub, APEPeriodViewScreen, "_assign_one", "_ids_in_month")
 
-    APEPeriodViewScreen.add_selected(stub)
+    outcome = APEPeriodViewScreen._perform_add(stub, ape_id)
 
-    assert said, "the press must leave a status line"
     assert ape_id in {row["id"] for row in stub.right_items}, (
         "the half-written row must be in the panel for this test to mean anything"
     )
-    assert said[-1].startswith("Assigned 0 APE(s) to M11."), said[-1]
-    assert "1 partly assigned — in M11 with no month tactic behind it" in said[-1], said[-1]
-    assert "could not be assigned" not in said[-1], said[-1]
-
-
+    assert outcome.startswith("Assigned 0 APE(s) to M11."), outcome
+    assert "1 partly assigned — in M11 with no month tactic behind it" in outcome, outcome
 def test_apcm26_a_failed_remove_is_reported():
     """APC-M2.6 — Remove reports against the row, in all three outcomes.
 
@@ -1135,7 +1154,8 @@ def test_apcm63_a_half_written_quarter_assignment_is_reported_as_partial(tmp_pat
 
     ``assign_ape_to_quarter`` commits the quarter flag and only then raises on
     a segment it cannot resolve, so this screen had the fault in its plainest
-    form: one write, one raise, and the row in the panel either way.
+    form: one write, one raise, and the row in the panel either way. VTF-M4
+    moved the press to the Add New dialog's write (case (b)).
     """
     from src.getmoredone.screens.ape_assignment import APEAssignmentScreen
 
@@ -1156,7 +1176,6 @@ def test_apcm63_a_half_written_quarter_assignment_is_reported_as_partial(tmp_pat
     said = []
     stub = SimpleNamespace(
         _parse_period=lambda: (2026, 4),
-        left_checks={ape_id: SimpleNamespace(get=lambda: True)},
         vps_manager=vps,
         status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
         right_items=[],
@@ -1167,17 +1186,14 @@ def test_apcm63_a_half_written_quarter_assignment_is_reported_as_partial(tmp_pat
     )
     _bind(stub, APEAssignmentScreen, "_assign_one", "_ids_in_quarter")
 
-    APEAssignmentScreen.add_selected(stub)
+    outcome = APEAssignmentScreen._perform_add(stub, ape_id)
 
-    assert said, "the press must leave a status line"
     assert ape_id in {row["id"] for row in stub.right_items}, (
         "the half-written row must be in the panel for this test to mean anything"
     )
-    assert said[-1].startswith("Assigned 0 APE(s) to Q4."), said[-1]
-    assert "1 partly assigned — in Q4 with no quarter initiative behind it" in said[-1], said[-1]
-    assert "could not be assigned" not in said[-1], said[-1]
-
-
+    assert outcome.startswith("Assigned 0 APE(s) to Q4."), outcome
+    assert "1 partly assigned — in Q4 with no quarter initiative behind it" in outcome, outcome
+    assert "could not be assigned" not in outcome, outcome
 def test_apcm64_a_failed_quarter_remove_is_reported():
     """APC-M6.4 — the quarter screen's Remove reports too, in all three outcomes.
 

@@ -87,10 +87,20 @@ it. Test file: `tests/test_ape_period_consistency.py` unless stated.
 |---|---|---|
 | APC-M2.1 | `assign_ape_to_month(ape, 1, 11)` returns `False` and writes **nothing** (`q1` and `m11` unchanged) | `test_apcm21_mismatched_quarter_and_month_is_refused_and_writes_nothing` |
 | APC-M2.2 | A consistent pair still succeeds — `assign_ape_to_month(ape, 4, 11)` is `True` | `test_apcm22_matching_quarter_and_month_still_assigns` |
-| APC-M2.3 | The Month screen's Save reports a refusal instead of silently skipping it (P2 — surface, never drop) | `test_apcm23_save_reports_refused_assignments` |
-| APC-M2.4 | A raising assignment is counted as refused, not allowed out of the loop: the APEs that did not raise are still written, the redraw still happens, and the line says how many | `test_apcm24_a_raising_assignment_is_counted_not_escaped` |
-| APC-M2.5 | The Save line is computed from the rows the panel is drawn from, not from the call's boolean, and names all four states: assigned, partly assigned (the call failed and the month holds the row anyway), could not be assigned, and reported assigned but not in the month | `test_apcm25_a_half_written_assignment_is_reported_as_partial`, `test_apcm23_save_reports_refused_assignments` |
+| APC-M2.3 | The Month screen's write path reports a refusal instead of silently skipping it (P2 — surface, never drop) | `test_apcm23_save_reports_refused_assignments` |
+| APC-M2.4 | A raising assignment is counted as refused, not allowed out of the write path: the redraw still happens and the line says how many | `test_apcm24_a_raising_assignment_is_counted_not_escaped` |
+| APC-M2.5 | The status line is computed from the rows the panel is drawn from, not from the call's boolean, and names all four states: assigned, partly assigned (the call failed and the month holds the row anyway), could not be assigned, and reported assigned but not in the month | `test_apcm25_a_half_written_assignment_is_reported_as_partial`, `test_apcm23_save_reports_refused_assignments` |
 | APC-M2.6 | The Month screen's **Remove** reports against the row too, in all three outcomes: removed, still in the month, and out of the month with the call reporting a problem | `test_apcm26_a_failed_remove_is_reported` |
+
+**2026-11-11 — the button these criteria were written against is gone.**
+VTF-M4 removed the header Save from this screen and from APE Quarter: the
+tick on the left is a filter now, so a Save that read the ticks had nothing
+to read. Every promise above moved to the Add New dialog's write,
+`_perform_add`, which assigns one row per press rather than every ticked
+row; the reconciliation, the `except` arm and the four states are the same
+code. The tests keep their APC ids and are listed below under their new
+names. See
+`docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md`.
 
 ### APC-M3 — the pickers cannot produce an invalid pair
 
@@ -146,9 +156,12 @@ and leaving it means the two APE screens disagree about what quarter you are in.
 | ID | Criterion | Test |
 |---|---|---|
 | APC-M6.1 | APE Quarter's Quarter picker opens on the current calendar quarter | `test_apcm61_quarter_screen_defaults_to_current_quarter` |
-| APC-M6.2 | APE Quarter reports what Save did on **both** its write paths, says so when nothing is checked, and counts a raise as refused rather than letting it escape | `test_apcm62_quarter_save_reports_refused_assignments`, `test_apcm62_quarter_save_with_nothing_checked_says_so`, `test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped`, `test_apcm62_quarter_drag_path_reaches_the_same_reporting` |
-| APC-M6.3 | APE Quarter's Save line is computed from the rows, not the boolean, with the same four states as APC-M2.5 | `test_apcm63_a_half_written_quarter_assignment_is_reported_as_partial` |
+| APC-M6.2 | APE Quarter reports what each of its write paths did, says so when there is nothing to add, and counts a raise as refused rather than letting it escape | `test_apcm62_quarter_save_reports_refused_assignments`, `test_apcm62_quarter_add_with_nothing_to_add_says_so`, `test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped`, `test_apcm62_quarter_drag_path_reaches_the_same_reporting` |
+| APC-M6.3 | APE Quarter's status line is computed from the rows, not the boolean, with the same four states as APC-M2.5 | `test_apcm63_a_half_written_quarter_assignment_is_reported_as_partial` |
 | APC-M6.4 | APE Quarter's **Remove** reports against the row, in the same three outcomes as APC-M2.6 | `test_apcm64_a_failed_quarter_remove_is_reported` |
+
+The 2026-11-11 note under the APC-M2 table applies here too: this screen's
+header Save is gone, and what it promised is the Add New dialog's.
 
 APC-M6.2 came out of the sweep, not the plan. `_describe_month_assignment`'s
 docstring claimed the reporting class was covered because both of the *Month*
@@ -243,7 +256,7 @@ only the one the suite happens to run in.
 | APC-M1.4 | done, changed — see §5.1 | `WeeklyItemsScreen._selected_week_context`; `test_apcm14_week_context_carries_no_derived_quarter` |
 | APC-M2.1 | done | `VPSManager.assign_ape_to_month`; `test_apcm21_mismatched_quarter_and_month_is_refused_and_writes_nothing`, `test_apcm21_every_mismatched_pair_is_refused` |
 | APC-M2.2 | done | `test_apcm22_matching_quarter_and_month_still_assigns` |
-| APC-M2.3 | done | `APEPeriodViewScreen._describe_month_assignment`; `test_apcm23_save_reports_refused_assignments`, `test_apcm23_save_button_reaches_the_reporting`, `test_apcm23_drag_path_reaches_the_same_reporting` |
+| APC-M2.3 | done | `APEPeriodViewScreen._describe_month_assignment`; `test_apcm23_save_reports_refused_assignments`, `test_apcm23_the_add_path_reaches_the_reporting`, `test_apcm23_drag_path_reaches_the_same_reporting` |
 | APC-M2.4 | done, from the sweep — see §5.8 | `APEPeriodViewScreen._assign_one`; `test_apcm24_a_raising_assignment_is_counted_not_escaped` |
 | APC-M2.5 | done, from the re-sweep — see §5.11 | `APEPeriodViewScreen._ids_in_month`, `_describe_month_assignment`; `test_apcm25_a_half_written_assignment_is_reported_as_partial` |
 | APC-M2.6 | done, from the re-sweep — see §5.11 | `APEPeriodViewScreen._remove_one`, `delete_month_item`; `test_apcm26_a_failed_remove_is_reported` |
@@ -261,7 +274,7 @@ only the one the suite happens to run in.
 | APC-M5.4 | done, from the sweep — see §5.8 | `VPSSchema._repair_orphan_month_flags`; `test_apcm54_the_repair_reports_every_row_it_changed` |
 | APC-M5.5 | done, from the re-sweep — see §5.11 | `VPSSchema._repair_orphan_month_flags`; `test_apcm55_the_repair_log_reaches_a_handler` |
 | APC-M6.1 | done | `src/getmoredone/screens/ape_assignment.py`; `test_apcm61_quarter_screen_defaults_to_current_quarter` |
-| APC-M6.2 | done, from the sweep — see §5.8 | `APEAssignmentScreen._assign_one`, `_describe_quarter_assignment`, `status_label`; `test_apcm62_quarter_save_reports_refused_assignments`, `test_apcm62_quarter_save_with_nothing_checked_says_so`, `test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped`, `test_apcm62_quarter_drag_path_reaches_the_same_reporting` |
+| APC-M6.2 | done, from the sweep — see §5.8 | `APEAssignmentScreen._assign_one`, `_describe_quarter_assignment`, `status_label`; `test_apcm62_quarter_save_reports_refused_assignments`, `test_apcm62_quarter_add_with_nothing_to_add_says_so`, `test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped`, `test_apcm62_quarter_drag_path_reaches_the_same_reporting` |
 | APC-M6.3 | done, from the re-sweep — see §5.11 | `APEAssignmentScreen._ids_in_quarter`, `_describe_quarter_assignment`; `test_apcm63_a_half_written_quarter_assignment_is_reported_as_partial` |
 | APC-M6.4 | done, from the re-sweep — see §5.11 | `APEAssignmentScreen._remove_one`, `delete_quarter_item`; `test_apcm64_a_failed_quarter_remove_is_reported` |
 

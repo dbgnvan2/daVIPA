@@ -1804,13 +1804,19 @@ def test_updm56_both_panels_still_say_when_they_are_empty():
         root.destroy()
 
 
-def test_updm54_the_selection_buttons_act_on_the_selection():
-    """UPD-M5.4 — Edit Weekly Tactic and Add Action Item stay, and still warn.
+def test_updm54_the_bottom_row_is_one_add_and_the_selection_still_works():
+    """UPD-M5.4, as VTF-M5 left it: one button below the list.
 
-    They act on the *selected* tactic and have no per-row equivalent in the
-    image, so UPD-D5 keeps them below the list. Both warn when nothing is
-    selected; a rewrite that left them wired to a stale index would warn on a
-    screen that does have a selection, which is what the second half checks.
+    UPD-M5.4 kept Edit Weekly Tactic, Delete Weekly and Add Action Item below
+    the list because they act on the *selected* tactic. The user withdrew all
+    three on 2026-11-11: the first two were second routes to the row's own
+    double-click and Delete, and the third created an Action Item this panel
+    cannot show. **Add Weekly Tactic** is what sits there now (VTF-M5.4).
+
+    What UPD-M5.4 still asserts is the half that survives: selecting a row
+    sets both the item and the index, and `open_selected_weekly_item` -- now
+    reached by double-click rather than by a button -- still warns when there
+    is no selection instead of opening an editor on nothing.
     """
     import src.getmoredone.screens.weekly_items as wi
 
@@ -1821,13 +1827,11 @@ def test_updm54_the_selection_buttons_act_on_the_selection():
     try:
         actions_bar = [c for c in screen.right_frame.winfo_children()
                        if c.grid_info() and int(c.grid_info()["row"]) == 1][0]
-        assert _button_texts(actions_bar) == [
-            "Edit Weekly Tactic", "Delete Weekly", "Add Action Item"]
+        assert _button_texts(actions_bar) == ["Add Weekly Tactic"]
 
         screen.selected_weekly_item = None
         screen.open_selected_weekly_item()
-        screen.create_action_item_for_selected_weekly()
-        assert warned == ["No Weekly Item Selected", "No Weekly Item Selected"]
+        assert warned == ["No Weekly Item Selected"]
 
         screen.on_select_weekly_item(0)
         assert screen.selected_weekly_item["id"] == "wt-1"
@@ -3153,12 +3157,17 @@ def test_updf25_the_status_line_moved_below_the_filters(tmp_path):
     verbatim: UPD-F2 moves rows, and a control that disappeared in the move
     would otherwise go unnoticed.
     """
+    # VTF-M4.1 took the Save off four of these headers: it read the ticks,
+    # and the ticks are a filter now. Each tab creates records from an Add
+    # New button under its right panel instead, which
+    # tests/test_vsp_tab_contracts.py asserts. Load, This Week and Refresh
+    # stay where they were (VTF-M4.2), which is what this set still pins.
     expected_buttons = {
-        "ape_quarter": ["Load", "Save", "Refresh"],
-        "ape_month": ["Load", "Save", "Refresh"],
-        "week_assignment": ["Load", "This Week", "Save", "Refresh"],
+        "ape_quarter": ["Load", "Refresh"],
+        "ape_month": ["Load", "Refresh"],
+        "week_assignment": ["Load", "This Week", "Refresh"],
         "week_actions": ["Load", "This Week"],
-        "annual_vision": ["Load Year", "Save", "Refresh"],
+        "annual_vision": ["Load Year", "Refresh"],
     }
     for name, build, has_filters in _FILTER_TABS:
         root, screen = build(tmp_path)

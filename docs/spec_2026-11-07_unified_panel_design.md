@@ -282,7 +282,7 @@ layout it had before the change.
 | M5.1 | The right panel renders a header of `#`, Segment, SubSegment, Category, Actions | `test_updm51_right_panel_has_the_actions_column` |
 | M5.2 | Each right row carries a Delete button that deletes that row's tactic | `test_updm52_row_delete_removes_that_tactic` |
 | M5.3 | Delete asks first, and a refused confirmation deletes nothing | `test_updm53_delete_is_confirmed_before_it_happens` |
-| M5.4 | `Edit Weekly Tactic` and `Add Action Item` still act on the selected tactic | `test_updm54_selection_buttons_still_work` |
+| M5.4 | The selection still drives the editor and the delete. **Superseded in part by VTF-M5 on 2026-11-11**: `Edit Weekly Tactic`, `Delete Weekly` and `Add Action Item` are off this tab, so the bottom row is `Add Weekly Tactic` alone | `::test_updm54_the_bottom_row_is_one_add_and_the_selection_still_works` |
 | M5.5 | The left header's first cell is empty, not "Pick" | `test_updm55_left_header_matches_the_other_tabs` |
 | M5.6 | Both panels use the shared table, with their own prefixes | `test_updm56_week_assignment_uses_the_shared_table` |
 | M5.7 | Selection tint and double-click-to-open survive the rewrite | `test_updm57_selection_and_double_click_survive` |
@@ -641,7 +641,7 @@ characters where it showed 15, and Category 14.
 | M5.1 | `done` | `::test_updm51_right_panel_has_the_actions_column`. The right panel had four columns and three buttons in a bar below the list; it has five columns now, with the row's Delete in the Actions one. |
 | M5.2 | `done` | `::test_updm52_a_row_delete_removes_that_row_not_the_selection`. Driven with a *different* row selected, because a per-row button wired to `delete_selected_weekly_item` would look right and delete the wrong tactic. |
 | M5.3 | `done` | `::test_updm53_delete_is_confirmed_before_it_happens`, which refuses the confirmation from both entry points and asserts nothing was deleted. |
-| M5.4 | `done` | `::test_updm54_the_selection_buttons_act_on_the_selection` and `::test_updm54_delete_weekly_still_deletes_the_selection`. |
+| M5.4 | `done`, superseded in part on 2026-11-11 | `::test_updm54_the_bottom_row_is_one_add_and_the_selection_still_works` and `::test_updm54_delete_weekly_still_deletes_the_selection`. VTF-M5 took the three bottom buttons off this tab — two were second routes to the row's own controls and the third created a record the panel cannot show — so what is asserted now is the one bottom button plus the selection the editor and the delete still read. |
 | M5.5 | `done` | `::test_updm55_left_header_matches_the_other_tabs`, asserted as text *and* pixels: a cell that was merely blanked would leave every row's cells one place to the right of the other tabs'. |
 | M5.6 | `done` | `::test_updm56_week_assignment_uses_the_shared_table_and_module_wiring`, `::..._columns_resize_and_persist`, `::..._the_week_assignment_prefixes_have_settings_fields`, `::..._a_left_row_is_a_drag_source_on_this_tab_too`, `::..._both_panels_still_say_when_they_are_empty`, `::..._a_row_with_no_category_colour_takes_the_subsegments`. |
 | M5.7 | `done` | `::test_updm57_clicking_a_right_row_selects_it_and_double_click_opens_it` and `::test_updm57_selecting_a_row_repaints_the_panel_instead_of_stacking_it`. |
