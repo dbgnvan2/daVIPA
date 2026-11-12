@@ -70,8 +70,8 @@ class AppSettings:
     # holds the mapping from priority_levels.LEVEL_KEYS to these names in both
     # directions.
     #
-    # "" means no fill — the row keeps the theme's own background, which is
-    # what a row with no high or critical factor has always had. It is not a
+    # "" means no fill — the Priority cell keeps the row's own background,
+    # which is what an item with no high or critical factor has. It is not a
     # stand-in for "unset": there is no such state, and the Restore Defaults
     # button is how a default comes back.
     #

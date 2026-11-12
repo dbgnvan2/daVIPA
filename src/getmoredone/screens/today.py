@@ -489,8 +489,9 @@ class TodayScreen(ctk.CTkFrame):
             segment_color=segment_color,
         )
         bg_color = fill.fill
-        # None from row_fill means "leave the theme's row text alone"; only a
-        # priority-level fill brings a text colour of its own (PLC-M4.4).
+        # None from row_fill means "leave the theme's row text alone". A
+        # *segment* fill is now the only source that brings a text colour of
+        # its own; a priority level stopped filling rows in PCC-M1.
         row_text = fill.text_color or palette["row_text"]
 
         frame = ctk.CTkFrame(self.scroll_frame, fg_color=bg_color)

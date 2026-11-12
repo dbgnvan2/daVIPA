@@ -380,7 +380,7 @@ def priority_fill_colors() -> Dict[str, str]:
 
 
 def priority_level_fill_colors() -> Dict[str, str]:
-    """PLC-M2 — the default row tint for each of the three priority *levels*.
+    """PLC-M2 — the default colour each of the three priority *levels* draws.
 
     Purpose: the one place the shipped level colours are written down.
     Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m2
@@ -390,8 +390,9 @@ def priority_level_fill_colors() -> Dict[str, str]:
     ``priority_score`` — see ``priority_levels`` for why the two are kept
     apart. These are only the defaults: the user sets their own in
     Settings → Priority Colours, and ``priority_levels.level_color`` prefers
-    theirs. The empty string is "no fill", which is what rows with no high or
-    critical factor have always had.
+    theirs. The empty string is "no fill": since PCC-M1 (2026-11-11) that
+    means an uncoloured Priority cell, which is what an item with no high or
+    critical factor has.
 
     **One value per level, not one per theme**, unlike every other table in
     this module. A colour the user picks in a colour chooser cannot have a
@@ -399,10 +400,11 @@ def priority_level_fill_colors() -> Dict[str, str]:
     different in the two appearance modes would be worse than one that does
     the same thing in both. The consequence — a pale fill needs dark text, in
     either mode — is handled where the fill is applied:
-    ``priority_levels.row_fill`` derives the row's text colour from the fill
-    with ``pick_text_color`` rather than leaving the theme's ``row_text`` on
-    it. Both defaults below are held to 4.5:1 against that picked text in both
-    modes by
+    ``priority_levels.fill_for_level`` derives the Priority cell's text colour
+    from the fill with ``pick_text_color`` rather than leaving the theme's
+    ``row_text`` on it. (It was ``row_fill`` and the whole row until PCC-M1,
+    2026-11-11, moved these three colours to the cell.) Both defaults
+    below are held to 4.5:1 against that picked text in both modes by
     ``tests/test_priority_level_colors.py::test_plcm46_default_level_colours_are_legible_in_both_themes``.
 
     Green for Any Critical is the user's choice, asked for directly and

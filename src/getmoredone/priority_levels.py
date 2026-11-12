@@ -1,8 +1,9 @@
 """Which priority *level* an action item is in, and what colour that level draws.
 
-Purpose: one place decides the three priority levels and the row tint each one
-         takes, so the five list screens cannot drift apart and the user can
-         recolour them from Settings.
+Purpose: one place decides the three priority levels and the colour each one
+         draws, so the five list screens cannot drift apart and the user can
+         recolour them from Settings. Since PCC-M1 (2026-11-11) that colour
+         is the Priority cell's background, not a row tint.
 Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m1
 Tests:   tests/test_priority_level_colors.py
 
@@ -72,8 +73,9 @@ LEVEL_LABELS: Dict[str, str] = {
 #: ``AppSettings`` holds one colour field per level, named with this prefix.
 SETTINGS_FIELD_PREFIX = "priority_level_color_"
 
-# Where a row's fill came from. The screens need this: only a level fill brings
-# its own text colour with it (see ``RowFill.text_color``).
+# Where a fill came from. Kept for ``row_control_kwargs``, which asks whether a
+# fill brought its own text colour; no screen reads it directly. Since PCC-M1 a
+# *row* fill is never ``SOURCE_LEVEL`` -- only a Priority cell's is.
 SOURCE_SEGMENT = "segment"
 SOURCE_COMPLETED = "completed"
 SOURCE_LEVEL = "level"
@@ -220,13 +222,14 @@ def _warn_unreadable_segment_color(value: Any) -> None:
 def row_control_kwargs(fill: "RowFill") -> Dict[str, str]:
     """Widget options that keep a row's controls legible on its fill.
 
-    Purpose: PLC-M4.9 -- ``priority_level_fill_colors`` is one value per level
-             with no light/dark branch, so in dark mode a level fill is a
-             *light* colour. A row's checkbox and drag grip take their colours
-             from the theme, which in dark mode means light-on-light: the
-             checkbox border measures about 2.6:1 against the shipped green,
-             under the 3:1 bar for a non-text control. PLC-M4.4 fixed the row
-             text and left the controls behind.
+    Purpose: PLC-M4.9 -- a row fill with no light/dark branch is a *light*
+             colour in dark mode, while a row's checkbox and drag grip take
+             their colours from the theme: light-on-light, with the checkbox
+             border at about 2.6:1, under the 3:1 bar for a non-text control.
+             PLC-M4.4 fixed the row text and left the controls behind.
+             The motivating case was a priority-level fill; since PCC-M1 the
+             only row fill that derives a text colour is a VSP segment's, and
+             that is the live case this serves.
     Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m4
     Tests:   tests/test_priority_level_colors.py::test_lrr_cold_a_segment_fill_carries_its_controls_too,
              ::test_plc_cold_the_three_screens_with_row_controls_pass_the_kwargs
