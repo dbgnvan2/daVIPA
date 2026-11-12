@@ -147,11 +147,14 @@ def two_tone_theme():
     ``test_pbga4`` and ``test_pbga7`` passed locally and failed on CI, on the
     same commit.
 
-    The pair those two tests are about cannot exist on a flat theme, which is
-    PBG-A11 and is counted by ``tests/test_time_block_colors.py``'s
-    ``test_pbga11_two_bundled_themes_have_one_surface_where_the_app_wants_two``.
-    Pinning a two-tone theme is what makes the assertion here deterministic
-    and able to fail.
+    Every bundled theme is two-tone since SEP-M1, which
+    ``tests/test_time_block_colors.py``'s
+    ``test_sepm2_no_bundled_theme_has_one_surface_where_the_app_wants_two``
+    holds to. ``apple_grey`` and ``black_white`` were flat until then, and the
+    pair these two tests are about cannot exist on a flat theme. The pin stays
+    anyway, because what it buys is determinism against load order rather than
+    an escape from those two: an assertion that depends on which theme ran
+    first is not evidence either way.
     """
     import copy
 
@@ -1233,10 +1236,10 @@ def test_pbga7_a_chip_is_not_the_colour_of_the_box_it_sits_in(
     in boxes of different colours, so one assertion per kind would pass for a
     chip pinned to either token.
 
-    ``two_tone_theme`` because the two tokens are one colour on two of the ten
-    bundled themes, where no choice between them can give the chip an edge
-    (PBG-A11). Without it this test measured whichever theme the suite had
-    left loaded.
+    ``two_tone_theme`` so the theme is pinned rather than inherited: without
+    it this test measured whichever theme the suite had left loaded. Two of
+    the ten bundled themes made the two tokens one colour until SEP-M1, where
+    no choice between them could give the chip an edge; none does now.
     """
     item = _scored_item(manager, "Draft the proposal")
     task = _item_block()
@@ -3225,9 +3228,9 @@ def test_pbga4_an_item_row_is_not_the_colour_of_the_pane_behind_it(
     So this measures them against each other, through ``PlanScreen``: a row
     built on a bare root has no pane to be the same colour as.
 
-    ``two_tone_theme`` for the reason ``test_pbga7`` gives: on ``apple_grey``
-    and ``black_white`` the two tokens are one colour, and the row has no edge
-    there whatever the code does (PBG-A11).
+    ``two_tone_theme`` for the reason ``test_pbga7`` gives. ``apple_grey`` and
+    ``black_white`` made the two tokens one colour until SEP-M1, and the row
+    had no edge there whatever the code did.
     """
     item = _scored_item(manager, "Draft the proposal")
     panel = PlanScreen(root, manager, _App(settings))
