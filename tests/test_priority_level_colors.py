@@ -52,6 +52,8 @@ from src.getmoredone.priority_levels import (
     SOURCE_NONE,
     SOURCE_SEGMENT,
     RowFill,
+    fill_for_level,
+    level_cell_fill,
     level_color,
     priority_color_rows,
     priority_level,
@@ -617,90 +619,11 @@ def test_plcm36_create_tabs_adds_the_priority_colours_tab():
 # PLC-M4 — the fill the five screens draw
 # =========================================================================
 
-def test_plcm41_a_row_takes_its_level_colour():
-    """PLC-M4.1 — each level draws its own colour, from settings."""
-    settings = AppSettings()
-    critical = row_fill(
-        settings, PALETTE, item=_item(CRITICAL, LOW), use_completed_tint=False
-    )
-    high = row_fill(
-        settings, PALETTE, item=_item(HIGH, LOW), use_completed_tint=False
-    )
-    assert critical.fill == settings.priority_level_color_any_critical
-    assert critical.source == SOURCE_LEVEL
-    assert high.fill == settings.priority_level_color_any_high
-    assert high.source == SOURCE_LEVEL
-    assert critical.fill != high.fill
-
-    # And it follows the setting, not a constant.
-    settings.priority_level_color_any_critical = "#010203"
-    assert row_fill(
-        settings, PALETTE, item=_item(CRITICAL, LOW), use_completed_tint=False
-    ).fill == "#010203"
-
-
-def test_plcm42_segment_and_completed_still_win():
-    """PLC-M4.2 — precedence is unchanged: segment, then completed, then level."""
-    settings = AppSettings()
-    item = _item(CRITICAL, CRITICAL)
-
-    segment = row_fill(
-        settings, PALETTE, item=item, use_completed_tint=False,
-        segment_color="#445566",
-    )
-    assert segment.fill == "#445566"
-    assert segment.source == SOURCE_SEGMENT
-
-    done = row_fill(settings, PALETTE, item=item, use_completed_tint=True)
-    assert done.fill == PALETTE["success_tint"]
-    assert done.source == SOURCE_COMPLETED
-
-    # A segment colour outranks the completed tint too, as it always has.
-    both = row_fill(
-        settings, PALETTE, item=item, use_completed_tint=True,
-        segment_color="#445566",
-    )
-    assert both.source == SOURCE_SEGMENT
-
-
-def test_plcm43_an_unset_level_means_no_fill():
-    """PLC-M4.3 — no fill is ``None``, which is what ``fg_color`` wants.
-
-    Not ``""``: Tk rejects the empty string as a colour, so returning it would
-    turn "no fill" into a raised ``TclError`` in the middle of a row build.
-    """
-    settings = AppSettings()
-    plain = row_fill(
-        settings, PALETTE, item=_item(MEDIUM, MEDIUM), use_completed_tint=False
-    )
-    assert plain.fill is None
-    assert plain.source == SOURCE_NONE
-
-    settings.priority_level_color_any_critical = ""
-    cleared = row_fill(
-        settings, PALETTE, item=_item(CRITICAL, LOW), use_completed_tint=False
-    )
-    assert cleared.fill is None
-    assert cleared.source == SOURCE_NONE
-
-
-def test_plcm44_level_fill_text_clears_the_contrast_bar():
-    """PLC-M4.4 — a level fill brings its own, legible, text colour.
-
-    This is what a single hex per level costs and how it is paid for: a pale
-    green fill in the dark theme would otherwise keep the theme's near-white
-    ``row_text``. Asserted over colours across the whole range, not only the
-    two defaults, because the user can pick anything.
-    """
-    settings = AppSettings()
-    for colour in ("#DCFCE7", "#FEF3C7", "#000000", "#FFFFFF", "#7F7F7F", "#450A0A"):
-        settings.priority_level_color_any_critical = colour
-        fill = row_fill(
-            settings, PALETTE, item=_item(CRITICAL, LOW), use_completed_tint=False
-        )
-        assert fill.text_color is not None
-        ratio = contrast_ratio(fill.fill, fill.text_color)
-        assert ratio >= MIN_TEXT_CONTRAST, f"{colour} -> {fill.text_color} is {ratio:.2f}"
+# ``test_plcm41_a_row_takes_its_level_colour`` was here. **Retired on
+# 2026-11-11 because the behaviour changed intentionally** (PCC-M1): it
+# asserted the row tint the user asked to remove. Replaced by
+# ``test_pccm1_a_level_no_longer_fills_a_row``, not rewritten in place, because
+# a test whose name contradicts its body is worse than no test.
 
 
 def test_plcm45_a_non_priority_fill_leaves_row_text_alone():
@@ -719,11 +642,9 @@ def test_plcm45_a_non_priority_fill_leaves_row_text_alone():
     What survives here is the rest of PLC-M4.5, unchanged and still true: a
     fill the *theme* chose keeps the text colour the theme designed for it.
     """
-    settings = AppSettings()
-    item = _item(CRITICAL, CRITICAL)
     for fill in (
-        row_fill(settings, PALETTE, item=item, use_completed_tint=True),
-        row_fill(settings, PALETTE, item=_item(LOW, LOW), use_completed_tint=False),
+        row_fill(PALETTE, use_completed_tint=True),
+        row_fill(PALETTE, use_completed_tint=False),
     ):
         assert fill.text_color is None, fill
 
@@ -749,12 +670,7 @@ def test_plcm46_default_level_colours_are_legible_in_both_themes(restore_appeara
             assert text is not None, (level, colour)
             settings = AppSettings()
             setattr(settings, settings_field_name(level), colour)
-            fill = row_fill(
-                settings,
-                PALETTE,
-                item=_item(CRITICAL if level == LEVEL_ANY_CRITICAL else HIGH, LOW),
-                use_completed_tint=False,
-            )
+            fill = fill_for_level(settings, level)
             ratio = contrast_ratio(fill.fill, fill.text_color)
             assert ratio >= MIN_TEXT_CONTRAST, f"{mode} {level}: {ratio:.2f}"
     assert seen[0] == seen[1]
@@ -873,12 +789,7 @@ def test_plcm4_a_completed_row_in_all_items_still_uses_the_status_check():
     """PLC-M4.2 — All Items decides "completed" from the status, as before."""
     settings = AppSettings()
     item = _item(CRITICAL, LOW, status=Status.COMPLETED)
-    fill = row_fill(
-        settings,
-        PALETTE,
-        item=item,
-        use_completed_tint=item.status == Status.COMPLETED,
-    )
+    fill = row_fill(PALETTE, use_completed_tint=item.status == Status.COMPLETED)
     assert fill.source == SOURCE_COMPLETED
     assert fill.fill == PALETTE["success_tint"]
 
@@ -1001,34 +912,11 @@ def test_plc_cold_a_bad_colour_cannot_be_saved_from_the_entry():
         assert stub.handed_to_app == 0, raw
 
 
-def test_plcm49_controls_follow_a_level_fill():
-    """PLC-M4.9 — a row's controls stay legible on a level fill.
-
-    ``priority_level_fill_colors`` has no dark variant, by design: a colour the
-    user picked cannot have one. So in dark mode a Critical row is light while
-    the theme's checkbox and grip colours are light too — the checkbox border
-    measures about 2.6:1 against the shipped green, under the 3:1 bar for a
-    non-text control. PLC-M4.4 fixed the row text and left these behind.
-    """
-    settings = AppSettings()
-    for level in (LEVEL_ANY_CRITICAL, LEVEL_ANY_HIGH):
-        colour = priority_level_fill_colors()[level]
-        fill = RowFill(colour, pick_text_color(colour), SOURCE_LEVEL)
-        kwargs = row_control_kwargs(fill)
-        assert set(kwargs) == {"border_color", "fg_color", "checkmark_color"}
-        assert kwargs["border_color"] == fill.text_color
-        assert kwargs["checkmark_color"] == colour
-        # 3:1 is the WCAG bar for a non-text control; this clears it because
-        # text_color already clears 4.5:1 against the same fill.
-        assert contrast_ratio(kwargs["border_color"], colour) >= 3.0
-
-    # A fill that brings no text colour leaves the theme's controls alone, so a
-    # completed row looks exactly as it did before.
-    assert row_control_kwargs(RowFill(PALETTE["success_tint"], None,
-                                      SOURCE_COMPLETED)) == {}
-    assert row_control_kwargs(RowFill(None, None, SOURCE_NONE)) == {}
-    # And so does a segment colour nobody could read a contrast from.
-    assert row_control_kwargs(RowFill("navy", None, SOURCE_SEGMENT)) == {}
+# ``test_plcm49_controls_follow_a_level_fill`` was here. **Retired on
+# 2026-11-11 because the behaviour changed intentionally** (PCC-M1). It built
+# its ``RowFill`` by hand, so it would have stayed green while guarding a state
+# no row can reach. ``row_control_kwargs`` is unchanged and still covered for
+# segment fills by ``test_lrr_cold_a_segment_fill_carries_its_controls_too``.
 
 
 def test_plc_cold_the_three_screens_with_row_controls_pass_the_kwargs():
@@ -1157,8 +1045,7 @@ def test_lrrm21_a_segment_fill_carries_its_own_text_colour():
     item = _item(CRITICAL, CRITICAL)
     for colour in ("#DCFCE7", "#FEF3C7", "#445566", "#000000", "#FFFFFF"):
         fill = row_fill(
-            settings, PALETTE, item=item, use_completed_tint=False,
-            segment_color=colour,
+            PALETTE, use_completed_tint=False, segment_color=colour,
         )
         assert fill.source == SOURCE_SEGMENT
         assert fill.fill == colour
@@ -1178,8 +1065,7 @@ def test_lrrm22_the_segment_text_colour_follows_the_fill():
 
     def text_for(colour):
         return row_fill(
-            settings, PALETTE, item=item, use_completed_tint=False,
-            segment_color=colour,
+            PALETTE, use_completed_tint=False, segment_color=colour,
         ).text_color
 
     pale = text_for("#F8FAFC")
@@ -1215,16 +1101,14 @@ def test_lrrm21_an_unreadable_segment_colour_keeps_the_themes_text():
     item = _item(MEDIUM, MEDIUM)
     for colour in ("navy", "red", "not-a-colour", "#GGHHII"):
         fill = row_fill(
-            settings, PALETTE, item=item, use_completed_tint=False,
-            segment_color=colour,
+            PALETTE, use_completed_tint=False, segment_color=colour,
         )
         assert fill.source == SOURCE_SEGMENT
         assert fill.text_color is None, f"{colour} -> {fill.text_color}"
 
     # A three-digit hex is a form the normaliser accepts, so it is derived.
     short = row_fill(
-        settings, PALETTE, item=item, use_completed_tint=False,
-        segment_color="#ABC",
+        PALETTE, use_completed_tint=False, segment_color="#ABC",
     )
     assert short.text_color == pick_text_color("#AABBCC")
 
@@ -1247,10 +1131,9 @@ def test_lrrm23_the_completed_tint_keeps_the_themes_text_colour():
     settings = AppSettings()
     item = _item(CRITICAL, CRITICAL)
 
-    done = row_fill(settings, PALETTE, item=item, use_completed_tint=True)
+    done = row_fill(PALETTE, use_completed_tint=True)
     segment = row_fill(
-        settings, PALETTE, item=item, use_completed_tint=True,
-        segment_color="#DCFCE7",
+        PALETTE, use_completed_tint=True, segment_color="#DCFCE7",
     )
     assert done.source == SOURCE_COMPLETED
     assert segment.source == SOURCE_SEGMENT
@@ -1327,26 +1210,35 @@ def test_lrrm11_no_screen_tests_importance_against_a_literal():
     )
 
 
-def _chip_condition(builder):
-    """The row builder's own ``is_priority_critical`` expression, compiled.
+def _cell_fill_expression(builder):
+    """The row builder's own Priority-cell ``RowFill``, compiled.
 
-    Returns a one-argument callable that evaluates the *real* expression from
-    the screen's source against an item, in that screen module's own globals.
-    So this is not a source-text assertion standing in for behaviour: the
-    screen's condition is what runs, and it resolves the same names it will
-    resolve at runtime.
+    Returns a callable that evaluates the *real* expression from the screen's
+    source against an item, in that screen module's own globals. So this is not
+    a source-text assertion standing in for behaviour: the screen's own call is
+    what runs, and it resolves the same names it will resolve at runtime.
 
-    Needed because the condition is a local inside a several-hundred-line
+    Needed because the expression is a local inside a several-hundred-line
     builder that cannot be called without a Tk root, a ``DatabaseManager``, a
     scroll frame and four lineage caches. Lifting the one expression out is a
     far smaller fiction than a stub of all of that.
+
+    **Retargeted on 2026-11-11 (PCC-M3)** from the local
+    ``is_priority_critical``, which the cell no longer keeps: it takes a colour
+    rather than a flag, so the expression to evaluate is the ``level_cell_fill``
+    call that replaced it. ``self`` is bound to a stand-in carrying only
+    ``settings``, which is all the expression reads off it.
     """
-    values = local_assignments(builder, "is_priority_critical")
-    assert len(values) == 1, f"is_priority_critical assigned {len(values)} times"
+    values = local_assignments(builder, "cell")
+    assert len(values) == 1, f"`cell` assigned {len(values)} times"
     expression = ast.fix_missing_locations(ast.Expression(body=values[0]))
-    code = compile(expression, "<chip-condition>", "eval")
+    code = compile(expression, "<cell-fill>", "eval")
     module_globals = vars(inspect.getmodule(builder))
-    return lambda item: eval(code, module_globals, {"item": item})  # noqa: S307
+    return lambda item, settings: eval(  # noqa: S307
+        code,
+        module_globals,
+        {"item": item, "self": SimpleNamespace(settings=settings)},
+    )
 
 
 def test_lrrm12_an_off_scale_critical_is_still_critical():
@@ -1377,12 +1269,25 @@ def test_lrrm12_an_off_scale_critical_is_still_critical():
     assert priority_level_for_item(ordinary) == LEVEL_ANY_CRITICAL
     assert priority_level_for_item(not_critical) != LEVEL_ANY_CRITICAL
 
+    # Asked of the cell's colour since PCC-M3, not of a boolean: same
+    # question, same four inputs.
+    settings = AppSettings()
+    critical_colour = settings.priority_level_color_any_critical
+    assert critical_colour, "Any Critical ships with a colour; this test needs one"
     for name, builder in ROW_BUILDERS:
-        is_critical = _chip_condition(builder)
-        assert is_critical(off_scale), f"{name}: importance {CRITICAL + 5} is not critical"
-        assert is_critical(stringly), f"{name}: importance '20' is not critical"
-        assert is_critical(ordinary), f"{name}: an ordinary critical item is not critical"
-        assert not is_critical(not_critical), f"{name}: a medium item is critical"
+        cell_fill = _cell_fill_expression(builder)
+        for item, label in (
+            (off_scale, f"importance {CRITICAL + 5}"),
+            (stringly, "importance '20'"),
+            (ordinary, "an ordinary critical item"),
+        ):
+            assert cell_fill(item, settings).fill == critical_colour, (
+                f"{name}: {label} does not colour the cell as critical"
+            )
+        # A medium item gets no cell colour at all, not merely a different one.
+        assert cell_fill(not_critical, settings).fill is None, (
+            f"{name}: a medium item colours the cell"
+        )
 
 
 # =========================================================================
@@ -1460,7 +1365,7 @@ def _factor_chip_condition(builder):
     Found by its effect rather than by its text: the one ``if`` in the builder
     whose body writes ``label_kwargs["fg_color"]``. Returns a callable taking
     the loop's own two names, so the screen's real condition runs against
-    adversarial factors -- the same approach as ``_chip_condition``, and for
+    adversarial factors -- the same approach as ``_cell_fill_expression``, and for
     the same reason: the condition sits inside a ``for`` over a list of
     four-tuples in a builder that cannot be called without a Tk root.
     """
@@ -1552,8 +1457,7 @@ def test_lrr_cold_a_segment_fill_carries_its_controls_too():
     item = _item(MEDIUM, MEDIUM)
     for colour in ("#DCFCE7", "#334155", "#F8FAFC", "#0F172A"):
         fill = row_fill(
-            settings, PALETTE, item=item, use_completed_tint=False,
-            segment_color=colour,
+            PALETTE, use_completed_tint=False, segment_color=colour,
         )
         kwargs = row_control_kwargs(fill)
         assert set(kwargs) == {"border_color", "fg_color", "checkmark_color"}, colour
@@ -1590,8 +1494,7 @@ def test_scvm41_a_malformed_segment_colour_does_not_become_a_fill():
 
     def fill_for(colour):
         return row_fill(
-            settings, PALETTE, item=item, use_completed_tint=False,
-            segment_color=colour,
+            PALETTE, use_completed_tint=False, segment_color=colour,
         )
 
     for colour in ("navy", "red", "not-a-colour", "#GGHHII", "#0X1234",
@@ -1608,3 +1511,410 @@ def test_scvm41_a_malformed_segment_colour_does_not_become_a_fill():
         assert fill.source == SOURCE_SEGMENT, typed
         assert fill.fill == normalised, typed
         assert fill.text_color == pick_text_color(normalised), typed
+
+
+# =========================================================================
+# PCC-M1 to PCC-M5 — the scheme moves from the row to the Priority cell
+#
+# Spec: docs/unused-docs/implementation_plan_2026-11-11_priority_cell_colour.md
+#
+# Before 2026-11-11 a level tinted the whole row and the Priority cell was
+# ``palette["danger"]`` -- a hard red reachable from no setting. The two have
+# swapped: the level colour is the cell's background, and a row with no segment
+# colour and no completion keeps the theme's own background.
+# =========================================================================
+
+#: The Priority cell's expected ``ctk.CTkLabel`` colour options, as
+#: ``ast.unparse`` renders them. Text and not a shape, so a swapped attribute
+#: or a dropped fallback fails -- ``None`` is a colour Tk rejects.
+EXPECTED_CELL_OPTIONS = {
+    "fg_color": "cell.fill or 'transparent'",
+    "text_color": "cell.text_color or row_text",
+    "corner_radius": "6 if cell.fill else 0",
+}
+
+#: The same, for a critical I/U factor chip.
+EXPECTED_CHIP_OPTIONS = {
+    "fg_color": "critical_chip.fill or 'transparent'",
+    "text_color": "critical_chip.text_color or row_text",
+    "corner_radius": "6",
+}
+
+
+def _label_calls_using(builder, name):
+    """Every ``ctk.CTkLabel`` call in ``builder`` that mentions ``name``.
+
+    Each is returned as ``{keyword: source text}``. Found by effect rather than
+    by position, for the reason ``_factor_chip_condition`` gives: these calls
+    sit inside loops in builders that cannot run without a Tk root.
+    """
+    tree = ast.parse(textwrap.dedent(inspect.getsource(builder)))
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not (isinstance(func, ast.Attribute) and func.attr == "CTkLabel"):
+            continue
+        if name not in {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}:
+            continue
+        found.append({kw.arg: ast.unparse(kw.value) for kw in node.keywords})
+    return found
+
+
+def _factor_chip_options(builder):
+    """What the critical-chip branch writes into ``label_kwargs``.
+
+    The same branch ``_factor_chip_condition`` finds, read for its assignments
+    instead of its test.
+    """
+    tree = ast.parse(textwrap.dedent(inspect.getsource(builder)))
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.If):
+            continue
+        written = {}
+        for statement in node.body:
+            if (
+                isinstance(statement, ast.Assign)
+                and isinstance(target := statement.targets[0], ast.Subscript)
+                and isinstance(target.value, ast.Name)
+                and target.value.id == "label_kwargs"
+                and isinstance(target.slice, ast.Constant)
+            ):
+                written[target.slice.value] = ast.unparse(statement.value)
+        if "fg_color" in written:
+            found.append(written)
+    assert len(found) == 1, f"found {len(found)} fg_color branches, not 1"
+    return found[0]
+
+
+def _danger_subscripts(builder):
+    """Every ``…["danger"]`` read inside ``builder``, as source text."""
+    tree = ast.parse(textwrap.dedent(inspect.getsource(builder)))
+    return [
+        ast.unparse(node)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Subscript)
+        and isinstance(node.slice, ast.Constant)
+        and node.slice.value == "danger"
+    ]
+
+
+def test_pccm1_a_level_no_longer_fills_a_row():
+    """PCC-M1 — a priority level is not one of ``row_fill``'s branches.
+
+    Replaces ``test_plcm41_a_row_takes_its_level_colour``, whose claim this
+    reverses. ``text_color`` is asserted as well as ``fill``: a row keeping a
+    derived text colour without its fill draws black text on the theme's own
+    background.
+    """
+    settings = AppSettings()
+    for importance in (CRITICAL, HIGH):
+        fill = row_fill(PALETTE, use_completed_tint=False)
+        assert fill.fill is None, f"importance {importance} still fills the row"
+        assert fill.text_color is None
+        assert fill.source == SOURCE_NONE
+        # And the level's colour is set, so this is not passing by accident.
+        assert level_color(settings, priority_level(importance, LOW))
+
+
+def test_pccm1_segment_and_completed_still_fill_a_row():
+    """PCC-M1 — precedence is now segment, then completed, then nothing.
+
+    Rewritten from ``test_plcm42_segment_and_completed_still_win`` by dropping
+    its third, level clause; what it said about these two is unchanged.
+    """
+    segment = row_fill(PALETTE, use_completed_tint=False, segment_color="#445566")
+    assert segment.fill == "#445566"
+    assert segment.source == SOURCE_SEGMENT
+
+    done = row_fill(PALETTE, use_completed_tint=True)
+    assert done.fill == PALETTE["success_tint"]
+    assert done.source == SOURCE_COMPLETED
+
+    # A segment colour outranks the completed tint too, as it always has.
+    both = row_fill(PALETTE, use_completed_tint=True, segment_color="#445566")
+    assert both.source == SOURCE_SEGMENT
+
+    plain = row_fill(PALETTE, use_completed_tint=False)
+    assert plain.fill is None
+    assert plain.source == SOURCE_NONE
+
+
+def test_pccm1_row_fill_no_longer_takes_the_settings_or_the_item():
+    """PCC-M1 — the two parameters it needed only to reach the level are gone.
+
+    ``row_fill(self.settings, palette, item=item, …)`` read as though the row
+    still depended on the item's priority. Asserted on the signature, so
+    restoring either parameter fails here.
+    """
+    parameters = inspect.signature(row_fill).parameters
+    assert list(parameters) == ["palette", "use_completed_tint", "segment_color"]
+    assert "item" not in parameters
+    assert "settings" not in parameters
+
+
+def test_pccm2_the_priority_cell_takes_its_level_colour():
+    """PCC-M2 — each level's cell colour comes from settings, not a constant."""
+    settings = AppSettings()
+    critical = level_cell_fill(settings, _item(CRITICAL, LOW))
+    high = level_cell_fill(settings, _item(HIGH, LOW))
+    assert critical.fill == settings.priority_level_color_any_critical
+    assert critical.source == SOURCE_LEVEL
+    assert high.fill == settings.priority_level_color_any_high
+    assert high.source == SOURCE_LEVEL
+    assert critical.fill != high.fill
+
+    # And it follows the setting, not a constant.
+    settings.priority_level_color_any_critical = "#010203"
+    assert level_cell_fill(settings, _item(CRITICAL, LOW)).fill == "#010203"
+
+    # ``fill_for_level`` is the same answer asked by level rather than by item.
+    assert fill_for_level(settings, LEVEL_ANY_CRITICAL).fill == "#010203"
+    assert fill_for_level(settings, LEVEL_ANY_HIGH) == high
+
+
+def test_pccm2_an_unset_level_means_no_cell_fill():
+    """PCC-M2 — no fill is ``None``, and it brings no text colour with it.
+
+    Moved from ``test_plcm43_an_unset_level_means_no_fill``. Not ``""``: Tk
+    rejects the empty string, turning "no fill" into a ``TclError`` mid-build.
+    ``text_color is None`` is the clause the cell adds -- an uncoloured cell on
+    a segment-filled row must keep the colour that row derived.
+    """
+    settings = AppSettings()
+    plain = level_cell_fill(settings, _item(MEDIUM, MEDIUM))
+    assert plain.fill is None
+    assert plain.text_color is None
+    assert plain.source == SOURCE_NONE
+
+    settings.priority_level_color_any_critical = ""
+    cleared = level_cell_fill(settings, _item(CRITICAL, LOW))
+    assert cleared.fill is None
+    assert cleared.text_color is None
+    assert cleared.source == SOURCE_NONE
+
+
+def test_pccm2_the_cell_text_clears_the_contrast_bar():
+    """PCC-M2 — a cell fill brings its own, legible, text colour.
+
+    Moved from ``test_plcm44_level_fill_text_clears_the_contrast_bar`` with the
+    same six colours: what ``AGENTS.md`` requires of a data colour used as a
+    fill. Across the range, not only the defaults, since the user picks it.
+    """
+    settings = AppSettings()
+    for colour in ("#DCFCE7", "#FEF3C7", "#000000", "#FFFFFF", "#7F7F7F", "#450A0A"):
+        settings.priority_level_color_any_critical = colour
+        cell = level_cell_fill(settings, _item(CRITICAL, LOW))
+        assert cell.text_color is not None
+        ratio = contrast_ratio(cell.fill, cell.text_color)
+        assert ratio >= MIN_TEXT_CONTRAST, f"{colour} -> {cell.text_color} is {ratio:.2f}"
+
+
+def test_pccm3_every_priority_cell_calls_the_helper():
+    """PCC-M3 — exactly one ``level_cell_fill`` call in each of the five.
+
+    The total as well as the per-screen count, so dropping a screen from
+    ``ROW_BUILDERS`` cannot leave this green -- as ``test_plcm48`` does.
+    """
+    counts = {
+        name: count_calls(builder, "level_cell_fill") for name, builder in ROW_BUILDERS
+    }
+    assert counts == {name: 1 for name, _ in ROW_BUILDERS}
+    assert sum(counts.values()) == 5
+    assert len(ROW_BUILDERS) == 5
+
+
+def test_pccm3_the_cell_options_come_from_the_helper():
+    """PCC-M3 — the three colour options, by name, on all five screens.
+
+    Exact text, not a shape: ``fg_color=cell.text_color`` is a shape-correct
+    swap, and dropping a fallback yields ``None``, which Tk rejects mid-build.
+    """
+    for name, builder in ROW_BUILDERS:
+        calls = _label_calls_using(builder, "cell")
+        assert len(calls) == 1, f"{name}: {len(calls)} CTkLabel calls use `cell`"
+        options = calls[0]
+        for keyword, expected in EXPECTED_CELL_OPTIONS.items():
+            assert options.get(keyword) == expected, f"{name}: {keyword}"
+
+
+def test_pccm4_the_chip_options_come_from_the_level():
+    """PCC-M4 — a critical I/U chip is painted from the Any Critical colour.
+
+    Four screens; Hierarchical draws no factor row. The *condition* stays
+    exactly ``is_critical_factor(label, value)`` because
+    ``test_lrr_cold_the_factor_chips_ask_the_authority_too`` evals that
+    expression with only ``label`` and ``value`` bound, so a local name added
+    to it raises ``NameError`` there. Only the two colours changed.
+    """
+    assert len(FACTOR_CHIP_BUILDERS) == 4, FACTOR_CHIP_BUILDERS
+    for name, builder in FACTOR_CHIP_BUILDERS:
+        options = _factor_chip_options(builder)
+        assert options == EXPECTED_CHIP_OPTIONS, f"{name}: {options}"
+        assert count_calls(builder, "fill_for_level") == 1, name
+
+    # Hierarchical has no chips, so it must not ask for the chip colour either.
+    assert count_calls(hierarchical.HierarchicalScreen.create_item_row,
+                       "fill_for_level") == 0
+
+
+def test_pccm5_no_row_builder_reaches_for_the_danger_palette():
+    """PCC-M5 — the hard red is gone from all five row builders.
+
+    Count zero, scoped to the builder and not the file: ``button_style(
+    "danger")`` elsewhere in these screens is a legitimate delete button.
+    """
+    for name, builder in ROW_BUILDERS:
+        found = _danger_subscripts(builder)
+        assert found == [], f"{name} still reads {found}"
+
+
+#: The five screens and how to render one: module, class, and whether the items
+#: must be completed first. Completed queries ``get_completed_items``, so an
+#: open item is invisible to it and the render reports no rows at all.
+RENDER_TARGETS = (
+    ("today", "TodayScreen", False),
+    ("upcoming", "UpcomingScreen", False),
+    ("all_items", "AllItemsScreen", False),
+    ("hierarchical", "HierarchicalScreen", False),
+    ("completed", "CompletedScreen", True),
+)
+
+
+@pytest.fixture(scope="module")
+def rendered_rows():
+    """Every list screen's rows, as really built by CustomTkinter.
+
+    One subprocess per screen, run once for the module: five renders at about
+    two seconds each is worth paying once rather than per test. See
+    ``tests/render_priority_cells.py`` for why it is a subprocess at all, and
+    why no window is mapped.
+
+    Returns ``{module: [(row_fill, [(text, fg_color, text_color), ...]), ...]}``.
+    """
+    import subprocess
+    import sys
+
+    root = Path(__file__).resolve().parents[1]
+    helper = root / "tests" / "render_priority_cells.py"
+    rendered = {}
+    for module, screen_class, needs_completing in RENDER_TARGETS:
+        argv = [sys.executable, str(helper), module, screen_class]
+        if needs_completing:
+            argv.append("completed")
+        result = subprocess.run(
+            argv, capture_output=True, text=True, timeout=180, cwd=str(root)
+        )
+        # Only a *display* failure is a skip. A bare TclError is what a rejected
+        # widget option raises, which is part of what this is for, so skipping
+        # on it would hide the fault instead of reporting it -- the same
+        # distinction test_plcm3_the_section_builds_on_real_widgets draws.
+        if result.returncode != 0:
+            lowered = result.stderr.lower()
+            if "no display name" in lowered or "couldn't connect" in lowered:
+                pytest.skip(f"no display for {module}: {result.stderr[-200:]}")
+            pytest.fail(f"{module} failed to render:\n{result.stderr[-2000:]}")
+        rows = []
+        for line in result.stdout.splitlines():
+            if line.startswith("ROW "):
+                rows.append((line[4:], []))
+            elif line.startswith("LBL "):
+                text, fg_color, text_color = line[4:].split("|")
+                rows[-1][1].append((text, fg_color, text_color))
+        assert rows, f"{module} rendered no rows:\n{result.stdout}"
+        rendered[module] = rows
+    return rendered
+
+
+#: The three rendered items, by score. A score is the product of all four
+#: factors and deliberately not the level -- 400 is the ``high`` band while
+#: being "No high or critical" -- the distinction ``test_plcm14`` guards.
+RENDERED_SCORES = {
+    LEVEL_ANY_CRITICAL: 1600,
+    LEVEL_ANY_HIGH: 800,
+    LEVEL_NO_HIGH_OR_CRITICAL: 400,
+}
+
+
+def _cell_for(rows, score):
+    """The ``(fg_color, text_color)`` of the Priority cell showing ``score``.
+
+    All Items draws the bare number under a ``"Priority"`` header; the other
+    four draw ``P:n`` with no header (``PRI-A3``). Both spellings are accepted,
+    so one assertion covers all five screens.
+    """
+    for _row_fill, labels in rows:
+        for text, fg_color, text_color in labels:
+            if text in (f"P:{score}", str(score)):
+                return fg_color, text_color
+    raise AssertionError(f"no Priority cell for score {score}")
+
+
+def test_pccm3_a_rendered_priority_cell_carries_the_level_colour(rendered_rows):
+    """PCC-M3 — what CustomTkinter holds on the widget, on each of the five.
+
+    The other five-screen checks here are structural. This one builds the row
+    and reads the colour back, so it is the only one that catches a screen
+    drawing something other than the answer it was given. The expected values
+    are the shipped defaults: ``render_priority_cells`` points ``AppSettings``
+    at its own temporary file, not at the developer's saved colours.
+    """
+    defaults = priority_level_fill_colors()
+    for module, _screen_class, _needs_completing in RENDER_TARGETS:
+        rows = rendered_rows[module]
+        for level, score in RENDERED_SCORES.items():
+            fg_color, text_color = _cell_for(rows, score)
+            expected = defaults[level]
+            if expected:
+                assert fg_color == expected, f"{module} {level}: {fg_color}"
+                assert text_color == pick_text_color(expected), f"{module} {level}"
+            else:
+                # "No high or critical" ships with no fill, so the cell is
+                # transparent and keeps the row's own text colour.
+                assert fg_color == "transparent", f"{module} {level}: {fg_color}"
+                assert text_color != pick_text_color(defaults[LEVEL_ANY_CRITICAL])
+
+
+def test_pccm1_a_rendered_row_has_no_priority_tint(rendered_rows):
+    """PCC-M1 — the row frame itself, which is what the user asked about.
+
+    A critical row's frame was ``#DCFCE7`` across its width; every row now
+    keeps CustomTkinter's own frame colour, a light/dark pair and never a hex
+    string. Every rendered row is checked, so a tint fails here whichever of
+    the three levels kept it.
+    """
+    for module, _screen_class, _needs_completing in RENDER_TARGETS:
+        for row_fill_value, labels in rendered_rows[module]:
+            assert "#" not in row_fill_value, f"{module} row is tinted: {row_fill_value}"
+            assert labels, f"{module} reported a row with no labels"
+
+
+def test_pccm4_a_rendered_critical_chip_carries_the_level_colour(rendered_rows):
+    """PCC-M4 — the I/U factor chips, rendered, on the four screens with them.
+
+    ``I:20`` must carry the Any Critical colour. ``I:10`` is High, a level but
+    not a *critical factor*, so it stays plain; ``E`` and ``V`` are Size and
+    Value, in no level at all, and their clause is what stops this passing on
+    a condition that ignores the label.
+    """
+    expected = priority_level_fill_colors()[LEVEL_ANY_CRITICAL]
+    checked = 0
+    for module, _screen_class, _needs_completing in RENDER_TARGETS:
+        if module == "hierarchical":
+            continue  # draws no factor row
+        chips = {
+            text: (fg_color, text_color)
+            for _row_fill, labels in rendered_rows[module]
+            for text, fg_color, text_color in labels
+            if ":" in text and text.split(":")[0] in ("I", "U", "E", "V")
+        }
+        assert chips.get("I:20") == (expected, pick_text_color(expected)), (
+            f"{module}: I:20 is {chips.get('I:20')}"
+        )
+        assert chips["I:10"][0] == "transparent", f"{module}: I:10 is painted"
+        assert chips["E:4"][0] == "transparent", f"{module}: E:4 is painted"
+        assert chips["V:4"][0] == "transparent", f"{module}: V:4 is painted"
+        checked += 1
+    assert checked == 4, checked
