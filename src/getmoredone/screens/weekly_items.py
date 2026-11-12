@@ -60,7 +60,16 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         self.category_filter_var = ctk.StringVar(value="All")
 
         self.left_items: List[Dict[str, object]] = []
+        # What the right panel is showing. Three paths index it by row
+        # position -- selection, double-click-to-open, the selected tint --
+        # so it must stay in step with what is rendered, not with the week.
         self.right_items: List[Dict[str, object]] = []
+        # The week's tactics before the tick filter: the "of M" in the
+        # heading, and what the filter is applied to.
+        self.all_right_items: List[Dict[str, object]] = []
+        # The week the right panel is showing, so its heading does not have to
+        # re-read a selector that can be mid-edit.
+        self.shown_week_start = ""
         self.left_checks: dict[str, ctk.BooleanVar] = {}
         self.segment_colors = {}
         self.subsegment_colors = {}
@@ -277,6 +286,8 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         if not parsed:
             self.left_items = []
             self.right_items = []
+            self.all_right_items = []
+            self.shown_week_start = ""
             self._render_lists()
             self.status_label.configure(text="Choose a Week Start.")
             return
@@ -287,13 +298,24 @@ class WeeklyItemsScreen(ctk.CTkFrame):
 
         self._refresh_filter_options(self.left_items, all_weekly_items)
         self.left_items = [row for row in self.left_items if self._ape_matches_filters(row)]
-        self.right_items = [row for row in all_weekly_items if self._weekly_matches_filters(row)]
+        # VTF-M2.1 — the three dropdowns are the left panel's filter only.
+        # The right panel is filtered by the ticks (VTF-M1.4), applied in
+        # `_render_lists` after the checkboxes have been rebuilt.
+        self.all_right_items = list(all_weekly_items)
+        # Loading a week rebuilds every checkbox, so no tick survives it and
+        # the panel shows the whole week. Set here as well as in
+        # `_render_lists` so the status line below never reads the previous
+        # week's list.
+        self.right_items = list(all_weekly_items)
+        self.shown_week_start = week_start
 
         self.selected_weekly_idx = None
         self.selected_weekly_item = None
         self._render_lists()
-        self.left_title_label.configure(text=f"Month-assigned APEs for {year}-{month:02d}")
-        self.right_title_label.configure(text=f"Weekly Tactics for {week_start}")
+        self.left_title_label.configure(
+            text=f"Month-assigned APEs for {year}-{month:02d} "
+                 "(tick to filter the tactics on the right)")
+        self.right_title_label.configure(text=self._right_title())
         self.status_label.configure(text=f"{len(self.left_items)} month item(s) on left, {len(self.right_items)} weekly tactic(s) on right")
 
     def jump_to_current_week(self):
@@ -406,9 +428,75 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         return status
 
     def _render_lists(self):
+        """Render both panels, left first.
+
+        `_render_left_rows` rebuilds `left_checks` from scratch, so the right
+        panel's tick filter is applied after it: computing it first would
+        filter by the checkboxes of the render before this one.
+        """
         self.left_checks = {}
         self._render_left_rows()
+        self.right_items = self._visible_right_items()
         self._render_right_rows()
+
+    # ------------------------------------------------ the tick as a filter
+
+    def _ticked_ape_ids(self) -> set:
+        """The ids of the ticked rows the left panel is currently showing.
+
+        `left_items` is already narrowed by the dropdowns by the time it is
+        rendered, and `_render_lists` rebuilds every checkbox, so a dropdown
+        change clears the ticks with the rows: there is no tick here that the
+        user cannot see (VTF-M1.9).
+        """
+        visible = {row.get("id") for row in self.left_items}
+        return {
+            key for key, var in self.left_checks.items()
+            if key in visible and var.get()
+        }
+
+    def _visible_right_items(self) -> List[Dict[str, object]]:
+        """The week's tactics the current ticks allow.
+
+        A weekly tactic names its parent APE in `annual_plan_element_id`, so
+        ticking APEs on the left shows their tactics for the week (VTF-M1.4).
+        No tick is no filter (VTF-M1.5).
+        """
+        ticked = self._ticked_ape_ids()
+        if not ticked:
+            return list(self.all_right_items)
+        return [
+            row for row in self.all_right_items
+            if row.get("annual_plan_element_id") in ticked
+        ]
+
+    def refresh_right_panel(self):
+        """Re-render the right panel alone, from the ticks.
+
+        Purpose: VTF-M1.6 — the checkbox's own command, so a tick takes
+                 effect without Load Week or Refresh. The left panel is not
+                 re-rendered (VTF-M1.8); rebuilding it would destroy the
+                 checkbox that is mid-click and clear every tick.
+        Tests:   tests/test_vsp_tab_filters.py::test_vtfm14_the_week_tab_right_panel_follows_the_ticks
+
+        The selection is dropped: it is held as a row *index* into
+        `right_items`, so a filter that changes which rows are listed would
+        leave it pointing at a different tactic. APE Week Actions already
+        clears its right panel when a filter hides the selected tactic.
+        """
+        self.selected_weekly_idx = None
+        self.selected_weekly_item = None
+        self.right_items = self._visible_right_items()
+        self.right_title_label.configure(text=self._right_title())
+        self._render_right_rows()
+
+    def _right_title(self) -> str:
+        """The right panel's heading, which says when a filter is narrowing it."""
+        base = f"Weekly Tactics for {self.shown_week_start}"
+        if len(self.right_items) == len(self.all_right_items):
+            return base
+        return (f"{base} ({len(self.right_items)} of "
+                f"{len(self.all_right_items)}, filtered by tick)")
 
     @staticmethod
     def _show_list_or_message(list_frame, message, empty: bool) -> None:
@@ -465,7 +553,10 @@ class WeeklyItemsScreen(ctk.CTkFrame):
 
             checked = ctk.BooleanVar(value=False)
             self.left_checks[row["id"]] = checked
-            ctk.CTkCheckBox(item, text="", variable=checked, width=20).grid(
+            ctk.CTkCheckBox(
+                item, text="", variable=checked, width=20,
+                command=self.refresh_right_panel,
+            ).grid(
                 row=0, column=self.left_table.grid_col("checkbox"),
                 padx=2, pady=5, sticky="w",
             )
@@ -731,10 +822,6 @@ class WeeklyItemsScreen(ctk.CTkFrame):
 
     def _ape_matches_filters(self, row: Dict[str, object]) -> bool:
         seg, sub, cat = self._ape_parts(row)
-        return self._parts_match_filters(seg, sub, cat)
-
-    def _weekly_matches_filters(self, row: Dict[str, object]) -> bool:
-        seg, sub, cat = self._weekly_parts(row)
         return self._parts_match_filters(seg, sub, cat)
 
     def _parts_match_filters(self, seg_name: str, sub_name: str, cat_name: str) -> bool:

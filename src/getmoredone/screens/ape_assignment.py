@@ -50,6 +50,10 @@ class APEAssignmentScreen(ctk.CTkFrame):
         self.subsegment_colors = {}
         self.category_colors = {}
         self.left_checks: dict[str, ctk.BooleanVar] = {}
+        # The quarter the panels currently show, which is not the quarter in
+        # the entry box: the entry can be mid-edit, and the right panel's
+        # heading must not re-parse it (a bad value pops an error dialog).
+        self.shown_quarter = 0
         # The app's own instance where there is one, so a saved divider does
         # not overwrite a setting changed elsewhere since this screen was
         # built; its own load when constructed without an app (tests).
@@ -231,11 +235,12 @@ class APEAssignmentScreen(ctk.CTkFrame):
         }
         self.left_items = self.vps_manager.get_annual_plan_elements(year)
         self.right_items = self.vps_manager.get_annual_plan_elements_for_quarter(year, quarter)
+        self.shown_quarter = quarter
         self._refresh_filter_options()
-        self.left_title_label.configure(text=f"Annual Plan Elements (check APEs to add to Quarter Q{quarter} and hit save)")
-        self.right_title_label.configure(text=f"APE For Quarter Q{quarter}")
-        self._render_rows(self.left_table, self._filtered_rows(self.left_items), selectable=True)
-        self._render_rows(self.right_table, self._filtered_rows(self.right_items), selectable=False)
+        self.left_title_label.configure(
+            text=f"Annual Plan Elements (tick to filter Quarter Q{quarter} on the right)")
+        self._render_rows(self.left_table, self._visible_left_items(), selectable=True)
+        self.refresh_right_panel()
 
     def _filtered_rows(self, rows: list[dict]) -> list[dict]:
         seg = self.segment_filter_var.get().strip()
@@ -279,9 +284,78 @@ class APEAssignmentScreen(ctk.CTkFrame):
         self.category_filter_combo.configure(values=cat_combo_values)
 
     def on_filters_changed(self):
+        """Re-render both panels for a dropdown change.
+
+        Purpose: VTF-M2.1 — the three dropdowns are the **left** panel's
+                 filter. They narrow the candidates; what narrows the right
+                 panel is the tick (VTF-M1.2). Until this criterion they
+                 filtered both panels, which left the right panel with two
+                 filters and the tick with nothing to do.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
+        Tests:   tests/test_vsp_tab_filters.py::test_vtfm21_the_dropdown_is_a_left_panel_filter
+
+        The right panel is still re-rendered, because a dropdown can hide a
+        ticked row: that tick stops counting (VTF-M1.9) and the right panel
+        has to show it.
+        """
         self._refresh_filter_options()
-        self._render_rows(self.left_table, self._filtered_rows(self.left_items), selectable=True)
-        self._render_rows(self.right_table, self._filtered_rows(self.right_items), selectable=False)
+        self._render_rows(self.left_table, self._visible_left_items(), selectable=True)
+        self.refresh_right_panel()
+
+    # ------------------------------------------------ the tick as a filter
+
+    def _visible_left_items(self) -> list[dict]:
+        """The left-hand rows the dropdowns allow — this panel's only filter."""
+        return self._filtered_rows(self.left_items)
+
+    def _ticked_ape_ids(self) -> set:
+        """The ids of the ticked rows the left panel is currently showing.
+
+        A tick is only honoured while its row is on screen (VTF-M1.9): a
+        dropdown can hide a ticked row, and a filter the user cannot see is a
+        filter they cannot clear.
+        """
+        visible = {
+            row.get("id", f"row-{idx}")
+            for idx, row in enumerate(self._visible_left_items())
+        }
+        return {
+            key for key, var in self.left_checks.items()
+            if key in visible and var.get()
+        }
+
+    def _visible_right_items(self) -> list[dict]:
+        """The quarter's rows the current ticks allow.
+
+        Both panels list `annual_plan_elements`, so the tick's id and the
+        right row's id are the same field: ticking an APE on the left shows
+        whether it is in this quarter (decision D3). No tick is no filter
+        (VTF-M1.5).
+        """
+        ticked = self._ticked_ape_ids()
+        if not ticked:
+            return list(self.right_items)
+        return [row for row in self.right_items if row.get("id") in ticked]
+
+    def refresh_right_panel(self):
+        """Re-render the right panel alone, from the ticks.
+
+        Purpose: VTF-M1.6 — the checkbox's own command, so a tick takes
+                 effect without Load or Refresh. The left panel is not
+                 re-rendered (VTF-M1.8): rebuilding it would destroy the
+                 checkbox that is mid-click.
+        Tests:   tests/test_vsp_tab_filters.py::test_vtfm12_the_quarter_tab_right_panel_follows_the_ticks
+        """
+        shown = self._visible_right_items()
+        self.right_title_label.configure(text=self._right_title(shown))
+        self._render_rows(self.right_table, shown, selectable=False)
+
+    def _right_title(self, shown: list[dict]) -> str:
+        """The right panel's heading, which says when a filter is narrowing it."""
+        base = f"APE For Quarter Q{self.shown_quarter}"
+        if len(shown) == len(self.right_items):
+            return base
+        return f"{base} ({len(shown)} of {len(self.right_items)}, filtered by tick)"
 
     def add_selected(self):
         """Assign every checked APE to the selected quarter.
@@ -445,7 +519,10 @@ class APEAssignmentScreen(ctk.CTkFrame):
                 if var is None:
                     var = ctk.BooleanVar(value=False)
                     self.left_checks[item_id] = var
-                ctk.CTkCheckBox(item, text="", variable=var, width=20).grid(
+                ctk.CTkCheckBox(
+                    item, text="", variable=var, width=20,
+                    command=self.refresh_right_panel,
+                ).grid(
                     row=0, column=table.grid_col("checkbox"), padx=2, pady=5, sticky="w"
                 )
                 self.row_drag.bind_row(

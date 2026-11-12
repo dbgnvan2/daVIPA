@@ -50,6 +50,10 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         self.subsegment_colors = {}
         self.category_colors = {}
         self.left_checks: dict[str, ctk.BooleanVar] = {}
+        # The month the panels currently show, which is not the month in the
+        # selector: the right panel's heading must not re-parse a selector
+        # that can be mid-edit (a bad value pops an error dialog).
+        self.shown_month = 0
         # The app's own instance where there is one, so a saved divider or
         # column width does not overwrite a setting changed elsewhere since
         # this screen was built; its own load when constructed without an app
@@ -304,11 +308,12 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         }
         self.left_items = self.vps_manager.get_annual_plan_elements_for_quarter(year, quarter)
         self.right_items = self.vps_manager.get_annual_plan_elements_for_month(year, month)
+        self.shown_month = month
         self._refresh_filter_options()
-        self.left_title_label.configure(text=f"APE For Quarter Q{quarter} (check APEs to add to Month M{month} and hit save)")
-        self.right_title_label.configure(text=f"APE For Month M{month}")
-        self._render_rows(self.left_table, self._filtered_rows(self.left_items), selectable=True)
-        self._render_rows(self.right_table, self._filtered_rows(self.right_items), selectable=False)
+        self.left_title_label.configure(
+            text=f"APE For Quarter Q{quarter} (tick to filter Month M{month} on the right)")
+        self._render_rows(self.left_table, self._visible_left_items(), selectable=True)
+        self.refresh_right_panel()
 
     def _filtered_rows(self, rows: list[dict]) -> list[dict]:
         seg = self.segment_filter_var.get().strip()
@@ -352,9 +357,70 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         self.category_filter_combo.configure(values=cat_combo_values)
 
     def on_filters_changed(self):
+        """Re-render both panels for a dropdown change.
+
+        Purpose: VTF-M2.1 — the three dropdowns are the **left** panel's
+                 filter; the tick is the right panel's (VTF-M1.3). Until this
+                 criterion they filtered both panels.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
+        Tests:   tests/test_vsp_tab_filters.py::test_vtfm21_the_dropdown_is_a_left_panel_filter
+
+        The right panel is still re-rendered, because a dropdown can hide a
+        ticked row and that tick then stops counting (VTF-M1.9).
+        """
         self._refresh_filter_options()
-        self._render_rows(self.left_table, self._filtered_rows(self.left_items), selectable=True)
-        self._render_rows(self.right_table, self._filtered_rows(self.right_items), selectable=False)
+        self._render_rows(self.left_table, self._visible_left_items(), selectable=True)
+        self.refresh_right_panel()
+
+    # ------------------------------------------------ the tick as a filter
+
+    def _visible_left_items(self) -> list[dict]:
+        """The left-hand rows the dropdowns allow — this panel's only filter."""
+        return self._filtered_rows(self.left_items)
+
+    def _ticked_ape_ids(self) -> set:
+        """The ids of the ticked rows the left panel is currently showing.
+
+        A tick is only honoured while its row is on screen (VTF-M1.9).
+        """
+        visible = {
+            row.get("id", f"row-{idx}")
+            for idx, row in enumerate(self._visible_left_items())
+        }
+        return {
+            key for key, var in self.left_checks.items()
+            if key in visible and var.get()
+        }
+
+    def _visible_right_items(self) -> list[dict]:
+        """The month's rows the current ticks allow.
+
+        Both panels list `annual_plan_elements`, so ticking an APE on the left
+        shows whether it is in this month (decision D3). No tick is no filter
+        (VTF-M1.5).
+        """
+        ticked = self._ticked_ape_ids()
+        if not ticked:
+            return list(self.right_items)
+        return [row for row in self.right_items if row.get("id") in ticked]
+
+    def refresh_right_panel(self):
+        """Re-render the right panel alone, from the ticks.
+
+        Purpose: VTF-M1.6 — the checkbox's own command. The left panel is not
+                 re-rendered (VTF-M1.8).
+        Tests:   tests/test_vsp_tab_filters.py::test_vtfm13_the_month_tab_right_panel_follows_the_ticks
+        """
+        shown = self._visible_right_items()
+        self.right_title_label.configure(text=self._right_title(shown))
+        self._render_rows(self.right_table, shown, selectable=False)
+
+    def _right_title(self, shown: list[dict]) -> str:
+        """The right panel's heading, which says when a filter is narrowing it."""
+        base = f"APE For Month M{self.shown_month}"
+        if len(shown) == len(self.right_items):
+            return base
+        return f"{base} ({len(shown)} of {len(self.right_items)}, filtered by tick)"
 
     def add_selected(self):
         """Assign every checked APE to the selected month.
@@ -551,7 +617,10 @@ class APEPeriodViewScreen(ctk.CTkFrame):
                 if var is None:
                     var = ctk.BooleanVar(value=False)
                     self.left_checks[item_id] = var
-                ctk.CTkCheckBox(item, text="", variable=var, width=20).grid(
+                ctk.CTkCheckBox(
+                    item, text="", variable=var, width=20,
+                    command=self.refresh_right_panel,
+                ).grid(
                     row=0, column=table.grid_col("checkbox"), padx=2, pady=5, sticky="w"
                 )
                 self.row_drag.bind_row(
