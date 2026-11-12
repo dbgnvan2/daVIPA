@@ -114,7 +114,7 @@ Hex top values (20 of 244 distinct):
 | `#f0e7ff` | 12 |
 | `#42386d` | 11 |
 
-Named top values:
+Named top values (all 40 distinct):
 
 | Color | Count |
 |---|---:|

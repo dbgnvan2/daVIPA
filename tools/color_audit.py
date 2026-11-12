@@ -46,8 +46,10 @@ UI_CODE_PATHS = ("src", "tools/generate_ctk_themes.py")
 # `!src/getmoredone/email_cleaning_rules.json` negation is flat, so it is not
 # applied when rg's walk root is `src` itself: the file was unsearchable while
 # `git check-ignore` reported it tracked. 106 tracked files in scope, 105
-# visible (2026-11-11). A positive `-g` overrides `.gitignore` outright, which
-# is the same reason `theme_files` can read `themes/*.json` at all. Naming the
+# visible (2026-11-11). A positive `-g` overrides `.gitignore`'s *file* rules,
+# which is the same reason `theme_files` can read `themes/*.json` at all; a
+# path under an ignored *directory* stays unreachable, and the test below is
+# what would say so. Naming the
 # extensions also bounds the walk, and the test below fails if a tracked file
 # in scope falls outside them.
 # Tests: tests/test_color_inventory_sync.py::test_civm17_every_tracked_file_in_scope_is_reachable_by_a_scan
@@ -261,9 +263,10 @@ def parse_line(line: str) -> Entry | None:
     return Entry(path=path, line=line_no, snippet=snippet.strip())
 
 
-# The hex table is capped and the named one is not: 244 distinct hex values
-# against 37 named (2026-11-11). The heading states both numbers, so the cap
-# announces what it drops (global rule 6).
+# The hex table is capped and the named one is not: distinct hex values run
+# into the hundreds, named into the dozens. Each heading states its own count
+# rather than this comment holding a copy -- the copy said 37 when the report
+# ranked 40, which is how a figure nothing re-measures drifts (global rule 6).
 # Tests: tests/test_color_inventory_sync.py::test_civm20_the_capped_frequency_table_says_how_much_it_hides
 HEX_TOP_N = 20
 
@@ -405,11 +408,12 @@ def build_report(lines: Dict[str, List[str]]) -> str:
     for color, count in hex_ranked[:HEX_TOP_N]:
         out.append(f"| `{color}` | {count} |")
     out.append("")
-    out.append("Named top values:")
+    named_ranked = by_count_then_name(Counter(named_occ))
+    out.append(f"Named top values (all {len(named_ranked)} distinct):")
     out.append("")
     out.append("| Color | Count |")
     out.append("|---|---:|")
-    for color, count in by_count_then_name(Counter(named_occ)):
+    for color, count in named_ranked:
         out.append(f"| `{color}` | {count} |")
     out.append("")
     out.append("## 2) Complete Occurrence Table (Grouped by Color Value, then File)")
