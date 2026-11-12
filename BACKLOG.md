@@ -23,6 +23,43 @@ One batch at a time in this checkout (`CLAUDE.md`). What is here is open work:
 adjacent issues from recent batches, screen reports, the carried-forward
 features, and the long-standing bugs, requests and user stories at the end.
 
+## Adjacent issues — the VSP tab filters and adds (VTF, filed 2026-11-11)
+
+Found while building VTF-M1 - VTF-M7 and not fixed, under global rule 10.
+
+### VTF-A1 — `screens/vision_planning.py` is an unreachable second annual panel (medium)
+
+`show_vision_planning` has no caller: `grep -rn "show_vision_planning" src/`
+finds the definition and nothing else. The module builds its own copy of the
+Annual Plan Elements panel — the same two lists, the same ticks — so it did
+**not** get the tick filter this batch added to
+`screens/annual_vision_segments.py`, and nothing on screen reveals that,
+because nothing on screen reaches it. Either delete it, or route the hub's tab
+at it and delete the other one; two copies of one panel is how one of them
+silently rots.
+
+### VTF-A2 — two `weekly_items` methods are now unreachable from the UI (low)
+
+`delete_selected_weekly_item` and `create_action_item_for_selected_weekly` were
+the commands of the two bottom buttons VTF-M5 removed. Nothing calls them from
+`src/` any more, but they are still exercised by tests in
+`tests/test_unified_panel_design.py`, `tests/test_weekly_items_title.py` and
+`tests/test_weekly_items_tactic_link.py`, so deleting the methods reddens three
+files. They were left in place rather than deleted-with-their-tests inside a
+batch whose subject was the buttons. Deleting them is a change of its own, and
+the tests that cover the row's own Delete and APE Week Actions' Add must be
+kept — only the selection-based ones go.
+
+### VTF-A3 — four test files each carry their own withdrawn-root screen builder (low)
+
+`tests/test_vsp_tab_filters.py`, `tests/test_vsp_tab_adds.py`,
+`tests/test_vsp_tab_contracts.py` and `tests/test_unified_panel_design.py` each
+define their own `_root()` / screen-construction helper, with the same
+`ctk.CTk()` + `geometry("1400x900+0+0")` + `withdraw()` body. The withdrawal is
+what keeps `tests/test_ci_contract.py`'s mapped-window count at 23, so the
+duplication is four places a future copy can forget it. A shared fixture in
+`conftest.py` would make that impossible rather than merely conventional.
+
 ## Open decision — what the colour inventory counts (CIV, filed 2026-11-11)
 
 Raised by two independent sweep passes over the batch that fixed the scan's

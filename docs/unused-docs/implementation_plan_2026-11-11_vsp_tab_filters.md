@@ -1,10 +1,10 @@
 # Implementation plan — the VSP tabs' left-to-right filter and the bottom Add New (VTF-M1 … VTF-M7)
 
 Date: 2026-11-11
-Status: **approved 2026-11-11 by the user; not started.** The four design
-decisions are settled (recorded under *Decisions taken*). The build waits on
-the checkout: another session's batch is in flight, and this repo allows one
-build batch at a time.
+Status: **approved 2026-11-11 by the user and built the same day: 31 of 31
+code criteria done, VTF-N1 and VTF-N2 outstanding as walk items.** The four
+design decisions are settled (recorded under *Decisions taken*). The status
+report is at the end of this file.
 Screens: `src/getmoredone/screens/annual_vision_segments.py`,
 `ape_assignment.py`, `ape_period_view.py`, `weekly_items.py`,
 `week_actions.py`, `vision_segments.py`
@@ -230,3 +230,78 @@ selected tactic. Say so if you want the other reading.
   This batch starts when that one has pushed.
 - Every `DatabaseManager` in the new tests takes an explicit `tmp_path`
   database, or the suite runs migrations against the user's real one.
+
+## Status report — built 2026-11-11
+
+Commits: `a637917`, `dec6e9d`, `1d69964`, `20bf04c` (VTF-M1, VTF-M2),
+`3e7b0af`, `e8d8b3e` (VTF-M3, VTF-M4, VTF-M5), `3ff52ae`, `5d42e8f`
+(VTF-M6, VTF-M7). `src/` and test changes are separate commits throughout, so
+the ratio stays visible in `git log --stat`.
+
+Tests live in `tests/test_vsp_tab_filters.py` (24), `tests/test_vsp_tab_adds.py`
+(12) and `tests/test_vsp_tab_contracts.py` (8). None takes the
+`mapped_windows` fixture, so `tests/test_ci_contract.py`'s count of 23 and
+`CLAUDE.md`'s Commands block are unchanged — the risk this plan names is
+closed. Every test was mutation-proved with the verbatim original restored:
+10 mutants for VTF-M1/M2, 8 for the rewritten APC tests, 16 for VTF-M3/M4/M5,
+15 for VTF-M6/M7.
+
+| ID | Status | Proof |
+|---|---|---|
+| VTF-M1.1 | done | `::test_vtfm11_the_annual_tab_right_panel_follows_the_ticks`, `::test_vtfm11_the_heading_says_when_the_right_panel_is_filtered` |
+| VTF-M1.2 | done | `::test_vtfm12_the_quarter_tab_right_panel_follows_the_ticks` |
+| VTF-M1.3 | done | `::test_vtfm13_the_month_tab_right_panel_follows_the_ticks` |
+| VTF-M1.4 | done | `::test_vtfm14_the_week_tab_right_panel_follows_the_ticks` |
+| VTF-M1.5 | done | `::test_vtfm15_no_tick_is_no_filter`, `::test_vtfm15_no_tick_is_no_filter_on_the_ape_tabs` |
+| VTF-M1.6 | done | `::test_vtfm16_the_tick_refreshes_without_a_button`, `::test_vtfm16_the_tick_refreshes_the_ape_tabs_without_a_button` |
+| VTF-M1.7 | done | `::test_vtfm17_the_dropdown_does_not_reach_the_right_panel` |
+| VTF-M1.8 | done | `::test_vtfm18_a_tick_leaves_the_left_panel_alone` |
+| VTF-M1.9 | done | `::test_vtfm19_a_hidden_tick_stops_filtering`, `::test_vtfm19_a_dropdown_that_hides_a_ticked_row_stops_its_filter` |
+| VTF-M2.1 | done | `::test_vtfm21_the_dropdown_is_a_left_panel_filter` |
+| VTF-M2.2 | done | `::test_vtfm22_the_options_still_come_from_the_left_items` |
+| VTF-M2.3 | done | `::test_vtfm23_week_actions_already_obeys_the_rule` |
+| VTF-M3.1 | done | `::test_vtfm31_the_annual_tab_adds_from_a_vision_element` |
+| VTF-M3.2 | done | `::test_vtfm32_the_quarter_tab_assigns_from_a_dialog` |
+| VTF-M3.3 | done | `::test_vtfm33_the_month_tab_assigns_from_a_dialog` |
+| VTF-M3.4 | done | `::test_vtfm34_the_week_tab_adds_a_weekly_tactic`, `::test_vtfm34_the_week_tab_refuses_before_a_week_is_chosen` |
+| VTF-M3.5 | done | `tests/test_vsp_tab_contracts.py::test_vtfm35_week_actions_add_sits_at_the_bottom` |
+| VTF-M3.6 | done | `::test_vtfm36_the_dialog_defaults_to_one_tick`, all four tabs in one test |
+| VTF-M3.7 | done | `::test_vtfm37_add_new_reports_on_the_status_line`, `::test_vtfm37_a_dialog_with_nothing_to_offer_refuses_on_the_status_line`, `::test_vtfm37_open_pick_record_dialog_reports_its_empty_refusal` |
+| VTF-M3.8 | done | `::test_vtfm38_the_new_record_appears_at_once`, on the real screen |
+| VTF-M4.1 | done | `::test_vtfm41_no_tab_still_saves_from_the_ticks`; `add_selected` is gone from all four classes |
+| VTF-M4.2 | done | the four header assertions in `tests/test_vsp_tab_contracts.py`, and `tests/test_unified_panel_design.py::test_updf25_the_status_line_moved_below_the_filters` |
+| VTF-M4.3 | done | `tests/test_ape_period_consistency.py::test_apcm23_drag_path_reaches_the_same_reporting`, `::test_apcm62_quarter_drag_path_reaches_the_same_reporting`, `tests/test_weekly_tactic_schema.py::test_wt_m1c3_both_creation_paths_report_collisions` and its two siblings. The annual tab's drop target is unchanged code and has no drag test of its own — see the handoff note |
+| VTF-M5.1 | done | `tests/test_vsp_tab_contracts.py::test_vtfm54_one_button_at_the_bottom`, with `tests/test_unified_panel_design.py::test_updm57_clicking_a_right_row_selects_it_and_double_click_opens_it` |
+| VTF-M5.2 | done | the same contract test, with `::test_updm52_a_row_delete_removes_that_row_not_the_selection` and `::test_updm53_delete_is_confirmed_before_it_happens` |
+| VTF-M5.3 | done | the same contract test asserts the bottom row verbatim |
+| VTF-M5.4 | done | `::test_vtfm54_one_button_at_the_bottom` |
+| VTF-M5.5 | done | `tests/test_vsp_tab_adds.py::test_vtfm55_a_new_tactic_is_not_invisible`, real manager on a real database |
+| VTF-M6.1 | done | `::test_vtfm61_the_new_buttons_sit_at_the_bottom`, `::test_vtfm71_vision_elements_controls` |
+| VTF-M6.2 | done | `::test_vtfm62_the_switcher_and_refresh_do_not_move` |
+| VTF-M7.1 | done | six tests in `tests/test_vsp_tab_contracts.py` — four `::test_vtfm71_*`, plus `::test_vtfm54_one_button_at_the_bottom` and `::test_vtfm35_week_actions_add_sits_at_the_bottom` for the two tabs whose contract is named by its own criterion |
+| VTF-N1 | **not done — walk item** | On-screen only. Filed in `docs/unused-docs/changes/2026-11-11-vsp-tab-filters-walk.md` |
+| VTF-N2 | **not done — walk item** | On-screen only, and it is the one hop no test covers: a real `CTkToplevel` is a mapped window. Same note |
+
+### What the code could not cover
+
+`open_pick_record_dialog`'s join between `on_confirm` and `report` — the line
+that writes the write's sentence to the tab's status line after the dialog
+closes — is asserted on neither side's behalf, because driving it needs a real
+`CTkToplevel` and that is a mapped window. Both ends are covered: each tab
+hands the dialog its own `_perform_add` and its own status label
+(VTF-M3.7), and each write reconciles and returns a sentence. It is one
+function for all four tabs, so VTF-N2 is one walk check rather than four.
+
+### Documents changed in this batch
+
+`docs/USER_GUIDE.md` (the hub section: the tick filter, the bottom Add New,
+the removed Save, APE Week Assignment's bottom row, Week Actions' moved
+button, Vision Elements' moved button), `CHANGELOG.md`,
+`docs/spec_2026-11-07_ape_period_consistency.md` (APC-M2 and APC-M6 point at
+the write path, with a dated supersession note),
+`docs/spec_2026-11-07_unified_panel_design.md` (UPD-M5.4),
+`docs/DOCUMENTATION_INDEX.md` (this plan's entry), `BACKLOG.md` (the two
+adjacent issues), `docs/ui_color_inventory.md` (regenerated), this file, and
+the handoff note. `docs/spec_coverage.md` is **not** changed: it is the Project
+Notes feature's criteria record, not a repo-wide one, and this plan's step 8
+named it by mistake.

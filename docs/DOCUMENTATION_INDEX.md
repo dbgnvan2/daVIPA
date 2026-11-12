@@ -485,9 +485,11 @@ measurement of the `TclError` claim this batch set out not to re-measure.
 ### docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
 
 Implementation plan for the six VSP Planning tabs' left-to-right filter and the
-bottom Add New (VTF-M1 - VTF-M7), from a user report of 2026-11-11. **Draft,
-approved by nobody; no code written. The four design decisions are settled.** Touches the five dual-panel tab modules
-and `vision_segments.py`:
+bottom Add New (VTF-M1 - VTF-M7), from a user report of 2026-11-11.
+**Approved 2026-11-11 and built the same day: 31 of 31 code criteria done,
+VTF-N1 and VTF-N2 outstanding as walk items. The status report is at the end
+of the plan.** Touches the five dual-panel tab modules and
+`vision_segments.py`:
 
 - The report's first part is **not a regression**: in the whole history of the
   four assignment tabs `left_checks` is read only by `add_selected`, the Save

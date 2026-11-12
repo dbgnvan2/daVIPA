@@ -7,6 +7,37 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — the VSP Plan tabs: the tick is a filter, and every tab adds (2026-11-11)
+
+- **A tick on the left now filters the right panel.** On Annual Plan Elements,
+  APE Quarter Assignment, APE Month Assignment and APE Week Assignment, ticking
+  a row on the left narrows the right panel to the records that belong to it,
+  and the right panel's heading says so. Nothing read those ticks before a
+  button was pressed, so the panels looked like filters and were not. No tick
+  is no filter — the right panel shows everything. A tick on a row the left
+  panel's own dropdown has hidden stops filtering, because a filter you cannot
+  see cannot be un-ticked. The left panel's dropdown still filters the left
+  panel only.
+- **Every tab has an Add New at the bottom.** Annual Plan Elements has **Add
+  New Annual Plan Element**, APE Quarter Assignment **Assign APE to Quarter**,
+  APE Month Assignment **Assign APE to Month**, APE Week Assignment **Add
+  Weekly Tactic**. Each opens a small dialog that lists the records it can act
+  on — a record already added is not offered — and defaults to the ticked row
+  when exactly one row is ticked. The outcome is reported on the tab's own
+  status line, including the refusal when there is nothing left to add.
+- **The header `Save` is gone from four tabs.** It wrote the ticked rows, and a
+  tick is a filter now. Drag-and-drop from left to right is unchanged and still
+  reports what it wrote and what it could not.
+- **APE Week Assignment's bottom row is one button.** *Edit Weekly Tactic*
+  opened the same editor as a double-click on the row and *Delete Weekly*
+  called the same delete as the row's own button, so both were second routes to
+  a control already on the row. *Add Action Item* created an Action Item this
+  panel cannot show; that button belongs to APE Week Actions, which has it.
+- **Two buttons moved below their list.** APE Week Actions' **Add Action Item**
+  left the toolbar for a row under the list, and Vision Elements' **+ New
+  Segment / SubSegment / Category** left the top row for one. Refresh and the
+  three-way view switcher did not move: they act on the panel, not on a record.
+
 ### Changed — the Plan screen's header, and what a drop says (2026-11-10)
 
 - **The header is two rows now.** The date, **Clear Day** and **AutoLoad** —
