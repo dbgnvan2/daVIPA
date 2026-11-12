@@ -228,8 +228,8 @@ def row_control_kwargs(fill: "RowFill") -> Dict[str, str]:
              under the 3:1 bar for a non-text control. PLC-M4.4 fixed the row
              text and left the controls behind.
     Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m4
-    Tests:   tests/test_priority_level_colors.py::test_plcm49_controls_follow_a_level_fill,
-             ::test_lrr_cold_a_segment_fill_carries_its_controls_too
+    Tests:   tests/test_priority_level_colors.py::test_lrr_cold_a_segment_fill_carries_its_controls_too,
+             ::test_plc_cold_the_three_screens_with_row_controls_pass_the_kwargs
 
     The condition is "this fill brought a text colour with it", and nothing
     narrower. It used to also require ``source == SOURCE_LEVEL``, which was the
@@ -296,10 +296,8 @@ class RowFill:
 
 
 def row_fill(
-    settings: Any,
     palette: Mapping[str, str],
     *,
-    item: Any,
     use_completed_tint: bool,
     segment_color: Optional[str] = None,
 ) -> RowFill:
@@ -308,12 +306,21 @@ def row_fill(
     Purpose: PLC-M4 -- the one copy of a rule that was written out by hand in
              five screens, each with its own precedence chain around it.
     Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md#plc-m4
-    Tests:   tests/test_priority_level_colors.py::test_plcm41_a_row_takes_its_level_colour
+    Tests:   tests/test_priority_level_colors.py::test_pccm1_segment_and_completed_still_fill_a_row
 
-    Precedence is the one the screens already had, unchanged: a VSP segment
-    colour wins, then completion, then the priority level, then nothing. The
-    two flags are what each screen already decided for itself, and three of the
-    five screens do not use every branch:
+    Precedence: a VSP segment colour wins, then completion, then nothing.
+
+    **A priority level is no longer one of the branches (PCC-M1, 2026-11-11).**
+    It was between PLC-M4 and then, which is why ``AGENTS.md`` names this the
+    one permitted full-row data fill. The scheme now applies to the Priority
+    cell alone (``level_cell_fill``), so a row with no segment colour and no
+    completion keeps the theme's own background, as before 2026-11-08. That is
+    also why ``settings`` and ``item`` are gone: both were here only to reach
+    the level, and keeping them read as though the row still depended on the
+    item's priority.
+
+    The two flags are what each screen already decided for itself, and neither
+    is used by all five:
 
     * ``use_completed_tint`` is "should this row take the completed tint", not
       "is this item completed". The Completed screen passes ``False`` because
@@ -327,8 +334,8 @@ def row_fill(
     Both differences are preserved here rather than quietly fixed; they are
     logged in ``BACKLOG.md`` instead (``PLC-A2``).
 
-    A segment fill derives its text colour the same way a level fill does, so
-    a pale VSP segment colour no longer draws the dark theme's near-white
+    A segment fill derives its text colour the same way the level fill used to,
+    so a pale VSP segment colour no longer draws the dark theme's near-white
     ``row_text`` on itself (LRR-M2.1, closing ``PLC-A1``).
 
     **The fill is the normalised value, or no fill at all (SCV-M4.1).** It
@@ -368,7 +375,50 @@ def row_fill(
         )
     if use_completed_tint:
         return RowFill(palette["success_tint"], None, SOURCE_COMPLETED)
-    colour = level_color(settings, priority_level_for_item(item))
+    return RowFill(None, None, SOURCE_NONE)
+
+
+def fill_for_level(settings: Any, level: str) -> RowFill:
+    """The colour one priority *level* draws, and legible text for it.
+
+    Purpose: PCC-M2 -- one authority for "what colour is this level", so the
+             five Priority cells and four chip sites cannot drift apart the way
+             the five row fills did before PLC-M4.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-11_priority_cell_colour.md#pcc-m2
+    Tests:   tests/test_priority_level_colors.py::test_pccm2_the_priority_cell_takes_its_level_colour,
+             ::test_pccm2_an_unset_level_means_no_cell_fill,
+             ::test_pccm2_the_cell_text_clears_the_contrast_bar
+
+    ``RowFill`` is reused rather than a second dataclass added: it is exactly
+    ``(fill, text_color, source)`` and nothing in it is row-shaped.
+
+    ``NO_FILL`` -- a cleared level, and the "No high or critical" default --
+    yields no fill *and* no text colour, so an uncoloured cell keeps the text
+    colour its row decided. An uncoloured cell can sit on a VSP segment fill,
+    where discarding that row's derived colour would make the text illegible.
+
+    ``level_color`` has already substituted the theme default for an unusable
+    stored value and logged it, so there is nothing to validate here.
+    """
+    colour = level_color(settings, level)
     if not colour:
         return RowFill(None, None, SOURCE_NONE)
     return RowFill(colour, pick_text_color(colour), SOURCE_LEVEL)
+
+
+def level_cell_fill(settings: Any, item: Any) -> RowFill:
+    """The fill for one item's Priority cell.
+
+    Purpose: PCC-M2 -- the priority colour scheme applies to this cell's
+             background and nothing else. Before 2026-11-11 it tinted the whole
+             row, and the cell was ``palette["danger"]``: a hard red unrelated
+             to the scheme and unreachable from Settings.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-11_priority_cell_colour.md#pcc-m2
+    Tests:   tests/test_priority_level_colors.py::test_pccm2_the_priority_cell_takes_its_level_colour,
+             ::test_pccm3_a_rendered_priority_cell_carries_the_level_colour
+
+    Asks ``priority_level_for_item`` and nothing else: it does not know whether
+    its row has a segment fill, a completed tint or neither. The cell's colour
+    is the item's priority; the row's is ``row_fill``'s separate decision.
+    """
+    return fill_for_level(settings, priority_level_for_item(item))

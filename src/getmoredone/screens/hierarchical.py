@@ -7,10 +7,8 @@ from typing import Optional, TYPE_CHECKING, List
 
 from ..models import ActionItem, Status
 from ..app_settings import AppSettings
-from ..color_contrast import pick_text_color
 from ..priority_levels import (
-    LEVEL_ANY_CRITICAL,
-    priority_level_for_item,
+    level_cell_fill,
     row_fill,
 )
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
@@ -239,9 +237,7 @@ class HierarchicalScreen(ctk.CTkFrame):
         # accent only and has never used it as a row fill, unlike Today,
         # Upcoming and All Items (BACKLOG).
         fill = row_fill(
-            self.settings,
             palette,
-            item=item,
             use_completed_tint=item.status == Status.COMPLETED,
             segment_color=None,
         )
@@ -313,14 +309,18 @@ class HierarchicalScreen(ctk.CTkFrame):
         ).grid(row=0, column=3, padx=5, pady=5, sticky="w")
 
         # Priority score
-        is_priority_critical = priority_level_for_item(item) == LEVEL_ANY_CRITICAL
+        # PCC-M3 -- the Priority cell's background is the priority colour
+        # scheme, and the only place it is drawn. A cell with no colour of
+        # its own keeps the row's text, which the row may have derived
+        # from a segment fill.
+        cell = level_cell_fill(self.settings, item)
         score_label = ctk.CTkLabel(
             frame,
             text=f"P:{item.priority_score}",
             width=60,
-            fg_color=palette["danger"] if is_priority_critical else "transparent",
-            text_color=pick_text_color(palette["danger"]) if is_priority_critical else row_text,
-            corner_radius=6 if is_priority_critical else 0,
+            fg_color=cell.fill or "transparent",
+            text_color=cell.text_color or row_text,
+            corner_radius=6 if cell.fill else 0,
             font=list_row_font()
         )
         score_label.grid(row=0, column=4, padx=5, pady=5)

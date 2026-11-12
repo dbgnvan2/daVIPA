@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING
 
 from ..models import Status
 from ..app_settings import AppSettings
-from ..color_contrast import pick_text_color
 from ..priority_levels import (
     LEVEL_ANY_CRITICAL,
+    fill_for_level,
     is_critical_factor,
-    priority_level_for_item,
+    level_cell_fill,
     row_control_kwargs,
     row_fill,
 )
@@ -249,9 +249,7 @@ class AllItemsScreen(ctk.CTkFrame):
                     self._week_action_segment_cache,
                 )
                 fill = row_fill(
-                    self.settings,
                     palette,
-                    item=item,
                     use_completed_tint=item.status == Status.COMPLETED,
                     segment_color=segment_color,
                 )
@@ -378,14 +376,18 @@ class AllItemsScreen(ctk.CTkFrame):
                 due_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_due_date_inline(item_id))
 
                 # Priority
-                is_priority_critical = priority_level_for_item(item) == LEVEL_ANY_CRITICAL
+                # PCC-M3 -- the Priority cell's background is the priority colour
+                # scheme, and the only place it is drawn. A cell with no colour of
+                # its own keeps the row's text, which the row may have derived
+                # from a segment fill.
+                cell = level_cell_fill(self.settings, item)
                 priority_label = ctk.CTkLabel(
                     item_frame,
                     text=str(item.priority_score),
                     width=80,
-                    fg_color=palette["danger"] if is_priority_critical else "transparent",
-                    text_color=pick_text_color(palette["danger"]) if is_priority_critical else row_text,
-                    corner_radius=6 if is_priority_critical else 0,
+                    fg_color=cell.fill or "transparent",
+                    text_color=cell.text_color or row_text,
+                    corner_radius=6 if cell.fill else 0,
                     font=list_row_font(),
                 )
                 priority_label.grid(row=0, column=7, padx=5, pady=5)
@@ -415,6 +417,10 @@ class AllItemsScreen(ctk.CTkFrame):
                         ("E", item.size, 40),
                         ("V", item.value, 40),
                     ]
+                    # PCC-M4 -- a critical factor chip takes the Any Critical level
+                    # colour, the same scheme the Priority cell carries. Asked once
+                    # per row, not once per chip.
+                    critical_chip = fill_for_level(self.settings, LEVEL_ANY_CRITICAL)
                     for factor_col, (label, value, width) in enumerate(columns):
                         text = f"{label}:{value}" if value not in (None, "") else ""
                         label_kwargs = {
@@ -425,8 +431,8 @@ class AllItemsScreen(ctk.CTkFrame):
                             "text_color": row_text,
                         }
                         if is_critical_factor(label, value):
-                            label_kwargs["fg_color"] = palette["danger"]
-                            label_kwargs["text_color"] = pick_text_color(palette["danger"])
+                            label_kwargs["fg_color"] = critical_chip.fill or "transparent"
+                            label_kwargs["text_color"] = critical_chip.text_color or row_text
                             label_kwargs["corner_radius"] = 6
                         ctk.CTkLabel(factors_frame, **label_kwargs).grid(
                             row=0, column=factor_col, padx=2)
