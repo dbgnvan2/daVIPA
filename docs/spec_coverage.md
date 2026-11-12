@@ -2086,7 +2086,7 @@ The decision was the user's, taken 2026-11-11, and the entry is gone from
 | PCC-M3 (rendered) | The colour CustomTkinter actually holds on the widget, per screen and per level | same | `::test_pccm3_a_rendered_priority_cell_carries_the_level_colour` | done |
 | PCC-M3 (rendered) | A colour the *user* saved, not a shipped default, reaches the real widget with its derived text — the positive twin the fallback-to-default render needs | same | `::test_pccm3_a_saved_colour_reaches_the_real_widget` | done |
 | PCC-M3 (rendered) | An uncoloured cell draws in the row's own text colour, asserted against a sibling label in the same row | same | `::test_pccm3_an_uncoloured_cell_keeps_the_rows_text` | done |
-| PCC-M3 (harness) | The render subprocess resolves no path in the user's real application-support directory | `tests/render_priority_cells.py` | `::test_pccm3_the_render_helper_stays_out_of_the_real_data_dir` | done |
+| PCC-M3 (harness) | The render subprocess resolves no path in the user's real application-support directory | `tests/render_priority_cells.py` | `::test_rlsm1_neither_render_helper_touches_the_real_data_dir[render_priority_cells.py]` — superseded 2026-11-12: the single-helper guard was replaced by the parametrised one when RLS-M1 found the second helper had the same defect | done |
 | PCC-M4 | A critical I/U factor chip takes the Any Critical colour; four screens, Hierarchical having no factor row | `today.py`, `upcoming.py`, `all_items.py`, `completed.py` | `::test_pccm4_the_chip_options_come_from_the_level`, `::test_pccm4_a_rendered_critical_chip_carries_the_level_colour` | done |
 | PCC-M5 | `palette["danger"]` is read in none of the five row builders, as an exact count scoped to the builder | same five | `::test_pccm5_no_row_builder_reaches_for_the_danger_palette` | done |
 | PCC-D1 | `AGENTS.md`'s *Semantic color rules* says what satisfies the derived-foreground rule now | `AGENTS.md` | none — no test reads prose (`effort-budget.md` §5) | done |
@@ -2271,3 +2271,87 @@ gone), the items-column floor (384px → 444px), the three refusal strings it
 quoted verbatim and had wrong, and the resize sentence — the length menu works
 on a box the drawn day added, up to the last box on the day; a length past it
 is still refused, because widening the day is **Later**'s job.
+
+### What CI caught that the sweep did not (2026-11-12)
+
+The push went red on all three Python versions. Three tests failed, none of
+them locally: two measured global theme state they did not set, and one
+asserted a floor the badge had moved. Nothing was wrong with the code the sweep
+had fixed.
+
+| Finding | What was wrong | Fix | Guard |
+|---|---|---|---|
+| theme leaked into two colour guards | `test_pbga4` and `test_pbga7` compared `surface` against `surface_subtle` as resolved colours, pinning only the appearance mode. `apply_theme` is global, so they measured whichever theme the suite had left loaded: this file alone leaves CustomTkinter's built-in `blue`, and the full suite leaves `apple_grey` or `black_white`, which set the two tokens to one colour. Green on the touched files, red on CI, same commit | a `two_tone_theme` fixture beside `light_appearance`, same shape and same reason — it loads `themes/blue.json`, asserts the two tokens differ, and restores the previous theme dict | both tests above; proved by pointing the fixture at `apple_grey`, which it refuses |
+| the collapse itself | on `apple_grey` and `black_white` a list row is the colour of its pane and a Plan chip the colour of its box, whichever token the code picks. App-wide and older than this batch — PBG-M3 only made the Plan screen join it by taking away the priority tint | **not fixed**: the fix is a shipped colour, which is the user's call. Filed as `BACKLOG.md` PBG-A11 with the measurement | `tests/test_time_block_colors.py::test_pbga11_two_bundled_themes_have_one_surface_where_the_app_wants_two` — an exact set, so a third flat theme fails it |
+| a precondition the badge put out of reach | `test_the_empty_item_note_fits_the_column_it_is_drawn_in` made its narrow column with a 60px title and `plan_items_col_width = 240`; PBG-M1's badge puts that pair's floor at 284. A mapped-window test, so it is skipped on the machine and only CI runs it | case (c), over-specified: both settings go below the floor and the precondition names `items_width_floor()` rather than a literal | the test itself, on CI |
+
+The lesson is the one `light_appearance` was written for and did not finish:
+a colour assertion that reads the loaded theme is measuring suite order. Either
+pin the theme or read every theme out of its JSON, as `test_pdm9` does.
+
+
+## RLS — test harness isolation (2026-11-12)
+
+The six findings of the PCC cold pass of 2026-11-12, accepted by the user and
+deferred so the PCC, LMM and PBG work could be pushed first. All six were
+re-verified against `ea91971` before the plan was written, not taken from the
+review report. Nothing here changes application behaviour: five are in
+`tests/`, one is in `conftest.py`.
+
+Tier: **Light** (`effort-budget.md` §1 — the changed paths are `tests/` and
+`conftest.py`; `CLAUDE.md`'s *Review sweeps* resolves the same way, "tests,
+config or a document alone earns no sweep at all"). So no cold pass ran, and
+`/csdp`'s `/code-review` and `/security-review` passes do not apply — its own
+guardrail gives a test-only batch the first alone. `effort-budget.md` §9 counts
+a findings-fix batch by findings, not lines: six findings, so at most six
+guards; this batch adds four.
+
+| ID | Criterion | Where | Test | Status |
+|---|---|---|---|---|
+| RLS-M1 | Neither render helper resolves a path in the user's real application-support directory, and each removes the temporary directory it makes | `tests/render_list_screen.py`, `tests/render_priority_cells.py` | `::test_rlsm1_neither_render_helper_touches_the_real_data_dir` (parametrised over both) | done |
+| RLS-M2 | The live-data fingerprint covers `weekly_tactic_debug.log`; `app.lock` is excluded, with the reason in the docstring | `conftest.py::_user_data_fingerprint` | `tests/test_settings_isolation.py::test_rlsm2_the_weekly_log_is_fingerprinted` | done |
+| RLS-M3 | One `LBL` parser, used by both call sites, tolerant of the separator inside a label's own text | `tests/test_priority_level_colors.py::parse_label_line` | `::test_rlsm3_a_piped_title_parses_to_three_fields` | done |
+| RLS-M4 | The unconsumed `.frame_fill` channel is gone, and the fixture docstring describes only what the fixture provides | `tests/render_priority_cells.py`, `tests/test_priority_level_colors.py` | none — see below | done |
+| RLS-M5 | The data-directory guard does not create the directory it guards, and asserts positively that the helper's workspace is under the temp root | `::test_rlsm1_…` | the same guard, both halves mutation-proved separately | done |
+| RLS-M6 | Each render helper refuses to be imported, since importing one sets `GETMOREDONE_DATA_DIR` process-wide | both helpers | `::test_rlsm6_a_render_helper_refuses_to_be_imported` (parametrised over both) | done |
+| RLS-D1 | This section | this file | none — no test reads prose (`effort-budget.md` §5) | done |
+
+**RLS-M1 was one environment variable, not two transplants.** The relayed
+description of the finding said to copy both the environment block and the
+`AppSettings.get_settings_path` patch from `render_priority_cells.py`.
+Re-reading showed the patch unnecessary: `get_settings_path` →
+`paths.default_settings_path` → `app_data_dir_path() / "settings.json"`, so one
+variable redirects the settings file, the weekly log, `app.lock` and the
+database together. The other helper needs the classmethod patch only because it
+*writes* a chosen settings file. This does not breach the suite's policy of
+running with that variable unset (`conftest.py`, guarded by
+`test_demo_install.py::test_d1_the_suite_runs_with_no_data_dir_override`): that
+policy is about the test-runner process, and a child process sets its own.
+
+**RLS-M6 was applied to both helpers, not the one the finding named.** RLS-M1
+gave `render_list_screen.py` the same module-scope side effect
+`render_priority_cells.py` had, so guarding only the file the review quoted
+would have left the defect in the file this batch created it in — the
+inconsistency `CLAUDE.md`'s rule 10 is about.
+
+**RLS-M4 got no guard, deliberately.** It is a deletion plus a docstring
+correction; `effort-budget.md` §5 forbids asserting on prose, and a test that a
+symbol is absent guards against re-adding something nobody is adding. Finishing
+the assertion instead was rejected: equality against the theme's frame fill is
+false on Upcoming, whose date-group header frame uses `surface_subtle` and is
+reported as a row by the label walk. The weakness the reviewer inferred from
+the dead channel — a row tinted `palette["danger"]` passing the
+not-a-level-colour check — is already caught by
+`::test_pccm5_no_row_builder_reaches_for_the_danger_palette`, an AST check with
+an exact count of zero.
+
+Every new guard was mutation-proved against the verbatim original, restored
+from a byte-for-byte copy: seven mutations, each red where expected. The M1
+proof resolved the real data directory and named it in the failure, which is
+the only way to observe that redirect from outside.
+
+Not in scope and still unverified by anything: the CustomTkinter UI contract
+(`~/.claude/standards/ui-regression.md`) that PCC's subject matter sits in. The
+manual checklist in
+`docs/unused-docs/implementation_plan_2026-11-11_priority_cell_colour.md` §8
+remains unwalked — no pass has run the application.
