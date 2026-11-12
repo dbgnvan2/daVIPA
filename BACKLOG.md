@@ -23,6 +23,40 @@ One batch at a time in this checkout (`CLAUDE.md`). What is here is open work:
 adjacent issues from recent batches, screen reports, the carried-forward
 features, and the long-standing bugs, requests and user stories at the end.
 
+## Open decision — what the colour inventory counts (CIV, filed 2026-11-11)
+
+Raised by two independent sweep passes over the batch that fixed the scan's
+gray-scale gap. Both are about what the document measures, so neither was
+settled in the batch.
+
+### CIV-A2 — prose about colours is counted as colour usage (medium — a decision)
+
+The CIV-A1 narrowing stopped the scan reading documents, but the same effect
+survives inside `src/`. Measured 2026-11-11:
+
+- The `### ``#abc``` section's 6 rows are all comments or docstrings
+  explaining that a three-digit hex gets expanded —
+  `src/getmoredone/color_contrast.py:50`, `vps_manager.py:206` and four
+  others. `#abc` is a form named in a sentence, not a colour anyone set.
+- `src/getmoredone/theme.py:16`'s `THEME_NAMES` tuple contributes 4 named
+  occurrences (`green`, `orange`, `grey`, `blue`), and
+  `tools/generate_ctk_themes.py` 4 more as theme-name keys. Those are theme
+  identifiers; the colours they select are counted separately from the theme
+  JSON.
+
+It is a decision rather than a defect because excluding comment and docstring
+lines would also drop comments that name a real fill, such as the
+`# deep -- the ``low`` fill is #052E16` line the report carries today. The
+question is whether section 1's count is colours *used* or colours
+*mentioned*. Either answer is implementable in `SCAN_COMMANDS` alone.
+
+### CIV-A3 — `assets/icons/*.svg` is still uninventoried (low)
+
+5 named-colour occurrences in shipped UI resources, named in the report's own
+"Not covered" line since CIV-A1. Widening is one entry in `UI_CODE_PATHS`
+plus an `-g` for the extension; the open question is whether an icon's fill
+belongs in a report whose Hard Rule is about widget colour.
+
 ## Adjacent issues — priority defaults and the cap (PRI, filed 2026-11-08)
 
 Promised by `docs/unused-docs/implementation_plan_2026-11-08_priority_defaults_and_cap.md`'s
