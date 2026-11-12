@@ -379,9 +379,28 @@ class APEAssignmentScreen(ctk.CTkFrame):
         taken = self._ids_in_quarter()
         return [
             (row["id"], describe_lineage(row))
-            for row in self.left_items
+            for row in self._visible_left_items()
             if row.get("id") and row.get("id") not in taken
         ]
+
+    def _empty_add_message(self, quarter: int) -> str:
+        """Why the dialog has nothing to offer, in the words of the real reason.
+
+        Purpose: P2/P9 — `_add_options` comes back empty for three different
+                 reasons and until 2026-11-11 all three were reported as the
+                 third, so a year with no Annual Plan Elements in it was told
+                 every one of them was already in the quarter.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
+        Tests:   tests/test_vsp_tab_adds.py::test_vtfs3_the_empty_refusal_names_the_real_reason
+        """
+        if not self.left_items:
+            return ("This year has no Annual Plan Elements yet -- add one on "
+                    "the Annual Plan Elements tab first.")
+        if not self._visible_left_items():
+            return ("Every Annual Plan Element is hidden by the Segment, "
+                    "SubSegment or Category filter above the left panel.")
+        return (f"Every Annual Plan Element the left panel shows is already "
+                f"in Q{quarter}.")
 
     def _add_default(self):
         """The ticked row to open the dialog on, when exactly one is ticked.
@@ -429,9 +448,7 @@ class APEAssignmentScreen(ctk.CTkFrame):
             confirm_text="Assign",
             report=lambda text: self.status_label.configure(text=text),
             on_confirm=self._perform_add,
-            empty_message=(
-                f"Every Annual Plan Element for this year is already in "
-                f"Q{quarter}."),
+            empty_message=self._empty_add_message(quarter),
         )
 
     def _ids_in_quarter(self) -> set:

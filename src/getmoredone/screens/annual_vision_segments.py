@@ -8,12 +8,15 @@ from typing import TYPE_CHECKING, Optional
 from ..app_settings import AppSettings
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
 from ..vps_manager import ActionItemsAttachedError, ProjectBoardsAttachedError
+from ..weekly_tactic_logging import get_weekly_tactic_logger
 from .chip_table import ANNUAL_RIGHT_COLUMNS, APE_LEFT_COLUMNS, ChipTable, panel_fitter
 from .lineage_filters import FILTER_ROW_HEIGHT
 from .pick_record_dialog import describe_lineage, open_pick_record_dialog
 from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .split_panel import SPLITTER_WIDTH, SplitPanel
+
+logger = get_weekly_tactic_logger()
 
 if TYPE_CHECKING:
     from ..vps_manager import VPSManager
@@ -384,11 +387,26 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         self._create_from_row(item)
 
     def _create_from_row(self, row: dict):
-        year = self._parse_year()
-        if year is None:
+        """Create a dropped Vision Element's annual records, and say what happened.
+
+        Purpose: the drop is a write, so it goes through the same write the
+                 Add New dialog uses. It called the manager raw until
+                 2026-11-11: `row_drag.finish` wraps `on_drop` in no `try`,
+                 so a locked database or a stale row escaped into a Tk
+                 callback -- a traceback on a stderr a packaged app has
+                 nowhere to send, nothing on screen and no refresh -- and a
+                 success said nothing either. The three sibling tabs all
+                 guard and report on their drop (P1/P5).
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
+        Tests:   tests/test_vsp_tab_adds.py::test_vtfs1_the_dropped_row_reports_what_it_wrote
+                 tests/test_vsp_tab_adds.py::test_vtfs1_a_raising_drop_is_reported_not_escaped
+        """
+        key = row.get("id")
+        if not key:
+            self.status_label.configure(
+                text="That row carries no Vision Element to add.")
             return
-        self.vps_manager.create_annual_records_from_vision_element(year, row["id"])
-        self.refresh_lists()
+        self.status_label.configure(text=self._perform_add(key))
 
     # --------------------------------------------------- VTF-M3: Add New
 
@@ -412,13 +430,29 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         guessing between them would create a record the user did not pick.
         """
         ticked = self._ticked_vision_element_ids()
-        return next(iter(ticked)) if len(ticked) == 1 else None
+        if len(ticked) != 1:
+            return None
+        only = next(iter(ticked))
+        # The siblings' guard (P5): a key `_add_options` excluded is not an
+        # option, so handing it over as `initial` opens the combo blank.
+        taken = {row.get("vision_element_id") for row in self.right_items}
+        return only if only not in taken else None
 
     def _perform_add(self, vision_element_id: str) -> str:
         """Create both annual records for one Vision Element, and say so.
 
-        VTF-M3.8 — the refresh is here, so the new row is in the right panel
-        before the sentence about it reaches the status line.
+        Purpose: VTF-M3.8 — the refresh is here, so the new row is in the
+                 right panel before the sentence about it reaches the status
+                 line. P6 — and the sentence is then read off that panel
+                 rather than off the absence of an exception:
+                 `create_annual_records_from_vision_element` logs a failed
+                 project board as a warning and carries on, so "Added" was
+                 claimed for a half-written record. P1 — a locked database is
+                 reported, not raised into a Tk callback, because the drop
+                 path shares this method and has no `try` above it.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
+        Tests:   tests/test_vsp_tab_adds.py::test_vtfs2_an_unwritten_add_is_not_reported_as_added
+                 tests/test_vsp_tab_adds.py::test_vtfs1_a_raising_drop_is_reported_not_escaped
         """
         year = self._parse_year()
         if year is None:
@@ -426,10 +460,21 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         row = next(
             (r for r in self.left_items if r.get("id") == vision_element_id),
             None)
-        self.vps_manager.create_annual_records_from_vision_element(
-            year, vision_element_id)
-        self.refresh_lists()
         name = describe_lineage(row) if row else "the Vision Element"
+        try:
+            self.vps_manager.create_annual_records_from_vision_element(
+                year, vision_element_id)
+        except Exception as exc:
+            logger.exception(
+                "[annual_vision_segments] %s raised while being added to %s.",
+                vision_element_id, year)
+            self.refresh_lists()
+            return f"Could not add {name} to {year}: {exc}"
+        self.refresh_lists()
+        if vision_element_id not in {
+                r.get("vision_element_id") for r in self.right_items}:
+            return (f"{name} is not in {year}'s Annual Plan Elements after "
+                    f"the write -- see the log.")
         return f"Added {name} to {year}."
 
     def open_add_dialog(self):

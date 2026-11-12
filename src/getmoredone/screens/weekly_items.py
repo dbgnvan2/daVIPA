@@ -430,9 +430,12 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         try:
             result = self.vps_manager.create_week_action_items_for_ape(
                 ape_id, year, month, [week_start])
-        except ValueError as exc:
-            # Raised on a stale APE or a bad month. Unhandled inside a Tk
-            # binding this is a traceback on stderr and nothing on screen.
+        except Exception as exc:
+            # A stale APE or a bad month raises ValueError; a locked database
+            # raises sqlite3.OperationalError. Only ValueError was caught
+            # until 2026-11-11, and the drag path has no `try` above this one
+            # (`row_drag.finish` calls `on_drop` raw), so anything else was a
+            # traceback on stderr and nothing on screen (P1/P5).
             logger.exception("[weekly_items] create failed: %s", exc)
             return f"Could not create the weekly tactic: {exc}"
         # Always refresh and always say what happened: a create that collided
