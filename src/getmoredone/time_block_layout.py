@@ -73,7 +73,8 @@ PRIORITY_BANDS: Tuple[Tuple[int, str], ...] = (
     (100, "medium"),
     (1, "low"),
 )
-UNSCORED_BAND = "unscored"
+# ``UNSCORED_BAND = "unscored"`` was here; ``priority_band`` was its only
+# reader and went with the band scheme (PBG-M5).
 
 # Minutes past midnight are the source of truth; HH:MM is for storage and
 # display. A day packed past midnight keeps counting (25:00, not 01:00) so the

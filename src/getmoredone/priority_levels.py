@@ -17,11 +17,10 @@ A level is **not** a priority *band*. A band is a threshold on
 (``time_block_layout.PRIORITY_BANDS``); it has five names of its own and, until
 PBG-M5 (2026-11-12), three colour tables in ``theme.py``. Since then the level
 is the only priority anything is drawn in. The band named "critical" and the
-level named "Any
-Critical" are different questions about the same item, and the answers come
-apart: a Medium / Medium / XL / XL item scores 400, which is the ``high`` band,
-while having no high or critical factor at all. That is why this module carries
-its own names rather than reusing the band ones, and why
+level named "Any Critical" are different questions about the same item, and
+the answers come apart: a Medium / Medium / XL / XL item scores 400, which is
+the ``high`` band, while having no high or critical factor at all. That is why
+this module carries its own names rather than reusing the band ones, and why
 ``test_plcm14_a_big_score_is_not_a_critical_level`` exists.
 
 Two deliberate choices in ``priority_level``:

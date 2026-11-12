@@ -136,13 +136,10 @@ PLAN_AUTOSCROLL_MS = 60
 #: off the bottom of the pane.
 OUTSIDE_GROUP_HEIGHT_PX = 150
 
-#: The narrowest the empty-items note will wrap to. Tk reads a wraplength of
-#: zero or less as "do not wrap", so a column of 56px or under would have
-#: turned the note back into the one long clipped line that the wrapping was
-#: added to fix. Below this width the note is wider than its column and
-#: clipped at the right edge, which is the readable end: it is anchored west,
-#: so it still starts at the first word.
-NOTE_MIN_WRAP_PX = 120
+# ``NOTE_MIN_WRAP_PX = 120`` was here, a floor on the note's wraplength.
+# Deleted (P27): PBG-M1's badge raised ``items_width_floor``, so the narrowest
+# column leaves 169px and the floor could not fire. The column's own floor is
+# what keeps the note wrapping.
 
 #: Days with a calendar export in flight, keyed by (database path, day), and
 #: the lock that guards the set.
@@ -1021,10 +1018,7 @@ class PlanScreen(ctk.CTkFrame):
                     ),
                     anchor="w",
                     justify="left",
-                    wraplength=max(
-                        NOTE_MIN_WRAP_PX,
-                        self.items_col_width() - ITEMS_TEXT_INSET_PX,
-                    ),
+                    wraplength=self.items_col_width() - ITEMS_TEXT_INSET_PX,
                 ).grid(row=0, column=0, padx=10, pady=20, sticky="w")
             else:
                 for row, item in enumerate(shown):
@@ -2449,7 +2443,11 @@ class PlanScreen(ctk.CTkFrame):
             return
 
         try:
-            resized = self.db_manager.set_block_length(block.id, minutes, self.bounds)
+            # PBG-A3 -- the drawn day, as the move paths pass it. Without it
+            # a resize on a box the drawn day added was refused outright.
+            resized = self.db_manager.set_block_length(
+                block.id, minutes, self.bounds, day_span=self._grid.span
+            )
         except SlotRefusedError as refused:
             self.set_status(refusal_text(refused.reason), "error")
             return
@@ -3018,7 +3016,11 @@ class PlanScreen(ctk.CTkFrame):
         user's work goes.
         """
         try:
-            moved = self.db_manager.place_block_at(block_id, slot_index, self.bounds)
+            # LMM-A1 -- ``slot_index`` came off ``_slot_frames``, built over
+            # the drawn span, so that is the day to check against.
+            moved = self.db_manager.place_block_at(
+                block_id, slot_index, self.bounds, day_span=self._grid.span
+            )
         except SlotRefusedError as refused:
             self.set_status(refusal_text(refused.reason), "error")
             return

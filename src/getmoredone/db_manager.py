@@ -1611,12 +1611,13 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
     ) -> None:
         """Raise ``SlotRefusedError`` unless the grid allows this placement.
 
-        ``day_span`` is for the one caller that is deliberately placing a block
-        outside the day as it is drawn now: a drop on Earlier or Later, which
-        is asking for the drawn day to be wider (PD-M14.1). Left out, the day
-        checked against is the one on screen -- the template's hours stretched
-        to this date's own blocks -- so an ordinary drop cannot land off the
-        grid by passing a span nobody drew.
+        ``day_span`` is the day as it is **drawn**. Pass it from any caller
+        whose box index came off the screen. Left out, ``can_place`` checks
+        ``template_span(bounds)`` alone -- Day Settings' hours, with no
+        stretching to this date's blocks, which is what this docstring claimed
+        until 2026-11-12 and is the proximate cause of LM-6 and LMM-A1. Omit
+        it only where the template is the rule on purpose: AutoLoad and the
+        break button.
         """
         from .time_block_layout import SlotRefusedError, can_place, slots_for_minutes
 
@@ -1784,16 +1785,23 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             self.update_time_block(block)
         return block
 
-    def set_block_length(self, block_id: str, minutes: int, bounds) -> TimeBlock:
+    def set_block_length(
+        self, block_id: str, minutes: int, bounds, day_span=None
+    ) -> TimeBlock:
         """Change a block's length, keeping it where it is.
 
         Purpose: TG-M11 -- the right-click menu's lengths.
         Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
         Tests:   tests/test_time_block_crud.py::test_tgm112_a_resize_that_does_not_fit_is_refused
+                 tests/test_time_block_crud.py::test_pbga3_a_block_on_a_drawn_box_can_be_resized
 
         A length that would not fit from where the block sits is refused and
         the block does not move. Silently sliding it somewhere it does fit
         would answer a question the user did not ask.
+
+        ``day_span`` as ``_refuse_unless_it_fits`` documents it. Without the
+        parameter, which is how this shipped until 2026-11-12, every length
+        was refused on a box the drawn day added (PBG-A3).
         """
         from .time_block_layout import clamp_block_minutes
 
@@ -1806,6 +1814,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         wanted = clamp_block_minutes(minutes)
         self._refuse_unless_it_fits(
             block.block_date, block.slot_index, wanted, bounds, ignoring=block.id,
+            day_span=day_span,
             # PF-M8 -- as the move paths, for the same reason.
             placing_lunch=BlockType.normalize(block.block_type) == BlockType.LUNCH,
         )

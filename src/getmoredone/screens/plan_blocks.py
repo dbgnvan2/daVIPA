@@ -74,9 +74,11 @@ SLOT_STRIPE_GAP_PX = 8
 SLOT_BARS_WIDTH_PX = 22
 SLOT_LENGTH_WIDTH_PX = 48
 
-#: PBG-M1 -- the priority badge's column, wide enough for ``P:100`` so a
-#: three-digit score is not clipped and every badge ends at the same pixel.
-SLOT_BADGE_WIDTH_PX = 44
+#: PBG-M1 -- the badge's column, the 60px the five list screens reserve for
+#: the same text. Measured: ``P:9999`` (the cap) is 45px, and a filled badge
+#: asks 57px with ``corner_radius`` as padding. At 44px it overflowed the
+#: title column, which has no slack at the pane's floor. Tests: PBG-A5.
+SLOT_BADGE_WIDTH_PX = 60
 
 #: The column left of the depth bars. In the left pane it carries the marker
 #: that says the day already holds a block for this item; in a day box it is
@@ -120,7 +122,7 @@ CHIP_LENGTH_COLUMN = 5
 def chip_column_minsizes(title_width: int = SLOT_TITLE_WIDTH_PX):
     """The column widths one task's line is laid out in, in order.
 
-    Purpose: PD-M1.1 -- a day box and an item row are the same four columns,
+    Purpose: PD-M1.1 -- a day box and an item row are the same six columns,
              so there is one place that says what those columns are.
     Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_day_controls.md#pd-m1
     Tests:   tests/test_plan_screen.py::test_pdm11_the_item_row_uses_the_chips_column_order
@@ -129,6 +131,10 @@ def chip_column_minsizes(title_width: int = SLOT_TITLE_WIDTH_PX):
     them up to find the narrowest a pane can be dragged to and still draw a
     row. Written out twice they agreed by inspection, which is the kind of
     agreement that lasts until someone widens one of them.
+
+    A column empty in one pane is still reserved in both -- the marker, and
+    the badge since PBG-M1 -- or the two panes' lengths land on different
+    pixels. Both floors sum this tuple, so the badge raised each by 60px.
     """
     return (
         STRIPE_WIDTH_PX + SLOT_STRIPE_GAP_PX,
@@ -287,8 +293,9 @@ def build_item_row(
     its children -- a press that lands on a label must start the same drag as
     one that lands on the frame, or half the row is dead to the mouse.
 
-    The first line is ``_build_block_chip``'s line: the same four columns in
-    the same order at the same widths -- stripe, title, depth bars, length --
+    The first line is ``_build_block_chip``'s line: the same columns in the
+    same order at the same widths -- stripe, title, marker, depth bars,
+    priority badge, length --
     so the two panes read as one list of tasks either side of a divider. PB-M6
     built it as two stacked lines with the length under the bars, which
     mirrored a box's facts without mirroring its layout, and on screen the
@@ -329,6 +336,9 @@ def build_item_row(
     """
     # PBG-M3 -- the theme's own surface. The row carried a priority fill and a
     # band stripe until 2026-11-12; the badge below carries priority now.
+    # ``surface_subtle`` on an ``items_scroll`` that resolves to ``surface``:
+    # with no tint and no border that pair is the row's only edge, so PBG-A4
+    # measures it rather than restating it.
     palette = semantic_colors()
     span = slots_for_minutes(work_block_minutes)
     frame = ctk.CTkFrame(
@@ -377,10 +387,11 @@ def build_item_row(
         text=PD_BLOCKED_TEXT if already_blocked else PD_UNSCHEDULED_TEXT,
         width=SLOT_MARKER_WIDTH_PX,
         anchor="w",
-        # The theme's own pair for a mark on a priority fill, not
+        # The theme's own pair for a mark on a row surface, not
         # `status_text_color`: that one's green is dark in both themes, and
-        # the dark theme's fills are deep enough to swallow it (1.63:1 on the
-        # green fill). See `semantic_colors`.
+        # the dark theme's surface is deep enough to swallow it. The priority
+        # fills this was first measured against are gone with the band
+        # scheme; `semantic_colors` carries the surface measurement now.
         text_color=semantic_colors()[
             "scheduled_mark" if already_blocked else "unscheduled_mark"
         ],
@@ -400,6 +411,8 @@ def build_item_row(
     # PBG-M2 -- the badge the five list screens draw in their Priority cell,
     # on the same ``level_cell_fill`` colour, so one scheme answers "what
     # priority is this" everywhere. An uncoloured level keeps the row's text.
+    # ``settings`` is the user's own Priority Colours; ``None`` falls back to
+    # the shipped defaults, which is what a caller with no settings wants.
     cell = level_cell_fill(settings, item)
     ctk.CTkLabel(
         frame,
@@ -799,15 +812,21 @@ def _build_block_chip(
     palette = semantic_colors()
     kind = BlockType.normalize(block.block_type)
 
-    # PBG-M4 -- PB-M4's shading and PB-M7's shaded continuation are both gone
-    # with the band scheme. A task is the theme's subtle surface and padding is
-    # transparent, which is what tells the two apart now.
+    # PBG-M4 -- PB-M4's shading and PB-M7's shaded continuation are gone with
+    # the band scheme; padding's bar, not its fill, tells it from a task.
+    # The 1px border is the chip's edge: a chip filled with either surface
+    # token is 1.0:1 against some box it can sit in. Tests: PBG-A7.
     padding = kind in (BlockType.BUFFER, BlockType.BREAK)
     fill = "transparent" if padding else palette["surface_subtle"]
     body_text = palette["body_text"]
 
     chip = ctk.CTkFrame(
-        parent, fg_color=fill, corner_radius=4, height=chip_height - 4
+        parent,
+        fg_color=fill,
+        corner_radius=4,
+        height=chip_height - 4,
+        border_width=1,
+        border_color=palette["border"],
     )
     chip.grid(row=row, column=0, sticky="ew", pady=1)
     configure_chip_columns(chip, title_width)
