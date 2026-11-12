@@ -141,19 +141,33 @@ def _categories(table):
 
 
 def _annual_stub(events, left=(), right=(), vps=None):
+    # As in _quarter_stub: `_perform_add` reconciles its sentence against the
+    # rows the panel was redrawn from, so a fixture whose refresh does not pick
+    # the write up reads as "is not in 2026's Annual Plan Elements" -- which is
+    # the reconciliation working, not the write failing. `held` is this
+    # fixture's year, and the redraw re-reads it as refresh_lists does.
+    held = [row for row in right]
+
+    def default_create(year, vision_element_id):
+        events.append((year, vision_element_id))
+        held.append(_annual_row(len(held) + 1, vision_element_id, "Made"))
+
     stub = SimpleNamespace(
         year_var=SimpleNamespace(get=lambda: str(YEAR)),
         left_items=list(left),
         right_items=list(right),
         left_checks={},
         vps_manager=vps or SimpleNamespace(
-            create_annual_records_from_vision_element=lambda *a: events.append(a)),
-        refresh_lists=lambda: events.append("refresh"),
+            create_annual_records_from_vision_element=default_create),
         status_label=SimpleNamespace(configure=lambda **kw: events.append(kw["text"])),
+    )
+    stub.refresh_lists = lambda: (
+        events.append("refresh"),
+        setattr(stub, "right_items", list(held)),
     )
     _bind(stub, AnnualVisionSegmentsScreen, "_parse_year",
           "_ticked_vision_element_ids", "_add_options", "_add_default",
-          "_perform_add", "open_add_dialog")
+          "_perform_add", "_create_from_row", "open_add_dialog")
     # `write` is whichever method this tab hands the dialog as `on_confirm`.
     stub.write = stub._perform_add
     return stub
@@ -189,7 +203,8 @@ def _quarter_stub(events, left=(), right=(), assign=None):
     )
     _bind(stub, APEAssignmentScreen, "_filtered_rows", "_visible_left_items",
           "_ticked_ape_ids", "_ids_in_quarter", "_assign_one", "_add_options",
-          "_add_default", "_perform_add", "open_add_dialog")
+          "_add_default", "_perform_add", "_empty_add_message",
+          "open_add_dialog")
     stub.write = stub._perform_add
     return stub
 
@@ -221,7 +236,8 @@ def _month_stub(events, left=(), right=(), assign=None):
     )
     _bind(stub, APEPeriodViewScreen, "_filtered_rows", "_visible_left_items",
           "_ticked_ape_ids", "_ids_in_month", "_assign_one", "_add_options",
-          "_add_default", "_perform_add", "open_add_dialog")
+          "_add_default", "_perform_add", "_empty_add_message",
+          "open_add_dialog")
     stub.write = stub._perform_add
     return stub
 
@@ -550,3 +566,194 @@ def test_vtfm55_a_new_tactic_is_not_invisible(tmp_path):
         )
     finally:
         vps.close()
+
+
+# ------------------------------------------- VTF-S1 - VTF-S6: the cold pass
+#
+# A cold review pass over this batch on 2026-11-11 found one high and four
+# medium findings, all in the write and refusal paths above. These are the
+# tests for the fixes. They are numbered VTF-S1 - VTF-S6 after the findings,
+# not after the plan's criteria, because they are about what the first build
+# of those criteria got wrong.
+
+def test_vtfs1_the_dropped_row_reports_what_it_wrote():
+    """VTF-S1 — a drop on the annual tab says what it did, as the dialog does.
+
+    The drop called the manager raw and reported nothing either way. Its three
+    sibling tabs all report on their drop, so the silence was this tab's alone
+    (P5).
+    """
+    events = []
+    left = [_vision_element(1, "Blog"), _vision_element(2, "Pod")]
+    stub = _annual_stub(events, left=left, right=[])
+
+    stub._create_from_row(left[1])
+
+    assert (YEAR, "ve-2") in events, f"the create never happened: {events}"
+    assert f"Added {describe_lineage(left[1])} to {YEAR}." in events, events
+
+
+def test_vtfs1_a_drop_with_no_id_refuses_rather_than_raising():
+    """VTF-S1 — a row carrying no id is refused on the status line.
+
+    ``row["id"]`` was indexed directly, so such a row was a ``KeyError`` inside
+    a Tk callback rather than a sentence.
+    """
+    events = []
+    stub = _annual_stub(events, left=[], right=[])
+
+    stub._create_from_row({"category_name": "Pod"})
+
+    assert events == ["That row carries no Vision Element to add."], events
+
+
+def test_vtfs1_a_raising_drop_is_reported_not_escaped():
+    """VTF-S1 / P1 — a locked database is a sentence, not a traceback.
+
+    ``screens/row_drag.py``'s ``finish`` calls ``on_drop`` with no ``try``, so
+    anything raised here escapes into a Tk callback: on a packaged app that is
+    a traceback on a stderr with nowhere to go, nothing on screen and no
+    refresh. A retryable failure must leave a retryable impression (P1).
+    """
+    events = []
+
+    def locked(_year, _vision_element_id):
+        raise RuntimeError("database is locked")
+
+    left = [_vision_element(1, "Blog")]
+    stub = _annual_stub(
+        events, left=left, right=[],
+        vps=SimpleNamespace(create_annual_records_from_vision_element=locked))
+
+    stub._create_from_row(left[0])
+
+    assert "refresh" in events, "the panel must still be redrawn"
+    assert any(
+        text.startswith(f"Could not add {describe_lineage(left[0])} to {YEAR}:")
+        and "database is locked" in text
+        for text in events if isinstance(text, str)
+    ), events
+    assert not any(
+        isinstance(text, str) and text.startswith("Added") for text in events
+    ), "a failed write must not report as an add"
+
+
+def test_vtfs2_an_unwritten_add_is_not_reported_as_added():
+    """VTF-S2 / P6 — "Added" is read off the panel, not off a silent return.
+
+    ``create_annual_records_from_vision_element`` logs a failed project board
+    as a warning and carries on, so the absence of an exception is not proof
+    that the year carries the record. This fixture is that shape: the manager
+    returns normally and writes nothing.
+    """
+    events = []
+    left = [_vision_element(1, "Blog")]
+    stub = _annual_stub(
+        events, left=left, right=[],
+        vps=SimpleNamespace(
+            create_annual_records_from_vision_element=lambda *a: None))
+
+    said = stub._perform_add("ve-1")
+
+    assert said == (
+        f"{describe_lineage(left[0])} is not in {YEAR}'s Annual Plan Elements "
+        f"after the write -- see the log."
+    ), said
+
+
+def test_vtfs3_the_empty_refusal_names_the_real_reason():
+    """VTF-S3 / P2/P9 — one empty option list, three reasons, three sentences.
+
+    All three were reported as the third, so a year holding no Annual Plan
+    Elements was told every one of them was already in the quarter.
+    """
+    empty = _quarter_stub([], left=[], right=[])
+    assert empty._empty_add_message(4) == (
+        "This year has no Annual Plan Elements yet -- add one on the "
+        "Annual Plan Elements tab first."
+    ), empty._empty_add_message(4)
+
+    hidden = _quarter_stub([], left=[_row("ape-1", "Blog")], right=[])
+    hidden.category_filter_var = SimpleNamespace(get=lambda: "Pod")
+    assert hidden._empty_add_message(4) == (
+        "Every Annual Plan Element is hidden by the Segment, SubSegment or "
+        "Category filter above the left panel."
+    ), hidden._empty_add_message(4)
+
+    taken = _quarter_stub([], left=[_row("ape-1", "Blog")],
+                          right=[_row("ape-1", "Blog")])
+    assert taken._empty_add_message(4) == (
+        "Every Annual Plan Element the left panel shows is already in Q4."
+    ), taken._empty_add_message(4)
+
+    # The month tab says the same three things about its own period.
+    month_empty = _month_stub([], left=[], right=[])
+    assert month_empty._empty_add_message(11) == (
+        "This quarter has no Annual Plan Elements yet -- assign one on the "
+        "APE Quarter Assignment tab first."
+    ), month_empty._empty_add_message(11)
+
+    month_taken = _month_stub([], left=[_row("ape-1", "Blog")],
+                              right=[_row("ape-1", "Blog")])
+    assert month_taken._empty_add_message(11) == (
+        "Every Annual Plan Element the left panel shows is already in M11."
+    ), month_taken._empty_add_message(11)
+
+
+def test_vtfs4_a_non_valueerror_from_the_week_write_is_reported():
+    """VTF-S4 / P1 — the week tab's write catches more than ``ValueError``.
+
+    Only ``ValueError`` was caught, and ``_assign_dragged_row`` calls this
+    method straight from a drag release with no ``try`` above it, so a locked
+    database was a traceback on stderr and nothing on screen.
+    """
+    events = []
+
+    def locked(*_a):
+        raise RuntimeError("database is locked")
+
+    stub = _week_stub(events, left=[_row("ape-1", "Blog")], create=locked)
+
+    said = stub._create_tactic_for("ape-1")
+
+    assert said == "Could not create the weekly tactic: database is locked", said
+
+
+def test_vtfs5_the_dialog_offers_only_what_the_left_panel_shows():
+    """VTF-S5 / P3 — the dropdown narrows the dialog's options too.
+
+    ``_add_options`` read the unfiltered ``left_items`` on the quarter and
+    month tabs, so a dialog opened under a Category filter listed every
+    category's APEs. The week tab's own docstring states the opposite rule as
+    the design intent, and that tab honours it.
+    """
+    rows = [_row("ape-1", "Blog"), _row("ape-2", "Pod")]
+
+    quarter = _quarter_stub([], left=rows, right=[])
+    quarter.category_filter_var = SimpleNamespace(get=lambda: "Pod")
+    assert [key for key, _label in quarter._add_options()] == ["ape-2"], (
+        "the quarter dialog must not offer a row the left panel is hiding")
+
+    month = _month_stub([], left=rows, right=[])
+    month.category_filter_var = SimpleNamespace(get=lambda: "Pod")
+    assert [key for key, _label in month._add_options()] == ["ape-2"], (
+        "the month dialog must not offer a row the left panel is hiding")
+
+
+def test_vtfs6_a_ticked_row_already_added_is_not_the_default():
+    """VTF-S6 / P5 — the annual tab's ``_add_default`` skips a taken row.
+
+    Both sibling tabs carry this guard. Without it ``initial`` is a key
+    ``_add_options`` excluded, and ``pick_record_dialog`` falls through to an
+    empty label, so the combo opens blank instead of preselected.
+    """
+    left = [_vision_element(1, "Blog")]
+    stub = _annual_stub([], left=left, right=[_annual_row(1, "ve-1", "Blog")])
+    stub.left_checks = {"ve-1": _tick()}
+
+    assert stub._add_default() is None, (
+        "a Vision Element the year already carries is not an option to default to")
+
+    free = _annual_stub([], left=left, right=[])
+    free.left_checks = {"ve-1": _tick()}
+    assert free._add_default() == "ve-1", "the one ticked row is still the default"

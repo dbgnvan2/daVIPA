@@ -294,7 +294,8 @@ def test_apcm23_the_add_path_reaches_the_reporting():
     )
     _bind(stub, APEPeriodViewScreen, "_assign_one", "_ids_in_month",
           "_filtered_rows", "_visible_left_items", "_ticked_ape_ids",
-          "_add_options", "_add_default", "_perform_add", "open_add_dialog")
+          "_add_options", "_add_default", "_perform_add",
+          "_empty_add_message", "open_add_dialog")
 
     outcome = APEPeriodViewScreen._perform_add(stub, "ape-bad")
 
@@ -926,11 +927,17 @@ def test_apcm62_quarter_add_with_nothing_to_add_says_so():
     )
     _bind(stub, APEAssignmentScreen, "_assign_one", "_ids_in_quarter",
           "_filtered_rows", "_visible_left_items", "_ticked_ape_ids",
-          "_add_options", "_add_default", "_perform_add", "open_add_dialog")
+          "_add_options", "_add_default", "_perform_add",
+          "_empty_add_message", "open_add_dialog")
 
     assert stub.open_add_dialog() is None, "no window opens when nothing can be added"
+    # Case (b), 2026-11-11: this fixture's year holds no APEs at all, and the
+    # refusal used to tell it every one of them was already in Q4. The promise
+    # -- the press that can write nothing says so -- is unchanged; the sentence
+    # now names the real reason (P2/P9, VTF-S3).
     assert said == [
-        "Every Annual Plan Element for this year is already in Q4."
+        "This year has no Annual Plan Elements yet -- add one on the "
+        "Annual Plan Elements tab first."
     ], said
 def test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped():
     """APC-M6.2 — the sibling screen, hardened on the same axis (P5).
