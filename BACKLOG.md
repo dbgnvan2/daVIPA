@@ -137,6 +137,75 @@ the only way the displayed number stops disagreeing with what the app can
 produce, or render `min(score, MAX_SCORE)` and say in the guide that it is
 capped.
 
+## Adjacent issues — the surface separation's neighbours (SEP, filed 2026-11-12)
+
+Found while fixing the SEP cold pass's high findings and not fixed, under
+global rule 10. Both are older than SEP and neither is caused by it.
+
+### PBG-A12 — eight themes put muted label text at 2.5–3.0:1 (medium)
+
+`muted_text` is `CTkEntry.placeholder_text_color`, and the app spends it as a
+*label* colour as well as a placeholder — the Plan panes' hint and summary,
+the Plan chips' times, and twenty-odd labels on the project boards. Measured
+2026-11-12 with the repo's own `color_contrast.contrast_ratio`, light mode,
+against each theme's own two surface tokens:
+
+| themes | placeholder | vs `surface_subtle` | vs `surface` |
+|---|---|---|---|
+| `base_dark_blue`, `blue`, `green`, `grey`, `orange`, `pink`, `purple` | `#858585` | **2.614** | **2.957** |
+| `davipa` | `#858585` | **2.498** | **3.089** |
+| `apple_grey` | `#6E6E73` | 4.658 | 5.071 |
+| `black_white` | `#4B5563` (SEP-M6) | 6.867 | 7.557 |
+
+Dark mode clears the bar everywhere (5.378 – 8.271). `#858585` is
+CustomTkinter's own bundled placeholder, carried through
+`tools/generate_ctk_themes.py` untouched for the eight; the two themes with a
+value of their own are the two this repo overrides. So this is as old as those
+themes and has nothing to do with SEP — but it is worse than what SEP fixed,
+and SEP is what measured it.
+
+Not fixed here for two reasons. It is a shipped-colour decision across eight
+themes, which is the user's call and the same call PBG-A11 waited on. And a
+placeholder dark enough for a label is a bright placeholder in an empty
+entry — the token is doing two jobs, and the honest fix may be to split it
+rather than to darken it.
+
+Pinned, not skipped, by
+`tests/test_time_block_colors.py::test_sepm6_the_two_label_colours_are_legible_on_both_surfaces`:
+it asserts the sub-bar set is *exactly* these eight, so neither a ninth theme
+joining nor one of the eight being fixed can pass unnoticed. Fixing this means
+taking the theme out of `MUTED_TEXT_UNDER_BAR_BEFORE_SEP` in the same change.
+
+### SEP-A1 — eight inherited surfaces in four other modules (medium)
+
+SEP-M5 named the Plan panes' surfaces because an unnamed `CTkFrame` resolves
+to `fg_color` or `top_fg_color` depending on its nesting depth, so a row and
+the pane behind it can come out the same colour at one depth and not another.
+The Plan screen is fixed. The same shape is live elsewhere: these four modules
+both inherit a scroll surface and name a surface token for a child drawn in
+it.
+
+| module | inherited scroll surfaces |
+|---|---|
+| `screens/project_boards.py` | 4 |
+| `screens/item_editor_dialogs.py` | 2 |
+| `screens/today.py` | 1 (`_build_column_header`, the pinned header at `today.py:210`) |
+| `screens/item_editor_project_dialog.py` | 1 |
+
+`today.py:210` is the one measured: it fills the pinned header with
+`surface_subtle` while `TodayScreen` itself resolves to `top_fg_color`, so the
+header is flat against the list behind it on all ten themes, before and after
+SEP. The other seven are unmeasured — the grep says the ingredients are there,
+not that the collision is.
+
+Not fixed here: naming eight surfaces across four modules is a sweeping diff
+in a batch about two theme files, and it would be asserted by nothing. The
+durable fix is a guard that measures a *rendered pair* — a child and the
+widget actually behind it — rather than another theme-file assertion, which is
+the class of test that passed twice while this defect was live. There are 41
+inherited scroll surfaces across 23 screen modules in all, so the guard is
+worth more than the eight fixes.
+
 ## Adjacent issue — the priority cell colour (PCC, filed 2026-11-12)
 
 Found while building PCC-M1 - PCC-M5 and not fixed, under global rule 10.

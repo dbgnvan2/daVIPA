@@ -540,11 +540,12 @@ in `docs/spec_coverage.md` § *PBG*. Touches
 ### docs/unused-docs/implementation_plan_2026-11-12_surface_separation.md
 
 Implementation plan for giving `apple_grey` and `black_white` a subtle surface
-distinct from their frame surface (SEP-M1 - SEP-M4, SEP-D1). **Approved
-2026-11-12 and built the same day: 5 of 5 criteria `done`** — per-criterion
-status in `docs/spec_coverage.md` § *Surface separation*. Touches
-`tools/generate_ctk_themes.py`, the two themes it writes, one guard and the
-documents; **no line under `src/`**:
+distinct from their frame surface (SEP-M1 - SEP-M7, SEP-D1). **Approved
+2026-11-12 and built the same day: 7 of 8 criteria `done`, SEP-M4 `partial`**
+— per-criterion status in `docs/spec_coverage.md` § *Surface separation*.
+Revision 3 (§9) records the cold pass that added SEP-M5 - M7 and downgraded
+SEP-M4. Touches `tools/generate_ctk_themes.py`, the two themes it writes, the
+Plan screen, two guards and the documents:
 
 - Those two themes set `CTkFrame.top_fg_color` equal to `CTkFrame.fg_color` in
   both modes, and those are the two tokens `theme.py` exposes as
@@ -557,6 +558,13 @@ documents; **no line under `src/`**:
   1 of this plan would have derived a separated colour inside
   `semantic_colors()`; it was abandoned for `BACKLOG.md` PBG-A11's better
   argument that the fix is a shipped colour and belongs in the generator.
+- **Separating the two tokens was necessary and not sufficient.** With them
+  equal, `CTkFrame`'s nesting-parity alternation was a visual no-op on those
+  two themes; separating them made it live, which moved the collision onto
+  the Plan panes' scroll frame rather than closing it. SEP-M5 names those
+  surfaces. The same inherited-surface shape is still live in four other
+  modules — `BACKLOG.md` SEP-A1 — so the *class* is open even though the
+  Plan screen and the themes are fixed.
 - No new palette decision was needed, which was the stated reason PBG-A11 had
   been deferred: `apple_grey` already declared the three-level stack and
   `black_white` already ships the greys it needed. `#2C2C2E` is the only new
