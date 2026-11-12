@@ -402,3 +402,27 @@ class TestBulkEditIntegration:
         updated_linked = db_manager.get_project_board_items(sample_project_board.id)
         for item in updated_linked:
             assert item.start_date == new_start_date
+
+
+
+def test_a_filter_toggles_on_and_off(gui_screen):
+    """The link dialog's filter buttons used to raise KeyError on
+    palette["surface_hover"] whenever any filter was toggled.
+
+    Called unbound on real buttons, so no dialog window is opened.
+    """
+    from types import SimpleNamespace
+
+    import customtkinter as ctk
+    from src.getmoredone.screens.project_boards import LinkProjectActionItemsDialog
+    from src.getmoredone.theme import button_style
+
+    _, _, root = gui_screen
+    names = ("btn_completed", "btn_not_completed", "btn_linked", "btn_not_linked")
+    dialog = SimpleNamespace(**{n: ctk.CTkButton(root) for n in names})
+    dialog.filter_completed = True
+    dialog.filter_not_completed = dialog.filter_linked = dialog.filter_not_linked = False
+
+    LinkProjectActionItemsDialog._update_filter_button_appearance(dialog)
+    assert dialog.btn_completed.cget("fg_color") == button_style("primary")["fg_color"]
+    assert dialog.btn_linked.cget("fg_color") == "transparent"
