@@ -135,6 +135,49 @@ def root():
 
 
 @pytest.fixture
+def content_frame(root):
+    """``PlanScreen``'s real master: ``app.py``'s content frame.
+
+    SEP-M5 -- for the colour tests, the depth is the measurement. A
+    ``CTkFrame`` built with ``fg_color=None`` takes the theme's
+    ``top_fg_color`` when its master carries the theme's ``fg_color``, and
+    ``fg_color`` otherwise, so each level of nesting flips the token an
+    unnamed surface resolves to. ``app.py`` grids ``PlanScreen`` inside
+    ``self.content_frame = ctk.CTkFrame(self, corner_radius=0)``; a test that
+    grids it on a bare ``CTk`` window is one level short, and every unnamed
+    surface inside it comes out the other colour.
+
+    That is not hypothetical. ``test_pbga4`` compared an item row against the
+    pane behind it and passed on a bare root while the built screen had the
+    row and the pane the same colour on all ten themes -- the defect its own
+    docstring said a reviewer had predicted. The screen names both surfaces
+    now, so the pair no longer depends on depth; this fixture is what makes
+    the test able to notice if that stops being true.
+
+    **Order the fixtures so the theme is pinned before this one runs.** The
+    parity check CustomTkinter makes is ``master._fg_color == theme[...]
+    ["fg_color"]`` -- an equality against the theme loaded *now*. A frame
+    built under one theme and then measured under another fails that check
+    whatever its colour, so every descendant falls through to ``fg_color``
+    and the chain this fixture exists to reproduce never forms. Put
+    ``two_tone_theme`` and ``light_appearance`` ahead of ``content_frame`` in
+    the signature; pytest builds fixtures in the order they are named.
+
+    This is not a detail. With the fixture in the wrong position,
+    ``test_pbga4`` stayed green against a ``PlanScreen`` whose surfaces had
+    been put back the way the defect left them -- the second false pass in a
+    row on the same assertion, for a second unrelated reason.
+
+    Only the tests that read a surface colour need it. The rest of this file
+    builds on ``root``, because nesting depth is nothing to a layout or a
+    callback.
+    """
+    frame = ctk.CTkFrame(root, corner_radius=0)
+    frame.grid(row=0, column=0, sticky="nsew")
+    return frame
+
+
+@pytest.fixture
 def two_tone_theme():
     """Pin a theme whose two surface tokens are different colours.
 
@@ -3214,7 +3257,7 @@ def test_pbga2_the_plan_screen_passes_the_users_own_priority_colours(
 
 
 def test_pbga4_an_item_row_is_not_the_colour_of_the_pane_behind_it(
-    root, manager, settings, light_appearance, two_tone_theme
+    two_tone_theme, light_appearance, content_frame, manager, settings
 ):
     """PBG-A4 — the row has an edge, in the pane it is actually drawn in.
 
@@ -3228,12 +3271,22 @@ def test_pbga4_an_item_row_is_not_the_colour_of_the_pane_behind_it(
     So this measures them against each other, through ``PlanScreen``: a row
     built on a bare root has no pane to be the same colour as.
 
+    ``content_frame`` and not ``root``, which is the whole of why that
+    reviewer was right and this test was wrong. On a bare ``CTk`` window
+    ``PlanScreen`` sits one level shallower than ``app.py`` builds it, every
+    unnamed surface inside it flips, and ``items_scroll`` came out
+    ``surface`` here while the built screen gave it ``surface_subtle`` -- the
+    row's own colour. The assertion was sound and the harness measured a
+    screen the user never sees. SEP-M5 names both surfaces in ``plan.py`` so
+    the pair is no longer a function of depth, and this fixture is what would
+    catch the naming being dropped again.
+
     ``two_tone_theme`` for the reason ``test_pbga7`` gives. ``apple_grey`` and
     ``black_white`` made the two tokens one colour until SEP-M1, and the row
     had no edge there whatever the code did.
     """
     item = _scored_item(manager, "Draft the proposal")
-    panel = PlanScreen(root, manager, _App(settings))
+    panel = PlanScreen(content_frame, manager, _App(settings))
     row = build_item_row(
         panel.items_scroll, item, 0, already_blocked=False,
         work_block_minutes=30, settings=settings,
