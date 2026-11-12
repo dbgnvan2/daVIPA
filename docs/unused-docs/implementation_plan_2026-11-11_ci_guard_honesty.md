@@ -133,6 +133,53 @@ accusing line and the timestamp-only branch change.
 > app process". `GETMOREDONE_TEST_GUARD_APP` forces the state in tests, so no
 > test's outcome depends on whether the app happens to be open.
 
+> **Second amendment, 2026-11-11.** The first cold pass returned a
+> high-severity finding, which this repo answers with a further cold pass in a
+> different failure family (`CLAUDE.md`, *Review sweeps*). That pass was test
+> quality over the batch's test diff, and returned one high and four medium —
+> all fixed in-loop, each mutation-proved.
+>
+> 1. **The detector had the registry's blind spot in a new shape.** A
+>    same-file helper only counted when it read the attribute back on one of
+>    its own *parameters*, so `_independently` — a helper that builds its own
+>    window, the natural way to write one — was invisible, and with it every
+>    test calling it. `test_cigm11_cigm12_the_probe_agrees_with_the_display`
+>    was therefore unguarded and unseen: on Xvfb both sides of its
+>    `is` comparison are `False`, so it passed while measuring nothing. The
+>    rule is now "any same-file function that reads an attribute back", which
+>    takes the tree from 8 read-backs to 9, and that one test — which must
+>    *not* ask the precondition, since it exists to check the precondition
+>    against a real window — is named in `EXEMPT_FROM_THE_PRECONDITION` with
+>    its reason, asserted to be exactly one entry and asserted still to be a
+>    read-back, so neither a quiet addition nor a stale exemption survives.
+>    `test_cghm42` gained the refactored shape as a fourth adversarial case.
+> 2. **Dropped, with the reason recorded in the code** (below medium by the
+>    reviewer's own grading): also counting `caps.require(...)` as asking. The
+>    two tests *of* `require` call it that way while monkeypatching the probe,
+>    so they are not display-dependent, and counting them took `test_cghm43`'s
+>    exact count from 4 to 6. A guarded test written that way is reported as
+>    unguarded — loudly, by name.
+> 3. **The silencing tests asserted the wrapper's return value**, not that
+>    `-topmost` never reached Tk, so they stayed green against a wrapper that
+>    called through and then returned `None`. They now record what reached the
+>    interpreter. Writing that spy found a second thing: `Wm.wm_attributes`
+>    hands `tk.call` the whole command packed into one tuple, so the first
+>    version recorded the call and recognised nothing — it passed against the
+>    very mutation it was written to catch, and only the mutation proof showed
+>    it. The spy flattens, and refuses to forward a `-topmost` write even when
+>    one arrives, because an un-silenced `-topmost` during a run beachballs
+>    this machine.
+> 4. **Three smaller ones.** The verdict table never took the
+>    `old is None` / `new is None` routes — the escape on a machine where the
+>    app has never run is a test *creating* the file — so it has two more rows.
+>    `::test_cghm14_app_detection_cannot_hang_or_raise` read the forcing seam
+>    it was not testing, so exporting `GETMOREDONE_TEST_GUARD_APP` in a shell
+>    inverted it; it clears it first. And the accusation is now a named
+>    constant, `GUARD_ACCUSATION`, instead of a phrase the test found by
+>    grepping the dict's prose — this repo asserts on code, not on English.
+>
+> Also deleted: `_requirers()`, left without a caller by `bf8b6c6`.
+
 ## 5. What this batch cannot verify here, and how it is proved
 
 `CGH-M3.1` makes two tests take `mapped_windows`, the fixture the local
