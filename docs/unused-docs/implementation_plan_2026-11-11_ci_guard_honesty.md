@@ -235,6 +235,42 @@ accusing line and the timestamp-only branch change.
 > no child construction in between, and `finally` restores it, but that is
 > reasoning, not a measurement.
 
+> **Fourth amendment, 2026-11-11 — the batch's last pass.** The third pass's
+> high meant a fourth, and this repo's own rule puts the in-loop fixes in
+> scope: they are written last, fastest, and in the most anchored state. So
+> the fourth pass reviewed only the three fix commits. **No high. Two
+> medium**, both fixed, both mutation-proved, and the pass confirmed on the
+> real tree that no fix had weakened an earlier one and that each "expected
+> empty" row of the detector table is empty for the mechanism it names --
+> re-run with a based class in place of the baseless one, all three stand-in
+> binding shapes are flagged.
+>
+> 1. **One of the two guards was widened and its twin was not.** Accepting
+>    `usefixtures` and keyword-only parameters taught the detector a shape
+>    that `tests/test_ci_contract.py`'s `_mapped_window_test_count` could not
+>    see, so a new on-screen-window test written that way would have been
+>    correctly cleared by the detector while leaving "25 tests build a real
+>    on-screen window" untouched and its guard green -- the drift that count
+>    exists to catch. The rule now lives once, as
+>    `display_capabilities.fixture_names`, and both guards call it;
+>    `::test_the_fixture_request_is_read_the_same_way_by_both_guards` pins the
+>    three asking shapes and the one that does not ask.
+> 2. **The two silencing tests asserted an empty recorder that nothing had
+>    consulted.** In the green path the wrapper short-circuits, so
+>    `spy.calls` is empty and `topmost_writes == []` could not tell "silenced"
+>    from "spy never wired in" -- the control T5.3 had gained a pass earlier,
+>    for this reason. Each now puts an `-alpha` write through the installed
+>    spy first and asserts it landed.
+>
+> Dropped as below medium: a doubled `#:` paragraph above `GUARD_ACCUSATION`,
+> `test_cghm43`'s docstring describing the registry-era count (accurate as
+> history), and `(after or before)[3]` mirroring the implementation's own
+> `(new or old)[3]`.
+>
+> **Four cold passes, no warm ones; twelve findings fixed in loop, one filed
+> (`CGH-A1`), and 17 mutation proofs.** The batch stops here: the rule asks
+> for a further pass only after a high, and this one produced none.
+
 ## 5. What this batch cannot verify here, and how it is proved
 
 `CGH-M3.1` makes two tests take `mapped_windows`, the fixture the local
