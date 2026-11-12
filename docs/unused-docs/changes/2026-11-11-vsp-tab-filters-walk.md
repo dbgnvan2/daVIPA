@@ -34,7 +34,8 @@ the three adjacent issues found and not fixed.
   `docs/spec_2026-11-07_unified_panel_design.md`
 
 Commits: `a637917`, `dec6e9d`, `1d69964`, `20bf04c`, `3e7b0af`, `e8d8b3e`,
-`3ff52ae`, `5d42e8f`.
+`3ff52ae`, `5d42e8f`, `51d9123` (documents), then `eb09644` and `f770abc`
+for the sweep's fixes.
 
 ## Verification
 
@@ -51,7 +52,8 @@ Every run was prefixed `GETMOREDONE_NO_MAPPED_WINDOWS=1 nice -n 19 taskpolicy
 - Result: PASS (39 tests)
 - Command: `./venv/bin/python tools/agents/check_docs_sync.py`
 - Result: PASS
-- Mutation: 39 mutants, 39 killed, across three drivers (10 for VTF-M1/M2, 8
+- Mutation: 39 mutants for the build, 39 killed, plus 12 for the sweep's
+  fixes, 12 killed, across three drivers (10 for VTF-M1/M2, 8
   for the rewritten APC tests, 16 for VTF-M3/M4/M5, 15 for VTF-M6/M7 — the
   first driver's 10 overlap the APC set). Each restored the verbatim original
   in a `finally:`.
@@ -83,6 +85,13 @@ Every run was prefixed `GETMOREDONE_NO_MAPPED_WINDOWS=1 nice -n 19 taskpolicy
   by `tests/test_ape_period_consistency.py` and
   `tests/test_weekly_tactic_schema.py`. Worth one drag on that tab during the
   walk.
+- **The sweep's fixes are the least-reviewed code here.** `eb09644` and
+  `f770abc` were written last and fastest, after the first cold pass, which is
+  the most anchored state (CLAUDE.md: every in-loop fix is in scope for the
+  next pass). The second cold pass covered them, in a different failure family
+  — test quality and the UI control contract. They touch the annual drop path,
+  the annual `_perform_add`, `_empty_add_message` on both APE tabs,
+  `_add_options` on both, and `weekly_items._create_tactic_for`'s except arm.
 - **Adjacent issues found, not fixed** (global rule 10) — filed as VTF-A1,
   VTF-A2 and VTF-A3 in `BACKLOG.md`: the unreachable second annual panel in
   `screens/vision_planning.py`, the two now-unreachable `weekly_items`

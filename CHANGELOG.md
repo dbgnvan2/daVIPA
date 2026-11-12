@@ -33,6 +33,14 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   called the same delete as the row's own button, so both were second routes to
   a control already on the row. *Add Action Item* created an Action Item this
   panel cannot show; that button belongs to APE Week Actions, which has it.
+- **Every one of these paths says what it did.** A drop of a Vision Element on
+  the Annual Plan Elements panel now reports on that tab's status line as the
+  other three tabs' drops already did, and reports a failed write rather than
+  leaving the panel unchanged in silence. The sentence is read off the panel
+  the refresh just redrew, so a half-written record is not reported as a clean
+  success. A refusal names its reason — the period holds no records yet, the
+  lineage dropdowns are hiding them all, or every record the left panel shows
+  is already there — where one wording used to be given for all three.
 - **Two buttons moved below their list.** APE Week Actions' **Add Action Item**
   left the toolbar for a row under the list, and Vision Elements' **+ New
   Segment / SubSegment / Category** left the top row for one. Refresh and the

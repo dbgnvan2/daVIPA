@@ -2,7 +2,8 @@
 
 Date: 2026-11-11
 Status: **approved 2026-11-11 by the user and built the same day: 31 of 31
-code criteria done, VTF-N1 and VTF-N2 outstanding as walk items.** The four
+code criteria done, VTF-N1 and VTF-N2 outstanding as walk items. A cold sweep
+then found 6 findings (1 high) and they are fixed; see *The sweep* below.** The four
 design decisions are settled (recorded under *Decisions taken*). The status
 report is at the end of this file.
 Screens: `src/getmoredone/screens/annual_vision_segments.py`,
@@ -292,6 +293,28 @@ hands the dialog its own `_perform_add` and its own status label
 (VTF-M3.7), and each write reconciles and returns a sentence. It is one
 function for all four tabs, so VTF-N2 is one walk check rather than four.
 
+### The sweep, and what it changed (VTF-S1 - VTF-S6)
+
+A cold `learning-qa` pass over the nine build commits found **1 high, 4 medium
+and 1 low-medium** finding, all of them in the write and refusal paths VTF-M3
+added. Fixed in `eb09644` (src) and `f770abc` (tests), as a class across the
+four tabs. These IDs are the sweep's; `BACKLOG.md`'s VTF-A1 - VTF-A3 are the
+adjacent issues found and not fixed, which is a different list.
+
+| ID | Severity | What was wrong | Test |
+|---|---|---|---|
+| VTF-S1 | high | The Annual Plan Elements drop called the manager raw — no guard, no report either way. `row_drag.finish` calls `on_drop` with no `try`, so a locked database or a stale row escaped into a Tk callback. Its three sibling tabs all guarded and reported (P5) | `::test_vtfs1_the_dropped_row_reports_what_it_wrote`, `::test_vtfs1_a_drop_with_no_id_refuses_rather_than_raising`, `::test_vtfs1_a_raising_drop_is_reported_not_escaped` |
+| VTF-S2 | medium | That tab's `_perform_add` claimed "Added" from the absence of an exception. The manager logs a failed project board as a warning and carries on, so a half-written record read as clean success (P6) | `::test_vtfs2_an_unwritten_add_is_not_reported_as_added` |
+| VTF-S3 | medium | The quarter and month refusals gave one wording for all three reasons an option list comes back empty, so a year holding no APEs was told every one of them was already in the quarter (P2/P9) | `::test_vtfs3_the_empty_refusal_names_the_real_reason`, and `tests/test_ape_period_consistency.py::test_apcm62_quarter_add_with_nothing_to_add_says_so` |
+| VTF-S4 | medium | `weekly_items._create_tactic_for` caught only `ValueError`, and `_assign_dragged_row` calls it straight from a drag release with no `try` above it (P1) | `::test_vtfs4_a_non_valueerror_from_the_week_write_is_reported` |
+| VTF-S5 | medium | `_add_options` on the quarter and month tabs read the unfiltered `left_items`, so a dialog opened under a Category filter listed every category's APEs. The week tab's docstring states the opposite rule as the design intent | `::test_vtfs5_the_dialog_offers_only_what_the_left_panel_shows` |
+| VTF-S6 | low-medium | The annual `_add_default` handed over a key `_add_options` had excluded, so a tick on an already-added Vision Element opened the combo blank. Both siblings carry the guard (P5) | `::test_vtfs6_a_ticked_row_already_added_is_not_the_default` |
+
+12 further mutants, 12 killed. `tests/test_ape_period_consistency.py::test_apcm62_quarter_add_with_nothing_to_add_says_so` changed its expected sentence under rule (b), the behaviour changed intentionally: that fixture's year holds no APEs, which is the exact input the old refusal was wrong about, and the promise it asserts is unchanged.
+
+A high-severity finding requires a further cold pass, in a different failure
+family. The second pass covered test quality and the UI control contract.
+
 ### Documents changed in this batch
 
 `docs/USER_GUIDE.md` (the hub section: the tick filter, the bottom Add New,
@@ -300,8 +323,10 @@ button, Vision Elements' moved button), `CHANGELOG.md`,
 `docs/spec_2026-11-07_ape_period_consistency.md` (APC-M2 and APC-M6 point at
 the write path, with a dated supersession note),
 `docs/spec_2026-11-07_unified_panel_design.md` (UPD-M5.4),
-`docs/DOCUMENTATION_INDEX.md` (this plan's entry), `BACKLOG.md` (the two
+`docs/DOCUMENTATION_INDEX.md` (this plan's entry), `BACKLOG.md` (the three
 adjacent issues), `docs/ui_color_inventory.md` (regenerated), this file, and
-the handoff note. `docs/spec_coverage.md` is **not** changed: it is the Project
+the handoff note. The sweep's fixes changed what the user sees on two counts --
+the annual drop now reports, and a refusal names its reason -- so
+`docs/USER_GUIDE.md` and `CHANGELOG.md` were changed again with them. `docs/spec_coverage.md` is **not** changed: it is the Project
 Notes feature's criteria record, not a repo-wide one, and this plan's step 8
 named it by mistake.
