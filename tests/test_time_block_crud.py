@@ -453,15 +453,20 @@ def test_pbga3_a_block_on_a_drawn_box_can_be_resized(manager):
     The template is 08:00-17:00, boxes 0..17. A block on box 18 is on the day
     only because the screen drew it wider -- a drop on **Later**. Without
     ``day_span`` ``_refuse_unless_it_fits`` measures against the template
-    alone, so every length was refused there, the one it already had included,
-    and the right-click menu was dead on that box.
+    alone, so the menu was dead on that box: every length was refused there,
+    the one the block already had included.
 
-    Both halves are asserted: refused when the caller claims the template, and
-    written when the caller passes the day it drew. One alone would pass for a
-    manager that ignored the argument entirely.
+    ``drawn`` is the span the screen would really pass, which is the one
+    ``span_for_blocks`` derives -- it reaches this block and stops. So the
+    third assertion is the honest limit of the fix: a length that runs past
+    the last drawn box is *still* refused, because box 19 is not on the day.
+    Lengthening there is a request to widen the day, which is **Later**'s job,
+    not the length menu's. An earlier draft of this test passed
+    ``DaySpan(0, 20)`` -- reachable, but not from this database -- and so read
+    as though lengthening now worked.
     """
     outer = 18
-    drawn = DaySpan(0, outer + 2)
+    drawn = DaySpan(0, outer)
     assert not template_span(BOUNDS).holds(outer, 1), (
         "precondition: box 18 has to be outside the template, or there is "
         "nothing here to refuse"
@@ -473,17 +478,25 @@ def test_pbga3_a_block_on_a_drawn_box_can_be_resized(manager):
         ),
         outer, BOUNDS, day_span=drawn,
     )
+    assert drawn == build_day_grid(
+        manager.get_time_blocks(DAY), BOUNDS
+    ).span, "precondition: this is not the span the screen would pass"
 
+    # The length it already has, which is what made the menu dead.
     with pytest.raises(SlotRefusedError) as refused:
-        manager.set_block_length(block.id, 60, BOUNDS)
+        manager.set_block_length(block.id, 30, BOUNDS)
     assert refused.value.reason == SlotRefusal.OUTSIDE_GRID
 
-    manager.set_block_length(block.id, 60, BOUNDS, day_span=drawn)
-
+    manager.set_block_length(block.id, 30, BOUNDS, day_span=drawn)
     resized = manager.get_time_block(block.id)
-    assert (resized.planned_minutes, resized.slot_index) == (60, outer), (
+    assert (resized.planned_minutes, resized.slot_index) == (30, outer), (
         "the resize did not take, or it moved the block"
     )
+
+    # Past the last drawn box: refused, and meant to be.
+    with pytest.raises(SlotRefusedError) as past_the_end:
+        manager.set_block_length(block.id, 60, BOUNDS, day_span=drawn)
+    assert past_the_end.value.reason == SlotRefusal.OUTSIDE_GRID
 
 
 def test_tgm64_a_day_start_change_writes_no_rows(manager):

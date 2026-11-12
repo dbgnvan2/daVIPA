@@ -1160,14 +1160,9 @@ def test_pbgm4_padding_keeps_its_neutral_and_a_task_does_not(
     _pad_pane, pad_row = _one_slot_pane(root, padding, width=600, mapped=False)
     pad_chip = pad_row.block_widgets[0][1]
 
-    palette = semantic_colors()
-    assert _as_hex(task_chip, task_chip.cget("fg_color")) == _as_hex(
-        task_chip, palette["surface_subtle"]
-    ), f"a task chip is {task_chip.cget('fg_color')}, not the theme's surface"
-    assert pad_chip.cget("fg_color") == "transparent", (
-        f"a padding chip is {pad_chip.cget('fg_color')}, not transparent"
-    )
-
+    # The fills are PBG-A7's subject, because what matters about them is a
+    # relationship to the box and not a token. What is left here is the bar,
+    # which is the whole of what tells padding from a task now.
     task_stripe = _stripe_of(task_chip)
     pad_stripe = _stripe_of(pad_chip)
     assert task_stripe.cget("fg_color") == "transparent", (
@@ -1177,20 +1172,64 @@ def test_pbgm4_padding_keeps_its_neutral_and_a_task_does_not(
         pad_stripe, block_type_colors()[BlockType.BUFFER]
     ), "padding lost the neutral that says it is padding"
 
-    # PBG-A7 -- with the tint gone, a chip's fill is the same token as some
-    # box it can sit in: a task chip and a box holding tasks are both
-    # ``surface_subtle``, and a padding chip's "transparent" resolves to the
-    # ``surface`` its own box is filled with. Either way the chip has no edge
-    # of its own, and two tasks in one box have nothing between them. The
-    # border is what draws it, so it is asserted and not left to the eye.
+
+def _box_of(chip):
+    """The box frame a chip is drawn in -- the chip's body's own parent."""
+    return chip.master.master
+
+
+def test_pbga7_a_chip_is_not_the_colour_of_the_box_it_sits_in(
+    root, manager, light_appearance
+):
+    """PBG-A7 — the chip has an edge, in each box it can land in.
+
+    PBG-M4 took the band tint off the chip and gave it one fixed token. That
+    token is the colour of some box the chip can sit in -- a box holding tasks
+    is ``surface_subtle``, a padding or lunch box is ``surface`` -- so the chip
+    was 1.0:1 against its own box and two tasks in one box had nothing between
+    them. A 1px border did not fix it: CustomTkinter draws the border beneath
+    the children, and the stripe and the labels reach the chip's edges.
+
+    So the chip takes the token its box does not, and that is measured against
+    the real parent rather than restated: a task chip and a padding chip land
+    in boxes of different colours, so one assertion per kind would pass for a
+    chip pinned to either token.
+    """
+    item = _scored_item(manager, "Draft the proposal")
+    task = _item_block()
+    task.item_id = item.id
+    _task_pane, task_row = _one_slot_pane(
+        root, task, width=600, mapped=False, items_by_id={item.id: item}
+    )
+    task_chip = task_row.block_widgets[0][1]
+
+    padding = TimeBlock(
+        block_date=THURSDAY, start_time="08:00", end_time="08:30",
+        planned_minutes=30, label="Buffer", slot_index=0,
+        block_type=BlockType.BUFFER,
+    )
+    _pad_pane, pad_row = _one_slot_pane(root, padding, width=600, mapped=False)
+    pad_chip = pad_row.block_widgets[0][1]
+
+    palette = semantic_colors()
+    seen = set()
     for name, chip in (("task", task_chip), ("padding", pad_chip)):
-        assert int(chip.cget("border_width")) == 1, (
-            f"a {name} chip has no border, and its fill is the same colour as "
-            f"the box it sits in"
+        box = _box_of(chip)
+        box_fill = _as_hex(box, box.cget("fg_color"))
+        chip_fill = _as_hex(chip, chip.cget("fg_color"))
+        seen.add(box_fill)
+        assert chip_fill != box_fill, (
+            f"a {name} chip and its box are both {box_fill}, so the chip has "
+            f"no edge"
         )
-        assert _as_hex(chip, chip.cget("border_color")) == _as_hex(
-            chip, palette["border"]
-        ), f"a {name} chip's border is not the theme's"
+
+    assert seen == {
+        _as_hex(task_chip, palette["surface"]),
+        _as_hex(task_chip, palette["surface_subtle"]),
+    }, (
+        f"precondition: the two kinds have to land in boxes of different "
+        f"colours, or one fixed chip token would satisfy both -- saw {seen}"
+    )
 
 
 # --- TB-M11 : drag blocks to rearrange --------------------------------------
@@ -1230,7 +1269,7 @@ def test_pbgm5_the_band_scheme_is_gone_from_every_module_that_held_it():
     gone = {
         theme: ("priority_band_colors", "priority_fill_colors",
                 "priority_stripe_colors"),
-        time_block_layout: ("priority_band",),
+        time_block_layout: ("priority_band", "UNSCORED_BAND"),
         plan_blocks: ("stripe_for_item", "fill_for_item", "_band_of",
                       "accent_for_item", "accent_for_block",
                       "stripe_for_block"),
@@ -4402,6 +4441,11 @@ def test_pbgm4_a_continuation_box_is_the_same_surface_as_its_first_box(
     coloured box followed by two empty ones -- a task that stops after half an
     hour. The colour that said "which task" is gone; "the same task" is still
     the surface, and the arrow is still what says continued.
+
+    Asserted against a *starting* chip in an equivalent box rather than
+    against a token, because since PBG-A7 the fill is derived from the box the
+    chip lands in -- and both of these boxes hold a task, so both chips must
+    land on the same colour.
     """
     item = _scored_item(manager, "Draft the proposal")
     block = _item_block()
@@ -4416,10 +4460,18 @@ def test_pbgm4_a_continuation_box_is_the_same_surface_as_its_first_box(
     chip = _find_continuation_chip(row.frame)
     assert chip is not None, "no continuation chip in the second box"
 
-    palette = semantic_colors()
+    _first_pane, first_row = _one_slot_pane(
+        root, _item_block(), width=600, mapped=False,
+        items_by_id={item.id: item},
+    )
+    first_chip = first_row.block_widgets[0][1]
+
     assert _as_hex(chip, chip.cget("fg_color")) == _as_hex(
-        chip, palette["surface_subtle"]
-    ), f"the continuation is {chip.cget('fg_color')}, not the task's surface"
+        first_chip, first_chip.cget("fg_color")
+    ), (
+        f"the continuation is {chip.cget('fg_color')} and the box that starts "
+        f"a task is {first_chip.cget('fg_color')}"
+    )
     assert chip.cget("fg_color") != "transparent", (
         "the continuation is unfilled, which reads as a task that stops"
     )

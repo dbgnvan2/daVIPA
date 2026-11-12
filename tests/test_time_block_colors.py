@@ -190,9 +190,9 @@ def test_pdm9_the_two_marks_are_legible_on_the_row_surface(restore_appearance):
     theme, which would leave global CustomTkinter state behind it.
     """
     themes = sorted(Path("themes").glob("*.json"))
-    assert len(themes) >= 10, (
-        f"only {len(themes)} theme files found -- this test is measuring "
-        "fewer surfaces than the app ships"
+    assert len(themes) == 10, (
+        f"{len(themes)} theme files found, not the 10 this app ships -- a "
+        "floor here would hide a theme that stopped being measured"
     )
 
     failures = []
