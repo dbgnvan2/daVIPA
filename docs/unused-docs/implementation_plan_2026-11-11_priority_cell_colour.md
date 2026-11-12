@@ -122,10 +122,11 @@ it asks "what colour is my level".
   builders: exactly one `level_cell_fill` call each, five in total, and
   `len(ROW_BUILDERS) == 5` so a screen cannot be dropped from the list and the
   test still pass. Exact counts, never a floor (`CLAUDE.md`, *Test rules*).
-- `test_pccm3_a_critical_cell_is_drawn_in_the_level_colour` — real widgets, no
-  AST: build one row per screen for an Any Critical item and read the score
-  label's `cget("fg_color")` and `cget("text_color")`. Asserts the colour the
-  user sees, not the shape of the source.
+- `test_pccm3_a_rendered_priority_cell_carries_the_level_colour` — real
+  widgets, no AST: build one row per screen and read the score label's
+  `cget("fg_color")` and `cget("text_color")` back. Asserts the colour the
+  user sees, not the shape of the source. (Shipped under this name; the plan
+  first called it `test_pccm3_a_critical_cell_is_drawn_in_the_level_colour`.)
 - `test_pccm3_an_uncoloured_cell_keeps_the_rows_text` — a "No high or critical"
   item on a segment-filled row: the cell is transparent and its text is the
   row's derived text, not `pick_text_color`'s answer for nothing.
@@ -257,3 +258,31 @@ made them.
   module docstring explains why, and `test_plcm14` guards the distinction.
 - It does not change `row_control_kwargs`. Its live caller is the segment
   fill, which still derives a text colour.
+
+## 8. Manual checklist — what no assertion reaches
+
+`tests/render_priority_cells.py` builds real rows and reads the colours back,
+so the shipped defaults on a plain row are asserted. Three things are not, and
+they are the ones to look at in the running app. Reported with the batch rather
+than guarded.
+
+1. **A row with a VSP segment colour.** Open Today on an item whose segment has
+   a colour set. The row should carry the segment colour across its width, and
+   the Priority cell should sit on it — coloured if the item is Critical or
+   High, transparent if not. A transparent cell keeps the row's own derived
+   text colour, so the number should read against the segment colour, not
+   against the theme's default.
+2. **Your own saved colours, in both appearance modes.** Settings → Priority
+   Colours, pick something dark for Any Critical, save, and look at Today in
+   light mode and in dark. The cell's text should flip to stay legible; the row
+   should not change at all.
+3. **Any Critical cleared.** Clear that field and save. A critical item's
+   Priority cell should look like every other cell, and so should its `I:` or
+   `U:` chip when the columns are expanded. This is the documented consequence
+   of "same scheme" for the chips (§PCC-M4), not a defect — it is here because
+   it is the one case where turning a colour off removes a signal rather than
+   just a colour.
+
+Each is a look, not a measurement: the contrast ratios behind them are already
+asserted over the whole colour range by
+`::test_pccm2_the_cell_text_clears_the_contrast_bar`.

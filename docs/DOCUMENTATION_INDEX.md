@@ -482,6 +482,36 @@ which is listed here only inside this entry rather than as an entry of its own,
 as every handoff note is — it carries the five-step on-screen checklist and the
 measurement of the `TclError` claim this batch set out not to re-measure.
 
+### docs/unused-docs/implementation_plan_2026-11-11_priority_cell_colour.md
+
+Implementation plan for moving the priority colour scheme off the list row and
+onto the Priority cell's background (PCC-M1 - PCC-M5), closing `BACKLOG.md`'s
+`PLC-A3`, low, filed 2026-11-08 — the `P:` chip's hard-coded `danger`, which
+that filing called "worth a decision rather than leaving it implicit".
+**Approved 2026-11-11 and built the same day: 14 of 14 criteria `done`; one
+item not code-testable (how it looks on the user's own saved colours and on a
+VSP-segment-coloured row)** — per-criterion status in `docs/spec_coverage.md`.
+Touches `src/getmoredone/priority_levels.py` and `screens/today.py`,
+`screens/upcoming.py`, `screens/all_items.py`, `screens/hierarchical.py`,
+`screens/completed.py`:
+
+- A priority level tinted the whole row, and the Priority cell carried
+  `palette["danger"]` — `#B91C1C`, a hard red reachable from no setting and
+  unrelated to the three level colours. The two swap: `row_fill` loses its
+  level branch, and `level_cell_fill` colours the cell. The user chose all five
+  list screens, all three levels, and the I/U factor chips included.
+- `row_fill` loses `settings` and `item` with the branch that needed them. A
+  parameter kept past its use was the worse option here: five screens called it
+  as `row_fill(self.settings, palette, item=item, …)`, which reads as though
+  the row still depends on the item's priority.
+- Five tests retired or rewritten, each because the behaviour changed
+  intentionally, with the reason recorded where the test was. One of them,
+  `test_plcm49`, would have stayed green while guarding a state the app can no
+  longer reach.
+- `tests/render_priority_cells.py` is new: it builds a real row per screen in a
+  subprocess and reports each label's colours, so the rendered colour is
+  asserted and not only the source that chooses it. No window is mapped.
+
 ### docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
 
 Implementation plan for the six VSP Planning tabs' left-to-right filter and the

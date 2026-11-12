@@ -107,6 +107,15 @@ Implement a cohesive UI color system with low runtime overhead by:
   blanket ban on full-row fills on 2026-11-11: the ban was guarding against a
   saturated fill under theme-coloured text, and deriving the foreground is what
   actually removes that risk.
+- A **priority level** colours one cell, not the row. `priority_levels.row_fill`
+  used to take it as a third branch, after the segment colour and the completed
+  tint, so a critical item was green across its whole width. Since 2026-11-11 it
+  is the background of the Priority cell alone -- `priority_levels.level_cell_fill`
+  and `fill_for_level`, which derive the cell's text with `pick_text_color` under
+  the same 4.5:1 bar as a row fill. The red that cell used to take,
+  `palette["danger"]`, was reachable from no setting and is gone from all five
+  list screens; `tests/test_priority_level_colors.py::test_pccm5_no_row_builder_reaches_for_the_danger_palette`
+  keeps it gone. A critical I/U factor chip takes the same colour.
 
 ## Refactor policy
 - No new hard-coded colors in widgets (hex or named colors) except:

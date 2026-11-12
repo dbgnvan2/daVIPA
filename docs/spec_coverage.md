@@ -1934,7 +1934,7 @@ Closes `PRI-A1` and `PLC-A1`, both medium, both filed 2026-11-08. Tests are in
 
 | Criterion | Implementation | Test | Status |
 |---|---|---|---|
-| LRR-M1.1 | The five screens ask the authority for the `P:` chip; no priority factor is compared to a literal anywhere in `screens/` | `today.py`, `upcoming.py`, `all_items.py`, `hierarchical.py`, `completed.py` (`is_priority_critical`) | `::test_lrrm11_no_screen_tests_importance_against_a_literal` | done |
+| LRR-M1.1 | The five screens ask the authority for the `P:` chip; no priority factor is compared to a literal anywhere in `screens/` | `today.py`, `upcoming.py`, `all_items.py`, `hierarchical.py`, `completed.py` (`is_priority_critical`, replaced by `level_cell_fill` in PCC-M3 below) | `::test_lrrm11_no_screen_tests_importance_against_a_literal` | done |
 | LRR-M1.2 | An importance of 25, and one stored as the string `"20"`, are critical to the chip | `priority_levels.py::priority_level_for_item` → `::_at_least` | `::test_lrrm12_an_off_scale_critical_is_still_critical` | done |
 | LRR-M2.1 | A segment fill carries a text colour derived with `pick_text_color`; an unreadable colour keeps the theme's | `priority_levels.py::row_fill` | `::test_lrrm21_a_segment_fill_carries_its_own_text_colour`, `::test_lrrm21_an_unreadable_segment_colour_keeps_the_themes_text` | done |
 | LRR-M2.2 | A pale segment colour gets dark text and a dark one light text, both over 4.5:1 | same | `::test_lrrm22_the_segment_text_colour_follows_the_fill` | done |
@@ -2063,3 +2063,64 @@ was mutation-proved red at `#ABC`. `::test_scvm66_the_category_pass_does_not_req
 asserted a colour-map ceiling that could not fail, because the parent
 subsegment's colour was readable and the branch was never entered; it is now
 an exact count with the parent seeded malformed.
+
+### PCC — the priority scheme moves from the row to the Priority cell (2026-11-11)
+
+Plan: [`docs/unused-docs/implementation_plan_2026-11-11_priority_cell_colour.md`](unused-docs/implementation_plan_2026-11-11_priority_cell_colour.md).
+Closes `PLC-A3`, low, filed 2026-11-08 — the `P:` chip's hard-coded `danger`,
+which that filing called "worth a decision rather than leaving it implicit".
+The decision was the user's, taken 2026-11-11, and the entry is gone from
+`BACKLOG.md`. Tests are in `tests/test_priority_level_colors.py`.
+
+| Criterion | Implementation | Test | Status |
+|---|---|---|---|
+| PCC-M1 | A priority level is no longer one of `row_fill`'s branches; precedence is segment, then completed, then nothing | `priority_levels.py::row_fill` | `::test_pccm1_a_level_no_longer_fills_a_row`, `::test_pccm1_segment_and_completed_still_fill_a_row` | done |
+| PCC-M1 (visible) | No rendered row in any of the five screens carries a priority tint | the five row builders | `::test_pccm1_a_rendered_row_has_no_priority_tint` | done |
+| PCC-M1 (signature) | `row_fill` no longer takes `settings` or `item`, the two it needed only to reach the level | same | `::test_pccm1_row_fill_no_longer_takes_the_settings_or_the_item` | done |
+| PCC-M2 | One authority for what colour a level draws, deriving the text with `pick_text_color` | `priority_levels.py::fill_for_level`, `::level_cell_fill` | `::test_pccm2_the_priority_cell_takes_its_level_colour` | done |
+| PCC-M2 | A cleared level, and "No high or critical", give no fill **and** no text colour | same | `::test_pccm2_an_unset_level_means_no_cell_fill` | done |
+| PCC-M2 | The cell's text clears 4.5:1 against the fill, over six colours spanning the range | same, with `color_contrast.py::pick_text_color` | `::test_pccm2_the_cell_text_clears_the_contrast_bar` | done |
+| PCC-M3 | Exactly one `level_cell_fill` call in each of the five row builders, five in total | `today.py`, `upcoming.py`, `all_items.py`, `hierarchical.py`, `completed.py` | `::test_pccm3_every_priority_cell_calls_the_helper` | done |
+| PCC-M3 | The cell's `fg_color`, `text_color` and `corner_radius` come from that fill, with the fallbacks that keep an uncoloured cell drawable | same | `::test_pccm3_the_cell_options_come_from_the_helper` | done |
+| PCC-M3 (rendered) | The colour CustomTkinter actually holds on the widget, per screen and per level | same | `::test_pccm3_a_rendered_priority_cell_carries_the_level_colour` | done |
+| PCC-M4 | A critical I/U factor chip takes the Any Critical colour; four screens, Hierarchical having no factor row | `today.py`, `upcoming.py`, `all_items.py`, `completed.py` | `::test_pccm4_the_chip_options_come_from_the_level`, `::test_pccm4_a_rendered_critical_chip_carries_the_level_colour` | done |
+| PCC-M5 | `palette["danger"]` is read in none of the five row builders, as an exact count scoped to the builder | same five | `::test_pccm5_no_row_builder_reaches_for_the_danger_palette` | done |
+| PCC-D1 | `AGENTS.md`'s *Semantic color rules* says what satisfies the derived-foreground rule now | `AGENTS.md` | none — no test reads prose (`effort-budget.md` §5) | done |
+| PCC-D2 | `docs/USER_GUIDE.md`'s *Priority Colours* describes the cell, not the row | `docs/USER_GUIDE.md` | none, same reason | done |
+| PCC-D3 | This section | this file | none, same reason | done |
+
+Not code-testable: how the change looks on the user's own saved colours and on
+a VSP-segment-coloured row, where an uncoloured Priority cell inherits the
+row's derived text. The rendered checks above cover the shipped defaults on a
+plain row, which is as far as an assertion reaches; the rest went to the
+three-step manual checklist in the plan's §8, reported with the batch.
+
+**Five tests were retired or rewritten, all because the behaviour changed
+intentionally** (`CLAUDE.md`, *Test rules*, clause (b)). Each disposition is
+recorded where the test was or in the replacement's docstring, not only here:
+
+| Was | Now |
+|---|---|
+| `::test_plcm41_a_row_takes_its_level_colour` | **Retired.** Its claim is the one reversed. A comment stands where it was. |
+| `::test_plcm42_segment_and_completed_still_win` | **Rewritten** as `::test_pccm1_segment_and_completed_still_fill_a_row`, minus the level clause. |
+| `::test_plcm43_an_unset_level_means_no_fill` | **Moved** to `::test_pccm2_an_unset_level_means_no_cell_fill`, keeping the `None`-not-`""` reason and adding the text-colour clause. |
+| `::test_plcm44_level_fill_text_clears_the_contrast_bar` | **Moved** to `::test_pccm2_the_cell_text_clears_the_contrast_bar`, same six colours. |
+| `::test_plcm49_controls_follow_a_level_fill` | **Retired.** It built a `RowFill` by hand so it would have stayed green while guarding a state the app can no longer reach. `row_control_kwargs` is unchanged and still covered for segment fills. |
+
+Three more were retargeted rather than re-aimed: `::test_plcm45` lost two dead
+locals, `::test_plcm46` reaches the level colour through `fill_for_level`
+instead of `row_fill`, and `::test_plcm4_a_completed_row_in_all_items_still_uses_the_status_check`
+dropped the two arguments. `_chip_condition` became
+`_cell_fill_expression`: it read the local `is_priority_critical`, which the
+five screens kept beside the cell while the cell was red-or-nothing, and now
+compiles the `level_cell_fill` call that replaced it.
+`::test_lrrm12_an_off_scale_critical_is_still_critical` asks the same question
+of the colour that it asked of the flag, over the same four inputs.
+
+Adjacent, found and not fixed (global rule 10), neither filed because both are
+low and `effort-budget.md` §3 drops below-medium rather than journalling them:
+`screens/item_editor_dialogs.py:257` and `:476` draw a `P:` score with no
+colour at all in the parent/child picker dialogs, the only other list-shaped
+place a score appears; and the score column's magic widths, already open as
+`PRI-A2`, sit on the exact lines this batch edited and were deliberately left
+alone.

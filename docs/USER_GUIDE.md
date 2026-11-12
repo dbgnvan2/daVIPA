@@ -790,13 +790,21 @@ Date Increment Settings:
 - **Completion Badge** — What: Optional image shown on completed Today items. Why: Replace the default large green check mark with your preferred badge.
 - **Confetti Every N Completions** — What: Controls how often confetti triggers on Today completions. Why: Tune or disable celebration feedback.
 
-Priority Colours (added 2026-11-08):
-- What: The row tint for each of the three **priority levels**. A priority level
-  is a rule on an item's own Importance and Urgency, and it tints the whole row
-  in Today, Upcoming, All Items, Hierarchical and Completed, and in the Action
-  Items panel of APE Week Assignment, which draws Today's rows.
+Priority Colours (added 2026-11-08; moved from the row to the Priority cell 2026-11-11):
+- What: The background of the **Priority cell** for each of the three
+  **priority levels**. A priority level is a rule on an item's own Importance
+  and Urgency, and it colours the Priority cell in Today, Upcoming, All Items,
+  Hierarchical and Completed, and in the Action Items panel of APE Week
+  Assignment, which draws Today's rows.
 - Why: The old behaviour had one tint, a pale red, for Critical items only, with
   no way to change it and no tier between Critical and nothing.
+- **Changed on 2026-11-11.** Between 2026-11-08 and then these colours tinted
+  the **whole row**, and the Priority cell carried a separate hard red that no
+  setting could reach. The two have swapped: the level colour is the cell's
+  background now, and a row with no VSP segment colour and no completion is
+  drawn in the theme's own background, as it was before 2026-11-08. The red is
+  gone. Nothing else about the three colours changed — the same values, set in
+  the same place, shown somewhere smaller.
 - The three levels, checked in this order:
   - **Any Critical** — Importance *or* Urgency is Critical. Default `#DCFCE7`,
     a green. One Critical factor outranks a High one.
@@ -804,7 +812,7 @@ Priority Colours (added 2026-11-08):
     Critical. Default `#FEF3C7`, an amber. This tier is new; before
     2026-11-08 a High item looked the same as a Low one.
   - **No high or critical** — neither factor is High or Critical. Default: no
-    fill, so the row keeps the theme's own background, as it always has.
+    fill, so the cell is transparent and keeps the row's own text colour.
 - A missing factor does not disqualify an item: Urgency Critical with
   Importance unset is still **Any Critical**.
 - Controls per level: a `#RRGGBB` field, a **Pick Colour** button, and a swatch
@@ -815,16 +823,17 @@ Priority Colours (added 2026-11-08):
     rather than silently substituting one.
   - **Restore Defaults** — Puts the three shipped defaults back into the
     fields. It does not save them; press Apply / Save to keep them.
-- **Clear a field** to give that level no fill.
-- One colour per level, used in both light and dark mode. The row's *text*
+- **Clear a field** to give that level no colour. With Any Critical cleared, a
+  critical item's Priority cell looks like any other — and so does its critical
+  Importance or Urgency chip, which takes the same colour (see below).
+- One colour per level, used in both light and dark mode. The cell's *text*
   colour is chosen automatically for contrast against whatever you pick, so a
-  pale colour gets dark text in either mode, and the row's own controls — the
-  complete checkbox, and Today's drag grip — follow it for the same reason.
-- A **VSP segment colour outranks these tints**: where Today, Upcoming and All
-  Items can colour a row from its segment, that colour wins and the priority
-  tint is not drawn. Since 2026-11-10 a segment-coloured row picks its text
-  colour for contrast in the same way, so a pale segment colour reads in the
-  dark theme instead of keeping the theme's near-white row text.
+  pale colour gets dark text in either mode.
+- **A VSP segment colour no longer competes with these.** It fills the row;
+  these colour one cell on it, so both can show at once. Where Today, Upcoming
+  and All Items colour a row from its segment, that row picks its own text
+  colour for contrast (since 2026-11-10), and an uncoloured Priority cell keeps
+  that text colour rather than choosing its own.
   - Since 2026-11-11 a segment colour that is **not** a `#RRGGBB` value draws
     no fill at all, so those rows look as they would with no segment colour
     set, and `app.log` names the value once. The narrow accent stripe at the
@@ -840,8 +849,10 @@ Priority Colours (added 2026-11-08):
   colours. An item can sit in the top band while being in no critical level:
   Medium Importance and Urgency with XL Size and Value scores 6400, which is
   the critical band, and is "No high or critical" as a level.
-- The red `P:` priority chip on a row is unchanged and still marks a Critical
-  item, so with a green Any Critical the row and its chip differ by design.
+- **The I and U factor chips** (shown when the columns are expanded) take the
+  **Any Critical** colour when that one factor is itself Critical. Size (`E`)
+  and Value (`V`) never do: they are in the priority score and in no level.
+  Before 2026-11-11 those chips were the same hard red as the Priority cell.
 
 ### Vision Planning (Unified Hub)
 - What: A single workspace with top navigation for all vision-planning flows.

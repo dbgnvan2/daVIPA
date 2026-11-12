@@ -405,22 +405,6 @@ treatment is right and the other three are wrong, or the reverse; nothing
 records which, and `row_fill` preserves the difference by having both pass
 `segment_color=None`.
 
-### PLC-A3 — the `P:` chip hard-codes `danger` for critical, in five screens (low)
-
-`fg_color=palette["danger"] if is_priority_critical else "transparent"`, in all
-five list screens. Out of scope by the user's explicit choice — the colour
-setting paints the row tint only — but with Any Critical now green, the row and
-its chip disagree by design. Worth a decision rather than leaving it implicit.
-
-What remains open here is the chip's **colour**, and only that. Its
-*condition* was the second half of this filing and is closed: the LRR batch
-(2026-11-10) replaced the five inline `importance == 20 or urgency == 20`
-copies with `priority_level_for_item(item) == LEVEL_ANY_CRITICAL`, held by
-`tests/test_priority_level_colors.py::test_lrrm11_no_screen_tests_importance_against_a_literal`.
-So the chip and the row tint now agree on *which* items are critical and
-disagree only on what critical should look like, which is the product
-decision.
-
 ### PLC-A4 — `settings.py` is 1214 lines (low)
 
 Well past the 700-line refactor mark in
