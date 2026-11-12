@@ -40,7 +40,7 @@ and theme_files line counts.
 
 | Scan | Lines |
 |---|---:|
-| `app_settings` | 26 |
+| `app_settings` | 25 |
 | `hex` | 187 |
 | `named` | 57 |
 | `theme_api` | 2 |
@@ -64,7 +64,6 @@ AppSettings persisted color/theme fields:
 src/getmoredone/app_settings.py:55:    appearance_mode: str = "dark"  # system | dark | light
 src/getmoredone/app_settings.py:56:    theme_name: str = "apple_grey"
 src/getmoredone/app_settings.py:69:    # tests/test_priority_level_colors.py::test_plcm21_every_level_has_a_settings_field
-src/getmoredone/app_settings.py:73:    # "" means no fill — the row keeps the theme's own background, which is
 src/getmoredone/app_settings.py:78:    # The defaults are duplicated from theme.priority_level_fill_colors(),
 src/getmoredone/app_settings.py:82:    priority_level_color_any_critical: str = "#DCFCE7"
 src/getmoredone/app_settings.py:83:    priority_level_color_any_high: str = "#FEF3C7"
@@ -219,13 +218,13 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:465` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
+| `src/getmoredone/theme.py:467` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 
 ### `#0284c7`
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:459` | `"Week": "#0284C7",` |
+| `src/getmoredone/theme.py:461` | `"Week": "#0284C7",` |
 
 ### `#052e16`
 
@@ -238,7 +237,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:458` | `"Month": "#059669",` |
+| `src/getmoredone/theme.py:460` | `"Month": "#059669",` |
 
 ### `#0b368d`
 
@@ -250,7 +249,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:455` | `"Annual Plan": "#0D9488",` |
+| `src/getmoredone/theme.py:457` | `"Annual Plan": "#0D9488",` |
 
 ### `#0ea5e9`
 
@@ -494,7 +493,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:454` | `"Annual Vision": "#2563EB",` |
+| `src/getmoredone/theme.py:456` | `"Annual Vision": "#2563EB",` |
 
 ### `#262454`
 
@@ -720,7 +719,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:465` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
+| `src/getmoredone/theme.py:467` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 
 ### `#3b8ed0`
 
@@ -910,7 +909,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:440` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
+| `src/getmoredone/theme.py:442` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
 | `themes/black_white.json:27` | `"#4B5563"` |
 | `tools/generate_ctk_themes.py:78` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
 
@@ -1230,7 +1229,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:453` | `"TL Vision": "#7C3AED",` |
+| `src/getmoredone/theme.py:455` | `"TL Vision": "#7C3AED",` |
 | `themes/purple.json:35` | `"#7C3AED"` |
 | `themes/purple.json:87` | `"#7C3AED"` |
 | `themes/purple.json:120` | `"#7C3AED"` |
@@ -1532,7 +1531,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:440` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
+| `src/getmoredone/theme.py:442` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
 | `themes/black_white.json:70` | `"#9CA3AF",` |
 | `themes/black_white.json:79` | `"#9CA3AF"` |
 | `tools/generate_ctk_themes.py:81` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
@@ -1575,7 +1574,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:465` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
+| `src/getmoredone/theme.py:467` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 
 ### `#aab0b5`
 
@@ -1904,7 +1903,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/app_settings.py:82` | `priority_level_color_any_critical: str = "#DCFCE7"` |
 | `src/getmoredone/theme.py:137` | `"on_strong": "#ECFDF5" if mode == "light" else "#DCFCE7",` |
 | `src/getmoredone/theme.py:370` | `"low": "#DCFCE7",` |
-| `src/getmoredone/theme.py:419` | `LEVEL_ANY_CRITICAL: "#DCFCE7",` |
+| `src/getmoredone/theme.py:421` | `LEVEL_ANY_CRITICAL: "#DCFCE7",` |
 
 ### `#de1b24`
 
@@ -1981,7 +1980,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:457` | `"Quarter": "#EA580C",` |
+| `src/getmoredone/theme.py:459` | `"Quarter": "#EA580C",` |
 
 ### `#ea6fda`
 
@@ -2023,7 +2022,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:465` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
+| `src/getmoredone/theme.py:467` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
 
 ### `#ef7292`
@@ -2098,7 +2097,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:456` | `"Annual Initiative": "#F59E0B",` |
+| `src/getmoredone/theme.py:458` | `"Annual Initiative": "#F59E0B",` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
 
 ### `#f5a6be`
@@ -2144,7 +2143,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:465` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
+| `src/getmoredone/theme.py:467` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
 
 ### `#f9f5ff`
@@ -2248,7 +2247,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/app_settings.py:83` | `priority_level_color_any_high: str = "#FEF3C7"` |
 | `src/getmoredone/theme.py:369` | `"medium": "#FEF3C7",` |
-| `src/getmoredone/theme.py:420` | `LEVEL_ANY_HIGH: "#FEF3C7",` |
+| `src/getmoredone/theme.py:422` | `LEVEL_ANY_HIGH: "#FEF3C7",` |
 
 ### `#ff5a8a`
 
@@ -2333,7 +2332,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:465` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
+| `src/getmoredone/theme.py:467` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 
 ### `#ffd8a8`
 

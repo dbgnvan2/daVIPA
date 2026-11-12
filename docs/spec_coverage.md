@@ -2083,17 +2083,29 @@ The decision was the user's, taken 2026-11-11, and the entry is gone from
 | PCC-M3 | Exactly one `level_cell_fill` call in each of the five row builders, five in total | `today.py`, `upcoming.py`, `all_items.py`, `hierarchical.py`, `completed.py` | `::test_pccm3_every_priority_cell_calls_the_helper` | done |
 | PCC-M3 | The cell's `fg_color`, `text_color` and `corner_radius` come from that fill, with the fallbacks that keep an uncoloured cell drawable | same | `::test_pccm3_the_cell_options_come_from_the_helper` | done |
 | PCC-M3 (rendered) | The colour CustomTkinter actually holds on the widget, per screen and per level | same | `::test_pccm3_a_rendered_priority_cell_carries_the_level_colour` | done |
+| PCC-M3 (rendered) | A colour the *user* saved, not a shipped default, reaches the real widget with its derived text — the positive twin the fallback-to-default render needs | same | `::test_pccm3_a_saved_colour_reaches_the_real_widget` | done |
+| PCC-M3 (rendered) | An uncoloured cell draws in the row's own text colour, asserted against a sibling label in the same row | same | `::test_pccm3_an_uncoloured_cell_keeps_the_rows_text` | done |
+| PCC-M3 (harness) | The render subprocess resolves no path in the user's real application-support directory | `tests/render_priority_cells.py` | `::test_pccm3_the_render_helper_stays_out_of_the_real_data_dir` | done |
 | PCC-M4 | A critical I/U factor chip takes the Any Critical colour; four screens, Hierarchical having no factor row | `today.py`, `upcoming.py`, `all_items.py`, `completed.py` | `::test_pccm4_the_chip_options_come_from_the_level`, `::test_pccm4_a_rendered_critical_chip_carries_the_level_colour` | done |
 | PCC-M5 | `palette["danger"]` is read in none of the five row builders, as an exact count scoped to the builder | same five | `::test_pccm5_no_row_builder_reaches_for_the_danger_palette` | done |
 | PCC-D1 | `AGENTS.md`'s *Semantic color rules* says what satisfies the derived-foreground rule now | `AGENTS.md` | none — no test reads prose (`effort-budget.md` §5) | done |
 | PCC-D2 | `docs/USER_GUIDE.md`'s *Priority Colours* describes the cell, not the row | `docs/USER_GUIDE.md` | none, same reason | done |
 | PCC-D3 | This section | this file | none, same reason | done |
+| PCC-D4 | `BACKLOG.md` gains `PCC-A1` and `PCC-A3`, and loses `PLC-A3`, closed by this batch | `BACKLOG.md` | none, same reason | done |
 
-Not code-testable: how the change looks on the user's own saved colours and on
-a VSP-segment-coloured row, where an uncoloured Priority cell inherits the
-row's derived text. The rendered checks above cover the shipped defaults on a
-plain row, which is as far as an assertion reaches; the rest went to the
-three-step manual checklist in the plan's §8, reported with the batch.
+Not code-testable: how the change looks on a **VSP-segment-coloured row**,
+where an uncoloured Priority cell inherits the text colour that row derived,
+and on a **completed row**, whose measurement is `PCC-A3`. The helper creates
+no segment and renders no filled row, so neither composition is built by any
+assertion. Both are in the plan's §8 checklist, reported with the batch.
+
+Two things that paragraph deferred to a human on 2026-11-11 are now asserted,
+after the cold passes of 2026-11-12 pointed out that neither was: a colour the
+user saved reaching the real widget (`::test_pccm3_a_saved_colour_reaches_the_real_widget`
+— the render of the shipped defaults could not tell a working settings read
+from a broken one, since `level_color` falls back to the same value), and an
+uncoloured cell keeping the row's text (`::test_pccm3_an_uncoloured_cell_keeps_the_rows_text`,
+which the plan listed as an acceptance test and the build did not write).
 
 **Five tests were retired or rewritten, all because the behaviour changed
 intentionally** (`CLAUDE.md`, *Test rules*, clause (b)). Each disposition is
@@ -2117,10 +2129,20 @@ compiles the `level_cell_fill` call that replaced it.
 `::test_lrrm12_an_off_scale_critical_is_still_critical` asks the same question
 of the colour that it asked of the flag, over the same four inputs.
 
-Adjacent, found and not fixed (global rule 10), neither filed because both are
-low and `effort-budget.md` §3 drops below-medium rather than journalling them:
-`screens/item_editor_dialogs.py:257` and `:476` draw a `P:` score with no
-colour at all in the parent/child picker dialogs, the only other list-shaped
-place a score appears; and the score column's magic widths, already open as
-`PRI-A2`, sit on the exact lines this batch edited and were deliberately left
-alone.
+Adjacent, found and not fixed (global rule 10). Both are low, so
+`effort-budget.md` §3 would drop them; the user was asked on 2026-11-12 and
+chose to file one:
+
+- **`PCC-A1`, filed in `BACKLOG.md`** — `screens/item_editor_dialogs.py:257`
+  and `:476` draw a `P:` score with no colour at all in the parent/child
+  picker dialogs, the only other list-shaped place a score appears.
+- **Not filed** — the score column's magic widths, already open as `PRI-A2`,
+  sit on the exact lines this batch edited and were deliberately left alone.
+  Filing it again would put two items in `BACKLOG.md` for one width problem.
+- **`PCC-A3`, filed in `BACKLOG.md`, medium** — the two cold passes of
+  2026-11-12 both found that a completed row's Priority cell measures 1.02:1
+  against the row in light mode, where the red it replaced was 5.77:1. The
+  colours were approved knowing they are pale; the composition was not part of
+  that approval, so the numbers were put to the user, who chose to ship and
+  file rather than alter the colours or add a border. Dark mode improves
+  (13.4:1 against 2.27:1). No assertion covers it; it is the plan's §8 item 4.

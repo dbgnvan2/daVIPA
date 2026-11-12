@@ -87,6 +87,68 @@ Fix when touched: decide the question first. If yes, add the `elif edge is not
 None` case alongside the other two; if no, report a refusal instead of
 dropping the gesture.
 
+## Adjacent issue — the priority cell colour (PCC, filed 2026-11-12)
+
+Found while building PCC-M1 - PCC-M5 and not fixed, under global rule 10.
+
+### PCC-A3 — a completed row's Priority cell is invisible in light mode (medium)
+
+Found by two independent cold passes on 2026-11-12, which reached it
+separately. Measured here with the repo's own `color_contrast.contrast_ratio`:
+
+| cell fill | vs completed row, light (`success_tint` `#E8F5EE`) | vs the same, dark (`#1F2B24`) |
+|---|---|---|
+| Any Critical `#DCFCE7` | **1.02:1** | 13.38:1 |
+| Any High `#FEF3C7` | **1.01:1** | 13.19:1 |
+| what it replaced, `palette["danger"]` `#B91C1C` | 5.77:1 | 2.27:1 |
+
+Today, All Items and Hierarchical all pass `use_completed_tint=True`, so a
+completed critical item is a pale-green row carrying a pale-green cell: the
+indicator renders and cannot be seen. The same applies to its `I:`/`U:` chips
+on Today and All Items. This repo holds a non-text indicator to 3:1
+(`row_control_kwargs`, and `tests/test_priority_level_colors.py`'s own bar).
+
+**Not a defect in the change as approved.** The user was told before approving
+that a critical cell would be pale green rather than red, chose that, and on
+2026-11-12 was shown the numbers above and chose to ship them and file this
+rather than alter the colours or add a border. Recorded so the decision is
+visible, not to reopen it.
+
+Note the trade is not one-way: in dark mode these colours are far *better*
+against a completed row than the red was (13.4:1 against 2.27:1). The
+regression is light mode only.
+
+Fix when touched, cheapest first: give the cell `border_width=1,
+border_color=cell.text_color` — the derived text colour is black on both
+defaults, so the patch gains an edge at about 19:1 against a completed row
+with no colour change at all. Then hold it to 3:1 with a test over every row
+background a cell can sit on (each theme's `CTkFrame.fg_color` plus
+`palette["success_tint"]`).
+
+No assertion covers this composition: `tests/render_priority_cells.py` renders
+open items for the three screens that tint completed rows, and CompletedScreen
+passes `use_completed_tint=False`, so no rendered row in the suite has a fill
+under a cell. It is the plan's §8 checklist item 4.
+
+### PCC-A1 — the parent/child pickers draw an uncoloured priority score (low)
+
+`screens/item_editor_dialogs.py:257` and `:476` draw a `P:{priority_score}`
+label under a `"Priority"` header with no colour at all. They are the only
+other place in the app where a priority score appears in a list, so after PCC
+the same number is colour-coded on the five list screens and plain here.
+
+Left alone deliberately: the user named the list screens, and a dialog that has
+never been coloured is not the red PCC replaced. Whether a picker dialog should
+carry the scheme at all is a design question, not a defect.
+
+Fix when touched: call `priority_levels.level_cell_fill(settings, item)` and
+pass `fill`/`text_color` to the label, as the five row builders now do. The
+authority already derives legible text for any colour the user picks, so there
+is nothing to work out — only the decision to do it.
+
+The other finding, the score column's width (`width=60` in four screens,
+`width=80` in All Items), is already open as `PRI-A2` and is not filed twice.
+
 ## Adjacent issues — the suite's honesty about its environment (CGH, filed 2026-11-11)
 
 Found while building CGH-M1 - CGH-M4 and not fixed, under global rule 10.

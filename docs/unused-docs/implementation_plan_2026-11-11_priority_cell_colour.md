@@ -1,7 +1,10 @@
 # PCC — the priority colour scheme moves from the row to the Priority cell
 
-**Status:** awaiting approval. Written 2026-11-11, before any code.
-**Base:** `main` at `1faf21a`, clean and in sync.
+**Status:** approved 2026-11-11 and built 2026-11-11 - 2026-11-12. All nine
+criteria done; see `docs/spec_coverage.md` for the per-criterion record and
+the status report in the batch's handoff note for what was measured.
+**Base:** `main` at `eb6dd3d`, clean and in sync. (This line read `1faf21a`
+while the plan was being written; the batch was cut from `eb6dd3d`.)
 **Tier (`effort-budget.md` §1):** **Full** — `src/` and a user-visible contract.
 Sweep budget applies: at most two warm passes, at least one cold pass.
 
@@ -64,8 +67,10 @@ Week Assignment **is** a `TodayScreen` (`screens/chip_table.py:405`, guarded by
 
 Nothing is removed, renamed, relocated or disabled. Every control in the five
 rows keeps its place, its text, its width and its click binding — the Priority
-cell keeps `width=60` (`width=80` in All Items), its `<Button-1>` binding to
-`edit_priority_inline`, and its `corner_radius=6`-when-filled shape. What
+cell keeps `width=60` (`width=80` in All Items), its `corner_radius=6`-when-
+filled shape, and, on the three screens that have ever had one (Today,
+Upcoming, All Items), its `<Button-1>` binding to `edit_priority_inline`.
+Hierarchical and Completed have no such binding and gain none. What
 changes is which colour two of them are drawn in. **One user-visible change to
 call out:** rows that are green or amber today will be the theme's own
 background, and the Priority cell will carry that green or amber instead.
@@ -232,9 +237,9 @@ GETMOREDONE_NO_MAPPED_WINDOWS=1 nice -n 19 taskpolicy -b ./venv/bin/python -m py
 ## 6. Adjacent issues found, not fixed (global rule 10)
 
 Scanned `src/getmoredone/screens/` for the same pattern. Two findings, neither
-in scope, and **neither is filed in `BACKLOG.md` until this plan is approved**
-— the `PRI` section exists because a previous plan promised filings and never
-made them.
+in scope. Filing was put to the user separately from the plan's approval, on
+2026-11-12: **`PCC-A1` is filed in `BACKLOG.md`; `PCC-A2` is not**, because it
+is the same width problem as the already-open `PRI-A2`.
 
 - **PCC-A1 (low) — `screens/item_editor_dialogs.py:257` and `:476`** draw a
   `P:{priority_score}` label under a `"Priority"` header with **no colour at
@@ -283,6 +288,17 @@ than guarded.
    it is the one case where turning a colour off removes a signal rather than
    just a colour.
 
-Each is a look, not a measurement: the contrast ratios behind them are already
-asserted over the whole colour range by
-`::test_pccm2_the_cell_text_clears_the_contrast_bar`.
+4. **A completed critical item, light mode.** Complete an item whose
+   Importance is Critical and look at it in Today, All Items or Hierarchical.
+   The Priority cell will be a pale green patch on the pale green completed
+   row and effectively invisible — measured at 1.02:1, where the red it
+   replaced was 5.77:1. **Known and accepted**, filed as `PCC-A3` with the
+   numbers and the one-line fix; the user was shown this on 2026-11-12 and
+   chose to ship it. Dark mode is the other way round: these colours are
+   13.4:1 there against the red's 2.27:1. Here so the look is expected rather
+   than reported as a bug.
+
+Items 1 to 3 are a look, not a measurement: the contrast ratios behind them are
+already asserted over the whole colour range by
+`::test_pccm2_the_cell_text_clears_the_contrast_bar`. Item 4 is the measurement
+`PCC-A3` records, and no assertion covers its composition — see that entry.
