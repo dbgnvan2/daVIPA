@@ -602,8 +602,11 @@ class PlanScreen(ctk.CTkFrame):
         # alternates with nesting depth, and at app.py's depth this pane's
         # scroll frame came out the item row's own colour. Why:
         # docs/unused-docs/implementation_plan_2026-11-12_surface_separation.md
+        # The theme's [light, dark] pair, not semantic_colors()'s resolved
+        # string, so the pane repaints when the OS switches mode.
         palette = semantic_colors()
-        frame = ctk.CTkFrame(self, fg_color=palette["surface"])
+        pane_fill = ctk.ThemeManager.theme["CTkFrame"]["fg_color"]
+        frame = ctk.CTkFrame(self, fg_color=pane_fill)
         frame.grid(
             row=1, column=0, sticky="nsew",
             padx=(PLAN_PANE_EDGE_PAD_PX, 0), pady=10,
@@ -626,7 +629,7 @@ class PlanScreen(ctk.CTkFrame):
         self.items_hint.grid(row=1, column=0, padx=10, pady=(0, 6), sticky="w")
 
         self.items_scroll = ctk.CTkScrollableFrame(
-            frame, fg_color=palette["surface"]
+            frame, fg_color=pane_fill
         )
         self.items_scroll.grid(row=2, column=0, sticky="nsew", padx=5, pady=(0, 5))
         self.items_scroll.grid_columnconfigure(0, weight=1)
@@ -857,7 +860,8 @@ class PlanScreen(ctk.CTkFrame):
     def create_day_pane(self):
         # SEP-M5 -- named, not inherited; see ``create_items_pane``.
         palette = semantic_colors()
-        frame = ctk.CTkFrame(self, fg_color=palette["surface"])
+        pane_fill = ctk.ThemeManager.theme["CTkFrame"]["fg_color"]
+        frame = ctk.CTkFrame(self, fg_color=pane_fill)
         frame.grid(
             row=1, column=2, sticky="nsew",
             padx=(0, PLAN_PANE_EDGE_PAD_PX), pady=10,
@@ -894,7 +898,7 @@ class PlanScreen(ctk.CTkFrame):
         # The drop target for an item drag, and the container a block drag is
         # reordered within.
         self.blocks_scroll = ctk.CTkScrollableFrame(
-            frame, fg_color=palette["surface"]
+            frame, fg_color=pane_fill
         )
         self.blocks_scroll.grid(row=3, column=0, sticky="nsew", padx=5, pady=4)
         self.blocks_scroll.grid_columnconfigure(0, weight=1)

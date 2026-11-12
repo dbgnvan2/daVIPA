@@ -27,7 +27,7 @@ rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkg
 
 ## 1) Summary Counts By Type
 
-- Hex colors (match count): **1064**
+- Hex colors (match count): **1063**
 - Named colors (match count): **649**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
@@ -41,7 +41,7 @@ and theme_files line counts.
 | Scan | Lines |
 |---|---:|
 | `app_settings` | 25 |
-| `hex` | 163 |
+| `hex` | 162 |
 | `named` | 57 |
 | `theme_api` | 2 |
 | `theme_files` | 1292 |
@@ -88,30 +88,30 @@ src/getmoredone/app_settings.py:715:        from .theme import normalize_theme_n
 src/getmoredone/app_settings.py:717:        return normalize_theme_name(value)
 ```
 
-Hex top values (20 of 231 distinct):
+Hex top values (20 of 230 distinct):
 
 | Color | Count |
 |---|---:|
 | `#dce4ee` | 60 |
+| `#ffffff` | 56 |
 | `#979da2` | 52 |
-| `#ffffff` | 52 |
+| `#000000` | 35 |
 | `#565b5e` | 34 |
-| `#000000` | 33 |
 | `#3e454a` | 27 |
 | `#4a4d50` | 27 |
 | `#939ba2` | 27 |
 | `#949a9f` | 27 |
+| `#1d1d1f` | 21 |
 | `#2e1c8f` | 21 |
-| `#1d1d1f` | 19 |
 | `#6e6e73` | 17 |
 | `#334155` | 16 |
 | `#343638` | 16 |
 | `#f9f9fa` | 16 |
-| `#111111` | 15 |
 | `#86868b` | 15 |
+| `#111111` | 13 |
 | `#d2d2d7` | 13 |
 | `#f0e7ff` | 12 |
-| `#f5f5f7` | 12 |
+| `#42386d` | 11 |
 
 Named top values (all 40 distinct):
 
@@ -181,6 +181,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:5` | `"#000000"` |
 | `themes/black_white.json:11` | `"#000000"` |
 | `themes/black_white.json:19` | `"#000000"` |
+| `themes/black_white.json:23` | `"#000000"` |
 | `themes/black_white.json:38` | `"#000000",` |
 | `themes/black_white.json:58` | `"#000000",` |
 | `themes/black_white.json:74` | `"#000000",` |
@@ -194,11 +195,12 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `tools/generate_ctk_themes.py:57` | `BLACK_WHITE_HOVER = ["#000000", "#FFFFFF"]` |
 | `tools/generate_ctk_themes.py:61` | `("CTk", "fg_color"): ["#F5F5F7", "#000000"],` |
 | `tools/generate_ctk_themes.py:62` | `("CTkToplevel", "fg_color"): ["#F5F5F7", "#000000"],` |
-| `tools/generate_ctk_themes.py:75` | `("CTk", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:76` | `("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:77` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:81` | `("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],` |
-| `tools/generate_ctk_themes.py:84` | `("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],` |
+| `tools/generate_ctk_themes.py:74` | `("CTk", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:75` | `("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:76` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:77` | `("CTkFrame", "top_fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:79` | `("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],` |
+| `tools/generate_ctk_themes.py:82` | `("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],` |
 
 ### `#000365`
 
@@ -273,7 +275,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `themes/black_white.json:23` | `"#111111"` |
 | `themes/black_white.json:34` | `"#111111",` |
 | `themes/black_white.json:47` | `"#111111"` |
 | `themes/black_white.json:67` | `"#111111"` |
@@ -286,8 +287,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:274` | `"#111111",` |
 | `tools/generate_ctk_themes.py:56` | `BLACK_WHITE_ANCHOR = ["#111111", "#F3F4F6"]` |
 | `tools/generate_ctk_themes.py:58` | `BLACK_WHITE_BUTTON_TEXT = ["#FFFFFF", "#111111"]` |
-| `tools/generate_ctk_themes.py:79` | `("CTkFrame", "top_fg_color"): ["#F3F4F6", "#111111"],` |
-| `tools/generate_ctk_themes.py:82` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],` |
+| `tools/generate_ctk_themes.py:80` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],` |
 
 ### `#14375e`
 
@@ -362,6 +362,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `themes/apple_grey.json:19` | `"#1D1D1F"` |
+| `themes/apple_grey.json:23` | `"#1D1D1F"` |
 | `themes/apple_grey.json:34` | `"#1D1D1F",` |
 | `themes/apple_grey.json:47` | `"#1D1D1F"` |
 | `themes/apple_grey.json:58` | `"#1D1D1F",` |
@@ -377,9 +378,10 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `tools/generate_ctk_themes.py:52` | `APPLE_GREY_ANCHOR = ["#1D1D1F", "#D2D2D7"]` |
 | `tools/generate_ctk_themes.py:54` | `APPLE_GREY_BUTTON_TEXT = ["#FFFFFF", "#1D1D1F"]` |
 | `tools/generate_ctk_themes.py:63` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:67` | `("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
-| `tools/generate_ctk_themes.py:68` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:70` | `("CTkEntry", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
+| `tools/generate_ctk_themes.py:64` | `("CTkFrame", "top_fg_color"): ["#FFFFFF", "#1D1D1F"],` |
+| `tools/generate_ctk_themes.py:66` | `("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
+| `tools/generate_ctk_themes.py:67` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
+| `tools/generate_ctk_themes.py:69` | `("CTkEntry", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
 
 ### `#1d2531`
 
@@ -520,13 +522,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/brand.py:83` | `800: "#6B2F00", 900: "#461F00", 950: "#2A1400",` |
-
-### `#2c2c2e`
-
-| File:Line | Snippet |
-|---|---|
-| `themes/apple_grey.json:23` | `"#2C2C2E"` |
-| `tools/generate_ctk_themes.py:65` | `("CTkFrame", "top_fg_color"): ["#F5F5F7", "#2C2C2E"],` |
 
 ### `#2cc985`
 
@@ -792,8 +787,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `themes/apple_grey.json:27` | `"#424245"` |
 | `themes/apple_grey.json:71` | `"#424245"` |
-| `tools/generate_ctk_themes.py:66` | `("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],` |
-| `tools/generate_ctk_themes.py:69` | `("CTkEntry", "border_color"): ["#D2D2D7", "#424245"],` |
+| `tools/generate_ctk_themes.py:65` | `("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],` |
+| `tools/generate_ctk_themes.py:68` | `("CTkEntry", "border_color"): ["#D2D2D7", "#424245"],` |
 
 ### `#461f00`
 
@@ -877,9 +872,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/theme.py:342` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
 | `themes/black_white.json:27` | `"#4B5563"` |
-| `themes/black_white.json:78` | `"#4B5563",` |
-| `tools/generate_ctk_themes.py:80` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
-| `tools/generate_ctk_themes.py:86` | `("CTkEntry", "placeholder_text_color"): ["#4B5563", "#9CA3AF"],` |
+| `tools/generate_ctk_themes.py:78` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
 
 ### `#4caf50`
 
@@ -1074,8 +1067,9 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `themes/black_white.json:71` | `"#6B7280"` |
-| `tools/generate_ctk_themes.py:83` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
-| `tools/generate_ctk_themes.py:85` | `# SEP-M6: was #6B7280, 4.39:1 on the new subtle surface; now 6.87:1.` |
+| `themes/black_white.json:78` | `"#6B7280",` |
+| `tools/generate_ctk_themes.py:81` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
+| `tools/generate_ctk_themes.py:83` | `("CTkEntry", "placeholder_text_color"): ["#6B7280", "#9CA3AF"],` |
 
 ### `#6bcb77`
 
@@ -1108,8 +1102,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:222` | `"#6E6E73"` |
 | `themes/black_white.json:250` | `"#6E6E73"` |
 | `themes/black_white.json:295` | `"#6E6E73"` |
-| `tools/generate_ctk_themes.py:71` | `("CTkEntry", "placeholder_text_color"): ["#6E6E73", "#A1A1A6"],` |
-| `tools/generate_ctk_themes.py:179` | `widget_cfg["text_color_disabled"] = ["#86868B", "#6E6E73"]` |
+| `tools/generate_ctk_themes.py:70` | `("CTkEntry", "placeholder_text_color"): ["#6E6E73", "#A1A1A6"],` |
+| `tools/generate_ctk_themes.py:176` | `widget_cfg["text_color_disabled"] = ["#86868B", "#6E6E73"]` |
 
 ### `#6e7174`
 
@@ -1253,7 +1247,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:221` | `"#86868B",` |
 | `themes/black_white.json:249` | `"#86868B",` |
 | `themes/black_white.json:294` | `"#86868B",` |
-| `tools/generate_ctk_themes.py:179` | `widget_cfg["text_color_disabled"] = ["#86868B", "#6E6E73"]` |
+| `tools/generate_ctk_themes.py:176` | `widget_cfg["text_color_disabled"] = ["#86868B", "#6E6E73"]` |
 
 ### `#86efac`
 
@@ -1481,8 +1475,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/theme.py:342` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
 | `themes/black_white.json:70` | `"#9CA3AF",` |
 | `themes/black_white.json:79` | `"#9CA3AF"` |
-| `tools/generate_ctk_themes.py:83` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
-| `tools/generate_ctk_themes.py:86` | `("CTkEntry", "placeholder_text_color"): ["#4B5563", "#9CA3AF"],` |
+| `tools/generate_ctk_themes.py:81` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
+| `tools/generate_ctk_themes.py:83` | `("CTkEntry", "placeholder_text_color"): ["#6B7280", "#9CA3AF"],` |
 
 ### `#9d174d`
 
@@ -1509,7 +1503,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `themes/apple_grey.json:79` | `"#A1A1A6"` |
-| `tools/generate_ctk_themes.py:71` | `("CTkEntry", "placeholder_text_color"): ["#6E6E73", "#A1A1A6"],` |
+| `tools/generate_ctk_themes.py:70` | `("CTkEntry", "placeholder_text_color"): ["#6E6E73", "#A1A1A6"],` |
 
 ### `#a396cb`
 
@@ -1711,7 +1705,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `themes/black_white.json:26` | `"#D1D5DB",` |
-| `tools/generate_ctk_themes.py:80` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
+| `tools/generate_ctk_themes.py:78` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
 
 ### `#d1d5de`
 
@@ -1738,8 +1732,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/apple_grey.json:206` | `"#D2D2D7"` |
 | `themes/apple_grey.json:275` | `"#D2D2D7"` |
 | `tools/generate_ctk_themes.py:52` | `APPLE_GREY_ANCHOR = ["#1D1D1F", "#D2D2D7"]` |
-| `tools/generate_ctk_themes.py:66` | `("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],` |
-| `tools/generate_ctk_themes.py:69` | `("CTkEntry", "border_color"): ["#D2D2D7", "#424245"],` |
+| `tools/generate_ctk_themes.py:65` | `("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],` |
+| `tools/generate_ctk_themes.py:68` | `("CTkEntry", "border_color"): ["#D2D2D7", "#424245"],` |
 
 ### `#d5d9de`
 
@@ -1996,7 +1990,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `themes/black_white.json:22` | `"#F3F4F6",` |
 | `themes/black_white.json:35` | `"#F3F4F6"` |
 | `themes/black_white.json:87` | `"#F3F4F6"` |
 | `themes/black_white.json:120` | `"#F3F4F6"` |
@@ -2006,7 +1999,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:206` | `"#F3F4F6"` |
 | `themes/black_white.json:275` | `"#F3F4F6"` |
 | `tools/generate_ctk_themes.py:56` | `BLACK_WHITE_ANCHOR = ["#111111", "#F3F4F6"]` |
-| `tools/generate_ctk_themes.py:79` | `("CTkFrame", "top_fg_color"): ["#F3F4F6", "#111111"],` |
 
 ### `#f43e37`
 
@@ -2046,16 +2038,14 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `themes/apple_grey.json:4` | `"#F5F5F7",` |
 | `themes/apple_grey.json:10` | `"#F5F5F7",` |
-| `themes/apple_grey.json:22` | `"#F5F5F7",` |
 | `themes/apple_grey.json:39` | `"#F5F5F7"` |
 | `themes/apple_grey.json:59` | `"#F5F5F7"` |
 | `themes/apple_grey.json:75` | `"#F5F5F7"` |
 | `tools/generate_ctk_themes.py:53` | `APPLE_GREY_HOVER = ["#000000", "#F5F5F7"]` |
 | `tools/generate_ctk_themes.py:61` | `("CTk", "fg_color"): ["#F5F5F7", "#000000"],` |
 | `tools/generate_ctk_themes.py:62` | `("CTkToplevel", "fg_color"): ["#F5F5F7", "#000000"],` |
-| `tools/generate_ctk_themes.py:65` | `("CTkFrame", "top_fg_color"): ["#F5F5F7", "#2C2C2E"],` |
-| `tools/generate_ctk_themes.py:67` | `("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
-| `tools/generate_ctk_themes.py:70` | `("CTkEntry", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
+| `tools/generate_ctk_themes.py:66` | `("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
+| `tools/generate_ctk_themes.py:69` | `("CTkEntry", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
 
 ### `#f7f5ff`
 
@@ -2342,11 +2332,13 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/settings.py:741` | `initial = self.drag_schedule_text_color_var.get().strip() or "#FFFFFF"` |
 | `src/getmoredone/screens/settings_priority_colors.py:199` | ``` ``#FFFFFF``, and a user who typed a colour they meant has no way to ``` |
 | `themes/apple_grey.json:18` | `"#FFFFFF",` |
+| `themes/apple_grey.json:22` | `"#FFFFFF",` |
 | `themes/apple_grey.json:46` | `"#FFFFFF",` |
 | `themes/apple_grey.json:66` | `"#FFFFFF",` |
 | `themes/black_white.json:4` | `"#FFFFFF",` |
 | `themes/black_white.json:10` | `"#FFFFFF",` |
 | `themes/black_white.json:18` | `"#FFFFFF",` |
+| `themes/black_white.json:22` | `"#FFFFFF",` |
 | `themes/black_white.json:39` | `"#FFFFFF"` |
 | `themes/black_white.json:46` | `"#FFFFFF",` |
 | `themes/black_white.json:59` | `"#FFFFFF"` |
@@ -2370,13 +2362,15 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `tools/generate_ctk_themes.py:57` | `BLACK_WHITE_HOVER = ["#000000", "#FFFFFF"]` |
 | `tools/generate_ctk_themes.py:58` | `BLACK_WHITE_BUTTON_TEXT = ["#FFFFFF", "#111111"]` |
 | `tools/generate_ctk_themes.py:63` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:68` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:75` | `("CTk", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:76` | `("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:77` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:81` | `("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],` |
-| `tools/generate_ctk_themes.py:82` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],` |
-| `tools/generate_ctk_themes.py:84` | `("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],` |
+| `tools/generate_ctk_themes.py:64` | `("CTkFrame", "top_fg_color"): ["#FFFFFF", "#1D1D1F"],` |
+| `tools/generate_ctk_themes.py:67` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
+| `tools/generate_ctk_themes.py:74` | `("CTk", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:75` | `("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:76` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:77` | `("CTkFrame", "top_fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:79` | `("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],` |
+| `tools/generate_ctk_themes.py:80` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],` |
+| `tools/generate_ctk_themes.py:82` | `("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],` |
 
 ### `black`
 

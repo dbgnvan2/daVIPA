@@ -61,8 +61,7 @@ APPLE_NEUTRAL_OVERRIDES: Dict[Tuple[str, str], List[str]] = {
     ("CTk", "fg_color"): ["#F5F5F7", "#000000"],
     ("CTkToplevel", "fg_color"): ["#F5F5F7", "#000000"],
     ("CTkFrame", "fg_color"): ["#FFFFFF", "#1D1D1F"],
-    # SEP-M1: Apple's grouped background / dark elevation; separation 1.09 / 1.21.
-    ("CTkFrame", "top_fg_color"): ["#F5F5F7", "#2C2C2E"],
+    ("CTkFrame", "top_fg_color"): ["#FFFFFF", "#1D1D1F"],
     ("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],
     ("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],
     ("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],
@@ -75,15 +74,13 @@ BLACK_WHITE_NEUTRAL_OVERRIDES: Dict[Tuple[str, str], List[str]] = {
     ("CTk", "fg_color"): ["#FFFFFF", "#000000"],
     ("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],
     ("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],
-    # SEP-M1: this theme's own anchor pair; separation 1.10 / 1.11.
-    ("CTkFrame", "top_fg_color"): ["#F3F4F6", "#111111"],
+    ("CTkFrame", "top_fg_color"): ["#FFFFFF", "#000000"],
     ("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],
     ("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],
     ("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],
     ("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],
     ("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],
-    # SEP-M6: was #6B7280, 4.39:1 on the new subtle surface; now 6.87:1.
-    ("CTkEntry", "placeholder_text_color"): ["#4B5563", "#9CA3AF"],
+    ("CTkEntry", "placeholder_text_color"): ["#6B7280", "#9CA3AF"],
 }
 
 
