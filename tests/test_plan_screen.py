@@ -161,14 +161,11 @@ def two_tone_theme():
     ``test_pbga4`` and ``test_pbga7`` passed locally and failed on CI, on the
     same commit.
 
-    Every bundled theme is two-tone since SEP-M1, which
-    ``tests/test_time_block_colors.py``'s
-    ``test_sepm2_no_bundled_theme_has_one_surface_where_the_app_wants_two``
-    holds to. ``apple_grey`` and ``black_white`` were flat until then, and the
-    pair these two tests are about cannot exist on a flat theme. The pin stays
-    anyway, because what it buys is determinism against load order rather than
-    an escape from those two: an assertion that depends on which theme ran
-    first is not evidence either way.
+    The pair those two tests are about cannot exist on a flat theme, which is
+    PBG-A11 and is counted by ``tests/test_time_block_colors.py``'s
+    ``test_pbga11_two_bundled_themes_have_one_surface_where_the_app_wants_two``.
+    Pinning a two-tone theme is what makes the assertion here deterministic
+    and able to fail.
     """
     import copy
 
@@ -1250,10 +1247,10 @@ def test_pbga7_a_chip_is_not_the_colour_of_the_box_it_sits_in(
     in boxes of different colours, so one assertion per kind would pass for a
     chip pinned to either token.
 
-    ``two_tone_theme`` so the theme is pinned rather than inherited: without
-    it this test measured whichever theme the suite had left loaded. Two of
-    the ten bundled themes made the two tokens one colour until SEP-M1, where
-    no choice between them could give the chip an edge; none does now.
+    ``two_tone_theme`` because the two tokens are one colour on two of the ten
+    bundled themes, where no choice between them can give the chip an edge
+    (PBG-A11). Without it this test measured whichever theme the suite had
+    left loaded.
     """
     item = _scored_item(manager, "Draft the proposal")
     task = _item_block()
@@ -3248,6 +3245,21 @@ def test_pbga4_an_item_row_is_not_the_colour_of_the_pane_behind_it(
         f"the row and the pane behind it are both {pane}, so the row has no "
         f"edge"
     )
+
+
+def test_sepm5_the_named_panes_follow_a_mode_change(
+    two_tone_theme, light_appearance, content_frame, manager, settings
+):
+    """SEP-M5 — a named pane repaints when the OS switches light to dark.
+
+    A resolved string from ``semantic_colors()`` stays the light colour, and
+    the headings, which do repaint, vanish against it.
+    """
+    panel = PlanScreen(content_frame, manager, _App(settings))
+    ctk.set_appearance_mode("dark")
+    dark = ctk.ThemeManager.theme["CTkFrame"]["fg_color"][1]
+    for pane in (panel.items_scroll, panel.blocks_scroll):
+        assert _as_hex(pane, pane.cget("fg_color")) == _as_hex(pane, dark)
 
 
 def test_pbgm2_the_item_rows_badge_carries_the_level_colour(

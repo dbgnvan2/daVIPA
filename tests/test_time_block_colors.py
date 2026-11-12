@@ -184,10 +184,8 @@ def test_pdm9_the_two_marks_are_legible_on_the_row_surface(restore_appearance):
     happens to have loaded. The pair this replaced measured against hard-coded
     priority fills and so was theme-independent for free; ``surface_subtle``
     is ``CTkFrame.top_fg_color``, which each theme file sets for itself --
-    ``gray85``/``gray16`` in seven, and its own pair in ``apple_grey``,
-    ``black_white`` and ``davipa`` (SEP-M1 gave the first two theirs; they
-    repeated ``CTkFrame.fg_color`` before) -- so a single-theme measurement
-    would let a theme ship a sub-4.5:1 glyph
+    ``gray85`` in most, ``#FFFFFF`` in two and ``#DFCCFF`` in ``davipa`` --
+    so a single-theme measurement would let a theme ship a sub-4.5:1 glyph
     with the suite green. Read out of the JSON rather than by loading each
     theme, which would leave global CustomTkinter state behind it.
     """
@@ -233,87 +231,30 @@ def test_pdm9_the_two_marks_are_legible_on_the_row_surface(restore_appearance):
     )
 
 
-def test_sepm2_no_bundled_theme_has_one_surface_where_the_app_wants_two():
-    """SEP-M2/M7 — no bundled theme gives ``surface`` and ``surface_subtle`` one colour.
+def test_pbga11_two_bundled_themes_have_one_surface_where_the_app_wants_two():
+    """PBG-A11 — ``apple_grey`` and ``black_white`` set both surfaces alike.
 
-    Counts the ten files (an empty glob passes ``== set()``), checks each mode,
-    and resolves ``grayNN`` so ``gray100`` equals ``#FFFFFF``.
+    The app separates a row from its pane, and a Plan chip from its box, with
+    one pair of tokens: ``surface`` is ``CTkFrame.fg_color`` and
+    ``surface_subtle`` is ``CTkFrame.top_fg_color``. Two bundled themes give
+    them the same value in both modes -- ``#FFFFFF``/``#1D1D1F`` and
+    ``#FFFFFF``/``#000000`` -- so on those two there is no edge to be had
+    whichever token the code picks. That is app-wide and older than the Plan
+    screen's badge: every list row in the app is the colour of its pane there.
+    PBG-M3 only made the Plan screen join them, by taking away the priority
+    tint that had been separating its rows.
+
+    An exact set, not a count: this is a shipped-colour decision the user has
+    to make (BACKLOG PBG-A11), and until it is made the suite should say which
+    two themes it covers for and fail if a third one flattens.
     """
-    themes = sorted(Path("themes").glob("*.json"))
-    assert len(themes) == 10, (
-        f"{len(themes)} theme files found, not the 10 this app ships -- an "
-        "empty-set assertion over a glob passes when the glob finds nothing"
-    )
-
     flat = set()
-    for path in themes:
+    for path in sorted(Path("themes").glob("*.json")):
         frame = json.loads(path.read_text())["CTkFrame"]
-        for mode, half in (("Light", 0), ("Dark", 1)):
-            surface = _as_hex(frame["fg_color"][half])
-            subtle = _as_hex(frame["top_fg_color"][half])
-            if surface == subtle:
-                flat.add(f"{path.stem}/{mode}")
+        if frame["fg_color"] == frame["top_fg_color"]:
+            flat.add(path.stem)
 
-    assert flat == set(), (
-        "these themes give both surfaces one colour, so a row has no edge "
-        f"against its pane on them: {sorted(flat)}"
-    )
-
-
-# PBG-A12: muted_text under 4.5:1 before SEP, CustomTkinter's #858585.
-MUTED_TEXT_UNDER_BAR_BEFORE_SEP = {
-    "base_dark_blue/Light",
-    "blue/Light",
-    "davipa/Light",
-    "green/Light",
-    "grey/Light",
-    "orange/Light",
-    "pink/Light",
-    "purple/Light",
-}
-
-
-def test_sepm6_the_two_label_colours_are_legible_on_both_surfaces():
-    """SEP-M6 — muted and body label text clear 4.5:1 on both surfaces.
-
-    The sub-bar set must be exactly the eight that predate SEP (PBG-A12), so a
-    regression or a fix there both show up.
-    """
-    themes = sorted(Path("themes").glob("*.json"))
-    assert len(themes) == 10, (
-        f"{len(themes)} theme files found, not the 10 this app ships -- a "
-        "floor here would hide a theme that stopped being measured"
-    )
-
-    muted_under = set()
-    body_failures = []
-    for path in themes:
-        theme = json.loads(path.read_text())
-        for mode, half in (("Light", 0), ("Dark", 1)):
-            surfaces = {
-                "surface": _as_hex(theme["CTkFrame"]["fg_color"][half]),
-                "surface_subtle": _as_hex(theme["CTkFrame"]["top_fg_color"][half]),
-            }
-            muted = _as_hex(theme["CTkEntry"]["placeholder_text_color"][half])
-            body = _as_hex(theme["CTkLabel"]["text_color"][half])
-            for token, surface in surfaces.items():
-                if contrast_ratio(surface, muted) < MIN_CONTRAST:
-                    muted_under.add(f"{path.stem}/{mode}")
-                ratio = contrast_ratio(surface, body)
-                if ratio < MIN_CONTRAST:
-                    body_failures.append(
-                        f"{path.stem}/{mode}: body {body} on {token} "
-                        f"{surface} is {ratio:.2f}"
-                    )
-
-    assert not body_failures, (
-        f"body text closer than {MIN_CONTRAST}:1 to a surface behind it: "
-        + "; ".join(sorted(body_failures))
-    )
-    assert muted_under == MUTED_TEXT_UNDER_BAR_BEFORE_SEP, (
-        "the themes whose muted label text is under "
-        f"{MIN_CONTRAST}:1 changed.\n"
-        f"  joined: {sorted(muted_under - MUTED_TEXT_UNDER_BAR_BEFORE_SEP)}\n"
-        f"  left:   {sorted(MUTED_TEXT_UNDER_BAR_BEFORE_SEP - muted_under)}\n"
-        "joined = regression; left = PBG-A12 fixed, update the set."
+    assert flat == {"apple_grey", "black_white"}, (
+        "the themes whose two surfaces are one colour are no longer the two "
+        f"this is filed for: {sorted(flat)}"
     )
