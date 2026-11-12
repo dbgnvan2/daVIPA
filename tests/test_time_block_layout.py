@@ -41,7 +41,6 @@ from src.getmoredone.time_block_layout import (
     normalize_block_weekdays,
     parse_clock_time,
     parse_hhmm,
-    priority_band,
     span_for_blocks,
     template_span,
     times_for_slot,
@@ -248,38 +247,10 @@ def test_default_minutes_for_block_type_works_without_settings():
     assert default_minutes_for_block_type(BlockType.BREAK) == 5
 
 
-# --- priority bands ---------------------------------------------------------
-
-@pytest.mark.parametrize(
-    "score, band",
-    [
-        (102400, "critical"),  # PRI-M2.7: a legacy pre-cap score, not the top
-        # of the scale -- 20 x 20 x 16 x 16 now stores as 9999. Rows written
-        # before the cap still hold the raw product, and the bands must not
-        # re-colour them.
-        (2000, "critical"),
-        (1999, "high"),
-        (500, "high"),
-        (499, "medium"),
-        (100, "medium"),
-        (99, "low"),
-        (4, "low"),            # 1 x 1 x 2 x 2, the lowest real score
-        (1, "low"),
-    ],
-)
-def test_priority_band_thresholds(score, band):
-    assert priority_band(score) == band
-
-
-@pytest.mark.parametrize("missing", [0, None, -5, "", "high"])
-def test_priority_band_calls_an_unscored_item_unscored(missing):
-    """An item missing one of its four factors scores 0 — absence, not low priority.
-
-    calculate_priority_score returns 0 if any factor is 0 or None, so a 0 means
-    the user has not finished scoring the item. Painting it the same colour as a
-    genuinely low-priority item would invent data they never entered.
-    """
-    assert priority_band(missing) == "unscored"
+# The two priority-band tests were here. PBG-M5 (2026-11-12) deleted
+# ``priority_band`` with the three colour tables that were its only readers;
+# the thresholds it bucketed on stay in ``PRIORITY_BANDS``, where
+# ``test_priority_floor_and_cap`` still measures the score's cap against them.
 
 
 # --- DayBounds --------------------------------------------------------------

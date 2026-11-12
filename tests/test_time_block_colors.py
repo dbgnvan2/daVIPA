@@ -20,20 +20,12 @@ from pathlib import Path
 import customtkinter as ctk
 import pytest
 
-from src.getmoredone.color_contrast import (
-    contrast_ratio,
-    pick_text_color,
-    relative_luminance,
-)
+from src.getmoredone.color_contrast import contrast_ratio, relative_luminance
 from src.getmoredone.theme import (
     block_type_colors,
     depth_bar_colors,
-    priority_band_colors,
-    priority_fill_colors,
-    priority_stripe_colors,
     semantic_colors,
 )
-from src.getmoredone.time_block_layout import PRIORITY_BANDS, UNSCORED_BAND
 
 # WCAG AA for normal text. These accents are stripes rather than text, where
 # the standard asks only 3:1 -- held to the stricter bar anyway, so there is
@@ -98,23 +90,6 @@ def restore_appearance():
         ctk.set_appearance_mode("system" if was_system else original)
 
 
-def test_tbm122_band_colors_meet_contrast_in_both_themes(restore_appearance):
-    """TB-M12.2 — every priority band is legible against the block surface.
-
-    Collected and reported together rather than asserted one at a time: a
-    single failing band tells you the table needs work, and the whole list
-    tells you how much.
-    """
-    failures = []
-    for mode in THEMES:
-        ctk.set_appearance_mode(mode)
-        surface = _block_surface()
-        for band, color in priority_band_colors().items():
-            ratio = contrast_ratio(surface, _as_hex(color))
-            if ratio < MIN_CONTRAST:
-                failures.append(f"{mode}/{band}={color}: {ratio:.2f} on {surface}")
-
-    assert not failures, "bands below the contrast minimum: " + "; ".join(failures)
 
 
 def test_block_type_colors_meet_contrast_in_both_themes(restore_appearance):
@@ -171,18 +146,6 @@ def test_a_filled_depth_bar_is_distinguishable_from_an_empty_one(restore_appeara
         )
 
 
-def test_every_band_name_has_exactly_one_colour(restore_appearance):
-    """The band names and the colour table are kept in step, both themes.
-
-    An exact set, not "every name has an entry": a colour for a band no score
-    can reach is dead, and a band with no colour is a KeyError the first time
-    a user scores an item into it.
-    """
-    expected = {name for _threshold, name in PRIORITY_BANDS} | {UNSCORED_BAND}
-
-    for mode in THEMES:
-        ctk.set_appearance_mode(mode)
-        assert set(priority_band_colors()) == expected
 
 
 def test_tbm123_no_inline_hex_in_plan_screen():
@@ -204,19 +167,6 @@ def test_tbm123_no_inline_hex_in_plan_screen():
     )
 
 
-def test_theme_is_the_only_module_that_defines_the_band_table():
-    """Nothing but theme.py may define ``priority_band_colors``.
-
-    The companion to the test above: that one proves the screens hold no hex,
-    this one proves no other module grew a second band table to hold it in.
-    """
-    offenders = [
-        str(path)
-        for path in Path("src/getmoredone").rglob("*.py")
-        if path.name != "theme.py" and "def priority_band_colors" in path.read_text()
-    ]
-
-    assert offenders == [], f"a second band colour table exists in {offenders}"
 
 
 # --- PB-M1 / PB-M4 : the stripe table and the fill table -------------------
@@ -255,112 +205,29 @@ def _luminance_of(color: str) -> float:
     return relative_luminance(_as_hex(color))
 
 
-def test_pbm11_stripe_colors_cover_every_band(restore_appearance):
-    """PB-M1.1 — the stripe table answers for every band, in both themes.
-
-    A band missing from this table is a KeyError the moment an item of that
-    priority is drawn, which is every band's turn eventually.
-    """
-    expected = {name for _threshold, name in PRIORITY_BANDS} | {UNSCORED_BAND}
-    for mode in THEMES:
-        ctk.set_appearance_mode(mode)
-        assert set(priority_stripe_colors()) == expected, (
-            f"{mode}: stripe table is {sorted(priority_stripe_colors())}"
-        )
-        assert set(priority_fill_colors()) == expected, (
-            f"{mode}: fill table is {sorted(priority_fill_colors())}"
-        )
 
 
-def test_pbm12_stripe_colors_meet_the_non_text_contrast_bar(restore_appearance):
-    """PB-M1.2 — every stripe is visible against the surface it is drawn on.
-
-    3:1 and not 4.5:1: a stripe carries no text, and holding it to the text bar
-    is what forced the light-theme bands dark enough to be asked about.
-    """
-    failures = []
-    for mode in THEMES:
-        ctk.set_appearance_mode(mode)
-        surface = _block_surface()
-        for band, color in priority_stripe_colors().items():
-            ratio = contrast_ratio(surface, _as_hex(color))
-            if ratio < MIN_NON_TEXT_CONTRAST:
-                failures.append(f"{mode}/{band}={color}: {ratio:.2f} on {surface}")
-
-    assert not failures, "stripes below the non-text minimum: " + "; ".join(failures)
 
 
-def test_pbm13_stripe_colors_are_brighter_than_the_text_safe_set(restore_appearance):
-    """PB-M1.3 — "brighter" as relative luminance, not as an opinion.
-
-    Light theme only. The dark set is already near the top of each ramp with
-    4.5:1 to spare, so there is nothing to trade there and the two tables are
-    deliberately the same values -- asserting a strict increase in dark mode
-    would be asserting a difference that should not exist.
-    """
-    ctk.set_appearance_mode("Light")
-    safe = priority_band_colors()
-    dimmer = [
-        f"{band}: stripe {stripe} is not brighter than band {safe[band]}"
-        for band, stripe in priority_stripe_colors().items()
-        if _luminance_of(stripe) <= _luminance_of(safe[band])
-    ]
-
-    assert dimmer == [], "; ".join(dimmer)
 
 
-def test_pbm13_the_dark_stripe_table_is_the_band_table(restore_appearance):
-    """The other half of PB-M1.3, stated rather than left to be inferred.
-
-    Without this, the two dark tables could drift apart and nothing would
-    notice: no contrast test can tell a deliberate match from an accident.
-    """
-    ctk.set_appearance_mode("Dark")
-    assert priority_stripe_colors() == priority_band_colors()
 
 
-def test_pbm41_pick_text_color_is_not_what_makes_a_fill_legible(restore_appearance):
-    """PB-M4.1 — the fill's own luminance, not the chooser's, carries the text.
-
-    The obvious form of this criterion -- loop the fills, call
-    ``pick_text_color``, assert 4.5:1 -- **cannot fail**. The chooser returns
-    black or white, and for every luminance L at least one of the two clears
-    4.5: black falls below it only when L < 0.175, where white is already
-    above 4.67. It was written that way and passed against a mid grey planted
-    to break it. What can fail is the fill being near that crossover at all,
-    where the better of the two choices is only just legible and a theme tweak
-    in either direction makes it worse. Each fill must clear the bar with the
-    margin a tint should have.
-    """
-    failures = []
-    for mode in THEMES:
-        ctk.set_appearance_mode(mode)
-        for band, fill in priority_fill_colors().items():
-            chosen = pick_text_color(_as_hex(fill))
-            ratio = contrast_ratio(_as_hex(fill), chosen)
-            if ratio < MIN_TINT_CONTRAST:
-                failures.append(f"{mode}/{band}={fill} + {chosen}: {ratio:.2f}")
-
-    assert not failures, (
-        f"fills closer than {MIN_TINT_CONTRAST}:1 to their own text: "
-        + "; ".join(failures)
-    )
 
 
-def test_pdm9_the_two_marks_are_legible_on_every_fill(restore_appearance):
-    """PD-M9 — the green check and the red question mark are text on a fill.
+def test_pdm9_the_two_marks_are_legible_on_the_row_surface(restore_appearance):
+    """PD-M9 — the green check and the red question mark are still glyphs.
 
-    They sit on a priority fill, which is a pale tint in the light theme and a
-    deep one in the dark theme, so one pair of colours cannot serve both: the
-    dark green `success_strong` carries measures 1.63:1 against the dark
-    theme's green fill, which is a mark nobody can see. Held to the 4.5:1 text
-    bar, not the 3:1 non-text one -- they are glyphs, and the whole of what
-    each one says is which glyph it is.
+    They sat on a priority fill until PBG-M3 and are measured against the
+    theme's own row surface now, which is the only thing behind them. Held to
+    the 4.5:1 text bar, not the 3:1 non-text one -- they are glyphs, and the
+    whole of what each one says is which glyph it is.
     """
     failures = []
     for mode in THEMES:
         ctk.set_appearance_mode(mode)
         palette = semantic_colors()
+        surface = _as_hex(palette["surface_subtle"])
         marks = {
             "scheduled": palette["scheduled_mark"],
             "unscheduled": palette["unscheduled_mark"],
@@ -369,36 +236,16 @@ def test_pdm9_the_two_marks_are_legible_on_every_fill(restore_appearance):
             f"{mode}: the two marks are the same colour, so only the glyph "
             "tells them apart"
         )
-        for band, fill in priority_fill_colors().items():
-            for role, mark in marks.items():
-                ratio = contrast_ratio(_as_hex(mark), _as_hex(fill))
-                if ratio < MIN_CONTRAST:
-                    failures.append(
-                        f"{mode}/{band}: {role} {mark} on {fill} is {ratio:.2f}"
-                    )
+        for role, mark in marks.items():
+            ratio = contrast_ratio(_as_hex(mark), surface)
+            if ratio < MIN_CONTRAST:
+                failures.append(
+                    f"{mode}: {role} {mark} on {surface} is {ratio:.2f}"
+                )
 
     assert not failures, (
-        f"marks closer than {MIN_CONTRAST}:1 to the fill behind them: "
+        f"marks closer than {MIN_CONTRAST}:1 to the surface behind them: "
         + "; ".join(failures)
     )
 
 
-def test_pbm42_a_stripe_is_visible_on_its_own_fill(restore_appearance):
-    """PB-M4.2 — the bar still reads once the task behind it is shaded.
-
-    The stripe used to sit on ``surface_subtle``. It now sits on its own band's
-    tint, which is a different and in the light theme a *lighter* background,
-    so the ratio that was measured is not the ratio the user sees.
-    """
-    failures = []
-    for mode in THEMES:
-        ctk.set_appearance_mode(mode)
-        fills = priority_fill_colors()
-        for band, stripe in priority_stripe_colors().items():
-            ratio = contrast_ratio(_as_hex(fills[band]), _as_hex(stripe))
-            if ratio < MIN_NON_TEXT_CONTRAST:
-                failures.append(
-                    f"{mode}/{band}: {stripe} on {fills[band]} is {ratio:.2f}"
-                )
-
-    assert not failures, "stripes lost against their own fill: " + "; ".join(failures)

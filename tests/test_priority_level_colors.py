@@ -189,15 +189,15 @@ def test_plcm14_a_big_score_is_not_a_critical_level():
     The adversarial case for this module: an item that looks urgent by every
     aggregate measure and is not, by the only measure a level uses. Medium
     importance and urgency with XL size and XL value scores
-    5 x 5 x 16 x 16 = 6400, which ``priority_band`` calls ``critical`` — the
-    top band, above its 2000 threshold. Its *level* is "no high or critical",
-    because the user marked neither factor High.
+    5 x 5 x 16 x 16 = 6400, which is above the top ``PRIORITY_BANDS``
+    threshold of 2000. Its *level* is "no high or critical", because the user
+    marked neither factor High.
 
     Conflating the two would paint this row as though the user had called it
     critical when they had not, which is the failure the two separate name
     sets exist to prevent.
     """
-    from src.getmoredone.time_block_layout import priority_band
+    from src.getmoredone.time_block_layout import PRIORITY_BANDS
 
     item = _item(
         importance=MEDIUM,
@@ -207,7 +207,10 @@ def test_plcm14_a_big_score_is_not_a_critical_level():
     )
     score = item.calculate_priority_score()
     assert score == 6400
-    assert priority_band(score) == "critical"
+    # The band arithmetic, read off the thresholds. ``priority_band`` itself
+    # went with the band colours in PBG-M5; the two scales coming apart is
+    # what this test is about, and that has not changed.
+    assert score > max(threshold for threshold, _name in PRIORITY_BANDS)
     assert priority_level_for_item(item) == LEVEL_NO_HIGH_OR_CRITICAL
 
 

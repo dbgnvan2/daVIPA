@@ -31,7 +31,7 @@ import pytest
 from src.getmoredone.app_settings import AppSettings
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem, BlockType, TimeBlock
-from src.getmoredone.color_contrast import contrast_ratio, pick_text_color
+from src.getmoredone.color_contrast import contrast_ratio
 from src.getmoredone.screens.plan import (
     ITEMS_TEXT_INSET_PX,
     NOTE_MIN_WRAP_PX,
@@ -65,22 +65,19 @@ from src.getmoredone.screens.plan_blocks import (
     SLOT_ROW_GAP_PX,
     SLOT_MARKER_WIDTH_PX,
     SLOT_TITLE_WIDTH_PX,
+    CHIP_BADGE_COLUMN,
     DepthBarStack,
-    accent_for_block,
-    accent_for_item,
     build_item_row,
     build_outside_group,
     build_slot_row,
     chip_column_minsizes,
-    fill_for_item,
     item_row_height,
     slot_row_height,
-    stripe_for_item,
 )
+from src.getmoredone.priority_levels import level_cell_fill
 from src.getmoredone.screens.plan_settings_dialog import PlanSettingsDialog
 from src.getmoredone.theme import (
     block_type_colors,
-    priority_band_colors,
     semantic_colors,
     status_text_color,
 )
@@ -95,7 +92,6 @@ from src.getmoredone.time_block_layout import (
     SlotRefusedError,
     build_day_grid,
     day_grid,
-    priority_band,
     slots_for_minutes,
 )
 
@@ -180,8 +176,8 @@ def _item(manager, title, start_date=THURSDAY, **kwargs):
     return item
 
 
-def _scored_item(manager, title, band="critical", **kwargs):
-    """An item that is really in a priority band after the database has it.
+def _scored_item(manager, title, **kwargs):
+    """An item that really scores after the database has it.
 
     ``_item(..., priority_score=51200)`` does not produce a scored item.
     ``create_action_item`` calls ``update_priority_score``, which multiplies the
@@ -190,21 +186,16 @@ def _scored_item(manager, title, band="critical", **kwargs):
     unscored grey with the unscored grey. 51200 is a real critical score
     (20 x 20 x 16 x 8); it was only ever being thrown away.
 
-    The resulting band is asserted here rather than left to the caller, so this
-    helper cannot start handing back unscored items without a test failing on
-    the spot.
+    The score is asserted here rather than left to the caller, so this helper
+    cannot start handing back unscored items without a test failing on the
+    spot. Both factors are Critical, so the item also has the top priority
+    *level* -- which is what the badge draws since PBG-M2.
     """
-    factors = {
-        "critical": dict(importance=20, urgency=20, size=16, value=8),   # 51200
-    }[band]
-    item = _item(manager, title, **factors, **kwargs)
+    # 20 x 20 x 16 x 8 = 51200, a real critical score.
+    item = _item(manager, title, importance=20, urgency=20, size=16, value=8, **kwargs)
     assert item.priority_score > 0, (
         f"{title!r} came back from the database scoring "
         f"{item.priority_score!r} -- the factors did not take"
-    )
-    assert priority_band(item.priority_score) == band, (
-        f"{title!r} scores {item.priority_score}, which is band "
-        f"{priority_band(item.priority_score)!r}, not {band!r}"
     )
     return item
 
@@ -1138,12 +1129,48 @@ def test_padding_blocks_are_refused_on_a_non_block_day(root, manager, settings):
     assert "not a block day" in panel.status_label.cget("text")
 
 
-def test_a_padding_block_is_not_priority_coloured(screen, manager):
-    """Colouring padding by a priority it does not have is information the data does not support."""
-    block = _add_block(manager, 30, "Buffer", 0, block_type=BlockType.BUFFER)
+def test_pbgm4_padding_keeps_its_neutral_and_a_task_does_not(
+    root, manager, light_appearance
+):
+    """PBG-M4 — the band is gone from the day pane; padding's own colour is not.
 
-    assert accent_for_block(block, None) == block_type_colors()[BlockType.BUFFER]
-    assert accent_for_block(block, None) not in priority_band_colors().values()
+    A task's bar carried the priority band and its surface carried the band
+    tint. Both are the theme's own now, which leaves ``block_type_colors`` as
+    the one thing that tells a buffer from a task -- so it is asserted here
+    rather than left to the eye.
+    """
+    item = _scored_item(manager, "Draft the proposal")
+    task = _item_block()
+    task.item_id = item.id
+    _task_pane, task_row = _one_slot_pane(
+        root, task, width=600, mapped=False, items_by_id={item.id: item}
+    )
+    task_chip = task_row.block_widgets[0][1]
+
+    padding = TimeBlock(
+        block_date=THURSDAY, start_time="08:00", end_time="08:30",
+        planned_minutes=30, label="Buffer", slot_index=0,
+        block_type=BlockType.BUFFER,
+    )
+    _pad_pane, pad_row = _one_slot_pane(root, padding, width=600, mapped=False)
+    pad_chip = pad_row.block_widgets[0][1]
+
+    palette = semantic_colors()
+    assert _as_hex(task_chip, task_chip.cget("fg_color")) == _as_hex(
+        task_chip, palette["surface_subtle"]
+    ), f"a task chip is {task_chip.cget('fg_color')}, not the theme's surface"
+    assert pad_chip.cget("fg_color") == "transparent", (
+        f"a padding chip is {pad_chip.cget('fg_color')}, not transparent"
+    )
+
+    task_stripe = _stripe_of(task_chip)
+    pad_stripe = _stripe_of(pad_chip)
+    assert task_stripe.cget("fg_color") == "transparent", (
+        f"a task's bar is {task_stripe.cget('fg_color')}, not transparent"
+    )
+    assert _as_hex(pad_stripe, pad_stripe.cget("fg_color")) == _as_hex(
+        pad_stripe, block_type_colors()[BlockType.BUFFER]
+    ), "padding lost the neutral that says it is padding"
 
 
 # --- TB-M11 : drag blocks to rearrange --------------------------------------
@@ -1168,25 +1195,35 @@ def test_depth_draws_three_bars_with_the_right_number_filled():
         root.destroy()
 
 
-def test_priority_bands_colour_an_item_by_its_score():
-    """TB-M12 — the band comes from the score, and the colour from the theme."""
-    bands = priority_band_colors()
+def test_pbgm5_the_band_scheme_is_gone_from_every_module_that_held_it():
+    """PBG-M5 — deleted, not left dead for the next reader to wonder about.
 
-    critical = ActionItem(who="me", title="x", priority_score=102400)
-    low = ActionItem(who="me", title="x", priority_score=4)
-    unscored = ActionItem(who="me", title="x", priority_score=0)
+    The three colour tables, the six helpers that read them and the function
+    that bucketed a score are all gone. Asserted by name because the cost of
+    the deletion was the two criteria above: a helper left importable is a
+    helper something can start using again, and then there are two answers to
+    "what colour is this item's priority" on one screen.
+    """
+    from src.getmoredone import theme, time_block_layout
+    from src.getmoredone.screens import plan_blocks
 
-    assert accent_for_item(critical) == bands["critical"]
-    assert accent_for_item(low) == bands["low"]
-    assert accent_for_item(unscored) == bands["unscored"]
-    assert accent_for_item(critical) != accent_for_item(low)
+    gone = {
+        theme: ("priority_band_colors", "priority_fill_colors",
+                "priority_stripe_colors"),
+        time_block_layout: ("priority_band",),
+        plan_blocks: ("stripe_for_item", "fill_for_item", "_band_of",
+                      "accent_for_item", "accent_for_block",
+                      "stripe_for_block"),
+    }
+    still_there = {
+        f"{module.__name__}.{name}"
+        for module, names in gone.items()
+        for name in names
+        if hasattr(module, name)
+    }
+    assert not still_there, f"the band scheme is still importable: {still_there}"
 
 
-def test_an_unscored_item_is_not_coloured_as_low_priority():
-    """Score 0 means a missing factor — absence of information, not low priority."""
-    bands = priority_band_colors()
-
-    assert bands["unscored"] != bands["low"]
 
 
 # --- the lunch band ----------------------------------------------------------
@@ -2825,9 +2862,26 @@ def _row_columns(widget, title):
                 columns["title"] = column
             elif re.fullmatch(r"\d+m", shown):
                 columns["length"] = column
+            elif re.fullmatch(r"P:\d+", shown):
+                columns["badge"] = column
             elif shown in (PD_BLOCKED_TEXT, PD_UNSCHEDULED_TEXT):
                 columns["marker"] = column
     return columns
+
+
+def _stripe_of(widget):
+    """The 6px bar at the left edge of a row or a chip.
+
+    By its width, not by being the first frame: a chip's depth stack is a
+    ``CTkFrame`` subclass too, and which of them Tk hands back first is
+    creation order, not a contract.
+    """
+    return next(
+        child for child in widget.winfo_children()
+        if isinstance(child, ctk.CTkFrame)
+        and not isinstance(child, DepthBarStack)
+        and child.cget("width") == STRIPE_WIDTH_PX
+    )
 
 
 def _find_depth_stacks(widget):
@@ -2874,36 +2928,6 @@ def test_pbm31_the_depth_bars_are_inside_the_box(root, manager, mapped_windows):
     )
 
 
-def test_pbm43_a_chip_is_filled_by_its_priority(root, manager, light_appearance):
-    """PB-M4.3 — the task is shaded by its band, not by the generic surface.
-
-    Asserted against ``fill_for_item`` rather than a literal: a test holding
-    its own copy of the hex would pass a theme change that the screen failed.
-
-    Adjacent to PB-M7's fix and corrected with it, because it was the same
-    defect: the item was built with ``priority_score=51200``, which the database
-    recomputes to 0, and the pane rendered with an empty ``items_by_id``, so
-    both sides of the comparison were the unscored tint. Only the second
-    assertion could fail, and a critical task drawn in the unscored grey would
-    have passed the test named for drawing it in its band.
-    """
-    item = _scored_item(manager, "Draft the proposal")
-    block = _item_block()
-    block.item_id = item.id
-    _pane, row = _one_slot_pane(
-        root, block, width=600, mapped=False, items_by_id={item.id: item}
-    )
-
-    chip = row.block_widgets[0][1]
-    assert _as_hex(chip, chip.cget("fg_color")) == _as_hex(
-        chip, fill_for_item(item)
-    ), f"chip fill is {chip.cget('fg_color')}, not {fill_for_item(item)}"
-    assert _as_hex(chip, chip.cget("fg_color")) != _as_hex(
-        chip, semantic_colors()["surface_subtle"]
-    ), "the chip is still drawn on the generic surface"
-    assert _as_hex(chip, chip.cget("fg_color")) != _as_hex(
-        chip, fill_for_item(None)
-    ), "a critical task is drawn in the unscored tint"
 
 
 def test_pbm51_box_height_follows_the_setting():
@@ -3020,81 +3044,91 @@ def test_pbm54_an_unusable_title_width_falls_back(root, manager, settings, bad):
     assert panel.box_title_width() == SLOT_TITLE_WIDTH_PX
 
 
-def test_pbm1_an_item_rows_stripe_uses_the_brighter_table(
+def test_pbgm3_an_item_row_is_the_themes_surface_with_a_neutral_bar(
     root, manager, light_appearance
 ):
-    """PB-M1 reaches the widget, not just the theme module.
+    """PBG-M3 — the row carries no priority colour at all now.
 
-    A colour table nothing consumes is a table that passes its own contrast
-    tests and changes nothing on screen.
-
-    The fourth test built on an unscored item, and the one the re-sweep of the
-    fixes found still standing. On an unscored item the first assertion compared
-    the unscored stripe with itself, and the second had teeth only because the
-    light unscored stripe and the unscored band happen to differ -- so the whole
-    test exercised the one band whose two tables were never in question.
-    ``stripe_for_item`` pinned to the unscored stripe, or reading the text-safe
-    table for every scored band, passed it.
+    It was a band tint behind the whole row with a brighter band bar at its
+    edge. Both are asserted gone *by value*, not by "is not the old table":
+    the tables are deleted, so there is nothing left to compare against, and
+    the positive assertion is the one that catches a row that goes back to
+    tinting itself from some other source.
     """
     item = _scored_item(manager, "Draft the proposal")
     row = build_item_row(
         root, item, 0, already_blocked=False, work_block_minutes=30
     )
-    stripe = next(
-        child for child in row.winfo_children()
-        if isinstance(child, ctk.CTkFrame) and not isinstance(child, DepthBarStack)
+
+    palette = semantic_colors()
+    assert _as_hex(row, row.cget("fg_color")) == _as_hex(
+        row, palette["surface_subtle"]
+    ), f"the row is drawn on {row.cget('fg_color')}, not the theme's surface"
+
+    stripe = _stripe_of(row)
+    assert stripe.cget("fg_color") == "transparent", (
+        f"the row's bar is {stripe.cget('fg_color')}, not transparent"
     )
 
-    assert _as_hex(row, stripe.cget("fg_color")) == _as_hex(
-        row, stripe_for_item(item)
-    )
-    assert _as_hex(row, stripe.cget("fg_color")) != _as_hex(
-        row, accent_for_item(item)
-    ), "the stripe is still the text-safe band colour"
-    assert _as_hex(row, stripe.cget("fg_color")) != _as_hex(
-        row, stripe_for_item(None)
-    ), "the stripe is the unscored bar, so it says nothing about the band"
+    title = _find_label(row, item.title)
+    assert title is not None, "no title label on the row"
+    assert _as_hex(title, title.cget("text_color")) == _as_hex(
+        title, palette["body_text"]
+    ), "the title is still coloured for a fill the row no longer has"
 
 
-def test_pbm41_a_chips_title_is_coloured_for_the_shade_behind_it(
+def test_pbgm2_the_item_rows_badge_carries_the_level_colour(
     root, manager, light_appearance
 ):
-    """PB-M4.1 — the renderer picks the title colour from the fill it drew.
+    """PBG-M2 — the badge is the Priority cell, in the Plan screen's listing.
 
-    The theme-level form of this criterion cannot fail (see
-    ``test_pbm41_pick_text_color_is_not_what_makes_a_fill_legible``). This one
-    can: before PB-M4 the title was the theme's body text, which is the right
-    colour for the theme's surface and the wrong one for a band tint -- pale
-    text on a pale shade, the same failure the clock labels had.
-
-    Adjacent to PB-M7's fix and corrected with it: the item was not really
-    scored and the chip's item was ``None``, so this ran against the unscored
-    tint -- the one fill whose pairing with the body text was never the bug.
+    Same text and same colour source as the five list screens: ``P:<score>``
+    on ``level_cell_fill``, which is the user's own Priority Colours setting.
+    Both branches are exercised -- a Critical/Critical item has a fill, and an
+    item with neither factor high has none and keeps the row's text colour --
+    because a badge pinned to one or the other would pass a single-case test.
     """
-    item = _scored_item(manager, "Draft the proposal")
-    block = _item_block()
-    block.item_id = item.id
-    _pane, row = _one_slot_pane(
-        root, block, width=600, mapped=False, items_by_id={item.id: item}
+    scored = _scored_item(manager, "Draft the proposal")
+    plain = _item(manager, "Tidy the desk", importance=4, urgency=4, size=2, value=2)
+
+    palette = semantic_colors()
+    for item in (scored, plain):
+        row = build_item_row(
+            root, item, 0, already_blocked=False, work_block_minutes=30,
+            settings=None,
+        )
+        badge = _find_label(row, f"P:{item.priority_score}")
+        assert badge is not None, (
+            f"no P:{item.priority_score} badge on {item.title!r}'s row"
+        )
+        assert int(badge.grid_info()["column"]) == CHIP_BADGE_COLUMN
+
+        cell = level_cell_fill(None, item)
+        if cell.fill:
+            assert _as_hex(badge, badge.cget("fg_color")) == _as_hex(
+                badge, cell.fill
+            ), f"{item.title!r}'s badge is not its level's colour"
+            assert _as_hex(badge, badge.cget("text_color")) == _as_hex(
+                badge, cell.text_color
+            ), f"{item.title!r}'s badge text is not the colour chosen for it"
+        else:
+            assert badge.cget("fg_color") == "transparent", (
+                f"{item.title!r} has no level colour, so its badge has no fill"
+            )
+            assert _as_hex(badge, badge.cget("text_color")) == _as_hex(
+                badge, palette["body_text"]
+            ), "an uncoloured badge should keep the row's own text colour"
+
+    assert level_cell_fill(None, scored).fill, (
+        "precondition: a Critical/Critical item has a level colour, or the "
+        "coloured branch above was never taken"
+    )
+    assert not level_cell_fill(None, plain).fill, (
+        "precondition: a low item has no level colour, or the uncoloured "
+        "branch above was never taken"
     )
 
-    assert _as_hex(row.frame, fill_for_item(item)) != _as_hex(
-        row.frame, fill_for_item(None)
-    ), "the item is unscored, so this test is not about a band tint at all"
 
-    chip = row.block_widgets[0][1]
-    title = _find_label(chip, "Draft the proposal")
-    assert title is not None, "no title label on the chip"
-
-    fill = _as_hex(chip, chip.cget("fg_color"))
-    drawn = _as_hex(title, title.cget("text_color"))
-    assert drawn == _as_hex(title, pick_text_color(fill)), (
-        f"title is {title.cget('text_color')} on a {fill} chip, not the "
-        "colour chosen for that fill"
-    )
-    assert contrast_ratio(fill, drawn) >= 4.5, (
-        f"title {drawn} on {fill} is {contrast_ratio(fill, drawn):.2f}:1"
-    )
 
 
 def test_the_empty_item_note_fits_the_column_it_is_drawn_in(
@@ -3359,20 +3393,21 @@ def test_the_empty_item_note_wraps_even_in_a_narrow_column(
     single long clipped line this batch had just removed.
 
     PD-M2.7 raised ``plan_items_col_width`` to what an item row needs, which
-    takes a 50px column off the table and with it most of this floor's reach.
-    Not all of it: the row's own floor is mostly the title column, which has a
-    fallback and no minimum of its own, so a 1px title width in a
-    hand-edited file still produces a 141px items column and an 85px
-    wraplength. That is the input now, and the floor is still what stands
-    between it and a note that does not wrap.
+    took a 50px column off the table and with it most of this floor's reach.
+    PBG-M1's badge column took the rest: the narrowest items column the screen
+    can produce is now wider than the floor, so what this asserts is the state
+    of that -- the note wraps at the width the column leaves, and that width is
+    above the floor. The ``max`` in ``refresh`` stays as the defence it was
+    written to be; nothing the screen can be set to reaches it any more.
     """
     settings.drag_schedule_title_col_width = 1
     settings.plan_items_col_width = 50
     panel = PlanScreen(root, manager, _App(settings))
-    assert panel.items_col_width() - ITEMS_TEXT_INSET_PX < NOTE_MIN_WRAP_PX, (
-        f"a {panel.items_col_width()}px column leaves more than "
-        f"{NOTE_MIN_WRAP_PX}px to wrap in, so the floor is not what is being "
-        "measured"
+    leaves = panel.items_col_width() - ITEMS_TEXT_INSET_PX
+    assert leaves > NOTE_MIN_WRAP_PX, (
+        f"a {panel.items_col_width()}px column leaves {leaves}px to wrap in, "
+        f"at or under the {NOTE_MIN_WRAP_PX}px floor -- the floor is reachable "
+        "again, so this test should assert it as it did before PBG-M1"
     )
     panel.selected_date = SATURDAY
     panel.refresh()
@@ -3382,9 +3417,9 @@ def test_the_empty_item_note_wraps_even_in_a_narrow_column(
         if isinstance(child, ctk.CTkLabel)
         and "No open items start" in child.cget("text")
     )
-    assert note.cget("wraplength") == NOTE_MIN_WRAP_PX, (
-        f"the note wraps at {note.cget('wraplength')}, which Tk reads as "
-        "'do not wrap' at or below zero"
+    assert note.cget("wraplength") == leaves, (
+        f"the note wraps at {note.cget('wraplength')}, not the {leaves}px its "
+        "column leaves it"
     )
 
 
@@ -3750,35 +3785,11 @@ def test_pbm61_a_tall_row_keeps_its_slack_below_its_text(
     )
 
 
-def test_pbm62_an_item_row_does_not_print_its_priority_score(root, manager):
-    """PB-M6.2 — the number is gone from the row.
-
-    The band is the shade the row is drawn on and the colour of its stripe, so
-    the score was a third way of saying one thing, in the one place a reader
-    is looking for something the colour cannot tell them.
-
-    The item has to be really scored for the first assertion to mean anything.
-    Written against ``_item(..., priority_score=51200)`` the number never
-    reached the row even before the change -- the database recomputed the score
-    to 0, so what the old code printed was ``P 0`` and ``"51200" in text`` was
-    dead either way.
-    """
-    item = _scored_item(manager, "Draft the proposal")
-    row = build_item_row(
-        root, item, 0, already_blocked=False, work_block_minutes=30
-    )
-
-    texts = [
-        child.cget("text") for child in row.winfo_children()
-        if isinstance(child, ctk.CTkLabel)
-    ]
-    assert not any(str(item.priority_score) in text for text in texts), (
-        f"the priority score ({item.priority_score}) is still on the row: "
-        f"{texts}"
-    )
-    assert not any(text.startswith("P ") for text in texts), (
-        f"the row still carries a P-prefixed score: {texts}"
-    )
+# ``test_pbm62_an_item_row_does_not_print_its_priority_score`` was here.
+# PB-M6.2 took the number off the row because the band was already saying it
+# twice -- as the row's shade and as its stripe. The user asked for the badge
+# on 2026-11-12 and for the shading to go, which reverses that criterion:
+# ``test_pbgm2_the_item_rows_badge_carries_the_level_colour`` is its inverse.
 
 
 def test_pdm11_the_item_row_uses_the_chips_column_order(root, manager):
@@ -3814,15 +3825,25 @@ def test_pdm11_the_item_row_uses_the_chips_column_order(root, manager):
     # has a marker too. The behaviour changed intentionally -- the column used
     # to be empty unless the item was blocked -- and the set is asserted
     # whole rather than loosened, so a row that lost a part still fails here.
-    assert set(columns) == {"stripe", "title", "marker", "bars", "length"}, (
+    assert set(columns) == {
+        "stripe", "title", "marker", "bars", "badge", "length"
+    }, (
         f"the row is missing a part: found {sorted(columns)} -- an incomplete "
         "row would make the comparison below vacuous"
     )
-    # The chip's marker column is empty by design: the mark is about the item
-    # list, and a box the task is already in has nothing to say about whether
-    # it is scheduled. So the comparison is over the parts both panes draw.
+    # PBG-M1: the badge's column reaches both panes, and the item row is the
+    # pane that draws in it -- the badge was asked for in the listing. The
+    # marker column is empty in a box for the older reason: the mark is about
+    # the item list, and a box the task is already in has nothing to say about
+    # whether it is scheduled. So the comparison is over what both panes draw.
     chip_columns = _row_columns(chip, item.title)
-    shared = {role: column for role, column in columns.items() if role != "marker"}
+    assert "badge" not in chip_columns, (
+        "a day box draws the badge; it was asked for in the item listing"
+    )
+    shared = {
+        role: column for role, column in columns.items()
+        if role not in ("marker", "badge")
+    }
     assert shared == chip_columns, (
         f"the item row puts its parts in {shared} and a box chip in "
         f"{chip_columns}"
@@ -3895,16 +3916,29 @@ def test_pdm12_the_length_sits_beside_the_depth_bars(root, manager):
         child for child in row.winfo_children()
         if isinstance(child, ctk.CTkLabel) and child.cget("text") == "45m"
     )
+    # PBG-M1 put the badge between them. The chain is asserted rather than the
+    # old bars+1, so the line's order is still fixed and the badge cannot be
+    # dropped into it anywhere else.
+    badge = next(
+        child for child in row.winfo_children()
+        if isinstance(child, ctk.CTkLabel)
+        and child.cget("text") == f"P:{item.priority_score}"
+    )
 
     bars_at = bars.grid_info()
     duration_at = duration.grid_info()
-    assert int(duration_at["row"]) == int(bars_at["row"]), (
-        f"the length is on row {duration_at['row']} and the bars on "
-        f"{bars_at['row']} -- they are not on one line"
+    badge_at = badge.grid_info()
+    assert int(duration_at["row"]) == int(bars_at["row"]) == int(badge_at["row"]), (
+        f"the length is on row {duration_at['row']}, the badge on "
+        f"{badge_at['row']} and the bars on {bars_at['row']} -- not one line"
     )
-    assert int(duration_at["column"]) == int(bars_at["column"]) + 1, (
-        f"the length is in column {duration_at['column']} and the bars in "
+    assert int(badge_at["column"]) == int(bars_at["column"]) + 1, (
+        f"the badge is in column {badge_at['column']} and the bars in "
         f"{bars_at['column']} -- it is not the next column along"
+    )
+    assert int(duration_at["column"]) == int(badge_at["column"]) + 1, (
+        f"the length is in column {duration_at['column']} and the badge in "
+        f"{badge_at['column']} -- it is not the next column along"
     )
 
 
@@ -4243,22 +4277,16 @@ def test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it(
         assert right <= width, (
             f"{shown!r} ends at {right} in a {width}px row -- it is clipped"
         )
-def test_pbm71_a_continuation_box_is_the_colour_of_its_task(root, manager):
-    """PB-M7.1 — the later boxes of a long task are shaded like the first.
+def test_pbgm4_a_continuation_box_is_the_same_surface_as_its_first_box(
+    root, manager
+):
+    """PBG-M4 — the later boxes of a long task are drawn like the first one.
 
-    They were transparent, on the argument that shading a continuation would
-    read as a second task of equal weight. On screen the opposite happened: a
-    90-minute task was one coloured box followed by two empty ones, which
-    reads as a task that stops after half an hour. The arrow is what says
-    "same task, continued", and the colour is what says which task.
-
-    Both halves of this had to be fixed before it could fail for the thing it
-    is named after. The item was built with ``priority_score=51200``, which the
-    database recomputed to 0, and the pane was rendered with an empty
-    ``items_by_id``, so the chip's item was ``None``: band ``unscored`` on both
-    sides, and an implementation that filled every continuation with the
-    unscored tint regardless of its task would have passed. Hence the real
-    factors, the lookup, and the last assertion.
+    PB-M7 is the reason this is still asserted after the band went. The later
+    boxes were transparent once, and on screen a 90-minute task read as one
+    coloured box followed by two empty ones -- a task that stops after half an
+    hour. The colour that said "which task" is gone; "the same task" is still
+    the surface, and the arrow is still what says continued.
     """
     item = _scored_item(manager, "Draft the proposal")
     block = _item_block()
@@ -4273,23 +4301,18 @@ def test_pbm71_a_continuation_box_is_the_colour_of_its_task(root, manager):
     chip = _find_continuation_chip(row.frame)
     assert chip is not None, "no continuation chip in the second box"
 
+    palette = semantic_colors()
     assert _as_hex(chip, chip.cget("fg_color")) == _as_hex(
-        chip, fill_for_item(item)
-    ), f"the continuation is {chip.cget('fg_color')}, not the task's shade"
-    assert _as_hex(chip, chip.cget("fg_color")) != _as_hex(
-        chip, fill_for_item(None)
-    ), "the continuation is the unscored tint, so it says nothing about which task"
-
-    stripe = next(
-        child for child in chip.winfo_children()
-        if isinstance(child, ctk.CTkFrame)
+        chip, palette["surface_subtle"]
+    ), f"the continuation is {chip.cget('fg_color')}, not the task's surface"
+    assert chip.cget("fg_color") != "transparent", (
+        "the continuation is unfilled, which reads as a task that stops"
     )
-    assert _as_hex(stripe, stripe.cget("fg_color")) == _as_hex(
-        stripe, stripe_for_item(item)
-    ), "the continuation's bar is not the task's bar"
-    assert _as_hex(stripe, stripe.cget("fg_color")) != _as_hex(
-        stripe, stripe_for_item(None)
-    ), "the continuation's bar is the unscored bar"
+
+    stripe = _stripe_of(chip)
+    assert stripe.cget("fg_color") == "transparent", (
+        "the continuation's bar draws a colour no task line carries now"
+    )
 
 
 def test_pbm71_a_continuation_box_keeps_its_arrow(root, manager):
