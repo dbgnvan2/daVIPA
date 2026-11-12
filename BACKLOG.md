@@ -147,7 +147,16 @@ Found during SEP, older than it, not fixed (rule 10).
 `purple` ship CustomTkinter's `#858585` placeholder, which the app also uses as
 a label colour: 2.50–3.09:1 on their light surfaces (bar 4.5). Dark mode
 passes. Your call: darken it in eight themes, or split placeholder from label
-colour. Pinned by `test_sepm6_…`'s exact set; remove a theme from it with the fix.
+colour. Unguarded.
+
+### PBG-A11 — two bundled themes make one surface where the app wants two (medium — a decision, reopened)
+
+`apple_grey` and `black_white` set `CTkFrame.top_fg_color` equal to
+`fg_color`, so list rows and Plan chips have no edge on them. Pinned by
+`test_pbga11_…`'s exact set. SEP changed the two themes and was backed out the
+same day: an unnamed frame takes one token or the other by nesting depth, so the
+change landed differently on every screen. SEP-A1 has to come first. Filed text:
+`docs/unused-docs/changes/2026-11-12-pbg-a11-retired.md`.
 
 ### SEP-A1 — inherited surfaces that may collide like the Plan screen did (medium)
 

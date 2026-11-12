@@ -540,8 +540,8 @@ in `docs/spec_coverage.md` § *PBG*. Touches
 ### docs/unused-docs/implementation_plan_2026-11-12_surface_separation.md
 
 Implementation plan for giving `apple_grey` and `black_white` a subtle surface
-distinct from their frame surface (SEP-M1 - SEP-M7, SEP-D1). **Approved
-2026-11-12 and built the same day: 7 of 8 criteria `done`, SEP-M4 `partial`**
+distinct from their frame surface (SEP-M1 - SEP-M7, SEP-D1). **Built and
+backed out 2026-11-12; only SEP-M5 (Plan panes) remains**
 — per-criterion status in `docs/spec_coverage.md` § *Surface separation*.
 Revision 3 (§9) records the cold pass that added SEP-M5 - M7 and downgraded
 SEP-M4. Touches `tools/generate_ctk_themes.py`, the two themes it writes, the

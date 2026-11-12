@@ -3,7 +3,7 @@
 - Date: 2026-11-12
 - Spec prefix: **SEP** (verified unused)
 - Base: `bab64ee` = `origin/main`, tree clean, checkout free (RLS pushed)
-- Status: **awaiting approval — no code written**
+- Status: **backed out 2026-11-12** — themes restored; only the Plan panes' named surfaces (SEP-M5) remain
 - Supersedes revision 1. The approach changed on evidence, not on reflection:
   see §1.1.
 

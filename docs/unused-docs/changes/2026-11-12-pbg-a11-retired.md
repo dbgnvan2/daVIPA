@@ -1,5 +1,7 @@
 # PBG-A11 retired — the two flat themes given a subtle surface
 
+**Reversed 2026-11-12: the theme change was backed out and PBG-A11 is open again in `BACKLOG.md`.**
+
 - Date: 2026-11-12
 - Retired by: SEP-M1 - SEP-M3, `docs/unused-docs/implementation_plan_2026-11-12_surface_separation.md`
 
