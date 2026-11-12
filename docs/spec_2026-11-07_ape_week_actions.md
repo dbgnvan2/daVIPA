@@ -58,7 +58,9 @@ user sees. See §7.
 `screens/weekly_items.py` (611 lines, `WeeklyItemsScreen`) is a two-pane
 splitter: month-assigned APEs on the left, Weekly Tactics for the selected week
 on the right, with `Edit Weekly Tactic` / `Delete Weekly` / `Add Action Item`
-beneath the right pane. Its own header label reads **"APE Weekly Assignment"**
+beneath the right pane. *(As of 2026-11-11 those three are gone and the bottom
+row is `Add Weekly Tactic` alone — VTF-M5. The pieces this section goes on to
+list are unaffected.)* Its own header label reads **"APE Weekly Assignment"**
 (line 74) — already a different string from the tab's "APE Weekly".
 
 Reusable pieces already in it, which the new tab needs and must not copy:

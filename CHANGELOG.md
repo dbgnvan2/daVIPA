@@ -40,7 +40,13 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the refresh just redrew, so a half-written record is not reported as a clean
   success. A refusal names its reason — the period holds no records yet, the
   lineage dropdowns are hiding them all, or every record the left panel shows
-  is already there — where one wording used to be given for all three.
+  is already there — where one wording used to be given for all three. On APE
+  Week Assignment the old single wording sent a user with a Category filter
+  set to the wrong tab.
+- **APE Week Assignment's count follows the tick.** Its status line names how
+  many tactics the week holds; only Load Week used to write it, so a tick
+  narrowed the panel and its heading while the line two rows above went on
+  naming the pre-filter total.
 - **Two buttons moved below their list.** APE Week Actions' **Add Action Item**
   left the toolbar for a row under the list, and Vision Elements' **+ New
   Segment / SubSegment / Category** left the top row for one. Refresh and the

@@ -68,23 +68,33 @@ Every run was prefixed `GETMOREDONE_NO_MAPPED_WINDOWS=1 nice -n 19 taskpolicy
   narrows to its records and the right heading names the filter; untick,
   confirm it widens again; tick two, confirm both sets appear; set the left
   dropdown so a ticked row is hidden, confirm the filter drops.
-- **VTF-N2 — not done, on-screen walk item, and the one hop no test covers.**
-  `open_pick_record_dialog`'s join between `on_confirm` and `report` — the line
-  that writes the write's sentence to the tab's status line after the dialog
-  closes — cannot be driven by a test, because a real `CTkToplevel` is a mapped
-  window and `tests/test_ci_contract.py` pins that count at 23. Both ends are
-  covered (each tab hands the dialog its own `_perform_add` and its own status
-  label; each write reconciles and returns a sentence); the join is not. It is
-  one function for all four tabs, so one check covers it: on any one tab, press
-  Add New, confirm, and read the status line. While there, confirm the dialog
-  opens at all on macOS without a `TclError` — the PF-M1 failure mode — on each
-  of the four tabs.
+- **VTF-N2 — not done, on-screen walk item.** Confirm the dialog opens on
+  macOS from each of the four tabs' buttons without a `TclError` — the PF-M1
+  failure mode — and that pressing Add leaves a sentence on the tab's status
+  line. This note said at first that the *logic* of that last hop could not be
+  tested either, because a real `CTkToplevel` is a mapped window and
+  `tests/test_ci_contract.py` pins that count at 23. The second cold pass
+  rejected that and was right: the window was not what made it untestable, the
+  closure was. It is now `confirm_choice` in `pick_record_dialog.py`, a plain
+  function, and three tests assert its order -- write, close, then report. What
+  is left for the walk is the window.
+- **VTF-S8 is read off the code, not measured on screen.** The Annual Plan
+  Elements status line now wraps at 400px so it cannot widen its column. The
+  test asserts the label's requested width against that wrap; whether 400 is
+  the right number at the default split ratio is worth a look during the walk.
 - **The annual tab's drag drop target has no drag test of its own.**
   `annual_vision_segments.py:202` builds a `RowDragSource` onto the right
   frame; it is unchanged code, and VTF-M4.3 is proved for the other three tabs
   by `tests/test_ape_period_consistency.py` and
   `tests/test_weekly_tactic_schema.py`. Worth one drag on that tab during the
   walk.
+- **The second sweep found six more, all medium, all fixed.** VTF-S7 (the
+  confirm hop, extracted), VTF-S8 (the status line that could widen its
+  column), VTF-S9 (two tabs' refusals still gave one wording for two
+  reasons), VTF-S10 (the week tab's count did not follow the tick), VTF-S11
+  (nothing asserted any of the five buttons was wired to its handler -- the
+  batch's whole subject) and VTF-S12 (two live specs still described the three
+  deleted buttons as current controls). The plan's sweep table has the detail.
 - **The sweep's fixes are the least-reviewed code here.** `eb09644` and
   `f770abc` were written last and fastest, after the first cold pass, which is
   the most anchored state (CLAUDE.md: every in-loop fix is in scope for the
@@ -92,6 +102,10 @@ Every run was prefixed `GETMOREDONE_NO_MAPPED_WINDOWS=1 nice -n 19 taskpolicy
   — test quality and the UI control contract. They touch the annual drop path,
   the annual `_perform_add`, `_empty_add_message` on both APE tabs,
   `_add_options` on both, and `weekly_items._create_tactic_for`'s except arm.
+  The second sweep's own fixes are in scope for the third pass the same way,
+  and they touch `pick_record_dialog.confirm_choice`, the annual status label,
+  `_empty_add_message` on the annual and week tabs, and
+  `weekly_items._describe_counts`.
 - **Adjacent issues found, not fixed** (global rule 10) — filed as VTF-A1,
   VTF-A2 and VTF-A3 in `BACKLOG.md`: the unreachable second annual panel in
   `screens/vision_planning.py`, the two now-unreachable `weekly_items`

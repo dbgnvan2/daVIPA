@@ -2,8 +2,9 @@
 
 Date: 2026-11-11
 Status: **approved 2026-11-11 by the user and built the same day: 31 of 31
-code criteria done, VTF-N1 and VTF-N2 outstanding as walk items. A cold sweep
-then found 6 findings (1 high) and they are fixed; see *The sweep* below.** The four
+code criteria done, VTF-N1 and VTF-N2 outstanding as walk items. Two cold
+sweeps then found 12 findings (1 high, 10 medium, 1 low-medium) and all are
+fixed; see *The sweep* below.** The four
 design decisions are settled (recorded under *Decisions taken*). The status
 report is at the end of this file.
 Screens: `src/getmoredone/screens/annual_vision_segments.py`,
@@ -239,8 +240,11 @@ Commits: `a637917`, `dec6e9d`, `1d69964`, `20bf04c` (VTF-M1, VTF-M2),
 (VTF-M6, VTF-M7). `src/` and test changes are separate commits throughout, so
 the ratio stays visible in `git log --stat`.
 
-Tests live in `tests/test_vsp_tab_filters.py` (24), `tests/test_vsp_tab_adds.py`
-(12) and `tests/test_vsp_tab_contracts.py` (8). None takes the
+Tests live in `tests/test_vsp_tab_filters.py`, `tests/test_vsp_tab_adds.py`
+and `tests/test_vsp_tab_contracts.py` — 16, 12 and 8 tests as the build left
+them, 17, 24 and 10 after the two sweeps (measured 2026-11-11 with
+`--collect-only -q`; the first draft of this report said 24 for the filters
+file, which was wrong). None takes the
 `mapped_windows` fixture, so `tests/test_ci_contract.py`'s count of 23 and
 `CLAUDE.md`'s Commands block are unchanged — the risk this plan names is
 closed. Every test was mutation-proved with the verbatim original restored:
@@ -281,17 +285,22 @@ closed. Every test was mutation-proved with the verbatim original restored:
 | VTF-M6.2 | done | `::test_vtfm62_the_switcher_and_refresh_do_not_move` |
 | VTF-M7.1 | done | six tests in `tests/test_vsp_tab_contracts.py` — four `::test_vtfm71_*`, plus `::test_vtfm54_one_button_at_the_bottom` and `::test_vtfm35_week_actions_add_sits_at_the_bottom` for the two tabs whose contract is named by its own criterion |
 | VTF-N1 | **not done — walk item** | On-screen only. Filed in `docs/unused-docs/changes/2026-11-11-vsp-tab-filters-walk.md` |
-| VTF-N2 | **not done — walk item** | On-screen only, and it is the one hop no test covers: a real `CTkToplevel` is a mapped window. Same note |
+| VTF-N2 | **not done — walk item** | On-screen only: that the dialog opens on macOS without a `TclError`. Its *logic* is covered since VTF-S7 extracted `confirm_choice`. Same note |
 
 ### What the code could not cover
 
-`open_pick_record_dialog`'s join between `on_confirm` and `report` — the line
-that writes the write's sentence to the tab's status line after the dialog
-closes — is asserted on neither side's behalf, because driving it needs a real
-`CTkToplevel` and that is a mapped window. Both ends are covered: each tab
-hands the dialog its own `_perform_add` and its own status label
-(VTF-M3.7), and each write reconciles and returns a sentence. It is one
-function for all four tabs, so VTF-N2 is one walk check rather than four.
+At the end of the build this was `open_pick_record_dialog`'s join between
+`on_confirm` and `report` — the line that writes the write's sentence to the
+tab's status line after the dialog closes — on the grounds that driving it
+needs a real `CTkToplevel`, which is a mapped window. The second cold pass
+rejected that reasoning, and it was right: the logic did not need the window,
+only the closure did. It is now `confirm_choice`, a module-level function
+tested with four fakes (VTF-S7), and the order it guarantees — write, close,
+then report — is asserted.
+
+What is left for the walk is the window itself: that the dialog opens on macOS
+from a button `command=` without a `TclError`, and that a filter reads as a
+filter on screen. Those are VTF-N1 and VTF-N2 and no test replaces them.
 
 ### The sweep, and what it changed (VTF-S1 - VTF-S6)
 
@@ -313,7 +322,26 @@ adjacent issues found and not fixed, which is a different list.
 12 further mutants, 12 killed. `tests/test_ape_period_consistency.py::test_apcm62_quarter_add_with_nothing_to_add_says_so` changed its expected sentence under rule (b), the behaviour changed intentionally: that fixture's year holds no APEs, which is the exact input the old refusal was wrong about, and the promise it asserts is unchanged.
 
 A high-severity finding requires a further cold pass, in a different failure
-family. The second pass covered test quality and the UI control contract.
+family. The second pass covered test quality and the UI control contract, and
+found **six medium findings**, all confirmed in the code before being fixed
+(`4a0f` onward). Its own fixes are in scope for the third pass.
+
+| ID | What was wrong | Test |
+|---|---|---|
+| VTF-S7 | `open_pick_record_dialog`'s join between the write, the close and the tab's status line was the body of a closure over a `CTkToplevel`, so no test could reach the one hop that delivers every tab's add sentence. Dropping the `report` call left a refused or half-written add silent on all four tabs with nothing red — the APC-M2.3 defect exactly. Extracted as `confirm_choice`, which is drivable with four fakes, so this is no longer the untestable hop VTF-N2 was written for | `::test_vtfs7_the_confirmed_pick_closes_then_reports`, `::test_vtfs7_a_raising_write_keeps_the_dialog_open`, `::test_vtfs7_an_unpicked_choice_is_refused_on_the_dialog` |
+| VTF-S8 | The Annual Plan Elements status line is the only one of the five inside a panel column rather than across the header, it was packed `fill="x", expand=True`, and `SplitPanel` sets that column's width with `minsize`, a floor and not a ceiling. The first refusal over a hundred characters would make the column request its own width and push the panels off the body | `tests/test_vsp_tab_contracts.py::test_vtfs8_the_annual_status_line_cannot_widen_its_column` |
+| VTF-S9 | VTF-S3 split the empty-option refusal on two tabs; the other two kept one wording for two reasons. The annual tab told an empty database that every Vision Element already had an annual record, and the week tab — whose `left_items` is dropdown-narrowed in place at load — sent a user with a Category filter set to the wrong tab, which is a wrong instruction and not just a wrong preamble | `::test_vtfs9_every_tab_names_the_real_reason` |
+| VTF-S10 | APE Week Assignment is the only tab whose status line carries a count, and only Load Week wrote it, so a tick narrowed the panel and its heading while the line two rows above went on naming the pre-filter total | `tests/test_vsp_tab_filters.py::test_vtfs10_the_count_on_the_status_line_follows_the_tick` |
+| VTF-S11 | Nothing asserted that any of the five new or moved buttons was connected to its handler. The batch's whole subject is buttons; every add test called the method directly on a stub, and the suite's one command assertion tested truthiness, which a button wired to `refresh` would pass. `command=self.open_add_dialog` could be deleted from all four tabs and the suite stayed green | `tests/test_vsp_tab_contracts.py::test_vtfs11_every_new_button_is_wired_to_its_handler` |
+| VTF-S12 | Two live specs still described the three deleted buttons as current controls — `docs/spec_2026-11-07_unified_panel_design.md`'s decision D5 and its risk list, and `docs/spec_2026-11-07_ape_week_actions.md` §1.2. Both are reference material `CLAUDE.md` says is read *before* working, so a reader got two opposite answers (global rule 13) | No test; no guard in this repo reads prose |
+
+The second pass also found that `_create_from_index` on the annual tab has no
+caller, which is a third orphan beside the two `BACKLOG.md` VTF-A2 names, and
+several stale docstrings and one `if has_filters` guard in
+`tests/test_unified_panel_design.py` that skips the only tab whose status line
+moved. Those are below medium and were dropped under
+`standards/effort-budget.md` rule 3, except that they are named here so the
+omission is on the record.
 
 ### Documents changed in this batch
 

@@ -202,6 +202,16 @@ as buttons below the list, because they act on the *selected* tactic and have
 no per-row equivalent in the image. Row selection and double-click-to-open
 stay as they are.
 
+> **Superseded on 2026-11-11 by VTF-M5.** The three buttons below that list
+> are gone. `Edit Weekly Tactic` opened the same editor as a double-click on
+> the row and `Delete Weekly` called the same delete as the row's own button,
+> so both were second routes to a control already on the row; `Add Action
+> Item` created an Action Item this panel cannot display, and that button
+> belongs to APE Week Actions, which has it. The bottom row is one button,
+> `Add Weekly Tactic`. Row selection and double-click-to-open are unchanged,
+> and the rest of D5 — the table's shape and the row's own Delete — stands.
+> See `docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md`.
+
 **D6 — APE Week Actions gets the divider, the chip table on the left, and the
 filter combos; it does not get the drag.** Dragging a tactic from the left
 panel onto the right would have to mean something, and on this tab the right
@@ -367,7 +377,9 @@ first screen moved onto it. See §10.
 - **`weekly_items.py`'s right panel is a behaviour change, not a move.** Rows
   gain a Delete they did not have, and a `Delete Weekly` button that acts on
   the selection stays beside it. Two ways to delete the same thing is a
-  reasonable thing to get wrong; M5.2 and M5.4 both have to pass.
+  reasonable thing to get wrong; M5.2 and M5.4 both have to pass. *(The risk
+  was real and the answer on 2026-11-11 was to remove the second way: VTF-M5
+  deleted that button. See the note on D5.)*
 - **This batch touches `week_actions.py` and `weekly_items.py`**, the two files
   the unpushed AWA batch just created and changed. See §7.
 - **`test_ci_contract.py` pins the mapped-window count at 22.** Any new test
