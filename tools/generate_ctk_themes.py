@@ -61,7 +61,14 @@ APPLE_NEUTRAL_OVERRIDES: Dict[Tuple[str, str], List[str]] = {
     ("CTk", "fg_color"): ["#F5F5F7", "#000000"],
     ("CTkToplevel", "fg_color"): ["#F5F5F7", "#000000"],
     ("CTkFrame", "fg_color"): ["#FFFFFF", "#1D1D1F"],
-    ("CTkFrame", "top_fg_color"): ["#FFFFFF", "#1D1D1F"],
+    # SEP-M1: a third step, not a repeat of the frame. These two tokens are
+    # `theme.py`'s `surface` and `surface_subtle`, and they are the only thing
+    # separating a list row from its pane and a Plan chip from its box -- so
+    # equal values meant no edge anywhere in the app (was PBG-A11). `#F5F5F7`
+    # is this theme's own window fill, which is Apple's grouped background
+    # under white cards; `#2C2C2E` is Apple's dark elevation above `#1D1D1F`.
+    # Measured separation 1.0888 light / 1.2076 dark.
+    ("CTkFrame", "top_fg_color"): ["#F5F5F7", "#2C2C2E"],
     ("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],
     ("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],
     ("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],
@@ -74,7 +81,11 @@ BLACK_WHITE_NEUTRAL_OVERRIDES: Dict[Tuple[str, str], List[str]] = {
     ("CTk", "fg_color"): ["#FFFFFF", "#000000"],
     ("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],
     ("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],
-    ("CTkFrame", "top_fg_color"): ["#FFFFFF", "#000000"],
+    # SEP-M1, as above. Both values are this theme's own anchor pair
+    # (`BLACK_WHITE_ANCHOR`), so the high-contrast look spends no new colour:
+    # it already ships a grey ramp for borders and entries.
+    # Measured separation 1.1005 light / 1.1121 dark.
+    ("CTkFrame", "top_fg_color"): ["#F3F4F6", "#111111"],
     ("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],
     ("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],
     ("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],
