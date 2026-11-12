@@ -13,6 +13,7 @@ exits 0 is worse than no selftest: CI would report every broken bundle green
 from __future__ import annotations
 
 import os
+import pathlib
 import subprocess
 import sys
 from pathlib import Path
@@ -26,10 +27,21 @@ RUN_PY = REPO_ROOT / "run.py"
 
 
 def _run_selftest_subprocess(env_overrides: dict, timeout: int = 120):
-    """Invoke run.py --selftest in a clean subprocess; return the CompletedProcess."""
+    """Invoke run.py --selftest in a clean subprocess; return the CompletedProcess.
+
+    RLS-M7: the child gets ``GETMOREDONE_DATA_DIR`` too, because
+    ``GETMOREDONE_DB`` isolates only the database and the child would otherwise
+    create the real ``weekly_tactic_debug.log``. The explicit path still wins
+    for the database: ``resolve_db_path`` consults ``GETMOREDONE_DB`` first.
+    """
     env = dict(os.environ)
     env.update({k: str(v) for k, v in env_overrides.items()})
     env.setdefault("PYTHONPATH", str(REPO_ROOT / "src"))
+    if "GETMOREDONE_DB" in env_overrides:
+        env.setdefault(
+            "GETMOREDONE_DATA_DIR",
+            str(pathlib.Path(str(env_overrides["GETMOREDONE_DB"])).parent),
+        )
     return subprocess.run(
         [sys.executable, str(RUN_PY), "--selftest"],
         cwd=str(REPO_ROOT),
@@ -125,6 +137,7 @@ def test_rm1b_selftest_creates_no_window(tmp_path, monkeypatch):
 
     monkeypatch.setattr(ctk, "CTk", _Recorder)
     monkeypatch.setenv("GETMOREDONE_DB", str(tmp_path / "selftest.db"))
+    monkeypatch.setenv("GETMOREDONE_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("GETMOREDONE_RESOURCE_ROOT", str(REPO_ROOT))
 
     assert selftest.run_selftest() == 0
@@ -142,6 +155,7 @@ def test_rm1b_selftest_does_not_import_the_main_window_module(tmp_path):
     )
     env = dict(os.environ)
     env["GETMOREDONE_DB"] = str(tmp_path / "selftest.db")
+    env["GETMOREDONE_DATA_DIR"] = str(tmp_path)      # RLS-M7, as the helper above
     env["GETMOREDONE_RESOURCE_ROOT"] = str(REPO_ROOT)
     result = subprocess.run(
         [sys.executable, "-c", code],
@@ -149,6 +163,28 @@ def test_rm1b_selftest_does_not_import_the_main_window_module(tmp_path):
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "APP_IMPORTED False" in result.stdout, result.stdout
+
+
+def test_rlsm7_the_selftest_child_keeps_its_weekly_log_out_of_the_real_data_dir(tmp_path):
+    """The selftest subprocess writes its weekly log inside the temp data dir.
+
+    Purpose: RLS-M7 -- CI run 43286853100 went red with 2865 passed and no
+             test failing, because this child created
+             ``/home/runner/.local/share/GetMoreDone/weekly_tactic_debug.log``.
+             Asserted positively, on the log being inside ``tmp_path``, since a
+             negative passes wherever the real file already exists.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-12_test_harness_isolation.md#rls-m7
+    """
+    result = _run_selftest_subprocess({
+        "GETMOREDONE_DB": tmp_path / "selftest.db",
+        "GETMOREDONE_RESOURCE_ROOT": REPO_ROOT,
+    })
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (tmp_path / "weekly_tactic_debug.log").exists(), (
+        "the selftest child did not put its weekly log in the temp data "
+        f"directory, so it resolved the real one: {sorted(tmp_path.iterdir())}"
+    )
 
 
 # --------------------------------------------------------------------------

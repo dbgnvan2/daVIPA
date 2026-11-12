@@ -97,6 +97,40 @@ def _user_data_fingerprint():
     return fingerprint
 
 
+def _preattach_weekly_tactic_log(session):
+    """Point the weekly-tactic logger at a temp file before collection imports.
+
+    Purpose: RLS-M8 -- six modules call ``get_weekly_tactic_logger()`` at
+             *module scope* (``db_manager.py``, ``vps_schema.py``,
+             ``weekly_tactic.py``, ``weekly_tactic_migrations.py``,
+             ``weekly_tactic_maintenance.py``, ``screens/weekly_items.py``),
+             and ``logging.FileHandler`` creates its file on construction,
+             so the real ``weekly_tactic_debug.log`` existed as soon as
+             collection imported any of them. ``_isolate_weekly_tactic_log``
+             below cannot prevent it -- a fixture runs after collection, as its
+             own docstring says. Found by CI run 43286853100, invisible locally
+             because the file already exists here. Works through
+             ``get_weekly_tactic_logger``'s documented idempotence: a logger
+             that already has handlers is returned untouched.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-12_test_harness_isolation.md#rls-m8
+    Tests:   tests/test_settings_isolation.py::test_rlsm8_a_preattached_handler_stops_the_real_log_being_created
+    """
+    import tempfile
+
+    from src.getmoredone.weekly_tactic_logging import LOGGER_NAME
+
+    workspace = Path(tempfile.mkdtemp(prefix="gmd-test-weekly-log-"))
+    handler = logging.FileHandler(
+        workspace / "weekly_tactic_debug.log", encoding="utf-8"
+    )
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    logger = logging.getLogger(LOGGER_NAME)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    session.config._gmd_weekly_log_handler = handler
+    session.config._gmd_weekly_log_dir = workspace
+
+
 def remove_test_db_dir(path) -> bool:
     """Delete the temp directory sessionstart made. Returns whether it went.
 
@@ -163,6 +197,11 @@ def pytest_sessionstart(session):
     # Tests: tests/test_demo_install.py::test_d1_the_suite_runs_with_no_data_dir_override
     if "GETMOREDONE_DATA_DIR" in os.environ:
         session.config._gmd_data_dir_env = os.environ.pop("GETMOREDONE_DATA_DIR")
+
+    # Before the fingerprint, and before collection imports anything: see
+    # _preattach_weekly_tactic_log. Taking the fingerprint first would record
+    # a file this process had already created.
+    _preattach_weekly_tactic_log(session)
 
     session.config._user_data_before = _user_data_fingerprint()
 
@@ -356,6 +395,18 @@ def pytest_sessionfinish(session, exitstatus):
     data_dir_env = getattr(session.config, "_gmd_data_dir_env", None)
     if data_dir_env is not None:
         os.environ["GETMOREDONE_DATA_DIR"] = data_dir_env
+
+    weekly_handler = getattr(session.config, "_gmd_weekly_log_handler", None)
+    if weekly_handler is not None:
+        import shutil
+
+        from src.getmoredone.weekly_tactic_logging import LOGGER_NAME
+
+        logging.getLogger(LOGGER_NAME).removeHandler(weekly_handler)
+        weekly_handler.close()
+        shutil.rmtree(
+            getattr(session.config, "_gmd_weekly_log_dir", None), ignore_errors=True
+        )
 
     before = getattr(session.config, "_user_data_before", None)
     if before is None:

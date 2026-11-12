@@ -168,6 +168,10 @@ def _run_selftest(db_path: Path) -> subprocess.CompletedProcess:
 
     env = dict(os.environ)
     env["GETMOREDONE_DB"] = str(db_path)
+    # RLS-M7: GETMOREDONE_DB isolates only the database, so without this the
+    # child creates the real weekly_tactic_debug.log. The database still lands
+    # on db_path, which resolve_db_path consults first.
+    env["GETMOREDONE_DATA_DIR"] = str(db_path.parent)
     env["GETMOREDONE_RESOURCE_ROOT"] = str(REPO_ROOT)
     env.setdefault("PYTHONPATH", str(REPO_ROOT / "src"))
     return subprocess.run(

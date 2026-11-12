@@ -179,6 +179,54 @@ def test_rlsm2_the_weekly_log_is_fingerprinted(tmp_path):
     assert result.returncode != 0, "the guard did not fail the run"
 
 
+def test_rlsm8_a_preattached_handler_stops_the_real_log_being_created(tmp_path):
+    """Importing a module that builds the logger must not create the real log.
+
+    Purpose: RLS-M8 -- six modules build the weekly-tactic logger at module
+             scope, so CI run 43286853100 found the real log created during
+             collection, before any fixture could run.
+             ``conftest._preattach_weekly_tactic_log`` gets in first.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-12_test_harness_isolation.md#rls-m8
+
+    ``HOME`` is redirected so the resolved data directory holds no log yet --
+    the only state in which this is observable, since creating a file that is
+    already there changes neither mtime nor contents.
+    """
+    fake_home = tmp_path / "fake_home"
+    fake_home.mkdir()
+
+    result = _run_nested_pytest(
+        tmp_path,
+        """
+        import logging
+        from pathlib import Path
+
+        from platformdirs import user_data_dir
+
+        from src.getmoredone.paths import APP_AUTHOR, APP_NAME
+        from src.getmoredone.weekly_tactic_logging import LOGGER_NAME
+
+        import src.getmoredone.db_manager  # noqa: F401 -- logger at module scope
+
+        def test_probe():
+            real_dir = Path(user_data_dir(APP_NAME, APP_AUTHOR))
+            attached = [h.baseFilename
+                        for h in logging.getLogger(LOGGER_NAME).handlers
+                        if hasattr(h, "baseFilename")]
+            assert attached, "sessionstart attached no file handler"
+            assert not any(str(real_dir) in p for p in attached), attached
+            assert not (real_dir / "weekly_tactic_debug.log").exists(), (
+                f"the real weekly log was created at {real_dir}")
+        """,
+        env_extra={"HOME": str(fake_home)},
+        env_remove=("XDG_DATA_HOME", "GETMOREDONE_DATA_DIR"),
+    )
+
+    assert result.returncode == 0, (
+        f"the import created the real weekly log:\n{result.stdout}\n{result.stderr}")
+    assert "1 passed" in result.stdout, (
+        f"the probe did not run, so it asserted nothing:\n{result.stdout}")
+
 # --- CIG-A4: the guard must name the right cause -----------------------------
 
 _SETTINGS_BEFORE = (1_000_000_000, 40, "a" * 64, "/fake/settings.json")
