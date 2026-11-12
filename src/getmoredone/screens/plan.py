@@ -2337,11 +2337,6 @@ class PlanScreen(ctk.CTkFrame):
 
         The minutes come from Day Settings' lunch length: what is being moved is
         when lunch is, and its length is still a setting.
-
-        Lunch may land on a box that already holds work. A lunch box draws
-        "Lunch" and nothing else, so that work moves to the "Outside the day"
-        group -- visible, and said out loud here rather than left to be
-        noticed (P2).
         """
         block = self._lunch_block()
         already_outside = {
@@ -2361,9 +2356,7 @@ class PlanScreen(ctk.CTkFrame):
                     block, slot_index, self.bounds, day_span=self._grid.span
                 )
             else:
-                # The return value, not the block read above: ``place_block_at``
-                # works on its own copy, so the local one still holds the time
-                # lunch is leaving -- which is the time the status reported.
+                # The return value: the block read above holds the old time.
                 block = self.db_manager.place_block_at(
                     block.id, slot_index, self.bounds
                 )

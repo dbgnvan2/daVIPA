@@ -602,10 +602,8 @@ def lunch_window(
     return None
 
 
-#: A lunch window of no length, so no slot on the grid is lunch. ``None``
-#: cannot say that: ``day_grid`` reads it as "the window Day Settings names",
-#: which is how the flag that exists to take lunch out of the way came to put
-#: the Day Settings hour back -- the one hour a lunch block is always leaving.
+#: No slot is lunch. ``None`` cannot say that: ``day_grid`` reads it as the
+#: window Day Settings names, which is the hour a lunch block is always leaving.
 NO_LUNCH: Tuple[int, int] = (0, 0)
 
 
@@ -797,11 +795,9 @@ def can_place(
     about to create, because that box is outside the hours by definition --
     that is what the gesture means.
 
-    ``placing_lunch`` says the block being placed *is* this date's lunch, so
-    neither reason a box can be taken applies: no slot is lunch, because this
-    block defines where lunch is, and no box is full, because a lunch box
-    holds the lunch alone (``build_day_grid`` surfaces whatever else was in it
-    under "Outside the day").
+    ``placing_lunch``: the block being placed *is* this date's lunch, so
+    neither reason a box can be taken applies -- it defines where lunch is, and
+    a lunch box holds the lunch alone (``build_day_grid`` surfaces the rest).
     """
     span = max(1, int(span))
     drawn = template_span(bounds) if day_span is None else day_span
@@ -818,8 +814,7 @@ def can_place(
     if any(slot.is_lunch for slot in covered):
         return SlotRefusal.CROSSES_LUNCH
 
-    # PF-M8 -- a lunch box draws "Lunch" and nothing else, so the room left in
-    # the boxes lunch is moving onto is not a reason to refuse the move.
+    # PF-M8 -- a lunch box holds the lunch alone, so the room in it is moot.
     if placing_lunch:
         return None
 

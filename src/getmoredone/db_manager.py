@@ -1806,9 +1806,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         wanted = clamp_block_minutes(minutes)
         self._refuse_unless_it_fits(
             block.block_date, block.slot_index, wanted, bounds, ignoring=block.id,
-            # PF-M8 -- the same reason the move paths pass it: a lunch block
-            # defines the lunch it sits on, so lengthening it is not a
-            # collision with the Day Settings hour it may be covering.
+            # PF-M8 -- as the move paths, for the same reason.
             placing_lunch=BlockType.normalize(block.block_type) == BlockType.LUNCH,
         )
         with self.transaction():
