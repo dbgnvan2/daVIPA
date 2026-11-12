@@ -598,7 +598,18 @@ class PlanScreen(ctk.CTkFrame):
         )
 
     def create_items_pane(self):
-        frame = ctk.CTkFrame(self)
+        # SEP-M5 -- these two surfaces are named, not inherited. A ``CTkFrame``
+        # built with ``fg_color=None`` takes the theme's ``top_fg_color`` when
+        # its master carries the theme's ``fg_color``, and ``fg_color``
+        # otherwise (``ctk_frame.py``), so the token *alternates with nesting
+        # depth*. ``CTkScrollableFrame`` passes ``fg_color`` straight into that
+        # logic. Under ``app.py``'s ``content_frame`` the chain reaches this
+        # pane's scroll frame on ``surface_subtle`` -- which is the row's own
+        # colour, so the row had no edge -- while a test building
+        # ``PlanScreen`` on a bare root gets the opposite parity and passes.
+        # Naming the surface is what makes the screen and its test agree.
+        palette = semantic_colors()
+        frame = ctk.CTkFrame(self, fg_color=palette["surface"])
         frame.grid(
             row=1, column=0, sticky="nsew",
             padx=(PLAN_PANE_EDGE_PAD_PX, 0), pady=10,
@@ -615,12 +626,14 @@ class PlanScreen(ctk.CTkFrame):
             frame,
             text="Drag an item onto the day to block it.",
             anchor="w",
-            text_color=semantic_colors()["muted_text"],
+            text_color=palette["muted_text"],
             font=ctk.CTkFont(size=11),
         )
         self.items_hint.grid(row=1, column=0, padx=10, pady=(0, 6), sticky="w")
 
-        self.items_scroll = ctk.CTkScrollableFrame(frame)
+        self.items_scroll = ctk.CTkScrollableFrame(
+            frame, fg_color=palette["surface"]
+        )
         self.items_scroll.grid(row=2, column=0, sticky="nsew", padx=5, pady=(0, 5))
         self.items_scroll.grid_columnconfigure(0, weight=1)
 
@@ -848,7 +861,9 @@ class PlanScreen(ctk.CTkFrame):
             )
 
     def create_day_pane(self):
-        frame = ctk.CTkFrame(self)
+        # SEP-M5 -- named, not inherited; see ``create_items_pane``.
+        palette = semantic_colors()
+        frame = ctk.CTkFrame(self, fg_color=palette["surface"])
         frame.grid(
             row=1, column=2, sticky="nsew",
             padx=(0, PLAN_PANE_EDGE_PAD_PX), pady=10,
@@ -867,7 +882,7 @@ class PlanScreen(ctk.CTkFrame):
             frame,
             text="",
             anchor="w",
-            text_color=semantic_colors()["muted_text"],
+            text_color=palette["muted_text"],
             font=ctk.CTkFont(size=11),
         )
         self.day_summary.grid(row=1, column=0, padx=10, pady=(0, 6), sticky="w")
@@ -884,7 +899,9 @@ class PlanScreen(ctk.CTkFrame):
 
         # The drop target for an item drag, and the container a block drag is
         # reordered within.
-        self.blocks_scroll = ctk.CTkScrollableFrame(frame)
+        self.blocks_scroll = ctk.CTkScrollableFrame(
+            frame, fg_color=palette["surface"]
+        )
         self.blocks_scroll.grid(row=3, column=0, sticky="nsew", padx=5, pady=4)
         self.blocks_scroll.grid_columnconfigure(0, weight=1)
 
