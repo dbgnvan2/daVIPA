@@ -62,37 +62,28 @@ duplication is four places a future copy can forget it. A shared fixture in
 
 ## Open decision — what the colour inventory counts (CIV, filed 2026-11-11)
 
-Raised by two independent sweep passes over the batch that fixed the scan's
-gray-scale gap. Both are about what the document measures, so neither was
-settled in the batch.
+Both raised by the sweep over the gray-scale batch, and both about what the
+document measures rather than defects, so neither was settled in the batch.
 
 ### CIV-A2 — prose about colours is counted as colour usage (medium — a decision)
 
-The CIV-A1 narrowing stopped the scan reading documents, but the same effect
-survives inside `src/`. Measured 2026-11-11:
+CIV-A1 stopped the scan reading documents; the same effect survives inside
+`src/`. Measured 2026-11-11: the `### ``#abc``` section's 6 rows are all
+docstrings explaining that a three-digit hex gets expanded, and
+`src/getmoredone/theme.py:16`'s `THEME_NAMES` contributes 4 named occurrences
+that are theme identifiers, with 4 more from `generate_ctk_themes.py`.
 
-- The `### ``#abc``` section's 6 rows are all comments or docstrings
-  explaining that a three-digit hex gets expanded —
-  `src/getmoredone/color_contrast.py:50`, `vps_manager.py:206` and four
-  others. `#abc` is a form named in a sentence, not a colour anyone set.
-- `src/getmoredone/theme.py:16`'s `THEME_NAMES` tuple contributes 4 named
-  occurrences (`green`, `orange`, `grey`, `blue`), and
-  `tools/generate_ctk_themes.py` 4 more as theme-name keys. Those are theme
-  identifiers; the colours they select are counted separately from the theme
-  JSON.
-
-It is a decision rather than a defect because excluding comment and docstring
-lines would also drop comments that name a real fill, such as the
-`# deep -- the ``low`` fill is #052E16` line the report carries today. The
-question is whether section 1's count is colours *used* or colours
-*mentioned*. Either answer is implementable in `SCAN_COMMANDS` alone.
+A decision, not a defect: excluding comment lines would also drop comments
+naming a real fill, such as the `# deep -- the ``low`` fill is #052E16` line
+the report carries. The question is whether section 1 counts colours *used*
+or colours *mentioned*. Implementable in `SCAN_COMMANDS` alone.
 
 ### CIV-A3 — `assets/icons/*.svg` is still uninventoried (low)
 
 5 named-colour occurrences in shipped UI resources, named in the report's own
-"Not covered" line since CIV-A1. Widening is one entry in `UI_CODE_PATHS`
-plus an `-g` for the extension; the open question is whether an icon's fill
-belongs in a report whose Hard Rule is about widget colour.
+"Not covered" line since CIV-A1. One entry in `UI_CODE_PATHS` plus a `-g`;
+the open question is whether an icon fill belongs in a report whose Hard Rule
+is about widget colour.
 
 ## Adjacent issues — priority defaults and the cap (PRI, filed 2026-11-08)
 

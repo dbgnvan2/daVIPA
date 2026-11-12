@@ -42,16 +42,11 @@ NAMED_PATTERN = rf'"({_NAMED_WORDS})"' + rf"|'({_NAMED_WORDS})'"
 # Tests: tests/test_color_inventory_sync.py::test_civm5_the_scans_feeding_one_count_do_not_overlap
 UI_CODE_PATHS = ("src", "tools/generate_ctk_themes.py")
 
-# `.gitignore` line 26 ignores `*.json`, and its
-# `!src/getmoredone/email_cleaning_rules.json` negation is flat, so it is not
-# applied when rg's walk root is `src` itself: the file was unsearchable while
-# `git check-ignore` reported it tracked. 106 tracked files in scope, 105
-# visible (2026-11-11). A positive `-g` overrides `.gitignore`'s *file* rules,
-# which is the same reason `theme_files` can read `themes/*.json` at all; a
-# path under an ignored *directory* stays unreachable, and the test below is
-# what would say so. Naming the
-# extensions also bounds the walk, and the test below fails if a tracked file
-# in scope falls outside them.
+# A flat `.gitignore` negation is not applied when rg's walk root is the
+# negated path's own parent, so `*.json` (line 26) hid a tracked file from a
+# walk of `src`: 106 tracked in scope, 105 visible (2026-11-11). A positive
+# `-g` overrides `.gitignore`'s file rules -- not its directory rules -- which
+# is also why `theme_files` can read `themes/*.json`.
 # Tests: tests/test_color_inventory_sync.py::test_civm17_every_tracked_file_in_scope_is_reachable_by_a_scan
 UI_CODE_GLOBS = ("-g", "*.py", "-g", "*.json")
 
@@ -274,12 +269,11 @@ HEX_TOP_N = 20
 def md_code(value: str, limit: int) -> str:
     """One inline code span holding `value`, truncated to `limit` first.
 
-    A snippet is quoted source, so it can hold backticks and pipes. `|` needs
-    escaping even inside a code span, because the row's cells are
-    pipe-separated; a backtick needs a fence longer than the longest run
-    inside it, plus a space of padding when the text starts or ends with one.
-    Escaping only `|` left 10 of 1735 rows broken (2026-11-11). Truncating
-    before escaping, not after, is what keeps a `\\|` from being cut in half.
+    GFM strips `\\|` while splitting row cells, so a pipe needs escaping even
+    inside a span; a backtick needs a fence longer than the longest run
+    inside, padded when the text starts or ends with one. Escaping only `|`
+    left 10 of 1735 rows broken, and truncating after escaping would cut a
+    `\\|` in half (2026-11-11).
     Tests: tests/test_color_inventory_sync.py::test_civm21_every_occurrence_snippet_renders_as_one_code_span
     """
     text = value[:limit].replace("|", "\\|")
