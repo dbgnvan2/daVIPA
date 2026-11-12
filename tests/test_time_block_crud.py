@@ -29,10 +29,12 @@ from src.getmoredone.models import ActionItem, BlockType, TimeBlock
 from src.getmoredone.time_block_layout import (
     MAX_BLOCKS_PER_SLOT,
     DayBounds,
+    DaySpan,
     SlotRefusal,
     SlotRefusedError,
     build_day_grid,
     parse_hhmm,
+    template_span,
 )
 
 DAY = "2026-11-05"           # a Thursday
@@ -442,6 +444,45 @@ def test_a_resize_that_fits_rewrites_the_end_time(manager):
     resized = manager.get_time_block(block.id)
     assert (resized.planned_minutes, resized.start_time, resized.end_time) == (
         45, "09:00", "09:45",
+    )
+
+
+def test_pbga3_a_block_on_a_drawn_box_can_be_resized(manager):
+    """PBG-A3 — ``set_block_length`` checks the day it is told about.
+
+    The template is 08:00-17:00, boxes 0..17. A block on box 18 is on the day
+    only because the screen drew it wider -- a drop on **Later**. Without
+    ``day_span`` ``_refuse_unless_it_fits`` measures against the template
+    alone, so every length was refused there, the one it already had included,
+    and the right-click menu was dead on that box.
+
+    Both halves are asserted: refused when the caller claims the template, and
+    written when the caller passes the day it drew. One alone would pass for a
+    manager that ignored the argument entirely.
+    """
+    outer = 18
+    drawn = DaySpan(0, outer + 2)
+    assert not template_span(BOUNDS).holds(outer, 1), (
+        "precondition: box 18 has to be outside the template, or there is "
+        "nothing here to refuse"
+    )
+    block = manager.add_block_at(
+        TimeBlock(
+            block_date=DAY, start_time="", end_time="",
+            planned_minutes=30, label="resize me",
+        ),
+        outer, BOUNDS, day_span=drawn,
+    )
+
+    with pytest.raises(SlotRefusedError) as refused:
+        manager.set_block_length(block.id, 60, BOUNDS)
+    assert refused.value.reason == SlotRefusal.OUTSIDE_GRID
+
+    manager.set_block_length(block.id, 60, BOUNDS, day_span=drawn)
+
+    resized = manager.get_time_block(block.id)
+    assert (resized.planned_minutes, resized.slot_index) == (60, outer), (
+        "the resize did not take, or it moved the block"
     )
 
 

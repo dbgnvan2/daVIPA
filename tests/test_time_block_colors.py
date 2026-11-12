@@ -18,9 +18,11 @@ import re
 from pathlib import Path
 
 import customtkinter as ctk
+import json
+
 import pytest
 
-from src.getmoredone.color_contrast import contrast_ratio, relative_luminance
+from src.getmoredone.color_contrast import contrast_ratio
 from src.getmoredone.theme import (
     block_type_colors,
     depth_bar_colors,
@@ -90,8 +92,6 @@ def restore_appearance():
         ctk.set_appearance_mode("system" if was_system else original)
 
 
-
-
 def test_block_type_colors_meet_contrast_in_both_themes(restore_appearance):
     """Buffer, break and lunch accents, held to the same bar as the bands."""
     failures = []
@@ -146,8 +146,6 @@ def test_a_filled_depth_bar_is_distinguishable_from_an_empty_one(restore_appeara
         )
 
 
-
-
 def test_tbm123_no_inline_hex_in_plan_screen():
     """TB-M12.3 — no hard-coded colour in the Plan screen's three modules.
 
@@ -167,52 +165,11 @@ def test_tbm123_no_inline_hex_in_plan_screen():
     )
 
 
-
-
-# --- PB-M1 / PB-M4 : the stripe table and the fill table -------------------
-#
-# Two tables rather than one because they are held to different bars. A stripe
-# is not text, so WCAG asks 3:1 of it; a band colour behind a label is text and
-# asks 4.5:1. On a pale light-theme surface brighter means *less* contrast, so
-# one value cannot be both the brightest bar and the safest label colour.
-
-#: WCAG AA for a non-text graphical object. What a stripe actually has to meet.
-MIN_NON_TEXT_CONTRAST = 3.0
-
-#: What a fill tint has to clear against the text drawn on it. Well above the
-#: 4.5 AA bar on purpose -- see ``test_pbm41_...`` for why 4.5 is unfailable
-#: here. A tint is a pale or a deep background, not a mid grey, and 10:1 is
-#: comfortably met by every value in the table while excluding the crossover
-#: band where neither black nor white is a good answer.
-MIN_TINT_CONTRAST = 10.0
-
-
-def _luminance_of(color: str) -> float:
-    """WCAG relative luminance, so "brighter" is a number and not a taste.
-
-    Thin wrapper on ``color_contrast.relative_luminance`` -- the app's own
-    function -- because the value arriving here may be a CustomTkinter
-    (light, dark) tuple that has to be resolved first.
-
-    This was a second copy of the formula, justified by a docstring saying
-    ``color_contrast`` exposed only the ratio. It exposes
-    ``relative_luminance`` publicly, and the copy had drifted already: it
-    linearised at 0.03928 where the source uses the 0.04045 of the current
-    WCAG text. Close enough never to change a verdict, which is what makes a
-    duplicate formula worth deleting rather than correcting -- in the same
-    file that asserts theme.py is the only module defining the band table.
-    """
-    return relative_luminance(_as_hex(color))
-
-
-
-
-
-
-
-
-
-
+# ``MIN_NON_TEXT_CONTRAST``, ``MIN_TINT_CONTRAST`` and ``_luminance_of`` were
+# here, with the 3:1 stripe bar and the 10:1 tint bar they measured. PBG-M5
+# deleted the stripe table and the fill table, so the five tests that used them
+# went too, and these are deleted rather than left: a constant naming a bar
+# nothing enforces reads as a bar something enforces.
 
 
 def test_pdm9_the_two_marks_are_legible_on_the_row_surface(restore_appearance):
@@ -222,12 +179,26 @@ def test_pdm9_the_two_marks_are_legible_on_the_row_surface(restore_appearance):
     theme's own row surface now, which is the only thing behind them. Held to
     the 4.5:1 text bar, not the 3:1 non-text one -- they are glyphs, and the
     whole of what each one says is which glyph it is.
+
+    Against **every bundled theme's** surface, not just the one this process
+    happens to have loaded. The pair this replaced measured against hard-coded
+    priority fills and so was theme-independent for free; ``surface_subtle``
+    is ``CTkFrame.top_fg_color``, which each theme file sets for itself --
+    ``gray85`` in most, ``#FFFFFF`` in two and ``#DFCCFF`` in ``davipa`` --
+    so a single-theme measurement would let a theme ship a sub-4.5:1 glyph
+    with the suite green. Read out of the JSON rather than by loading each
+    theme, which would leave global CustomTkinter state behind it.
     """
+    themes = sorted(Path("themes").glob("*.json"))
+    assert len(themes) >= 10, (
+        f"only {len(themes)} theme files found -- this test is measuring "
+        "fewer surfaces than the app ships"
+    )
+
     failures = []
     for mode in THEMES:
         ctk.set_appearance_mode(mode)
         palette = semantic_colors()
-        surface = _as_hex(palette["surface_subtle"])
         marks = {
             "scheduled": palette["scheduled_mark"],
             "unscheduled": palette["unscheduled_mark"],
@@ -236,16 +207,25 @@ def test_pdm9_the_two_marks_are_legible_on_the_row_surface(restore_appearance):
             f"{mode}: the two marks are the same colour, so only the glyph "
             "tells them apart"
         )
-        for role, mark in marks.items():
-            ratio = contrast_ratio(_as_hex(mark), surface)
-            if ratio < MIN_CONTRAST:
-                failures.append(
-                    f"{mode}: {role} {mark} on {surface} is {ratio:.2f}"
-                )
+        # A theme file's colour pair is [light, dark]; ``THEMES`` is the
+        # appearance-mode name, so the half is picked by name and not by the
+        # order this loop happens to run in.
+        half = 0 if mode == "Light" else 1
+        surfaces = {"the loaded theme": _as_hex(palette["surface_subtle"])}
+        for path in themes:
+            pair = json.loads(path.read_text())["CTkFrame"]["top_fg_color"]
+            surfaces[path.name] = _as_hex(pair[half])
+
+        for where, surface in surfaces.items():
+            for role, mark in marks.items():
+                ratio = contrast_ratio(_as_hex(mark), surface)
+                if ratio < MIN_CONTRAST:
+                    failures.append(
+                        f"{mode}/{where}: {role} {mark} on {surface} is "
+                        f"{ratio:.2f}"
+                    )
 
     assert not failures, (
         f"marks closer than {MIN_CONTRAST}:1 to the surface behind them: "
         + "; ".join(failures)
     )
-
-

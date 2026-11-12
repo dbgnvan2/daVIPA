@@ -30,11 +30,10 @@ import pytest
 
 from src.getmoredone.app_settings import AppSettings
 from src.getmoredone.db_manager import DatabaseManager
-from src.getmoredone.models import ActionItem, BlockType, TimeBlock
+from src.getmoredone.models import ActionItem, BlockType, PriorityFactors, TimeBlock
 from src.getmoredone.color_contrast import contrast_ratio
 from src.getmoredone.screens.plan import (
     ITEMS_TEXT_INSET_PX,
-    NOTE_MIN_WRAP_PX,
     OUTSIDE_GROUP_HEIGHT_PX,
     PLAN_DIVIDER_WIDTH_PX,
     PLAN_ITEMS_COL_WIDTH_PX,
@@ -60,6 +59,7 @@ from src.getmoredone.screens.plan_blocks import (
     PD_LATER_TEXT,
     STRIPE_WIDTH_PX,
     SLOT_CHIP_HEIGHT_PX,
+    SLOT_BADGE_WIDTH_PX,
     SLOT_LENGTH_WIDTH_PX,
     SLOT_MIN_HEIGHT_PX,
     SLOT_ROW_GAP_PX,
@@ -183,15 +183,20 @@ def _scored_item(manager, title, **kwargs):
     ``create_action_item`` calls ``update_priority_score``, which multiplies the
     four factors and returns 0 when any of them is None -- so the item came back
     ``unscored`` and every colour assertion written against it compared the
-    unscored grey with the unscored grey. 51200 is a real critical score
-    (20 x 20 x 16 x 8); it was only ever being thrown away.
+    unscored grey with the unscored grey.
+
+    The four factors below multiply out to 51200, which
+    ``priority_score_from_factors`` caps at ``PriorityFactors.MAX_SCORE``, so
+    the item this hands back scores **9999** and its badge reads ``P:9999``.
+    That is the top of the scale, and the number the badge's column has to be
+    wide enough for (PBG-A5).
 
     The score is asserted here rather than left to the caller, so this helper
     cannot start handing back unscored items without a test failing on the
     spot. Both factors are Critical, so the item also has the top priority
     *level* -- which is what the badge draws since PBG-M2.
     """
-    # 20 x 20 x 16 x 8 = 51200, a real critical score.
+    # 20 x 20 x 16 x 8, capped to PriorityFactors.MAX_SCORE.
     item = _item(manager, title, importance=20, urgency=20, size=16, value=8, **kwargs)
     assert item.priority_score > 0, (
         f"{title!r} came back from the database scoring "
@@ -1172,6 +1177,21 @@ def test_pbgm4_padding_keeps_its_neutral_and_a_task_does_not(
         pad_stripe, block_type_colors()[BlockType.BUFFER]
     ), "padding lost the neutral that says it is padding"
 
+    # PBG-A7 -- with the tint gone, a chip's fill is the same token as some
+    # box it can sit in: a task chip and a box holding tasks are both
+    # ``surface_subtle``, and a padding chip's "transparent" resolves to the
+    # ``surface`` its own box is filled with. Either way the chip has no edge
+    # of its own, and two tasks in one box have nothing between them. The
+    # border is what draws it, so it is asserted and not left to the eye.
+    for name, chip in (("task", task_chip), ("padding", pad_chip)):
+        assert int(chip.cget("border_width")) == 1, (
+            f"a {name} chip has no border, and its fill is the same colour as "
+            f"the box it sits in"
+        )
+        assert _as_hex(chip, chip.cget("border_color")) == _as_hex(
+            chip, palette["border"]
+        ), f"a {name} chip's border is not the theme's"
+
 
 # --- TB-M11 : drag blocks to rearrange --------------------------------------
 
@@ -1222,8 +1242,6 @@ def test_pbgm5_the_band_scheme_is_gone_from_every_module_that_held_it():
         if hasattr(module, name)
     }
     assert not still_there, f"the band scheme is still importable: {still_there}"
-
-
 
 
 # --- the lunch band ----------------------------------------------------------
@@ -2928,8 +2946,6 @@ def test_pbm31_the_depth_bars_are_inside_the_box(root, manager, mapped_windows):
     )
 
 
-
-
 def test_pbm51_box_height_follows_the_setting():
     """PB-M5.1 — the arithmetic takes the chip height from its caller.
 
@@ -3077,6 +3093,70 @@ def test_pbgm3_an_item_row_is_the_themes_surface_with_a_neutral_bar(
     ), "the title is still coloured for a fill the row no longer has"
 
 
+def test_pbga2_the_plan_screen_passes_the_users_own_priority_colours(
+    root, manager, settings, light_appearance
+):
+    """PBG-A2 — the badge takes the colour the user saved, not the default.
+
+    ``build_item_row`` has a ``settings`` parameter and ``refresh`` passes
+    ``self.settings`` into it. Nothing proved that: the badge test calls the
+    builder with ``settings=None`` and compares against
+    ``level_cell_fill(None, item)``, so both sides are the shipped default and
+    the assertion holds just as well with the screen's argument deleted --
+    while Settings -> Priority Colours silently stops reaching this screen.
+    ``test_pdm15`` exists for exactly this reason on the title width.
+
+    A colour no default uses, so a working settings read and a broken one are
+    distinguishable.
+    """
+    saved = "#010203"
+    assert saved != AppSettings().priority_level_color_any_critical, (
+        "precondition: the test colour has to differ from the shipped default"
+    )
+    settings.priority_level_color_any_critical = saved
+
+    item = _scored_item(manager, "Draft the proposal")
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = item.start_date
+    panel.refresh()
+
+    badge = _find_label(panel.items_scroll, f"P:{item.priority_score}")
+    assert badge is not None, f"no P:{item.priority_score} badge in the pane"
+    assert _as_hex(badge, badge.cget("fg_color")) == saved, (
+        f"the badge is {badge.cget('fg_color')}, not the {saved} the user "
+        "saved -- the screen is not passing its settings to the row"
+    )
+
+
+def test_pbga4_an_item_row_is_not_the_colour_of_the_pane_behind_it(
+    root, manager, settings, light_appearance
+):
+    """PBG-A4 — the row has an edge, in the pane it is actually drawn in.
+
+    PBG-M3 took the priority tint off the row, so what separates one row from
+    the pane behind it is now a single pair of theme tokens and nothing else:
+    no tint, no border. ``test_pbgm3`` names the row's token and ``plan.py``
+    names the pane's, and neither can see that the two are the same colour --
+    which is what a reviewer predicted had happened here, reasoning from
+    ``CTkScrollableFrame``'s own source rather than from the built screen.
+
+    So this measures them against each other, through ``PlanScreen``: a row
+    built on a bare root has no pane to be the same colour as.
+    """
+    item = _scored_item(manager, "Draft the proposal")
+    panel = PlanScreen(root, manager, _App(settings))
+    row = build_item_row(
+        panel.items_scroll, item, 0, already_blocked=False,
+        work_block_minutes=30, settings=settings,
+    )
+
+    pane = _as_hex(row, panel.items_scroll.cget("fg_color"))
+    assert _as_hex(row, row.cget("fg_color")) != pane, (
+        f"the row and the pane behind it are both {pane}, so the row has no "
+        f"edge"
+    )
+
+
 def test_pbgm2_the_item_rows_badge_carries_the_level_colour(
     root, manager, light_appearance
 ):
@@ -3129,6 +3209,44 @@ def test_pbgm2_the_item_rows_badge_carries_the_level_colour(
     )
 
 
+def test_pbga5_the_badge_fits_the_column_reserved_for_it(
+    root, manager, light_appearance
+):
+    """PBG-A5 — measured, at the top of the scale and on the wider branch.
+
+    ``SLOT_BADGE_WIDTH_PX`` shipped at 44px on the reasoning that ``P:100``
+    fits, which was the wrong number to size for: ``priority_score`` is capped
+    at ``PriorityFactors.MAX_SCORE``, so the top of the scale is four digits,
+    and a *filled* badge spends ``corner_radius`` as padding on each side --
+    ``P:9999`` asked for 57px against the 44 reserved. A ``CTkLabel`` does not
+    clip, so the overflow came out of the title column, and at the pane's own
+    floor there is no slack there to take.
+
+    Asserted on the filled branch because it is the wider of the two, and
+    against ``MAX_SCORE`` rather than a literal so a change to the cap moves
+    this with it.
+    """
+    item = _scored_item(manager, "Draft the proposal")
+    assert item.priority_score == PriorityFactors.MAX_SCORE, (
+        "precondition: this helper is meant to render a capped score"
+    )
+
+    row = build_item_row(
+        root, item, 0, already_blocked=False, work_block_minutes=30,
+        settings=None,
+    )
+    badge = _find_label(row, f"P:{item.priority_score}")
+    assert badge is not None, "no badge on the row"
+    assert badge.cget("fg_color") != "transparent", (
+        "precondition: a capped Critical item has a level fill, which is the "
+        "branch that pays the corner-radius padding"
+    )
+
+    badge.update_idletasks()
+    assert badge.winfo_reqwidth() <= SLOT_BADGE_WIDTH_PX, (
+        f"P:{item.priority_score} asks for {badge.winfo_reqwidth()}px in a "
+        f"{SLOT_BADGE_WIDTH_PX}px column, so it overflows into the title"
+    )
 
 
 def test_the_empty_item_note_fits_the_column_it_is_drawn_in(
@@ -3382,32 +3500,29 @@ def test_the_outside_group_takes_no_room_on_a_day_without_one(
     )
 
 
-def test_the_empty_item_note_wraps_even_in_a_narrow_column(
+def test_the_empty_item_note_wraps_to_the_narrowest_column_there_is(
     root, manager, settings
 ):
-    """The note's wraplength is floored, because Tk reads 0 as "do not wrap".
+    """Tk reads a wraplength of zero or less as "do not wrap".
 
-    ``items_col_width() - ITEMS_TEXT_INSET_PX`` is zero at a 56px column and
-    negative below it, and Tk documents ``-wraplength`` of zero or less as no
-    wrapping at all -- so the narrowest columns were the ones that got the
-    single long clipped line this batch had just removed.
+    So the note needs its column to leave it a positive width, and what
+    guarantees that is the floor on the column itself -- ``items_col_width``
+    cannot return less than ``items_width_floor``, which sums the chip columns
+    and is 225px once PBG-M1's badge is one of them. There was a second floor
+    on the wraplength here; PBG-A6 deleted it, because no setting could reach
+    it any more and a guard nothing can trip cannot be tested.
 
-    PD-M2.7 raised ``plan_items_col_width`` to what an item row needs, which
-    took a 50px column off the table and with it most of this floor's reach.
-    PBG-M1's badge column took the rest: the narrowest items column the screen
-    can produce is now wider than the floor, so what this asserts is the state
-    of that -- the note wraps at the width the column leaves, and that width is
-    above the floor. The ``max`` in ``refresh`` stays as the defence it was
-    written to be; nothing the screen can be set to reaches it any more.
+    Asked for at the narrowest the screen can be set to, which is what the two
+    settings below are: both are below the floor, so both are clamped to it.
     """
     settings.drag_schedule_title_col_width = 1
     settings.plan_items_col_width = 50
     panel = PlanScreen(root, manager, _App(settings))
     leaves = panel.items_col_width() - ITEMS_TEXT_INSET_PX
-    assert leaves > NOTE_MIN_WRAP_PX, (
-        f"a {panel.items_col_width()}px column leaves {leaves}px to wrap in, "
-        f"at or under the {NOTE_MIN_WRAP_PX}px floor -- the floor is reachable "
-        "again, so this test should assert it as it did before PBG-M1"
+    assert leaves > 0, (
+        f"the narrowest column the screen can produce is "
+        f"{panel.items_col_width()}px, which leaves {leaves}px to wrap in -- "
+        "Tk would draw the note as one unwrapped clipped line"
     )
     panel.selected_date = SATURDAY
     panel.refresh()
@@ -6887,7 +7002,7 @@ def test_lmm1_lunch_moves_off_the_settings_hour_and_back_again(screen, manager):
 
 
 def test_lmm3_a_lunch_move_says_how_many_blocks_it_displaced(screen, manager):
-    """LM-3 — work lunch lands on goes below the day, and is said out loud.
+    """LM-3 — work lunch lands on goes to Outside the day, and is said so.
 
     A lunch box draws "Lunch" and nothing else, so the tasks in the box lunch
     moves onto are surfaced under "Outside the day" rather than refused (LM-2)
@@ -6942,7 +7057,7 @@ def test_lmm5_a_lunch_resize_says_how_many_it_displaced(screen, manager):
 
 
 def test_lmm6_lunch_moves_onto_a_box_the_extended_day_drew(
-    screen, manager, monkeypatch
+    screen, manager
 ):
     """LM-6 — the move path checks the day being drawn, as the add path does.
 
@@ -6968,6 +7083,38 @@ def test_lmm6_lunch_moves_onto_a_box_the_extended_day_drew(
     assert len(blocks) == 1, blocks
     assert blocks[0].slot_index == outer, (blocks[0].slot_index, outer, status)
     assert status.startswith("Lunch moved to"), status
+    # The one block in box 4 was displaced, so this is also the only coverage
+    # of ``_displaced_note``'s singular wording; asserted rather than left to
+    # the prefix above.
+    assert status.endswith("1 Time Block moved to Outside the day"), status
+
+
+def test_pbga8_an_ordinary_block_moves_onto_a_box_the_extended_day_drew(
+    screen, manager
+):
+    """PBG-A8 — the same omission, on the gesture that is not lunch.
+
+    ``move_block_to_slot`` is the ordinary drag of a block from one box to
+    another, and it called ``place_block_at`` without ``day_span`` while the
+    box index it passed came off ``_slot_frames`` -- which ``load_blocks``
+    builds over the *drawn* day. So every box the drawn day added refused the
+    drop with *That Time Block is outside the day*. Filed as LMM-A1 when LM-6
+    fixed the lunch path and left this one.
+    """
+    item = _item(manager, "early work")
+    screen.refresh()
+    screen.extend_day_for(item, DAY_EXTEND_EARLIER)
+    outer = screen._grid.span.first
+    assert outer < 0, f"precondition: the day is not extended ({outer})"
+
+    block = _add_block(manager, 30, "move me", 4)
+    screen.refresh()
+    screen.move_block_to_slot(block.id, outer)
+
+    status = screen.status_label.cget("text")
+    moved = manager.get_time_block(block.id)
+    assert moved.slot_index == outer, (moved.slot_index, outer, status)
+    assert status.startswith("Moved to"), status
 
 
 def test_pfm94_clearing_the_hover_restores_the_border_colour(screen, manager, monkeypatch):
