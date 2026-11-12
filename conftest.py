@@ -266,15 +266,21 @@ def guard_verdicts(before, after, app_state):
 #: The accusation lives in the content case alone. Until 2026-11-11 it was
 #: appended outside the branch, so the line written to say "harmless" ended by
 #: blaming a test anyway (CIG-A4).
+#: The accusation itself. Named, because the test that checks which verdicts
+#: blame a test used to find them by grepping this dict's prose, so a reword
+#: would have reported the exit status and the accusation as out of step --
+#: and this repo asserts on code, not on English.
+GUARD_ACCUSATION = "bypassed the isolation in conftest.py"
+
 GUARD_EXPLANATIONS = {
     GUARD_CONTENT_CHANGED: (
         "  Its CONTENT changed and no packaged app process was running, so a "
-        "test wrote it: something bypassed the isolation in conftest.py."
+        f"test wrote it: something {GUARD_ACCUSATION}."
     ),
     GUARD_CONTENT_APP_UNKNOWN: (
         "  Its CONTENT changed and whether the app was running could not be "
         "determined here. Treated as a test write: something may have "
-        "bypassed the isolation in conftest.py. Re-run with the app closed."
+        f"{GUARD_ACCUSATION}. Re-run with the app closed."
     ),
     GUARD_CONTENT_APP_RUNNING: (
         "  Its CONTENT changed while a process matching the packaged app was "
