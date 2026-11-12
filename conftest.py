@@ -45,6 +45,12 @@ def _user_data_fingerprint():
     two deserve different words (P1: a transient condition must not be reported
     as a terminal one).
 
+    Both files are hashed. The database was compared by size alone until
+    2026-11-11, and an in-place UPDATE of existing rows changes no bytes of
+    size -- measured on a throwaway SQLite file in journal_mode delete, which
+    is what this app runs: 400 same-length updates moved mtime and left the
+    size identical. The guard then called that "nothing was rewritten".
+
     Built without ``paths.default_settings_path()``, which calls
     ``app_data_dir_path()`` and *creates* the directory — a read-only guard
     should not bring the user's data directory into existence on a machine
@@ -74,7 +80,7 @@ def _user_data_fingerprint():
             fingerprint[key] = None
             continue
         stat = target.stat()
-        digest = hashlib.sha256(target.read_bytes()).hexdigest() if key == "settings" else None
+        digest = hashlib.sha256(target.read_bytes()).hexdigest()
         fingerprint[key] = (stat.st_mtime_ns, stat.st_size, digest, str(target))
     return fingerprint
 
@@ -165,13 +171,24 @@ def pytest_sessionstart(session):
 #: Verdicts the real-data guard can reach. The warning text is built from
 #: these, so a test can assert which case fired without reading the sentence.
 GUARD_CONTENT_CHANGED = "content_changed"
+GUARD_CONTENT_APP_RUNNING = "content_changed_app_running"
+GUARD_CONTENT_APP_UNKNOWN = "content_changed_app_unknown"
 GUARD_APP_RUNNING = "app_running"
 GUARD_TIMESTAMP_ONLY = "timestamp_only"
 GUARD_APP_UNKNOWN = "app_unknown"
 
-#: Matches the packaged build's executable and a source launch. Not the test
-#: run itself: pytest's command line carries neither.
-APP_PROCESS_PATTERN = r"daVIPA\.app/Contents/MacOS|run\.py"
+#: The packaged build's executable, and only that. A source launch reads as
+#: "no app process" deliberately: the suite spawns `run.py --selftest` itself
+#: (tests/test_first_run.py, tests/test_selftest_cli.py), so a pattern wide
+#: enough to see a real source launch would hand the guard an alibi for a
+#: write one of those subprocesses had made.
+APP_PROCESS_PATTERN = r"daVIPA\.app/Contents/MacOS/daVIPA"
+
+#: Test-only seam, like GETMOREDONE_TEST_GUARD_DIR: "running", "absent" or
+#: "unknown". Without it the guard's own tests would pass or fail depending on
+#: whether the packaged app happened to be open on the machine running them.
+TEST_GUARD_APP_ENV = "GETMOREDONE_TEST_GUARD_APP"
+TEST_GUARD_APP_STATES = {"running": True, "absent": False, "unknown": None}
 
 
 def app_is_running(timeout=2.0):
@@ -181,11 +198,20 @@ def app_is_running(timeout=2.0):
     running at all, the real database's digest moved across a 50-second idle.
     The guard blamed a test for that.
 
-    A false positive here only softens the timestamp-only wording, which never
-    failed a run; a content change fails it whatever this returns.
+    Reports what was observed, never why: pgrep can say a process matching the
+    app exists, and nothing more.
     """
     import shutil
     import subprocess
+
+    forced = os.environ.get(TEST_GUARD_APP_ENV)
+    if forced:
+        if forced not in TEST_GUARD_APP_STATES:
+            raise ValueError(
+                f"{TEST_GUARD_APP_ENV}={forced!r}: expected one of "
+                f"{sorted(TEST_GUARD_APP_STATES)}"
+            )
+        return TEST_GUARD_APP_STATES[forced]
 
     exe = shutil.which("pgrep")
     if exe is None:
@@ -220,7 +246,12 @@ def guard_verdicts(before, after, app_state):
             or old[1] != new[1] or (old[2] is not None and old[2] != new[2])
         )
         if content_changed:
-            verdict = GUARD_CONTENT_CHANGED
+            # An app process rewriting the user's own file is what the app is
+            # for. With none found -- the suite was the only thing running --
+            # the same change is an escape.
+            verdict = (GUARD_CONTENT_APP_RUNNING if app_state is True
+                       else GUARD_CONTENT_APP_UNKNOWN if app_state is None
+                       else GUARD_CONTENT_CHANGED)
         elif app_state is True:
             verdict = GUARD_APP_RUNNING
         elif app_state is None:
@@ -237,23 +268,37 @@ def guard_verdicts(before, after, app_state):
 #: blaming a test anyway (CIG-A4).
 GUARD_EXPLANATIONS = {
     GUARD_CONTENT_CHANGED: (
-        "  Its CONTENT changed - a test wrote it, or it was edited. If a test "
-        "did it: something bypassed the isolation in conftest.py."
+        "  Its CONTENT changed and no packaged app process was running, so a "
+        "test wrote it: something bypassed the isolation in conftest.py."
+    ),
+    GUARD_CONTENT_APP_UNKNOWN: (
+        "  Its CONTENT changed and whether the app was running could not be "
+        "determined here. Treated as a test write: something may have "
+        "bypassed the isolation in conftest.py. Re-run with the app closed."
+    ),
+    GUARD_CONTENT_APP_RUNNING: (
+        "  Its CONTENT changed while a process matching the packaged app was "
+        "running, which is that app saving. Re-run with the app closed to be "
+        "sure it was not a test."
     ),
     GUARD_APP_RUNNING: (
-        "  Only its timestamp moved, and a GetMoreDone process is running - it "
-        "saved on a window move or column drag. Harmless; nothing was "
-        "rewritten."
+        "  Only its timestamp moved, and a process matching the packaged app "
+        "was running. Its bytes are unchanged, so nothing wrote to it."
     ),
     GUARD_TIMESTAMP_ONLY: (
-        "  Only its timestamp moved and no GetMoreDone process was found. "
-        "Nothing was rewritten, so no test wrote to it."
+        "  Only its timestamp moved. Its bytes are unchanged, so nothing "
+        "wrote to it."
     ),
     GUARD_APP_UNKNOWN: (
-        "  Only its timestamp moved. Whether the app is running could not be "
-        "determined here, so the cause is unknown. Nothing was rewritten."
+        "  Only its timestamp moved. Its bytes are unchanged, so nothing "
+        "wrote to it, whatever was running."
     ),
 }
+
+#: A verdict blames a test exactly when it fails the run. Asserted, so the two
+#: cannot drift apart the way the accusing line drifted out of its branch.
+GUARD_FAILING_VERDICTS = frozenset(
+    {GUARD_CONTENT_CHANGED, GUARD_CONTENT_APP_UNKNOWN})
 
 
 def guard_report(verdicts):
@@ -268,8 +313,12 @@ def guard_report(verdicts):
 
 
 def guard_should_fail(verdicts) -> bool:
-    """Only a content change fails the run. A timestamp is not an escape."""
-    return any(verdict == GUARD_CONTENT_CHANGED for _, verdict, _ in verdicts)
+    """A content change fails the run unless the packaged app was running.
+
+    A timestamp alone never does: with both files hashed, equal bytes mean
+    nothing was written.
+    """
+    return any(verdict in GUARD_FAILING_VERDICTS for _, verdict, _ in verdicts)
 
 
 @pytest.hookimpl(trylast=True)
