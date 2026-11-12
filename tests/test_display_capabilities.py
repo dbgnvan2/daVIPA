@@ -1,4 +1,4 @@
-"""The display probe that keeps seven tests honest on a headless runner.
+"""The display probe, and the detector that finds what needs it.
 
 Purpose: CIG-M1 — one shared precondition for every test that sets a window
          attribute and reads it back, so a display with no window manager
@@ -11,6 +11,7 @@ Tests:   this file
 from __future__ import annotations
 
 import ast
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -20,37 +21,95 @@ from tests import display_capabilities as caps
 
 REPO = Path(__file__).resolve().parents[1]
 
-#: Every test that reads a display attribute back **from a window it never
-#: maps**, and so needs the precondition. The qualifier is the whole point:
-#: `tests/test_tk_offscreen.py` has two more `-alpha` read-backs that are
-#: deliberately absent from this registry because they map their window first
-#: and so pass on CI. Written without the qualifier, this comment claimed a
-#: completeness it did not have — found by the cold pass, 2026-11-09.
-#:
-#: A registry, not a detector: it cannot notice a *new* test that reads an
-#: attribute back without asking, and `CIG-A1` records that gap. What it does
-#: catch is the precondition being dropped from one of these eight, which is
-#: how the seven failures of run 42586742228 were written in the first place —
-#: six of them never had one, and the seventh had a private copy nobody else
-#: could use.
-EXPECTED_CALLERS = {
-    ("tests/test_timer_session_endings.py",
-     "test_t51_a_modal_drops_the_timers_always_on_top"),
-    ("tests/test_timer_session_endings.py",
-     "test_t52_the_timer_is_topmost_again_afterwards"),
-    ("tests/test_timer_session_endings.py",
-     "test_t56_a_second_modal_does_not_hand_the_flag_back_early"),
-    ("tests/test_timer_session_endings.py",
-     "test_t57_an_unbalanced_resume_does_not_break_the_next_modal"),
-    ("tests/test_weekly_tactic_surfaces.py",
-     "test_wt_m6b6_a_notice_lowers_an_always_on_top_parent"),
-    ("tests/test_tk_offscreen.py",
-     "test_alpha_still_passes_through_the_attributes_wrapper"),
-    ("tests/test_tk_offscreen.py",
-     "test_raw_tkinter_windows_are_hidden_and_registered_too"),
-    ("tests/test_weekly_tactic_completion_widgets.py",
-     "test_wtpw_the_prompt_survives_a_real_always_on_top_parent"),
-}
+def _root_name(node):
+    """The leftmost name in ``a.b.c`` — the object the call is made on."""
+    while isinstance(node, ast.Attribute):
+        node = node.value
+    return node.id if isinstance(node, ast.Name) else None
+
+
+def _is_a_read_back(node, exempt) -> bool:
+    """A one-argument ``attributes('-x')``, or a 4-token ``wm attributes`` call.
+
+    Two arguments is a write, which needs no display. ``exempt`` holds the
+    names bound to stand-ins defined in the same file: a spy reports back
+    whatever was written to it, which is the point of using one.
+    """
+    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+        return False
+    if _root_name(node.func.value) in exempt:
+        return False
+    if node.func.attr in ("attributes", "wm_attributes"):
+        return (len(node.args) == 1 and isinstance(node.args[0], ast.Constant)
+                and isinstance(node.args[0].value, str)
+                and node.args[0].value.startswith("-"))
+    if node.func.attr == "call":
+        literals = [a.value for a in node.args if isinstance(a, ast.Constant)]
+        return len(node.args) == 4 and literals[:2] == ["wm", "attributes"]
+    return False
+
+
+def _stand_in_names(func, classes):
+    """Names in this test bound from a class defined in the same file."""
+    found = set()
+    for node in ast.walk(func):
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+            if _root_name(node.value.func) in classes:
+                found |= {t.id for t in node.targets if isinstance(t, ast.Name)}
+    return found
+
+
+def _scan(source: str, label: str):
+    """``(reads, asks, maps)`` for one module's tests, by AST.
+
+    A read-back reached through a module-level helper in the same file counts:
+    ``tests/test_timer_session_endings.py`` reads through ``_topmost_now``, and
+    a walk that looked only for the call shape would not see it. Measured
+    2026-11-11: one level is enough for this suite.
+    """
+    tree = ast.parse(source)
+    classes = {n.name for n in tree.body if isinstance(n, ast.ClassDef)}
+
+    helpers = set()
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and not node.name.startswith("test_"):
+            params = {a.arg for a in node.args.args}
+            if any(_is_a_read_back(inner, set())
+                   and _root_name(inner.func.value) in params
+                   for inner in ast.walk(node)):
+                helpers.add(node.name)
+
+    reads, asks, maps = set(), set(), set()
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.FunctionDef)
+                and node.name.startswith("test_")):
+            continue
+        exempt = _stand_in_names(node, classes)
+        for inner in ast.walk(node):
+            if _is_a_read_back(inner, exempt):
+                reads.add((label, node.name))
+            if isinstance(inner, ast.Call) and isinstance(inner.func, ast.Name):
+                if inner.func.id == "require":
+                    asks.add((label, node.name))
+                elif inner.func.id in helpers and not (
+                        inner.args and isinstance(inner.args[0], ast.Name)
+                        and inner.args[0].id in exempt):
+                    reads.add((label, node.name))
+        if "mapped_windows" in [a.arg for a in node.args.args]:
+            maps.add((label, node.name))
+    return reads, asks, maps
+
+
+def _read_backs():
+    """Every test in ``tests/`` that reads a window attribute back."""
+    reads, asks, maps = set(), set(), set()
+    for path in sorted(REPO.glob("tests/test_*.py")):
+        found = _scan(path.read_text(encoding="utf-8"),
+                      str(path.relative_to(REPO)))
+        reads |= found[0]
+        asks |= found[1]
+        maps |= found[2]
+    return reads, asks, maps
 
 
 def _independently(attribute: str) -> bool:
@@ -121,25 +180,83 @@ def _requirers():
     return found
 
 
-def test_cigm14_every_display_dependent_test_uses_the_shared_precondition():
-    """CIG-M1.4 — the eight, exactly, and by AST rather than by grep.
+def test_cghm41_every_real_read_back_asks_or_maps():
+    """CGH-M4.1 — a detector, not a list.
 
-    Exact set equality in both directions: a test that loses its precondition
-    is as much a defect as one that gains a skip nobody decided on.
+    Purpose: the registry this replaced asserted set equality over the eight
+             tests that already asked, so it could catch one losing its
+             precondition and could not catch a NEW test reading an attribute
+             back without one -- which is how six of the seven failures of run
+             42586742228 were written (CIG-A1). Run against the tree on
+             2026-11-11 it found two more: T5.3 and the -topmost silencing
+             test, both asserting a negative that a display reporting nothing
+             satisfies for free.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-11_ci_guard_honesty.md
+    Tests:   this file
     """
-    found = _requirers()
+    reads, asks, maps = _read_backs()
 
-    missing = sorted(EXPECTED_CALLERS - found)
-    assert not missing, (
-        "these tests read a display attribute back and no longer ask the "
-        "shared precondition first, so they fail rather than skip where the "
-        f"display has no window manager: {missing}")
+    unguarded = sorted(reads - asks - maps)
+    assert not unguarded, (
+        "these tests read a window attribute back on a real window without "
+        "asking the shared precondition or mapping the window, so on a display "
+        "with no window manager they measure nothing and pass: "
+        f"{unguarded}"
+    )
 
-    unexpected = sorted(found - EXPECTED_CALLERS)
-    assert not unexpected, (
-        "these tests ask the precondition and are not in EXPECTED_CALLERS — "
-        "if the skip is deliberate, register it here with the reason: "
-        f"{unexpected}")
+
+def test_cghm42_a_new_offender_is_detected():
+    """CGH-M4.2 — adversarial (P7): the case the registry could not see."""
+    offender = textwrap.dedent("""
+        def test_new_and_unguarded():
+            window = ctk.CTk()
+            assert window.attributes("-topmost") == 0
+    """)
+    reads, asks, maps = _scan(offender, "synthetic.py")
+    assert reads - asks - maps == {("synthetic.py", "test_new_and_unguarded")}, (
+        "a new test reading -topmost back with no precondition was not detected"
+    )
+
+    guarded = textwrap.dedent("""
+        def test_new_but_asks():
+            require("-topmost")
+            window = ctk.CTk()
+            assert window.attributes("-topmost") == 0
+    """)
+    reads, asks, maps = _scan(guarded, "synthetic.py")
+    assert reads - asks - maps == set(), "a test that asks was still reported"
+
+    spied = textwrap.dedent("""
+        class _Spy:
+            def attributes(self, *args):
+                return 0
+
+        def test_reads_its_own_spy():
+            window = _Spy()
+            assert window.attributes("-topmost") == 0
+    """)
+    reads, _, _ = _scan(spied, "synthetic.py")
+    assert reads == set(), "a read on a stand-in defined in the file was flagged"
+
+
+def test_cghm43_the_display_dependent_count_is_exact():
+    """CGH-M4.3 — how much a headless runner cannot assert, as a number.
+
+    Four, after CIG-A2 and CIG-A3 moved four of the eight onto mapped windows
+    and a spy. An exact count, not a floor: a floor hides the narrowing it
+    exists to catch, and a skip nobody decided on is as much a defect as a
+    precondition dropped.
+    """
+    reads, asks, maps = _read_backs()
+
+    assert len(asks) == 4, (
+        f"{len(asks)} tests now skip where the display has no window manager, "
+        f"not four: {sorted(asks)}"
+    )
+    assert asks <= reads, (
+        "these tests ask the display precondition and never read an attribute "
+        f"back, so the skip buys nothing: {sorted(asks - reads)}"
+    )
 
 
 def test_cigm14_the_private_copy_of_the_precondition_is_gone():

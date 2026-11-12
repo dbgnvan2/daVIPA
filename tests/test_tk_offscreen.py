@@ -19,7 +19,6 @@ import customtkinter as ctk
 import pytest
 
 from conftest import reapply_transparency, wrap_reapplying_transparency
-from tests.display_capabilities import require
 
 
 class _FakeWindow:
@@ -319,8 +318,11 @@ def test_topmost_is_silenced_for_the_run():
     root = ctk.CTk()
     try:
         window = ctk.CTkToplevel(root)
-        window.attributes("-topmost", True)
-        assert window.attributes("-topmost") == 0, (
+        # The wrapper returns None for a -topmost write and never reaches Tk;
+        # the real call returns ''. So this measures the interception itself,
+        # on any display. The read-back it replaced reported nothing on Xvfb
+        # and passed there whatever the wrapper did (CIG-A1).
+        assert window.attributes("-topmost", True) is None, (
             "-topmost took effect during a test run; it must be silenced like "
             "lift, focus_force and grab_set"
         )
@@ -338,8 +340,9 @@ def test_topmost_is_silenced_under_its_other_name_too():
     root = ctk.CTk()
     try:
         window = ctk.CTkToplevel(root)
-        window.wm_attributes("-topmost", True)
-        assert window.wm_attributes("-topmost") == 0, (
+        # The interception, like the test above: None is the wrapper's return,
+        # never Tk's.
+        assert window.wm_attributes("-topmost", True) is None, (
             "-topmost took effect through wm_attributes; both spellings must "
             "be silenced"
         )
@@ -347,23 +350,24 @@ def test_topmost_is_silenced_under_its_other_name_too():
         root.destroy()
 
 
-def test_alpha_still_passes_through_the_attributes_wrapper():
+def test_alpha_still_passes_through_the_attributes_wrapper(mapped_windows):
     """Silencing -topmost must not break the transparency the run depends on.
 
     The wrapper intercepts attributes() wholesale, so it would be easy to drop
     -alpha with it — and every window in the suite would become visible.
 
-    Reading -alpha back needs a compositor to have honoured it; CI's Xvfb has
-    none, and there is no desktop there for a visible window to appear on. The
-    precondition skips in that case rather than asserting what the display
-    does.
+    Mapped rather than gated by the precondition: an unmapped window does not
+    report -alpha back on Xvfb, so this skipped on CI and measured nothing
+    there. The two transparency tests above pass on CI for exactly this reason
+    (CIG-A2).
     """
-    require("-alpha")
-
     root = ctk.CTk()
     try:
         window = ctk.CTkToplevel(root)
+        window.geometry("400x300")
+        window.update_idletasks()
         window.attributes("-alpha", 0.0)
+        window.update_idletasks()
         assert float(window.attributes("-alpha")) == 0.0, (
             "the attributes wrapper swallowed -alpha; windows would be visible"
         )
@@ -487,24 +491,42 @@ def test_raw_tkinter_windows_are_hidden_and_registered_too():
 
     root = tk.Tk()
     try:
-        # These four hold on any display, so they come before the precondition
-        # rather than after it. This is the only test in the suite that drives
-        # a raw tk.Tk and tk.Toplevel through the guard -- WL-5's whole
-        # subject -- and putting require() first took that coverage away from
-        # CI altogether. Found by the cold pass, 2026-11-09.
+        # These four hold on any display, and this is the only test in the
+        # suite that drives a raw tk.Tk and tk.Toplevel through the guard --
+        # WL-5's whole subject -- so they must not sit behind anything that
+        # can skip. The -alpha read-back used to, and took the whole test with
+        # it on CI; it is the mapped test below now (CIG-A2).
         assert root in _LIVE_WINDOWS, "a raw tk.Tk was not registered for cleanup"
         assert root.state() == "withdrawn", "a raw tk.Tk was left on screen"
 
         child = tk.Toplevel(root)
         assert child in _LIVE_WINDOWS, "a raw tk.Toplevel was not registered"
         assert child.state() == "withdrawn"
-
-        # Only the read-back needs a display that reports -alpha on an
-        # unmapped window.
-        require("-alpha")
-        assert float(root.attributes("-alpha")) == 0.0
     finally:
         root.destroy()
+
+
+def test_a_raw_tkinter_window_is_transparent_when_mapped(mapped_windows):
+    """WL-5's read-back half, on a window the compositor has actually mapped.
+
+    Withdrawn, this reported nothing on Xvfb. It cannot join the test above,
+    which asserts those same windows are *withdrawn* -- the state this fixture
+    exists to switch off.
+    """
+    import tkinter as tk
+
+    root = tk.Tk()
+    try:
+        root.geometry("400x300")
+        root.update_idletasks()
+        alpha = float(root.attributes("-alpha"))
+    finally:
+        root.destroy()
+
+    assert alpha == 0.0, (
+        f"a raw tk.Tk was mapped at alpha={alpha} — it is drawn over the "
+        "user's work and takes their keyboard"
+    )
 
 
 def test_no_helper_builds_a_window_the_suite_cannot_reach():

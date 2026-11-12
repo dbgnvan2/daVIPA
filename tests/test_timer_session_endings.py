@@ -212,6 +212,37 @@ def _topmost_now(window) -> bool:
     return bool(int(window.tk.call("wm", "attributes", window._w, "-topmost")))
 
 
+class _TopmostSpy:
+    """A window-shaped stand-in that reads back what was written to it.
+
+    T5.6 and T5.7 are about the depth counter, not about the attribute
+    reaching Tk, and a runner with no window manager cannot report -topmost
+    back — so on CI they skipped and measured nothing (CIG-A3). T5.1 and T5.2
+    stay on real Tk, where the read-back is the point.
+    """
+
+    def __init__(self, topmost: bool = True):
+        self._w = ".spy"
+        self.writes = []
+        self._topmost = 1 if topmost else 0
+        self.tk = self
+
+    def call(self, *args):
+        """``wm attributes <name> -topmost [value]`` — read with 4 args, write with 5."""
+        assert args[:2] == ("wm", "attributes") and args[3] == "-topmost", args
+        if len(args) == 4:
+            return self._topmost
+        self._topmost = int(args[4])
+        self.writes.append(bool(self._topmost))
+        return ""
+
+    def winfo_exists(self):
+        return True
+
+    def is_topmost(self) -> bool:
+        return bool(self._topmost)
+
+
 def test_t51_a_modal_drops_the_timers_always_on_top(root, manager, hushed,):
     """T5.1 — while the note dialog is up, the timer is not on top of it."""
     require("-topmost")
@@ -259,29 +290,27 @@ def test_t52_the_timer_is_topmost_again_afterwards(root, manager, hushed):
     timer.destroy()
 
 
-def test_t53_a_parent_that_was_not_topmost_is_left_alone(root, manager, hushed):
+def test_t53_a_parent_that_was_not_topmost_is_left_alone(root):
     """T5.3 — the helper never *raises* a window, only ever lowers and restores.
 
-    It reaches wm attributes through the Tcl interpreter, past the patch
-    conftest uses to keep always-on-top windows off the user's desktop. That is
-    only defensible while it cannot turn the flag on for a window that did not
-    already have it.
+    Asserted as "it wrote nothing", not as "the flag reads False": a display
+    with no window manager reports nothing back, so the read-back version
+    passed there whatever the helper did (CIG-A1).
     """
     from src.getmoredone.screens.timer_window_dialogs import suspend_parent_topmost
 
-    item = _item(manager)
-    timer = _stopped_timer(root, manager, item)
-    assert not _topmost_now(timer), "conftest should have swallowed the timer's own set"
+    parent = _TopmostSpy(topmost=False)
+    dialog = ctk.CTkToplevel(root)
+    try:
+        suspend_parent_topmost(dialog, parent)
+    finally:
+        dialog.destroy()
 
-    dialog = ctk.CTkToplevel(timer)
-    suspend_parent_topmost(dialog, timer)
-    dialog.destroy()
-    timer.update()
-
-    assert not _topmost_now(timer), (
-        "the helper turned always-on-top ON for a window that did not have it"
+    assert parent.writes == [], (
+        f"the helper wrote -topmost {parent.writes} to a window that did not "
+        "have it"
     )
-    timer.destroy()
+    assert not parent.is_topmost()
 
 
 def test_t54_every_grabbing_dialog_suspends_the_parents_topmost():
@@ -433,30 +462,23 @@ def test_t56_a_second_modal_does_not_hand_the_flag_back_early():
     restore. Then A closes and raises the parent back over B, which is still
     holding grab_set() — the reported bug, rebuilt out of its own fix.
     """
-    require("-topmost")
-
     from src.getmoredone.screens.timer_window_dialogs import (
         _resume_topmost, _suspend_topmost)
 
-    parent = ctk.CTk()
-    parent.withdraw()
-    try:
-        _really_topmost(parent)
-        assert _topmost_now(parent), "precondition"
+    parent = _TopmostSpy()
+    assert parent.is_topmost(), "precondition"
 
-        assert _suspend_topmost(parent) is True          # modal A
-        assert _suspend_topmost(parent) is True          # modal B, over A
-        assert not _topmost_now(parent)
+    assert _suspend_topmost(parent) is True              # modal A
+    assert _suspend_topmost(parent) is True              # modal B, over A
+    assert not parent.is_topmost()
 
-        _resume_topmost(parent)                          # A closes first
-        assert not _topmost_now(parent), (
-            "the parent was raised back over a modal that is still open"
-        )
+    _resume_topmost(parent)                              # A closes first
+    assert not parent.is_topmost(), (
+        "the parent was raised back over a modal that is still open"
+    )
 
-        _resume_topmost(parent)                          # B closes
-        assert _topmost_now(parent), "the flag was never given back"
-    finally:
-        parent.destroy()
+    _resume_topmost(parent)                              # B closes
+    assert parent.is_topmost(), "the flag was never given back"
 
 
 def test_t57_an_unbalanced_resume_does_not_break_the_next_modal():
@@ -473,28 +495,21 @@ def test_t57_an_unbalanced_resume_does_not_break_the_next_modal():
     raise the flag. It could not fail: nothing had been saved, so the write
     was skipped for a reason unrelated to the guard.
     """
-    require("-topmost")
-
     from src.getmoredone.screens.timer_window_dialogs import (
         _resume_topmost, _suspend_topmost)
 
-    parent = ctk.CTk()
-    parent.withdraw()
-    try:
-        _really_topmost(parent)
-        _suspend_topmost(parent)
-        _resume_topmost(parent)
-        assert _topmost_now(parent), "precondition: back to where we started"
+    parent = _TopmostSpy()
+    _suspend_topmost(parent)
+    _resume_topmost(parent)
+    assert parent.is_topmost(), "precondition: back to where we started"
 
-        _resume_topmost(parent)          # the stray one
+    _resume_topmost(parent)              # the stray one
 
-        assert _suspend_topmost(parent) is True
-        assert not _topmost_now(parent), (
-            "the modal after a stray resume opened with the parent still "
-            "always-on-top — the reported bug, via the counter"
-        )
-    finally:
-        parent.destroy()
+    assert _suspend_topmost(parent) is True
+    assert not parent.is_topmost(), (
+        "the modal after a stray resume opened with the parent still "
+        "always-on-top — the reported bug, via the counter"
+    )
 
 
 # --- T2 / T3 / T6 : Complete & Create Follow Up ------------------------------

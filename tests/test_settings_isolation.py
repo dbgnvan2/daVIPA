@@ -143,6 +143,135 @@ def test_the_session_guard_leaves_a_clean_run_alone(tmp_path):
     assert "GUARD:" not in result.stdout
 
 
+# --- CIG-A4: the guard must name the right cause -----------------------------
+
+_SETTINGS_BEFORE = (1_000_000_000, 40, "a" * 64, "/fake/settings.json")
+
+
+@pytest.mark.parametrize("app_state,after,expected", [
+    # A content change is an escape whatever the app is doing.
+    (True, (2_000_000_000, 41, "a" * 64, "/fake/settings.json"),
+     "content_changed"),
+    (False, (2_000_000_000, 40, "b" * 64, "/fake/settings.json"),
+     "content_changed"),
+    # Only the timestamp moved: the cause is which process was up.
+    (True, (2_000_000_000, 40, "a" * 64, "/fake/settings.json"), "app_running"),
+    (False, (2_000_000_000, 40, "a" * 64, "/fake/settings.json"),
+     "timestamp_only"),
+    (None, (2_000_000_000, 40, "a" * 64, "/fake/settings.json"), "app_unknown"),
+    # Nothing moved.
+    (True, _SETTINGS_BEFORE, None),
+])
+def test_cghm11_the_guard_verdict_is_a_function_of_the_fingerprints(
+        app_state, after, expected):
+    """CGH-M1.1 — the decision, not the sentence.
+
+    Purpose: until 2026-11-11 the branch was inline in the hook and only
+             reachable by running a nested pytest, so the app-running case was
+             never exercised (CIG-A4).
+    """
+    import conftest
+
+    verdicts = conftest.guard_verdicts(
+        {"settings": _SETTINGS_BEFORE}, {"settings": after}, app_state)
+
+    if expected is None:
+        assert verdicts == [], f"an unchanged file produced {verdicts}"
+        return
+    assert [verdict for _, verdict, _ in verdicts] == [expected]
+    assert verdicts[0][0] == "settings"
+    assert verdicts[0][2] == "/fake/settings.json"
+
+
+def test_cghm12_only_the_content_case_accuses_a_test():
+    """CGH-M1.2 — exactly one of the four explanations blames a test.
+
+    The accusation used to be appended outside the if/else, so the branch
+    written to say "harmless" ended by blaming a test anyway.
+    """
+    import conftest
+
+    accusing = [
+        verdict for verdict, text in conftest.GUARD_EXPLANATIONS.items()
+        if "bypassed the isolation" in text
+    ]
+
+    assert accusing == [conftest.GUARD_CONTENT_CHANGED], (
+        f"{len(accusing)} of the explanations blame a test: {accusing}")
+    assert conftest.guard_should_fail(
+        [("database", conftest.GUARD_APP_RUNNING, "/fake/db")]) is False
+    assert conftest.guard_should_fail(
+        [("database", conftest.GUARD_CONTENT_CHANGED, "/fake/db")]) is True
+
+
+def test_cghm12_a_timestamp_move_leaves_the_run_green(tmp_path):
+    """CGH-M1.2, end to end: a touched mtime is reported and is not a failure."""
+    result = _run_nested_pytest(tmp_path, """
+        import os
+        from pathlib import Path
+
+        def test_probe():
+            watched = Path(os.environ["GETMOREDONE_TEST_GUARD_DIR"]) / "settings.json"
+            stat = watched.stat()
+            os.utime(watched, ns=(stat.st_atime_ns, stat.st_mtime_ns + 10 ** 9))
+    """)
+
+    assert "GUARD:" in result.stdout, (
+        f"the timestamp move was not reported at all:\n{result.stdout}")
+    assert "bypassed the isolation" not in result.stdout, (
+        f"a timestamp move blamed a test:\n{result.stdout}")
+    assert result.returncode == 0, (
+        f"a timestamp move failed the run:\n{result.stdout}")
+
+
+def test_cghm14_app_detection_cannot_hang_or_raise(monkeypatch):
+    """CGH-M1.4 — unknown is not an escape (P1), and the call has a timeout (P5)."""
+    import shutil
+
+    import conftest
+
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+    assert conftest.app_is_running() is None, "no pgrep must read as unknown"
+
+    monkeypatch.setattr(shutil, "which", lambda _name: "/usr/bin/pgrep")
+
+    class _Found:
+        def __init__(self, returncode, stdout=""):
+            self.returncode = returncode
+            self.stdout = stdout
+
+    seen = {}
+
+    def _answer(returncode, stdout=""):
+        def run(cmd, **kwargs):
+            seen.update(kwargs)
+            return _Found(returncode, stdout)
+        return run
+
+    for returncode, stdout, expected in [
+        (0, "44389\n", True),
+        (0, "", False),
+        (1, "", False),
+        (2, "", None),
+    ]:
+        monkeypatch.setattr(subprocess, "run", _answer(returncode, stdout))
+        assert conftest.app_is_running() is expected, (
+            f"pgrep exit {returncode} with {stdout!r} read as the wrong state")
+
+    assert seen.get("timeout"), "the lookup has no timeout"
+
+    def _raise(exc):
+        def run(cmd, **kwargs):
+            raise exc
+        return run
+
+    for exc in (OSError("no such binary"),
+                subprocess.TimeoutExpired(cmd="pgrep", timeout=2.0)):
+        monkeypatch.setattr(subprocess, "run", _raise(exc))
+        assert conftest.app_is_running() is None, (
+            f"{type(exc).__name__} did not read as unknown")
+
+
 def test_remove_test_db_dir_refuses_a_directory_it_did_not_make(tmp_path):
     """The helper runs at the end of every local run; a wrong path is final.
 

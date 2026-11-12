@@ -54,7 +54,7 @@ def _ask_the_display(attribute: str) -> bool:
     try:
         # Inside the try: a machine with no display at all raises here, and
         # the docstring below promises that is a False rather than an error in
-        # all eight callers. It was outside it until the cold pass, 2026-11-09.
+        # all four callers. It was outside it until the cold pass, 2026-11-09.
         window = tk.Tk()
         window.withdraw()
         window.tk.call("wm", "attributes", window._w, attribute, value)
@@ -73,7 +73,7 @@ def _ask_the_display(attribute: str) -> bool:
 def honours(attribute: str) -> bool:
     """Does a withdrawn window here report ``attribute`` back? Asked once.
 
-    Cached because it builds and destroys a window, and eight tests ask. A
+    Cached because it builds and destroys a window, and four tests ask. A
     display with no window at all answers False rather than raising, so a
     caller gets a skip with a reason.
     """
