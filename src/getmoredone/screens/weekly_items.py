@@ -228,6 +228,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         # belongs to the Week Actions tab, which has it.
         right_actions = ctk.CTkFrame(self.right_frame)
         right_actions.grid(row=1, column=0, sticky="w", padx=4, pady=(6, 4))
+        self.right_actions = right_actions
         ctk.CTkButton(
             right_actions,
             text="Add Weekly Tactic",

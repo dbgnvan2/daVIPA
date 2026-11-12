@@ -65,22 +65,20 @@ class VisionSegmentsScreen(ctk.CTkFrame):
         self._create_action_row()
         self._create_view_switcher()
         self._create_lists()
+        self._create_bottom_actions()
         self.refresh_all()
         self._set_active_view(self.active_view)
 
     def _create_action_row(self):
+        """The top row, which is Refresh alone now.
+
+        VTF-M6.1 — the New button moved to the bottom of the list it adds to,
+        so it sits where the other five VSP tabs put theirs. Refresh stays
+        here (VTF-M6.2): it acts on the whole panel, not on a record.
+        """
         top = ctk.CTkFrame(self.container)
         top.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 6))
-        top.grid_columnconfigure(2, weight=1)
-        self.primary_action_btn = ctk.CTkButton(
-            top,
-            text="",
-            width=self.ACTION_BUTTON_WIDTH + 40,
-            height=self.TAB_BUTTON_HEIGHT,
-            command=self._run_primary_action,
-            **button_style("primary"),
-        )
-        self.primary_action_btn.grid(row=0, column=0, padx=(4, 8), pady=6, sticky="w")
+        top.grid_columnconfigure(1, weight=1)
         self.refresh_btn = ctk.CTkButton(
             top,
             text="Refresh",
@@ -89,7 +87,29 @@ class VisionSegmentsScreen(ctk.CTkFrame):
             command=self._refresh_active_view,
             **button_style("secondary"),
         )
-        self.refresh_btn.grid(row=0, column=1, padx=4, pady=6, sticky="w")
+        self.refresh_btn.grid(row=0, column=0, padx=(4, 8), pady=6, sticky="w")
+
+    def _create_bottom_actions(self):
+        """The New button, under the list.
+
+        Purpose: VTF-M6.1 — one button whose label follows the active view, as
+                 it always has; what changed is where it sits. The container's
+                 row 2 is the only weighted one, so this row stays at the
+                 bottom whatever the list does.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
+        Tests:   tests/test_vsp_tab_contracts.py::test_vtfm61_the_new_buttons_sit_at_the_bottom
+        """
+        self.bottom_actions = ctk.CTkFrame(self.container, fg_color="transparent")
+        self.bottom_actions.grid(row=3, column=0, sticky="ew", padx=8, pady=(0, 8))
+        self.primary_action_btn = ctk.CTkButton(
+            self.bottom_actions,
+            text="",
+            width=self.ACTION_BUTTON_WIDTH + 40,
+            height=self.TAB_BUTTON_HEIGHT,
+            command=self._run_primary_action,
+            **button_style("primary"),
+        )
+        self.primary_action_btn.grid(row=0, column=0, padx=(4, 8), pady=6, sticky="w")
 
     def _create_view_switcher(self):
         switcher = ctk.CTkFrame(self.container, fg_color="transparent")

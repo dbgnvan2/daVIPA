@@ -31,7 +31,7 @@ rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkg
 - Named colors (match count): **649**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
-- Widget explicit overrides (line count): **532**
+- Widget explicit overrides (line count): **533**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -46,7 +46,7 @@ and theme_files line counts.
 | `theme_api` | 2 |
 | `theme_files` | 1292 |
 | `tuples` | 2 |
-| `widget` | 532 |
+| `widget` | 533 |
 
 Widget override property breakdown:
 
@@ -54,7 +54,7 @@ Widget override property breakdown:
 |---|---:|
 | `border_color` | 14 |
 | `corner_radius` | 61 |
-| `fg_color` | 248 |
+| `fg_color` | 249 |
 | `hover_color` | 11 |
 | `text_color` | 216 |
 
@@ -650,7 +650,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/segment_color_utils.py:10` | `DEFAULT_SEGMENT_COLOR = "#334155"` |
 | `src/getmoredone/screens/settings_vsp_segments.py:13` | `DEFAULT_INDICATOR_COLOR = "#334155"` |
 | `src/getmoredone/screens/vision_segments.py:13` | `DEFAULT_SWATCH_COLOR = "#334155"` |
-| `src/getmoredone/screens/vision_segments.py:379` | `color_row, color = self._color_input(f, (row or {}).get("color_hex", "#334155"))` |
+| `src/getmoredone/screens/vision_segments.py:399` | `color_row, color = self._color_input(f, (row or {}).get("color_hex", "#334155"))` |
 | `src/getmoredone/vps_manager.py:1433` | `color_map[name] = row["color_hex"] or "#334155"` |
 | `src/getmoredone/vps_manager.py:1443` | `color = (row["color_hex"] or "").strip() or "#334155"` |
 | `src/getmoredone/vps_manager_taxonomy.py:1010` | `COALESCE(sd.color_hex, '#334155') AS color_hex,` |
@@ -1428,7 +1428,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/vision_segments.py:518` | `color_row, color = self._color_input(f, (row or {}).get("color_hex", "#94A3B8"))` |
+| `src/getmoredone/screens/vision_segments.py:538` | `color_row, color = self._color_input(f, (row or {}).get("color_hex", "#94A3B8"))` |
 | `src/getmoredone/theme.py:314` | `"unscored": "#94A3B8",` |
 
 ### `#97208c`
