@@ -2146,3 +2146,33 @@ chose to file one:
   that approval, so the numbers were put to the user, who chose to ship and
   file rather than alter the colours or add a border. Dark mode improves
   (13.4:1 against 2.27:1). No assertion covers it; it is the plan's §8 item 4.
+
+## LM — lunch moves to any box, in either direction (2026-11-12)
+
+No plan file: six criteria, one screen, one afternoon. Reported from the
+running screen — lunch could be dragged away from where it starts and not
+back. Root cause at `time_block_layout.py::can_place`: `ignore_lunch=True`
+passed `lunch = None`, which `day_grid` reads as the window Day Settings
+names — the one hour a lunch block is always leaving. The flag is now
+`placing_lunch` and passes the `NO_LUNCH = (0, 0)` sentinel.
+
+| Criterion | Implementation | Test | Status |
+|---|---|---|---|
+| LM-1 | The move is not one-way: the settings hour, away, and back, repeatedly, with the status naming the time lunch arrived at rather than the one it left | `time_block_layout.py` (`NO_LUNCH`, `can_place`), `db_manager.py::place_block_at`, `screens/plan.py::place_lunch_at` | `tests/test_plan_screen.py::test_lmm1_lunch_moves_off_the_settings_hour_and_back_again` | done |
+| LM-2 | A box full of tasks does not refuse the day's lunch; the tasks it displaces are surfaced under "Outside the day" | `time_block_layout.py::can_place` (the `placing_lunch` early return) | `tests/test_time_block_crud.py::test_lmm2_lunch_is_not_refused_by_a_box_that_is_full_of_tasks` | done |
+| LM-3 | The move says how many Time Blocks it displaced | `screens/plan.py::_outside_ids`, `::_displaced_note` | `tests/test_plan_screen.py::test_lmm3_a_lunch_move_says_how_many_blocks_it_displaced` | done |
+| LM-4 | Choosing a length for a lunch sitting on the settings hour is not refused | `db_manager.py::set_block_length` (passes `placing_lunch`) | `tests/test_time_block_crud.py::test_lmm4_a_lunch_block_can_be_lengthened_on_the_settings_hour` | done |
+| LM-5 | The resize gesture announces what the move gesture announces, through the same helper | `screens/plan.py::set_block_minutes` | `tests/test_plan_screen.py::test_lmm5_a_lunch_resize_says_how_many_it_displaced` | done |
+| LM-6 | The move path checks the day being drawn, as the add path does, so a box "Earlier"/"Later" drew takes the lunch on every gesture and not only the first | `screens/plan.py::place_lunch_at` (`day_span=self._grid.span`) | `tests/test_plan_screen.py::test_lmm6_lunch_moves_onto_a_box_the_extended_day_drew` | done |
+
+LM-5 and LM-6 are the two medium findings of the cold pass of 2026-11-12,
+fixed in loop (`01c042a`). The four lows it found were dropped under
+`effort-budget.md` §3, except the wording: the displaced clause said "moved
+below the day" for a group headed **Outside the day**, and now names it.
+
+`outside_grid` for a slot the drawn day does not contain is correct and was
+kept — the refusal the user reported was never that one.
+
+Adjacent, found and not fixed (global rule 10): `LMM-A1` (medium), `LMM-A2`
+and `LMM-A3` (low), filed in `BACKLOG.md` on 2026-11-12. `LMM-A1` is the same
+stale-day-shape bug one call site along, in `move_block_to_slot`.
