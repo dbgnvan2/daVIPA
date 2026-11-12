@@ -96,6 +96,42 @@ moved, which the app saving the same values does not do. Narrowing that to a
 warning would weaken the guard against the thing it exists for. Only the
 accusing line and the timestamp-only branch change.
 
+> **Amended 2026-11-11, after the cold pass this plan costed in §6 — the
+> decision above is withdrawn.** Its premise is false: a size comparison does
+> not establish that nothing was rewritten. Measured on a throwaway SQLite
+> file in `journal_mode=delete` (which is what this app runs — no
+> `journal_mode` or WAL appears anywhere under `src/`), 400 in-place `UPDATE`s
+> with same-length payloads moved `mtime_ns` and changed the size by **0
+> bytes**. So a test escaping to the user's real database landed in the
+> timestamp-only branch, where the new wording called it harmless and the run
+> stayed green — the guard's own blind spot, stated as a conclusion.
+>
+> Replaced by two changes. **Both files are hashed**, so "its bytes are
+> unchanged" is now evidence rather than an assumption (cost: sha256 over the
+> real database twice per session, ~10 ms for 3 MB). And because the packaged
+> app *does* rewrite that database as it sits idle — the 2026-11-09
+> measurement behind `CIG-A4` — hashing it would otherwise redden every local
+> run with the app open, so a content change splits three ways: no app process
+> found → fails the run (the escape); a packaged app process found → reported,
+> green, with "re-run with the app closed to be sure"; undetermined → fails,
+> because unknown is not an alibi (P1). CI has no app running, so CI still
+> fails hard on any content change.
+>
+> `GUARD_FAILING_VERDICTS` holds the failing set and
+> `::test_cghm12_a_verdict_blames_a_test_exactly_when_it_fails_the_run`
+> asserts that a verdict accuses exactly when it fails, so the accusation
+> cannot drift out of its branch again in either direction.
+>
+> The same pass found the app probe's pattern too wide:
+> `daVIPA\.app/Contents/MacOS|run\.py` matched the suite's own
+> `<repo>/run.py --selftest` subprocesses (`tests/test_first_run.py:174`,
+> `tests/test_selftest_cli.py:34`), which resolve the user's real
+> `settings.json` because they redirect `GETMOREDONE_DB` only — a leaked one
+> would have handed the guard an alibi for its own writes. The pattern is now
+> the packaged executable alone, and a source launch deliberately reads as "no
+> app process". `GETMOREDONE_TEST_GUARD_APP` forces the state in tests, so no
+> test's outcome depends on whether the app happens to be open.
+
 ## 5. What this batch cannot verify here, and how it is proved
 
 `CGH-M3.1` makes two tests take `mapped_windows`, the fixture the local
