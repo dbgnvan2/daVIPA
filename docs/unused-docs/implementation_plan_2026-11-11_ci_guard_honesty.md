@@ -107,8 +107,9 @@ accusing line and the timestamp-only branch change.
 > stayed green — the guard's own blind spot, stated as a conclusion.
 >
 > Replaced by two changes. **Both files are hashed**, so "its bytes are
-> unchanged" is now evidence rather than an assumption (cost: sha256 over the
-> real database twice per session, ~10 ms for 3 MB). And because the packaged
+> unchanged" is now evidence rather than an assumption (measured cost: sha256 over
+> this machine's real 3.03 MB database, best of five, 1.4 ms -- twice per
+> session). And because the packaged
 > app *does* rewrite that database as it sits idle — the 2026-11-09
 > measurement behind `CIG-A4` — hashing it would otherwise redden every local
 > run with the app open, so a content change splits three ways: no app process
