@@ -100,7 +100,11 @@ def _run_nested_pytest(tmp_path, probe_body, env_extra=None, env_remove=()):
     fake_data_dir.mkdir()
     (fake_data_dir / "settings.json").write_text('{"stub": true}')
 
-    env = dict(os.environ, GETMOREDONE_TEST_GUARD_DIR=str(fake_data_dir))
+    # "absent" by default: the guard now treats a content change differently
+    # when a packaged app process is running, and whether one is open on the
+    # machine running these tests is not something a test may depend on.
+    env = dict(os.environ, GETMOREDONE_TEST_GUARD_DIR=str(fake_data_dir),
+               GETMOREDONE_TEST_GUARD_APP="absent")
     env.update(env_extra or {})
     for name in env_remove:
         env.pop(name, None)
@@ -117,6 +121,10 @@ def test_the_session_guard_fails_the_run_when_content_changes(tmp_path):
 
     Nothing exercised these hooks before; "it fires" had been checked by hand.
     The probe restores the file it edits, so this test is safe to run anywhere.
+
+    Changed 2026-11-11 (intentional behaviour change, not a test bent to pass):
+    the harness now forces the app state to "absent", because a content change
+    with the packaged app running is that app saving, not an escape.
     """
     result = _run_nested_pytest(tmp_path, """
         import os
@@ -146,62 +154,88 @@ def test_the_session_guard_leaves_a_clean_run_alone(tmp_path):
 # --- CIG-A4: the guard must name the right cause -----------------------------
 
 _SETTINGS_BEFORE = (1_000_000_000, 40, "a" * 64, "/fake/settings.json")
+_DB_BEFORE = (1_000_000_000, 3_000_000, "c" * 64, "/fake/getmoredone.db")
 
 
-@pytest.mark.parametrize("app_state,after,expected", [
-    # A content change is an escape whatever the app is doing.
-    (True, (2_000_000_000, 41, "a" * 64, "/fake/settings.json"),
+def _moved(before, *, size=None, digest=None):
+    """``before`` with its mtime advanced, and optionally size or digest."""
+    mtime, old_size, old_digest, path = before
+    return (mtime + 10 ** 9,
+            old_size if size is None else size,
+            old_digest if digest is None else digest,
+            path)
+
+
+@pytest.mark.parametrize("key,before,app_state,after,expected", [
+    # Content moved, nothing else running: the escape the guard exists for.
+    ("settings", _SETTINGS_BEFORE, False, _moved(_SETTINGS_BEFORE, size=41),
      "content_changed"),
-    (False, (2_000_000_000, 40, "b" * 64, "/fake/settings.json"),
+    ("settings", _SETTINGS_BEFORE, False,
+     _moved(_SETTINGS_BEFORE, digest="b" * 64), "content_changed"),
+    # Same, with the app up: that app saving, reported but not an escape.
+    ("settings", _SETTINGS_BEFORE, True,
+     _moved(_SETTINGS_BEFORE, digest="b" * 64), "content_changed_app_running"),
+    # Same, with no way to tell: unknown must not excuse it (P1).
+    ("settings", _SETTINGS_BEFORE, None,
+     _moved(_SETTINGS_BEFORE, digest="b" * 64), "content_changed_app_unknown"),
+    # The database, same size, different bytes -- an in-place UPDATE of
+    # existing rows. Compared by size alone until 2026-11-11, which read it as
+    # "nothing was rewritten".
+    ("database", _DB_BEFORE, False, _moved(_DB_BEFORE, digest="d" * 64),
      "content_changed"),
-    # Only the timestamp moved: the cause is which process was up.
-    (True, (2_000_000_000, 40, "a" * 64, "/fake/settings.json"), "app_running"),
-    (False, (2_000_000_000, 40, "a" * 64, "/fake/settings.json"),
+    # Only the timestamp moved: the bytes are equal, so nothing wrote.
+    ("settings", _SETTINGS_BEFORE, True, _moved(_SETTINGS_BEFORE),
+     "app_running"),
+    ("settings", _SETTINGS_BEFORE, False, _moved(_SETTINGS_BEFORE),
      "timestamp_only"),
-    (None, (2_000_000_000, 40, "a" * 64, "/fake/settings.json"), "app_unknown"),
+    ("settings", _SETTINGS_BEFORE, None, _moved(_SETTINGS_BEFORE),
+     "app_unknown"),
+    ("database", _DB_BEFORE, False, _moved(_DB_BEFORE), "timestamp_only"),
     # Nothing moved.
-    (True, _SETTINGS_BEFORE, None),
+    ("settings", _SETTINGS_BEFORE, True, _SETTINGS_BEFORE, None),
 ])
 def test_cghm11_the_guard_verdict_is_a_function_of_the_fingerprints(
-        app_state, after, expected):
+        key, before, app_state, after, expected):
     """CGH-M1.1 — the decision, not the sentence.
 
     Purpose: until 2026-11-11 the branch was inline in the hook and only
-             reachable by running a nested pytest, so the app-running case was
+             reachable by running a nested run, so the app-running case was
              never exercised (CIG-A4).
     """
     import conftest
 
-    verdicts = conftest.guard_verdicts(
-        {"settings": _SETTINGS_BEFORE}, {"settings": after}, app_state)
+    verdicts = conftest.guard_verdicts({key: before}, {key: after}, app_state)
 
     if expected is None:
         assert verdicts == [], f"an unchanged file produced {verdicts}"
         return
     assert [verdict for _, verdict, _ in verdicts] == [expected]
-    assert verdicts[0][0] == "settings"
-    assert verdicts[0][2] == "/fake/settings.json"
+    assert verdicts[0][0] == key
+    assert verdicts[0][2] == before[3]
 
 
-def test_cghm12_only_the_content_case_accuses_a_test():
-    """CGH-M1.2 — exactly one of the four explanations blames a test.
+def test_cghm12_a_verdict_blames_a_test_exactly_when_it_fails_the_run():
+    """CGH-M1.2 — the accusation and the exit status cannot drift apart.
 
     The accusation used to be appended outside the if/else, so the branch
-    written to say "harmless" ended by blaming a test anyway.
+    written to say "harmless" ended by blaming a test anyway. The inverse is
+    the same defect: a verdict that fails a run without saying why.
     """
     import conftest
 
-    accusing = [
+    accusing = {
         verdict for verdict, text in conftest.GUARD_EXPLANATIONS.items()
         if "bypassed the isolation" in text
-    ]
+    }
 
-    assert accusing == [conftest.GUARD_CONTENT_CHANGED], (
-        f"{len(accusing)} of the explanations blame a test: {accusing}")
-    assert conftest.guard_should_fail(
-        [("database", conftest.GUARD_APP_RUNNING, "/fake/db")]) is False
-    assert conftest.guard_should_fail(
-        [("database", conftest.GUARD_CONTENT_CHANGED, "/fake/db")]) is True
+    assert accusing == set(conftest.GUARD_FAILING_VERDICTS), (
+        f"{sorted(accusing)} blame a test but "
+        f"{sorted(conftest.GUARD_FAILING_VERDICTS)} fail the run")
+    assert len(accusing) == 2, f"expected two accusing verdicts, got {accusing}"
+    for verdict in conftest.GUARD_EXPLANATIONS:
+        assert conftest.guard_should_fail(
+            [("database", verdict, "/fake/db")]) is (verdict in accusing), (
+            f"{verdict} fails the run and blames nobody, or the reverse")
 
 
 def test_cghm12_a_timestamp_move_leaves_the_run_green(tmp_path):
@@ -222,6 +256,78 @@ def test_cghm12_a_timestamp_move_leaves_the_run_green(tmp_path):
         f"a timestamp move blamed a test:\n{result.stdout}")
     assert result.returncode == 0, (
         f"a timestamp move failed the run:\n{result.stdout}")
+
+
+def test_cghm13_a_content_change_with_the_app_up_is_reported_not_failed(tmp_path):
+    """CGH-M1.3 — the app saving is not an escape, and says so.
+
+    Measured 2026-11-09: the packaged app rewrites the user's database while it
+    sits idle, so hashing the database (which this batch does, to close the
+    same-size blind spot) would redden every local run with the app open.
+    """
+    result = _run_nested_pytest(tmp_path, """
+        import os
+        from pathlib import Path
+
+        def test_probe():
+            watched = Path(os.environ["GETMOREDONE_TEST_GUARD_DIR"]) / "settings.json"
+            watched.write_text('{"stub": true, "saved_by_the_app": true}')
+    """, env_extra={"GETMOREDONE_TEST_GUARD_APP": "running"})
+
+    assert "GUARD:" in result.stdout, (
+        f"the change was not reported at all:\n{result.stdout}")
+    assert "bypassed the isolation" not in result.stdout, (
+        f"the app saving was blamed on a test:\n{result.stdout}")
+    assert result.returncode == 0, (
+        f"the app saving failed the run:\n{result.stdout}")
+
+
+def test_cghm13_the_database_is_hashed_not_just_sized(tmp_path, monkeypatch):
+    """CGH-M1.3 — an in-place write of the same number of bytes is detected.
+
+    Purpose: the fingerprint hashed ``settings`` only, so a test writing the
+             real database in place was reported as "nothing was rewritten".
+    """
+    import conftest
+
+    (tmp_path / "settings.json").write_text('{"stub": true}')
+    db = tmp_path / "getmoredone.db"
+    db.write_bytes(b"\x01" * 4096)
+    monkeypatch.setenv("GETMOREDONE_TEST_GUARD_DIR", str(tmp_path))
+
+    before = conftest._user_data_fingerprint()
+    db.write_bytes(b"\x02" * 4096)
+    after = conftest._user_data_fingerprint()
+
+    assert before["database"][1] == after["database"][1], "the size moved"
+    assert before["database"][2] is not None, "the database carries no digest"
+    assert before["database"][2] != after["database"][2], "the digest is stale"
+    assert [verdict for _, verdict, _ in
+            conftest.guard_verdicts(before, after, False)] == ["content_changed"]
+
+
+def test_cghm14_the_app_pattern_does_not_match_the_suites_own_launches():
+    r"""CGH-M1.4 — the suite must not hand the guard an alibi for its own writes.
+
+    Purpose: the pattern was ``daVIPA\.app/Contents/MacOS|run\.py`` and
+             tests/test_first_run.py and tests/test_selftest_cli.py both spawn
+             ``<repo>/run.py --selftest``, so a leaked subprocess would have
+             read as "the app is running".
+    """
+    import re
+
+    import conftest
+
+    pattern = re.compile(conftest.APP_PROCESS_PATTERN)
+    repo_root = Path(__file__).resolve().parents[1]
+
+    assert not pattern.search(f"{sys.executable} {repo_root / 'run.py'} --selftest"), (
+        "the suite's own selftest launch matches the app pattern")
+    assert not pattern.search(f"{sys.executable} -m pytest tests"), (
+        "a test run matches the app pattern")
+    assert pattern.search(
+        "/Applications/daVIPA.app/Contents/MacOS/daVIPA"), (
+        "the packaged app does not match its own pattern")
 
 
 def test_cghm14_app_detection_cannot_hang_or_raise(monkeypatch):
