@@ -558,13 +558,8 @@ Plan screen, two guards and the documents:
   1 of this plan would have derived a separated colour inside
   `semantic_colors()`; it was abandoned for `BACKLOG.md` PBG-A11's better
   argument that the fix is a shipped colour and belongs in the generator.
-- **Separating the two tokens was necessary and not sufficient.** With them
-  equal, `CTkFrame`'s nesting-parity alternation was a visual no-op on those
-  two themes; separating them made it live, which moved the collision onto
-  the Plan panes' scroll frame rather than closing it. SEP-M5 names those
-  surfaces. The same inherited-surface shape is still live in four other
-  modules — `BACKLOG.md` SEP-A1 — so the *class* is open even though the
-  Plan screen and the themes are fixed.
+- Separating the tokens moved the Plan collision rather than closing it;
+  SEP-M5 fixes the Plan screen, `BACKLOG.md` SEP-A1 covers the rest.
 - No new palette decision was needed, which was the stated reason PBG-A11 had
   been deferred: `apple_grey` already declared the three-level stack and
   `black_white` already ships the greys it needed. `#2C2C2E` is the only new

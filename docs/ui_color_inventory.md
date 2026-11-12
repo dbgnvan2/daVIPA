@@ -27,11 +27,11 @@ rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkg
 
 ## 1) Summary Counts By Type
 
-- Hex colors (match count): **1071**
+- Hex colors (match count): **1064**
 - Named colors (match count): **649**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
-- Widget explicit overrides (line count): **543**
+- Widget explicit overrides (line count): **542**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -41,12 +41,12 @@ and theme_files line counts.
 | Scan | Lines |
 |---|---:|
 | `app_settings` | 25 |
-| `hex` | 168 |
+| `hex` | 163 |
 | `named` | 57 |
 | `theme_api` | 2 |
 | `theme_files` | 1292 |
 | `tuples` | 2 |
-| `widget` | 543 |
+| `widget` | 542 |
 
 Widget override property breakdown:
 
@@ -54,7 +54,7 @@ Widget override property breakdown:
 |---|---:|
 | `border_color` | 14 |
 | `corner_radius` | 62 |
-| `fg_color` | 255 |
+| `fg_color` | 254 |
 | `hover_color` | 11 |
 | `text_color` | 218 |
 
@@ -93,8 +93,8 @@ Hex top values (20 of 231 distinct):
 | Color | Count |
 |---|---:|
 | `#dce4ee` | 60 |
-| `#ffffff` | 54 |
 | `#979da2` | 52 |
+| `#ffffff` | 52 |
 | `#565b5e` | 34 |
 | `#000000` | 33 |
 | `#3e454a` | 27 |
@@ -102,7 +102,7 @@ Hex top values (20 of 231 distinct):
 | `#939ba2` | 27 |
 | `#949a9f` | 27 |
 | `#2e1c8f` | 21 |
-| `#1d1d1f` | 20 |
+| `#1d1d1f` | 19 |
 | `#6e6e73` | 17 |
 | `#334155` | 16 |
 | `#343638` | 16 |
@@ -110,8 +110,8 @@ Hex top values (20 of 231 distinct):
 | `#111111` | 15 |
 | `#86868b` | 15 |
 | `#d2d2d7` | 13 |
-| `#f5f5f7` | 13 |
 | `#f0e7ff` | 12 |
+| `#f5f5f7` | 12 |
 
 Named top values (all 40 distinct):
 
@@ -194,11 +194,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `tools/generate_ctk_themes.py:57` | `BLACK_WHITE_HOVER = ["#000000", "#FFFFFF"]` |
 | `tools/generate_ctk_themes.py:61` | `("CTk", "fg_color"): ["#F5F5F7", "#000000"],` |
 | `tools/generate_ctk_themes.py:62` | `("CTkToplevel", "fg_color"): ["#F5F5F7", "#000000"],` |
-| `tools/generate_ctk_themes.py:81` | `("CTk", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:82` | `("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:83` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:90` | `("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],` |
-| `tools/generate_ctk_themes.py:93` | `("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],` |
+| `tools/generate_ctk_themes.py:75` | `("CTk", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:76` | `("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:77` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:81` | `("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],` |
+| `tools/generate_ctk_themes.py:84` | `("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],` |
 
 ### `#000365`
 
@@ -286,8 +286,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:274` | `"#111111",` |
 | `tools/generate_ctk_themes.py:56` | `BLACK_WHITE_ANCHOR = ["#111111", "#F3F4F6"]` |
 | `tools/generate_ctk_themes.py:58` | `BLACK_WHITE_BUTTON_TEXT = ["#FFFFFF", "#111111"]` |
-| `tools/generate_ctk_themes.py:88` | `("CTkFrame", "top_fg_color"): ["#F3F4F6", "#111111"],` |
-| `tools/generate_ctk_themes.py:91` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],` |
+| `tools/generate_ctk_themes.py:79` | `("CTkFrame", "top_fg_color"): ["#F3F4F6", "#111111"],` |
+| `tools/generate_ctk_themes.py:82` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],` |
 
 ### `#14375e`
 
@@ -377,10 +377,9 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `tools/generate_ctk_themes.py:52` | `APPLE_GREY_ANCHOR = ["#1D1D1F", "#D2D2D7"]` |
 | `tools/generate_ctk_themes.py:54` | `APPLE_GREY_BUTTON_TEXT = ["#FFFFFF", "#1D1D1F"]` |
 | `tools/generate_ctk_themes.py:63` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:69` | ``# under white cards; `#2C2C2E` is Apple's dark elevation above `#1D1D1F`.`` |
-| `tools/generate_ctk_themes.py:73` | `("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
-| `tools/generate_ctk_themes.py:74` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:76` | `("CTkEntry", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
+| `tools/generate_ctk_themes.py:67` | `("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
+| `tools/generate_ctk_themes.py:68` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
+| `tools/generate_ctk_themes.py:70` | `("CTkEntry", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
 
 ### `#1d2531`
 
@@ -527,8 +526,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `themes/apple_grey.json:23` | `"#2C2C2E"` |
-| `tools/generate_ctk_themes.py:69` | ``# under white cards; `#2C2C2E` is Apple's dark elevation above `#1D1D1F`.`` |
-| `tools/generate_ctk_themes.py:71` | `("CTkFrame", "top_fg_color"): ["#F5F5F7", "#2C2C2E"],` |
+| `tools/generate_ctk_themes.py:65` | `("CTkFrame", "top_fg_color"): ["#F5F5F7", "#2C2C2E"],` |
 
 ### `#2cc985`
 
@@ -794,8 +792,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `themes/apple_grey.json:27` | `"#424245"` |
 | `themes/apple_grey.json:71` | `"#424245"` |
-| `tools/generate_ctk_themes.py:72` | `("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],` |
-| `tools/generate_ctk_themes.py:75` | `("CTkEntry", "border_color"): ["#D2D2D7", "#424245"],` |
+| `tools/generate_ctk_themes.py:66` | `("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],` |
+| `tools/generate_ctk_themes.py:69` | `("CTkEntry", "border_color"): ["#D2D2D7", "#424245"],` |
 
 ### `#461f00`
 
@@ -880,9 +878,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/theme.py:342` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
 | `themes/black_white.json:27` | `"#4B5563"` |
 | `themes/black_white.json:78` | `"#4B5563",` |
-| `tools/generate_ctk_themes.py:89` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
-| `tools/generate_ctk_themes.py:97` | ``# to. `#4B5563` is this theme's own border dark, already shipped above,`` |
-| `tools/generate_ctk_themes.py:99` | `("CTkEntry", "placeholder_text_color"): ["#4B5563", "#9CA3AF"],` |
+| `tools/generate_ctk_themes.py:80` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
+| `tools/generate_ctk_themes.py:86` | `("CTkEntry", "placeholder_text_color"): ["#4B5563", "#9CA3AF"],` |
 
 ### `#4caf50`
 
@@ -1077,8 +1074,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `themes/black_white.json:71` | `"#6B7280"` |
-| `tools/generate_ctk_themes.py:92` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
-| `tools/generate_ctk_themes.py:94` | ``# SEP-M6 -- darkened from `#6B7280` with SEP-M1. The subtle surface it is`` |
+| `tools/generate_ctk_themes.py:83` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
+| `tools/generate_ctk_themes.py:85` | `# SEP-M6: was #6B7280, 4.39:1 on the new subtle surface; now 6.87:1.` |
 
 ### `#6bcb77`
 
@@ -1111,8 +1108,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:222` | `"#6E6E73"` |
 | `themes/black_white.json:250` | `"#6E6E73"` |
 | `themes/black_white.json:295` | `"#6E6E73"` |
-| `tools/generate_ctk_themes.py:77` | `("CTkEntry", "placeholder_text_color"): ["#6E6E73", "#A1A1A6"],` |
-| `tools/generate_ctk_themes.py:192` | `widget_cfg["text_color_disabled"] = ["#86868B", "#6E6E73"]` |
+| `tools/generate_ctk_themes.py:71` | `("CTkEntry", "placeholder_text_color"): ["#6E6E73", "#A1A1A6"],` |
+| `tools/generate_ctk_themes.py:179` | `widget_cfg["text_color_disabled"] = ["#86868B", "#6E6E73"]` |
 
 ### `#6e7174`
 
@@ -1256,7 +1253,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:221` | `"#86868B",` |
 | `themes/black_white.json:249` | `"#86868B",` |
 | `themes/black_white.json:294` | `"#86868B",` |
-| `tools/generate_ctk_themes.py:192` | `widget_cfg["text_color_disabled"] = ["#86868B", "#6E6E73"]` |
+| `tools/generate_ctk_themes.py:179` | `widget_cfg["text_color_disabled"] = ["#86868B", "#6E6E73"]` |
 
 ### `#86efac`
 
@@ -1484,8 +1481,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/theme.py:342` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
 | `themes/black_white.json:70` | `"#9CA3AF",` |
 | `themes/black_white.json:79` | `"#9CA3AF"` |
-| `tools/generate_ctk_themes.py:92` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
-| `tools/generate_ctk_themes.py:99` | `("CTkEntry", "placeholder_text_color"): ["#4B5563", "#9CA3AF"],` |
+| `tools/generate_ctk_themes.py:83` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
+| `tools/generate_ctk_themes.py:86` | `("CTkEntry", "placeholder_text_color"): ["#4B5563", "#9CA3AF"],` |
 
 ### `#9d174d`
 
@@ -1512,7 +1509,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `themes/apple_grey.json:79` | `"#A1A1A6"` |
-| `tools/generate_ctk_themes.py:77` | `("CTkEntry", "placeholder_text_color"): ["#6E6E73", "#A1A1A6"],` |
+| `tools/generate_ctk_themes.py:71` | `("CTkEntry", "placeholder_text_color"): ["#6E6E73", "#A1A1A6"],` |
 
 ### `#a396cb`
 
@@ -1714,7 +1711,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `themes/black_white.json:26` | `"#D1D5DB",` |
-| `tools/generate_ctk_themes.py:89` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
+| `tools/generate_ctk_themes.py:80` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
 
 ### `#d1d5de`
 
@@ -1741,8 +1738,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/apple_grey.json:206` | `"#D2D2D7"` |
 | `themes/apple_grey.json:275` | `"#D2D2D7"` |
 | `tools/generate_ctk_themes.py:52` | `APPLE_GREY_ANCHOR = ["#1D1D1F", "#D2D2D7"]` |
-| `tools/generate_ctk_themes.py:72` | `("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],` |
-| `tools/generate_ctk_themes.py:75` | `("CTkEntry", "border_color"): ["#D2D2D7", "#424245"],` |
+| `tools/generate_ctk_themes.py:66` | `("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],` |
+| `tools/generate_ctk_themes.py:69` | `("CTkEntry", "border_color"): ["#D2D2D7", "#424245"],` |
 
 ### `#d5d9de`
 
@@ -2009,8 +2006,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/black_white.json:206` | `"#F3F4F6"` |
 | `themes/black_white.json:275` | `"#F3F4F6"` |
 | `tools/generate_ctk_themes.py:56` | `BLACK_WHITE_ANCHOR = ["#111111", "#F3F4F6"]` |
-| `tools/generate_ctk_themes.py:88` | `("CTkFrame", "top_fg_color"): ["#F3F4F6", "#111111"],` |
-| `tools/generate_ctk_themes.py:95` | ``# read on went from `#FFFFFF` to `#F3F4F6`, which took this pair from`` |
+| `tools/generate_ctk_themes.py:79` | `("CTkFrame", "top_fg_color"): ["#F3F4F6", "#111111"],` |
 
 ### `#f43e37`
 
@@ -2057,10 +2053,9 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `tools/generate_ctk_themes.py:53` | `APPLE_GREY_HOVER = ["#000000", "#F5F5F7"]` |
 | `tools/generate_ctk_themes.py:61` | `("CTk", "fg_color"): ["#F5F5F7", "#000000"],` |
 | `tools/generate_ctk_themes.py:62` | `("CTkToplevel", "fg_color"): ["#F5F5F7", "#000000"],` |
-| `tools/generate_ctk_themes.py:67` | `` # equal values meant no edge anywhere in the app (was PBG-A11). `#F5F5F7` `` |
-| `tools/generate_ctk_themes.py:71` | `("CTkFrame", "top_fg_color"): ["#F5F5F7", "#2C2C2E"],` |
-| `tools/generate_ctk_themes.py:73` | `("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
-| `tools/generate_ctk_themes.py:76` | `("CTkEntry", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
+| `tools/generate_ctk_themes.py:65` | `("CTkFrame", "top_fg_color"): ["#F5F5F7", "#2C2C2E"],` |
+| `tools/generate_ctk_themes.py:67` | `("CTkLabel", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
+| `tools/generate_ctk_themes.py:70` | `("CTkEntry", "text_color"): ["#1D1D1F", "#F5F5F7"],` |
 
 ### `#f7f5ff`
 
@@ -2375,15 +2370,13 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `tools/generate_ctk_themes.py:57` | `BLACK_WHITE_HOVER = ["#000000", "#FFFFFF"]` |
 | `tools/generate_ctk_themes.py:58` | `BLACK_WHITE_BUTTON_TEXT = ["#FFFFFF", "#111111"]` |
 | `tools/generate_ctk_themes.py:63` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:74` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
-| `tools/generate_ctk_themes.py:81` | `("CTk", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:82` | `("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:83` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],` |
-| `tools/generate_ctk_themes.py:90` | `("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],` |
-| `tools/generate_ctk_themes.py:91` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],` |
-| `tools/generate_ctk_themes.py:93` | `("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],` |
-| `tools/generate_ctk_themes.py:95` | ``# read on went from `#FFFFFF` to `#F3F4F6`, which took this pair from`` |
-| `tools/generate_ctk_themes.py:98` | ``# and measures 6.867 on the subtle surface and 7.557 on `#FFFFFF`.`` |
+| `tools/generate_ctk_themes.py:68` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#1D1D1F"],` |
+| `tools/generate_ctk_themes.py:75` | `("CTk", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:76` | `("CTkToplevel", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:77` | `("CTkFrame", "fg_color"): ["#FFFFFF", "#000000"],` |
+| `tools/generate_ctk_themes.py:81` | `("CTkLabel", "text_color"): ["#000000", "#FFFFFF"],` |
+| `tools/generate_ctk_themes.py:82` | `("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],` |
+| `tools/generate_ctk_themes.py:84` | `("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],` |
 
 ### `black`
 

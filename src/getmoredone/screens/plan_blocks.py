@@ -337,10 +337,8 @@ def build_item_row(
     # PBG-M3 -- the theme's own surface. The row carried a priority fill and a
     # band stripe until 2026-11-12; the badge below carries priority now.
     # ``surface_subtle`` on an ``items_scroll`` that *names* ``surface``
-    # (SEP-M5 -- it used to inherit it, and inherited the row's own colour
-    # instead at the depth the app builds this screen at): with no tint and
-    # no border that pair is the row's only edge, so PBG-A4 measures it
-    # rather than restating it.
+    # (SEP-M5; it used to inherit it): with no tint and no border that pair is
+    # the row's only edge, so PBG-A4 measures it rather than restating it.
     palette = semantic_colors()
     span = slots_for_minutes(work_block_minutes)
     frame = ctk.CTkFrame(

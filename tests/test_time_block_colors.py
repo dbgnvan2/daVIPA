@@ -234,32 +234,10 @@ def test_pdm9_the_two_marks_are_legible_on_the_row_surface(restore_appearance):
 
 
 def test_sepm2_no_bundled_theme_has_one_surface_where_the_app_wants_two():
-    """SEP-M2 — every bundled theme separates its two surface tokens.
+    """SEP-M2/M7 — no bundled theme gives ``surface`` and ``surface_subtle`` one colour.
 
-    The app separates a row from its pane, and a Plan chip from its box, with
-    one pair of tokens: ``surface`` is ``CTkFrame.fg_color`` and
-    ``surface_subtle`` is ``CTkFrame.top_fg_color``. ``apple_grey`` and
-    ``black_white`` gave them the same value in both modes -- ``#FFFFFF``
-    /``#1D1D1F`` and ``#FFFFFF``/``#000000`` -- so on those two there was no
-    edge to be had whichever token the code picked. That was app-wide and
-    older than the Plan screen's badge: every list row in the app was the
-    colour of its pane there. PBG-M3 only made the Plan screen join them, by
-    taking away the priority tint that had been separating its rows.
-
-    SEP-M1 gave each of those two a subtle surface off its own ramp, in
-    ``tools/generate_ctk_themes.py`` where the themes are generated rather
-    than in the JSON it writes. So this asserts the empty set instead of
-    counting the known-flat two: there is no shipped-colour decision
-    outstanding any more, and a theme that flattens from here is a
-    regression whichever one it is.
-
-    SEP-M7 -- three things an empty-set assertion has to do that counting the
-    known-flat two did not. It must count the themes, because ``== set()`` over
-    a glob also passes when the glob finds nothing. It must compare per mode,
-    because a theme flat in one mode is flat where that user is. And it must
-    resolve through ``_as_hex``, because eight of these themes name these
-    colours ``grayNN``: ``gray100`` and ``#FFFFFF`` draw one pixel and compare
-    unequal as strings.
+    Counts the ten files (an empty glob passes ``== set()``), checks each mode,
+    and resolves ``grayNN`` so ``gray100`` equals ``#FFFFFF``.
     """
     themes = sorted(Path("themes").glob("*.json"))
     assert len(themes) == 10, (
@@ -282,13 +260,7 @@ def test_sepm2_no_bundled_theme_has_one_surface_where_the_app_wants_two():
     )
 
 
-# SEP-M6 -- the (theme, mode) pairs whose ``muted_text`` sat under the 4.5:1
-# text bar *before* SEP-M1 and still do, measured 2026-11-12. Eight themes
-# carry CustomTkinter's bundled ``#858585`` placeholder, which is 2.498-2.957
-# against their own light surfaces. SEP-M1 did not cause this and does not fix
-# it; it is filed as PBG-A12. Named here rather than skipped, so the pairs
-# outside it are held to the bar and no further theme can join the set
-# unnoticed.
+# PBG-A12: muted_text under 4.5:1 before SEP, CustomTkinter's #858585.
 MUTED_TEXT_UNDER_BAR_BEFORE_SEP = {
     "base_dark_blue/Light",
     "blue/Light",
@@ -302,28 +274,10 @@ MUTED_TEXT_UNDER_BAR_BEFORE_SEP = {
 
 
 def test_sepm6_the_two_label_colours_are_legible_on_both_surfaces():
-    """SEP-M6 — ``muted_text`` and ``body_text`` against both surface tokens.
+    """SEP-M6 — muted and body label text clear 4.5:1 on both surfaces.
 
-    ``muted_text`` is ``CTkEntry.placeholder_text_color``, and the app uses it
-    as a *label* colour as well as a placeholder -- the Plan panes' hints and
-    summaries, the Plan chips' times, and twenty-odd labels on the project
-    boards. So separating the surfaces moved the ground under it: giving
-    ``black_white`` a ``#F3F4F6`` subtle surface took its light placeholder
-    from 4.834 to 4.393 and under the bar, which is what SEP-M6 darkened
-    ``#6B7280`` to ``#4B5563`` for.
-
-    Measured against *both* tokens, because a label can sit on either -- the
-    Plan summary is on the pane, the chip time on the chip -- and over all ten
-    theme files rather than the one this process loaded, for the reason
-    ``test_pdm9`` gives.
-
-    What is deliberately *not* asserted: that every pair clears the bar. Eight
-    themes ship CustomTkinter's ``#858585`` placeholder at 2.5-3.0:1 on their
-    own light surfaces, which is older than this work and worse than what it
-    fixed. Asserting the bar outright would redden the suite for a defect this
-    batch did not cause; skipping those themes would let the two it touched
-    regress silently. So the set of failures is asserted to be *exactly* the
-    set that predates it.
+    The sub-bar set must be exactly the eight that predate SEP (PBG-A12), so a
+    regression or a fix there both show up.
     """
     themes = sorted(Path("themes").glob("*.json"))
     assert len(themes) == 10, (
@@ -361,6 +315,5 @@ def test_sepm6_the_two_label_colours_are_legible_on_both_surfaces():
         f"{MIN_CONTRAST}:1 changed.\n"
         f"  joined: {sorted(muted_under - MUTED_TEXT_UNDER_BAR_BEFORE_SEP)}\n"
         f"  left:   {sorted(MUTED_TEXT_UNDER_BAR_BEFORE_SEP - muted_under)}\n"
-        "A theme that joined is a regression. A theme that left is PBG-A12 "
-        "being fixed -- take it out of the set above with the fix."
+        "joined = regression; left = PBG-A12 fixed, update the set."
     )

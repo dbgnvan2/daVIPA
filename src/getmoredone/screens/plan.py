@@ -598,16 +598,10 @@ class PlanScreen(ctk.CTkFrame):
         )
 
     def create_items_pane(self):
-        # SEP-M5 -- these two surfaces are named, not inherited. A ``CTkFrame``
-        # built with ``fg_color=None`` takes the theme's ``top_fg_color`` when
-        # its master carries the theme's ``fg_color``, and ``fg_color``
-        # otherwise (``ctk_frame.py``), so the token *alternates with nesting
-        # depth*. ``CTkScrollableFrame`` passes ``fg_color`` straight into that
-        # logic. Under ``app.py``'s ``content_frame`` the chain reaches this
-        # pane's scroll frame on ``surface_subtle`` -- which is the row's own
-        # colour, so the row had no edge -- while a test building
-        # ``PlanScreen`` on a bare root gets the opposite parity and passes.
-        # Naming the surface is what makes the screen and its test agree.
+        # SEP-M5 -- named, not inherited: an unnamed CTkFrame's surface
+        # alternates with nesting depth, and at app.py's depth this pane's
+        # scroll frame came out the item row's own colour. Why:
+        # docs/unused-docs/implementation_plan_2026-11-12_surface_separation.md
         palette = semantic_colors()
         frame = ctk.CTkFrame(self, fg_color=palette["surface"])
         frame.grid(

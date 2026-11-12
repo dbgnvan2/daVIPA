@@ -232,55 +232,16 @@ On `apple_grey`, once in Light and once in Dark, then once on `black_white`:
 
 ## 9. What the cold pass changed (revision 3, 2026-11-12)
 
-The first cold pass over SEP-M1 – M4 and SEP-D1 produced three high findings,
-all verified against the built screen before any of them was acted on. Two of
-the three said an assertion in this batch was passing against a screen the app
-never builds. They are SEP-M5 – M7 in `docs/spec_coverage.md`.
+Three high findings, verified before fixing; SEP-M5 – M7 in `spec_coverage.md`.
 
-**The mechanism §1 – §4 missed.** With `top_fg_color` equal to `fg_color`, the
-nesting-parity alternation in `CTkFrame.__init__` — an unnamed frame takes
-`top_fg_color` when its master carries the theme's `fg_color`, and `fg_color`
-otherwise — was a *visual no-op* on `apple_grey` and `black_white`. Separating
-the two tokens is what made it live. So SEP-M1 did not close the collision on
-the default theme; it moved it one level down, from "every row is its pane" to
-"`items_scroll` is the row". The plan reasoned about the colours and not about
-the depth they are resolved at, and nothing in §1 – §8 could have caught that,
-because the only test that compared the pair built the screen at the wrong
-depth.
-
-**Two false passes on one assertion, for two unrelated reasons.** `test_pbga4`
-was written for precisely this defect — its docstring says a reviewer predicted
-it from `CTkScrollableFrame`'s source. It passed anyway, twice:
-
-1. It built `PlanScreen` on a bare `ctk.CTk()`, one level shallower than
-   `app.py`, which flips every unnamed surface inside it.
-2. Fixing that was not enough. `two_tone_theme` was named *after*
-   `content_frame` in the signature, so the frame was built under one theme
-   and measured under another. CustomTkinter's parity check is an equality
-   against the theme loaded *now*, so the stale frame failed it whatever its
-   colour and every descendant fell through to `fg_color` — the chain never
-   formed, and the test stayed green against a fully reverted fix.
-
-Only after both were fixed did reverting SEP-M5 turn it red. That three-way
-result — red at app depth, green on a bare root, same code — is the evidence
-the finding was real, and it is in `spec_coverage.md` under SEP-M5.
-
-**One finding of my own was wrong.** I reported `build_outside_group`'s chips
-as a third instance of the same defect, reasoning that `outside_frame` is
-`transparent` over a `surface` frame. The chips are not drawn on
-`outside_frame`; each sits inside a `holder` with an explicit `surface_subtle`
-fill, and `box_fill` matches it. All three `box_fill` call sites were then
-checked against their box's own fill and all three are correct. Recorded
-because the error is the same one the reviewer and I both made from the other
-direction: reading the widget tree in the source instead of measuring the
-built one.
-
-**What came out of it that is not in the criteria.** Eight themes put
-`muted_text` at 2.5 – 3.0:1 in light mode (PBG-A12), and four other modules
-carry the same inherited-surface shape the Plan screen had (SEP-A1). Neither
-is caused by this work; both are filed in `BACKLOG.md`, and PBG-A12 is pinned
-by an exact-set assertion rather than skipped.
-
-**Still not verified in the app.** §7's checklist is unwalked. Nothing in this
-repo looks at a rendered pane, which is the single fact that let one assertion
-pass twice against a screen no user sees.
+- **SEP-M1 alone did not fix the Plan screen.** An unnamed `CTkFrame` takes
+  `top_fg_color` or `fg_color` by nesting depth. While the two were equal that
+  did nothing; separating them put `items_scroll` on the row's own colour at
+  `app.py`'s depth. SEP-M5 names the surfaces.
+- **`test_pbga4` passed falsely twice:** built on a bare root (one level too
+  shallow), then with the theme pinned after the frame was built. Fixed both;
+  reverting SEP-M5 is now red.
+- **`black_white` muted text fell to 4.39:1** on the new subtle surface;
+  SEP-M6 darkened it. Eight other themes were already at 2.5–3.0:1 (PBG-A12).
+- My report that `build_outside_group` had the same defect was wrong: its
+  chips sit in an explicitly filled `holder`.
