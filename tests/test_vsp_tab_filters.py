@@ -624,3 +624,35 @@ def test_vtfm23_week_actions_already_obeys_the_rule():
     calls, stub = _stub("t-2", {"t-1"})
     WeekActionsScreen.on_filters_changed(stub)
     assert calls == [("select", None)]
+
+
+# ------------------------------------------------- VTF-S10: the second pass
+
+def test_vtfs10_the_count_on_the_status_line_follows_the_tick():
+    """VTF-S10 — a number that describes the panel is read off the panel.
+
+    APE Week Assignment is the only one of the five tabs whose status line
+    carries a count, and until 2026-11-11 only Load Week wrote it. So a tick
+    narrowed the panel and its heading while the line two rows above went on
+    naming the pre-filter total: three rows on screen reduced to two, and the
+    status line still said three.
+    """
+    left = [_ape_row(1, category="Blog"), _ape_row(2, category="Pod")]
+    right = [_tactic_row(1, "ape-1", category="Blog"),
+             _tactic_row(2, "ape-2", category="Pod"),
+             _tactic_row(3, "ape-2", category="Pod")]
+    root, screen = _week_screen(left, right)
+    try:
+        assert screen.status_label.cget("text") == (
+            "2 month item(s) on left, 3 weekly tactic(s) on right")
+
+        screen.left_checks["ape-1"].set(True)
+        screen.refresh_right_panel()
+
+        assert _categories(screen.right_table) == ["Blog"], (
+            "the fixture must really be narrowed, or the count proves nothing")
+        assert screen.status_label.cget("text") == (
+            "2 month item(s) on left, 1 weekly tactic(s) on right"
+        ), screen.status_label.cget("text")
+    finally:
+        root.destroy()

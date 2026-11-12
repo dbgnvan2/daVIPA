@@ -538,6 +538,9 @@ def test_apcm43_weekly_screen_left_panel_asks_by_month_only():
         # test is about is the arguments of the left panel's own query.
         _right_title=lambda: "",
         _render_lists=lambda: None,
+        # VTF-S10 — the status line's counts are now read off the lists by a
+        # helper, so a tick updates them too.
+        _describe_counts=lambda: "",
         left_title_label=SimpleNamespace(configure=lambda **_k: None),
         right_title_label=SimpleNamespace(configure=lambda **_k: None),
         status_label=SimpleNamespace(configure=lambda **_k: None),

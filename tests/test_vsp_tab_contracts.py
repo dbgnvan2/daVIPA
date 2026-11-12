@@ -287,3 +287,92 @@ def test_vtfm62_the_switcher_and_refresh_do_not_move(tmp_path):
             root.destroy()
     finally:
         vps.close()
+
+
+# ---------------------------------- VTF-S8, VTF-S11: the second cold pass
+
+def _command_of(frame, text):
+    """The ``command`` of the one button under ``frame`` with this label."""
+    for child in frame.winfo_children():
+        if isinstance(child, ctk.CTkButton) and child.cget("text") == text:
+            return child.cget("command")
+    raise AssertionError(f"no button labelled {text!r} under {frame}")
+
+
+def test_vtfs11_every_new_button_is_wired_to_its_handler(tmp_path):
+    """VTF-S11 — the buttons this batch added and moved reach their methods.
+
+    The batch's whole subject is buttons and not one assertion read a
+    ``command``: every add test calls ``open_add_dialog`` or the write method
+    directly on a stub, and the one command assertion in the suite tested
+    truthiness, which a button wired to ``refresh`` would pass. Deleting
+    ``command=self.open_add_dialog`` from all four tabs left the suite green.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        seed_ape(vps, year=YEAR)
+        for cls, label, attr in (
+                (AnnualVisionSegmentsScreen, "Add New Annual Plan Element",
+                 "open_add_dialog"),
+                (APEAssignmentScreen, "Assign APE to Quarter",
+                 "open_add_dialog"),
+                (APEPeriodViewScreen, "Assign APE to Month",
+                 "open_add_dialog"),
+                (WeeklyItemsScreen, "Add Weekly Tactic", "open_add_dialog"),
+        ):
+            root, screen = _screen(cls, vps)
+            try:
+                assert _command_of(screen.right_actions, label) == getattr(
+                    screen, attr), f"{cls.__name__}'s {label} is not wired"
+            finally:
+                root.destroy()
+
+        # The two buttons that only moved must still carry the command they
+        # had on the row they left.
+        root, screen = _screen(VisionSegmentsScreen, vps)
+        try:
+            assert screen.primary_action_btn.cget("command") == \
+                screen._run_primary_action
+        finally:
+            root.destroy()
+
+        root, screen = _screen(WeekActionsScreen, vps)
+        try:
+            panel = screen.actions_panel
+            assert _command_of(panel.bottom_actions, "Add Action Item") == \
+                panel.add_action_item
+        finally:
+            root.destroy()
+    finally:
+        vps.close()
+
+
+def test_vtfs8_the_annual_status_line_cannot_widen_its_column(tmp_path):
+    """VTF-S8 — the one status line inside a panel column wraps.
+
+    It is packed ``fill="x", expand=True`` into a frame gridded into the
+    body's right column, and ``SplitPanel`` sets that column's width with
+    ``grid_columnconfigure(minsize=...)``, which is a floor and not a ceiling.
+    Without a wrap the first long sentence -- the refusals are over a hundred
+    characters -- makes the column request its own width and pushes the panels
+    off the body. The four sibling tabs put their status lines across the
+    header, so this tab is the only one that needs it.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        root, screen = _screen(AnnualVisionSegmentsScreen, vps)
+        try:
+            wrap = int(screen.status_label.cget("wraplength"))
+            assert wrap > 0, "the status line must wrap, or it widens the column"
+
+            long_refusal = screen._empty_add_message(YEAR)
+            assert len(long_refusal) > 40, (
+                "the sentence this label has to hold is a long one")
+            screen.status_label.configure(text=long_refusal)
+            screen.update_idletasks()
+            assert screen.status_label.winfo_reqwidth() <= wrap + 40, (
+                "the label asked for more width than its wrap allows")
+        finally:
+            root.destroy()
+    finally:
+        vps.close()

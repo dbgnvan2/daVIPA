@@ -49,6 +49,7 @@ from src.getmoredone.screens.annual_vision_segments import (  # noqa: E402
 from src.getmoredone.screens.ape_assignment import APEAssignmentScreen  # noqa: E402
 from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen  # noqa: E402
 from src.getmoredone.screens.pick_record_dialog import (  # noqa: E402
+    confirm_choice,
     describe_lineage,
     open_pick_record_dialog,
 )
@@ -167,7 +168,8 @@ def _annual_stub(events, left=(), right=(), vps=None):
     )
     _bind(stub, AnnualVisionSegmentsScreen, "_parse_year",
           "_ticked_vision_element_ids", "_add_options", "_add_default",
-          "_perform_add", "_create_from_row", "open_add_dialog")
+          "_perform_add", "_create_from_row", "_empty_add_message",
+          "open_add_dialog")
     # `write` is whichever method this tab hands the dialog as `on_confirm`.
     stub.write = stub._perform_add
     return stub
@@ -254,9 +256,11 @@ def _week_stub(events, left=(), create=None):
         refresh=lambda: events.append("refresh"),
         status_label=SimpleNamespace(configure=lambda **kw: events.append(kw["text"])),
         _describe_week_creation=WeeklyItemsScreen._describe_week_creation,
+        **_all_filters_open(),
     )
     _bind(stub, WeeklyItemsScreen, "_ticked_ape_ids", "_add_options",
-          "_add_default", "_create_tactic_for", "open_add_dialog")
+          "_add_default", "_create_tactic_for", "_empty_add_message",
+          "_any_filter_set", "open_add_dialog")
     # This tab hands the dialog the shared write itself: the drag path calls
     # the same method, so there is no one-row wrapper around it.
     stub.write = stub._create_tactic_for
@@ -446,9 +450,11 @@ def test_vtfm37_a_dialog_with_nothing_to_offer_refuses_on_the_status_line():
 
     assert stub._add_options() == [], "the fixture must leave nothing to offer"
     assert stub.open_add_dialog() is None, "no window opens with nothing to offer"
+    # Case (b), 2026-11-11: the second sentence moved into the branch that is
+    # true when there are no Vision Elements at all (VTF-S9). This fixture has
+    # one, so the refusal is the first branch alone.
     assert events == [
-        f"Every Vision Element already has an annual record for {YEAR}. "
-        f"Add a Vision Element on the Vision Elements tab first."
+        f"Every Vision Element already has an annual record for {YEAR}."
     ], events
 
 
@@ -757,3 +763,102 @@ def test_vtfs6_a_ticked_row_already_added_is_not_the_default():
     free = _annual_stub([], left=left, right=[])
     free.left_checks = {"ve-1": _tick()}
     assert free._add_default() == "ve-1", "the one ticked row is still the default"
+
+
+# ---------------------------------- VTF-S7, VTF-S9: the second cold pass
+#
+# A second cold pass, in a different failure family, ran over the batch and
+# its own fixes. These are the tests for what it found in this file's subject.
+
+def test_vtfs7_the_confirmed_pick_closes_then_reports():
+    """VTF-S7 — the hop that delivers every tab's add sentence, in order.
+
+    ``confirm_choice`` was the body of a closure over a ``CTkToplevel``, so no
+    test could reach it: both ends were asserted and the join was not, and
+    dropping the report left a refused or half-written add silent on all four
+    tabs with nothing red. The order is the contract -- the window goes before
+    the tab's status line is written, or the sentence lands behind a dialog.
+    """
+    order = []
+    done = confirm_choice(
+        " Blog ", {"Blog": "ve-1"},
+        on_confirm=lambda key: order.append(f"wrote {key}") or "Added Blog.",
+        report=lambda text: order.append(f"reported {text}"),
+        set_status=lambda text: order.append(f"dialog said {text}"),
+        close=lambda: order.append("closed"),
+    )
+
+    assert done is True
+    assert order == ["wrote ve-1", "closed", "reported Added Blog."], order
+
+
+def test_vtfs7_a_raising_write_keeps_the_dialog_open():
+    """VTF-S7 — a write that raises reports on the dialog, not on the tab.
+
+    The tab's status line would be behind the window, so the error belongs on
+    the dialog's own label and the dialog must stay up for a second try.
+    """
+    order = []
+
+    def boom(_key):
+        raise RuntimeError("database is locked")
+
+    done = confirm_choice(
+        "Blog", {"Blog": "ve-1"},
+        on_confirm=boom,
+        report=lambda text: order.append(f"reported {text}"),
+        set_status=lambda text: order.append(f"dialog said {text}"),
+        close=lambda: order.append("closed"),
+    )
+
+    assert done is False
+    assert order == ["dialog said Could not add it: database is locked"], order
+
+
+def test_vtfs7_an_unpicked_choice_is_refused_on_the_dialog():
+    """VTF-S7 — an empty or unknown combo value writes nothing."""
+    order = []
+    done = confirm_choice(
+        "", {"Blog": "ve-1"},
+        on_confirm=lambda _key: pytest.fail("nothing was picked"),
+        report=lambda text: order.append(f"reported {text}"),
+        set_status=lambda text: order.append(f"dialog said {text}"),
+        close=lambda: order.append("closed"),
+    )
+
+    assert done is False
+    assert order == ["dialog said Choose one from the list first."], order
+
+
+def test_vtfs9_every_tab_names_the_real_reason():
+    """VTF-S9 — all four refusals distinguish empty from filtered-out.
+
+    The first cold pass's fix covered the quarter and month tabs. The annual
+    tab told an empty database that every Vision Element already had an annual
+    record; the week tab, whose `left_items` is dropdown-narrowed in place at
+    load, sent a user with a Category filter set to the wrong tab.
+    """
+    annual_empty = _annual_stub([], left=[], right=[])
+    assert annual_empty._empty_add_message(YEAR) == (
+        "There are no Vision Elements yet -- add one on the Vision Elements "
+        "tab first."
+    ), annual_empty._empty_add_message(YEAR)
+
+    annual_taken = _annual_stub([], left=[_vision_element(1, "Blog")],
+                                right=[_annual_row(1, "ve-1", "Blog")])
+    assert annual_taken._empty_add_message(YEAR) == (
+        f"Every Vision Element already has an annual record for {YEAR}."
+    ), annual_taken._empty_add_message(YEAR)
+
+    week_open = _week_stub([], left=[])
+    assert week_open._empty_add_message() == (
+        "No month-assigned APEs are listed on the left. Assign one to this "
+        "month on the APE Month Assignment tab first."
+    ), week_open._empty_add_message()
+
+    week_filtered = _week_stub([], left=[])
+    week_filtered.category_filter_var = SimpleNamespace(get=lambda: "Pod")
+    assert week_filtered._empty_add_message() == (
+        "No month-assigned APE matches the Segment, SubSegment or Category "
+        "filter above the left panel."
+    ), week_filtered._empty_add_message()
