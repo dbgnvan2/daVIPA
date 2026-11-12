@@ -2328,7 +2328,9 @@ config or a document alone earns no sweep at all"). So no cold pass ran, and
 `/csdp`'s `/code-review` and `/security-review` passes do not apply — its own
 guardrail gives a test-only batch the first alone. `effort-budget.md` §9 counts
 a findings-fix batch by findings, not lines: six findings, so at most six
-guards; this batch adds four.
+guards; this batch adds four. RLS-M2's guard then produced two findings of
+its own on CI (RLS-M7, RLS-M8), each with one guard — see *What RLS-M2's
+guard caught* below.
 
 | ID | Criterion | Where | Test | Status |
 |---|---|---|---|---|
@@ -2338,6 +2340,8 @@ guards; this batch adds four.
 | RLS-M4 | The unconsumed `.frame_fill` channel is gone, and the fixture docstring describes only what the fixture provides | `tests/render_priority_cells.py`, `tests/test_priority_level_colors.py` | none — see below | done |
 | RLS-M5 | The data-directory guard does not create the directory it guards, and asserts positively that the helper's workspace is under the temp root | `::test_rlsm1_…` | the same guard, both halves mutation-proved separately | done |
 | RLS-M6 | Each render helper refuses to be imported, since importing one sets `GETMOREDONE_DATA_DIR` process-wide | both helpers | `::test_rlsm6_a_render_helper_refuses_to_be_imported` (parametrised over both) | done |
+| RLS-M7 | A `run.py --selftest` child given only `GETMOREDONE_DB` also gets `GETMOREDONE_DATA_DIR`, so its weekly log lands in the temp directory | `tests/test_selftest_cli.py::_run_selftest_subprocess`, `tests/test_first_run.py::_run_selftest` | `tests/test_selftest_cli.py::test_rlsm7_the_selftest_child_keeps_its_weekly_log_out_of_the_real_data_dir` | done |
+| RLS-M8 | A handler is attached to the weekly-tactic logger in `pytest_sessionstart`, before collection imports the six modules that build it at module scope, and before the fingerprint is taken | `conftest.py::_preattach_weekly_tactic_log` | `tests/test_settings_isolation.py::test_rlsm8_a_preattached_handler_stops_the_real_log_being_created` | done |
 | RLS-D1 | This section | this file | none — no test reads prose (`effort-budget.md` §5) | done |
 
 **RLS-M1 was one environment variable, not two transplants.** The relayed
@@ -2370,7 +2374,7 @@ not-a-level-colour check — is already caught by
 an exact count of zero.
 
 Every new guard was mutation-proved against the verbatim original, restored
-from a byte-for-byte copy: seven mutations, each red where expected. The M1
+from a byte-for-byte copy: nine mutations, each red where expected. The M1
 proof resolved the real data directory and named it in the failure, which is
 the only way to observe that redirect from outside.
 
@@ -2379,3 +2383,44 @@ Not in scope and still unverified by anything: the CustomTkinter UI contract
 manual checklist in
 `docs/unused-docs/implementation_plan_2026-11-11_priority_cell_colour.md` §8
 remains unwalked — no pass has run the application.
+
+
+### What RLS-M2's guard caught (2026-11-12)
+
+RLS-M2 put `weekly_tactic_debug.log` into the session-end fingerprint, and the
+first CI run to carry it — 43286853100 — went red with **2865 passed, 6
+skipped and no test failing**. The non-zero exit was the guard reporting that
+`/home/runner/.local/share/GetMoreDone/weekly_tactic_debug.log` had changed.
+Two separate writers, fixed as RLS-M7 and RLS-M8:
+
+- **RLS-M7, the children.** `run.py --selftest` was given `GETMOREDONE_DB`
+  only. `paths.app_data_dir_path`'s own docstring says that variable "isolates
+  only the first of those", so the child resolved the real application-support
+  directory for everything else, and `get_weekly_tactic_logger` builds a
+  `logging.FileHandler` with the default `delay`, which opens — and therefore
+  creates — the file on construction. Both helpers that spawn that child now
+  pass `GETMOREDONE_DATA_DIR` as well.
+- **RLS-M8, the parent.** Six modules call `get_weekly_tactic_logger()` at
+  module scope (`db_manager.py`, `vps_schema.py`, `weekly_tactic.py`,
+  `weekly_tactic_migrations.py`, `weekly_tactic_maintenance.py`,
+  `screens/weekly_items.py`), so the real log existed as soon as collection
+  imported any of them. The existing `_isolate_weekly_tactic_log` fixture
+  cannot prevent that and says so in its own docstring: a fixture runs after
+  collection. `_preattach_weekly_tactic_log` runs in `pytest_sessionstart`
+  instead and works through `get_weekly_tactic_logger`'s documented
+  idempotence — a logger that already has handlers is returned untouched, so
+  the real path is never handed to a `FileHandler`.
+
+**Why CI saw this and the local suite did not.** Creating a file that already
+exists changes neither its mtime nor its contents, so on any machine that has
+run the application the escape is invisible to a fingerprint. A fresh CI runner
+has no such file. Reproducing it locally therefore needed `HOME` redirected to
+an empty directory; with that, seven targeted files fired the guard before the
+fix and 202 tests pass with no log under the fake data directory after it.
+
+**RLS-M7 is guarded on one of its two call sites.** The guard drives
+`tests/test_selftest_cli.py::_run_selftest_subprocess`, and mutating the
+override out of that helper turns it red. The identical one-line override in
+`tests/test_first_run.py::_run_selftest` has no guard of its own:
+`effort-budget.md` §9 allows one guard per finding, and a second copy of the
+same assertion would buy the second call site at the cost of the ratio.
