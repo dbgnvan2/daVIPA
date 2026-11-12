@@ -1,7 +1,8 @@
-"""PLC-M1 to PLC-M4 — the three priority levels, their colours, and the row tint.
+"""PLC-M1 to PCC-M5 — the three priority levels and the colour each one draws.
 
 Purpose: hold the level rule, the settings that colour it, the Settings tab
-         that edits them, and the fill the five list screens draw.
+         that edits them, and the fill the five list screens draw. PCC-M1
+         (2026-11-11) moved that fill from the row to the Priority cell.
 Spec:    docs/unused-docs/implementation_plan_2026-11-08_priority_level_colours.md
 Tests:   this file
 
@@ -10,11 +11,13 @@ written out by hand in five screens, had no "high" tier, was not configurable,
 and had no test of any kind. Everything here is therefore new coverage rather
 than a restatement of what was already guarded.
 
-No test in this file takes the ``mapped_windows`` fixture or builds a Tk root:
-the level rule, the effective colour, the Settings tab's content and its save
-path are all plain functions over plain objects, and the five screens are
-checked structurally. ``test_ci_contract.py``'s mapped-window count is
-therefore untouched.
+No test in this file takes the ``mapped_windows`` fixture, and most build no Tk
+root at all: the level rule, the effective colour, the Settings tab's content
+and its save path are plain functions over plain objects, and the five screens
+are mostly checked structurally. The exception is the ``rendered_rows`` fixture
+and the tests that use it, which build a real screen per subprocess and
+withdraw the root, so ``test_ci_contract.py``'s mapped-window count is
+untouched either way.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from __future__ import annotations
 import ast
 import inspect
 import logging
+import os
 import textwrap
 from dataclasses import fields
 from pathlib import Path
@@ -39,6 +43,7 @@ from src.getmoredone.color_contrast import (
     pick_text_color,
 )
 from src.getmoredone.models import ActionItem, PriorityFactors, Status
+from src.getmoredone.paths import app_data_dir_path
 from src.getmoredone.priority_levels import (
     LEVEL_ANY_CRITICAL,
     LEVEL_ANY_HIGH,
@@ -51,7 +56,6 @@ from src.getmoredone.priority_levels import (
     SOURCE_LEVEL,
     SOURCE_NONE,
     SOURCE_SEGMENT,
-    RowFill,
     fill_for_level,
     level_cell_fill,
     level_color,
@@ -787,7 +791,6 @@ def test_plcm48_the_five_screens_reload_settings_before_building_rows():
 
 def test_plcm4_a_completed_row_in_all_items_still_uses_the_status_check():
     """PLC-M4.2 — All Items decides "completed" from the status, as before."""
-    settings = AppSettings()
     item = _item(CRITICAL, LOW, status=Status.COMPLETED)
     fill = row_fill(PALETTE, use_completed_tint=item.status == Status.COMPLETED)
     assert fill.source == SOURCE_COMPLETED
@@ -1609,13 +1612,18 @@ def test_pccm1_a_level_no_longer_fills_a_row():
     derived text colour without its fill draws black text on the theme's own
     background.
     """
+    fill = row_fill(PALETTE, use_completed_tint=False)
+    assert fill.fill is None
+    assert fill.text_color is None
+    assert fill.source == SOURCE_NONE
+
+    # Not passing because the levels have no colours: both coloured levels
+    # still have one, and the call above cannot see either. There is no loop
+    # over importance here on purpose -- ``row_fill`` no longer takes the item,
+    # so two iterations would issue the identical call and the message would
+    # name a relationship the call cannot have.
     settings = AppSettings()
     for importance in (CRITICAL, HIGH):
-        fill = row_fill(PALETTE, use_completed_tint=False)
-        assert fill.fill is None, f"importance {importance} still fills the row"
-        assert fill.text_color is None
-        assert fill.source == SOURCE_NONE
-        # And the level's colour is set, so this is not passing by accident.
         assert level_color(settings, priority_level(importance, LOW))
 
 
@@ -1763,8 +1771,12 @@ def test_pccm4_the_chip_options_come_from_the_level():
 def test_pccm5_no_row_builder_reaches_for_the_danger_palette():
     """PCC-M5 — the hard red is gone from all five row builders.
 
-    Count zero, scoped to the builder and not the file: ``button_style(
-    "danger")`` elsewhere in these screens is a legitimate delete button.
+    Count zero, scoped to the builder because that is the unit of the claim.
+    Not a file- or project-wide ban: ``danger`` is the legitimate colour of a
+    delete button, and ``screens/plan.py`` and ``screens/weekly_items.py``
+    among others still use it properly. (These five files happen to contain
+    none at all today -- the docstring previously said otherwise, corrected
+    after the cold pass of 2026-11-12 measured it.)
     """
     for name, builder in ROW_BUILDERS:
         found = _danger_subscripts(builder)
@@ -1792,7 +1804,10 @@ def rendered_rows():
     ``tests/render_priority_cells.py`` for why it is a subprocess at all, and
     why no window is mapped.
 
-    Returns ``{module: [(row_fill, [(text, fg_color, text_color), ...]), ...]}``.
+    Returns a namespace: ``.rows`` is
+    ``{module: [(row_fill, [(text, fg_color, text_color), ...]), ...]}`` and
+    ``.frame_fill`` is ``{module: the theme's own CTkFrame fill}``, which is
+    what an untinted row must equal.
     """
     import subprocess
     import sys
@@ -1800,6 +1815,7 @@ def rendered_rows():
     root = Path(__file__).resolve().parents[1]
     helper = root / "tests" / "render_priority_cells.py"
     rendered = {}
+    frame_fills = {}
     for module, screen_class, needs_completing in RENDER_TARGETS:
         argv = [sys.executable, str(helper), module, screen_class]
         if needs_completing:
@@ -1817,15 +1833,22 @@ def rendered_rows():
                 pytest.skip(f"no display for {module}: {result.stderr[-200:]}")
             pytest.fail(f"{module} failed to render:\n{result.stderr[-2000:]}")
         rows = []
+        frame_fill = None
         for line in result.stdout.splitlines():
-            if line.startswith("ROW "):
+            if line.startswith("THEME "):
+                frame_fill = line[6:]
+            elif line.startswith("ROW "):
                 rows.append((line[4:], []))
             elif line.startswith("LBL "):
-                text, fg_color, text_color = line[4:].split("|")
+                # rsplit: a label's text is arbitrary user data and may contain
+                # the separator; the two colours never do.
+                text, fg_color, text_color = line[4:].rsplit("|", 2)
                 rows[-1][1].append((text, fg_color, text_color))
         assert rows, f"{module} rendered no rows:\n{result.stdout}"
+        assert frame_fill, f"{module} reported no theme frame fill"
         rendered[module] = rows
-    return rendered
+        frame_fills[module] = frame_fill
+    return SimpleNamespace(rows=rendered, frame_fill=frame_fills)
 
 
 #: The three rendered items, by score. A score is the product of all four
@@ -1863,7 +1886,7 @@ def test_pccm3_a_rendered_priority_cell_carries_the_level_colour(rendered_rows):
     """
     defaults = priority_level_fill_colors()
     for module, _screen_class, _needs_completing in RENDER_TARGETS:
-        rows = rendered_rows[module]
+        rows = rendered_rows.rows[module]
         for level, score in RENDERED_SCORES.items():
             fg_color, text_color = _cell_for(rows, score)
             expected = defaults[level]
@@ -1872,22 +1895,39 @@ def test_pccm3_a_rendered_priority_cell_carries_the_level_colour(rendered_rows):
                 assert text_color == pick_text_color(expected), f"{module} {level}"
             else:
                 # "No high or critical" ships with no fill, so the cell is
-                # transparent and keeps the row's own text colour.
+                # transparent. What its text colour must be is a claim of
+                # its own: ::test_pccm3_an_uncoloured_cell_keeps_the_rows_text.
                 assert fg_color == "transparent", f"{module} {level}: {fg_color}"
-                assert text_color != pick_text_color(defaults[LEVEL_ANY_CRITICAL])
 
 
 def test_pccm1_a_rendered_row_has_no_priority_tint(rendered_rows):
     """PCC-M1 — the row frame itself, which is what the user asked about.
 
     A critical row's frame was ``#DCFCE7`` across its width; every row now
-    keeps CustomTkinter's own frame colour, a light/dark pair and never a hex
-    string. Every rendered row is checked, so a tint fails here whichever of
-    the three levels kept it.
+    No rendered frame's fill is any of the three level colours. Asserted by
+    naming them, not by the shape of the string: an earlier version asserted
+    no ``#`` appeared anywhere, which held only because this helper does not
+    apply the app's theme -- the app's own default (``apple_grey``) has
+    ``['#FFFFFF', '#1D1D1F']`` for a plain ``CTkFrame``, so that assertion
+    would have failed on a faithful render while nothing was tinted (found by
+    the cold correctness pass, 2026-11-12).
+
+    Not equality against the theme's own frame colour either: Upcoming draws
+    a date-group header in ``surface_subtle`` (``upcoming.py:264``) and the
+    walk reports it alongside the item rows, so a screen may legitimately
+    fill a frame with something that is not the theme default. What PCC-M1
+    claims, and all it claims, is that a priority level is never the reason.
+
+    Every rendered frame is checked, so the tint fails here whichever of the
+    three levels kept it.
     """
+    levels = {c for c in priority_level_fill_colors().values() if c and c != NO_FILL}
+    assert len(levels) == 2, levels  # Critical and High ship a colour; the third does not
     for module, _screen_class, _needs_completing in RENDER_TARGETS:
-        for row_fill_value, labels in rendered_rows[module]:
-            assert "#" not in row_fill_value, f"{module} row is tinted: {row_fill_value}"
+        for row_fill_value, labels in rendered_rows.rows[module]:
+            assert row_fill_value not in levels, (
+                f"{module} row is tinted with a level colour: {row_fill_value}"
+            )
             assert labels, f"{module} reported a row with no labels"
 
 
@@ -1906,7 +1946,7 @@ def test_pccm4_a_rendered_critical_chip_carries_the_level_colour(rendered_rows):
             continue  # draws no factor row
         chips = {
             text: (fg_color, text_color)
-            for _row_fill, labels in rendered_rows[module]
+            for _row_fill, labels in rendered_rows.rows[module]
             for text, fg_color, text_color in labels
             if ":" in text and text.split(":")[0] in ("I", "U", "E", "V")
         }
@@ -1918,3 +1958,180 @@ def test_pccm4_a_rendered_critical_chip_carries_the_level_colour(rendered_rows):
         assert chips["V:4"][0] == "transparent", f"{module}: V:4 is painted"
         checked += 1
     assert checked == 4, checked
+
+
+def test_pccm3_the_render_helper_stays_out_of_the_real_data_dir():
+    """The render subprocess resolves no path in the user's own data directory.
+
+    Found by the security pass of 2026-11-12, not by a test. The helper
+    redirected ``AppSettings.get_settings_path`` and passed an explicit
+    database path, but left ``GETMOREDONE_DATA_DIR`` alone -- and
+    ``VPSManager.__init__`` opens ``app_data_dir_path() /
+    "weekly_tactic_debug.log"`` in append mode, which is the record a user
+    reads to audit what the weekly-tactic migration did to their own rows.
+    ``conftest.py``'s ``_isolate_weekly_tactic_log`` swaps logging handlers
+    in-process and so cannot reach a subprocess.
+
+    Run the way the fixture runs it -- with ``GETMOREDONE_DATA_DIR`` absent,
+    which is what ``conftest.py`` leaves behind -- because that is the only
+    state in which the defect bites.
+
+    Asserted on the directory the subprocess *resolved*, which it reports,
+    and not on the real directory's contents: an earlier version compared
+    the real directory's files and mtimes before and after, and that test
+    passed with the redirect removed. ``weekly_tactic_debug.log`` already
+    exists on a machine that has run the app, and a ``FileHandler`` that
+    opens it in append mode and emits nothing leaves its mtime alone -- so
+    the harm is that the real file is held open and written to *whenever*
+    those syncs do emit, which a before/after snapshot of one quiet run
+    cannot see. Mutation-proved against the redirect itself.
+    """
+    import subprocess
+    import sys
+
+    root = Path(__file__).resolve().parents[1]
+    helper = root / "tests" / "render_priority_cells.py"
+    # conftest.py pops the override, so in this process this is the user's
+    # own directory -- the one the subprocess must not land in.
+    real = app_data_dir_path()
+
+    result = subprocess.run(
+        [sys.executable, str(helper), "today", "TodayScreen"],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        cwd=str(root),
+        env={k: v for k, v in os.environ.items() if k != "GETMOREDONE_DATA_DIR"},
+    )
+    if result.returncode != 0:
+        lowered = result.stderr.lower()
+        if "no display name" in lowered or "couldn't connect" in lowered:
+            pytest.skip(f"no display: {result.stderr[-200:]}")
+        pytest.fail(f"the helper failed to render:\n{result.stderr[-2000:]}")
+
+    reported = [
+        line[8:] for line in result.stdout.splitlines() if line.startswith("DATADIR ")
+    ]
+    assert len(reported) == 1, f"the helper reported {len(reported)} data dirs"
+    assert reported[0] != str(real), (
+        f"the render resolved the real data directory: {reported[0]}"
+    )
+
+
+def test_pccm3_a_saved_colour_reaches_the_real_widget():
+    """A colour the user saved, not a default, comes back off the widget.
+
+    The positive twin of
+    ``test_pccm3_a_rendered_priority_cell_carries_the_level_colour`` (P40).
+    That test renders the shipped defaults, and ``level_color`` falls back to
+    the *same* theme default whenever the stored value is unreadable -- so on
+    its own it would pass identically whether a saved colour reaches the widget
+    or the settings read is broken end to end.
+
+    ``#010203`` is in no theme and no default, so it can only appear on the
+    label if ``AppSettings.load()`` read the file, ``level_color`` kept the
+    value, and the screen passed it through. Its derived text is ``#FFFFFF``,
+    the opposite of every default's ``#000000``, so the derivation is observed
+    on a real widget too. Any High is left alone and must still be its default,
+    which is what rules out a mutation that paints every cell one colour.
+
+    Found by the failure-pattern sweep of 2026-11-12, which noted the plan had
+    handed this to a human as manual-checklist item 2.
+    """
+    import subprocess
+    import sys
+
+    root = Path(__file__).resolve().parents[1]
+    helper = root / "tests" / "render_priority_cells.py"
+    saved = "#010203"
+
+    result = subprocess.run(
+        [sys.executable, str(helper), "today", "TodayScreen", f"--critical={saved}"],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        cwd=str(root),
+    )
+    if result.returncode != 0:
+        lowered = result.stderr.lower()
+        if "no display name" in lowered or "couldn't connect" in lowered:
+            pytest.skip(f"no display: {result.stderr[-200:]}")
+        pytest.fail(f"the helper failed to render:\n{result.stderr[-2000:]}")
+
+    rows = []
+    for line in result.stdout.splitlines():
+        if line.startswith("ROW "):
+            rows.append((line[4:], []))
+        elif line.startswith("LBL "):
+            text, fg_color, text_color = line[4:].split("|")
+            rows[-1][1].append((text, fg_color, text_color))
+    assert rows, f"no rows rendered:\n{result.stdout}"
+
+    critical = _cell_for(rows, RENDERED_SCORES[LEVEL_ANY_CRITICAL])
+    assert critical == (saved, pick_text_color(saved)), critical
+    assert pick_text_color(saved) == "#FFFFFF", "this test needs a dark fill"
+
+    # The level nobody saved a colour for is untouched, so this cannot pass by
+    # painting every cell the same.
+    high = _cell_for(rows, RENDERED_SCORES[LEVEL_ANY_HIGH])
+    assert high == (
+        priority_level_fill_colors()[LEVEL_ANY_HIGH],
+        pick_text_color(priority_level_fill_colors()[LEVEL_ANY_HIGH]),
+    ), high
+
+
+def test_pccm3_an_uncoloured_cell_keeps_the_rows_text(rendered_rows):
+    """An uncoloured Priority cell draws in the row's own text colour.
+
+    Listed in the plan as an acceptance test for PCC-M3 and **not written
+    during the build** — the cold correctness pass of 2026-11-12 found the
+    plan and `spec_coverage.md` both reporting the criterion done with no test
+    behind it. Written now rather than left as a manual look.
+
+    The claim is the reason ``fill_for_level`` returns ``text_color=None`` for
+    a level with no colour: a cell that picked a colour for nothing would
+    discard whatever the row had already derived. Asserted against a sibling
+    label in the same row, so it holds whatever the theme or appearance mode
+    makes that colour -- an equality against ``gray10`` would be a restatement
+    of this interpreter's theme.
+
+    The composition the plan named, a "No high or critical" item on a
+    *segment-filled* row, is still not built by any assertion: the helper
+    creates no VSP segment. That case stays in the plan's §8 checklist. What is
+    asserted here is the mechanism it depends on.
+    """
+    plain_score = RENDERED_SCORES[LEVEL_NO_HIGH_OR_CRITICAL]
+    assert not priority_level_fill_colors()[LEVEL_NO_HIGH_OR_CRITICAL], (
+        "this test needs the level that ships without a colour"
+    )
+
+    checked = 0
+    for module, _screen_class, _needs_completing in RENDER_TARGETS:
+        for _row_fill, labels in rendered_rows.rows[module]:
+            cell = [
+                (fg, text_colour)
+                for text, fg, text_colour in labels
+                if text in (f"P:{plain_score}", str(plain_score))
+            ]
+            if not cell:
+                continue
+            fg_color, cell_text = cell[0]
+            assert fg_color == "transparent", f"{module}: {fg_color}"
+
+            # The title is the label the row builder always hands its own
+            # derived text colour, so it is what the cell must match. Not
+            # every label in a row is given one -- Hierarchical leaves some
+            # at the theme's own pair -- so comparing against all of them
+            # would be asserting something the row does not claim.
+            titles = [
+                text_colour
+                for text, fg, text_colour in labels
+                if "plain item" in text
+            ]
+            assert len(titles) == 1, f"{module}: {len(titles)} title labels"
+            assert cell_text == titles[0], (
+                f"{module}: cell text is {cell_text}, the row is {titles[0]}"
+            )
+            checked += 1
+
+    assert checked == len(RENDER_TARGETS), f"only {checked} screens had a plain row"
