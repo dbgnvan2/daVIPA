@@ -1029,7 +1029,8 @@ header — filed as `PRIT-N1`, not a test gap.
 | PRI-M2.4 | The **stored** row is capped on create and on update | unchanged `::create_action_item` and `::update_action_item`, both via `update_priority_score` | `::test_prim24_the_stored_score_is_capped_on_create_and_on_update` | done |
 | PRI-M2.5 | One function computes the score; no module multiplies the four factors itself | `src/getmoredone/models.py`, `screens/item_editor.py`, `screens/inline_editors.py` | `::test_prim25_only_one_function_multiplies_the_factors` — AST walk over the whole module, **exact count of 0**, parsed not grepped, and **not filtered by operand name**. The first version matched only operands named `importance`/`urgency`/`size`/`value`, which left it blind at the one site PRI-M2 exists to protect: `screens/inline_editors.py::update_score` already names its factors `i`, `u`, `s`, `v`, so a re-introduced `i * u * s * v` kept the guard green at 0. Measured: the three modules hold no four-operand product of any kind, so the strict form is achievable. **Five** positive controls — `::test_prim25_the_product_detector_finds_a_product` at four namings, including the single letters, and `::test_prim25_the_product_detector_excuses_the_one_scorer`; mutations F, G and H confirm all five load-bearing. **What the walk still cannot see is the larger half**, and the criterion does not rest on it: the real scorer accumulates in a loop, so a copied loop, a `reduce`, a `math.prod`, intermediate variables, `*=`, or any `/` in the chain is not a four-operand product and is invisible. PRI-M2.5 is actually held by PRI-M2.6's behavioural test at both render sites; this walk is the cheap structural check beside it | done |
 | PRI-M2.6 | Both score labels say when the score was capped | unchanged `src/getmoredone/models.py::priority_score_label`, and both render sites | the model boundary in `::test_prim26_the_label_says_capped_only_above_the_cap` (6400 and 12800, the two numbers either side of the cap), and both sites driven as behaviour in `tests/test_priority_floor_form.py::test_prim26_a_capped_label_says_it_is_capped` | done |
-| PRI-M2.7 | `priority_band` still classifies pre-cap rows, so the cap does not re-colour history | unchanged `src/getmoredone/time_block_layout.py::priority_band` | existing `tests/test_time_block_layout.py` row (`102400 → critical`), whose comment called that "the top of the scale" and now says "a legacy pre-cap score" (`d58f5e0`). The `PRIORITY_BANDS` comment said the score runs to 102400 and was corrected the same way (`3db5807`) | done |
+
+PRI-M2.7 is **retired**, not done: it asserted that `time_block_layout.py::priority_band` still classified pre-cap rows, and PBG-M5 deleted that function. The reason is filed in `docs/unused-docs/implementation_plan_2026-11-12_plan_priority_badge.md`.
 
 ### Human review required (not code-testable)
 
@@ -2191,7 +2192,7 @@ before the plan was written.
 | PBG-M1 | A badge column is added to `chip_column_minsizes`, so it reaches both panes or neither; the item row draws in it and a day box leaves it empty | `plan_blocks.py` (`SLOT_BADGE_WIDTH_PX`, `CHIP_BADGE_COLUMN`, `chip_column_minsizes`) | `tests/test_plan_screen.py::test_pdm11_the_item_row_uses_the_chips_column_order`, `::test_pdm12_the_length_sits_beside_the_depth_bars` | done |
 | PBG-M2 | The badge reads `P:<score>` on `level_cell_fill`, its text colour from the same `RowFill`, falling back to the row's text when the level has no colour | `plan_blocks.py::build_item_row`, `plan.py` (passes `settings`) | `tests/test_plan_screen.py::test_pbgm2_the_item_rows_badge_carries_the_level_colour` | done |
 | PBG-M3 | An item row is drawn on the theme's surface and its bar carries no colour | `plan_blocks.py::build_item_row` | `tests/test_plan_screen.py::test_pbgm3_an_item_row_is_the_themes_surface_with_a_neutral_bar` | done |
-| PBG-M4 | A task's day chip likewise, continuations included; padding keeps its `block_type_colors` bar and transparent surface | `plan_blocks.py::_build_block_chip` | `::test_pbgm4_padding_keeps_its_neutral_and_a_task_does_not`, `::test_pbgm4_a_continuation_box_is_the_same_surface_as_its_first_box` | done |
+| PBG-M4 | A task's day chip likewise, continuations included; padding keeps its `block_type_colors` bar. Its surface is no longer transparent: PBG-A7 made every chip's fill the surface token its box does not use | `plan_blocks.py::_build_block_chip` | `::test_pbgm4_padding_keeps_its_neutral_and_a_task_does_not`, `::test_pbgm4_a_continuation_box_is_the_same_surface_as_its_first_box`, `::test_pbga7_a_chip_is_not_the_colour_of_the_box_it_sits_in` | done |
 | PBG-M5 | The band scheme is deleted, not left dead: six helpers from `plan_blocks.py`, three tables from `theme.py`, `priority_band` from `time_block_layout.py` | those three files | `::test_pbgm5_the_band_scheme_is_gone_from_every_module_that_held_it` | done |
 | PBG-M6 | `docs/ui_color_inventory.md` regenerated, since PBG-M5 removes colour literals from `src/` | `tools/color_audit.py` | `tests/test_color_inventory_sync.py` | done |
 
@@ -2238,18 +2239,20 @@ unused before this batch and still are (`CHIP_BARS_COLUMN`,
 
 ### What the cold sweep changed (2026-11-12)
 
-Three cold passes ran over this batch and the LMM fix commits before the push:
+Four cold passes ran over this batch and the LMM fix commits before the push:
 one against `learnings.md`'s P1–P44, one against `ui-regression.md` and the
-repo's test rules, one over the LMM fixes alone. Two highs and six mediums were
-fixed in loop; below-medium findings were dropped, bar four that were plainly
-false statements this batch had written. Nine new mutations were run, each red
-where expected, every mutated file restored byte-exact.
+repo's test rules, one over the LMM fixes alone, and a fourth over the in-loop
+fixes themselves — the least-reviewed code in any change. Two highs and ten
+mediums were fixed in loop; below-medium findings were dropped, bar four that
+were plainly false statements this batch had written. The fourth pass produced
+no high, which is where the repo's rule stops the sweep. Ten new mutations were
+run, each red where expected, every mutated file restored byte-exact.
 
 | Finding | What was wrong | Fix | Guard |
 |---|---|---|---|
 | badge width | `SLOT_BADGE_WIDTH_PX` was 44px, justified as "wide enough for `P:100`". The scale's top is `MAX_SCORE` = 9999, and a *filled* badge spends `corner_radius` as padding on each side: `P:9999` asks for 57px, overflowing into the title column, which at the pane's floor has no slack | 60px, the same the five list screens reserve, with the measurement in the comment | `::test_pbga5_the_badge_fits_the_column_reserved_for_it` |
 | settings not proven | `plan.py` passes `settings=self.settings`, but the only badge test called the builder with `settings=None` and compared against `level_cell_fill(None, item)` — both sides default, so deleting the screen's argument left the suite green while Settings → Priority Colours stopped reaching the screen | a `test_pdm15`-shaped guard: a colour no default uses, set in settings, read off the real row | `::test_pbga2_the_plan_screen_passes_the_users_own_priority_colours` |
-| chips had no edge | With the tint gone a task chip and the box holding tasks are both `surface_subtle`, and a padding chip's `"transparent"` resolves to the `surface` its own box is filled with — 1.0:1 either way, and two tasks in one box with nothing between them | the chip carries the box's own 1px border, which does not depend on which box it landed in | `::test_pbgm4_padding_keeps_its_neutral_and_a_task_does_not` |
+| chips had no edge | With the tint gone a task chip and the box holding tasks are both `surface_subtle`, and a padding chip's `"transparent"` resolves to the `surface` its own box is filled with — 1.0:1 either way, and two tasks in one box with nothing between them | **two attempts.** A 1px `border` was fixed first; the fourth pass measured it at 1.34:1 in `davipa` and found it drawn beneath the children, so the stripe and the labels paint over it on three sides. Replaced by `_build_block_chip(..., box_fill=)`: the chip takes whichever surface token its box does not use | `::test_pbga7_a_chip_is_not_the_colour_of_the_box_it_sits_in`, measured against the chip's real parent |
 | row/pane not measured | A reviewer predicted the item row was the exact colour of the pane behind it, reasoning from `CTkScrollableFrame`'s source. Measured on the built screen it is not — `items_scroll` resolves to `surface` and the row is `surface_subtle` — but nothing asserted the pair, and a first attempt at the "fix" did cause the collision | the relationship is measured through `PlanScreen`, not restated | `::test_pbga4_an_item_row_is_not_the_colour_of_the_pane_behind_it` |
 | `day_span`, five sites | LM-6 passed the drawn day on the lunch-move path and left its siblings. `move_block_to_slot` took its box index off `_slot_frames`, which is built over the drawn day, and checked against the template; `set_block_length` had no `day_span` parameter at all, so a resize on a box the drawn day added was refused whatever length was asked for | both pass the drawn span; `set_block_length` gains the parameter. `add_padding_block` and AutoLoad still omit it, deliberately — `template_span` names the template as what they may fill — and that line is now drawn in `BACKLOG.md` | `::test_pbga8_an_ordinary_block_moves_onto_a_box_the_extended_day_drew`, `tests/test_time_block_crud.py::test_pbga3_a_block_on_a_drawn_box_can_be_resized` |
 | false docstring | `_refuse_unless_it_fits` told every caller that omitting `day_span` checks "the template's hours stretched to this date's own blocks". `can_place` does no stretching. That sentence is what made all five omissions look safe | corrected, and it says where the argument may be omitted on purpose | — (prose) |
@@ -2257,9 +2260,14 @@ where expected, every mutated file restored byte-exact.
 | wrap floor | above | above | above |
 | stale prose | four statements this batch had written that were false: `_scored_item` said it produced 51200 when the cap makes it 9999; the marker's comment explained its colours as "a mark on a priority fill"; `chip_column_minsizes` said "the same four columns"; a `priority_levels` docstring had a broken line wrap | corrected | — (prose) |
 | dead on arrival | `UNSCORED_BAND`, and `MIN_NON_TEXT_CONTRAST` / `MIN_TINT_CONTRAST` / `_luminance_of` in `test_time_block_colors.py`, left behind by the deleted tests — constants naming bars nothing enforces | deleted | — |
+| test asserted an unreachable span | `test_pbga3` resized with `DaySpan(0, 20)`; `span_for_blocks` returns `DaySpan(0, 18)` for that fixture, and with it a 60-minute length on box 18 is **still** refused. The test, the docstring and a guide sentence read as though lengthening now worked | the test asserts the reachable span, the write at an equal length, and the refusal past the last drawn box as intended; the docstring and the guide say the same | `tests/test_time_block_crud.py::test_pbga3_a_block_on_a_drawn_box_can_be_resized` |
+| two `day_span` docstrings left behind | `place_block_at` still said the fit is checked against "the day that will exist rather than the one on screen", the claim `_refuse_unless_it_fits` was corrected to remove; `add_block_at` documented the parameter not at all | both point at `_refuse_unless_it_fits` | — (prose) |
+| a `done` row for deleted code | PRI-M2.7 cited `time_block_layout.py::priority_band` and a test row, both deleted by PBG-M5 | retired, not restated; reason filed in the batch's implementation plan | — |
+| two guards a shade loose | `test_pdm9` asserted `len(themes) >= 10`, the kind of floor the test rules forbid; `test_pbgm5`'s gone-map named `priority_band` but not the `UNSCORED_BAND` deleted beside it | an exact count, and both names | both tests above |
 
 The guide changed with the code: the item row's parts, the continuation box
 (its shared *colour* said which task owned the half hour, and that colour is
 gone), the items-column floor (384px → 444px), the three refusal strings it
-quoted verbatim and had wrong, and the resize sentence, which is now true on a
-box the drawn day added.
+quoted verbatim and had wrong, and the resize sentence — the length menu works
+on a box the drawn day added, up to the last box on the day; a length past it
+is still refused, because widening the day is **Later**'s job.

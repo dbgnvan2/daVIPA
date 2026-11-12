@@ -171,7 +171,10 @@ regression is light mode only.
 Fix when touched, cheapest first: give the cell `border_width=1,
 border_color=cell.text_color` — the derived text colour is black on both
 defaults, so the patch gains an edge at about 19:1 against a completed row
-with no colour change at all. Then hold it to 3:1 with a test over every row
+with no colour change at all. Measure it on screen: a
+CustomTkinter border draws beneath the widget's children, so it survives only
+where `corner_radius` exceeds `border_width` and no child sits flush to the
+edge — which is what sank the same fix on the day chips (PBG-A7). Then hold it to 3:1 with a test over every row
 background a cell can sit on (each theme's `CTkFrame.fg_color` plus
 `palette["success_tint"]`).
 

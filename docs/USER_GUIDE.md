@@ -572,7 +572,10 @@ Day pane (right):
   a dropped item unless the item has a Work Block value, which is used instead.
   A length is refused if it would not fit from where the task sits — the task is
   never slid somewhere it does fit, because that would answer a question you did
-  not ask.
+  not ask. On a box that only exists because you dragged the day open with
+  **Earlier** or **Later**, the menu works from 2026-11-12, but only up to the
+  last box on the day: a length that would run past it is refused, because
+  **Later** is what widens the day.
 - **Block lengths stop at a day** — What: 1440 minutes is the longest block
   the app will store. A custom length above it is refused in the dialog. An
   item whose Work Block is above it is clamped to 1440, which needs 48 boxes,
@@ -619,7 +622,8 @@ Day pane (right):
   day*. Choosing a longer lunch from its right-click menu says the same thing
   about the boxes the new length takes — including on a box that only exists
   because you dragged the day open with **Earlier** or **Later**, where until
-  2026-11-12 the length menu refused every length it offered. Drag them back
+  2026-11-12 the length menu refused every length it offered, the one the block
+  already had included. Drag them back
   onto the day wherever you want them.
 - **A refusal always says which** — What: One of *That Time Block is outside
   the day — Day Settings sets its hours*, *That Time Block runs into lunch —

@@ -106,3 +106,15 @@ Found while reading for this plan:
 
 4. `docs/spec_coverage.md` has no LM section for the lunch batch. Held back
    because the priority-colour session is editing that file.
+
+## Retired criterion: PRI-M2.7 (2026-11-12)
+
+PRI-M2.7 read "`priority_band` still classifies pre-cap rows, so the cap does
+not re-colour history", citing `time_block_layout.py::priority_band` and a row
+in `tests/test_time_block_layout.py`. PBG-M5 deleted both: nothing in `src/`
+buckets a score into a band any more, so there is no colouring for the cap to
+change. The thresholds survive as `PRIORITY_BANDS`, read only by
+`tests/test_priority_floor_and_cap.py:231` and
+`tests/test_priority_level_colors.py:213` — both measuring the cap against the
+top threshold, which is PRI-M2.1's subject, not this one's. Removed rather
+than restated.
