@@ -271,6 +271,15 @@ accusing line and the timestamp-only branch change.
 > (`CGH-A1`), and 17 mutation proofs.** The batch stops here: the rule asks
 > for a further pass only after a high, and this one produced none.
 
+> **CGH-M3 verified, 2026-11-12 — the batch is closed.** §5 left this
+> criterion `partial` because the two mapped tests skip locally and only a CI
+> run could prove them. CI run 43162159433 on `1faf21a`: **2862 passed, 6
+> skipped, no failures** on each of the three Python versions, against
+> **2827 passed, 10 skipped** on `474e7b7` before the batch. The skip list is
+> 4 `-topmost` read-backs + 1 display-does-not-honour-`-topmost` + 1 no-music-
+> folder, so **5 display skips**, exactly the number §5 predicted, and neither
+> `-alpha` skip remains. Both read-backs now assert on CI.
+
 ## 5. What this batch cannot verify here, and how it is proved
 
 `CGH-M3.1` makes two tests take `mapped_windows`, the fixture the local
