@@ -10,6 +10,7 @@ from ..theme import button_style, combo_box_style, semantic_colors, status_text_
 from ..vps_manager import ActionItemsAttachedError, ProjectBoardsAttachedError
 from .chip_table import ANNUAL_RIGHT_COLUMNS, APE_LEFT_COLUMNS, ChipTable, panel_fitter
 from .lineage_filters import FILTER_ROW_HEIGHT
+from .pick_record_dialog import describe_lineage, open_pick_record_dialog
 from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .split_panel import SPLITTER_WIDTH, SplitPanel
@@ -82,11 +83,8 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         ctk.CTkButton(header, text="Load Year", width=100, command=self.refresh_lists, **button_style("secondary")).grid(
             row=1, column=2, padx=6, pady=(0, 8), sticky="w"
         )
-        ctk.CTkButton(header, text="Save", width=100, command=self.add_selected, **button_style("primary")).grid(
-            row=1, column=3, padx=6, pady=(0, 8), sticky="w"
-        )
         ctk.CTkButton(header, text="Refresh", width=90, command=self.refresh_lists, **button_style("secondary")).grid(
-            row=1, column=4, padx=6, pady=(0, 8), sticky="w"
+            row=1, column=3, padx=6, pady=(0, 8), sticky="w"
         )
 
         # This tab carries no lineage *dropdowns* -- there is no lineage above
@@ -166,6 +164,22 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
             self.right_list, self.settings,
             f"{self.SETTINGS_PREFIX}_right", ANNUAL_RIGHT_COLUMNS,
         )
+
+        # VTF-M3.1/M3.7 — the Add New that replaced the header Save, and
+        # the status line it reports on. Under the right panel, because the
+        # record it creates is a right-panel record.
+        right_actions = ctk.CTkFrame(body, fg_color="transparent")
+        right_actions.grid(row=2, column=2, sticky="ew", padx=(2, 8), pady=(0, 8))
+        self.right_actions = right_actions
+        ctk.CTkButton(
+            right_actions,
+            text="Add New Annual Plan Element",
+            width=230,
+            command=self.open_add_dialog,
+            **button_style("primary"),
+        ).pack(side="left", padx=(0, 8))
+        self.status_label = ctk.CTkLabel(right_actions, text="", anchor="w")
+        self.status_label.pack(side="left", fill="x", expand=True)
 
         # UPD-M1 — the ratio, the clamp and the four handlers live in
         # screens/split_panel.py, and the ratio now persists.
@@ -376,19 +390,67 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         self.vps_manager.create_annual_records_from_vision_element(year, row["id"])
         self.refresh_lists()
 
-    def add_selected(self):
+    # --------------------------------------------------- VTF-M3: Add New
+
+    def _add_options(self) -> list:
+        """The Vision Elements this year does not have an annual record for.
+
+        Offering one that is already there would be an option that changes
+        nothing: `create_annual_records_from_vision_element` is idempotent.
+        """
+        taken = {row.get("vision_element_id") for row in self.right_items}
+        return [
+            (row["id"], describe_lineage(row))
+            for row in self.left_items
+            if row.get("id") and row.get("id") not in taken
+        ]
+
+    def _add_default(self):
+        """The ticked row to open the dialog on, when exactly one is ticked.
+
+        VTF-M3.6 — one tick is an unambiguous intention; two are not, and
+        guessing between them would create a record the user did not pick.
+        """
+        ticked = self._ticked_vision_element_ids()
+        return next(iter(ticked)) if len(ticked) == 1 else None
+
+    def _perform_add(self, vision_element_id: str) -> str:
+        """Create both annual records for one Vision Element, and say so.
+
+        VTF-M3.8 — the refresh is here, so the new row is in the right panel
+        before the sentence about it reaches the status line.
+        """
         year = self._parse_year()
         if year is None:
-            return
-        selected_ids = [k for k, v in self.left_checks.items() if v.get()]
-        if not selected_ids:
-            return
-        selected_set = set(selected_ids)
-        for row in self.left_items:
-            if row.get("id") in selected_set:
-                self.vps_manager.create_annual_records_from_vision_element(year, row["id"])
+            return "Enter a valid year first."
+        row = next(
+            (r for r in self.left_items if r.get("id") == vision_element_id),
+            None)
+        self.vps_manager.create_annual_records_from_vision_element(
+            year, vision_element_id)
         self.refresh_lists()
+        name = describe_lineage(row) if row else "the Vision Element"
+        return f"Added {name} to {year}."
 
+    def open_add_dialog(self):
+        """VTF-M3.1 — pick a Vision Element and create its annual records."""
+        year = self._parse_year()
+        if year is None:
+            return None
+        return open_pick_record_dialog(
+            self,
+            title="Add New Annual Plan Element",
+            prompt=f"Which Vision Element should {year} carry?",
+            options=self._add_options(),
+            initial=self._add_default(),
+            confirm_text="Add",
+            report=lambda text: self.status_label.configure(text=text),
+            on_confirm=self._perform_add,
+            empty_message=(
+                f"Every Vision Element already has an annual record for "
+                f"{year}. Add a Vision Element on the Vision Elements tab "
+                f"first."),
+        )
 
     def edit_annual_item(self, row: dict):
         """Edit a right-side annual item by updating its source Vision Element."""

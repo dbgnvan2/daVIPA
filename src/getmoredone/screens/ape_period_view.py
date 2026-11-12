@@ -11,6 +11,7 @@ from ..date_utils import months_of_quarter, quarter_of_month
 from ..theme import button_style, semantic_colors, status_text_color
 from ..weekly_tactic_logging import get_weekly_tactic_logger
 from .chip_table import APE_LEFT_COLUMNS, APE_RIGHT_COLUMNS, ChipTable, panel_fitter
+from .pick_record_dialog import describe_lineage, open_pick_record_dialog
 from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .split_panel import SPLITTER_WIDTH, SplitPanel
@@ -94,9 +95,6 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         self._sync_month_choices()
         ctk.CTkButton(header, text="Load", width=88, command=self.refresh_lists, **button_style("secondary")).grid(
             row=1, column=6, padx=(8, 4), pady=(0, 8), sticky="w"
-        )
-        ctk.CTkButton(header, text="Save", width=88, command=self.add_selected, **button_style("primary")).grid(
-            row=1, column=7, padx=4, pady=(0, 8), sticky="w"
         )
         ctk.CTkButton(header, text="Refresh", width=88, command=self.refresh_lists, **button_style("secondary")).grid(
             row=1, column=8, padx=(4, 12), pady=(0, 8), sticky="w"
@@ -195,6 +193,19 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         # UPD-M1 — the ratio, the clamp and the four handlers live in
         # screens/split_panel.py. UPD-M4 is where this screen stopped keeping
         # its own copy of them, and gained the persistence it never had.
+        # VTF-M3/M3.7 — the Add New that replaced the header Save, under the
+        # right panel, because the assignment it makes is a right-panel row.
+        right_actions = ctk.CTkFrame(body, fg_color="transparent")
+        right_actions.grid(row=2, column=2, sticky="ew", padx=(2, 8), pady=(0, 8))
+        self.right_actions = right_actions
+        ctk.CTkButton(
+            right_actions,
+            text="Assign APE to Month",
+            width=190,
+            command=self.open_add_dialog,
+            **button_style("primary"),
+        ).pack(side="left", padx=(0, 8))
+
         self.split = SplitPanel(
             body,
             left_frame,
@@ -422,47 +433,60 @@ class APEPeriodViewScreen(ctk.CTkFrame):
             return base
         return f"{base} ({len(shown)} of {len(self.right_items)}, filtered by tick)"
 
-    def add_selected(self):
-        """Assign every checked APE to the selected month.
+    # --------------------------------------------------- VTF-M3: Add New
 
-        Purpose: APC-M2.3 — Save says what it did, including what it failed to
-                 do, for every APE in the press rather than for the press.
+    def _add_options(self) -> list:
+        """The quarter's APEs this month does not already hold (VTF-M3.3)."""
+        taken = self._ids_in_month()
+        return [
+            (row["id"], describe_lineage(row))
+            for row in self.left_items
+            if row.get("id") and row.get("id") not in taken
+        ]
+
+    def _add_default(self):
+        """The ticked row to open the dialog on, when exactly one is ticked."""
+        ticked = self._ticked_ape_ids()
+        if len(ticked) != 1:
+            return None
+        only = next(iter(ticked))
+        return only if only not in self._ids_in_month() else None
+
+    def _perform_add(self, ape_id: str) -> str:
+        """Assign one APE to the month, and say what really happened.
+
+        Purpose: VTF-M3.7 — the reconciliation the Save button did
+                 (APC-M2.3/M2.5), on the path that replaced it.
         Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m2
-        Tests:   tests/test_ape_period_consistency.py::test_apcm23_save_reports_refused_assignments
-                 tests/test_ape_period_consistency.py::test_apcm24_a_raising_assignment_is_counted_not_escaped
-
-        APC-M2.4 — each APE is assigned inside its own ``try``.
-        ``assign_ape_to_month`` does not only return ``False``: it raises
-        ``ValueError`` when an APE's ``segment_name`` resolves to no segment
-        (``vps_manager`` — the renamed-segment hazard
-        ``tests/test_rename_safe_links.py`` exists for). Without the ``try``
-        the raise left the earlier APEs written, skipped both the redraw and
-        the status line, and left the *previous* press's "Assigned 3 APE(s)"
-        on screen — a success message for a save that half happened, with the
-        traceback going to a stderr a double-clicked app does not have.
-
-        Counted as refused rather than re-raised, and the exception goes to the
-        log: the whole point of the status line is that a press reconciles
-        with what reached the database, and a press that wrote two of three
-        has to say two.
+        Tests:   tests/test_ape_period_consistency.py::test_apcm24_a_raising_assignment_is_counted_not_escaped
         """
         parsed = self._parse_period()
         if not parsed:
-            return
+            return "Enter a valid year, quarter and month first."
         _year, quarter, month = parsed
-        selected_ids = [row_id for row_id, var in self.left_checks.items() if var.get()]
-        if not selected_ids:
-            self.status_label.configure(text="Check one or more APEs on the left first.")
-            return
-        claimed = {
-            ape_id for ape_id in selected_ids
-            if self._assign_one(ape_id, quarter, month)
-        }
+        claimed = {ape_id} if self._assign_one(ape_id, quarter, month) else set()
         self.refresh_lists()
-        self.status_label.configure(
-            text=self._describe_month_assignment(
-                selected_ids, claimed, self._ids_in_month(), month
-            )
+        return self._describe_month_assignment(
+            [ape_id], claimed, self._ids_in_month(), month)
+
+    def open_add_dialog(self):
+        """VTF-M3.3 — pick an APE and assign it to the selected month."""
+        parsed = self._parse_period()
+        if not parsed:
+            return None
+        _year, _quarter, month = parsed
+        return open_pick_record_dialog(
+            self,
+            title=f"Assign APE to Month M{month}",
+            prompt=f"Which Annual Plan Element should M{month} carry?",
+            options=self._add_options(),
+            initial=self._add_default(),
+            confirm_text="Assign",
+            report=lambda text: self.status_label.configure(text=text),
+            on_confirm=self._perform_add,
+            empty_message=(
+                f"Every Annual Plan Element in this quarter is already in "
+                f"M{month}."),
         )
 
     def _ids_in_month(self) -> set:

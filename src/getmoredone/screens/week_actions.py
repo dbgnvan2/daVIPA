@@ -87,12 +87,18 @@ class WeekTacticActionsPanel(TodayScreen):
     # ------------------------------------------------------------------ toolbar
 
     def _build_toolbar(self, parent):
-        """Row 0: which tactic is showing, and Add Action Item.
+        """Row 0: which tactic is showing. Row 3: Add Action Item.
 
         Replaces Today's search / Expand / Top 3 / + New Item / Refresh row.
         None of those five belongs above a list of one tactic's children.
         Spec:  docs/spec_2026-11-07_ape_week_actions.md#awa-m6
+               docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
         Tests: tests/test_ape_week_actions.py::test_awam53_row_behaviours_are_inherited_not_copied
+               tests/test_vsp_tab_contracts.py::test_vtfm35_week_actions_add_sits_at_the_bottom
+
+        VTF-M3.5 moved the button to the bottom of the panel, where the other
+        five tabs' Add New buttons now sit. It is the same button with the
+        same command; only its parent and its row changed.
         """
         bar = ctk.CTkFrame(parent, fg_color="transparent")
         bar.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
@@ -107,14 +113,21 @@ class WeekTacticActionsPanel(TodayScreen):
         )
         self.heading_label.grid(row=0, column=0, sticky="w")
 
+        # The panel inherits Today's rows: 0 the toolbar, 1 the column
+        # header, 2 the scrolling list -- the only row with weight -- so row
+        # 3 is the bottom of the panel.
+        bottom = ctk.CTkFrame(parent, fg_color="transparent")
+        bottom.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 12))
+        self.bottom_actions = bottom
+
         self.add_button = ctk.CTkButton(
-            bar,
+            bottom,
             text="Add Action Item",
             width=140,
             command=self.add_action_item,
             **button_style("primary"),
         )
-        self.add_button.grid(row=0, column=2, sticky="e", padx=(8, 0))
+        self.add_button.pack(side="left")
 
     # ---------------------------------------------------------------- selection
 

@@ -21,6 +21,7 @@ from .chip_table import (
     show_list_or_message,
 )
 from .lineage_filters import annual_plan_element_parts, weekly_tactic_parts
+from .pick_record_dialog import describe_lineage, open_pick_record_dialog
 from .row_drag import RowDragSource
 from .segment_color_utils import (
     load_latest_lineage_color_maps,
@@ -104,9 +105,6 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         )
         ctk.CTkButton(header, text="This Week", width=86, command=self.jump_to_current_week, **button_style("secondary")).grid(
             row=1, column=3, padx=5, pady=(0, 8), sticky="w"
-        )
-        ctk.CTkButton(header, text="Save", width=76, command=self.add_selected, **button_style("primary")).grid(
-            row=1, column=4, padx=(8, 5), pady=(0, 8), sticky="w"
         )
         ctk.CTkButton(header, text="Refresh", width=86, command=self.refresh, **button_style("secondary")).grid(
             row=1, column=5, padx=5, pady=(0, 8), sticky="w"
@@ -222,17 +220,21 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         )
         self.right_empty.grid(row=0, column=0, pady=20, padx=10, sticky="nw")
 
+        # VTF-M5.4 — one button under the right panel. The two it replaced
+        # were second routes to the row's own controls: Delete Weekly called
+        # the same `delete_weekly_row` as the row's Delete, and Edit Weekly
+        # Tactic opened the same editor as a double-click. Add Action Item
+        # created an Action Item this panel cannot display; that button
+        # belongs to the Week Actions tab, which has it.
         right_actions = ctk.CTkFrame(self.right_frame)
         right_actions.grid(row=1, column=0, sticky="w", padx=4, pady=(6, 4))
-        ctk.CTkButton(right_actions, text="Edit Weekly Tactic", command=self.open_selected_weekly_item, width=150, **button_style("secondary")).pack(
-            side="left", padx=6, pady=6
-        )
-        ctk.CTkButton(right_actions, text="Delete Weekly", command=self.delete_selected_weekly_item, width=130, **button_style("danger")).pack(
-            side="left", padx=6, pady=6
-        )
-        ctk.CTkButton(right_actions, text="Add Action Item", command=self.create_action_item_for_selected_weekly, width=130, **button_style("primary")).pack(
-            side="left", padx=6, pady=6
-        )
+        ctk.CTkButton(
+            right_actions,
+            text="Add Weekly Tactic",
+            command=self.open_add_dialog,
+            width=170,
+            **button_style("primary"),
+        ).pack(side="left", padx=6, pady=6)
 
         # UPD-M5 — one table per panel, from screens/chip_table.py. The two
         # panels take the same column sets as the other APE tabs, so the three
@@ -385,29 +387,81 @@ class WeeklyItemsScreen(ctk.CTkFrame):
     def on_filters_changed(self):
         self.load_selected_week()
 
-    def add_selected(self):
+    # --------------------------------------------------- VTF-M3: Add New
+
+    def _add_options(self) -> list:
+        """The month's APEs on the left, as the dialog's options (VTF-M3.4).
+
+        `left_items` is the list the dropdowns have already narrowed, so the
+        dialog offers what the left panel is showing. None is excluded: one
+        APE can carry a tactic in several weeks, and
+        `create_week_action_items_for_ape` reports a collision itself.
+        """
+        return [
+            (row["id"], describe_lineage(row))
+            for row in self.left_items if row.get("id")
+        ]
+
+    def _add_default(self):
+        """The ticked row to open the dialog on, when exactly one is ticked.
+
+        VTF-M3.6 — one tick is an unambiguous intention; two are not.
+        """
+        ticked = self._ticked_ape_ids()
+        return next(iter(ticked)) if len(ticked) == 1 else None
+
+    def _create_tactic_for(self, ape_id) -> str:
+        """Create one weekly tactic for the selected week, and say what happened.
+
+        Purpose: VTF-M3.4 — the one write both remaining paths share. The
+                 drag path and the Add New dialog had the same four lines,
+                 including the `ValueError` that is a stale APE or a bad
+                 month; two copies is where one of them stops reporting
+                 collisions (P5).
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
+        Tests:   tests/test_vsp_tab_adds.py::test_vtfm34_the_week_tab_adds_a_weekly_tactic
+                 tests/test_weekly_tactic_schema.py::test_wt_m1c3_both_creation_paths_report_collisions
+        """
         parsed = self._selected_week_context()
         if not parsed:
-            messagebox.showwarning("No Week Selected", "Choose a Week Start first.")
-            return
+            return "Choose a Week Start first."
         week_start, year, month = parsed
-        selected_ids = [ape_id for ape_id, var in self.left_checks.items() if var.get()]
-        if not selected_ids:
-            messagebox.showwarning("No APE Selected", "Check one or more month-assigned APEs on the left first.")
-            return
-
-        created = 0
-        skipped = 0
-        collided = 0
-        for ape_id in selected_ids:
-            result = self.vps_manager.create_week_action_items_for_ape(ape_id, year, month, [week_start])
-            created += int(result.get("created_count", 0))
-            skipped += int(result.get("skipped_count", 0))
-            collided += int(result.get("collided_count", 0))
-
+        try:
+            result = self.vps_manager.create_week_action_items_for_ape(
+                ape_id, year, month, [week_start])
+        except ValueError as exc:
+            # Raised on a stale APE or a bad month. Unhandled inside a Tk
+            # binding this is a traceback on stderr and nothing on screen.
+            logger.exception("[weekly_items] create failed: %s", exc)
+            return f"Could not create the weekly tactic: {exc}"
+        # Always refresh and always say what happened: a create that collided
+        # used to produce no refresh, no status and no sign of rejection.
         self.refresh()
-        self.status_label.configure(
-            text=self._describe_week_creation(created, skipped, collided)
+        return self._describe_week_creation(
+            int(result.get("created_count", 0)),
+            int(result.get("skipped_count", 0)),
+            int(result.get("collided_count", 0)),
+        )
+
+    def open_add_dialog(self):
+        """VTF-M3.4/M5.4 — pick a parent APE and add a tactic for the week."""
+        parsed = self._selected_week_context()
+        if not parsed:
+            self.status_label.configure(text="Choose a Week Start first.")
+            return None
+        week_start, _year, _month = parsed
+        return open_pick_record_dialog(
+            self,
+            title="Add Weekly Tactic",
+            prompt=f"Which Annual Plan Element is the tactic for {week_start}?",
+            options=self._add_options(),
+            initial=self._add_default(),
+            confirm_text="Add Tactic",
+            report=lambda text: self.status_label.configure(text=text),
+            on_confirm=self._create_tactic_for,
+            empty_message=(
+                "No month-assigned APEs are listed on the left. Assign one to "
+                "this month on the APE Month Assignment tab first."),
         )
 
     @staticmethod
@@ -790,35 +844,14 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         Spec:    docs/spec_2026-11-07_unified_panel_design.md#upd-m5
         Tests:   tests/test_weekly_tactic_schema.py::test_wt_m1c3_both_creation_paths_report_collisions
         """
-        parsed = self._selected_week_context()
-        if not parsed:
-            # The button path warns when no week is chosen; the drag path
-            # used to do nothing at all for the same input.
+        if not self._selected_week_context():
+            # The dialog says the same thing on the same input; the drag path
+            # used to do nothing at all for it.
             self.status_label.configure(
                 text="Select a Week Start before dragging an Annual Plan Element."
             )
             return
-        week_start, year, month = parsed
-        try:
-            result = self.vps_manager.create_week_action_items_for_ape(
-                row["id"], year, month, [week_start])
-        except ValueError as exc:
-            # create_week_action_items_for_ape raises on a stale APE or a
-            # bad month. Unhandled inside a Tk binding that is a traceback
-            # on stderr and nothing on screen.
-            logger.exception("[weekly_items] drag create failed: %s", exc)
-            self.status_label.configure(text=f"Could not create the weekly tactic: {exc}")
-            return
-        # Always refresh and always say what happened: a drag that collided
-        # used to produce no refresh, no status and no sign of rejection.
-        self.refresh()
-        self.status_label.configure(
-            text=self._describe_week_creation(
-                int(result.get("created_count", 0)),
-                int(result.get("skipped_count", 0)),
-                int(result.get("collided_count", 0)),
-            )
-        )
+        self.status_label.configure(text=self._create_tactic_for(row["id"]))
 
     def _ape_matches_filters(self, row: Dict[str, object]) -> bool:
         seg, sub, cat = self._ape_parts(row)

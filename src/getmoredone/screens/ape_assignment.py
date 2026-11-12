@@ -11,6 +11,7 @@ from ..date_utils import current_quarter
 from ..theme import button_style, semantic_colors, status_text_color
 from ..weekly_tactic_logging import get_weekly_tactic_logger
 from .chip_table import APE_LEFT_COLUMNS, APE_RIGHT_COLUMNS, ChipTable, panel_fitter
+from .pick_record_dialog import describe_lineage, open_pick_record_dialog
 from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .split_panel import SPLITTER_WIDTH, SplitPanel
@@ -84,9 +85,6 @@ class APEAssignmentScreen(ctk.CTkFrame):
         )
         ctk.CTkButton(header, text="Load", width=88, command=self.refresh_lists, **button_style("secondary")).grid(
             row=1, column=4, padx=(8, 4), pady=(0, 8), sticky="w"
-        )
-        ctk.CTkButton(header, text="Save", width=88, command=self.add_selected, **button_style("primary")).grid(
-            row=1, column=5, padx=4, pady=(0, 8), sticky="w"
         )
         ctk.CTkButton(header, text="Refresh", width=88, command=self.refresh_lists, **button_style("secondary")).grid(
             row=1, column=6, padx=(4, 12), pady=(0, 8), sticky="w"
@@ -187,6 +185,19 @@ class APEAssignmentScreen(ctk.CTkFrame):
 
         # UPD-M1 — the ratio, the clamp, the three divider handlers and the
         # body's resize handler all live in screens/split_panel.py.
+        # VTF-M3/M3.7 — the Add New that replaced the header Save, under the
+        # right panel, because the assignment it makes is a right-panel row.
+        right_actions = ctk.CTkFrame(body, fg_color="transparent")
+        right_actions.grid(row=2, column=2, sticky="ew", padx=(2, 8), pady=(0, 8))
+        self.right_actions = right_actions
+        ctk.CTkButton(
+            right_actions,
+            text="Assign APE to Quarter",
+            width=200,
+            command=self.open_add_dialog,
+            **button_style("primary"),
+        ).pack(side="left", padx=(0, 8))
+
         self.split = SplitPanel(
             body,
             left_frame,
@@ -357,40 +368,70 @@ class APEAssignmentScreen(ctk.CTkFrame):
             return base
         return f"{base} ({len(shown)} of {len(self.right_items)}, filtered by tick)"
 
-    def add_selected(self):
-        """Assign every checked APE to the selected quarter.
+    # --------------------------------------------------- VTF-M3: Add New
 
-        Purpose: APC-M6.2 — the quarter screen says what Save did, as the month
-                 screen does, on both of its write paths.
+    def _add_options(self) -> list:
+        """The year's APEs this quarter does not already hold.
+
+        VTF-M3.2. An APE already in the quarter is not offered: assigning it
+        again would be an option that changes nothing the user can see.
+        """
+        taken = self._ids_in_quarter()
+        return [
+            (row["id"], describe_lineage(row))
+            for row in self.left_items
+            if row.get("id") and row.get("id") not in taken
+        ]
+
+    def _add_default(self):
+        """The ticked row to open the dialog on, when exactly one is ticked.
+
+        VTF-M3.6 — one tick is an unambiguous intention; two are not.
+        """
+        ticked = self._ticked_ape_ids()
+        if len(ticked) != 1:
+            return None
+        only = next(iter(ticked))
+        return only if only not in self._ids_in_quarter() else None
+
+    def _perform_add(self, ape_id: str) -> str:
+        """Assign one APE to the quarter, and say what really happened.
+
+        Purpose: VTF-M3.7 — the same reconciliation the Save button did
+                 (APC-M6.2/M6.3), on the path that replaced it:
+                 `_assign_one` turns a refusal and a raise into one answer,
+                 and the sentence is computed against the rows the panel was
+                 redrawn from, never from the return code.
         Spec:    docs/spec_2026-11-07_ape_period_consistency.md#apc-m6
-        Tests:   tests/test_ape_period_consistency.py::test_apcm62_quarter_save_reports_refused_assignments
-                 tests/test_ape_period_consistency.py::test_apcm62_quarter_save_with_nothing_checked_says_so
-
-        APC-M6.2. ``assign_ape_to_quarter`` returns a bare boolean and can
-        raise ``ValueError`` when an APE's segment resolves to nothing, and
-        this screen discarded both: a rejected APE simply did not appear in the
-        right-hand panel, which is what a click on the wrong row looks like.
-        The month screen was hardened on exactly this axis in the same change
-        and this one was left silent — the "fixed as a class" shape P5
-        describes, where the denominator was two paths on one screen and is
-        really four across two.
+        Tests:   tests/test_ape_period_consistency.py::test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped
         """
         parsed = self._parse_period()
         if not parsed:
-            return
+            return "Enter a valid year and quarter first."
         _year, quarter = parsed
-        selected_ids = [row_id for row_id, var in self.left_checks.items() if var.get()]
-        if not selected_ids:
-            self.status_label.configure(text="Check one or more APEs on the left first.")
-            return
-        claimed = {
-            ape_id for ape_id in selected_ids if self._assign_one(ape_id, quarter)
-        }
+        claimed = {ape_id} if self._assign_one(ape_id, quarter) else set()
         self.refresh_lists()
-        self.status_label.configure(
-            text=self._describe_quarter_assignment(
-                selected_ids, claimed, self._ids_in_quarter(), quarter
-            )
+        return self._describe_quarter_assignment(
+            [ape_id], claimed, self._ids_in_quarter(), quarter)
+
+    def open_add_dialog(self):
+        """VTF-M3.2 — pick an APE and assign it to the selected quarter."""
+        parsed = self._parse_period()
+        if not parsed:
+            return None
+        _year, quarter = parsed
+        return open_pick_record_dialog(
+            self,
+            title=f"Assign APE to Quarter Q{quarter}",
+            prompt=f"Which Annual Plan Element should Q{quarter} carry?",
+            options=self._add_options(),
+            initial=self._add_default(),
+            confirm_text="Assign",
+            report=lambda text: self.status_label.configure(text=text),
+            on_confirm=self._perform_add,
+            empty_message=(
+                f"Every Annual Plan Element for this year is already in "
+                f"Q{quarter}."),
         )
 
     def _ids_in_quarter(self) -> set:
