@@ -2324,6 +2324,22 @@ class PlanScreen(ctk.CTkFrame):
                 return block
         return None
 
+    def _outside_ids(self) -> set:
+        """The ids in the "Outside the day" group, as the day is drawn now."""
+        return {block.id for block in self._grid.outside}
+
+    def _displaced_note(self, before: set) -> str:
+        """What a gesture pushed out of its box, as a clause, or "" for none.
+
+        Tests: tests/test_plan_screen.py::test_lmm3_a_lunch_move_says_how_many_blocks_it_displaced
+               tests/test_plan_screen.py::test_lmm5_a_lunch_resize_says_how_many_it_displaced
+        """
+        displaced = len(self._outside_ids() - before)
+        if not displaced:
+            return ""
+        plural = "" if displaced == 1 else "s"
+        return f" — {displaced} Time Block{plural} moved to Outside the day"
+
     def place_lunch_at(self, slot_index: int):
         """PF-M8 — give this date a lunch block, or move the one it has.
 
@@ -2339,9 +2355,7 @@ class PlanScreen(ctk.CTkFrame):
         when lunch is, and its length is still a setting.
         """
         block = self._lunch_block()
-        already_outside = {
-            getattr(other, "id", None) for other in self._grid.outside
-        }
+        already_outside = self._outside_ids()
         try:
             if block is None:
                 block = TimeBlock(
@@ -2357,8 +2371,10 @@ class PlanScreen(ctk.CTkFrame):
                 )
             else:
                 # The return value: the block read above holds the old time.
+                # ``day_span`` as the add path passes it: without it the fit
+                # is checked against Day Settings' hours, not the day drawn.
                 block = self.db_manager.place_block_at(
-                    block.id, slot_index, self.bounds
+                    block.id, slot_index, self.bounds, day_span=self._grid.span
                 )
         except SlotRefusedError as refused:
             self.set_status(refusal_text(refused.reason), "error")
@@ -2368,15 +2384,11 @@ class PlanScreen(ctk.CTkFrame):
             return
 
         self.refresh()
-        displaced = len(
-            {getattr(other, "id", None) for other in self._grid.outside}
-            - already_outside
+        self.set_status(
+            f"Lunch moved to {block.start_time}"
+            + self._displaced_note(already_outside),
+            "success",
         )
-        moved = f"Lunch moved to {block.start_time}"
-        if displaced:
-            plural = "" if displaced == 1 else "s"
-            moved += f" — {displaced} Time Block{plural} moved below the day"
-        self.set_status(moved, "success")
 
     def open_block_menu(self, event, block: TimeBlock):
         """TB-M9 — durations, a custom length, and delete.
@@ -2421,6 +2433,7 @@ class PlanScreen(ctk.CTkFrame):
         it is the same object the row menu hands back on the next click, and a
         refused length left on it would show a size the database refused (P6).
         """
+        already_outside = self._outside_ids()
         if block.slot_index is None:
             # Reachable by an ordinary gesture: the outside-day group binds
             # this same menu. Said in the screen's words -- the database's
@@ -2446,6 +2459,8 @@ class PlanScreen(ctk.CTkFrame):
         text = f"Set block to {resized.planned_minutes}m"
         if spare:
             text += f" — {boxes} boxes, {spare}m spare"
+        # PF-M8 -- as the move path, for the same reason.
+        text += self._displaced_note(already_outside)
         self.set_status(text, "success")
 
     def ask_custom_minutes(self, block: TimeBlock):

@@ -604,8 +604,10 @@ Day pane (right):
   onto the hour Day Settings names, which is where every lunch starts, and a
   box that already holds work. A lunch box shows `Lunch` and nothing else, so
   the tasks that were in that box move to **Outside the day**, and the status
-  line says how many: *Lunch moved to 14:00 — 2 Time Blocks moved below the
-  day*. Drag them back onto the day wherever you want them.
+  line says how many: *Lunch moved to 14:00 — 2 Time Blocks moved to Outside the
+  day*. Choosing a longer lunch from its right-click menu says the same thing
+  about the boxes the new length takes. Drag them back onto the day wherever
+  you want them.
 - **A refusal always says which** — What: One of *That is outside the day — Day
   Settings sets its hours*, *That would run into lunch — try a later box*, or
   *That half hour is full — try another box*. Choosing a length for a block that
