@@ -10,25 +10,25 @@ Rendered from `SCAN_COMMANDS` in `tools/color_audit.py`, so what is printed here
 
 ```bash
 # widget
-rg --sort path --no-config -n -H 'fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=' src tools/generate_ctk_themes.py
+rg --sort path --no-config -n -H 'fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=' src tools/generate_ctk_themes.py -g '*.py' -g '*.json'
 # hex
-rg --sort path --no-config -n -H '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b' src tools/generate_ctk_themes.py
+rg --sort path --no-config -n -H '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b' src tools/generate_ctk_themes.py -g '*.py' -g '*.json'
 # named
-rg --sort path --no-config -n -H -i '"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray[0-9]{0,3}|grey[0-9]{0,3})"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray[0-9]{0,3}|grey[0-9]{0,3})'"'"'' src tools/generate_ctk_themes.py
+rg --sort path --no-config -n -H -i '"(darkgreen|green|darkred|red|orange|blue|teal|cyan|yellow|white|black|gray[0-9]{0,3}|grey[0-9]{0,3})"|'"'"'(darkgreen|green|darkred|red|orange|blue|teal|cyan|yellow|white|black|gray[0-9]{0,3}|grey[0-9]{0,3})'"'"'' src tools/generate_ctk_themes.py -g '*.py' -g '*.json'
 # theme_api
-rg --sort path --no-config -n -H 'set_default_color_theme\(|set_appearance_mode\(' src tools/generate_ctk_themes.py
+rg --sort path --no-config -n -H 'set_default_color_theme\(|set_appearance_mode\(' src tools/generate_ctk_themes.py -g '*.py' -g '*.json'
 # tuples
-rg --sort path --no-config -n -H '(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\s*=\s*(\(|\[)' src tools/generate_ctk_themes.py
+rg --sort path --no-config -n -H '(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\s*=\s*(\(|\[)' src tools/generate_ctk_themes.py -g '*.py' -g '*.json'
 # app_settings
 rg --sort path --no-config -n -H 'color|theme|appearance_mode|theme_name|drag_schedule_date_text_color|color_hex' src/getmoredone/app_settings.py
 # theme_files
-rg --sort path --no-config -n -H '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray[0-9]{0,3}|grey[0-9]{0,3})"|'"'"'(darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black|gray[0-9]{0,3}|grey[0-9]{0,3})'"'"'' themes -g '*.json'
+rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkgreen|green|darkred|red|orange|blue|teal|cyan|yellow|white|black|gray[0-9]{0,3}|grey[0-9]{0,3})"|'"'"'(darkgreen|green|darkred|red|orange|blue|teal|cyan|yellow|white|black|gray[0-9]{0,3}|grey[0-9]{0,3})'"'"'' themes -g '*.json'
 ```
 
 ## 1) Summary Counts By Type
 
 - Hex colors (match count): **1088**
-- Named colors (match count): **647**
+- Named colors (match count): **649**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
 - Widget explicit overrides (line count): **526**
@@ -89,7 +89,7 @@ src/getmoredone/app_settings.py:715:        from .theme import normalize_theme_n
 src/getmoredone/app_settings.py:717:        return normalize_theme_name(value)
 ```
 
-Hex top values:
+Hex top values (20 of 244 distinct):
 
 | Color | Count |
 |---|---:|
@@ -153,6 +153,7 @@ Named top values:
 | `orange` | 5 |
 | `blue` | 4 |
 | `gray30` | 3 |
+| `darkred` | 2 |
 | `grey` | 2 |
 | `yellow` | 2 |
 | `black` | 1 |
@@ -230,7 +231,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:146` | `# deep -- the `low` fill is #052E16 -- and `success_strong`'s dark` |
+| `src/getmoredone/theme.py:146` | ``# deep -- the `low` fill is #052E16 -- and `success_strong`'s dark`` |
 | `src/getmoredone/theme.py:377` | `"low": "#052E16",` |
 
 ### `#059669`
@@ -243,7 +244,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/vps_manager.py:220` | ```#+12345`` raised nothing and derived ``#0B368D`` from a` |
+| `src/getmoredone/vps_manager.py:220` | ``` ``#+12345`` raised nothing and derived ``#0B368D`` from a ``` |
 
 ### `#0d9488`
 
@@ -1594,12 +1595,12 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/color_contrast.py:50` | `exception. A three-digit ``#ABC`` is expanded, because that is a form people` |
-| `src/getmoredone/screens/vps_segment_editor.py:216` | `Accepts ``#abc`` and a missing ``#``, which the old check refused --` |
-| `src/getmoredone/screens/vps_segment_editor.py:242` | `# text. ``validate_color`` accepts ``#abc`` and a missing ``#``, and` |
-| `src/getmoredone/vps_manager.py:206` | ```normalize_hex_color`` expands ``#abc`` and supplies a missing ``#``.` |
-| `src/getmoredone/vps_manager_taxonomy.py:356` | `# typed; once that gate reads ``#abc`` and ``abcdef``, both became` |
-| `src/getmoredone/vps_manager_taxonomy.py:449` | `gate reads ``#abc``, storing the text as given would write a` |
+| `src/getmoredone/color_contrast.py:50` | ```exception. A three-digit ``#ABC`` is expanded, because that is a form people``` |
+| `src/getmoredone/screens/vps_segment_editor.py:216` | ```Accepts ``#abc`` and a missing ``#``, which the old check refused --``` |
+| `src/getmoredone/screens/vps_segment_editor.py:242` | ```# text. ``validate_color`` accepts ``#abc`` and a missing ``#``, and``` |
+| `src/getmoredone/vps_manager.py:206` | ``` ``normalize_hex_color`` expands ``#abc`` and supplies a missing ``#``. ``` |
+| `src/getmoredone/vps_manager_taxonomy.py:356` | ```# typed; once that gate reads ``#abc`` and ``abcdef``, both became``` |
+| `src/getmoredone/vps_manager_taxonomy.py:449` | ```gate reads ``#abc``, storing the text as given would write a``` |
 
 ### `#ac5515`
 
@@ -2425,7 +2426,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/settings.py:713` | `color_value = self.drag_schedule_text_color_var.get().strip() or "#FFFFFF"` |
 | `src/getmoredone/screens/settings.py:717` | `color_value = "#FFFFFF"` |
 | `src/getmoredone/screens/settings.py:741` | `initial = self.drag_schedule_text_color_var.get().strip() or "#FFFFFF"` |
-| `src/getmoredone/screens/settings_priority_colors.py:199` | ```#FFFFFF``, and a user who typed a colour they meant has no way to` |
+| `src/getmoredone/screens/settings_priority_colors.py:199` | ``` ``#FFFFFF``, and a user who typed a colour they meant has no way to ``` |
 | `themes/apple_grey.json:18` | `"#FFFFFF",` |
 | `themes/apple_grey.json:22` | `"#FFFFFF",` |
 | `themes/apple_grey.json:46` | `"#FFFFFF",` |
@@ -2481,6 +2482,13 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:248` | `"blue": palette["primary"],` |
 | `tools/generate_ctk_themes.py:48` | `"blue": ["#3B8ED0", "#1F6AA5"],` |
+
+### `darkred`
+
+| File:Line | Snippet |
+|---|---|
+| `src/getmoredone/screens/vision_planning.py:315` | `fg_color="darkred", hover_color="red",` |
+| `src/getmoredone/screens/vision_planning.py:577` | `fg_color="darkred", hover_color="red",` |
 
 ### `gray`
 
@@ -3279,7 +3287,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/color_contrast.py:51` | `type and every browser accepts; a named colour such as ``"red"`` is not,` |
+| `src/getmoredone/color_contrast.py:51` | ```type and every browser accepts; a named colour such as ``"red"`` is not,``` |
 | `src/getmoredone/screens/timer_window.py:919` | `self._update_status_label("Stopped", "red")` |
 | `src/getmoredone/screens/timer_window.py:971` | `self._update_status_label("⏰ BREAK OVER! ⏰", "red")` |
 | `src/getmoredone/screens/timer_window.py:1074` | `self._update_status_label("Not saved — try Done again", "red")` |

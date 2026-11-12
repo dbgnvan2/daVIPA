@@ -26,7 +26,7 @@ HEX_PATTERN = "#[0-9a-fA-F]{6}\\b|#[0-9a-fA-F]{3}\\b"
 # other colour, so they appeared nowhere at all. Measured 2026-11-11.
 # Tests: tests/test_color_inventory_sync.py::test_civm15_gray_scale_literals_reach_the_named_tables
 _NAMED_WORDS = (
-    "darkgreen|green|red|orange|blue|teal|cyan|yellow|white|black"
+    "darkgreen|green|darkred|red|orange|blue|teal|cyan|yellow|white|black"
     "|gray[0-9]{0,3}|grey[0-9]{0,3}"
 )
 NAMED_PATTERN = rf'"({_NAMED_WORDS})"' + rf"|'({_NAMED_WORDS})'"
@@ -42,12 +42,26 @@ NAMED_PATTERN = rf'"({_NAMED_WORDS})"' + rf"|'({_NAMED_WORDS})'"
 # Tests: tests/test_color_inventory_sync.py::test_civm5_the_scans_feeding_one_count_do_not_overlap
 UI_CODE_PATHS = ("src", "tools/generate_ctk_themes.py")
 
+# `.gitignore` line 26 ignores `*.json`, and its
+# `!src/getmoredone/email_cleaning_rules.json` negation is flat, so it is not
+# applied when rg's walk root is `src` itself: the file was unsearchable while
+# `git check-ignore` reported it tracked. 106 tracked files in scope, 105
+# visible (2026-11-11). A positive `-g` overrides `.gitignore` outright, which
+# is the same reason `theme_files` can read `themes/*.json` at all. Naming the
+# extensions also bounds the walk, and the test below fails if a tracked file
+# in scope falls outside them.
+# Tests: tests/test_color_inventory_sync.py::test_civm17_every_tracked_file_in_scope_is_reachable_by_a_scan
+UI_CODE_GLOBS = ("-g", "*.py", "-g", "*.json")
+
 
 def _rg(*args: str) -> List[str]:
     """A scan command carrying the flags every scan must have.
 
     ``--sort path``: rg searches in parallel and promises no output order,
-    which the staleness gate cannot tolerate.
+    which the staleness gate cannot tolerate. It also settles *which* files
+    are searched -- an unsorted run raced on ``.gitignore``'s whitelists and
+    returned 11 lines on 6 of 10 runs and 0 on the other 4 -- so this flag is
+    load-bearing twice over.
     ``--no-config``: ``RIPGREP_CONFIG_PATH`` or a developer's ``~/.ripgreprc``
     can set ``--heading`` or ``--no-line-number``, and then ``parse_line``
     returns ``None`` for every line and the report comes out structurally
@@ -66,28 +80,35 @@ def _rg(*args: str) -> List[str]:
 SCAN_COMMANDS: Dict[str, List[str]] = {
     "widget": _rg(
         "fg_color=|hover_color=|text_color=|border_color=|button_color=|progress_color=|selected_color=|corner_radius=|highlight_color=",
-        *UI_CODE_PATHS,
+        *UI_CODE_PATHS, *UI_CODE_GLOBS,
     ),
-    "hex": _rg(HEX_PATTERN, *UI_CODE_PATHS),
-    "named": _rg("-i", NAMED_PATTERN, *UI_CODE_PATHS),
+    "hex": _rg(HEX_PATTERN, *UI_CODE_PATHS, *UI_CODE_GLOBS),
+    "named": _rg("-i", NAMED_PATTERN, *UI_CODE_PATHS, *UI_CODE_GLOBS),
     "theme_api": _rg(
         "set_default_color_theme\\(|set_appearance_mode\\(",
-        *UI_CODE_PATHS,
+        *UI_CODE_PATHS, *UI_CODE_GLOBS,
     ),
     "tuples": _rg(
         "(fg_color|hover_color|text_color|border_color|button_color|progress_color|selected_color|highlight_color)\\s*=\\s*(\\(|\\[)",
-        *UI_CODE_PATHS,
+        *UI_CODE_PATHS, *UI_CODE_GLOBS,
     ),
     "app_settings": _rg(
         "color|theme|appearance_mode|theme_name|drag_schedule_date_text_color|color_hex",
         "src/getmoredone/app_settings.py",
     ),
-    "theme_files": _rg(f"{HEX_PATTERN}|{NAMED_PATTERN}", "themes", "-g", "*.json"),
+    # `-i` matches `named` above and `NAMED_RE`'s `(?i)` below. It was absent
+    # here, so a capitalised colour in a theme file would have been extracted
+    # by a scan that never searched for it. Latent -- every literal on disk is
+    # lowercase, so the counts are identical either way (2026-11-11).
+    # Tests: tests/test_color_inventory_sync.py::test_civm19_one_case_policy_across_both_named_scans_and_the_extractor
+    "theme_files": _rg(
+        "-i", f"{HEX_PATTERN}|{NAMED_PATTERN}", "themes", "-g", "*.json",
+    ),
 }
 
 # Compiled from the same source as the scan patterns, not retyped. They were
 # separate literals, and the gray-scale fix to NAMED_PATTERN left this one on
-# bare words: all 527 theme lines were returned and 0 of their 30 values were
+# bare words: all 527 theme lines were returned and none of their values were
 # ranked (2026-11-11). One operation, one definition (global rule 5).
 # Tests: tests/test_color_inventory_sync.py::test_civm16_the_search_pattern_and_the_extractor_agree
 HEX_RE = re.compile(HEX_PATTERN)
@@ -240,8 +261,28 @@ def parse_line(line: str) -> Entry | None:
     return Entry(path=path, line=line_no, snippet=snippet.strip())
 
 
-def md_escape(value: str) -> str:
-    return value.replace("|", "\\|")
+# The hex table is capped and the named one is not: 244 distinct hex values
+# against 37 named (2026-11-11). The heading states both numbers, so the cap
+# announces what it drops (global rule 6).
+# Tests: tests/test_color_inventory_sync.py::test_civm20_the_capped_frequency_table_says_how_much_it_hides
+HEX_TOP_N = 20
+
+
+def md_code(value: str, limit: int) -> str:
+    """One inline code span holding `value`, truncated to `limit` first.
+
+    A snippet is quoted source, so it can hold backticks and pipes. `|` needs
+    escaping even inside a code span, because the row's cells are
+    pipe-separated; a backtick needs a fence longer than the longest run
+    inside it, plus a space of padding when the text starts or ends with one.
+    Escaping only `|` left 10 of 1735 rows broken (2026-11-11). Truncating
+    before escaping, not after, is what keeps a `\\|` from being cut in half.
+    Tests: tests/test_color_inventory_sync.py::test_civm21_every_occurrence_snippet_renders_as_one_code_span
+    """
+    text = value[:limit].replace("|", "\\|")
+    fence = "`" * (max((len(run) for run in re.findall("`+", text)), default=0) + 1)
+    pad = " " if text.startswith("`") or text.endswith("`") else ""
+    return f"{fence}{pad}{text}{pad}{fence}"
 
 
 def build_report(lines: Dict[str, List[str]]) -> str:
@@ -353,11 +394,15 @@ def build_report(lines: Dict[str, List[str]]) -> str:
     out.extend(sorted(lines["app_settings"], key=scan_line_key))
     out.append("```")
     out.append("")
-    out.append("Hex top values:")
+    hex_ranked = by_count_then_name(Counter(hex_occ))
+    out.append(
+        f"Hex top values ({min(HEX_TOP_N, len(hex_ranked))} of "
+        f"{len(hex_ranked)} distinct):"
+    )
     out.append("")
     out.append("| Color | Count |")
     out.append("|---|---:|")
-    for color, count in by_count_then_name(Counter(hex_occ))[:20]:
+    for color, count in hex_ranked[:HEX_TOP_N]:
         out.append(f"| `{color}` | {count} |")
     out.append("")
     out.append("Named top values:")
@@ -377,8 +422,8 @@ def build_report(lines: Dict[str, List[str]]) -> str:
         out.append("| File:Line | Snippet |")
         out.append("|---|---|")
         for entry in occurrences[color]:
-            snippet = md_escape(entry.snippet)[:180]
-            out.append(f"| `{entry.path}:{entry.line}` | `{snippet}` |")
+            snippet = md_code(entry.snippet, 180)
+            out.append(f"| `{entry.path}:{entry.line}` | {snippet} |")
         out.append("")
 
     out.append("### Theme API Occurrences")
@@ -386,8 +431,8 @@ def build_report(lines: Dict[str, List[str]]) -> str:
     out.append("| File:Line | Snippet |")
     out.append("|---|---|")
     for entry in theme_api_entries:
-        snippet = md_escape(entry.snippet)[:200]
-        out.append(f"| `{entry.path}:{entry.line}` | `{snippet}` |")
+        snippet = md_code(entry.snippet, 200)
+        out.append(f"| `{entry.path}:{entry.line}` | {snippet} |")
     out.append("")
 
     out.append("### Tuple / Appearance Tuple Occurrences")
@@ -395,8 +440,8 @@ def build_report(lines: Dict[str, List[str]]) -> str:
     out.append("| File:Line | Snippet |")
     out.append("|---|---|")
     for entry in tuple_entries:
-        snippet = md_escape(entry.snippet)[:200]
-        out.append(f"| `{entry.path}:{entry.line}` | `{snippet}` |")
+        snippet = md_code(entry.snippet, 200)
+        out.append(f"| `{entry.path}:{entry.line}` | {snippet} |")
     out.append("")
 
     out.append("## 3) Replace Plan")
