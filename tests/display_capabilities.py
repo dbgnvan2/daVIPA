@@ -69,6 +69,34 @@ def _ask_the_display(attribute: str) -> bool:
             window.destroy()
 
 
+def fixture_names(func) -> set:
+    """Every fixture a test function requests, from its AST node.
+
+    Positional, keyword-only and positional-only alike, plus
+    ``@pytest.mark.usefixtures("...")`` -- which is how a fixture wanted purely
+    for its side effect is usually written.
+
+    Shared, because two guards ask this question and they disagreed: the
+    read-back detector in ``tests/test_display_capabilities.py`` counted the
+    mark as mapping the window while the count in ``tests/test_ci_contract.py``
+    did not, so a new on-screen-window test written that way would have been
+    correctly cleared by one and invisible to the other -- the drift the count
+    exists to catch (cold pass, 2026-11-11).
+    """
+    import ast
+
+    args = func.args
+    names = {a.arg for a in args.posonlyargs + args.args + args.kwonlyargs}
+    for decorator in func.decorator_list:
+        if not isinstance(decorator, ast.Call):
+            continue
+        if (isinstance(decorator.func, ast.Attribute)
+                and decorator.func.attr == "usefixtures"):
+            names |= {a.value for a in decorator.args
+                      if isinstance(a, ast.Constant) and isinstance(a.value, str)}
+    return names
+
+
 @functools.lru_cache(maxsize=None)
 def honours(attribute: str) -> bool:
     """Does a withdrawn window here report ``attribute`` back? Asked once.

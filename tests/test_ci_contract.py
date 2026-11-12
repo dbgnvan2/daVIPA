@@ -32,6 +32,7 @@ import re
 import functools
 import subprocess
 import sys
+import textwrap
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -939,7 +940,13 @@ def _mapped_window_test_count() -> int:
     By AST rather than by a text search: ``mapped_windows`` appears in
     docstrings, in comments and in this file, and a grep count would include
     all of them.
+
+    The request is read by ``display_capabilities.fixture_names``, the same
+    function the read-back detector uses, so the two cannot disagree about
+    what asking for the fixture looks like.
     """
+    from tests.display_capabilities import fixture_names
+
     total = 0
     for path in sorted((REPO_ROOT / "tests").glob("test_*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -947,9 +954,44 @@ def _mapped_window_test_count() -> int:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 if not node.name.startswith("test_"):
                     continue
-                if "mapped_windows" in [arg.arg for arg in node.args.args]:
+                if "mapped_windows" in fixture_names(node):
                     total += 1
     return total
+
+
+def test_the_fixture_request_is_read_the_same_way_by_both_guards():
+    """A test that asks for the fixture by mark is counted, not just cleared.
+
+    Purpose: the read-back detector was widened to accept
+             `@pytest.mark.usefixtures("mapped_windows")` and keyword-only
+             parameters; this counter still read `node.args.args`, so a new
+             on-screen-window test written either way would have passed the
+             detector and left the documented count untouched.
+    Tests:   this test
+    """
+    from tests.display_capabilities import fixture_names
+
+    source = textwrap.dedent("""
+        @pytest.mark.usefixtures("mapped_windows")
+        def test_by_mark():
+            pass
+
+        def test_by_keyword(*, mapped_windows):
+            pass
+
+        def test_positionally(mapped_windows):
+            pass
+
+        def test_not_at_all():
+            pass
+    """)
+    asked = {node.name for node in ast.walk(ast.parse(source))
+             if isinstance(node, ast.FunctionDef)
+             and "mapped_windows" in fixture_names(node)}
+
+    assert asked == {"test_by_mark", "test_by_keyword", "test_positionally"}, (
+        f"the fixture request was read as {sorted(asked)}; a shape this misses "
+        "is a real window the documented count does not mention")
 
 
 def test_the_documented_mapped_window_count_is_the_real_one():

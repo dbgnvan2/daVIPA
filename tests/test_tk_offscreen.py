@@ -375,8 +375,17 @@ def test_topmost_is_silenced_for_the_run():
             # read-back this replaced reported nothing on Xvfb and passed there
             # whatever the wrapper did (CIG-A1).
             returned = window.attributes("-topmost", True)
+            # A positive control: -alpha passes through, so it must reach the
+            # recorder. Without it `topmost_writes == []` below is an empty
+            # list from a spy that was never in the path, which is how the
+            # first version of this test passed while measuring nothing.
+            window.attributes("-alpha", 0.0)
         finally:
             window.tk = real
+        assert spy.calls, (
+            "the recorder never saw the -alpha write, so it was not in the "
+            "path and the assertion below would pass whatever happened"
+        )
         assert spy.topmost_writes == [], (
             "-topmost reached Tk during a test run; it must be silenced like "
             f"lift, focus_force and grab_set: {spy.topmost_writes}"
@@ -403,8 +412,17 @@ def test_topmost_is_silenced_under_its_other_name_too():
         try:
             window.tk = spy
             returned = window.wm_attributes("-topmost", True)
+            # A positive control: -alpha passes through, so it must reach the
+            # recorder. Without it `topmost_writes == []` below is an empty
+            # list from a spy that was never in the path, which is how the
+            # first version of this test passed while measuring nothing.
+            window.wm_attributes("-alpha", 0.0)
         finally:
             window.tk = real
+        assert spy.calls, (
+            "the recorder never saw the -alpha write, so it was not in the "
+            "path and the assertion below would pass whatever happened"
+        )
         assert spy.topmost_writes == [], (
             "-topmost reached Tk through wm_attributes; both spellings must "
             f"be silenced: {spy.topmost_writes}"

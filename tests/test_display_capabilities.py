@@ -122,27 +122,6 @@ def _stand_in_names(func, classes):
     return found
 
 
-def _fixture_names(func):
-    """Every fixture this test requests, by signature or by mark.
-
-    Positional, keyword-only and positional-only alike, plus
-    ``@pytest.mark.usefixtures("...")`` -- which is how a fixture requested
-    purely for its side effect is usually written, and which the first version
-    did not see, so such a test was reported as an offender.
-    """
-    args = func.args
-    names = {a.arg for a in
-             args.posonlyargs + args.args + args.kwonlyargs}
-    for decorator in func.decorator_list:
-        if not isinstance(decorator, ast.Call):
-            continue
-        if (isinstance(decorator.func, ast.Attribute)
-                and decorator.func.attr == "usefixtures"):
-            names |= {a.value for a in decorator.args
-                      if isinstance(a, ast.Constant) and isinstance(a.value, str)}
-    return names
-
-
 def _scan(source: str, label: str):
     """``(reads, asks, maps)`` for one module's tests, by AST.
 
@@ -202,7 +181,7 @@ def _scan(source: str, label: str):
                     reads.add((label, node.name))
                     if inner.func.id in guarding_helpers:
                         asks.add((label, node.name))
-        if "mapped_windows" in _fixture_names(node):
+        if "mapped_windows" in caps.fixture_names(node):
             maps.add((label, node.name))
     return reads, asks, maps
 
