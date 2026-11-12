@@ -34,6 +34,9 @@ import customtkinter as ctk  # noqa: E402
 from src.getmoredone.screens.annual_vision_segments import (  # noqa: E402
     AnnualVisionSegmentsScreen,
 )
+from src.getmoredone.screens.ape_assignment import APEAssignmentScreen  # noqa: E402
+from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen  # noqa: E402
+from src.getmoredone.screens.weekly_items import WeeklyItemsScreen  # noqa: E402
 
 YEAR = 2026
 
@@ -260,3 +263,364 @@ def test_vtfm11_the_heading_says_when_the_right_panel_is_filtered():
         )
     finally:
         root.destroy()
+
+
+# ------------------------------------------- helpers: the three APE tabs
+
+def _ape_row(idx, segment="Purposeful Work", subsegment="Living Systems",
+             category="Blog"):
+    """One Annual Plan Element row, as the VSP queries return it."""
+    return {
+        "id": f"ape-{idx}",
+        "segment_name": segment,
+        "subsegment_name": subsegment,
+        "category_name": category,
+    }
+
+
+def _tactic_row(idx, ape_id, category="Blog"):
+    """One Weekly Tactic row. Its lineage arrives under ``ape_*`` keys."""
+    return {
+        "id": f"wt-{idx}",
+        "title": f"Week {idx}",
+        "start_date": "2026-02-23",
+        "annual_plan_element_id": ape_id,
+        "ape_segment_name": "Purposeful Work",
+        "ape_subsegment_name": "Living Systems",
+        "ape_category_name": category,
+    }
+
+
+def _fake_period_vps(left_rows, right_rows):
+    """A VPS double for the Quarter and Month tabs.
+
+    The period queries ignore the period they are asked for, so a test does
+    not have to make the screen's own year/quarter/month selectors agree with
+    a fixture.
+    """
+    return SimpleNamespace(
+        get_annual_plan_elements=lambda year: list(left_rows),
+        get_annual_plan_elements_for_quarter=lambda year, quarter: list(left_rows),
+        get_annual_plan_elements_for_month=lambda year, month: list(right_rows),
+        get_vision_categories=lambda: [],
+        get_vision_subsegments=lambda: [],
+        get_segment_color_map=lambda: {},
+        get_segment_colors_by_id=lambda: {},
+        resolve_segment_color=lambda name, colors: "",
+    )
+
+
+def _quarter_screen(left_rows=(), right_rows=()):
+    """APE Quarter Assignment on a withdrawn root, already rendered."""
+    root = _root()
+    vps = _fake_period_vps(left_rows, right_rows)
+    # The quarter tab's right panel is the quarter query, not the month one.
+    vps.get_annual_plan_elements_for_quarter = lambda year, quarter: list(right_rows)
+    vps.get_annual_plan_elements = lambda year: list(left_rows)
+    app = SimpleNamespace(vps_manager=vps)
+    screen = APEAssignmentScreen(root, vps, app)
+    screen.update_idletasks()
+    return root, screen
+
+
+def _month_screen(left_rows=(), right_rows=()):
+    """APE Month Assignment on a withdrawn root, already rendered."""
+    root = _root()
+    vps = _fake_period_vps(left_rows, right_rows)
+    app = SimpleNamespace(vps_manager=vps)
+    screen = APEPeriodViewScreen(root, vps, app)
+    screen.update_idletasks()
+    return root, screen
+
+
+def _week_screen(left_rows=(), right_rows=()):
+    """APE Week Assignment on a withdrawn root, already rendered."""
+    root = _root()
+    vps = SimpleNamespace(
+        get_weekly_action_items=lambda **_kw: list(right_rows),
+        get_annual_plan_elements_for_month=lambda year, month: list(left_rows),
+        get_vision_categories=lambda: [],
+        get_vision_subsegments=lambda: [],
+        get_segment_color_map=lambda: {},
+        get_segment_colors_by_id=lambda: {},
+        resolve_segment_color=lambda name, colors: "",
+        count_open_children_for_weekly_tactic=lambda item_id: (0, 0),
+        children_to_delete_with_weekly_tactic=lambda item_id: [],
+    )
+    app = SimpleNamespace(vps_manager=vps)
+    screen = WeeklyItemsScreen(root, vps, app)
+    screen.update_idletasks()
+    return root, screen
+
+
+def _three_ape_tab(builder):
+    """Three APEs on the left; the first two of them on the right."""
+    left = [_ape_row(1, category="Blog"), _ape_row(2, category="Pod"),
+            _ape_row(3, category="Talk")]
+    right = [_ape_row(1, category="Blog"), _ape_row(2, category="Pod")]
+    return builder(left, right)
+
+
+# ------------------------------------------ VTF-M1, the three APE tabs
+
+def test_vtfm12_the_quarter_tab_right_panel_follows_the_ticks():
+    """VTF-M1.2 — ticking an APE narrows the quarter to those APE ids.
+
+    Both panels list `annual_plan_elements`, so the tick says "show me
+    whether these are in the quarter" (decision D3).
+    """
+    root, screen = _three_ape_tab(_quarter_screen)
+    try:
+        assert _categories(screen.right_table) == ["Blog", "Pod"]
+
+        screen.left_checks["ape-2"].set(True)
+        screen.refresh_right_panel()
+        assert _categories(screen.right_table) == ["Pod"]
+
+        # ape-3 is on the left and not in the quarter: ticking it adds no row.
+        screen.left_checks["ape-3"].set(True)
+        screen.refresh_right_panel()
+        assert _categories(screen.right_table) == ["Pod"]
+    finally:
+        root.destroy()
+
+
+def test_vtfm13_the_month_tab_right_panel_follows_the_ticks():
+    """VTF-M1.3 — the same, on the month's rows."""
+    root, screen = _three_ape_tab(_month_screen)
+    try:
+        assert _categories(screen.right_table) == ["Blog", "Pod"]
+
+        screen.left_checks["ape-1"].set(True)
+        screen.refresh_right_panel()
+        assert _categories(screen.right_table) == ["Blog"]
+    finally:
+        root.destroy()
+
+
+def test_vtfm14_the_week_tab_right_panel_follows_the_ticks():
+    """VTF-M1.4 — ticking APEs narrows the week to their tactics.
+
+    The two panels hold different kinds of record here, so the join is the
+    tactic's `annual_plan_element_id` rather than a shared id.
+    """
+    left = [_ape_row(1, category="Blog"), _ape_row(2, category="Pod")]
+    right = [_tactic_row(1, "ape-1", category="Blog"),
+             _tactic_row(2, "ape-2", category="Pod"),
+             _tactic_row(3, "ape-2", category="Pod")]
+    root, screen = _week_screen(left, right)
+    try:
+        assert _categories(screen.right_table) == ["Blog", "Pod", "Pod"]
+
+        screen.left_checks["ape-2"].set(True)
+        screen.refresh_right_panel()
+        assert [row["id"] for row in screen.right_items] == ["wt-2", "wt-3"]
+        assert _categories(screen.right_table) == ["Pod", "Pod"]
+    finally:
+        root.destroy()
+
+
+def test_vtfm15_no_tick_is_no_filter_on_the_ape_tabs():
+    """VTF-M1.5 — no tick ticked is every right-hand row, on all four tabs.
+
+    The annual tab is `test_vtfm15_no_tick_is_no_filter`; these are the other
+    three. An untouched screen must look exactly as it did before VTF-M1.
+    """
+    for builder, expected in ((_quarter_screen, ["Blog", "Pod"]),
+                              (_month_screen, ["Blog", "Pod"])):
+        root, screen = _three_ape_tab(builder)
+        try:
+            assert _categories(screen.right_table) == expected
+            screen.left_checks["ape-1"].set(True)
+            screen.refresh_right_panel()
+            assert _categories(screen.right_table) == ["Blog"]
+            screen.left_checks["ape-1"].set(False)
+            screen.refresh_right_panel()
+            assert _categories(screen.right_table) == expected
+        finally:
+            root.destroy()
+
+    root, screen = _week_screen(
+        [_ape_row(1)], [_tactic_row(1, "ape-1"), _tactic_row(2, "ape-9")])
+    try:
+        assert [row["id"] for row in screen.right_items] == ["wt-1", "wt-2"]
+        screen.left_checks["ape-1"].set(True)
+        screen.refresh_right_panel()
+        assert [row["id"] for row in screen.right_items] == ["wt-1"]
+        screen.left_checks["ape-1"].set(False)
+        screen.refresh_right_panel()
+        assert [row["id"] for row in screen.right_items] == ["wt-1", "wt-2"]
+    finally:
+        root.destroy()
+
+
+def test_vtfm16_the_tick_refreshes_the_ape_tabs_without_a_button():
+    """VTF-M1.6 — each APE tab's checkbox carries the command itself."""
+    for builder in (_quarter_screen, _month_screen):
+        root, screen = _three_ape_tab(builder)
+        try:
+            boxes = _checkboxes(screen)
+            assert len(boxes) == 3
+            boxes[1].toggle()
+            assert screen.left_checks["ape-2"].get() is True
+            assert _categories(screen.right_table) == ["Pod"]
+        finally:
+            root.destroy()
+
+    root, screen = _week_screen(
+        [_ape_row(1), _ape_row(2)],
+        [_tactic_row(1, "ape-1"), _tactic_row(2, "ape-2")])
+    try:
+        boxes = _checkboxes(screen)
+        assert len(boxes) == 2
+        boxes[0].toggle()
+        assert [row["id"] for row in screen.right_items] == ["wt-1"]
+    finally:
+        root.destroy()
+
+
+def test_vtfm17_the_dropdown_does_not_reach_the_right_panel():
+    """VTF-M1.7 — a dropdown narrows the left list, and so which rows can be
+    ticked; it leaves the right panel alone.
+
+    Decision D2, in the user's words: *"Only the left panel is filtered. The
+    right panel is filtered by selecting a record on the left panel."*
+    """
+    left = [_ape_row(1, subsegment="Living Systems", category="Blog"),
+            _ape_row(2, subsegment="Other Systems", category="Pod")]
+    right = [_ape_row(1, subsegment="Living Systems", category="Blog"),
+             _ape_row(2, subsegment="Other Systems", category="Pod")]
+    root, screen = _quarter_screen(left, right)
+    try:
+        assert _categories(screen.left_table) == ["Blog", "Pod"]
+        assert _categories(screen.right_table) == ["Blog", "Pod"]
+
+        screen.subsegment_filter_var.set("Living Systems")
+        screen.on_filters_changed()
+
+        # The left list is narrowed; the right panel is not.
+        assert _categories(screen.left_table) == ["Blog"]
+        assert _categories(screen.right_table) == ["Blog", "Pod"]
+    finally:
+        root.destroy()
+
+
+def test_vtfm19_a_dropdown_that_hides_a_ticked_row_stops_its_filter():
+    """VTF-M1.9 — a tick the dropdown has hidden stops narrowing the right.
+
+    The two filters compose in one direction only. A tick on a row the user
+    can no longer see is a filter they cannot clear, so it is ignored, and
+    with no visible tick left the right panel shows every row again.
+    """
+    left = [_ape_row(1, subsegment="Living Systems", category="Blog"),
+            _ape_row(2, subsegment="Other Systems", category="Pod")]
+    right = [_ape_row(1, subsegment="Living Systems", category="Blog"),
+             _ape_row(2, subsegment="Other Systems", category="Pod")]
+    root, screen = _quarter_screen(left, right)
+    try:
+        screen.left_checks["ape-2"].set(True)
+        screen.refresh_right_panel()
+        assert _categories(screen.right_table) == ["Pod"]
+
+        screen.subsegment_filter_var.set("Living Systems")
+        screen.on_filters_changed()
+
+        assert screen.left_checks["ape-2"].get() is True
+        assert screen._ticked_ape_ids() == set()
+        assert _categories(screen.right_table) == ["Blog", "Pod"]
+    finally:
+        root.destroy()
+
+
+# ------------------------------------------------------------------ VTF-M2
+
+def test_vtfm21_the_dropdown_is_a_left_panel_filter():
+    """VTF-M2.1 — on all three APE tabs the dropdown leaves the right panel.
+
+    Until this criterion `on_filters_changed` applied `_filtered_rows` to both
+    panels, which gave the right panel two filters and the tick nothing to do.
+    """
+    for builder in (_quarter_screen, _month_screen):
+        left = [_ape_row(1, subsegment="Living Systems", category="Blog"),
+                _ape_row(2, subsegment="Other Systems", category="Pod")]
+        root, screen = builder(left, list(left))
+        try:
+            screen.segment_filter_var.set("All")
+            screen.subsegment_filter_var.set("Other Systems")
+            screen.on_filters_changed()
+            assert _categories(screen.left_table) == ["Pod"]
+            assert _categories(screen.right_table) == ["Blog", "Pod"]
+        finally:
+            root.destroy()
+
+    # APE Week Assignment bakes its dropdown filter into the row lists rather
+    # than applying it at render time, so the assertion is on the lists.
+    left = [_ape_row(1, subsegment="Living Systems", category="Blog"),
+            _ape_row(2, subsegment="Other Systems", category="Pod")]
+    right = [_tactic_row(1, "ape-1", category="Blog"),
+             _tactic_row(2, "ape-2", category="Pod")]
+    root, screen = _week_screen(left, right)
+    try:
+        screen.subsegment_filter_var.set("Other Systems")
+        screen.on_filters_changed()
+        assert [row["id"] for row in screen.left_items] == ["ape-2"]
+        assert [row["id"] for row in screen.right_items] == ["wt-1", "wt-2"]
+    finally:
+        root.destroy()
+
+
+def test_vtfm22_the_options_still_come_from_the_left_items():
+    """VTF-M2.2 — the dropdown's options are built from the left items.
+
+    The dropdowns are the left panel's filter, so a value that exists only on
+    the right is not an option: offering one would be an option that narrows
+    the left list to nothing.
+    """
+    left = [_ape_row(1, subsegment="Living Systems")]
+    right = [_ape_row(9, subsegment="Right Only")]
+    root, screen = _quarter_screen(left, right)
+    try:
+        values = screen.subsegment_filter_combo.cget("values")
+        assert "Living Systems" in values
+        assert "Right Only" not in values
+    finally:
+        root.destroy()
+
+
+def test_vtfm23_week_actions_already_obeys_the_rule():
+    """VTF-M2.3 — APE Week Actions is unchanged: its dropdowns filter the
+    left list, and reach the right panel only to clear a hidden selection.
+
+    Driven through the real method on a stub, so no display is needed. The
+    right panel is reloaded by `select_tactic`; a filter that leaves the
+    selection visible must not call it.
+    """
+    from src.getmoredone.screens.week_actions import WeekActionsScreen
+
+    rows = [{"id": "t-1"}, {"id": "t-2"}]
+
+    def _stub(selected, visible_ids):
+        calls = []
+        return calls, SimpleNamespace(
+            tactic_rows=list(rows),
+            visible_rows=[],
+            selected_tactic_id=selected,
+            filters=SimpleNamespace(
+                filtered=lambda rs: [r for r in rs if r["id"] in visible_ids]),
+            _render_tactics=lambda: calls.append("render_left"),
+            select_tactic=lambda tid: calls.append(("select", tid)),
+            _report_counts=lambda: None,
+        )
+
+    # The selection survives the filter: the left list is re-rendered and the
+    # right panel is not touched.
+    calls, stub = _stub("t-1", {"t-1"})
+    WeekActionsScreen.on_filters_changed(stub)
+    assert stub.visible_rows == [{"id": "t-1"}]
+    assert calls == ["render_left"]
+
+    # The filter hides the selection: the right panel is cleared, which is the
+    # one direction in which a left filter may reach it.
+    calls, stub = _stub("t-2", {"t-1"})
+    WeekActionsScreen.on_filters_changed(stub)
+    assert calls == [("select", None)]

@@ -500,7 +500,11 @@ def test_apcm43_weekly_screen_left_panel_asks_by_month_only():
         ),
         _refresh_filter_options=lambda *_a: None,
         _ape_matches_filters=lambda _r: True,
-        _weekly_matches_filters=lambda _r: True,
+        # VTF-M2.1 removed the right panel's dropdown filter, so
+        # `_weekly_matches_filters` is gone and the right heading now comes
+        # from `_right_title`. The assertion below is unchanged: what this
+        # test is about is the arguments of the left panel's own query.
+        _right_title=lambda: "",
         _render_lists=lambda: None,
         left_title_label=SimpleNamespace(configure=lambda **_k: None),
         right_title_label=SimpleNamespace(configure=lambda **_k: None),
