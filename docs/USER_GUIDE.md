@@ -375,9 +375,9 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   the header: with seven controls up there the header had no room left for it.
 - **+ Break** / **+ Buffer** — What: Puts a 30-minute padding block in the first
   box that will hold it. Why: Real days are not back-to-back. These carry no
-  item, so they are drawn in a neutral colour rather than a priority one — the
-  same stripe colour and the same box surface as lunch, because the three are
-  one kind of thing: time the day is not working. An empty box is not drawn
+  item, so they keep a neutral bar where a task's bar draws nothing — the same
+  bar colour as lunch, because the three are one kind of thing: time the day is
+  not working. An empty box is not drawn
   that way; it is room, and it is drawn as room.
 - **AutoLoad** — What: Blocks every item in the left-hand list that the day
   still has room for, one after another: from the top of the list down the
@@ -469,9 +469,16 @@ Items pane (left):
   it replaced because the words needed a second line, and a second line set a
   floor that made every row the same height — see *How tall a row is* below. A
   scheduled item is marked rather than hidden, because an item can genuinely
-  need two blocks in a day. The priority
-  score is not printed: the row is drawn in its priority band and striped in
-  it, so the number said a third time what the colour already says twice.
+  need two blocks in a day.
+- **Priority badge** — What: `P:<score>` at the right-hand end of the row,
+  before the length, on the colour of the item's **priority level** — the same
+  badge the Priority column draws on Today, Upcoming, All Items, Hierarchical
+  and Completed. Why: one scheme answers "what priority is this" everywhere,
+  and it is the scheme you set in *Settings → Priority Colours*. Until
+  2026-11-12 the row was tinted and striped in a *band* colour instead, which
+  was a second scheme with five colours of its own and no setting behind it.
+  An item with no High or Critical factor has no level colour, so its badge is
+  the number with no fill.
 - **How tall a row is** — What: The space the item's work block will take in an
   empty day — from the top edge of the first box it would fill to the bottom
   edge of the last. A half hour that already holds a task is taller than one
@@ -541,9 +548,10 @@ Day pane (right):
   reads as a task that stops after half an hour. Only the last box can have
   minutes left over, so only the last box claims any: a middle box is spent in
   full.
-- **Colour** — What: The stripe down the left of a task is its item's priority
-  band: critical, high, medium, low, or grey for unscored. Why: The shape of
-  the day is readable before any of the text is.
+- **Colour** — What: Nothing in the day pane is priority-coloured. A task's
+  bar draws nothing; padding keeps its neutral bar. Why: priority is the
+  badge's colour, in the item list, and one scheme is enough. The day's shape
+  is its boxes and their lengths.
 - **Release a task in the day column but not on a box** — What: Nothing moves,
   and the status line says *Drop a block on a half-hour box*. Why: The same
   reason as for an item: a release over the heading, the summary or the
@@ -569,14 +577,14 @@ Day pane (right):
   fitting — and the status line names that refusal, not the clamp. Why: past a
   day the app can no longer write an end time that is the start plus the
   length, so the block would be drawn claiming minutes it does not own.
-- **What a task in a box shows** — What: A coloured bar in its priority band,
-  the task's title, a three-bar depth stack, and its length in minutes. The task
-  is also shaded in its priority band, so the day reads as a column of
-  priorities without having to look at the bars. Padding — a Buffer or a Break —
-  is left unshaded and keeps its neutral bar, because it has no priority to
-  show. A continuation box (the second and later boxes of a longer task) carries
-  the same shade and stripe as the box that starts the task, with its `↳` to
-  say it is the same task rather than another one. Why: a box that showed only
+- **What a task in a box shows** — What: The task's title, a three-bar depth
+  stack, and its length in minutes, on the theme's own surface. Padding — a
+  Buffer or a Break — is transparent and keeps its neutral bar, which is what
+  tells the two apart. A continuation box (the second and later boxes of a
+  longer task) is drawn on the same surface as the box that starts the task,
+  with its `↳` to say it is the same task rather than another one — an unfilled
+  continuation read as a task that stops after half an hour. The priority badge
+  is not drawn here; it is in the item list, where it was asked for. Why: a box that showed only
   the bar was the state this screen shipped in; the title is what tells you
   which task the half hour is spent on.
 - **Task height and title width** — What: Both come from Settings ▸ Date
@@ -854,11 +862,12 @@ Priority Colours (added 2026-11-08; moved from the row to the Priority cell 2026
     one left behind by an earlier version.
 - A saved colour shows the next time you open one of those screens; no relaunch
   is needed.
-- These are **not** the Plan screen's priority bands. A band comes from the
-  priority *score* — the product of all four factors — and has its own five
-  colours. An item can sit in the top band while being in no critical level:
-  Medium Importance and Urgency with XL Size and Value scores 6400, which is
-  the critical band, and is "No high or critical" as a level.
+- A level is **not** the priority *score*. The score is the product of all
+  four factors; a level is a rule on two of them. An item can score at the top
+  and be in no critical level: Medium Importance and Urgency with XL Size and
+  Value scores 6400 and is "No high or critical" as a level. Since 2026-11-12
+  the level is the only priority colour in the app — the Plan screen's five
+  band colours are gone, and its badge uses these.
 - **The I and U factor chips** (shown when the columns are expanded) take the
   **Any Critical** colour when that one factor is itself Critical. Size (`E`)
   and Value (`V`) never do: they are in the priority score and in no level.

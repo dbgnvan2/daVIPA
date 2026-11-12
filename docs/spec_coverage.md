@@ -2176,3 +2176,55 @@ kept — the refusal the user reported was never that one.
 Adjacent, found and not fixed (global rule 10): `LMM-A1` (medium), `LMM-A2`
 and `LMM-A3` (low), filed in `BACKLOG.md` on 2026-11-12. `LMM-A1` is the same
 stale-day-shape bug one call site along, in `move_block_to_slot`.
+
+## PBG — the priority badge replaces the Plan screen's band colouring (2026-11-12)
+
+Plan: `docs/unused-docs/implementation_plan_2026-11-12_plan_priority_badge.md`
+
+Requirement, as given: *"On the plan screen show the priority badge in the
+action item listing. Remove the current priority level coloring."* Both panes,
+and the badge carries the level scheme — the two answers settled with the user
+before the plan was written.
+
+| Criterion | Implementation | Test | Status |
+|---|---|---|---|
+| PBG-M1 | A badge column is added to `chip_column_minsizes`, so it reaches both panes or neither; the item row draws in it and a day box leaves it empty | `plan_blocks.py` (`SLOT_BADGE_WIDTH_PX`, `CHIP_BADGE_COLUMN`, `chip_column_minsizes`) | `tests/test_plan_screen.py::test_pdm11_the_item_row_uses_the_chips_column_order`, `::test_pdm12_the_length_sits_beside_the_depth_bars` | done |
+| PBG-M2 | The badge reads `P:<score>` on `level_cell_fill`, its text colour from the same `RowFill`, falling back to the row's text when the level has no colour | `plan_blocks.py::build_item_row`, `plan.py` (passes `settings`) | `tests/test_plan_screen.py::test_pbgm2_the_item_rows_badge_carries_the_level_colour` | done |
+| PBG-M3 | An item row is drawn on the theme's surface and its bar carries no colour | `plan_blocks.py::build_item_row` | `tests/test_plan_screen.py::test_pbgm3_an_item_row_is_the_themes_surface_with_a_neutral_bar` | done |
+| PBG-M4 | A task's day chip likewise, continuations included; padding keeps its `block_type_colors` bar and transparent surface | `plan_blocks.py::_build_block_chip` | `::test_pbgm4_padding_keeps_its_neutral_and_a_task_does_not`, `::test_pbgm4_a_continuation_box_is_the_same_surface_as_its_first_box` | done |
+| PBG-M5 | The band scheme is deleted, not left dead: six helpers from `plan_blocks.py`, three tables from `theme.py`, `priority_band` from `time_block_layout.py` | those three files | `::test_pbgm5_the_band_scheme_is_gone_from_every_module_that_held_it` | done |
+| PBG-M6 | `docs/ui_color_inventory.md` regenerated, since PBG-M5 removes colour literals from `src/` | `tools/color_audit.py` | `tests/test_color_inventory_sync.py` | done |
+
+Three things the plan did not foresee, found by running it:
+
+- **PB-M6.2 is reversed.** The row deliberately did not print its score,
+  because the band said it twice already. The user asked for the badge, so
+  `test_pbm62_an_item_row_does_not_print_its_priority_score` is retired and
+  PBG-M2's guard is its inverse. Case (b) of the test rule: the behaviour
+  changed intentionally.
+- **The red mark went under the contrast bar.** PD-M9's question mark sat on a
+  pale band tint and now sits on `surface_subtle`, which is darker: `#B91C1C`
+  measured 4.15:1 there against the 4.5:1 a glyph needs. Light-mode
+  `unscheduled_mark` is `#991B1B`, 5.33:1, and
+  `test_pdm9_the_two_marks_are_legible_on_the_row_surface` measures it against
+  the surface it is actually on.
+- **The empty-list note's wrap floor is now out of reach.** The badge's 44px
+  widens the narrowest items column to 209px, which leaves 153px to wrap in
+  against a 120px floor. `NOTE_MIN_WRAP_PX` stays as defence;
+  `test_the_empty_item_note_wraps_even_in_a_narrow_column` asserts the state of
+  that rather than a floor nothing can reach, and says in its own message what
+  to restore if a narrower column becomes possible.
+
+The bar was going to be the theme's neutral and is **transparent** instead: with
+the band gone it carries nothing, and 6px of grey in its place is ink that says
+nothing. The widget stays because its height is what holds a title inside its
+box. Padding's bar is then the only bar drawn, which is what tells a buffer from
+a task now that both surfaces are flat.
+
+Adjacent, found and not fixed (global rule 10): `PRIORITY_BANDS` and
+`UNSCORED_BAND` survive in `time_block_layout.py` with no reader in `src/` —
+`test_priority_floor_and_cap` measures the score's cap against the top
+threshold, which is why they were kept rather than deleted with
+`priority_band`. Four imports in `tests/` were unused before this batch and
+still are (`CHIP_BARS_COLUMN`, `SLOT_MARKER_WIDTH_PX`, `MAX_BLOCKS_PER_SLOT` in
+`test_plan_screen.py`, `SchedulingOptions` in `time_block_layout.py`).

@@ -83,6 +83,24 @@ only a defect: a lunch outside the drawn day is arguably meaningless. But the
 present behaviour answers it by doing nothing at all and saying nothing, which
 is the one answer a user cannot read.
 
+## Adjacent issue — the band thresholds outlived the bands (PBG, filed 2026-11-12)
+
+### PBG-A1 — `PRIORITY_BANDS` has no reader in `src/` (low)
+
+PBG-M5 deleted `priority_band` and the three colour tables it fed, because the
+Plan screen was their only user and it draws the priority *level* badge now.
+`PRIORITY_BANDS` and `UNSCORED_BAND` (`time_block_layout.py:69`) survived: they
+are the arithmetic, and `tests/test_priority_floor_and_cap.py:231` measures the
+score's cap against the top threshold, as does
+`test_priority_level_colors.py::test_plcm14_a_big_score_is_not_a_critical_level`.
+
+So they are not dead, but their only readers are tests. Either is defensible —
+they are a true statement about `priority_score` whether or not anything
+colours it — and the decision is worth making deliberately rather than by
+default: delete them and rewrite those two tests against
+`PriorityFactors.MAX_SCORE`, or keep them and say in the comment that they are
+a scale with no renderer. The comment says the second today.
+
 Fix when touched: decide the question first. If yes, add the `elif edge is not
 None` case alongside the other two; if no, report a refusal instead of
 dropping the gesture.

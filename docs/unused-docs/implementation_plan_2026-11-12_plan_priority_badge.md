@@ -1,6 +1,11 @@
 # PBG — the priority badge on the Plan screen (2026-11-12)
 
-**Status: plan, not approved. No code written.**
+**Status: approved by the user on 2026-11-12 and built.** The record of what
+was actually built, including three things this plan did not foresee, is
+`docs/spec_coverage.md` § *PBG*. Two decisions changed in the building: the
+task bar is transparent rather than the theme's neutral, and PB-M6.2 — "the
+item row does not print its priority score" — is reversed by the requirement
+and its test retired.
 
 Requirement, as given: *"On the plan screen show the priority badge in the
 action item listing. Remove the current priority level coloring."*

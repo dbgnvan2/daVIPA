@@ -27,11 +27,11 @@ rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkg
 
 ## 1) Summary Counts By Type
 
-- Hex colors (match count): **1088**
+- Hex colors (match count): **1063**
 - Named colors (match count): **649**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
-- Widget explicit overrides (line count): **534**
+- Widget explicit overrides (line count): **537**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -41,22 +41,22 @@ and theme_files line counts.
 | Scan | Lines |
 |---|---:|
 | `app_settings` | 25 |
-| `hex` | 187 |
+| `hex` | 162 |
 | `named` | 57 |
 | `theme_api` | 2 |
 | `theme_files` | 1292 |
 | `tuples` | 2 |
-| `widget` | 534 |
+| `widget` | 537 |
 
 Widget override property breakdown:
 
 | Property | Count |
 |---|---:|
 | `border_color` | 14 |
-| `corner_radius` | 61 |
-| `fg_color` | 249 |
+| `corner_radius` | 62 |
+| `fg_color` | 250 |
 | `hover_color` | 11 |
-| `text_color` | 217 |
+| `text_color` | 218 |
 
 AppSettings persisted color/theme fields:
 
@@ -88,7 +88,7 @@ src/getmoredone/app_settings.py:715:        from .theme import normalize_theme_n
 src/getmoredone/app_settings.py:717:        return normalize_theme_name(value)
 ```
 
-Hex top values (20 of 244 distinct):
+Hex top values (20 of 230 distinct):
 
 | Color | Count |
 |---|---:|
@@ -218,26 +218,19 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:467` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
+| `src/getmoredone/theme.py:367` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 
 ### `#0284c7`
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:461` | `"Week": "#0284C7",` |
-
-### `#052e16`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:146` | ``# deep -- the `low` fill is #052E16 -- and `success_strong`'s dark`` |
-| `src/getmoredone/theme.py:377` | `"low": "#052E16",` |
+| `src/getmoredone/theme.py:361` | `"Week": "#0284C7",` |
 
 ### `#059669`
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:460` | `"Month": "#059669",` |
+| `src/getmoredone/theme.py:360` | `"Month": "#059669",` |
 
 ### `#0b368d`
 
@@ -249,7 +242,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:457` | `"Annual Plan": "#0D9488",` |
+| `src/getmoredone/theme.py:357` | `"Annual Plan": "#0D9488",` |
 
 ### `#0ea5e9`
 
@@ -331,19 +324,12 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `themes/blue.json:210` | `"#154B75"` |
 | `themes/blue.json:279` | `"#154B75"` |
 
-### `#15803d`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:343` | `"low": "#15803D",` |
-
 ### `#166534`
 
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:136` | `"success_strong": "#166534" if mode == "light" else "#14532D",` |
-| `src/getmoredone/theme.py:150` | `"scheduled_mark": "#166534" if mode == "light" else "#4ADE80",` |
-| `src/getmoredone/theme.py:306` | `"low": "#166534",` |
+| `src/getmoredone/theme.py:149` | `"scheduled_mark": "#166534" if mode == "light" else "#4ADE80",` |
 
 ### `#171447`
 
@@ -493,19 +479,13 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:456` | `"Annual Vision": "#2563EB",` |
+| `src/getmoredone/theme.py:356` | `"Annual Vision": "#2563EB",` |
 
 ### `#262454`
 
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/brand.py:93` | `800: "#3F3A6B", 900: "#262454", 950: "#101342",` |
-
-### `#27272a`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:378` | `"unscored": "#27272A",` |
 
 ### `#288862`
 
@@ -719,7 +699,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:467` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
+| `src/getmoredone/theme.py:367` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 
 ### `#3b8ed0`
 
@@ -810,24 +790,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `tools/generate_ctk_themes.py:65` | `("CTkFrame", "border_color"): ["#D2D2D7", "#424245"],` |
 | `tools/generate_ctk_themes.py:68` | `("CTkEntry", "border_color"): ["#D2D2D7", "#424245"],` |
 
-### `#431407`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:375` | `"high": "#431407",` |
-
-### `#450a0a`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:374` | `"critical": "#450A0A",` |
-
-### `#451a03`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:376` | `"medium": "#451A03",` |
-
 ### `#461f00`
 
 | File:Line | Snippet |
@@ -896,8 +858,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:150` | `"scheduled_mark": "#166534" if mode == "light" else "#4ADE80",` |
-| `src/getmoredone/theme.py:313` | `"low": "#4ADE80",` |
+| `src/getmoredone/theme.py:149` | `"scheduled_mark": "#166534" if mode == "light" else "#4ADE80",` |
 
 ### `#4b1b2b`
 
@@ -909,7 +870,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:442` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
+| `src/getmoredone/theme.py:342` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
 | `themes/black_white.json:27` | `"#4B5563"` |
 | `tools/generate_ctk_themes.py:78` | `("CTkFrame", "border_color"): ["#D1D5DB", "#4B5563"],` |
 
@@ -936,12 +897,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/brand.py:73` | `800: "#78006E", 900: "#52004B", 950: "#360031",` |
-
-### `#52525b`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:307` | `"unscored": "#52525B",` |
 
 ### `#565b5e`
 
@@ -1120,7 +1075,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:268` | `"low_load": "#6BCB77",` |
+| `src/getmoredone/theme.py:269` | `"low_load": "#6BCB77",` |
 
 ### `#6e6799`
 
@@ -1170,12 +1125,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/brand.py:87` | `400: "#A396CB", 500: "#897CB2", 600: "#71659B", 700: "#5A4F85",` |
 | `themes/davipa.json:263` | `"#71659B"` |
-
-### `#71717a`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:344` | `"unscored": "#71717A",` |
 
 ### `#78006e`
 
@@ -1229,7 +1178,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:455` | `"TL Vision": "#7C3AED",` |
+| `src/getmoredone/theme.py:355` | `"TL Vision": "#7C3AED",` |
 | `themes/purple.json:35` | `"#7C3AED"` |
 | `themes/purple.json:87` | `"#7C3AED"` |
 | `themes/purple.json:120` | `"#7C3AED"` |
@@ -1304,7 +1253,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:262` | `"date_today": "#86EFAC",` |
+| `src/getmoredone/theme.py:263` | `"date_today": "#86EFAC",` |
 
 ### `#888888`
 
@@ -1352,12 +1301,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/brand.py:62` | `400: "#AD8BF9", 500: "#9170E0", 600: "#7859CA", 700: "#5E42B4",` |
-
-### `#92400e`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:305` | `"medium": "#92400E",` |
 
 ### `#939ba2`
 
@@ -1428,7 +1371,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/screens/vision_segments.py:538` | `color_row, color = self._color_input(f, (row or {}).get("color_hex", "#94A3B8"))` |
-| `src/getmoredone/theme.py:314` | `"unscored": "#94A3B8",` |
 
 ### `#97208c`
 
@@ -1498,13 +1440,12 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:132` | `"danger_hover": "#991B1B",` |
-| `src/getmoredone/theme.py:303` | `"critical": "#991B1B",` |
+| `src/getmoredone/theme.py:152` | `"unscheduled_mark": "#991B1B" if mode == "light" else "#FCA5A5",` |
 
 ### `#9a3412`
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:304` | `"high": "#9A3412",` |
 | `themes/orange.json:35` | `"#9A3412"` |
 | `themes/orange.json:87` | `"#9A3412"` |
 | `themes/orange.json:120` | `"#9A3412"` |
@@ -1531,7 +1472,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:442` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
+| `src/getmoredone/theme.py:342` | `padding = "#4B5563" if mode == "light" else "#9CA3AF"` |
 | `themes/black_white.json:70` | `"#9CA3AF",` |
 | `themes/black_white.json:79` | `"#9CA3AF"` |
 | `tools/generate_ctk_themes.py:81` | `("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],` |
@@ -1574,7 +1515,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:467` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
+| `src/getmoredone/theme.py:367` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 
 ### `#aab0b5`
 
@@ -1665,7 +1606,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:134` | `"warning": "#B45309" if mode == "light" else "#FBBF24",` |
-| `src/getmoredone/theme.py:342` | `"medium": "#B45309",` |
 
 ### `#b91c1c`
 
@@ -1673,7 +1613,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/screens/project_boards.py:1268` | `text_color="#B91C1C",` |
 | `src/getmoredone/theme.py:131` | `"danger": "#B91C1C",` |
-| `src/getmoredone/theme.py:151` | `"unscheduled_mark": "#B91C1C" if mode == "light" else "#FCA5A5",` |
+| `src/getmoredone/theme.py:150` | `# #B91C1C measured 4.15:1 on that surface, under the 4.5:1 a glyph` |
 
 ### `#bcb3e3`
 
@@ -1705,7 +1645,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:341` | `"high": "#C2410C",` |
 | `themes/orange.json:34` | `"#C2410C",` |
 | `themes/orange.json:86` | `"#C2410C",` |
 | `themes/orange.json:119` | `"#C2410C",` |
@@ -1820,19 +1759,13 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:269` | `"load_gradient": ["#FFD8A8", "#FFB347", "#F5A6BE", "#EF7292", "#D94B66"],` |
+| `src/getmoredone/theme.py:270` | `"load_gradient": ["#FFD8A8", "#FFB347", "#F5A6BE", "#EF7292", "#D94B66"],` |
 
 ### `#dacdff`
 
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/brand.py:86` | `50: "#F8F5FF", 100: "#EEE8FF", 200: "#DACDFF", 300: "#BEB1E5",` |
-
-### `#dc2626`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:340` | `"critical": "#DC2626",` |
 
 ### `#dce4ee`
 
@@ -1902,8 +1835,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/app_settings.py:82` | `priority_level_color_any_critical: str = "#DCFCE7"` |
 | `src/getmoredone/theme.py:137` | `"on_strong": "#ECFDF5" if mode == "light" else "#DCFCE7",` |
-| `src/getmoredone/theme.py:370` | `"low": "#DCFCE7",` |
-| `src/getmoredone/theme.py:421` | `LEVEL_ANY_CRITICAL: "#DCFCE7",` |
+| `src/getmoredone/theme.py:321` | `LEVEL_ANY_CRITICAL: "#DCFCE7",` |
 
 ### `#de1b24`
 
@@ -1938,7 +1870,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:270` | `"load_fallback": "#DFF8D8",` |
+| `src/getmoredone/theme.py:271` | `"load_fallback": "#DFF8D8",` |
 
 ### `#e6eef8`
 
@@ -1968,19 +1900,19 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:265` | `"future_long_term": "#E9C6CF",` |
+| `src/getmoredone/theme.py:266` | `"future_long_term": "#E9C6CF",` |
 
 ### `#e9caa0`
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:267` | `"future_next_quarter": "#E9CAA0",` |
+| `src/getmoredone/theme.py:268` | `"future_next_quarter": "#E9CAA0",` |
 
 ### `#ea580c`
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:459` | `"Quarter": "#EA580C",` |
+| `src/getmoredone/theme.py:359` | `"Quarter": "#EA580C",` |
 
 ### `#ea6fda`
 
@@ -2022,20 +1954,20 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:467` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
+| `src/getmoredone/theme.py:367` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
 
 ### `#ef7292`
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:269` | `"load_gradient": ["#FFD8A8", "#FFB347", "#F5A6BE", "#EF7292", "#D94B66"],` |
+| `src/getmoredone/theme.py:270` | `"load_gradient": ["#FFD8A8", "#FFB347", "#F5A6BE", "#EF7292", "#D94B66"],` |
 
 ### `#efe6a7`
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:266` | `"future_next_month": "#EFE6A7",` |
+| `src/getmoredone/theme.py:267` | `"future_next_month": "#EFE6A7",` |
 
 ### `#f0e7ff`
 
@@ -2078,13 +2010,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:264` | `"future_near_term": "#F4D35E",` |
-
-### `#f4f4f5`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:371` | `"unscored": "#F4F4F5",` |
+| `src/getmoredone/theme.py:265` | `"future_near_term": "#F4D35E",` |
 
 ### `#f55161`
 
@@ -2097,14 +2023,14 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:458` | `"Annual Initiative": "#F59E0B",` |
+| `src/getmoredone/theme.py:358` | `"Annual Initiative": "#F59E0B",` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
 
 ### `#f5a6be`
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:269` | `"load_gradient": ["#FFD8A8", "#FFB347", "#F5A6BE", "#EF7292", "#D94B66"],` |
+| `src/getmoredone/theme.py:270` | `"load_gradient": ["#FFD8A8", "#FFB347", "#F5A6BE", "#EF7292", "#D94B66"],` |
 
 ### `#f5f5f7`
 
@@ -2127,12 +2053,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/brand.py:91` | `50: "#F7F5FF", 100: "#EDE8FF", 200: "#D7CEFE", 300: "#BCB3E3",` |
 
-### `#f87171`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:310` | `"critical": "#F87171",` |
-
 ### `#f8f5ff`
 
 | File:Line | Snippet |
@@ -2143,7 +2063,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:467` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
+| `src/getmoredone/theme.py:367` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 | `src/getmoredone/vps_manager.py:1514` | `palette = ["#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#F97316"]` |
 
 ### `#f9f5ff`
@@ -2181,25 +2101,18 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/screens/project_boards.py:1266` | `fg_color="#FACC15",` |
 
-### `#fb923c`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:311` | `"high": "#FB923C",` |
-
 ### `#fbbf24`
 
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:134` | `"warning": "#B45309" if mode == "light" else "#FBBF24",` |
-| `src/getmoredone/theme.py:312` | `"medium": "#FBBF24",` |
 
 ### `#fca5a5`
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:151` | `"unscheduled_mark": "#B91C1C" if mode == "light" else "#FCA5A5",` |
-| `src/getmoredone/theme.py:261` | `"date_overdue": "#FCA5A5",` |
+| `src/getmoredone/theme.py:152` | `"unscheduled_mark": "#991B1B" if mode == "light" else "#FCA5A5",` |
+| `src/getmoredone/theme.py:262` | `"date_overdue": "#FCA5A5",` |
 
 ### `#fcc1ff`
 
@@ -2226,7 +2139,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:263` | `"date_future": "#FDE68A",` |
+| `src/getmoredone/theme.py:264` | `"date_future": "#FDE68A",` |
 
 ### `#fdecec`
 
@@ -2239,15 +2152,13 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:133` | `"on_danger": "#FEE2E2",` |
-| `src/getmoredone/theme.py:367` | `"critical": "#FEE2E2",` |
 
 ### `#fef3c7`
 
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/app_settings.py:83` | `priority_level_color_any_high: str = "#FEF3C7"` |
-| `src/getmoredone/theme.py:369` | `"medium": "#FEF3C7",` |
-| `src/getmoredone/theme.py:422` | `LEVEL_ANY_HIGH: "#FEF3C7",` |
+| `src/getmoredone/theme.py:322` | `LEVEL_ANY_HIGH: "#FEF3C7",` |
 
 ### `#ff5a8a`
 
@@ -2296,7 +2207,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/theme.py:121` | `"date_start_text": "#FFB347",` |
-| `src/getmoredone/theme.py:269` | `"load_gradient": ["#FFD8A8", "#FFB347", "#F5A6BE", "#EF7292", "#D94B66"],` |
+| `src/getmoredone/theme.py:270` | `"load_gradient": ["#FFD8A8", "#FFB347", "#F5A6BE", "#EF7292", "#D94B66"],` |
 
 ### `#ffc107`
 
@@ -2332,13 +2243,13 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:467` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
+| `src/getmoredone/theme.py:367` | `return ("#00C800", "#FFD54F", "#3B82F6", "#EF4444", "#A855F7", "#F97316")` |
 
 ### `#ffd8a8`
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/theme.py:269` | `"load_gradient": ["#FFD8A8", "#FFB347", "#F5A6BE", "#EF7292", "#D94B66"],` |
+| `src/getmoredone/theme.py:270` | `"load_gradient": ["#FFD8A8", "#FFB347", "#F5A6BE", "#EF7292", "#D94B66"],` |
 
 ### `#ffe2ff`
 
@@ -2369,12 +2280,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/brand.py:81` | `50: "#FFF4EF", 100: "#FFE6D8", 200: "#FFC9A9", 300: "#FD924A",` |
-
-### `#ffedd5`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/theme.py:368` | `"high": "#FFEDD5",` |
 
 ### `#fff3fc`
 
@@ -2479,7 +2384,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/screens/timer_window.py:892` | `status_color = "green" if self.timer_state == self.RUNNING else "blue"` |
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
-| `src/getmoredone/theme.py:248` | `"blue": palette["primary"],` |
+| `src/getmoredone/theme.py:249` | `"blue": palette["primary"],` |
 | `tools/generate_ctk_themes.py:48` | `"blue": ["#3B8ED0", "#1F6AA5"],` |
 
 ### `darkred`
@@ -2503,7 +2408,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/vision_planning.py:500` | `text_color="gray"` |
 | `src/getmoredone/screens/vision_planning.py:629` | `text_color="gray"` |
 | `src/getmoredone/screens/vps_editors.py:1289` | `separator = ctk.CTkFrame(main_frame, height=2, fg_color="gray")` |
-| `src/getmoredone/theme.py:250` | `"gray": palette["muted_text"],` |
+| `src/getmoredone/theme.py:251` | `"gray": palette["muted_text"],` |
 | `themes/apple_grey.json:176` | `"gray",` |
 | `themes/apple_grey.json:177` | `"gray"` |
 | `themes/base_dark_blue.json:73` | `"border_color": ["gray", "gray"]` |
@@ -3262,7 +3167,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/vision_planning.py:81` | `fg_color="green", width=120).pack(side="left", padx=5)` |
 | `src/getmoredone/screens/vision_planning.py:376` | `ctrl, text="Save", width=70, fg_color="green",` |
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
-| `src/getmoredone/theme.py:240` | `"green": palette["success_strong"],` |
+| `src/getmoredone/theme.py:241` | `"green": palette["success_strong"],` |
 | `tools/generate_ctk_themes.py:44` | `"green": ["#2CC985", "#2FA572"],` |
 
 ### `grey`
@@ -3279,7 +3184,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/timer_window.py:862` | `self._update_status_label("Paused", "orange")` |
 | `src/getmoredone/screens/timer_window.py:1025` | `self._update_status_label("Resting — Resume starts another block", "orange")` |
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
-| `src/getmoredone/theme.py:245` | `"orange": palette["warning"],` |
+| `src/getmoredone/theme.py:246` | `"orange": palette["warning"],` |
 | `tools/generate_ctk_themes.py:45` | `"orange": ["#C2410C", "#9A3412"],` |
 
 ### `red`
@@ -3292,7 +3197,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/timer_window.py:1074` | `self._update_status_label("Not saved — try Done again", "red")` |
 | `src/getmoredone/screens/vision_planning.py:315` | `fg_color="darkred", hover_color="red",` |
 | `src/getmoredone/screens/vision_planning.py:577` | `fg_color="darkred", hover_color="red",` |
-| `src/getmoredone/theme.py:243` | `"red": palette["danger"],` |
+| `src/getmoredone/theme.py:244` | `"red": palette["danger"],` |
 
 ### `white`
 
@@ -3306,14 +3211,14 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/vision_planning.py:547` | `text_color="white", width=120, height=28, corner_radius=6,` |
 | `src/getmoredone/screens/vision_planning.py:566` | `text_color="white", width=120, height=28, corner_radius=6,` |
 | `src/getmoredone/theme.py:120` | `"chip_text": "white",` |
-| `src/getmoredone/theme.py:253` | `"white": palette["body_text"],` |
+| `src/getmoredone/theme.py:254` | `"white": palette["body_text"],` |
 
 ### `yellow`
 
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/screens/timer_window.py:954` | `self._update_status_label("⏰ BREAK TIME! ⏰", "yellow")` |
-| `src/getmoredone/theme.py:246` | `"yellow": palette["warning"],` |
+| `src/getmoredone/theme.py:247` | `"yellow": palette["warning"],` |
 
 ### Theme API Occurrences
 

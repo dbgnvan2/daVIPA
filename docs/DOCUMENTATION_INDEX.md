@@ -512,6 +512,31 @@ Touches `src/getmoredone/priority_levels.py` and `screens/today.py`,
   subprocess and reports each label's colours, so the rendered colour is
   asserted and not only the source that chooses it. No window is mapped.
 
+### docs/unused-docs/implementation_plan_2026-11-12_plan_priority_badge.md
+
+Implementation plan for showing the priority badge in the Plan screen's item
+listing and removing the band colouring from both of its panes (PBG-M1 -
+PBG-M6). **Approved 2026-11-12 and built the same day: 6 of 6 criteria
+`done`** — per-criterion status, and the three things the plan did not foresee,
+in `docs/spec_coverage.md` § *PBG*. Touches
+`src/getmoredone/screens/plan_blocks.py`, `screens/plan.py`, `theme.py` and
+`time_block_layout.py`:
+
+- The Plan screen was the only user of the *band* scheme — `priority_score`
+  bucketed into five names, each with three colour tables. It draws the same
+  `P:<score>` badge on the same `level_cell_fill` colour as the five list
+  screens now, so one scheme answers "what priority is this" everywhere.
+- The band scheme is deleted rather than left importable: six helpers, three
+  theme tables and `priority_band`. `PRIORITY_BANDS` stays, with no reader in
+  `src/`; that is `BACKLOG.md`'s `PBG-A1`.
+- Removing the row's tint moved PD-M9's red question mark onto a darker
+  surface, where it measured 4.15:1 against the 4.5:1 a glyph needs. The
+  light-mode token is `#991B1B` now and its test measures the surface the mark
+  is actually on.
+- PB-M6.2 kept the score off the row because the band said it twice already.
+  The requirement reverses that criterion, and its test is retired with the
+  reason recorded where it stood.
+
 ### docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
 
 Implementation plan for the six VSP Planning tabs' left-to-right filter and the
