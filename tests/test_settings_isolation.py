@@ -151,6 +151,42 @@ def test_the_session_guard_leaves_a_clean_run_alone(tmp_path):
     assert "GUARD:" not in result.stdout
 
 
+def test_rlsm2_the_weekly_log_is_fingerprinted(tmp_path):
+    """A test that writes the real weekly-tactic log must turn the run red.
+
+    Purpose: RLS-M2 -- the fingerprint covered ``settings.json`` and
+             ``getmoredone.db`` and nothing else, so the one file in that
+             directory a subprocess render helper was actually found opening
+             was the one file the guard could not see. The log is the record a
+             user reads to audit what the weekly-tactic migration did to their
+             own rows.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-12_test_harness_isolation.md#rls-m2
+
+    Driven through the same nested run as
+    ``test_the_session_guard_fails_the_run_when_content_changes``, pointed at a
+    fake data directory via ``GETMOREDONE_TEST_GUARD_DIR``, so exercising the
+    guard touches none of the real files it exists to protect.
+
+    The fake directory holds no log to begin with, so this is the
+    "file appeared" route -- which is what a test creating the real log on a
+    machine where the app has never run would do.
+    """
+    result = _run_nested_pytest(tmp_path, """
+        import os
+        from pathlib import Path
+
+        def test_probe():
+            watched = Path(os.environ["GETMOREDONE_TEST_GUARD_DIR"])
+            (watched / "weekly_tactic_debug.log").write_text("written by a test\\n")
+    """)
+
+    assert "GUARD:" in result.stdout, (
+        f"the guard did not notice the weekly log:\n{result.stdout}\n{result.stderr}")
+    assert "weekly_log" in result.stdout, (
+        f"the guard fired but did not name the weekly log:\n{result.stdout}")
+    assert result.returncode != 0, "the guard did not fail the run"
+
+
 # --- CIG-A4: the guard must name the right cause -----------------------------
 
 _SETTINGS_BEFORE = (1_000_000_000, 40, "a" * 64, "/fake/settings.json")

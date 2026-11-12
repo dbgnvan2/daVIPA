@@ -36,10 +36,10 @@ and ``level_color`` falls back to the *same* theme default on an unreadable
 value -- so a render of the defaults alone cannot tell a working settings read
 from a broken one. Passing a colour no default uses makes the two
 distinguishable.
-Prints a ``ROW <fg_color>`` line per rendered row -- the row frame's own fill,
-which is what PCC-M1 changed -- followed by one
-``LBL <text>|<fg_color>|<text_color>`` line per gridded label in it. Exit 0 unless it genuinely
-fails to render.
+Prints a ``DATADIR <path>`` line, then a ``ROW <fg_color>`` line per rendered
+row -- the row frame's own fill, which is what PCC-M1 changed -- each followed
+by one ``LBL <text>|<fg_color>|<text_color>`` line per gridded label in it.
+Exit 0 unless it genuinely fails to render.
 
 ``completed`` completes every item after creating it, which is the only way the
 Completed screen has any rows at all: it queries ``get_completed_items``, so an
@@ -55,6 +55,15 @@ import sys
 import tempfile
 from datetime import date
 from unittest.mock import MagicMock
+
+if __name__ != "__main__":
+    raise RuntimeError(
+        f"{__file__} is a subprocess entry point, not a module. Importing it "
+        "sets GETMOREDONE_DATA_DIR for the whole process and creates a "
+        "temporary directory nothing will remove, because the redirect has to "
+        "happen before the application is imported and so cannot be deferred "
+        "to a function. Run it with subprocess.run([sys.executable, ...])."
+    )
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
@@ -137,13 +146,6 @@ def main(
     screen.refresh()
     window.update()
 
-    # What an untinted frame is *in this interpreter*. PCC-M1's rendered check
-    # compares against this rather than assuming CustomTkinter's bundled
-    # ['gray90', 'gray13']: the app's own default theme (apple_grey) has
-    # ['#FFFFFF', '#1D1D1F'] here, so a test that asserted "no # in the value"
-    # would fail the moment this helper applied the app's theme, while nothing
-    # was tinted.
-    print(f"THEME {ctk.ThemeManager.theme['CTkFrame']['fg_color']}")
     # Where the application resolved its data directory, read after it has
     # built everything. This is the only externally observable proof that
     # the redirect at the top of this file took effect: a subprocess that

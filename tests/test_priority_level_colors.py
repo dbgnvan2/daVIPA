@@ -1807,10 +1807,8 @@ def rendered_rows():
     ``tests/render_priority_cells.py`` for why it is a subprocess at all, and
     why no window is mapped.
 
-    Returns a namespace: ``.rows`` is
-    ``{module: [(row_fill, [(text, fg_color, text_color), ...]), ...]}`` and
-    ``.frame_fill`` is ``{module: the theme's own CTkFrame fill}``, which is
-    what an untinted row must equal.
+    Returns a namespace whose ``.rows`` is
+    ``{module: [(row_fill, [(text, fg_color, text_color), ...]), ...]}``.
     """
     import subprocess
     import sys
@@ -1818,7 +1816,6 @@ def rendered_rows():
     root = Path(__file__).resolve().parents[1]
     helper = root / "tests" / "render_priority_cells.py"
     rendered = {}
-    frame_fills = {}
     for module, screen_class, needs_completing in RENDER_TARGETS:
         argv = [sys.executable, str(helper), module, screen_class]
         if needs_completing:
@@ -1836,22 +1833,14 @@ def rendered_rows():
                 pytest.skip(f"no display for {module}: {result.stderr[-200:]}")
             pytest.fail(f"{module} failed to render:\n{result.stderr[-2000:]}")
         rows = []
-        frame_fill = None
         for line in result.stdout.splitlines():
-            if line.startswith("THEME "):
-                frame_fill = line[6:]
-            elif line.startswith("ROW "):
+            if line.startswith("ROW "):
                 rows.append((line[4:], []))
             elif line.startswith("LBL "):
-                # rsplit: a label's text is arbitrary user data and may contain
-                # the separator; the two colours never do.
-                text, fg_color, text_color = line[4:].rsplit("|", 2)
-                rows[-1][1].append((text, fg_color, text_color))
+                rows[-1][1].append(parse_label_line(line))
         assert rows, f"{module} rendered no rows:\n{result.stdout}"
-        assert frame_fill, f"{module} reported no theme frame fill"
         rendered[module] = rows
-        frame_fills[module] = frame_fill
-    return SimpleNamespace(rows=rendered, frame_fill=frame_fills)
+    return SimpleNamespace(rows=rendered)
 
 
 #: The three rendered items, by score. A score is the product of all four
@@ -1862,6 +1851,24 @@ RENDERED_SCORES = {
     LEVEL_ANY_HIGH: 800,
     LEVEL_NO_HIGH_OR_CRITICAL: 400,
 }
+
+
+def parse_label_line(line):
+    """The ``(text, fg_color, text_color)`` a helper's ``LBL `` line carries.
+
+    Purpose: RLS-M3 -- both call sites parsed this inline and they disagreed.
+             The fixture split from the right, and
+             ``test_pccm3_a_saved_colour_reaches_the_real_widget`` split from
+             the left, so a label whose *text* contained the separator raised
+             ``ValueError`` there and parsed correctly here. A label's text is
+             arbitrary user data and one of the rendered titles really does
+             contain a ``|``; the two colours never do. One parser, splitting
+             from the right, so the two cannot drift again.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-12_test_harness_isolation.md#rls-m3
+    Tests:   tests/test_priority_level_colors.py::test_rlsm3_a_piped_title_parses_to_three_fields
+    """
+    text, fg_color, text_color = line[4:].rsplit("|", 2)
+    return text, fg_color, text_color
 
 
 def _cell_for(rows, score):
@@ -1963,43 +1970,66 @@ def test_pccm4_a_rendered_critical_chip_carries_the_level_colour(rendered_rows):
     assert checked == 4, checked
 
 
-def test_pccm3_the_render_helper_stays_out_of_the_real_data_dir():
-    """The render subprocess resolves no path in the user's own data directory.
+#: Both subprocess render helpers, which must each stay out of the user's own
+#: application-support directory. ``render_priority_cells.py`` was fixed for
+#: PCC-M3; ``render_list_screen.py`` had the same defect and was missed, which
+#: is RLS-M1 -- so the guard is parametrised rather than written twice.
+RENDER_HELPERS = (
+    ("render_priority_cells.py", ("today", "TodayScreen")),
+    ("render_list_screen.py", ("today", "TodayScreen")),
+)
 
-    Found by the security pass of 2026-11-12, not by a test. The helper
-    redirected ``AppSettings.get_settings_path`` and passed an explicit
-    database path, but left ``GETMOREDONE_DATA_DIR`` alone -- and
-    ``VPSManager.__init__`` opens ``app_data_dir_path() /
-    "weekly_tactic_debug.log"`` in append mode, which is the record a user
-    reads to audit what the weekly-tactic migration did to their own rows.
-    ``conftest.py``'s ``_isolate_weekly_tactic_log`` swaps logging handlers
-    in-process and so cannot reach a subprocess.
 
-    Run the way the fixture runs it -- with ``GETMOREDONE_DATA_DIR`` absent,
-    which is what ``conftest.py`` leaves behind -- because that is the only
-    state in which the defect bites.
+@pytest.mark.parametrize("helper_name, args", RENDER_HELPERS)
+def test_rlsm1_neither_render_helper_touches_the_real_data_dir(helper_name, args):
+    """Neither render subprocess resolves a path in the user's data directory.
 
-    Asserted on the directory the subprocess *resolved*, which it reports,
-    and not on the real directory's contents: an earlier version compared
-    the real directory's files and mtimes before and after, and that test
-    passed with the redirect removed. ``weekly_tactic_debug.log`` already
-    exists on a machine that has run the app, and a ``FileHandler`` that
-    opens it in append mode and emits nothing leaves its mtime alone -- so
-    the harm is that the real file is held open and written to *whenever*
-    those syncs do emit, which a before/after snapshot of one quiet run
-    cannot see. Mutation-proved against the redirect itself.
+    Purpose: PCC-M3 found this in ``render_priority_cells.py``; the cold pass
+             of 2026-11-12 found ``render_list_screen.py`` still had it, and
+             that helper is executed for real by
+             ``test_item_editor_no_context.py``. ``VPSManager.__init__`` opens
+             ``app_data_dir_path() / "weekly_tactic_debug.log"`` -- the record
+             a user reads to audit what the weekly-tactic migration did to
+             their own rows -- and ``AppSettings.load()`` reads whatever they
+             have saved, which also made that caller's column assertions
+             depend on one machine's row font size. ``conftest.py``'s
+             ``_isolate_weekly_tactic_log`` cannot help: it swaps logging
+             handlers in-process, and that does not cross a process boundary.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-12_test_harness_isolation.md#rls-m1
+
+    Run with ``GETMOREDONE_DATA_DIR`` absent, which is what ``conftest.py``
+    leaves behind, because that is the only state in which the defect bites.
+
+    Asserted on the directory the subprocess *resolved*, which it reports, and
+    not on the real directory's contents: an earlier version compared the real
+    directory's files and mtimes before and after, and that test passed with
+    the redirect removed. ``weekly_tactic_debug.log`` already exists on a
+    machine that has run the app, and a ``FileHandler`` that opens it in append
+    mode and emits nothing leaves its mtime alone -- so a before/after snapshot
+    of one quiet run cannot see it.
+
+    Both halves are asserted (RLS-M5). A bare ``!=`` passes for a redirect that
+    escaped somewhere else entirely -- the current working directory, or
+    ``$HOME`` -- so the reported directory must also be *under the temp root*.
     """
     import subprocess
     import sys
+    import tempfile
+
+    from platformdirs import user_data_dir
+
+    from src.getmoredone.paths import APP_AUTHOR, APP_NAME
 
     root = Path(__file__).resolve().parents[1]
-    helper = root / "tests" / "render_priority_cells.py"
-    # conftest.py pops the override, so in this process this is the user's
-    # own directory -- the one the subprocess must not land in.
-    real = app_data_dir_path()
+    helper = root / "tests" / helper_name
+    # Computed, not resolved through ``app_data_dir_path()``, which *creates*
+    # the directory -- a read-only guard must not bring the user's data
+    # directory into existence on a machine where the app has never run
+    # (RLS-M5). This is the computation ``conftest.py`` documents and uses.
+    real = Path(user_data_dir(APP_NAME, APP_AUTHOR)).expanduser().resolve()
 
     result = subprocess.run(
-        [sys.executable, str(helper), "today", "TodayScreen"],
+        [sys.executable, str(helper), *args],
         capture_output=True,
         text=True,
         timeout=180,
@@ -2010,15 +2040,61 @@ def test_pccm3_the_render_helper_stays_out_of_the_real_data_dir():
         lowered = result.stderr.lower()
         if "no display name" in lowered or "couldn't connect" in lowered:
             pytest.skip(f"no display: {result.stderr[-200:]}")
-        pytest.fail(f"the helper failed to render:\n{result.stderr[-2000:]}")
+        pytest.fail(f"{helper_name} failed to render:\n{result.stderr[-2000:]}")
 
     reported = [
         line[8:] for line in result.stdout.splitlines() if line.startswith("DATADIR ")
     ]
-    assert len(reported) == 1, f"the helper reported {len(reported)} data dirs"
-    assert reported[0] != str(real), (
-        f"the render resolved the real data directory: {reported[0]}"
+    assert len(reported) == 1, (
+        f"{helper_name} reported {len(reported)} data dirs:\n{result.stdout}"
     )
+    landed = Path(reported[0]).resolve()
+    assert landed != real, f"{helper_name} resolved the real data directory: {landed}"
+    temp_root = Path(tempfile.gettempdir()).resolve()
+    assert temp_root in landed.parents, (
+        f"{helper_name} resolved {landed}, which is not under {temp_root} -- "
+        "the redirect escaped rather than being isolated"
+    )
+
+
+@pytest.mark.parametrize("helper_name, _args", RENDER_HELPERS)
+def test_rlsm6_a_render_helper_refuses_to_be_imported(helper_name, _args):
+    """Importing either helper raises instead of redirecting this process.
+
+    Purpose: RLS-M6 -- each helper sets ``GETMOREDONE_DATA_DIR`` and creates a
+             temporary directory at module scope, because the redirect has to
+             happen before the application is imported and so cannot be
+             deferred into a function. An import from inside the test process
+             would therefore repoint the whole run's data directory and leak a
+             directory nothing removes. The file says so and refuses.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-12_test_harness_isolation.md#rls-m6
+
+    Asserted through ``importlib`` rather than by reading the source, so it is
+    the refusal that is observed and not the presence of a line of text.
+    """
+    import importlib
+
+    before = os.environ.get("GETMOREDONE_DATA_DIR")
+    with pytest.raises(RuntimeError, match="subprocess entry point"):
+        importlib.import_module(f"tests.{helper_name[:-3]}")
+    assert os.environ.get("GETMOREDONE_DATA_DIR") == before, (
+        f"importing {helper_name} repointed this process's data directory"
+    )
+
+
+def test_rlsm3_a_piped_title_parses_to_three_fields():
+    """A label whose own text contains the separator still parses.
+
+    Purpose: RLS-M3 -- the two call sites disagreed, and the left-splitting one
+             would have raised ``ValueError`` on exactly this line.
+             ``render_list_screen.py`` really does render the title below, so
+             this is the live case and not a hypothetical.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-12_test_harness_isolation.md#rls-m3
+    """
+    title = "PW|LS|Blog - W8 - write blog 3"
+    parsed = parse_label_line(f"LBL {title}|#010203|#FFFFFF")
+
+    assert parsed == (title, "#010203", "#FFFFFF"), parsed
 
 
 def test_pccm3_a_saved_colour_reaches_the_real_widget():
@@ -2066,8 +2142,7 @@ def test_pccm3_a_saved_colour_reaches_the_real_widget():
         if line.startswith("ROW "):
             rows.append((line[4:], []))
         elif line.startswith("LBL "):
-            text, fg_color, text_color = line[4:].split("|")
-            rows[-1][1].append((text, fg_color, text_color))
+            rows[-1][1].append(parse_label_line(line))
     assert rows, f"no rows rendered:\n{result.stdout}"
 
     critical = _cell_for(rows, RENDERED_SCORES[LEVEL_ANY_CRITICAL])
