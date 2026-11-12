@@ -6882,8 +6882,69 @@ def test_lmm3_a_lunch_move_says_how_many_blocks_it_displaced(screen, manager):
 
     start = _lunch_blocks(manager)[0].start_time
     assert screen.status_label.cget("text") == (
-        f"Lunch moved to {start} — 2 Time Blocks moved below the day"
+        f"Lunch moved to {start} — 2 Time Blocks moved to Outside the day"
     ), screen.status_label.cget("text")
+    # The claim reconciled against the thing it describes (P6): a count in a
+    # status line that no group actually holds is the failure, not the wording.
+    assert sorted(b.label for b in screen._grid.outside) == ["task 0", "task 1"], [
+        b.label for b in screen._grid.outside
+    ]
+
+
+def test_lmm5_a_lunch_resize_says_how_many_it_displaced(screen, manager):
+    """LM-5 — the resize gesture announces what the move gesture announces.
+
+    ``set_block_length`` was taught to accept a lunch over a box holding work
+    in the same change that taught the move path to say how many blocks that
+    pushed to "Outside the day". The resize path said nothing, so the one
+    gesture the user guide names for changing the lunch's length relocated
+    their work silently (P2).
+    """
+    screen.place_lunch_at(4)
+    for n in range(2):
+        item = _item(manager, f"task {n}")
+        screen.refresh()
+        screen.block_item(item, 6)
+    screen.refresh()
+    lunch = _lunch_blocks(manager)[0]
+    assert len(screen._grid.outside) == 0, "precondition: nothing is outside yet"
+
+    screen.set_block_minutes(lunch, 120)
+
+    status = screen.status_label.cget("text")
+    assert status.endswith("— 2 Time Blocks moved to Outside the day"), status
+    assert sorted(b.label for b in screen._grid.outside) == ["task 0", "task 1"], [
+        b.label for b in screen._grid.outside
+    ]
+
+
+def test_lmm6_lunch_moves_onto_a_box_the_extended_day_drew(
+    screen, manager, monkeypatch
+):
+    """LM-6 — the move path checks the day being drawn, as the add path does.
+
+    ``place_lunch_at`` passed ``day_span`` when it created the block and not
+    when it moved it, so one function checked two different days: a box the
+    extended day drew took the lunch on the first drag and refused it on the
+    next move, with *That Time Block is outside the day*. That is the shape of
+    the bug this batch exists to fix, one call site along.
+    """
+    item = _item(manager, "early work")
+    screen.refresh()
+    # The gesture that widens the drawn day: it writes the item into a box
+    # before Day Start without rewriting Day Settings (PD-M14.1).
+    screen.extend_day_for(item, DAY_EXTEND_EARLIER)
+    outer = screen._grid.span.first
+    assert outer < 0, f"precondition: the day is not extended ({outer})"
+    screen.place_lunch_at(4)
+
+    screen.place_lunch_at(outer)
+
+    status = screen.status_label.cget("text")
+    blocks = _lunch_blocks(manager)
+    assert len(blocks) == 1, blocks
+    assert blocks[0].slot_index == outer, (blocks[0].slot_index, outer, status)
+    assert status.startswith("Lunch moved to"), status
 
 
 def test_pfm94_clearing_the_hover_restores_the_border_colour(screen, manager, monkeypatch):
