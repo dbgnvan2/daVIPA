@@ -155,21 +155,13 @@ def test_rlsm2_the_weekly_log_is_fingerprinted(tmp_path):
     """A test that writes the real weekly-tactic log must turn the run red.
 
     Purpose: RLS-M2 -- the fingerprint covered ``settings.json`` and
-             ``getmoredone.db`` and nothing else, so the one file in that
-             directory a subprocess render helper was actually found opening
-             was the one file the guard could not see. The log is the record a
-             user reads to audit what the weekly-tactic migration did to their
-             own rows.
+             ``getmoredone.db`` only, so the one file a render helper was found
+             opening was the one file the guard could not see.
     Spec:    docs/unused-docs/implementation_plan_2026-11-12_test_harness_isolation.md#rls-m2
 
-    Driven through the same nested run as
-    ``test_the_session_guard_fails_the_run_when_content_changes``, pointed at a
-    fake data directory via ``GETMOREDONE_TEST_GUARD_DIR``, so exercising the
-    guard touches none of the real files it exists to protect.
-
-    The fake directory holds no log to begin with, so this is the
-    "file appeared" route -- which is what a test creating the real log on a
-    machine where the app has never run would do.
+    Driven through the same nested run as the content-change guard above,
+    pointed at a fake directory, so no real file is touched. The fake directory
+    holds no log, so this is the "file appeared" route.
     """
     result = _run_nested_pytest(tmp_path, """
         import os

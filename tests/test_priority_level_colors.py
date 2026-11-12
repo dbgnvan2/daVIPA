@@ -1856,16 +1856,11 @@ RENDERED_SCORES = {
 def parse_label_line(line):
     """The ``(text, fg_color, text_color)`` a helper's ``LBL `` line carries.
 
-    Purpose: RLS-M3 -- both call sites parsed this inline and they disagreed.
-             The fixture split from the right, and
-             ``test_pccm3_a_saved_colour_reaches_the_real_widget`` split from
-             the left, so a label whose *text* contained the separator raised
-             ``ValueError`` there and parsed correctly here. A label's text is
-             arbitrary user data and one of the rendered titles really does
-             contain a ``|``; the two colours never do. One parser, splitting
-             from the right, so the two cannot drift again.
+    Purpose: RLS-M3 -- the two call sites parsed this inline and disagreed, and
+             a rendered title really does contain the separator. Split from the
+             right: a label's text is arbitrary, the two colours are not.
     Spec:    docs/unused-docs/implementation_plan_2026-11-12_test_harness_isolation.md#rls-m3
-    Tests:   tests/test_priority_level_colors.py::test_rlsm3_a_piped_title_parses_to_three_fields
+    Tests:   ::test_rlsm3_a_piped_title_parses_to_three_fields
     """
     text, fg_color, text_color = line[4:].rsplit("|", 2)
     return text, fg_color, text_color
@@ -1970,10 +1965,7 @@ def test_pccm4_a_rendered_critical_chip_carries_the_level_colour(rendered_rows):
     assert checked == 4, checked
 
 
-#: Both subprocess render helpers, which must each stay out of the user's own
-#: application-support directory. ``render_priority_cells.py`` was fixed for
-#: PCC-M3; ``render_list_screen.py`` had the same defect and was missed, which
-#: is RLS-M1 -- so the guard is parametrised rather than written twice.
+#: Both subprocess render helpers, parametrised rather than guarded twice.
 RENDER_HELPERS = (
     ("render_priority_cells.py", ("today", "TodayScreen")),
     ("render_list_screen.py", ("today", "TodayScreen")),
@@ -1984,33 +1976,23 @@ RENDER_HELPERS = (
 def test_rlsm1_neither_render_helper_touches_the_real_data_dir(helper_name, args):
     """Neither render subprocess resolves a path in the user's data directory.
 
-    Purpose: PCC-M3 found this in ``render_priority_cells.py``; the cold pass
-             of 2026-11-12 found ``render_list_screen.py`` still had it, and
-             that helper is executed for real by
-             ``test_item_editor_no_context.py``. ``VPSManager.__init__`` opens
-             ``app_data_dir_path() / "weekly_tactic_debug.log"`` -- the record
-             a user reads to audit what the weekly-tactic migration did to
-             their own rows -- and ``AppSettings.load()`` reads whatever they
-             have saved, which also made that caller's column assertions
-             depend on one machine's row font size. ``conftest.py``'s
-             ``_isolate_weekly_tactic_log`` cannot help: it swaps logging
-             handlers in-process, and that does not cross a process boundary.
+    Purpose: RLS-M1 -- ``VPSManager.__init__`` opens
+             ``app_data_dir_path() / "weekly_tactic_debug.log"`` and
+             ``AppSettings.load()`` reads the user's saved settings, so an
+             un-redirected helper touches both. ``conftest.py``'s
+             ``_isolate_weekly_tactic_log`` swaps handlers in-process and
+             cannot cross a process boundary.
     Spec:    docs/unused-docs/implementation_plan_2026-11-12_test_harness_isolation.md#rls-m1
 
     Run with ``GETMOREDONE_DATA_DIR`` absent, which is what ``conftest.py``
-    leaves behind, because that is the only state in which the defect bites.
+    leaves behind and the only state in which the defect bites. Asserted on the
+    directory the helper reports, not on the real directory's contents: an
+    append-mode open that emits nothing moves no mtime, so a before/after
+    snapshot passes with the redirect removed.
 
-    Asserted on the directory the subprocess *resolved*, which it reports, and
-    not on the real directory's contents: an earlier version compared the real
-    directory's files and mtimes before and after, and that test passed with
-    the redirect removed. ``weekly_tactic_debug.log`` already exists on a
-    machine that has run the app, and a ``FileHandler`` that opens it in append
-    mode and emits nothing leaves its mtime alone -- so a before/after snapshot
-    of one quiet run cannot see it.
-
-    Both halves are asserted (RLS-M5). A bare ``!=`` passes for a redirect that
-    escaped somewhere else entirely -- the current working directory, or
-    ``$HOME`` -- so the reported directory must also be *under the temp root*.
+    Both halves are asserted (RLS-M5): a bare ``!=`` passes for a redirect that
+    escaped to the cwd or ``$HOME``, so the path must also be under the temp
+    root.
     """
     import subprocess
     import sys
@@ -2022,10 +2004,8 @@ def test_rlsm1_neither_render_helper_touches_the_real_data_dir(helper_name, args
 
     root = Path(__file__).resolve().parents[1]
     helper = root / "tests" / helper_name
-    # Computed, not resolved through ``app_data_dir_path()``, which *creates*
-    # the directory -- a read-only guard must not bring the user's data
-    # directory into existence on a machine where the app has never run
-    # (RLS-M5). This is the computation ``conftest.py`` documents and uses.
+    # RLS-M5: computed, not resolved through ``app_data_dir_path()``, which
+    # *creates* the directory. The computation ``conftest.py`` uses.
     real = Path(user_data_dir(APP_NAME, APP_AUTHOR)).expanduser().resolve()
 
     result = subprocess.run(
@@ -2061,16 +2041,13 @@ def test_rlsm1_neither_render_helper_touches_the_real_data_dir(helper_name, args
 def test_rlsm6_a_render_helper_refuses_to_be_imported(helper_name, _args):
     """Importing either helper raises instead of redirecting this process.
 
-    Purpose: RLS-M6 -- each helper sets ``GETMOREDONE_DATA_DIR`` and creates a
-             temporary directory at module scope, because the redirect has to
-             happen before the application is imported and so cannot be
-             deferred into a function. An import from inside the test process
-             would therefore repoint the whole run's data directory and leak a
-             directory nothing removes. The file says so and refuses.
+    Purpose: RLS-M6 -- each helper sets ``GETMOREDONE_DATA_DIR`` and makes a
+             temporary directory at module scope, since the redirect must
+             precede the application import and cannot be deferred. An import
+             would repoint the whole run and leak a directory. Asserted through
+             ``importlib``, so the refusal is observed rather than a line of
+             source text.
     Spec:    docs/unused-docs/implementation_plan_2026-11-12_test_harness_isolation.md#rls-m6
-
-    Asserted through ``importlib`` rather than by reading the source, so it is
-    the refusal that is observed and not the presence of a line of text.
     """
     import importlib
 
@@ -2085,10 +2062,8 @@ def test_rlsm6_a_render_helper_refuses_to_be_imported(helper_name, _args):
 def test_rlsm3_a_piped_title_parses_to_three_fields():
     """A label whose own text contains the separator still parses.
 
-    Purpose: RLS-M3 -- the two call sites disagreed, and the left-splitting one
-             would have raised ``ValueError`` on exactly this line.
-             ``render_list_screen.py`` really does render the title below, so
-             this is the live case and not a hypothetical.
+    Purpose: RLS-M3 -- the left-splitting call site raised ``ValueError`` on
+             exactly this line, which ``render_list_screen.py`` renders.
     Spec:    docs/unused-docs/implementation_plan_2026-11-12_test_harness_isolation.md#rls-m3
     """
     title = "PW|LS|Blog - W8 - write blog 3"

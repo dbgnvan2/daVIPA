@@ -8,23 +8,13 @@ Purpose: the column-contiguity check in test_item_editor_no_context.py runs
 
 Not named ``test_*`` on purpose: it is a helper, not a test.
 
-``GETMOREDONE_DATA_DIR`` is pointed at a temporary directory **before the
-application is imported**. Without it this process resolves the user's real
-``~/Library/Application Support/GetMoreDone/``: ``AppSettings.load()`` reads
-whatever colours and row font size they have saved -- so a column assertion
-here would depend on one machine's settings -- and ``VPSManager.__init__``
-opens the real ``weekly_tactic_debug.log``, the record a user reads to audit
-what the weekly-tactic migration did to their own rows. ``conftest.py``'s
-``_isolate_weekly_tactic_log`` cannot help: it swaps logging handlers
-in-process, and that does not cross a process boundary.
+RLS-M1: ``GETMOREDONE_DATA_DIR`` is redirected before the application is
+imported, or this process reads the user's real settings and opens their real
+``weekly_tactic_debug.log``.
 
 Usage: python tests/render_list_screen.py <module> <ScreenClass> [expanded]
 Prints one ``DATADIR <path>`` line, then one "OK"/"GAP"/"DUP" line per rendered
-row; exit 0 always unless it genuinely fails to render. The ``DATADIR`` line is
-the only externally observable proof that the redirect above took effect, and
-it is safe to add because the caller asserts on the uppercase substrings
-``GAP``, ``DUP`` and ``NOROWS``, which a lowercase ``mkdtemp`` path cannot
-contain.
+row; exit 0 always unless it genuinely fails to render.
 
 Columns are reported **without** deduplication on purpose. Deduping hides an
 overlap — two widgets gridded into the same cell — and an overlap is precisely
@@ -52,12 +42,8 @@ if __name__ != "__main__":
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-#: Set before the application is imported, so every path that hangs off
-#: ``paths.app_data_dir_path`` -- the database, the settings file, ``app.lock``
-#: and ``weekly_tactic_debug.log`` -- lands here and not in the user's real
-#: application-support directory. ``paths`` reads the variable on each call and
-#: caches nothing, but doing this after the import would still leave a window
-#: for an import-time resolution to escape.
+#: Before the application is imported: one variable covers the database, the
+#: settings file, ``app.lock`` and ``weekly_tactic_debug.log``.
 WORKSPACE = pathlib.Path(tempfile.mkdtemp(prefix="render-list-screen-"))
 os.environ["GETMOREDONE_DATA_DIR"] = str(WORKSPACE)
 
@@ -94,10 +80,8 @@ def main(module: str, attr: str, expanded: bool = False) -> int:
             screen.refresh()
     window.update()
 
-    # Where the application resolved its data directory, read after it has
-    # built everything. A subprocess that resolved the real directory would
-    # merely *read* the settings file and open an existing log in append mode,
-    # which leaves no trace a caller can measure -- so the helper says so.
+    # The only externally observable proof the redirect took effect: resolving
+    # the real directory leaves no trace a caller could measure.
     print(f"DATADIR {app_data_dir_path()}")
 
     printed = 0

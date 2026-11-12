@@ -41,19 +41,12 @@ def _user_data_fingerprint():
     """(mtime, size, sha256) for each real file a stray run could rewrite.
 
     Three files: ``settings.json``, ``getmoredone.db`` and
-    ``weekly_tactic_debug.log``. The log joined the set on 2026-11-12 (RLS-M2)
-    because a subprocess render helper was found opening the real one -- it is
-    the record a user reads to audit what the weekly-tactic migration did to
-    their own rows, so a test run appending to it is exactly the event this
-    guard exists to report, and it was the one file in the directory the guard
-    could not see.
+    ``weekly_tactic_debug.log``. The log joined on 2026-11-12 (RLS-M2), after a
+    render helper was found opening the real one.
 
-    ``app.lock`` is deliberately **not** fingerprinted. The packaged app holds
-    an ``flock`` on it for as long as it is running, so its state tracks
-    whether the user happens to have daVIPA open rather than whether the suite
-    touched anything -- which would make this guard report the user's own
-    window instead of a defect. That a running app perturbs this directory is
-    already why the guard carries an app-running probe.
+    ``app.lock`` is deliberately excluded: the packaged app holds an ``flock``
+    on it while running, so its state would track whether the user has daVIPA
+    open rather than whether the suite touched anything.
 
     Content as well as mtime, because the app rewriting the same values on a
     window move is not the same event as a test corrupting the file, and the
