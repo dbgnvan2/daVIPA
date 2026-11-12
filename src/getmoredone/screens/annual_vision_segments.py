@@ -19,6 +19,13 @@ if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
 
 
+# VTF-M1 — the left panel's ticks became a filter on the right panel, so the
+# heading no longer tells the user to tick and press Save. There is no Save on
+# this tab any more (VTF-M4); records are created from the button under the
+# right panel (VTF-M3).
+LEFT_TITLE = "Vision Elements (tick to filter the annual elements on the right)"
+
+
 class AnnualVisionSegmentsScreen(ctk.CTkFrame):
     """Drag vision elements into annual list to create annual plan records."""
 
@@ -42,6 +49,10 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         self.subsegment_colors: dict[tuple[str, str], str] = {}
         self.category_colors: dict[tuple[str, str, str], str] = {}
         self.left_checks: dict[str, ctk.BooleanVar] = {}
+        # The year the panels currently show, which is not the year in the
+        # entry box: the entry can be mid-edit, and the right panel's heading
+        # must not re-parse it (a bad value pops an error dialog).
+        self.shown_year = 0
         # The app's own instance where there is one, so a saved divider or
         # column width does not overwrite a setting changed elsewhere since
         # this screen was built; its own load when constructed without an app
@@ -78,10 +89,12 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
             row=1, column=4, padx=6, pady=(0, 8), sticky="w"
         )
 
-        # This tab filters nothing -- there is no lineage above an annual plan
-        # element to filter by -- so row 2 is an empty frame one combo deep.
-        # The user asked for the blank line by name: without it the body of
-        # this tab starts 36px above the body of the four that do filter.
+        # This tab carries no lineage *dropdowns* -- there is no lineage above
+        # a vision element to narrow the left list by -- so row 2 is an empty
+        # frame one combo deep. The user asked for the blank line by name:
+        # without it the body of this tab starts 36px above the body of the
+        # four that do filter. The left panel's ticks are this tab's filter
+        # (VTF-M1) and sit on the rows, not here.
         self.filter_row = ctk.CTkFrame(
             header, fg_color="transparent", height=FILTER_ROW_HEIGHT)
         self.filter_row.grid(row=2, column=0, columnspan=6, sticky="w",
@@ -98,7 +111,7 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
 
         self.left_title_label = ctk.CTkLabel(
             body,
-            text="Vision Elements (check elements to add to the year and hit save)",
+            text=LEFT_TITLE,
             font=ctk.CTkFont(weight="bold"),
         )
         self.left_title_label.grid(
@@ -199,14 +212,10 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         }
         self.left_items = self.vps_manager.get_vision_elements()
         self.right_items = self.vps_manager.get_annual_vision_elements(year)
-        self.left_title_label.configure(
-            text="Vision Elements (check elements to add to the year and hit save)"
-        )
-        self.right_title_label.configure(
-            text=f"Annual Plan Elements for the year {year}"
-        )
+        self.shown_year = year
+        self.left_title_label.configure(text=LEFT_TITLE)
         self._render_rows(self.left_table, self.left_items, selectable=True)
-        self._render_rows(self.right_table, self.right_items, selectable=False)
+        self.refresh_right_panel()
 
     def _render_rows(self, table: ChipTable, rows: list[dict], selectable: bool):
         """Render one panel into the shared chip table.
@@ -263,7 +272,10 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
                 if var is None:
                     var = ctk.BooleanVar(value=False)
                     self.left_checks[item_id] = var
-                ctk.CTkCheckBox(item, text="", variable=var, width=20).grid(
+                ctk.CTkCheckBox(
+                    item, text="", variable=var, width=20,
+                    command=self.refresh_right_panel,
+                ).grid(
                     row=0, column=table.grid_col("checkbox"), padx=2, pady=5, sticky="w"
                 )
                 self.row_drag.bind_row(
@@ -289,6 +301,64 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
                     command=lambda r=row: self.delete_annual_item(r),
                     **button_style("danger"),
                 ).pack(side="left", padx=(2, 0))
+
+    # ------------------------------------------------ the tick as a filter
+
+    def _ticked_vision_element_ids(self) -> set:
+        """The ids of the ticked rows the left panel is currently showing.
+
+        Purpose: VTF-M1 — the tick is this tab's filter. A tick is only
+                 honoured while its row is on screen (VTF-M1.9): a filter the
+                 user cannot see is a filter they cannot undo. This tab shows
+                 every vision element, so the restriction is a no-op here and
+                 is written anyway, because `left_checks` outlives a Load Year
+                 and would otherwise keep filtering by a row that has gone.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
+        Tests:   tests/test_vsp_tab_filters.py::test_vtfm19_a_hidden_tick_stops_filtering
+        """
+        visible = {
+            row.get("id", f"row-{idx}")
+            for idx, row in enumerate(self.left_items)
+        }
+        return {
+            key for key, var in self.left_checks.items()
+            if key in visible and var.get()
+        }
+
+    def _visible_right_items(self) -> list:
+        """The right-hand rows the current ticks allow.
+
+        No tick is no filter (VTF-M1.5), so an untouched screen shows the
+        whole year exactly as it did before VTF-M1.
+        """
+        ticked = self._ticked_vision_element_ids()
+        if not ticked:
+            return list(self.right_items)
+        return [
+            row for row in self.right_items
+            if row.get("vision_element_id") in ticked
+        ]
+
+    def refresh_right_panel(self):
+        """Re-render the right panel alone, from the ticks.
+
+        Purpose: VTF-M1.6 — the checkbox's own command, so a tick takes
+                 effect without Load Year or Refresh. The left panel is not
+                 re-rendered (VTF-M1.8): rebuilding it under the pointer would
+                 destroy the checkbox that is mid-click, and a tick must never
+                 be able to hide its own row.
+        Tests:   tests/test_vsp_tab_filters.py::test_vtfm16_the_tick_refreshes_without_a_button
+        """
+        shown = self._visible_right_items()
+        self.right_title_label.configure(text=self._right_title(shown))
+        self._render_rows(self.right_table, shown, selectable=False)
+
+    def _right_title(self, shown: list) -> str:
+        """The right panel's heading, which says when a filter is narrowing it."""
+        base = f"Annual Plan Elements for the year {self.shown_year}"
+        if len(shown) == len(self.right_items):
+            return base
+        return f"{base} ({len(shown)} of {len(self.right_items)}, filtered by tick)"
 
     def _create_from_index(self, idx: int):
         year = self._parse_year()
