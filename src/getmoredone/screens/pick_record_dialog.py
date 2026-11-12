@@ -37,6 +37,41 @@ def describe_lineage(row) -> str:
     return " / ".join(parts)
 
 
+def confirm_choice(label, keys_by_label, *, on_confirm, report, set_status,
+                   close) -> bool:
+    """One pick confirmed: the write, then the close, then the status line.
+
+    Purpose: VTF-S7 — this is the hop that delivers every tab's add sentence,
+             and it was inside a closure over a `CTkToplevel`, so no test
+             could reach it. Both ends were asserted and the join was not:
+             dropping `report` left a refused or half-written add silent on
+             all four tabs with nothing red, which is the APC-M2.3 defect
+             exactly. As a function it is drivable with four fakes.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
+    Tests:   tests/test_vsp_tab_adds.py::test_vtfs7_the_confirmed_pick_closes_then_reports
+             tests/test_vsp_tab_adds.py::test_vtfs7_a_raising_write_keeps_the_dialog_open
+
+    The order is the contract. `close` runs before `report` so the tab's
+    status line is the last thing written and is not covered by a window that
+    is still up; and a write that raises must leave the dialog open with the
+    error on its own label, because the tab's line would be behind it.
+
+    Returns True when the write went through and the dialog is gone.
+    """
+    key = keys_by_label.get((label or "").strip())
+    if key is None:
+        set_status("Choose one from the list first.")
+        return False
+    try:
+        outcome = on_confirm(key)
+    except Exception as exc:  # The write refused, or the row went stale.
+        set_status(f"Could not add it: {exc}")
+        return False
+    close()
+    report(outcome)
+    return True
+
+
 def open_pick_record_dialog(
     parent,
     *,
@@ -101,18 +136,13 @@ def open_pick_record_dialog(
     actions.grid(row=3, column=0, columnspan=2, sticky="e", padx=8, pady=(8, 4))
 
     def on_ok():
-        label = choice_var.get().strip()
-        key = keys_by_label.get(label)
-        if key is None:
-            status_label.configure(text="Choose one from the list first.")
-            return
-        try:
-            outcome = on_confirm(key)
-        except Exception as exc:  # The write refused, or the row went stale.
-            status_label.configure(text=f"Could not add it: {exc}")
-            return
-        dialog.destroy()
-        report(outcome)
+        confirm_choice(
+            choice_var.get(), keys_by_label,
+            on_confirm=on_confirm,
+            report=report,
+            set_status=lambda text: status_label.configure(text=text),
+            close=dialog.destroy,
+        )
 
     ctk.CTkButton(actions, text="Cancel", width=90, command=dialog.destroy,
                   **button_style("secondary")).pack(side="right", padx=4)

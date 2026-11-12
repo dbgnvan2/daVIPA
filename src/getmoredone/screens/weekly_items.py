@@ -319,7 +319,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
             text=f"Month-assigned APEs for {year}-{month:02d} "
                  "(tick to filter the tactics on the right)")
         self.right_title_label.configure(text=self._right_title())
-        self.status_label.configure(text=f"{len(self.left_items)} month item(s) on left, {len(self.right_items)} weekly tactic(s) on right")
+        self.status_label.configure(text=self._describe_counts())
 
     def jump_to_current_week(self):
         current_week_start = self._week_start_for(date.today()).isoformat()
@@ -411,6 +411,30 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         ticked = self._ticked_ape_ids()
         return next(iter(ticked)) if len(ticked) == 1 else None
 
+    def _empty_add_message(self) -> str:
+        """Why the dialog has nothing to offer, in the words of the real reason.
+
+        Purpose: VTF-S9 / P2/P9 — `load_selected_week` narrows `left_items`
+                 through the dropdowns in place, so an empty option list means
+                 either that the month has no APEs or that the dropdowns are
+                 hiding them all. One wording covered both, and it sent a user
+                 with a Category filter set to the wrong tab.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
+        Tests:   tests/test_vsp_tab_adds.py::test_vtfs9_every_tab_names_the_real_reason
+        """
+        if self._any_filter_set():
+            return ("No month-assigned APE matches the Segment, SubSegment or "
+                    "Category filter above the left panel.")
+        return ("No month-assigned APEs are listed on the left. Assign one to "
+                "this month on the APE Month Assignment tab first.")
+
+    def _any_filter_set(self) -> bool:
+        """Whether any of the three lineage dropdowns is narrowing the left panel."""
+        return any(
+            (var.get() or "").strip() not in ("", "All")
+            for var in (self.segment_filter_var, self.subsegment_filter_var,
+                        self.category_filter_var))
+
     def _create_tactic_for(self, ape_id) -> str:
         """Create one weekly tactic for the selected week, and say what happened.
 
@@ -463,9 +487,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
             confirm_text="Add Tactic",
             report=lambda text: self.status_label.configure(text=text),
             on_confirm=self._create_tactic_for,
-            empty_message=(
-                "No month-assigned APEs are listed on the left. Assign one to "
-                "this month on the APE Month Assignment tab first."),
+            empty_message=self._empty_add_message(),
         )
 
     @staticmethod
@@ -528,6 +550,21 @@ class WeeklyItemsScreen(ctk.CTkFrame):
             if row.get("annual_plan_element_id") in ticked
         ]
 
+    def _describe_counts(self) -> str:
+        """The two counts the status line carries, read off the lists as drawn.
+
+        Purpose: VTF-S10 — this is the only one of the five tabs whose status
+                 line carries a count, and until 2026-11-11 only Load Week
+                 wrote it, so a tick narrowed the panel and the heading while
+                 the line two rows above went on naming the pre-filter total
+                 (P6: a number that claims to describe the panel is checked
+                 against the panel).
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
+        Tests:   tests/test_vsp_tab_filters.py::test_vtfs10_the_count_on_the_status_line_follows_the_tick
+        """
+        return (f"{len(self.left_items)} month item(s) on left, "
+                f"{len(self.right_items)} weekly tactic(s) on right")
+
     def refresh_right_panel(self):
         """Re-render the right panel alone, from the ticks.
 
@@ -546,6 +583,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         self.selected_weekly_item = None
         self.right_items = self._visible_right_items()
         self.right_title_label.configure(text=self._right_title())
+        self.status_label.configure(text=self._describe_counts())
         self._render_right_rows()
 
     def _right_title(self) -> str:

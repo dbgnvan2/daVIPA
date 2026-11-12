@@ -27,6 +27,11 @@ if TYPE_CHECKING:
 # heading no longer tells the user to tick and press Save. There is no Save on
 # this tab any more (VTF-M4); records are created from the button under the
 # right panel (VTF-M3).
+# The width the status line beside the Add New button wraps at. The button is
+# 230px and the right half of the body is about 660px at the default ratio, so
+# this is what is left for the sentence.
+STATUS_WRAPLENGTH = 400
+
 LEFT_TITLE = "Vision Elements (tick to filter the annual elements on the right)"
 
 
@@ -181,7 +186,16 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
             command=self.open_add_dialog,
             **button_style("primary"),
         ).pack(side="left", padx=(0, 8))
-        self.status_label = ctk.CTkLabel(right_actions, text="", anchor="w")
+        # VTF-S8 — this is the one status line that sits in a panel column
+        # rather than across the header, and `SplitPanel` sets that column's
+        # width with `minsize`, which is a floor and not a ceiling. Without a
+        # wrap the first long sentence -- the refusals below are over a
+        # hundred characters -- makes the column request its own width and
+        # pushes the panels off the body.
+        self.status_label = ctk.CTkLabel(
+            right_actions, text="", anchor="w",
+            text_color=status_text_color("muted"),
+            wraplength=STATUS_WRAPLENGTH, justify="left")
         self.status_label.pack(side="left", fill="x", expand=True)
 
         # UPD-M1 — the ratio, the clamp and the four handlers live in
@@ -423,6 +437,21 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
             if row.get("id") and row.get("id") not in taken
         ]
 
+    def _empty_add_message(self, year: int) -> str:
+        """Why the dialog has nothing to offer, in the words of the real reason.
+
+        Purpose: VTF-S9 / P2/P9 — the quarter and month tabs' helper, for this
+                 tab. One wording for two reasons told an empty database that
+                 every Vision Element already had an annual record.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
+        Tests:   tests/test_vsp_tab_adds.py::test_vtfs9_every_tab_names_the_real_reason
+        """
+        if not self.left_items:
+            return ("There are no Vision Elements yet -- add one on the "
+                    "Vision Elements tab first.")
+        return (f"Every Vision Element already has an annual record for "
+                f"{year}.")
+
     def _add_default(self):
         """The ticked row to open the dialog on, when exactly one is ticked.
 
@@ -491,10 +520,7 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
             confirm_text="Add",
             report=lambda text: self.status_label.configure(text=text),
             on_confirm=self._perform_add,
-            empty_message=(
-                f"Every Vision Element already has an annual record for "
-                f"{year}. Add a Vision Element on the Vision Elements tab "
-                f"first."),
+            empty_message=self._empty_add_message(year),
         )
 
     def edit_annual_item(self, row: dict):
