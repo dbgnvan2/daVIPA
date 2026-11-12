@@ -183,6 +183,11 @@ def _moved(before, *, size=None, digest=None):
     # "nothing was rewritten".
     ("database", _DB_BEFORE, False, _moved(_DB_BEFORE, digest="d" * 64),
      "content_changed"),
+    # A file that appeared, and one that went: on a machine where the app has
+    # never run, a test CREATING the real settings file is the escape, and it
+    # is the one route with no digest or size to compare.
+    ("settings", None, False, _SETTINGS_BEFORE, "content_changed"),
+    ("settings", _SETTINGS_BEFORE, False, None, "content_changed"),
     # Only the timestamp moved: the bytes are equal, so nothing wrote.
     ("settings", _SETTINGS_BEFORE, True, _moved(_SETTINGS_BEFORE),
      "app_running"),
@@ -211,7 +216,7 @@ def test_cghm11_the_guard_verdict_is_a_function_of_the_fingerprints(
         return
     assert [verdict for _, verdict, _ in verdicts] == [expected]
     assert verdicts[0][0] == key
-    assert verdicts[0][2] == before[3]
+    assert verdicts[0][2] == (after or before)[3]
 
 
 def test_cghm12_a_verdict_blames_a_test_exactly_when_it_fails_the_run():
@@ -225,7 +230,7 @@ def test_cghm12_a_verdict_blames_a_test_exactly_when_it_fails_the_run():
 
     accusing = {
         verdict for verdict, text in conftest.GUARD_EXPLANATIONS.items()
-        if "bypassed the isolation" in text
+        if conftest.GUARD_ACCUSATION in text
     }
 
     assert accusing == set(conftest.GUARD_FAILING_VERDICTS), (
@@ -250,9 +255,11 @@ def test_cghm12_a_timestamp_move_leaves_the_run_green(tmp_path):
             os.utime(watched, ns=(stat.st_atime_ns, stat.st_mtime_ns + 10 ** 9))
     """)
 
+    import conftest
+
     assert "GUARD:" in result.stdout, (
         f"the timestamp move was not reported at all:\n{result.stdout}")
-    assert "bypassed the isolation" not in result.stdout, (
+    assert conftest.GUARD_ACCUSATION not in result.stdout, (
         f"a timestamp move blamed a test:\n{result.stdout}")
     assert result.returncode == 0, (
         f"a timestamp move failed the run:\n{result.stdout}")
@@ -274,9 +281,11 @@ def test_cghm13_a_content_change_with_the_app_up_is_reported_not_failed(tmp_path
             watched.write_text('{"stub": true, "saved_by_the_app": true}')
     """, env_extra={"GETMOREDONE_TEST_GUARD_APP": "running"})
 
+    import conftest
+
     assert "GUARD:" in result.stdout, (
         f"the change was not reported at all:\n{result.stdout}")
-    assert "bypassed the isolation" not in result.stdout, (
+    assert conftest.GUARD_ACCUSATION not in result.stdout, (
         f"the app saving was blamed on a test:\n{result.stdout}")
     assert result.returncode == 0, (
         f"the app saving failed the run:\n{result.stdout}")
@@ -336,6 +345,10 @@ def test_cghm14_app_detection_cannot_hang_or_raise(monkeypatch):
 
     import conftest
 
+    # Every assertion below is about the pgrep path, which the forcing seam
+    # short-circuits. Exported in the shell -- the obvious thing to do while
+    # debugging the guard -- it inverted this test and the stated cause with it.
+    monkeypatch.delenv(conftest.TEST_GUARD_APP_ENV, raising=False)
     monkeypatch.setattr(shutil, "which", lambda _name: None)
     assert conftest.app_is_running() is None, "no pgrep must read as unknown"
 

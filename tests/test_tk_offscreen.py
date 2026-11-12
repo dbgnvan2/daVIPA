@@ -301,6 +301,56 @@ def test_a_mapped_window_is_invisible_but_still_measurable(mapped_windows):
     )
 
 
+class _RecordingTk:
+    """Records every ``tk.call``, and refuses to forward a -topmost write.
+
+    The silencing tests asserted the wrapper's return value, which left them
+    green against a wrapper that called through and then returned None -- the
+    exact regression the silencing exists to prevent. They now assert on what
+    reached Tk. It is not forwarded even when it arrives: an un-silenced
+    -topmost during a run beachballed this machine, which is why the wrapper
+    exists, so a failing test must report that and not reproduce it.
+    """
+
+    def __init__(self, real):
+        self._real = real
+        self.calls = []
+
+    @staticmethod
+    def _flatten(args):
+        """Tk takes a call either flat or packed into one tuple.
+
+        Measured 2026-11-11: ``Wm.wm_attributes`` hands it
+        ``(('wm', 'attributes', '.!ctktoplevel', '-alpha', 0.5),)``. Matching
+        the flat shape alone made the first version of this spy record the
+        call and recognise nothing, so the test passed against a wrapper that
+        called through -- vacuous in the one direction it exists to measure.
+        """
+        while len(args) == 1 and isinstance(args[0], tuple):
+            args = args[0]
+        return args
+
+    @classmethod
+    def _is_a_topmost_write(cls, args):
+        flat = cls._flatten(args)
+        return (flat[:2] == ("wm", "attributes") and "-topmost" in flat[3:]
+                and flat.index("-topmost") < len(flat) - 1)
+
+    def call(self, *args):
+        self.calls.append(args)
+        if self._is_a_topmost_write(args):
+            return ""
+        return self._real.call(*args)
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    @property
+    def topmost_writes(self):
+        return [self._flatten(call) for call in self.calls
+                if self._is_a_topmost_write(call)]
+
+
 def test_topmost_is_silenced_for_the_run():
     """Setting -topmost during a test run must do nothing.
 
@@ -318,13 +368,22 @@ def test_topmost_is_silenced_for_the_run():
     root = ctk.CTk()
     try:
         window = ctk.CTkToplevel(root)
-        # The wrapper returns None for a -topmost write and never reaches Tk;
-        # the real call returns ''. So this measures the interception itself,
-        # on any display. The read-back it replaced reported nothing on Xvfb
-        # and passed there whatever the wrapper did (CIG-A1).
-        assert window.attributes("-topmost", True) is None, (
-            "-topmost took effect during a test run; it must be silenced like "
-            "lift, focus_force and grab_set"
+        real, spy = window.tk, _RecordingTk(window.tk)
+        try:
+            window.tk = spy
+            # Display-independent: it asserts the write never reached Tk. The
+            # read-back this replaced reported nothing on Xvfb and passed there
+            # whatever the wrapper did (CIG-A1).
+            returned = window.attributes("-topmost", True)
+        finally:
+            window.tk = real
+        assert spy.topmost_writes == [], (
+            "-topmost reached Tk during a test run; it must be silenced like "
+            f"lift, focus_force and grab_set: {spy.topmost_writes}"
+        )
+        assert returned is None, (
+            "the wrapper passed a -topmost write through to Tk; the real call "
+            "returns '', never None"
         )
     finally:
         root.destroy()
@@ -340,11 +399,18 @@ def test_topmost_is_silenced_under_its_other_name_too():
     root = ctk.CTk()
     try:
         window = ctk.CTkToplevel(root)
-        # The interception, like the test above: None is the wrapper's return,
-        # never Tk's.
-        assert window.wm_attributes("-topmost", True) is None, (
-            "-topmost took effect through wm_attributes; both spellings must "
-            "be silenced"
+        real, spy = window.tk, _RecordingTk(window.tk)
+        try:
+            window.tk = spy
+            returned = window.wm_attributes("-topmost", True)
+        finally:
+            window.tk = real
+        assert spy.topmost_writes == [], (
+            "-topmost reached Tk through wm_attributes; both spellings must "
+            f"be silenced: {spy.topmost_writes}"
+        )
+        assert returned is None, (
+            "wm_attributes passed a -topmost write through to Tk"
         )
     finally:
         root.destroy()

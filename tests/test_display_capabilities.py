@@ -66,6 +66,12 @@ def _scan(source: str, label: str):
     ``tests/test_timer_session_endings.py`` reads through ``_topmost_now``, and
     a walk that looked only for the call shape would not see it. Measured
     2026-11-11: one level is enough for this suite.
+
+    A helper is any same-file function that reads an attribute back, whatever
+    window it reads from. Until the cold pass of 2026-11-11 it had to read
+    from one of its own parameters, which made ``_independently`` below -- a
+    helper that builds its own window, the natural shape for this -- invisible,
+    and with it every test calling one.
     """
     tree = ast.parse(source)
     classes = {n.name for n in tree.body if isinstance(n, ast.ClassDef)}
@@ -73,10 +79,7 @@ def _scan(source: str, label: str):
     helpers = set()
     for node in tree.body:
         if isinstance(node, ast.FunctionDef) and not node.name.startswith("test_"):
-            params = {a.arg for a in node.args.args}
-            if any(_is_a_read_back(inner, set())
-                   and _root_name(inner.func.value) in params
-                   for inner in ast.walk(node)):
+            if any(_is_a_read_back(inner, set()) for inner in ast.walk(node)):
                 helpers.add(node.name)
 
     reads, asks, maps = set(), set(), set()
@@ -88,6 +91,14 @@ def _scan(source: str, label: str):
         for inner in ast.walk(node):
             if _is_a_read_back(inner, exempt):
                 reads.add((label, node.name))
+            # Only the bare `require(...)` the suite imports counts as
+            # asking. Accepting `caps.require(...)` as well was tried on
+            # 2026-11-11 and reverted: the two tests OF `require` call it that
+            # way while monkeypatching the probe, so they are not
+            # display-dependent, and counting them took the exact count in
+            # test_cghm43 from 4 to 6. A guarded test written the attribute
+            # way would be reported as unguarded -- loudly, with the file and
+            # name, not silently.
             if isinstance(inner, ast.Call) and isinstance(inner.func, ast.Name):
                 if inner.func.id == "require":
                     asks.add((label, node.name))
@@ -162,22 +173,15 @@ def test_cigm13_an_unknown_attribute_is_an_error_not_a_skip():
         caps.honours("-topmsot")
 
 
-def _requirers():
-    """Every test function containing a call to `require`, by AST."""
-    found = set()
-    for path in sorted(REPO.glob("tests/test_*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            if not node.name.startswith("test_"):
-                continue
-            for inner in ast.walk(node):
-                if (isinstance(inner, ast.Call)
-                        and isinstance(inner.func, ast.Name)
-                        and inner.func.id == "require"):
-                    found.add((str(path.relative_to(REPO)), node.name))
-    return found
+#: The read-backs that must NOT ask the precondition, with the reason. Only
+#: one exists: a test that compares the probe against a freshly built window
+#: cannot be gated by the probe -- that would skip it exactly where it has
+#: something to measure. Asserted to be exactly this, so an exemption cannot
+#: be added quietly and a stale one cannot linger.
+EXEMPT_FROM_THE_PRECONDITION = {
+    ("tests/test_display_capabilities.py",
+     "test_cigm11_cigm12_the_probe_agrees_with_the_display"),
+}
 
 
 def test_cghm41_every_real_read_back_asks_or_maps():
@@ -196,7 +200,15 @@ def test_cghm41_every_real_read_back_asks_or_maps():
     """
     reads, asks, maps = _read_backs()
 
-    unguarded = sorted(reads - asks - maps)
+    assert EXEMPT_FROM_THE_PRECONDITION <= reads, (
+        "an exemption names a test the detector no longer sees as a "
+        "read-back, so it is hiding nothing and may be hiding something: "
+        f"{sorted(EXEMPT_FROM_THE_PRECONDITION - reads)}")
+    assert len(EXEMPT_FROM_THE_PRECONDITION) == 1, (
+        f"{len(EXEMPT_FROM_THE_PRECONDITION)} tests are exempt from the "
+        "precondition; each one is a test that passes on a bare display")
+
+    unguarded = sorted(reads - asks - maps - EXEMPT_FROM_THE_PRECONDITION)
     assert not unguarded, (
         "these tests read a window attribute back on a real window without "
         "asking the shared precondition or mapping the window, so on a display "
@@ -206,7 +218,12 @@ def test_cghm41_every_real_read_back_asks_or_maps():
 
 
 def test_cghm42_a_new_offender_is_detected():
-    """CGH-M4.2 — adversarial (P7): the case the registry could not see."""
+    """CGH-M4.2 — adversarial (P7): the case the registry could not see.
+
+    Extended 2026-11-11 by the cold pass with the refactored shape: a helper
+    that builds its own window. The first detector reported it as no read-back
+    at all, which is the registry's failure in a new place.
+    """
     offender = textwrap.dedent("""
         def test_new_and_unguarded():
             window = ctk.CTk()
@@ -237,6 +254,24 @@ def test_cghm42_a_new_offender_is_detected():
     """)
     reads, _, _ = _scan(spied, "synthetic.py")
     assert reads == set(), "a read on a stand-in defined in the file was flagged"
+
+    # The shape the first detector was blind to: the read-back factored into a
+    # helper that builds its own window, so it reads from a local and not from
+    # a parameter. Found by the cold pass of 2026-11-11, in this file.
+    refactored = textwrap.dedent("""
+        def _set_and_read(attribute):
+            window = tk.Tk()
+            window.tk.call("wm", "attributes", window._w, attribute, 1)
+            return window.tk.call("wm", "attributes", window._w, attribute)
+
+        def test_reads_through_a_helper_of_its_own():
+            assert _set_and_read("-topmost") == 1
+    """)
+    reads, asks, maps = _scan(refactored, "synthetic.py")
+    assert reads - asks - maps == {
+        ("synthetic.py", "test_reads_through_a_helper_of_its_own")}, (
+        "a read-back reached through a helper that builds its own window was "
+        "not detected, which is the registry's blind spot in a new shape")
 
 
 def test_cghm43_the_display_dependent_count_is_exact():
