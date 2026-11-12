@@ -602,6 +602,13 @@ def lunch_window(
     return None
 
 
+#: A lunch window of no length, so no slot on the grid is lunch. ``None``
+#: cannot say that: ``day_grid`` reads it as "the window Day Settings names",
+#: which is how the flag that exists to take lunch out of the way came to put
+#: the Day Settings hour back -- the one hour a lunch block is always leaving.
+NO_LUNCH: Tuple[int, int] = (0, 0)
+
+
 def day_grid(
     bounds: DayBounds,
     span: Optional[DaySpan] = None,
@@ -770,7 +777,7 @@ def can_place(
     *,
     ignoring: Optional[str] = None,
     day_span: Optional[DaySpan] = None,
-    ignore_lunch: bool = False,
+    placing_lunch: bool = False,
 ) -> Optional[str]:
     """``None`` if a block of ``span`` boxes may sit at ``slot_index``.
 
@@ -789,13 +796,19 @@ def can_place(
     on one of the two ends passes a span that already covers the box it is
     about to create, because that box is outside the hours by definition --
     that is what the gesture means.
+
+    ``placing_lunch`` says the block being placed *is* this date's lunch, so
+    neither reason a box can be taken applies: no slot is lunch, because this
+    block defines where lunch is, and no box is full, because a lunch box
+    holds the lunch alone (``build_day_grid`` surfaces whatever else was in it
+    under "Outside the day").
     """
     span = max(1, int(span))
     drawn = template_span(bounds) if day_span is None else day_span
     # PF-M8 -- lunch is where this date's own lunch block puts it, unless the
     # block being placed *is* that lunch: then there is no lunch in the way, or
     # the lunch could never be moved off the box it sits on.
-    lunch = None if ignore_lunch else lunch_window(blocks, bounds, ignoring=ignoring)
+    lunch = NO_LUNCH if placing_lunch else lunch_window(blocks, bounds, ignoring=ignoring)
     grid = day_grid(bounds, drawn, lunch)
     if not drawn.holds(slot_index, span):
         return SlotRefusal.OUTSIDE_GRID
@@ -804,6 +817,11 @@ def can_place(
     covered = grid[at : at + span]
     if any(slot.is_lunch for slot in covered):
         return SlotRefusal.CROSSES_LUNCH
+
+    # PF-M8 -- a lunch box draws "Lunch" and nothing else, so the room left in
+    # the boxes lunch is moving onto is not a reason to refuse the move.
+    if placing_lunch:
+        return None
 
     occupancy = slot_occupancy(blocks, bounds, ignoring=ignoring, day_span=drawn)
     if any(len(occupancy.get(slot.index, ())) >= MAX_BLOCKS_PER_SLOT for slot in covered):

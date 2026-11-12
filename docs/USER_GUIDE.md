@@ -595,9 +595,17 @@ Day pane (right):
   half hour and the day keeps its own lunch there; every other date keeps the
   lunch Day Settings names. The first drag writes the lunch block the setting
   had been standing in for, its length is still *Day Settings → Lunch
-  (minutes)*, and **deleting** the box (right-click → *Delete block*) hands the
+  (minutes)* until you pick another from its own right-click menu, and
+  **deleting** the box (right-click → *Delete block*) hands the
   date back to Day Settings. A date with its own lunch shows one Lunch box, not
   two: the moved one replaces the setting rather than sitting beside it.
+
+  **Any half hour of the day takes it, in either direction** — including back
+  onto the hour Day Settings names, which is where every lunch starts, and a
+  box that already holds work. A lunch box shows `Lunch` and nothing else, so
+  the tasks that were in that box move to **Outside the day**, and the status
+  line says how many: *Lunch moved to 14:00 — 2 Time Blocks moved below the
+  day*. Drag them back onto the day wherever you want them.
 - **A refusal always says which** — What: One of *That is outside the day — Day
   Settings sets its hours*, *That would run into lunch — try a later box*, or
   *That half hour is full — try another box*. Choosing a length for a block that

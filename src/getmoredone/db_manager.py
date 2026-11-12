@@ -1607,7 +1607,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         bounds,
         ignoring=None,
         day_span=None,
-        ignore_lunch: bool = False,
+        placing_lunch: bool = False,
     ) -> None:
         """Raise ``SlotRefusedError`` unless the grid allows this placement.
 
@@ -1627,7 +1627,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             slots_for_minutes(minutes),
             ignoring=ignoring,
             day_span=day_span,
-            ignore_lunch=ignore_lunch,
+            placing_lunch=placing_lunch,
         )
         if reason:
             raise SlotRefusedError(reason)
@@ -1661,7 +1661,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             day_span=day_span,
             # PF-M8 -- a lunch block defines the lunch it sits on, so it cannot
             # be refused by the lunch it is replacing or moving.
-            ignore_lunch=BlockType.normalize(block.block_type) == BlockType.LUNCH,
+            placing_lunch=BlockType.normalize(block.block_type) == BlockType.LUNCH,
         )
         with self.transaction() as conn:
             self._settle_block_on_slot(block, slot_index, bounds)
@@ -1777,7 +1777,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             ignoring=block.id,
             day_span=day_span,
             # PF-M8 -- moving the day's lunch is not a collision with it.
-            ignore_lunch=BlockType.normalize(block.block_type) == BlockType.LUNCH,
+            placing_lunch=BlockType.normalize(block.block_type) == BlockType.LUNCH,
         )
         with self.transaction():
             self._settle_block_on_slot(block, slot_index, bounds)
@@ -1805,7 +1805,11 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
 
         wanted = clamp_block_minutes(minutes)
         self._refuse_unless_it_fits(
-            block.block_date, block.slot_index, wanted, bounds, ignoring=block.id
+            block.block_date, block.slot_index, wanted, bounds, ignoring=block.id,
+            # PF-M8 -- the same reason the move paths pass it: a lunch block
+            # defines the lunch it sits on, so lengthening it is not a
+            # collision with the Day Settings hour it may be covering.
+            placing_lunch=BlockType.normalize(block.block_type) == BlockType.LUNCH,
         )
         with self.transaction():
             block.planned_minutes = wanted
