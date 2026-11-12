@@ -224,13 +224,23 @@ class _TopmostSpy:
     def __init__(self, topmost: bool = True):
         self._w = ".spy"
         self.writes = []
+        self.reads = 0
+        self.bad_shapes = []
         self._topmost = 1 if topmost else 0
         self.tk = self
 
     def call(self, *args):
         """``wm attributes <name> -topmost [value]`` — read with 4 args, write with 5."""
-        assert args[:2] == ("wm", "attributes") and args[3] == "-topmost", args
+        # Recorded, not asserted: both production callers wrap this in
+        # `except Exception`, which swallows an AssertionError, so a shape
+        # change read as "the helper did nothing" and a test asserting it
+        # wrote nothing passed (cold pass, 2026-11-11).
+        if not (len(args) >= 4 and args[:2] == ("wm", "attributes")
+                and args[3] == "-topmost"):
+            self.bad_shapes.append(args)
+            raise TypeError(f"unexpected wm attributes call: {args}")
         if len(args) == 4:
+            self.reads += 1
             return self._topmost
         self._topmost = int(args[4])
         self.writes.append(bool(self._topmost))
@@ -306,6 +316,14 @@ def test_t53_a_parent_that_was_not_topmost_is_left_alone(root):
     finally:
         dialog.destroy()
 
+    assert parent.bad_shapes == [], (
+        "the helper called wm attributes in a shape this spy does not model, "
+        f"so the assertions below measure nothing: {parent.bad_shapes}"
+    )
+    assert parent.reads == 1, (
+        f"the helper read the parent's -topmost {parent.reads} times; it must "
+        "read it exactly once to decide whether there is anything to lower"
+    )
     assert parent.writes == [], (
         f"the helper wrote -topmost {parent.writes} to a window that did not "
         "have it"

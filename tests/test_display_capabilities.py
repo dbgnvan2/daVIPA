@@ -40,23 +40,107 @@ def _is_a_read_back(node, exempt) -> bool:
     if _root_name(node.func.value) in exempt:
         return False
     if node.func.attr in ("attributes", "wm_attributes"):
-        return (len(node.args) == 1 and isinstance(node.args[0], ast.Constant)
-                and isinstance(node.args[0].value, str)
-                and node.args[0].value.startswith("-"))
+        # One argument is a read whether or not the attribute is written out:
+        # requiring a literal missed `window.attributes(attribute)`, and the
+        # one test in this suite that reads back is parametrised on exactly
+        # that name. Two arguments is a write, which needs no display.
+        return len(node.args) == 1 and not node.keywords
     if node.func.attr == "call":
         literals = [a.value for a in node.args if isinstance(a, ast.Constant)]
         return len(node.args) == 4 and literals[:2] == ["wm", "attributes"]
     return False
 
 
+def _stand_in_classes(tree):
+    """Classes in this file that are stand-ins, not real windows.
+
+    A stand-in has no bases: every one in this suite (``_FakeWindow``,
+    ``_RecordingTk``, ``_TopmostSpy``) answers for itself. A class WITH bases
+    is the opposite case -- ``tests/test_after_tracker.py`` builds
+    ``class _Window(TrackedAfterMixin, ctk.CTkToplevel)`` and
+    ``tests/test_reward_celebration.py`` a ``_Host`` the same way, and both are
+    real always-on-top-capable Tk windows. Exempting those by their name alone
+    made a read-back on one invisible, which is what this detector exists to
+    prevent (cold pass, 2026-11-11).
+
+    Declared anywhere, not only at the top level: a spy class written inside
+    the one test that needs it is the most common shape of all.
+    """
+    return {node.name for node in ast.walk(tree)
+            if isinstance(node, ast.ClassDef) and not node.bases}
+
+
+def _bound_names(target):
+    """Every plain name a binding target introduces, through tuples."""
+    if isinstance(target, ast.Name):
+        return {target.id}
+    if isinstance(target, (ast.Tuple, ast.List)):
+        found = set()
+        for element in target.elts:
+            found |= _bound_names(element)
+        return found
+    return set()
+
+
+def _from_a_stand_in(target, value, classes):
+    """The names ``target = value`` binds to a stand-in, pairing tuples.
+
+    ``window, other = _Spy(), _Spy()`` binds both, and a tuple on the right is
+    not a call -- which a check for a call alone reported as a real read.
+    """
+    if (isinstance(target, (ast.Tuple, ast.List))
+            and isinstance(value, (ast.Tuple, ast.List))
+            and len(target.elts) == len(value.elts)):
+        found = set()
+        for element, bound in zip(target.elts, value.elts):
+            found |= _from_a_stand_in(element, bound, classes)
+        return found
+    if isinstance(value, ast.Call) and _root_name(value.func) in classes:
+        return _bound_names(target)
+    return set()
+
+
 def _stand_in_names(func, classes):
-    """Names in this test bound from a class defined in the same file."""
+    """Names in this test bound from a stand-in class defined in the same file.
+
+    Assignment, annotated assignment and ``with ... as`` all bind, and a tuple
+    target binds several; handling only the first of those reported a spied
+    read as a real one.
+    """
     found = set()
     for node in ast.walk(func):
-        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
-            if _root_name(node.value.func) in classes:
-                found |= {t.id for t in node.targets if isinstance(t, ast.Name)}
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = (node.targets if isinstance(node, ast.Assign)
+                       else [node.target])
+            for target in targets:
+                found |= _from_a_stand_in(target, node.value, classes)
+        elif isinstance(node, ast.withitem):
+            if (isinstance(node.context_expr, ast.Call)
+                    and _root_name(node.context_expr.func) in classes
+                    and node.optional_vars is not None):
+                found |= _bound_names(node.optional_vars)
     return found
+
+
+def _fixture_names(func):
+    """Every fixture this test requests, by signature or by mark.
+
+    Positional, keyword-only and positional-only alike, plus
+    ``@pytest.mark.usefixtures("...")`` -- which is how a fixture requested
+    purely for its side effect is usually written, and which the first version
+    did not see, so such a test was reported as an offender.
+    """
+    args = func.args
+    names = {a.arg for a in
+             args.posonlyargs + args.args + args.kwonlyargs}
+    for decorator in func.decorator_list:
+        if not isinstance(decorator, ast.Call):
+            continue
+        if (isinstance(decorator.func, ast.Attribute)
+                and decorator.func.attr == "usefixtures"):
+            names |= {a.value for a in decorator.args
+                      if isinstance(a, ast.Constant) and isinstance(a.value, str)}
+    return names
 
 
 def _scan(source: str, label: str):
@@ -74,13 +158,23 @@ def _scan(source: str, label: str):
     and with it every test calling one.
     """
     tree = ast.parse(source)
-    classes = {n.name for n in tree.body if isinstance(n, ast.ClassDef)}
+    classes = _stand_in_classes(tree)
 
-    helpers = set()
+    # A helper is any same-file function that reads an attribute back; one
+    # that asks the precondition itself guards every caller, so the ask
+    # propagates with the read. Carrying the read without the ask reported a
+    # self-guarding helper's callers as unguarded (cold pass, 2026-11-11).
+    helpers, guarding_helpers = set(), set()
     for node in tree.body:
         if isinstance(node, ast.FunctionDef) and not node.name.startswith("test_"):
-            if any(_is_a_read_back(inner, set()) for inner in ast.walk(node)):
+            if any(_is_a_read_back(inner, _stand_in_names(node, classes))
+                   for inner in ast.walk(node)):
                 helpers.add(node.name)
+                if any(isinstance(inner, ast.Call)
+                       and isinstance(inner.func, ast.Name)
+                       and inner.func.id == "require"
+                       for inner in ast.walk(node)):
+                    guarding_helpers.add(node.name)
 
     reads, asks, maps = set(), set(), set()
     for node in ast.walk(tree):
@@ -106,7 +200,9 @@ def _scan(source: str, label: str):
                         inner.args and isinstance(inner.args[0], ast.Name)
                         and inner.args[0].id in exempt):
                     reads.add((label, node.name))
-        if "mapped_windows" in [a.arg for a in node.args.args]:
+                    if inner.func.id in guarding_helpers:
+                        asks.add((label, node.name))
+        if "mapped_windows" in _fixture_names(node):
             maps.add((label, node.name))
     return reads, asks, maps
 
@@ -217,33 +313,25 @@ def test_cghm41_every_real_read_back_asks_or_maps():
     )
 
 
-def test_cghm42_a_new_offender_is_detected():
-    """CGH-M4.2 — adversarial (P7): the case the registry could not see.
-
-    Extended 2026-11-11 by the cold pass with the refactored shape: a helper
-    that builds its own window. The first detector reported it as no read-back
-    at all, which is the registry's failure in a new place.
-    """
-    offender = textwrap.dedent("""
-        def test_new_and_unguarded():
+#: Each case is a module source and the tests the detector must report as
+#: unguarded read-backs. Every shape here was measured against this tree: the
+#: first four when the detector replaced the registry, the rest by the two
+#: cold passes of 2026-11-11, which found the detector blind or wrong on each.
+_DETECTOR_CASES = [
+    ("a new test reading -topmost back with no precondition", """
+        def test_offender():
             window = ctk.CTk()
             assert window.attributes("-topmost") == 0
-    """)
-    reads, asks, maps = _scan(offender, "synthetic.py")
-    assert reads - asks - maps == {("synthetic.py", "test_new_and_unguarded")}, (
-        "a new test reading -topmost back with no precondition was not detected"
-    )
+    """, {"test_offender"}),
 
-    guarded = textwrap.dedent("""
-        def test_new_but_asks():
+    ("a test that asks the precondition", """
+        def test_asks():
             require("-topmost")
             window = ctk.CTk()
             assert window.attributes("-topmost") == 0
-    """)
-    reads, asks, maps = _scan(guarded, "synthetic.py")
-    assert reads - asks - maps == set(), "a test that asks was still reported"
+    """, set()),
 
-    spied = textwrap.dedent("""
+    ("a read on a stand-in defined in the file", """
         class _Spy:
             def attributes(self, *args):
                 return 0
@@ -251,14 +339,9 @@ def test_cghm42_a_new_offender_is_detected():
         def test_reads_its_own_spy():
             window = _Spy()
             assert window.attributes("-topmost") == 0
-    """)
-    reads, _, _ = _scan(spied, "synthetic.py")
-    assert reads == set(), "a read on a stand-in defined in the file was flagged"
+    """, set()),
 
-    # The shape the first detector was blind to: the read-back factored into a
-    # helper that builds its own window, so it reads from a local and not from
-    # a parameter. Found by the cold pass of 2026-11-11, in this file.
-    refactored = textwrap.dedent("""
+    ("a read through a helper that builds its own window", """
         def _set_and_read(attribute):
             window = tk.Tk()
             window.tk.call("wm", "attributes", window._w, attribute, 1)
@@ -266,12 +349,97 @@ def test_cghm42_a_new_offender_is_detected():
 
         def test_reads_through_a_helper_of_its_own():
             assert _set_and_read("-topmost") == 1
-    """)
-    reads, asks, maps = _scan(refactored, "synthetic.py")
-    assert reads - asks - maps == {
-        ("synthetic.py", "test_reads_through_a_helper_of_its_own")}, (
-        "a read-back reached through a helper that builds its own window was "
-        "not detected, which is the registry's blind spot in a new shape")
+    """, {"test_reads_through_a_helper_of_its_own"}),
+
+    # A class WITH bases is a real window, not a stand-in. tests/
+    # test_after_tracker.py and tests/test_reward_celebration.py both build one
+    # over ctk.CTkToplevel, and the celebration host is the timer's own window.
+    ("a read on a real window subclassed in the file", """
+        class _Window(SomeMixin, ctk.CTkToplevel):
+            pass
+
+        def test_reads_a_real_subclass(root):
+            window = _Window(root)
+            assert window.attributes("-topmost") == 0
+    """, {"test_reads_a_real_subclass"}),
+
+    ("a stand-in class declared inside the test", """
+        def test_nested_spy():
+            class _Spy:
+                def attributes(self, *args):
+                    return 0
+
+            window = _Spy()
+            assert window.attributes("-topmost") == 0
+    """, set()),
+
+    ("a stand-in bound by a tuple, an annotation and a with", """
+        class _Spy:
+            def attributes(self, *args):
+                return 0
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        def test_tuple_target():
+            window, other = _Spy(), _Spy()
+            assert window.attributes("-topmost") == other.attributes("-alpha")
+
+        def test_annotated():
+            window: _Spy = _Spy()
+            assert window.attributes("-topmost") == 0
+
+        def test_with_as():
+            with _Spy() as window:
+                assert window.attributes("-topmost") == 0
+    """, set()),
+
+    ("a read whose attribute name is a variable", """
+        def test_variable_attribute(attribute):
+            window = tk.Tk()
+            assert window.attributes(attribute) == 0
+    """, {"test_variable_attribute"}),
+
+    ("a test that maps the window by mark rather than by signature", """
+        @pytest.mark.usefixtures("mapped_windows")
+        def test_maps_by_mark():
+            window = tk.Tk()
+            assert float(window.attributes("-alpha")) == 0.0
+    """, set()),
+
+    ("a helper that asks the precondition for its callers", """
+        def _topmost_now():
+            require("-topmost")
+            window = tk.Tk()
+            return window.attributes("-topmost")
+
+        def test_guarded_inside_the_helper():
+            assert _topmost_now() == 0
+    """, set()),
+]
+
+
+@pytest.mark.parametrize("label,source,expected", _DETECTOR_CASES,
+                         ids=[case[0] for case in _DETECTOR_CASES])
+def test_cghm42_a_new_offender_is_detected(label, source, expected):
+    """CGH-M4.2 — adversarial (P7): the cases the registry could not see.
+
+    A registry asserts set equality over the tests that already comply, so it
+    catches one losing its precondition and cannot catch a new one written
+    without any. Each row is a shape the detector was measured against; the
+    five after the fourth are shapes the cold passes found it wrong about, in
+    both directions -- a missed offender and a false accusation are each a
+    reason nobody trusts the guard.
+    """
+    reads, asks, maps = _scan(textwrap.dedent(source), "synthetic.py")
+
+    flagged = {name for _, name in reads - asks - maps}
+    assert flagged == expected, (
+        f"{label}: the detector reported {sorted(flagged)}, expected "
+        f"{sorted(expected)}")
 
 
 def test_cghm43_the_display_dependent_count_is_exact():
