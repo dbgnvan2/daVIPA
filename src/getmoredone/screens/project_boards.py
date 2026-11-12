@@ -476,17 +476,15 @@ class LinkProjectActionItemsDialog(ctk.CTkToplevel):
         self.refresh_results()
 
     def _update_filter_button_appearance(self):
-        palette = semantic_colors()
+        # An inactive filter goes back to the look it was built with; it asked
+        # for a "surface_hover" key semantic_colors() never had (KeyError).
         for btn, is_active in [
             (self.btn_completed, self.filter_completed),
             (self.btn_not_completed, self.filter_not_completed),
             (self.btn_linked, self.filter_linked),
             (self.btn_not_linked, self.filter_not_linked),
         ]:
-            if is_active:
-                btn.configure(fg_color=palette["primary"], hover_color=palette["primary_hover"])
-            else:
-                btn.configure(fg_color=palette["surface"], hover_color=palette["surface_hover"])
+            btn.configure(**button_style("primary" if is_active else "secondary"))
 
     def _link_selected_items(self):
         """File every checked item under this board, exclusively (BP1).
