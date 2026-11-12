@@ -661,6 +661,7 @@ def build_slot_row(
             items_by_id.get(block.item_id),
             inner,
             continued=True,
+            box_fill=fill,
             last_box=last_box,
             chip_height=chip_height,
             title_width=title_width,
@@ -673,6 +674,7 @@ def build_slot_row(
             items_by_id.get(block.item_id),
             inner,
             continued=False,
+            box_fill=fill,
             chip_height=chip_height,
             title_width=title_width,
         )
@@ -799,11 +801,17 @@ def _build_block_chip(
     row: int,
     *,
     continued: bool,
+    box_fill: str,
     last_box: bool = True,
     chip_height: int = SLOT_CHIP_HEIGHT_PX,
     title_width: int = SLOT_TITLE_WIDTH_PX,
 ) -> ctk.CTkFrame:
     """One task inside a box.
+
+    ``box_fill`` is the colour the chip is being drawn on, from the caller that
+    filled it. The chip takes the other of the two surface tokens, so it has an
+    edge wherever it lands -- PBG-A7, measured by
+    ``test_pbga7_a_chip_is_not_the_colour_of_the_box_it_sits_in``.
 
     ``continued`` marks the second and later boxes of a longer task: shown so
     the time is accounted for, greyed and without its controls so it is not
@@ -814,10 +822,21 @@ def _build_block_chip(
 
     # PBG-M4 -- PB-M4's shading and PB-M7's shaded continuation are gone with
     # the band scheme; padding's bar, not its fill, tells it from a task.
-    # The 1px border is the chip's edge: a chip filled with either surface
-    # token is 1.0:1 against some box it can sit in. Tests: PBG-A7.
+    #
+    # PBG-A7: with the tint gone, a fixed fill was 1.0:1 against some box the
+    # chip can sit in -- a task box is ``surface_subtle``, a padding or lunch
+    # box is ``surface``. A 1px border measured 1.34:1 in ``davipa`` and drew
+    # under the children, which reach the chip's edges on three sides. Taking
+    # the token the box does not use can be neither occluded nor low-contrast.
     padding = kind in (BlockType.BUFFER, BlockType.BREAK)
-    fill = "transparent" if padding else palette["surface_subtle"]
+    # Compared by value: ``box_fill`` is one of the two tokens this same
+    # ``semantic_colors()`` call returns, or "transparent" -- and an empty box
+    # has no chips.
+    fill = (
+        palette["surface"]
+        if box_fill == palette["surface_subtle"]
+        else palette["surface_subtle"]
+    )
     body_text = palette["body_text"]
 
     chip = ctk.CTkFrame(
@@ -825,8 +844,6 @@ def _build_block_chip(
         fg_color=fill,
         corner_radius=4,
         height=chip_height - 4,
-        border_width=1,
-        border_color=palette["border"],
     )
     chip.grid(row=row, column=0, sticky="ew", pady=1)
     configure_chip_columns(chip, title_width)
@@ -1040,6 +1057,7 @@ def build_outside_group(
             items_by_id.get(block.item_id),
             0,
             continued=False,
+            box_fill=palette["surface_subtle"],
             chip_height=chip_height,
             title_width=title_width,
         )

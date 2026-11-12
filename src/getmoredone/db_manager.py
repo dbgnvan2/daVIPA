@@ -1646,7 +1646,8 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         Tests:   tests/test_time_block_crud.py::test_tgm61_two_blocks_share_a_slot
 
         The fit is checked before anything is written, so a refusal leaves the
-        day exactly as it was rather than rolling a write back.
+        day exactly as it was rather than rolling a write back. ``day_span``
+        is as ``_refuse_unless_it_fits`` documents it -- the day as drawn.
 
         ``after_block_id`` and ``at_top`` are PF-M3: a box orders its blocks by
         ``position`` and a drop joins the end, which is right for an unrelated
@@ -1765,9 +1766,12 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         if it is already there, which is what lets it be nudged inside a full
         box instead of being refused by its own presence.
 
-        ``day_span`` is PF-M9: a block dropped past either end of the day is
-        asking for the day to be wider, and the fit has to be checked against
-        the day that will exist rather than the one on screen.
+        ``day_span`` is PF-M9, as ``_refuse_unless_it_fits`` documents it:
+        the day as the screen has **drawn** it, which is wider than the
+        template whenever blocks sit past either end. An earlier version of
+        this line said "the day that will exist rather than the one on
+        screen", which read as though the call could widen the day; it cannot
+        (PBG-A3).
         """
         block = self.get_time_block(block_id)
         if block is None:
@@ -1801,7 +1805,11 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
 
         ``day_span`` as ``_refuse_unless_it_fits`` documents it. Without the
         parameter, which is how this shipped until 2026-11-12, every length
-        was refused on a box the drawn day added (PBG-A3).
+        was refused on a box the drawn day added -- the length the block
+        already had included, so the menu was dead there (PBG-A3). With it,
+        a length is still refused when it would run past the last drawn box,
+        because that box is not on the day: widening the day is **Later**'s
+        job, not this call's.
         """
         from .time_block_layout import clamp_block_minutes
 
