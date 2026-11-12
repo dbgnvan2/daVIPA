@@ -229,3 +229,32 @@ def test_pdm9_the_two_marks_are_legible_on_the_row_surface(restore_appearance):
         f"marks closer than {MIN_CONTRAST}:1 to the surface behind them: "
         + "; ".join(failures)
     )
+
+
+def test_pbga11_two_bundled_themes_have_one_surface_where_the_app_wants_two():
+    """PBG-A11 — ``apple_grey`` and ``black_white`` set both surfaces alike.
+
+    The app separates a row from its pane, and a Plan chip from its box, with
+    one pair of tokens: ``surface`` is ``CTkFrame.fg_color`` and
+    ``surface_subtle`` is ``CTkFrame.top_fg_color``. Two bundled themes give
+    them the same value in both modes -- ``#FFFFFF``/``#1D1D1F`` and
+    ``#FFFFFF``/``#000000`` -- so on those two there is no edge to be had
+    whichever token the code picks. That is app-wide and older than the Plan
+    screen's badge: every list row in the app is the colour of its pane there.
+    PBG-M3 only made the Plan screen join them, by taking away the priority
+    tint that had been separating its rows.
+
+    An exact set, not a count: this is a shipped-colour decision the user has
+    to make (BACKLOG PBG-A11), and until it is made the suite should say which
+    two themes it covers for and fail if a third one flattens.
+    """
+    flat = set()
+    for path in sorted(Path("themes").glob("*.json")):
+        frame = json.loads(path.read_text())["CTkFrame"]
+        if frame["fg_color"] == frame["top_fg_color"]:
+            flat.add(path.stem)
+
+    assert flat == {"apple_grey", "black_white"}, (
+        "the themes whose two surfaces are one colour are no longer the two "
+        f"this is filed for: {sorted(flat)}"
+    )

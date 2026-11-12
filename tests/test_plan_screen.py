@@ -135,6 +135,44 @@ def root():
 
 
 @pytest.fixture
+def two_tone_theme():
+    """Pin a theme whose two surface tokens are different colours.
+
+    ``light_appearance`` fixed the mode; the theme leaked anyway. A colour
+    test that compares ``surface`` against ``surface_subtle`` was measuring
+    whichever theme the *suite* had left loaded, because ``apply_theme`` is
+    global: this file alone leaves CustomTkinter's built-in ``blue``
+    (``gray86``/``gray81``), and the full suite leaves one of the two bundled
+    themes that set ``CTkFrame.top_fg_color`` equal to ``fg_color``. So
+    ``test_pbga4`` and ``test_pbga7`` passed locally and failed on CI, on the
+    same commit.
+
+    The pair those two tests are about cannot exist on a flat theme, which is
+    PBG-A11 and is counted by ``tests/test_time_block_colors.py``'s
+    ``test_pbga11_two_bundled_themes_have_one_surface_where_the_app_wants_two``.
+    Pinning a two-tone theme is what makes the assertion here deterministic
+    and able to fail.
+    """
+    import copy
+
+    from src.getmoredone.theme import theme_path_for
+
+    saved_theme = copy.deepcopy(ctk.ThemeManager.theme)
+    saved_name = getattr(ctk.ThemeManager, "_currently_loaded_theme", None)
+    ctk.set_default_color_theme(str(theme_path_for("blue")))
+    assert (
+        ctk.ThemeManager.theme["CTkFrame"]["fg_color"]
+        != ctk.ThemeManager.theme["CTkFrame"]["top_fg_color"]
+    ), "themes/blue.json no longer gives two surfaces, so this fixture is a lie"
+    try:
+        yield
+    finally:
+        ctk.ThemeManager.theme = saved_theme
+        if saved_name is not None:
+            ctk.ThemeManager._currently_loaded_theme = saved_name
+
+
+@pytest.fixture
 def light_appearance():
     """Pin the appearance mode, so a colour assertion is not host-dependent.
 
@@ -1179,7 +1217,7 @@ def _box_of(chip):
 
 
 def test_pbga7_a_chip_is_not_the_colour_of_the_box_it_sits_in(
-    root, manager, light_appearance
+    root, manager, light_appearance, two_tone_theme
 ):
     """PBG-A7 — the chip has an edge, in each box it can land in.
 
@@ -1194,6 +1232,11 @@ def test_pbga7_a_chip_is_not_the_colour_of_the_box_it_sits_in(
     the real parent rather than restated: a task chip and a padding chip land
     in boxes of different colours, so one assertion per kind would pass for a
     chip pinned to either token.
+
+    ``two_tone_theme`` because the two tokens are one colour on two of the ten
+    bundled themes, where no choice between them can give the chip an edge
+    (PBG-A11). Without it this test measured whichever theme the suite had
+    left loaded.
     """
     item = _scored_item(manager, "Draft the proposal")
     task = _item_block()
@@ -3168,7 +3211,7 @@ def test_pbga2_the_plan_screen_passes_the_users_own_priority_colours(
 
 
 def test_pbga4_an_item_row_is_not_the_colour_of_the_pane_behind_it(
-    root, manager, settings, light_appearance
+    root, manager, settings, light_appearance, two_tone_theme
 ):
     """PBG-A4 — the row has an edge, in the pane it is actually drawn in.
 
@@ -3181,6 +3224,10 @@ def test_pbga4_an_item_row_is_not_the_colour_of_the_pane_behind_it(
 
     So this measures them against each other, through ``PlanScreen``: a row
     built on a bare root has no pane to be the same colour as.
+
+    ``two_tone_theme`` for the reason ``test_pbga7`` gives: on ``apple_grey``
+    and ``black_white`` the two tokens are one colour, and the row has no edge
+    there whatever the code does (PBG-A11).
     """
     item = _scored_item(manager, "Draft the proposal")
     panel = PlanScreen(root, manager, _App(settings))
@@ -3304,9 +3351,15 @@ def test_the_empty_item_note_fits_the_column_it_is_drawn_in(
     ``plan_items_col_width`` alone can no longer make one, because it is raised
     to what an item row needs. The column is read back off the screen rather
     than restated here, for that reason.
+
+    It asked for 240px at a 60px title column until 2026-11-12. PBG-M1's badge
+    put 60px more into the row, so that pair floors at 284 and the test failed
+    on its own precondition -- case (c), over-specified: a literal that was a
+    reachable floor and is not one now. Both settings are below the floor now,
+    so both clamp to it and the precondition names the floor itself.
     """
-    settings.drag_schedule_title_col_width = 60
-    settings.plan_items_col_width = 240
+    settings.drag_schedule_title_col_width = 1
+    settings.plan_items_col_width = 50
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = SATURDAY
     panel.refresh()
@@ -3318,9 +3371,10 @@ def test_the_empty_item_note_fits_the_column_it_is_drawn_in(
         and "No open items start" in child.cget("text")
     )
     width = panel.items_col_width()
-    assert width <= 240, (
-        f"the column came out at {width}px, so it is not the narrow one this "
-        "test is about"
+    floor = panel.items_width_floor()
+    assert width == floor, (
+        f"the column came out at {width}px rather than its {floor}px floor, "
+        "so it is not the narrowest one this test is about"
     )
     assert note.winfo_reqwidth() <= width, (
         f"the note asks for {note.winfo_reqwidth()}px inside a {width}px column"
