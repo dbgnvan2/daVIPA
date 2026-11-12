@@ -91,7 +91,12 @@ BLACK_WHITE_NEUTRAL_OVERRIDES: Dict[Tuple[str, str], List[str]] = {
     ("CTkEntry", "fg_color"): ["#FFFFFF", "#111111"],
     ("CTkEntry", "border_color"): ["#9CA3AF", "#6B7280"],
     ("CTkEntry", "text_color"): ["#000000", "#FFFFFF"],
-    ("CTkEntry", "placeholder_text_color"): ["#6B7280", "#9CA3AF"],
+    # SEP-M6 -- darkened from `#6B7280` with SEP-M1. The subtle surface it is
+    # read on went from `#FFFFFF` to `#F3F4F6`, which took this pair from
+    # 4.834 to 4.393 and so under the 4.5 bar the rest of this file is held
+    # to. `#4B5563` is this theme's own border dark, already shipped above,
+    # and measures 6.867 on the subtle surface and 7.557 on `#FFFFFF`.
+    ("CTkEntry", "placeholder_text_color"): ["#4B5563", "#9CA3AF"],
 }
 
 
