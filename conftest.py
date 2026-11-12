@@ -127,6 +127,8 @@ def _preattach_weekly_tactic_log(session):
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(logging.INFO)
     logger.addHandler(handler)
+    # As get_weekly_tactic_logger does, so tests see production's routing.
+    logger.propagate = False
     session.config._gmd_weekly_log_handler = handler
     session.config._gmd_weekly_log_dir = workspace
 

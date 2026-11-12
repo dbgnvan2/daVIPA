@@ -544,3 +544,12 @@ def test_the_temp_database_directory_is_removed_at_the_end_of_a_run(tmp_path):
         f"the run left {len(leftovers)} temp database director(ies) behind: "
         f"{[q.name for q in leftovers]}"
     )
+
+
+def test_rlsm8_the_preattached_logger_does_not_propagate():
+    """The pre-attached logger routes like production's: not to root."""
+    import logging
+
+    from src.getmoredone.weekly_tactic_logging import LOGGER_NAME
+
+    assert logging.getLogger(LOGGER_NAME).propagate is False
