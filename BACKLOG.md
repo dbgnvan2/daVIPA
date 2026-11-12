@@ -23,6 +23,35 @@ One batch at a time in this checkout (`CLAUDE.md`). What is here is open work:
 adjacent issues from recent batches, screen reports, the carried-forward
 features, and the long-standing bugs, requests and user stories at the end.
 
+## Adjacent issues — the suite's honesty about its environment (CGH, filed 2026-11-11)
+
+Found while building CGH-M1 - CGH-M4 and not fixed, under global rule 10.
+
+### CGH-A1 — the `-topmost` silencer only inspects the first attribute (low)
+
+`conftest.py`'s wrapper drops a `-topmost` write only when it is the FIRST
+argument:
+
+```python
+if args and args[0] == "-topmost" and len(args) > 1:
+    return None
+```
+
+`window.attributes("-alpha", 0.0, "-topmost", True)` is one call that sets
+both, and it would go straight through to Tk — the hole the wrapper exists to
+close, in the one shape it does not look at. An un-silenced `-topmost` during
+a run forces window-server round-trips and has beachballed this machine.
+
+Latent, not live: all six call sites under `src/` are single-attribute
+(`grep -rn "attributes(" src/` → `"-topmost", True` or `'-topmost', True`),
+so nothing produces the multi-attribute form today. `_RecordingTk` in
+`tests/test_tk_offscreen.py` already recognises `-topmost` anywhere in the
+call, so the test spy is stricter than the thing it tests.
+
+Fix when touched: scan the argument pairs rather than `args[0]`, and drop the
+`-topmost` pair while passing the rest through. Found by the third cold pass
+of the CGH batch, which was reviewing the spy, not the wrapper.
+
 ## Adjacent issues — the VSP tab filters and adds (VTF, filed 2026-11-11)
 
 Found while building VTF-M1 - VTF-M7 and not fixed, under global rule 10.

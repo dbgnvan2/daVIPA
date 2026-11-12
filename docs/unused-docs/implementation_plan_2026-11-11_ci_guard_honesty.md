@@ -180,6 +180,61 @@ accusing line and the timestamp-only branch change.
 >
 > Also deleted: `_requirers()`, left without a caller by `bf8b6c6`.
 
+> **Third amendment, 2026-11-11.** The second cold pass also returned a high,
+> so a third ran, in a third family: the correctness of the new tooling code
+> itself -- the AST detector and the two spies -- which neither earlier pass
+> had reviewed as code. One high, five medium, all fixed in-loop and each
+> mutation-proved; `test_cghm42` is now a ten-row table, one row per shape the
+> detector has been measured against.
+>
+> 1. **High: the stand-in exemption was "any class declared in this file".**
+>    `_stand_in_names` exempted every name bound from one, with no test that
+>    the class is a double -- and `tests/test_after_tracker.py` and
+>    `tests/test_reward_celebration.py` each declare a real
+>    `ctk.CTkToplevel` subclass, the celebration host being the timer's own
+>    always-on-top window. A read-back on one was invisible. A stand-in is now
+>    a class with **no bases**, which every real one here is, and classes
+>    declared anywhere count, not only at the top level -- a spy written
+>    inside the one test that needs it being the commonest shape.
+> 2. **A read is one argument, literal or not.** Requiring a string literal
+>    missed `window.attributes(attribute)`, and the suite's one read-back test
+>    is parametrised on exactly that name; it was seen only because it happens
+>    to go through the four-token `tk.call` branch.
+> 3. **`@pytest.mark.usefixtures("mapped_windows")` now counts as mapping**,
+>    as do keyword-only and positional-only parameters. Every current consumer
+>    takes the fixture positionally and never reads it, which is what pushes
+>    the next person to the mark -- and the mark would have been reported as an
+>    offence.
+> 4. **An ask propagates through a helper, as a read already did.** A helper
+>    that calls `require` itself guards every caller; carrying the read
+>    without the ask reported those callers as unguarded.
+> 5. **A stand-in bound by a tuple, an annotation or `with ... as` is a
+>    stand-in.** Only plain `name = Spy()` was recognised.
+> 6. **`_TopmostSpy` asserted its call shape**, and both production callers
+>    wrap the call in `except Exception`, which swallows an `AssertionError` --
+>    so a shape change read as "the helper did nothing", and T5.3, whose
+>    assertions are that nothing was written, passed against a helper that no
+>    longer reached the parent at all. The spy records the bad shape and
+>    raises `TypeError`; T5.3 asserts the shapes are empty and that the parent
+>    was read exactly once. Proved by mutating `_read_topmost` to return
+>    `False` without reading: T5.3 was green before, red now.
+>
+> Dropped as below medium, measured and recorded by the reviewer: two-level
+> helper chains, a helper that is a method, `getattr(window, "attributes")`,
+> a packed `tk.call` read, `tk.call(*tokens)`, and `async def` tests (no async
+> test exists and `pytest_asyncio` is not installed). Filed instead of fixed,
+> under global rule 10: `BACKLOG.md` `CGH-A1`, the `-topmost` silencer looking
+> only at the first argument of a multi-attribute write.
+>
+> `_RecordingTk` came back clean: the reviewer exercised `_flatten` and
+> `_is_a_topmost_write` over thirteen real argument shapes, both flat and
+> packed, reads and writes, and found the loop terminating and the index
+> arithmetic right in both directions. What it could not exercise is the
+> `__getattr__` proxy against tkinter's own machinery -- the proxy is
+> installed around a single `attributes()` call with no event processing and
+> no child construction in between, and `finally` restores it, but that is
+> reasoning, not a measurement.
+
 ## 5. What this batch cannot verify here, and how it is proved
 
 `CGH-M3.1` makes two tests take `mapped_windows`, the fixture the local
