@@ -2208,12 +2208,15 @@ Three things the plan did not foresee, found by running it:
   `unscheduled_mark` is `#991B1B`, 5.33:1, and
   `test_pdm9_the_two_marks_are_legible_on_the_row_surface` measures it against
   the surface it is actually on.
-- **The empty-list note's wrap floor is now out of reach.** The badge's 44px
-  widens the narrowest items column to 209px, which leaves 153px to wrap in
-  against a 120px floor. `NOTE_MIN_WRAP_PX` stays as defence;
-  `test_the_empty_item_note_wraps_even_in_a_narrow_column` asserts the state of
-  that rather than a floor nothing can reach, and says in its own message what
-  to restore if a narrower column becomes possible.
+- **The empty-list note's wrap floor is now out of reach.** The badge widens
+  the narrowest items column to 225px, which leaves 169px to wrap in against a
+  120px floor. The first cut kept `NOTE_MIN_WRAP_PX` "as defence" and rewrote
+  its test to assert that the floor was dead; the sweep called that P27, and it
+  was right — a guard nothing can trip is not a guard, and a test named for a
+  floor that asserts the floor's unreachability is worse than no test.
+  `NOTE_MIN_WRAP_PX` and its `max()` are deleted, and
+  `test_the_empty_item_note_wraps_to_the_narrowest_column_there_is` asserts
+  what actually keeps the note wrapping: the floor on the column itself.
 
 The bar was going to be the theme's neutral and is **transparent** instead: with
 the band gone it carries nothing, and 6px of grey in its place is ink that says
@@ -2221,10 +2224,42 @@ nothing. The widget stays because its height is what holds a title inside its
 box. Padding's bar is then the only bar drawn, which is what tells a buffer from
 a task now that both surfaces are flat.
 
-Adjacent, found and not fixed (global rule 10): `PRIORITY_BANDS` and
-`UNSCORED_BAND` survive in `time_block_layout.py` with no reader in `src/` —
-`test_priority_floor_and_cap` measures the score's cap against the top
-threshold, which is why they were kept rather than deleted with
-`priority_band`. Four imports in `tests/` were unused before this batch and
-still are (`CHIP_BARS_COLUMN`, `SLOT_MARKER_WIDTH_PX`, `MAX_BLOCKS_PER_SLOT` in
-`test_plan_screen.py`, `SchedulingOptions` in `time_block_layout.py`).
+Adjacent, found and not fixed (global rule 10): `PRIORITY_BANDS` survives in
+`time_block_layout.py` with no reader in `src/` — `test_priority_floor_and_cap`
+measures the score's cap against the top threshold, which is why it was kept
+rather than deleted with `priority_band`; `UNSCORED_BAND` had no reader at all
+and was deleted in the sweep. Filed as PBG-A9 (the level fills are close in
+value to the row surface, which is true on all six screens and so is not a
+Plan-screen defect) and PBG-A10 (a pre-cap score of five or six digits is wider
+than the 60px every screen reserves for it). Four imports in `tests/` were
+unused before this batch and still are (`CHIP_BARS_COLUMN`,
+`SLOT_MARKER_WIDTH_PX`, `MAX_BLOCKS_PER_SLOT` in `test_plan_screen.py`,
+`SchedulingOptions` in `time_block_layout.py`).
+
+### What the cold sweep changed (2026-11-12)
+
+Three cold passes ran over this batch and the LMM fix commits before the push:
+one against `learnings.md`'s P1–P44, one against `ui-regression.md` and the
+repo's test rules, one over the LMM fixes alone. Two highs and six mediums were
+fixed in loop; below-medium findings were dropped, bar four that were plainly
+false statements this batch had written. Nine new mutations were run, each red
+where expected, every mutated file restored byte-exact.
+
+| Finding | What was wrong | Fix | Guard |
+|---|---|---|---|
+| badge width | `SLOT_BADGE_WIDTH_PX` was 44px, justified as "wide enough for `P:100`". The scale's top is `MAX_SCORE` = 9999, and a *filled* badge spends `corner_radius` as padding on each side: `P:9999` asks for 57px, overflowing into the title column, which at the pane's floor has no slack | 60px, the same the five list screens reserve, with the measurement in the comment | `::test_pbga5_the_badge_fits_the_column_reserved_for_it` |
+| settings not proven | `plan.py` passes `settings=self.settings`, but the only badge test called the builder with `settings=None` and compared against `level_cell_fill(None, item)` — both sides default, so deleting the screen's argument left the suite green while Settings → Priority Colours stopped reaching the screen | a `test_pdm15`-shaped guard: a colour no default uses, set in settings, read off the real row | `::test_pbga2_the_plan_screen_passes_the_users_own_priority_colours` |
+| chips had no edge | With the tint gone a task chip and the box holding tasks are both `surface_subtle`, and a padding chip's `"transparent"` resolves to the `surface` its own box is filled with — 1.0:1 either way, and two tasks in one box with nothing between them | the chip carries the box's own 1px border, which does not depend on which box it landed in | `::test_pbgm4_padding_keeps_its_neutral_and_a_task_does_not` |
+| row/pane not measured | A reviewer predicted the item row was the exact colour of the pane behind it, reasoning from `CTkScrollableFrame`'s source. Measured on the built screen it is not — `items_scroll` resolves to `surface` and the row is `surface_subtle` — but nothing asserted the pair, and a first attempt at the "fix" did cause the collision | the relationship is measured through `PlanScreen`, not restated | `::test_pbga4_an_item_row_is_not_the_colour_of_the_pane_behind_it` |
+| `day_span`, five sites | LM-6 passed the drawn day on the lunch-move path and left its siblings. `move_block_to_slot` took its box index off `_slot_frames`, which is built over the drawn day, and checked against the template; `set_block_length` had no `day_span` parameter at all, so a resize on a box the drawn day added was refused whatever length was asked for | both pass the drawn span; `set_block_length` gains the parameter. `add_padding_block` and AutoLoad still omit it, deliberately — `template_span` names the template as what they may fill — and that line is now drawn in `BACKLOG.md` | `::test_pbga8_an_ordinary_block_moves_onto_a_box_the_extended_day_drew`, `tests/test_time_block_crud.py::test_pbga3_a_block_on_a_drawn_box_can_be_resized` |
+| false docstring | `_refuse_unless_it_fits` told every caller that omitting `day_span` checks "the template's hours stretched to this date's own blocks". `can_place` does no stretching. That sentence is what made all five omissions look safe | corrected, and it says where the argument may be omitted on purpose | — (prose) |
+| mark contrast, one theme | `test_pdm9` measured the two marks against whichever theme the test process had loaded. `surface_subtle` is `CTkFrame.top_fg_color`, which each theme file sets for itself | measured against all ten bundled themes in both modes, read out of the JSON. All twenty surfaces clear 4.5:1 | `tests/test_time_block_colors.py::test_pdm9_the_two_marks_are_legible_on_the_row_surface` |
+| wrap floor | above | above | above |
+| stale prose | four statements this batch had written that were false: `_scored_item` said it produced 51200 when the cap makes it 9999; the marker's comment explained its colours as "a mark on a priority fill"; `chip_column_minsizes` said "the same four columns"; a `priority_levels` docstring had a broken line wrap | corrected | — (prose) |
+| dead on arrival | `UNSCORED_BAND`, and `MIN_NON_TEXT_CONTRAST` / `MIN_TINT_CONTRAST` / `_luminance_of` in `test_time_block_colors.py`, left behind by the deleted tests — constants naming bars nothing enforces | deleted | — |
+
+The guide changed with the code: the item row's parts, the continuation box
+(its shared *colour* said which task owned the half hour, and that colour is
+gone), the items-column floor (384px → 444px), the three refusal strings it
+quoted verbatim and had wrong, and the resize sentence, which is now true on a
+box the drawn day added.

@@ -31,30 +31,30 @@ they do not rest on the same evidence. LMM-A1's refusal was executed, not only
 read: `can_place` called with `day_span` omitted and a slot outside the
 template span returns `outside_grid`, so its mechanism is observed and only the
 screen-level sequence -- extend the day, drag a block onto the new outer box --
-is predicted. LMM-A2 and LMM-A3 were located by reading and neither was
-executed.
+was predicted. It has since been reproduced and fixed (below). LMM-A2 and
+LMM-A3 were located by reading and neither was executed.
 
-### LMM-A1 — a block dragged onto an extended slot is refused (medium)
+### ~~LMM-A1 — a block dragged onto an extended slot is refused (medium)~~ — fixed 2026-11-12
 
-`screens/plan.py:3002`, inside `move_block_to_slot`, calls
-`place_block_at(block_id, slot_index, self.bounds)` with no `day_span`.
-`can_place` falls back to `template_span(bounds)` when it is left out
-(`time_block_layout.py:803`), so the check runs against Day Settings' hours
-rather than against the day actually drawn. A slot the user extended the day to
-reach is then outside the span the check knows about and the drop is refused
-`outside_grid`.
+Fixed in the PBG sweep, together with a fifth call site the entry below had
+claimed was fine. `move_block_to_slot` now passes `day_span=self._grid.span`
+to `place_block_at`, and `set_block_length` takes a `day_span` of its own —
+it had no such parameter at all, so a right-click resize of any block on a box
+the drawn day added was refused `outside_grid` whatever length was asked for,
+the one it already had included. Guards:
+`tests/test_plan_screen.py::test_pbga8_an_ordinary_block_moves_onto_a_box_the_extended_day_drew`
+and `tests/test_time_block_crud.py::test_pbga3_a_block_on_a_drawn_box_can_be_resized`.
 
-Its own sibling gets this right: `move_block_to_edge` passes
-`day_span=grown.span` (`screens/plan.py:3047`), and so do the four other call
-sites (`plan.py:1391`, `:1470`, `:2356`, `:2963`). This one is the omission.
-
-Same shape as the bug the LMM batch fixed — a placement check reading a stale
-or default idea of the day — which is why it is filed rather than dropped: a
-drag that is refused with a sentence about the grid, on a slot the user can
-see, is the failure the user reported in the first place.
-
-Fix when touched: pass `day_span=self._grid.span`, as `plan.py:2356` does, and
-cover it with a test that extends the day and drops a block on the new box.
+**The completeness claim in the original entry was wrong**, and that is the
+part worth keeping. It said the four other call sites got it right and "this
+one is the omission". There were three more: `set_block_length` above,
+`add_padding_block` (`plan.py:1316`) and AutoLoad (`plan.py:1946`). The last
+two are deliberate — `template_span`'s docstring names the template as what
+AutoLoad and the break button are allowed to fill — but the entry drew no line
+between a deliberate omission and a defective one, which is what the next
+reader would have acted on. The false docstring on
+`_refuse_unless_it_fits` that made every omission look safe is corrected in
+the same change.
 
 ### LMM-A2 — nothing refuses a second LUNCH block on one date (low)
 
@@ -89,21 +89,53 @@ is the one answer a user cannot read.
 
 PBG-M5 deleted `priority_band` and the three colour tables it fed, because the
 Plan screen was their only user and it draws the priority *level* badge now.
-`PRIORITY_BANDS` and `UNSCORED_BAND` (`time_block_layout.py:69`) survived: they
-are the arithmetic, and `tests/test_priority_floor_and_cap.py:231` measures the
-score's cap against the top threshold, as does
+`PRIORITY_BANDS` (`time_block_layout.py:66`) survived: it is the arithmetic,
+and `tests/test_priority_floor_and_cap.py:231` measures the score's cap against
+the top threshold, as does
 `test_priority_level_colors.py::test_plcm14_a_big_score_is_not_a_critical_level`.
+`UNSCORED_BAND` did not — the PBG sweep deleted it, because `priority_band`
+was its only reader and nothing was left to use the name.
 
-So they are not dead, but their only readers are tests. Either is defensible —
-they are a true statement about `priority_score` whether or not anything
-colours it — and the decision is worth making deliberately rather than by
-default: delete them and rewrite those two tests against
-`PriorityFactors.MAX_SCORE`, or keep them and say in the comment that they are
-a scale with no renderer. The comment says the second today.
+So `PRIORITY_BANDS` is not dead, but its only readers are tests. Either is
+defensible — it is a true statement about `priority_score` whether or not
+anything colours it — and the decision is worth making deliberately rather
+than by default.
 
-Fix when touched: decide the question first. If yes, add the `elif edge is not
-None` case alongside the other two; if no, report a refusal instead of
-dropping the gesture.
+Fix when touched: either delete it and rewrite those two tests against
+`PriorityFactors.MAX_SCORE`, or keep it and say in the comment that it is a
+scale with no renderer. The comment says the second today.
+
+### PBG-A9 — the badge's pill is nearly the value of the row behind it (low)
+
+In the light themes the shipped level fills (`#DCFCE7`, `#FEF3C7`) measure
+about 1.3:1 against `surface_subtle`, so on screen the badge reads as a number
+rather than as a coloured pill. The number itself is the signal and the badge's
+*text* is derived for contrast by `level_cell_fill`, so nothing is illegible —
+but the Plan screen traded a two-theme band table, whose values were held to
+3:1 and 10:1 bars, for a scheme with no such bar, and that trade was not
+measured when it was made.
+
+Not fixed, because the fix is to darken the level defaults and those are the
+colours the user set and the five list screens already draw. The same property
+is true on all six screens; this is not a Plan-screen defect.
+
+Fix when touched: decide whether the level fills want a minimum against the
+row surface at all. If they do, the bar belongs in
+`tests/test_priority_level_colors.py`, over all six screens at once, not here.
+
+### PBG-A10 — a pre-cap score is wider than the cell reserved for it (low)
+
+`priority_score` is capped at `PriorityFactors.MAX_SCORE`, but rows written
+before PRI-M2 still hold the raw product, up to 102400. `P:102400` is 59px of
+text and 71px with the badge's corner-radius padding, against the 60px the
+Plan row and the five list screens each reserve — so such a row overflows its
+column and takes the width out of its neighbour. Pre-existing on the five list
+screens; the Plan badge inherits it.
+
+Fix when touched: either migrate the stored scores to the cap once, which is
+the only way the displayed number stops disagreeing with what the app can
+produce, or render `min(score, MAX_SCORE)` and say in the guide that it is
+capped.
 
 ## Adjacent issue — the priority cell colour (PCC, filed 2026-11-12)
 

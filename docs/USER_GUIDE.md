@@ -461,8 +461,9 @@ Items pane (left):
 - **Items starting \<date\>** — What: Open items whose start date is that date,
   highest priority score first. Why: These are the only items the day is built
   from. Each row is one line, laid out exactly like a task inside a day box:
-  colour stripe, title, a mark saying whether the item is scheduled, the depth
-  bars, and the block length it would get (`30m`) at the right-hand end. The
+  title, a mark saying whether the item is scheduled, the depth bars, the
+  priority badge, and the block length it would get (`30m`) at the right-hand
+  end. The
   mark is a **green ✓** when the day already holds a block for this item and a
   **red ?** when it holds none, so the column says something about every row
   rather than only about the scheduled ones. It is a mark rather than the words
@@ -538,14 +539,16 @@ Day pane (right):
   length in minutes. Why: The box tells you the time; the chip tells you the
   task.
 - **A task that runs through a box** — What: The later boxes of a longer task
-  are shaded and striped like the box that starts it, and marked with `↳`. Each
-  reads `same task`, except the final one, which reads how many minutes of
+  are drawn on the same surface as the box that starts it, and marked with `↳`.
+  Each reads `same task`, except the final one, which reads how many minutes of
   itself the task leaves — `15m spare` for a 45-minute task in two boxes. Why:
-  the colour says which task owns the half hour and the arrow says it is the
-  same one, continued. They were drawn unshaded at first, so that a
-  continuation would not read as a second task of equal weight; on screen a
-  90-minute task became one coloured box followed by two empty ones, which
-  reads as a task that stops after half an hour. Only the last box can have
+  the arrow says it is the same task, continued, and the title repeated in each
+  box says which one. Until 2026-11-12 the shared *colour* said that, because
+  every task carried a priority band tint; with the tint gone the title and the
+  arrow carry it. They were drawn unshaded at first, so that a continuation
+  would not read as a second task of equal weight; on screen a 90-minute task
+  became one filled box followed by two empty ones, which reads as a task that
+  stops after half an hour. Only the last box can have
   minutes left over, so only the last box claims any: a middle box is spent in
   full.
 - **Colour** — What: Nothing in the day pane is priority-coloured. A task's
@@ -596,8 +599,8 @@ Day pane (right):
   draw one, and in the "Outside the day" group beneath the item list.
 - **Lunch** — What: A box like any other, labelled `Lunch`, that takes no tasks.
   Why: It is part of the day's shape, so it is drawn in its place rather than as
-  a gap you have to infer. A drop on it is refused with *That would run into
-  lunch — try a later box*.
+  a gap you have to infer. A drop on it is refused with *That Time Block runs
+  into lunch — try a later one*.
 
   **Lunch can be moved, on that date only.** Drag the `Lunch` box onto another
   half hour and the day keeps its own lunch there; every other date keeps the
@@ -614,11 +617,13 @@ Day pane (right):
   the tasks that were in that box move to **Outside the day**, and the status
   line says how many: *Lunch moved to 14:00 — 2 Time Blocks moved to Outside the
   day*. Choosing a longer lunch from its right-click menu says the same thing
-  about the boxes the new length takes. Drag them back onto the day wherever
-  you want them.
-- **A refusal always says which** — What: One of *That is outside the day — Day
-  Settings sets its hours*, *That would run into lunch — try a later box*, or
-  *That half hour is full — try another box*. Choosing a length for a block that
+  about the boxes the new length takes — including on a box that only exists
+  because you dragged the day open with **Earlier** or **Later**, where until
+  2026-11-12 the length menu refused every length it offered. Drag them back
+  onto the day wherever you want them.
+- **A refusal always says which** — What: One of *That Time Block is outside
+  the day — Day Settings sets its hours*, *That Time Block runs into lunch —
+  try a later one*, or *That Time Block is full — try another one*. Choosing a length for a block that
   is not on a box yet says *That block is not on a box yet — drag it onto a half
   hour first*. Why: Nothing is written, nothing is moved, and you are told what
   stopped it, in the screen's own words rather than the database's.
@@ -804,7 +809,7 @@ Date Increment Settings:
 - **Drag Schedule date text color** — What: Hex color for date-box text (default `#FFFFFF`). Why: Improve readability across box colors.
   - Includes **Pick Color** button for visual selection.
 - **Drag Schedule box height (px)** — What: Controls the height of all Drag Schedule date/future boxes, and, since 2026-11-06, the height of each task in a Plan half-hour box. Why: Match readability and spacing preferences, and keep a task the same size on both screens. A larger value makes the Plan tasks easier to read but makes the day scroll; empty half hours keep their compact height whatever this is set to. A blank, zero or non-numeric value falls back to 30 for the Plan boxes rather than flattening them, and a value below 30 is raised to 30 — one line of text, below which a half hour holding two tasks clips the second. Saving it takes effect as soon as you leave Settings; before 2026-11-06 the value was written to the file and the screens kept the one they started with until the next launch.
-- **Plan items column width (px)** — What: Width of the items column on the Plan screen (default 260). Why: Size it to the titles you actually have; the day column takes the rest of the window. A blank, zero or non-numeric value falls back to 260 rather than hiding the list. Either way the width is then raised, if it has to be, to what one item row needs — the stripe, *Drag Schedule title column width (px)*, the "already blocked" marker, the depth bars and the block length with its right-hand gap, plus the pane's own padding and scrollbar. At the default sizes that is 384px, so the shipped 260 is raised: a narrower column would clip the block length off the right-hand edge of every row with nothing on screen to say so. Dragging the divider between the panes writes this same setting. Narrowing the window takes width off this column first, down to that floor, so the day column keeps enough room to draw a block; widening it gives the width back.
+- **Plan items column width (px)** — What: Width of the items column on the Plan screen (default 260). Why: Size it to the titles you actually have; the day column takes the rest of the window. A blank, zero or non-numeric value falls back to 260 rather than hiding the list. Either way the width is then raised, if it has to be, to what one item row needs — the stripe, *Drag Schedule title column width (px)*, the "already blocked" marker, the depth bars, the priority badge and the block length with its right-hand gap, plus the pane's own padding and scrollbar. At the default sizes that is 444px, so the shipped 260 is raised: a narrower column would clip the block length off the right-hand edge of every row with nothing on screen to say so. Dragging the divider between the panes writes this same setting. Narrowing the window takes width off this column first, down to that floor, so the day column keeps enough room to draw a block; widening it gives the width back.
 - **Completion Badge** — What: Optional image shown on completed Today items. Why: Replace the default large green check mark with your preferred badge.
 - **Confetti Every N Completions** — What: Controls how often confetti triggers on Today completions. Why: Tune or disable celebration feedback.
 
