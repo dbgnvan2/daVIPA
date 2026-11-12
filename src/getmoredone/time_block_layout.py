@@ -64,8 +64,9 @@ MAX_DEPTH_BARS = 3
 # (20 x 20 x 16 x 16), and rows written then still hold the raw number, so
 # these thresholds have to keep classifying scores above the cap. Bands are
 # thresholds on that product, lowest bound first match wins from the top.
-# The colours for these band names live in theme.py; only the arithmetic is
-# here, so a theme change cannot alter which band an item is in.
+# No screen draws these bands since PBG-M5 (2026-11-12) and their three colour
+# tables are deleted. The thresholds stay because they are what the score's cap
+# is measured against -- ``test_priority_floor_and_cap`` reads the top one.
 PRIORITY_BANDS: Tuple[Tuple[int, str], ...] = (
     (2000, "critical"),
     (500, "high"),
@@ -320,47 +321,9 @@ def depth_bars(depth: Optional[str]) -> int:
     return DEPTH_BARS.get((depth or "").strip().lower(), DEFAULT_DEPTH_BARS)
 
 
-def priority_band(score: Optional[int]) -> str:
-    """Which band a priority score falls in.
-
-    Returns ``"unscored"`` for 0, None or a negative: an item missing one of its
-    four factors scores 0, and that is absence of information, not low priority.
-    Painting it the same colour as a genuinely low-priority item would invent
-    data the user never entered.
-    """
-    try:
-        number = int(score)
-    except (TypeError, ValueError):
-        return UNSCORED_BAND
-    if number <= 0:
-        return UNSCORED_BAND
-    for threshold, name in PRIORITY_BANDS:
-        if number >= threshold:
-            return name
-    return UNSCORED_BAND
-
-
-# ---------------------------------------------------------------------------
-# Retired with the order-based model (TG, 2026-11-05)
-#
-# ``DayTooFullError``, ``PackedBlock``, ``pack_day``, ``sort_blocks``,
-# ``renumber``, ``move_block`` and ``move_block_to_gap`` lived here.
-#
-# A planned day was an *order*: ``position`` was the truth, and the clock times
-# were derived by walking that order from Day Start, past lunch, until the day
-# ran out -- which is what ``DayTooFullError`` reported. A fixed grid stores the
-# box instead, so there is nothing to pack and no ceiling to run past: the last
-# box ends at Day End. ``position`` keeps its name and now orders the tasks
-# *inside* one box, which ``_next_position_in_slot`` assigns directly, so
-# nothing renumbers a day any more. A drop names a box, so there is no "between
-# rows 2 and 3" gap to convert into a list position.
-#
-# Deleted rather than left unused: a guard that can no longer fire is the thing
-# this repo's checklist warns about (P27), because the next reader takes its
-# presence as evidence that the case it names still exists.
-#
-# ``sort_blocks_by_slot`` below is the replacement for ``sort_blocks``.
-# ---------------------------------------------------------------------------
+# PBG-M5 -- ``priority_band`` was here: ``priority_score`` bucketed into
+# critical/high/medium/low/unscored. Its three colour tables are gone with it
+# (see ``theme.py``), and nothing else read the bucket.
 
 
 def total_planned_minutes(blocks: Iterable[TimeBlock]) -> int:

@@ -14,8 +14,10 @@ urgency. There are three, and they are the three the user named:
 
 A level is **not** a priority *band*. A band is a threshold on
 ``priority_score``, which is the *product* of all four factors
-(``time_block_layout.PRIORITY_BANDS``); it has five names of its own and its own
-colours in ``theme.py``. The band named "critical" and the level named "Any
+(``time_block_layout.PRIORITY_BANDS``); it has five names of its own and, until
+PBG-M5 (2026-11-12), three colour tables in ``theme.py``. Since then the level
+is the only priority anything is drawn in. The band named "critical" and the
+level named "Any
 Critical" are different questions about the same item, and the answers come
 apart: a Medium / Medium / XL / XL item scores 400, which is the ``high`` band,
 while having no high or critical factor at all. That is why this module carries
@@ -31,7 +33,7 @@ Two deliberate choices in ``priority_level``:
   about this build, not a rule.
 * **A missing factor is not an excuse.** Importance ``None`` with urgency
   ``Critical`` is Any Critical. This preserves the ``or`` the five list screens
-  have always used, and it is the opposite of ``priority_band``, where one
+  have always used, and it is the opposite of the band arithmetic, where one
   missing factor makes the whole item ``unscored``. The two are answering
   different questions: a band asks how big the score is, which a missing factor
   makes unanswerable, and a level asks whether the user marked either factor

@@ -139,16 +139,17 @@ def semantic_colors() -> Dict[str, str]:
         # item the day already holds a block for, a red question mark for one
         # it does not.
         #
-        # Their own tokens rather than `success_strong`/`danger`, because they
-        # are drawn on a priority *fill* and not on a surface. In the light
-        # theme the fills are pale tints, so the marks are the same dark green
-        # and red those two tokens carry there. In the dark theme the fills are
-        # deep -- the `low` fill is #052E16 -- and `success_strong`'s dark
-        # green measures 1.63:1 against it, a mark nobody can see, so the dark
-        # theme takes the light pair instead. Measured by
-        # ``tests/test_time_block_colors.py::test_pdm9_the_two_marks_are_legible_on_every_fill``.
+        # Their own tokens rather than `success_strong`/`danger`: they were
+        # drawn on a priority *fill* until PBG-M3 (2026-11-12) and keep their
+        # own values now that the row is `surface_subtle`, because that surface
+        # is darker than the pale light-theme tint they were chosen against.
+        # The dark pair is the lighter one for the same reason in reverse.
+        # Measured by
+        # ``tests/test_time_block_colors.py::test_pdm9_the_two_marks_are_legible_on_the_row_surface``.
         "scheduled_mark": "#166534" if mode == "light" else "#4ADE80",
-        "unscheduled_mark": "#B91C1C" if mode == "light" else "#FCA5A5",
+        # #B91C1C measured 4.15:1 on that surface, under the 4.5:1 a glyph
+        # needs; this is 5.33:1.
+        "unscheduled_mark": "#991B1B" if mode == "light" else "#FCA5A5",
     }
 
 
@@ -271,112 +272,11 @@ def schedule_colors() -> Dict[str, object]:
     }
 
 
-def priority_band_colors() -> Dict[str, str]:
-    """TB-M12 — one accent colour per priority band, light and dark.
-
-    Purpose: colour a block by the priority of the item behind it.
-    Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m12
-    Tests:   tests/test_time_block_colors.py::test_tbm122_band_colors_meet_contrast_in_both_themes
-
-    The band a score falls in is decided by ``time_block_layout.priority_band``,
-    not here: a theme change must not be able to move an item into a different
-    band. This function only says what each band looks like.
-
-    Centralised for the same reason the rest of this module is -- the project
-    rule is no hard-coded colours in widgets, and a one-off hex in plan.py
-    would be a second place a band's colour could be changed from.
-
-    "unscored" is a deliberate fifth value, not a fallback: an item missing one
-    of its four priority factors scores 0, and that is absence of information.
-    Painting it the same grey-green as a genuinely low-priority item would show
-    the user data they never entered.
-    """
-    mode = (ctk.get_appearance_mode() or "Dark").lower()
-    if mode == "light":
-        # Darker than the obvious 600-weight tints: those land at 4.2-4.3
-        # against the light theme's block surface (CTkFrame top_fg_color,
-        # gray81), which clears the 3:1 WCAG bar for a non-text accent but
-        # leaves nothing spare if a band colour is ever put behind text. These
-        # clear 4.5:1 -- measured against that surface, not the lighter page
-        # background, because the stripe is drawn on the block.
-        return {
-            "critical": "#991B1B",
-            "high": "#9A3412",
-            "medium": "#92400E",
-            "low": "#166534",
-            "unscored": "#52525B",
-        }
-    return {
-        "critical": "#F87171",
-        "high": "#FB923C",
-        "medium": "#FBBF24",
-        "low": "#4ADE80",
-        "unscored": "#94A3B8",
-    }
-
-
-def priority_stripe_colors() -> Dict[str, str]:
-    """PB-M1 — the band accent as a stripe, brighter than the text-safe set.
-
-    Purpose: a visible priority bar, without weakening the colours that have
-             to sit behind a label.
-    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m1
-    Tests:   tests/test_time_block_colors.py::test_pbm12_stripe_colors_meet_the_non_text_contrast_bar
-
-    A second table rather than an edit of ``priority_band_colors`` because the
-    two are held to different bars and cannot both be satisfied by one value.
-    A stripe is not text, so WCAG asks 3:1 of it; a band colour behind a label
-    is text, and asks 4.5:1. On a pale light-theme surface, brighter means less
-    contrast, so the light set below sits as high up each ramp as 3:1 allows
-    and the text-safe set stays where 4.5:1 put it.
-
-    The dark values are identical to ``priority_band_colors``: that set already
-    clears 4.5:1 against the dark surface with room to spare, so there is
-    nothing to trade and no second value worth inventing.
-    """
-    mode = (ctk.get_appearance_mode() or "Dark").lower()
-    if mode == "light":
-        return {
-            "critical": "#DC2626",
-            "high": "#C2410C",
-            "medium": "#B45309",
-            "low": "#15803D",
-            "unscored": "#71717A",
-        }
-    return dict(priority_band_colors())
-
-
-def priority_fill_colors() -> Dict[str, str]:
-    """PB-M4 — the shade a task is drawn on, by the priority behind it.
-
-    Purpose: carry priority as the shading of the task itself, not only as a
-             6px bar at its edge.
-    Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m4
-    Tests:   tests/test_plan_screen.py::test_pbm41_a_chips_title_is_coloured_for_the_shade_behind_it
-
-    A tint and not the accent. A wall of saturated rows stops carrying
-    information and fights the text on top of it, whatever the colour's source,
-    and the project rule permits a fill only where the foreground is derived
-    from it. These are chosen so ``pick_text_color`` clears 4.5:1 on them and
-    so the band's own stripe still clears 3:1 when drawn on them rather than on
-    the bare surface.
-    """
-    mode = (ctk.get_appearance_mode() or "Dark").lower()
-    if mode == "light":
-        return {
-            "critical": "#FEE2E2",
-            "high": "#FFEDD5",
-            "medium": "#FEF3C7",
-            "low": "#DCFCE7",
-            "unscored": "#F4F4F5",
-        }
-    return {
-        "critical": "#450A0A",
-        "high": "#431407",
-        "medium": "#451A03",
-        "low": "#052E16",
-        "unscored": "#27272A",
-    }
+# PBG-M5 -- ``priority_band_colors``, ``priority_stripe_colors`` and
+# ``priority_fill_colors`` were here: three tables keyed by the five bands of
+# ``priority_score``. The Plan screen was their only reader, and since
+# 2026-11-12 it draws the priority *level* badge the list screens draw. The
+# level table below is what remains, and is now the only priority colour.
 
 
 def priority_level_fill_colors() -> Dict[str, str]:

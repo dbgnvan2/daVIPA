@@ -1,32 +1,29 @@
 """TB-M7/TB-M12 — the two row widgets the Plan screen is built from.
 
-Purpose: render one draggable action item, and one time block, with the
-         priority band as an accent, depth as a three-bar stack, and a height
-         that tracks the block's length.
+Purpose: render one draggable action item, and one time block, with priority
+         as the badge the list screens draw, depth as a three-bar stack, and a
+         height that tracks the block's length.
 Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_blocks.md#tb-m12
 Tests:   tests/test_plan_screen.py
 
-Every colour here comes from theme.py. The project rule is no hard-coded hex
-in widgets, and a band colour written inline would be a second place it could
-be changed from -- which is the condition the rule exists to prevent, not a
-style preference.
+Every colour here comes from theme.py or, for the badge, from
+priority_levels.py. The project rule is no hard-coded hex in widgets: a colour
+written inline would be a second place it could be changed from, which is the
+condition the rule exists to prevent, not a style preference.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import customtkinter as ctk
 
-from ..color_contrast import pick_text_color
 from ..models import ActionItem, BlockType, Status, TimeBlock
+from ..priority_levels import level_cell_fill
 from ..theme import (
     block_type_colors,
     depth_bar_colors,
-    priority_band_colors,
-    priority_fill_colors,
-    priority_stripe_colors,
     semantic_colors,
     status_text_color,
 )
@@ -34,15 +31,14 @@ from ..time_block_layout import (
     block_title,
     MAX_DEPTH_BARS,
     depth_bars,
-    priority_band,
     slots_for_minutes,
     spare_minutes_in_last_slot,
 )
 
-# The coloured edge that carries the priority band. Narrow on purpose: a
-# saturated full-row fill stops carrying information and starts fighting the
-# text on top of it, and this band has no derived foreground of its own -- the
-# project rule permits a fill only where the row's foreground comes from it.
+# The edge of a task's line. It carried the priority band until PBG-M4 and is
+# transparent now: priority is the badge's colour, and a grey bar in its place
+# would be ink that says nothing. The widget stays because its height is what
+# holds a title inside its box -- see ``STRIPE_MIN_HEIGHT_PX``.
 STRIPE_WIDTH_PX = 6
 
 #: What the stripe asks to be tall. It is gridded ``sticky="ns"`` and stretched
@@ -77,6 +73,10 @@ SLOT_STRIPE_GAP_PX = 8
 #: own fixed width, so "30m" and "120m" end at the same pixel.
 SLOT_BARS_WIDTH_PX = 22
 SLOT_LENGTH_WIDTH_PX = 48
+
+#: PBG-M1 -- the priority badge's column, wide enough for ``P:100`` so a
+#: three-digit score is not clipped and every badge ends at the same pixel.
+SLOT_BADGE_WIDTH_PX = 44
 
 #: The column left of the depth bars. In the left pane it carries the marker
 #: that says the day already holds a block for this item; in a day box it is
@@ -113,7 +113,8 @@ CHIP_STRIPE_COLUMN = 0
 CHIP_TITLE_COLUMN = 1
 CHIP_MARKER_COLUMN = 2
 CHIP_BARS_COLUMN = 3
-CHIP_LENGTH_COLUMN = 4
+CHIP_BADGE_COLUMN = 4
+CHIP_LENGTH_COLUMN = 5
 
 
 def chip_column_minsizes(title_width: int = SLOT_TITLE_WIDTH_PX):
@@ -134,6 +135,7 @@ def chip_column_minsizes(title_width: int = SLOT_TITLE_WIDTH_PX):
         title_width,
         SLOT_MARKER_WIDTH_PX,
         SLOT_BARS_WIDTH_PX,
+        SLOT_BADGE_WIDTH_PX,
         SLOT_LENGTH_WIDTH_PX + CHIP_RIGHT_INSET_PX,
     )
 
@@ -185,52 +187,10 @@ SLOT_ROW_GAP_PX = 2
 ITEM_ROW_MIN_HEIGHT_PX = 33
 
 
-def stripe_for_item(item: Optional[ActionItem]) -> str:
-    """PB-M1 — the brighter band colour, for the stripe on an item's row."""
-    return priority_stripe_colors()[_band_of(item)]
-
-
-def fill_for_item(item: Optional[ActionItem]) -> str:
-    """PB-M4 — the shade a task is drawn on, by the priority behind it."""
-    return priority_fill_colors()[_band_of(item)]
-
-
-def _band_of(item: Optional[ActionItem]) -> str:
-    """Which priority band an item falls in, or "unscored" when there is none."""
-    if item is None:
-        return "unscored"
-    return priority_band(getattr(item, "priority_score", 0))
-
-
-def accent_for_item(item: Optional[ActionItem]) -> str:
-    """The band colour for the item behind a block, or the unscored grey."""
-    return priority_band_colors()[_band_of(item)]
-
-
-def accent_for_block(block: TimeBlock, item: Optional[ActionItem]) -> str:
-    """The accent for a block: its priority band, or a neutral for padding.
-
-    Buffer and break blocks carry no item, so they get a neutral. Colouring
-    them by a priority they do not have would be information the eye reads and
-    the data does not support.
-    """
-    kind = BlockType.normalize(block.block_type)
-    if kind in (BlockType.BUFFER, BlockType.BREAK):
-        return block_type_colors()[kind]
-    return accent_for_item(item)
-
-
-def stripe_for_block(block: TimeBlock, item: Optional[ActionItem]) -> str:
-    """PB-M1 — ``accent_for_block`` in the brighter stripe table.
-
-    Padding keeps its neutral: ``block_type_colors`` is already the dimmest
-    thing on the row and brightening it would make a buffer compete with the
-    task beside it for attention it has no claim to.
-    """
-    kind = BlockType.normalize(block.block_type)
-    if kind in (BlockType.BUFFER, BlockType.BREAK):
-        return block_type_colors()[kind]
-    return stripe_for_item(item)
+# PBG-M5 -- ``stripe_for_item``, ``fill_for_item``, ``_band_of``,
+# ``accent_for_item``, ``accent_for_block`` and ``stripe_for_block`` were here.
+# The band scheme they read is deleted: priority is the badge's colour now, and
+# a second scheme kept alive beside it is a second answer to one question.
 
 
 class DepthBarStack(ctk.CTkFrame):
@@ -311,6 +271,7 @@ def build_item_row(
     *,
     box_height: int = SLOT_CHIP_HEIGHT_PX,
     title_width: int = SLOT_TITLE_WIDTH_PX,
+    settings: Any = None,
 ) -> ctk.CTkFrame:
     """One action item in the left pane, ready to be dragged onto the day.
 
@@ -366,12 +327,13 @@ def build_item_row(
     the top either way -- so the line was kept until the mutation gate showed
     that moving the weight changed nothing it could see.
     """
-    fill = fill_for_item(item)
-    on_fill = pick_text_color(fill)
+    # PBG-M3 -- the theme's own surface. The row carried a priority fill and a
+    # band stripe until 2026-11-12; the badge below carries priority now.
+    palette = semantic_colors()
     span = slots_for_minutes(work_block_minutes)
     frame = ctk.CTkFrame(
         parent,
-        fg_color=fill,
+        fg_color=palette["surface_subtle"],
         corner_radius=6,
         height=item_row_height(span, box_height),
     )
@@ -386,7 +348,7 @@ def build_item_row(
         frame,
         width=STRIPE_WIDTH_PX,
         height=STRIPE_MIN_HEIGHT_PX,
-        fg_color=stripe_for_item(item),
+        fg_color="transparent",
         corner_radius=3,
     )
     stripe.grid(
@@ -396,7 +358,11 @@ def build_item_row(
     stripe.grid_propagate(False)
 
     title = ctk.CTkLabel(
-        frame, text=item.title, anchor="w", justify="left", text_color=on_fill
+        frame,
+        text=item.title,
+        anchor="w",
+        justify="left",
+        text_color=palette["body_text"],
     )
     title.grid(row=0, column=CHIP_TITLE_COLUMN, sticky="ew", pady=(5, 0))
 
@@ -431,6 +397,19 @@ def build_item_row(
     # way, which is why the bars already lined up there.
     bars.grid(row=0, column=CHIP_BARS_COLUMN, padx=(4, 6), pady=(5, 0))
 
+    # PBG-M2 -- the badge the five list screens draw in their Priority cell,
+    # on the same ``level_cell_fill`` colour, so one scheme answers "what
+    # priority is this" everywhere. An uncoloured level keeps the row's text.
+    cell = level_cell_fill(settings, item)
+    ctk.CTkLabel(
+        frame,
+        text=f"P:{item.priority_score}",
+        width=SLOT_BADGE_WIDTH_PX,
+        fg_color=cell.fill or "transparent",
+        text_color=cell.text_color or palette["body_text"],
+        corner_radius=6 if cell.fill else 0,
+    ).grid(row=0, column=CHIP_BADGE_COLUMN, sticky="e", pady=(5, 0))
+
     # The length, where a box writes it: the right-hand end of the task's own
     # line. This is the same task before it has been dragged there.
     ctk.CTkLabel(
@@ -438,7 +417,7 @@ def build_item_row(
         text=f"{work_block_minutes}m",
         width=SLOT_LENGTH_WIDTH_PX,
         anchor="e",
-        text_color=on_fill,
+        text_color=palette["body_text"],
     ).grid(
         row=0, column=CHIP_LENGTH_COLUMN, sticky="ne",
         padx=(0, CHIP_RIGHT_INSET_PX), pady=(5, 0),
@@ -820,21 +799,12 @@ def _build_block_chip(
     palette = semantic_colors()
     kind = BlockType.normalize(block.block_type)
 
-    # PB-M4: the task carries its priority as shading, not only as the bar at
-    # its edge. Padding has no priority to shade with, so it keeps the bare
-    # surface and the theme's own text.
-    #
-    # PB-M7: a continuation is shaded too. It was left unfilled on the
-    # argument that shading it would read as a second task of equal weight;
-    # on screen the opposite happened -- a 90-minute task was one coloured box
-    # followed by two empty ones, which reads as a task that stops. The arrow
-    # is what says "the same task, continued", and it is enough to say it.
-    if kind in (BlockType.BUFFER, BlockType.BREAK):
-        fill = "transparent"
-        body_text = palette["body_text"]
-    else:
-        fill = fill_for_item(item)
-        body_text = pick_text_color(fill)
+    # PBG-M4 -- PB-M4's shading and PB-M7's shaded continuation are both gone
+    # with the band scheme. A task is the theme's subtle surface and padding is
+    # transparent, which is what tells the two apart now.
+    padding = kind in (BlockType.BUFFER, BlockType.BREAK)
+    fill = "transparent" if padding else palette["surface_subtle"]
+    body_text = palette["body_text"]
 
     chip = ctk.CTkFrame(
         parent, fg_color=fill, corner_radius=4, height=chip_height - 4
@@ -853,9 +823,9 @@ def _build_block_chip(
         chip,
         width=STRIPE_WIDTH_PX,
         height=STRIPE_MIN_HEIGHT_PX,
-        # PB-M7: the continuation's bar is the task's bar. A border-grey one
-        # made the later half hours of a long task look like padding.
-        fg_color=stripe_for_block(block, item),
+        # Padding keeps its own neutral, which with both surfaces flat is the
+        # one thing left that distinguishes it. A task's bar draws nothing.
+        fg_color=block_type_colors()[kind] if padding else "transparent",
         corner_radius=3,
     )
     stripe.grid(
@@ -883,9 +853,6 @@ def _build_block_chip(
             text=f"{spare}m spare" if spare else "same task",
             width=SLOT_LENGTH_WIDTH_PX,
             anchor="e",
-            # PB-M7: chosen for the shade now behind it, like the title. The
-            # theme's muted text is the right colour for the theme's surface
-            # and the wrong one for a band tint.
             text_color=body_text,
         ).grid(
             row=0, column=CHIP_LENGTH_COLUMN, sticky="e",

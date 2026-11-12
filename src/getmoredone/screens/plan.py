@@ -1038,6 +1038,10 @@ class PlanScreen(ctk.CTkFrame):
                         ),
                         box_height=self.box_height(),
                         title_width=self.box_title_width(),
+                        # PBG-M2 -- the badge's colour is the user's priority
+                        # scheme, which lives here as it does on the five
+                        # list screens. ``None`` resolves to the defaults.
+                        settings=self.settings,
                     )
                     self.bind_item_drag(frame, item)
 
