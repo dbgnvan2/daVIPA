@@ -537,6 +537,35 @@ in `docs/spec_coverage.md` § *PBG*. Touches
   The requirement reverses that criterion, and its test is retired with the
   reason recorded where it stood.
 
+### docs/unused-docs/implementation_plan_2026-11-12_surface_separation.md
+
+Implementation plan for giving `apple_grey` and `black_white` a subtle surface
+distinct from their frame surface (SEP-M1 - SEP-M4, SEP-D1). **Approved
+2026-11-12 and built the same day: 5 of 5 criteria `done`** — per-criterion
+status in `docs/spec_coverage.md` § *Surface separation*. Touches
+`tools/generate_ctk_themes.py`, the two themes it writes, one guard and the
+documents; **no line under `src/`**:
+
+- Those two themes set `CTkFrame.top_fg_color` equal to `CTkFrame.fg_color` in
+  both modes, and those are the two tokens `theme.py` exposes as
+  `surface_subtle` and `surface` — the only thing separating a list row from
+  its pane and a Plan chip from its box. So every list row in the app was the
+  colour of its pane on the default theme. App-wide, and older than the Plan
+  screen's badge: PBG-M3 only made the Plan screen join it.
+- Found by CI, not by a sweep, because `test_pbga4` and `test_pbga7` pinned
+  the appearance mode but not the theme and so measured suite order. Revision
+  1 of this plan would have derived a separated colour inside
+  `semantic_colors()`; it was abandoned for `BACKLOG.md` PBG-A11's better
+  argument that the fix is a shipped colour and belongs in the generator.
+- No new palette decision was needed, which was the stated reason PBG-A11 had
+  been deferred: `apple_grey` already declared the three-level stack and
+  `black_white` already ships the greys it needed. `#2C2C2E` is the only new
+  literal.
+- The guard was inverted, not added: it asserted the flat set was exactly
+  those two, which pinned the bug in place once the decision was made.
+- §7's manual checklist is unwalked. Nothing automated looks at a rendered
+  screen, and the change reaches 39 call sites across 15 modules.
+
 ### docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
 
 Implementation plan for the six VSP Planning tabs' left-to-right filter and the
