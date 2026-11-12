@@ -23,6 +23,66 @@ One batch at a time in this checkout (`CLAUDE.md`). What is here is open work:
 adjacent issues from recent batches, screen reports, the carried-forward
 features, and the long-standing bugs, requests and user stories at the end.
 
+## Adjacent issues — the Day Plan's lunch and drag moves (LMM, filed 2026-11-12)
+
+Found while building the lunch-block move fix (`3adfc91`) and not fixed, under
+global rule 10. Located by reading the code named in each entry; none of the
+three was reproduced on the running screen, so the mechanism is verified and
+the symptom is predicted.
+
+### LMM-A1 — a block dragged onto an extended slot is refused (medium)
+
+`screens/plan.py:3002`, inside `move_block_to_slot`, calls
+`place_block_at(block_id, slot_index, self.bounds)` with no `day_span`.
+`can_place` falls back to `template_span(bounds)` when it is left out
+(`time_block_layout.py:803`), so the check runs against Day Settings' hours
+rather than against the day actually drawn. A slot the user extended the day to
+reach is then outside the span the check knows about and the drop is refused
+`outside_grid`.
+
+Its own sibling gets this right: `move_block_to_edge` passes
+`day_span=grown.span` (`screens/plan.py:3047`), and so do the four other call
+sites (`plan.py:1391`, `:1470`, `:2356`, `:2963`). This one is the omission.
+
+Same shape as the bug the LMM batch fixed — a placement check reading a stale
+or default idea of the day — which is why it is filed rather than dropped: a
+drag that is refused with a sentence about the grid, on a slot the user can
+see, is the failure the user reported in the first place.
+
+Fix when touched: pass `day_span=self._grid.span`, as `plan.py:2356` does, and
+cover it with a test that extends the day and drops a block on the new box.
+
+### LMM-A2 — nothing refuses a second LUNCH block on one date (low)
+
+`lunch_window` (`time_block_layout.py:572`) walks the date's blocks and
+`return`s on the first `LUNCH` it finds. A second one is not an error, it is
+simply unread: it keeps its slot, it draws, and it shades nothing. No write
+path refuses it either, so a duplicate can only arrive from a bug elsewhere or
+from a hand-edited database — which is why this is low rather than medium.
+
+Fix when touched: either refuse the second write where lunch blocks are
+created, or have `lunch_window` surface the duplicate rather than silently
+taking the first (the "surface, never silently drop" rule, P2/P9). A silent
+`return` on the first of several is the shape that hides the state.
+
+### LMM-A3 — the Day Settings lunch chip cannot be dropped on Earlier/Later (low)
+
+The `kind == "lunch"` branch of `on_drag_release` (`screens/plan.py:2766`)
+handles `target` and `pointer_over_day()` and has no `edge` case. The two
+branches above it both do — `item` at `plan.py:2736` and `block` at `:2753` —
+so dropping the lunch chip past either end of the day silently does nothing,
+while the same gesture with an Action Item or a scheduled block extends the
+day.
+
+Whether lunch *should* be able to extend the day is a product question, not
+only a defect: a lunch outside the drawn day is arguably meaningless. But the
+present behaviour answers it by doing nothing at all and saying nothing, which
+is the one answer a user cannot read.
+
+Fix when touched: decide the question first. If yes, add the `elif edge is not
+None` case alongside the other two; if no, report a refusal instead of
+dropping the gesture.
+
 ## Adjacent issues — the suite's honesty about its environment (CGH, filed 2026-11-11)
 
 Found while building CGH-M1 - CGH-M4 and not fixed, under global rule 10.
