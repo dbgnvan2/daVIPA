@@ -850,3 +850,56 @@ def test_cem12c_clearing_the_id_clears_the_calendar_with_it(tmp_path):
         assert cleared.calendar_event_calendar_id is None
     finally:
         manager.close()
+
+
+# --- LM-1/LM-2/LM-4 — a lunch block is not refused by the lunch it defines ---
+
+def _lunch_at(manager, slot_index, minutes=60, block_date=DAY):
+    """This date's own lunch block, in a box, the way the screen writes one."""
+    block = TimeBlock(
+        block_date=block_date,
+        start_time="",
+        end_time="",
+        planned_minutes=minutes,
+        label="Lunch",
+        block_type=BlockType.LUNCH,
+    )
+    return manager.add_block_at(block, slot_index, BOUNDS)
+
+
+def test_lmm2_lunch_is_not_refused_by_a_box_that_is_full_of_tasks(manager):
+    """LM-2 — the room left in a box is no reason to refuse the day's lunch.
+
+    A lunch box draws "Lunch" and nothing else, so ``build_day_grid`` surfaces
+    whatever was in it under "Outside the day" rather than hiding it. Counting
+    those tasks against the move left lunch unable to reach that half hour at
+    all, which is a position the user cannot put lunch on.
+    """
+    lunch = _lunch_at(manager, 4)
+    for n in range(MAX_BLOCKS_PER_SLOT):
+        _at(manager, 30, f"task {n}", 11)
+
+    manager.place_block_at(lunch.id, 11, BOUNDS)
+
+    assert manager.get_time_block(lunch.id).slot_index == 11
+    grid = build_day_grid(manager.get_time_blocks(DAY), BOUNDS)
+    assert sorted(b.label for b in grid.outside) == [
+        "task 0", "task 1", "task 2", "task 3"
+    ], "the displaced tasks are not surfaced"
+
+
+def test_lmm4_a_lunch_block_can_be_lengthened_on_the_settings_hour(manager):
+    """LM-4 — the resize path is the move path's sibling and passes the flag.
+
+    ``set_block_length`` never passed it, so ``lunch_window`` ignored the block
+    being resized, ``can_place`` fell back to Day Settings' hour, and a lunch
+    block sitting on that hour refused every length that covered it.
+    """
+    lunch = _lunch_at(manager, 8, minutes=30)   # 12:00, the settings' hour
+
+    manager.set_block_length(lunch.id, 60, BOUNDS)
+
+    resized = manager.get_time_block(lunch.id)
+    assert (resized.planned_minutes, resized.start_time, resized.end_time) == (
+        60, "12:00", "13:00",
+    )

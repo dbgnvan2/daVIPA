@@ -6832,6 +6832,60 @@ def test_pfm87_deleting_the_lunch_block_returns_the_date_to_the_settings(
     assert "12:00" in _lunch_times(screen), _lunch_times(screen)
 
 
+# ===== LM-1/LM-3 — lunch moves to any box, in either direction ==============
+
+
+def test_lmm1_lunch_moves_off_the_settings_hour_and_back_again(screen, manager):
+    """LM-1 — the move is not one-way: any box, either direction, repeatedly.
+
+    Reported from the running screen: lunch can be dragged away from where it
+    starts and not back. Every lunch block starts on Day Settings' hour, and
+    ``can_place`` passed ``None`` for "no lunch is in the way", which
+    ``day_grid`` reads as that very hour -- so it was the one box lunch could
+    never return to.
+
+    The status is asserted against the block's own start time, because
+    ``place_block_at`` works on its own copy: reported from the block read
+    before the write, it named the time lunch was leaving.
+    """
+    settings_hour = (
+        screen.bounds.lunch_start_minutes - screen.bounds.day_start_minutes
+    ) // SLOT_MINUTES
+    assert "12:00" in _lunch_times(screen), "precondition: the settings' lunch"
+
+    for target in (4, settings_hour, 4, settings_hour):
+        screen.place_lunch_at(target)
+
+        status = screen.status_label.cget("text")
+        blocks = _lunch_blocks(manager)
+        assert len(blocks) == 1, (target, blocks)
+        assert blocks[0].slot_index == target, (target, blocks[0].slot_index, status)
+        assert status == f"Lunch moved to {blocks[0].start_time}", (target, status)
+
+
+def test_lmm3_a_lunch_move_says_how_many_blocks_it_displaced(screen, manager):
+    """LM-3 — work lunch lands on goes below the day, and is said out loud.
+
+    A lunch box draws "Lunch" and nothing else, so the tasks in the box lunch
+    moves onto are surfaced under "Outside the day" rather than refused (LM-2)
+    or hidden. A relocation nobody is told about is one the user finds later
+    (P2).
+    """
+    for n in range(2):
+        item = _item(manager, f"task {n}")
+        screen.refresh()
+        screen.block_item(item, 4)
+    screen.refresh()
+    assert len(screen._grid.outside) == 0, "precondition: nothing is outside yet"
+
+    screen.place_lunch_at(4)
+
+    start = _lunch_blocks(manager)[0].start_time
+    assert screen.status_label.cget("text") == (
+        f"Lunch moved to {start} — 2 Time Blocks moved below the day"
+    ), screen.status_label.cget("text")
+
+
 def test_pfm94_clearing_the_hover_restores_the_border_colour(screen, manager, monkeypatch):
     """PF-M9.4 — the outline a drag leaves behind goes away completely.
 
