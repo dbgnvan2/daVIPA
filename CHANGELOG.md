@@ -7,6 +7,14 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — Vision Elements: Refresh joins the New button (2026-11-12)
+
+- **`Refresh` moved to the bottom row, beside the New button.** On the Vision
+  Elements tab it had a header row of its own above the view switcher; that row
+  is gone and the two controls a user presses are now in one place, under the
+  list. The view switcher moved up into the space it left. `Refresh` does the
+  same thing it did, on the same active view.
+
 ### Changed — the APE add button moved to the left panel (2026-11-12)
 
 - **APE Quarter Assignment and APE Month Assignment assign from the left.** The

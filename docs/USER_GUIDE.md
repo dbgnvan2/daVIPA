@@ -894,7 +894,7 @@ Priority Colours (added 2026-11-08; moved from the row to the Priority cell 2026
 - Why: Removes redundant screens and keeps workflows in one place.
 
 Top buttons:
-- **Vision Elements** — Create and maintain Segment|SubSegment|Category keys. Three lists shown one at a time; the view-switcher buttons and `Refresh` are at the top, and the `+ New Segment` / `+ New SubSegment` / `+ New Category` button sits under the list (one button, labelled for the view you are in) as of 2026-11-11. This tab has no left-to-right tick filter: it is one list at a time, so there is no right panel for a tick to narrow.
+- **Vision Elements** — Create and maintain Segment|SubSegment|Category keys. Three lists shown one at a time; the view-switcher buttons are at the top, and under the list sit the `+ New Segment` / `+ New SubSegment` / `+ New Category` button (one button, labelled for the view you are in) and, since 2026-11-12, `Refresh` beside it. `Refresh` had a row of its own above the switcher until then; that row is gone. This tab has no left-to-right tick filter: it is one list at a time, so there is no right panel for a tick to narrow.
 - **Annual Plan Elements** — Promote Vision Elements into annual records for a selected year.
 - **APE Assignment** — Assign Annual Plan Elements into a selected quarter. Opens on the current calendar quarter.
 - **APE Period View** — Assign quarter-selected APEs into a selected month. Opens on the current quarter and the current month, and the Month picker only ever offers the three months the selected Quarter contains.
