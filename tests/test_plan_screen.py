@@ -7578,3 +7578,81 @@ def test_pdm147_an_unconfirmed_day_shape_repairs_nothing(root, manager, settings
     panel.refresh()
 
     assert manager.get_time_blocks(THURSDAY)[0].slot_index == 6
+
+
+def test_pdm147_a_refused_repair_is_not_covered_by_saved(screen, manager):
+    """PD-M14.7 — the redraw after a save repairs; a refusal must still be said.
+
+    Found by the cold sweep: ``on_settings_saved`` overwrote the repair's
+    warning with "Day settings saved".
+    """
+    from src.getmoredone.time_block_layout import MAX_BLOCKS_PER_SLOT
+
+    for n in range(MAX_BLOCKS_PER_SLOT):
+        _add_block(manager, 30, f"full{n}", 4)  # 10:00 under 08:00
+    _raw_block(manager, "late", 7, "10:00")
+
+    screen.on_settings_saved(DayBounds())
+
+    status = screen.status_label.cget("text")
+    assert "would not fit" in status, status
+    assert status.startswith("Day settings saved"), status
+    assert screen.status_label.cget("text_color") == status_text_color("warning"), (
+        "a refused repair was reported in the success colour"
+    )
+
+
+def test_pdm144_a_failed_restore_says_the_file_holds_the_new_hours(
+    root, manager, settings, monkeypatch
+):
+    """PD-M14.4 — after a failed renumber, the dialog says what is on disk.
+
+    Found by the cold sweep: the restore's result was ignored and the log
+    claimed a restore that had not happened.
+    """
+    import sqlite3
+
+    _add_block(manager, 30, "standup", 3)
+
+    def write_then_fail(old, new, write_settings):
+        write_settings()
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(manager, "shift_day_start", write_then_fail)
+    saves = []
+    real_save = settings.save
+    monkeypatch.setattr(
+        settings, "save", lambda: saves.append(1) or (real_save() if len(saves) == 1 else False)
+    )
+
+    dialog = PlanSettingsDialog(root, settings, db_manager=manager)
+    try:
+        dialog.day_start_entry.delete(0, tk.END)
+        dialog.day_start_entry.insert(0, "07:00")
+        dialog.save()
+        assert "still holds the new hours" in dialog.error_label.cget("text")
+    finally:
+        if dialog.winfo_exists():
+            dialog.destroy()
+    assert settings.plan_day_start == "08:00"
+
+
+def test_pdm144_an_unexpected_error_puts_the_hours_back_in_memory(
+    root, manager, settings, monkeypatch
+):
+    """PD-M14.4 — any other exception restores the app-wide settings object."""
+
+    def explode(old, new, write_settings):
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr(manager, "shift_day_start", explode)
+    dialog = PlanSettingsDialog(root, settings, db_manager=manager)
+    try:
+        dialog.day_start_entry.delete(0, tk.END)
+        dialog.day_start_entry.insert(0, "07:00")
+        with pytest.raises(RuntimeError):
+            dialog.save()
+    finally:
+        if dialog.winfo_exists():
+            dialog.destroy()
+    assert settings.plan_day_start == "08:00"

@@ -1126,3 +1126,35 @@ def test_pdm147_a_repair_that_does_not_fit_writes_nothing(manager):
     assert result.refused == SlotRefusal.SLOT_FULL
     assert result.mismatched == 2
     assert _rows(manager) == before
+
+
+def test_pdm147_a_time_no_box_starts_at_is_left_and_counted(manager):
+    """PD-M14.7 — 09:00 under an 08:15 day has no box; flooring it would invent 08:45.
+
+    Found by the cold review.
+    """
+    _recorded(manager, "nine", 2, "09:00")
+
+    result = manager.repair_slots_from_times(DAY, DayBounds(day_start="08:15"))
+
+    assert result.moved == [] and result.misaligned == 1
+    assert _rows(manager)["nine"][0] == 2
+
+
+def test_pdm147_lunch_put_back_over_a_block_that_stays_writes_nothing(manager):
+    """PD-M14.7 — a lunch moved back onto a block that did not move is refused.
+
+    Found by the cold review: only moved blocks were checked, and a lunch's own
+    check ignores occupancy, so the block it landed on went off the grid.
+    """
+    _recorded(manager, "lunch", 0, "12:00", block_type=BlockType.LUNCH, minutes=60)
+    manager.add_block_at(
+        TimeBlock(block_date=DAY, start_time="", end_time="", planned_minutes=30, label="work"),
+        6, NINE,
+    )  # 12:00 under 09:00, so it sits where lunch would go back to
+    before = _rows(manager)
+
+    result = manager.repair_slots_from_times(DAY, NINE)
+
+    assert result.moved == [] and result.refused is not None
+    assert _rows(manager) == before
