@@ -7,6 +7,19 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Removed — code no screen reached (2026-11-12)
+
+- **The old Vision Planning screen.** `screens/vision_planning.py` and
+  `app.show_vision_planning` had no caller; the sidebar's VSP Plan button opens
+  the Vision Planning hub. Nothing on screen changes. Closes VTF-A1 and AWA-A2.
+- **Two Weekly Items methods** whose buttons VTF-M5 removed:
+  `create_action_item_for_selected_weekly` and `delete_selected_weekly_item`.
+  A weekly tactic's own Delete is unchanged. Closes VTF-A2.
+- **Tests:** eight copies of a withdrawn-root builder are one,
+  `conftest.withdrawn_root`. Closes VTF-A3. APB-A1 is closed as deliberate:
+  Add Weekly Tactic stays under the right panel, where the record it adds
+  appears.
+
 ### Changed — Vision Elements: Refresh joins the New button (2026-11-12)
 
 - **`Refresh` moved to the bottom row, beside the New button.** On the Vision
