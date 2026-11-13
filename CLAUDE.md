@@ -22,6 +22,11 @@ pytest -v                                       # Verbose
 pytest tests/test_vps_integration.py -v        # Single file
 pytest --cov=src/getmoredone                   # With coverage
 
+# A run that spins with no output: find the test. --timeout-method=thread
+# dumps every thread's stack, and works where the signal method cannot
+# interrupt a loop inside Tk (pytest-timeout is in requirements-dev.txt).
+pytest <files> -x --timeout=60 --timeout-method=thread
+
 # 25 tests build a real on-screen window and take keyboard focus: the
 # geometry checks, and the ones that drive real Tk button events. The count is
 # asserted against the suite by tests/test_ci_contract.py, so it cannot drift.

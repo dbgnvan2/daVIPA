@@ -17,3 +17,4 @@
 # Testing
 pytest>=7.4.0
 pytest-cov>=4.1.0
+pytest-timeout>=2.4.0   # find a hung test: --timeout=60 --timeout-method=thread

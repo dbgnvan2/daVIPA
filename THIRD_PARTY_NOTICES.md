@@ -38,6 +38,7 @@ Not distributed in the binaries; listed for completeness.
 |---|---|---|
 | pytest | 9.0.2 | MIT |
 | pytest-cov | 7.0.0 | MIT |
+| pytest-timeout | 2.4.0 | MIT |
 | PyInstaller | build tool | GPL-2.0 **with a bootloader exception** that permits distributing the packaged application under any licence |
 
 ## pygame — LGPL notice and relink statement
