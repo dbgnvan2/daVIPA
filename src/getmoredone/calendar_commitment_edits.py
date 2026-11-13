@@ -21,6 +21,7 @@ from .calendar_commitments import (
     can_edit_of,
     committed_slots,
     exclusion_of,
+    local_zone,
     parse_event,
 )
 from .google_calendar import CalendarEventMissing
@@ -66,9 +67,7 @@ def length_of(commitment: CalendarCommitment) -> int:
     return int(commitment.end_minutes) - int(commitment.start_minutes)
 
 
-def verify_unchanged(
-    event: dict, commitment: CalendarCommitment, *, tz=None, whole: bool = False
-) -> None:
+def verify_unchanged(event: dict, commitment: CalendarCommitment, *, tz=None) -> None:
     """Raise ``CommitmentChanged`` unless Google's copy is the Plan's (E6).
 
     Purpose: M4.5 -- a write never overwrites a change the Plan has not read.
@@ -76,8 +75,10 @@ def verify_unchanged(
 
     Compared: still held (not declined, cancelled or free), still the user's
     to change, and this date's start, end, title and number of guests (the
-    user was asked about emailing that many). ``whole`` -- for a move
-    or a new length -- also requires the event to be on this date only.
+    user was asked about emailing that many). The event must also be on
+    this date only: a rename or delete changes the whole Google event, so an
+    event over more than one day is changed in Google Calendar, not from one
+    day of the Plan.
     """
     if exclusion_of(event) is not None or not can_edit_of(event):
         raise CommitmentChanged(_changed_text(commitment))
@@ -97,9 +98,9 @@ def verify_unchanged(
         or now.guest_count != commitment.guest_count
     ):
         raise CommitmentChanged(_changed_text(commitment))
-    if whole and len(parts) != 1:
+    if len(parts) != 1:
         raise CommitmentNotMovable(
-            f"“{commitment.title}” runs over midnight, so it cannot be moved from one day"
+            f"“{commitment.title}” runs over more than one day; change it in Google Calendar"
         )
 
 
@@ -216,13 +217,18 @@ def edit_commitment(
         start = datetime.combine(date.fromisoformat(commitment.commitment_date), time()) + timedelta(
             minutes=start_minutes
         )
+        # Aware, in the zone the reader used, so the offset is in the string
+        # Google receives. ``update_event`` names UTC when tzlocal fails, and
+        # a naive time would then land hours away from the box it was put in.
+        zone = tz if tz is not None else local_zone()
+        start = start.replace(tzinfo=zone) if zone is not None else start.astimezone()
     return client.update_event(
         event_id=commitment.event_id,
         summary=request.title,
         start_datetime=start,
         duration_minutes=minutes,
         calendar_id=commitment.calendar_id,
-        check=lambda event: verify_unchanged(event, commitment, tz=tz, whole=request.moves),
+        check=lambda event: verify_unchanged(event, commitment, tz=tz),
         send_updates=send_updates,
     )
 
@@ -318,8 +324,9 @@ def write_commitment_edit(
         )
         return outcome
     stamp = clock().isoformat(timespec="seconds")
-    db_manager = DatabaseManager(db_path=db_path)
+    db_manager = None
     try:
+        db_manager = DatabaseManager(db_path=db_path)
         outcome.commitments = db_manager.apply_commitment_edit(
             commitment.event_id, commitment.commitment_date, fresh, stamp
         )
@@ -329,7 +336,8 @@ def write_commitment_edit(
         )
         return outcome
     finally:
-        db_manager.close()
+        if db_manager is not None:
+            db_manager.close()
     outcome.done = True
     outcome.message = _done_text(commitment, request)
     return outcome

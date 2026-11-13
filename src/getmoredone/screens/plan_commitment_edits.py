@@ -62,7 +62,7 @@ BUSY_TEXT = "Google Calendar is busy with another read or change — wait for it
 NOT_READY_TEXT = (
     "Google Calendar is not connected — Settings → Google Calendar, then try again"
 )
-NOT_MOVABLE_TEXT = "All day or over midnight — rename or delete only"
+NOT_MOVABLE_TEXT = "All day or over midnight — cannot be moved here"
 
 
 class PlanCommitmentEditsMixin:
@@ -145,8 +145,12 @@ class PlanCommitmentEditsMixin:
 
     def drop_commitment(self, commitment: CalendarCommitment, slot_index: int) -> bool:
         """A meeting dropped on a box: it starts there and keeps its length (E3)."""
-        start = self.bounds.day_start_minutes + int(slot_index) * SLOT_MINUTES
-        if start == commitment.start_minutes:
+        day_start = self.bounds.day_start_minutes
+        start = day_start + int(slot_index) * SLOT_MINUTES
+        # Its own box is no move: a click, or a drop back where it was. Boxes,
+        # not minutes -- a 9:15 meeting is in the 9:00 box, and comparing
+        # minutes would move it to 9:00 on a plain click.
+        if int(slot_index) == (commitment.start_minutes - day_start) // SLOT_MINUTES:
             return False
         return self.change_commitment(commitment, EditRequest(start_minutes=start))
 
@@ -270,6 +274,11 @@ class PlanCommitmentEditsMixin:
                 self._edit_result = EditOutcome(failure=str(error) or type(error).__name__)
             finally:
                 release_refresh(db_path)
+            if self._edit_result.failure:
+                # Logged here as well as shown: the screen may be gone by the
+                # time the poll would show it (P2).
+                logger.warning("Calendar change to %s not completed: %s",
+                               commitment.event_id, self._edit_result.failure)
 
         try:
             gc.collect()
