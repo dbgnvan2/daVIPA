@@ -79,6 +79,7 @@ from .plan_blocks import (
     build_virtual_slot_row,
     chip_column_minsizes,
 )
+from .plan_commitment_edits import PlanCommitmentEditsMixin
 from .plan_commitments import PlanCommitmentsMixin, commitments_by_slot
 from .plan_settings_dialog import PlanSettingsDialog
 from .segment_color_utils import resolve_segment_color_for_item
@@ -296,7 +297,7 @@ def _clock(minutes: int) -> str:
     return f"{hours}h {remainder:02d}m" if hours else f"{remainder}m"
 
 
-class PlanScreen(PlanCommitmentsMixin, ctk.CTkFrame):
+class PlanScreen(PlanCommitmentEditsMixin, PlanCommitmentsMixin, ctk.CTkFrame):
     """Screen for planning time blocks."""
 
     def __init__(self, parent, db_manager: 'DatabaseManager', app: 'GetMoreDoneApp'):
@@ -321,6 +322,11 @@ class PlanScreen(PlanCommitmentsMixin, ctk.CTkFrame):
         self._refresh_poll_id = None
         self._auto_refresh_id = None
         self._claim_watch_id = None
+        # CIP-M4 -- a meeting change in flight, and its poll.
+        self._edit_poll_id = None
+        self._edit_running = False
+        self._edit_result = None
+        self._drag_commitment = None
 
         # DatePickerButton calls its on_date_changed from its own __init__,
         # which lands here before the panes it would reload exist. The flag is
@@ -2895,6 +2901,7 @@ class PlanScreen(PlanCommitmentsMixin, ctk.CTkFrame):
 
     def on_drag_release(self, _event):
         kind, item, block = self._drag_kind, self._drag_item, self._drag_block
+        commitment = getattr(self, "_drag_commitment", None)
         self.clear_hover_target()
         self._end_drag()
 
@@ -2971,6 +2978,15 @@ class PlanScreen(PlanCommitmentsMixin, ctk.CTkFrame):
                 # worth of explanation: a move that does nothing and says
                 # nothing is indistinguishable from a drag that missed.
                 self.set_status("Drop that Action Item on a Time Block", "muted")
+        elif kind == "commitment" and commitment is not None:
+            # CIP-M4.2 / E3 -- asked and started here, while the gesture is
+            # still synchronous (PD-M13: no modal from an idle callback).
+            # Starting the worker destroys no widget, so this is safe inside
+            # the handler; the redraw comes from the poll.
+            if target is not None:
+                self.drop_commitment(commitment, target)
+            elif edge is not None or self.pointer_over_day():
+                self.set_status("Drop a meeting on a Time Block to move it", "muted")
         elif kind == "lunch":
             # PF-M8 -- the settings' lunch, dragged. The first one writes the
             # block this date was standing in for; later ones move it.
@@ -3007,6 +3023,7 @@ class PlanScreen(PlanCommitmentsMixin, ctk.CTkFrame):
         self._drag_kind = None
         self._drag_item = None
         self._drag_block = None
+        self._drag_commitment = None
 
     def _day_shape_is_the_users(self) -> bool:
         """Whether ``self.bounds`` came from settings we could actually read.

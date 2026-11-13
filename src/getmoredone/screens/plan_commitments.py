@@ -176,6 +176,7 @@ def build_commitment_chip(
     )
     label.grid(row=0, column=1, sticky="w")
     chip.label = label
+    chip.starts_here = starts_here
     return chip
 
 
@@ -226,6 +227,10 @@ class PlanCommitmentsMixin:
     def bind_commitment_handlers(self, frame, commitment: CalendarCommitment) -> None:
         from .plan import RIGHT_CLICK_SEQUENCES, _subtree
 
+        # CIP-E3 -- the chip in the box where the meeting starts is the one
+        # that drags. The strip and the boxes it continues into do not.
+        if getattr(frame, "starts_here", False):
+            self.bind_commitment_drag(frame, commitment)
         for widget in _subtree(frame):
             for sequence in RIGHT_CLICK_SEQUENCES:
                 widget.bind(
@@ -242,7 +247,8 @@ class PlanCommitmentsMixin:
         Tests:   tests/test_plan_screen_commitments.py::test_cipm34_an_editable_commitment_offers_no_dismiss
         """
         if commitment.can_edit:
-            return [("Change this meeting in Google Calendar, then Refresh", None)]
+            # CIP-M4 -- the honest gesture, now on the Plan itself.
+            return self.commitment_edit_entries(commitment)
         if commitment.dismissed:
             return [(
                 "Hold this time again",
@@ -482,7 +488,7 @@ class PlanCommitmentsMixin:
         return started
 
     def cancel_commitment_callbacks(self) -> None:
-        for name in ("_refresh_poll_id", "_auto_refresh_id", "_claim_watch_id"):
+        for name in ("_refresh_poll_id", "_auto_refresh_id", "_claim_watch_id", "_edit_poll_id"):
             pending = getattr(self, name, None)
             if pending is not None:
                 try:

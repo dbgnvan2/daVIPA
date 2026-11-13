@@ -134,6 +134,17 @@ def exclusion_of(event: dict) -> Optional[str]:
     return None
 
 
+def guest_count(event: dict) -> int:
+    """Other people Google could email about a change (CIP-E1): not self, not a room."""
+    return sum(
+        1
+        for attendee in event.get("attendees") or ()
+        if isinstance(attendee, dict)
+        and not attendee.get("self")
+        and not attendee.get("resource")
+    )
+
+
 def can_edit_of(event: dict) -> bool:
     """CIP-M4.1 -- the user organised it, or guests may change it."""
     organizer = event.get("organizer") or {}
@@ -173,6 +184,7 @@ def parse_event(
         transparency=event.get("transparency"),
         can_edit=can_edit_of(event),
         is_recurring_instance=bool(event.get("recurringEventId")),
+        guest_count=guest_count(event),
     )
     if not common["event_id"]:
         raise CommitmentParseError("no event id")

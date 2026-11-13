@@ -272,6 +272,15 @@ def _with_retry(description: str, call):
     )
 
 
+SEND_UPDATES_VALUES = ("all", "externalOnly", "none")
+
+
+def _check_send_updates(value: str) -> None:
+    """Refuse a ``sendUpdates`` Google would not read, before any call."""
+    if value not in SEND_UPDATES_VALUES:
+        raise ValueError(f"send_updates must be one of {SEND_UPDATES_VALUES}, not {value!r}")
+
+
 def _new_event_id() -> str:
     """An event id of our own for an insert, so a retry cannot duplicate it.
 
@@ -722,6 +731,9 @@ class GoogleCalendarManager:
         location: Optional[str] = None,
         attendees: Optional[list] = None,
         calendar_id: str = DEFAULT_CALENDAR_ID,
+        *,
+        check=None,
+        send_updates: str = "none",
     ) -> Dict[str, Any]:
         """Update an existing calendar event.
 
@@ -746,11 +758,19 @@ class GoogleCalendarManager:
         edits a meeting -- not a defect closed on a path a user can reach.
         Tests: tests/test_google_calendar_export_calls.py::test_cea1_update_can_change_the_location_and_the_attendees
 
+        CIP-E6 -- ``check``, if given, is called with the event as read, before
+        anything is changed; whatever it raises stops the write. CIP-E1 --
+        ``send_updates`` is Google's ``sendUpdates``. The default, ``"none"``,
+        is what the Plan day export has always sent.
+        Tests: tests/test_calendar_commitment_edits.py::test_cipm45_a_changed_event_is_not_overwritten
+               tests/test_calendar_commitment_edits.py::test_cipe1_the_export_still_sends_none
+
         Raises:
             CalendarEventMissing: if the event is gone (404/410), so the
                 caller can make it again rather than reporting a failure the
                 user cannot act on.
         """
+        _check_send_updates(send_updates)
         event = _with_retry(
             f"read calendar event {event_id}",
             lambda: self.service.events().get(
@@ -758,6 +778,9 @@ class GoogleCalendarManager:
                 eventId=event_id
             ).execute(),
         )
+
+        if check is not None:
+            check(event)
 
         # Only the named fields are touched; the rest of the body -- the
         # private marker included -- goes back exactly as it came.
@@ -794,21 +817,43 @@ class GoogleCalendarManager:
                 # opposite and both user-visible: no invitation at all for a
                 # guest just added, or mail to every attendee each time the
                 # Plan day export re-updates their event.
-                sendUpdates='none',
+                sendUpdates=send_updates,
             ).execute(),
         )
 
-    def delete_event(self, event_id: str, calendar_id: str = DEFAULT_CALENDAR_ID):
+    def get_event(self, event_id: str, calendar_id: str = DEFAULT_CALENDAR_ID) -> Dict[str, Any]:
+        """Read one event as Google holds it now (CIP-E6).
+
+        Raises ``CalendarEventMissing`` when it is gone.
+        """
+        return _with_retry(
+            f"read calendar event {event_id}",
+            lambda: self.service.events().get(
+                calendarId=calendar_id,
+                eventId=event_id
+            ).execute(),
+        )
+
+    def delete_event(
+        self,
+        event_id: str,
+        calendar_id: str = DEFAULT_CALENDAR_ID,
+        *,
+        send_updates: str = "none",
+    ):
         """Delete a calendar event.
 
         Raises ``CalendarEventMissing`` when it has already gone, which the
-        caller can treat as the end state it asked for.
+        caller can treat as the end state it asked for. ``send_updates`` is
+        Google's ``sendUpdates`` (CIP-E1); ``"none"`` is what the export sends.
         """
+        _check_send_updates(send_updates)
         _with_retry(
             f"delete calendar event {event_id}",
             lambda: self.service.events().delete(
                 calendarId=calendar_id,
-                eventId=event_id
+                eventId=event_id,
+                sendUpdates=send_updates,
             ).execute(),
         )
 

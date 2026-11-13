@@ -893,6 +893,9 @@ CALENDAR_COMMITMENT_COLUMNS = (
     ("fetched_at", "TEXT"),
     ("created_at", "TEXT NOT NULL DEFAULT ''"),
     ("updated_at", "TEXT NOT NULL DEFAULT ''"),
+    # CIP-E1 (batch 2) -- other guests, so the Plan can ask whether to email
+    # them during the gesture, without a network call before the dialog.
+    ("guest_count", "INTEGER NOT NULL DEFAULT 0"),
 )
 
 

@@ -30,7 +30,7 @@ _COLUMNS = (
     "id", "event_id", "calendar_id", "commitment_date", "start_time",
     "end_time", "start_minutes", "end_minutes", "title", "is_all_day",
     "response_status", "transparency", "can_edit", "is_recurring_instance",
-    "dismissed", "fetched_at", "created_at", "updated_at",
+    "dismissed", "fetched_at", "created_at", "updated_at", "guest_count",
 )
 
 
@@ -234,6 +234,55 @@ class DBManagerCommitmentsMixin:
         commitment.dismissed = bool(dismissed)
         return commitment
 
+    def apply_commitment_edit(
+        self,
+        event_id: str,
+        commitment_date: str,
+        commitments: Iterable[CalendarCommitment],
+        fetched_at: str,
+    ) -> List[CalendarCommitment]:
+        """Store what Google returned for one event on one date, after a write.
+
+        Purpose: CIP-M1.6 / E9 -- the second narrow writer, used only once
+                 Google has confirmed a change, so the cache is never ahead of
+                 the calendar. Every other date, every other event, and the
+                 date's read record are left alone.
+        Spec:    docs/spec_2026-11-08_calendar_into_the_plan.md#4-m1--the-commitment-store
+        Tests:   tests/test_calendar_commitment_edits.py::test_cipm16_apply_commitment_edit_replaces_only_that_event_on_that_date
+
+        ``commitments`` is that event's part on that date, from Google's
+        reply -- empty after a delete. A row keeps its id, so a screen
+        holding it still names the same meeting. Returns the rows written.
+        """
+        event_id, commitment_date = str(event_id), str(commitment_date)
+        commitments = list(commitments)
+        for commitment in commitments:
+            if (commitment.event_id, commitment.commitment_date) != (event_id, commitment_date):
+                raise CommitmentDateError(
+                    f"an edit of {event_id} on {commitment_date} cannot write "
+                    f"{commitment.event_id} on {commitment.commitment_date}"
+                )
+        now = datetime.now().isoformat()
+        with self.transaction() as conn:
+            old = conn.execute(
+                "SELECT id, created_at FROM calendar_commitments"
+                " WHERE event_id = ? AND commitment_date = ?",
+                (event_id, commitment_date),
+            ).fetchone()
+            conn.execute(
+                "DELETE FROM calendar_commitments WHERE event_id = ? AND commitment_date = ?",
+                (event_id, commitment_date),
+            )
+            for commitment in commitments:
+                if old is not None:
+                    commitment.id = old["id"]
+                    commitment.created_at = old["created_at"]
+                commitment.fetched_at = fetched_at
+                commitment.updated_at = now
+                commitment.dismissed = False
+                self._insert_commitment(conn, commitment)
+        return commitments
+
     def _committed_for(self, block_date: str, bounds) -> frozenset:
         """The boxes this date's commitments hold, read here so no writer can forget (D2)."""
         from .calendar_commitments import committed_slots
@@ -251,6 +300,7 @@ class DBManagerCommitmentsMixin:
             1 if commitment.is_recurring_instance else 0,
             1 if commitment.dismissed else 0, commitment.fetched_at,
             commitment.created_at, commitment.updated_at,
+            int(commitment.guest_count or 0),
         )
         placeholders = ", ".join("?" for _ in _COLUMNS)
         conn.execute(
@@ -279,4 +329,5 @@ class DBManagerCommitmentsMixin:
             fetched_at=row["fetched_at"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+            guest_count=int(row["guest_count"] or 0),
         )

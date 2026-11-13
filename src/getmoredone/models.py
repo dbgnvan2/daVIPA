@@ -583,3 +583,5 @@ class CalendarCommitment:
     id: str = field(default_factory=lambda: str(uuid4()))
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    #: CIP-E1 -- attendees other than the user and rooms, as last read.
+    guest_count: int = 0
