@@ -251,8 +251,9 @@ kept — only the selection-based ones go.
 `tests/test_vsp_tab_contracts.py` and `tests/test_unified_panel_design.py` each
 define their own `_root()` / screen-construction helper, with the same
 `ctk.CTk()` + `geometry("1400x900+0+0")` + `withdraw()` body. The withdrawal is
-what keeps `tests/test_ci_contract.py`'s mapped-window count at 23, so the
-duplication is four places a future copy can forget it. A shared fixture in
+what keeps `tests/test_ci_contract.py`'s mapped-window count where it is (the
+live number is in CLAUDE.md and conftest.py, and this entry said 23 after it
+had moved), so the duplication is four places a future copy can forget it. A shared fixture in
 `conftest.py` would make that impossible rather than merely conventional.
 
 ## Adjacent issue — the add button's panel on the other two VSP tabs (APB, filed 2026-11-12)

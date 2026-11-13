@@ -1020,8 +1020,12 @@ def test_awam14_and_m32_every_nav_key_opens_its_own_screen(tmp_path):
 def test_awam33_screen_constructs_withdrawn(tmp_path):
     """AWA-M3.3 — the new screen builds and tears down with no mapped window.
 
-    tests/test_ci_contract.py pins the suite's mapped-window count at 22;
-    a screen that needed a real on-screen window would move it.
+    tests/test_ci_contract.py pins the suite's mapped-window count against
+    the number CLAUDE.md and conftest.py state; a screen that needed a real
+    on-screen window would move it. The number is deliberately not repeated
+    here -- this docstring said 22 long after the real count had passed it,
+    which is exactly the drift that guard exists to stop, and no guard reads
+    prose in this repo.
     """
     from src.getmoredone.screens.week_actions import WeekActionsScreen
 
