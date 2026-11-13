@@ -4,6 +4,7 @@ Provides CRUD operations and business logic for all entities.
 """
 
 from contextlib import contextmanager
+from dataclasses import dataclass, replace
 from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict, Any, Tuple
 import logging
@@ -24,6 +25,28 @@ from . import week_calendar
 from .weekly_tactic_logging import get_weekly_tactic_logger
 
 logger = get_weekly_tactic_logger()
+
+
+class DayStartStepError(ValueError):
+    """PD-M14.4 -- Day Start moved by part of a box while blocks are planned."""
+
+
+class SettingsNotWrittenError(RuntimeError):
+    """PD-M14.4 -- the settings write failed, so the renumber was rolled back."""
+
+
+@dataclass
+class SlotRepair:
+    """PD-M14.7 -- what ``repair_slots_from_times`` did to one date.
+
+    ``mismatched`` blocks had a box their recorded time did not name;
+    ``moved`` are the ids put back, empty when ``refused`` says why none were.
+    """
+
+    moved: List[str]
+    refused: Optional[str]
+    mismatched: int
+    unreadable: int
 
 
 class DatabaseManager(DBManagerProjectBoardsMixin):
@@ -1763,6 +1786,122 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
                 (int(by), datetime.now().isoformat()),
             )
             return cursor.rowcount
+
+    def shift_day_start(self, old_start: str, new_start: str, write_settings) -> int:
+        """Move Day Start and renumber every block so each keeps its clock time.
+
+        Purpose: PD-M14.4 -- the Day Settings hours are a template for a blank
+                 day. Moving them must not move work already planned, which it
+                 did when a block's box was kept and its time re-derived.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-13_day_start_keeps_clock_times.md
+        Tests:   tests/test_time_block_crud.py::test_pdm144_changing_the_hours_keeps_clock_times
+                 tests/test_time_block_crud.py::test_pdm144_a_renumber_that_fails_leaves_the_hours_alone
+
+        ``write_settings`` saves the new hours and returns whether it did. It
+        runs inside the renumber's transaction, so a False or a raise rolls the
+        renumber back: the hours on disk and the boxes in the table never
+        describe two different days. Returns how many blocks were renumbered.
+
+        A move that is not a whole number of boxes is refused with
+        ``DayStartStepError`` while any block has a box, because no renumber
+        keeps a 09:00 block at 09:00 on a grid that starts at 08:45.
+        """
+        from .time_block_layout import SLOT_MINUTES, parse_hhmm
+
+        delta = parse_hhmm(old_start) - parse_hhmm(new_start)
+        by = delta // SLOT_MINUTES
+        if delta % SLOT_MINUTES:
+            planned = self.db.conn.execute(
+                "SELECT COUNT(*) FROM time_blocks WHERE slot_index IS NOT NULL"
+            ).fetchone()[0]
+            if planned:
+                raise DayStartStepError(
+                    "Day Start can only move in 30-minute steps while Time Blocks"
+                    " are planned"
+                )
+            by = 0
+        with self.transaction():
+            moved = self.shift_all_slots(by)
+            if not write_settings():
+                raise SettingsNotWrittenError("the settings file was not written")
+        return moved
+
+    def repair_slots_from_times(self, block_date: str, bounds) -> "SlotRepair":
+        """Put each block on this date back in the box its recorded time names.
+
+        Purpose: PD-M14.7 -- before PD-M14.4, a Day Start change kept every
+                 block's box and so moved it on the clock, while its row kept
+                 the time it was planned at. That recorded time is the one the
+                 user chose, so it is the one kept.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-13_day_start_keeps_clock_times.md
+        Tests:   tests/test_time_block_crud.py::test_pdm147_a_block_is_put_back_on_the_time_it_was_planned_at
+                 tests/test_time_block_crud.py::test_pdm147_a_day_that_agrees_is_not_touched
+                 tests/test_time_block_crud.py::test_pdm147_a_repair_that_does_not_fit_writes_nothing
+
+        Writes nothing when every box agrees with its time, so running it on
+        every load is the "once": the second run finds nothing to do. Blocks
+        with no box are adoption's (TG-M5), and a time that cannot be read is
+        left where it is and counted in ``unreadable``.
+
+        All or nothing per date. If any moved block would not fit the repaired
+        day -- outside the date, across lunch, a full box -- nothing is written
+        and ``refused`` names why, so the day is never half on one clock and
+        half on another.
+        """
+        from .time_block_layout import (
+            can_place,
+            slot_index_for_time,
+            slot_span_of,
+            span_for_blocks,
+        )
+
+        blocks = self.get_time_blocks(block_date)
+        targets: dict = {}
+        unreadable = 0
+        for block in blocks:
+            if block.slot_index is None:
+                continue
+            target = slot_index_for_time(block.start_time, bounds, allow_before=True)
+            if target is None:
+                unreadable += 1
+                continue
+            if target != int(block.slot_index):
+                targets[block.id] = target
+        if not targets:
+            return SlotRepair(moved=[], refused=None, mismatched=0, unreadable=unreadable)
+
+        repaired = [
+            replace(block, slot_index=targets[block.id]) if block.id in targets else block
+            for block in blocks
+        ]
+        drawn = span_for_blocks(repaired, bounds)
+        for block in repaired:
+            if block.id not in targets:
+                continue
+            reason = can_place(
+                repaired,
+                bounds,
+                block.slot_index,
+                slot_span_of(block),
+                ignoring=block.id,
+                day_span=drawn,
+                placing_lunch=BlockType.normalize(block.block_type) == BlockType.LUNCH,
+            )
+            if reason is not None:
+                return SlotRepair(
+                    moved=[], refused=reason, mismatched=len(targets), unreadable=unreadable
+                )
+
+        now = datetime.now().isoformat()
+        with self.transaction() as conn:
+            for block_id, target in targets.items():
+                conn.execute(
+                    "UPDATE time_blocks SET slot_index = ?, updated_at = ? WHERE id = ?",
+                    (int(target), now, block_id),
+                )
+        return SlotRepair(
+            moved=list(targets), refused=None, mismatched=len(targets), unreadable=unreadable
+        )
 
     def place_block_at(
         self, block_id: str, slot_index: int, bounds, day_span=None

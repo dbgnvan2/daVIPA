@@ -966,11 +966,18 @@ class PlanScreen(ctk.CTkFrame):
         if self.settings is None:
             self.set_status("Settings are unavailable", "error")
             return
-        dialog = PlanSettingsDialog(self, self.settings, on_saved=self.on_settings_saved)
+        dialog = PlanSettingsDialog(
+            self, self.settings, on_saved=self.on_settings_saved, db_manager=self.db_manager
+        )
         dialog.wait_window()
 
-    def on_settings_saved(self, bounds: DayBounds):
-        """The day's shape changed. Nothing is written, and that is the point.
+    def on_settings_saved(self, bounds: DayBounds, renumbered: int = 0):
+        """The day's shape changed; redraw it and say what that did.
+
+        PD-M14.4 superseded the paragraph below at the dialog: the dialog now
+        renumbers every block so each keeps its clock time
+        (``DatabaseManager.shift_day_start``) and passes ``renumbered``, the
+        count. This callback still writes nothing itself.
 
         Purpose: TG-M6.4 -- a block's box is stored relative to Day Start, so
                  moving Day Start re-times every day on read. There is no
@@ -978,7 +985,8 @@ class PlanScreen(ctk.CTkFrame):
                  transaction that can leave one day's times derived from one
                  set of bounds and another's from a different set.
         Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
-        Tests:   tests/test_plan_screen.py::test_tgm64_saving_settings_writes_no_blocks
+        Tests:   tests/test_plan_screen.py::test_tgm64_the_settings_callback_writes_no_blocks
+                 tests/test_plan_screen.py::test_pdm144_the_dialog_keeps_planned_work_on_its_clock
 
         The stored ``start_time``/``end_time`` columns are still written when a
         block is placed or resized, and they are still the block's own times --
@@ -1000,6 +1008,10 @@ class PlanScreen(ctk.CTkFrame):
                 " drag them onto a box",
                 "warning",
             )
+            return
+        if renumbered:
+            noun = "block kept its time" if renumbered == 1 else "blocks kept their times"
+            self.set_status(f"Day settings saved — {renumbered} {noun}", "success")
             return
         self.set_status("Day settings saved", "success")
 
@@ -1148,7 +1160,14 @@ class PlanScreen(ctk.CTkFrame):
             # as outside the day -- until the day's shape is known (P1: a
             # transient read failure must not be written down as a fact).
             adopted = []
+            repair = None
             if self._day_shape_is_the_users():
+                # PD-M14.7 first, so adoption sees the boxes where the recorded
+                # times put them. Same gate, for the same reason: against a
+                # guessed Day Start the recorded time names the wrong box.
+                repair = self.db_manager.repair_slots_from_times(
+                    self.selected_date, self.bounds
+                )
                 adopted = self.db_manager.adopt_legacy_day(
                     self.selected_date, self.bounds
                 )
@@ -1169,6 +1188,19 @@ class PlanScreen(ctk.CTkFrame):
                     f"Placed {len(adopted)} block(s) from an earlier version"
                     f" on the grid, using a day start of {self.bounds.day_start}",
                     "muted",
+                )
+            elif repair is not None and repair.moved:
+                count = len(repair.moved)
+                noun = "block back on the time it was" if count == 1 else (
+                    "blocks back on the times they were"
+                )
+                self.set_status(f"Put {count} {noun} planned at", "muted")
+            elif repair is not None and repair.refused:
+                self.set_status(
+                    f"{repair.mismatched} block(s) here are not at the time they"
+                    " were planned at, and moving them back would not fit"
+                    " — drag them where you want them",
+                    "warning",
                 )
             elif self._day_shape_is_unconfirmed() and any(
                 block.slot_index is None for block in blocks

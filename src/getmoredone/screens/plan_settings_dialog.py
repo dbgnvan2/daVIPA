@@ -13,9 +13,13 @@ tab should not require moving the first one's controls.
 
 from __future__ import annotations
 
+import logging
+import sqlite3
+
 import customtkinter as ctk
 
 from ..app_settings import AppSettings
+from ..db_manager import DayStartStepError, SettingsNotWrittenError
 from ..theme import button_style, status_text_color
 from ..time_block_layout import (
     MINUTES_PER_DAY,
@@ -28,6 +32,8 @@ from ..time_block_layout import (
     weekday_names,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class PlanSettingsDialog(ctk.CTkToplevel):
     """Modal for the four day times and the seven weekday flags.
@@ -39,10 +45,14 @@ class PlanSettingsDialog(ctk.CTkToplevel):
     someone to distrust it.
     """
 
-    def __init__(self, parent, settings: AppSettings, on_saved=None):
+    def __init__(self, parent, settings: AppSettings, on_saved=None, db_manager=None):
         super().__init__(parent)
         self.settings = settings
         self.on_saved = on_saved
+        # PD-M14.4 -- given, a Day Start change renumbers every block so each
+        # keeps its clock time. ``on_saved`` is then called with
+        # ``renumbered=`` as well as the bounds.
+        self.db_manager = db_manager
 
         self.title("Day Settings")
         self.geometry("460x440")
@@ -173,13 +183,25 @@ class PlanSettingsDialog(ctk.CTkToplevel):
         return {**times, "plan_lunch_minutes": lunch_minutes, "plan_block_weekdays": weekdays}
 
     def save(self):
-        """Validate, write to settings, and tell the caller to re-pack the day."""
+        """Validate, write to settings, renumber the blocks, and tell the caller.
+
+        PD-M14.4: with a ``db_manager``, the renumber and the settings write
+        happen in one transaction (``DatabaseManager.shift_day_start``), so
+        either both land or neither does. Spec:
+        docs/unused-docs/implementation_plan_2026-11-13_day_start_keeps_clock_times.md
+
+        No renumber while the day shape is unconfirmed: the boxes were laid
+        against a Day Start nobody could read, so there is no old value to
+        count from. PD-M14.7's repair puts those blocks back on their recorded
+        times when the confirmed day is next opened.
+        """
         try:
             values = self.collect()
         except ValueError as exc:
             self.error_label.configure(text=str(exc))
             return
 
+        drawn_start = DayBounds.from_settings(self.settings).day_start
         previous = {field: getattr(self.settings, field) for field in values}
         previous["plan_day_shape_unconfirmed"] = getattr(
             self.settings, "plan_day_shape_unconfirmed", False
@@ -191,7 +213,42 @@ class PlanSettingsDialog(ctk.CTkToplevel):
         # user these four times and takes their confirmation of them, so this
         # is where a guessed day shape stops being a guess.
         self.settings.plan_day_shape_unconfirmed = False
-        if not self.settings.save():
+
+        written = []
+
+        def write_settings() -> bool:
+            ok = bool(self.settings.save())
+            written.append(ok)
+            return ok
+
+        renumber = self.db_manager is not None and not previous["plan_day_shape_unconfirmed"]
+        renumbered = 0
+        try:
+            if renumber:
+                renumbered = self.db_manager.shift_day_start(
+                    drawn_start, values["plan_day_start"], write_settings
+                )
+            elif not write_settings():
+                raise SettingsNotWrittenError("the settings file was not written")
+        except DayStartStepError as exc:
+            for field, value in previous.items():
+                setattr(self.settings, field, value)
+            self.error_label.configure(text=str(exc))
+            return
+        except (sqlite3.Error, OSError):
+            # The renumber failed after, or while, the settings were written.
+            # Put the old hours back on disk too, or the file would describe a
+            # day the blocks were never renumbered for.
+            logger.exception("Day Start renumber failed; settings restored")
+            for field, value in previous.items():
+                setattr(self.settings, field, value)
+            if any(written):
+                self.settings.save()
+            self.error_label.configure(
+                text="Could not renumber the Time Blocks — see the log"
+            )
+            return
+        except SettingsNotWrittenError:
             # Said here rather than swallowed: ``on_saved`` reports "Day
             # settings saved" to the user, and the day it would then draw is
             # one that exists only in memory.
@@ -211,6 +268,9 @@ class PlanSettingsDialog(ctk.CTkToplevel):
             return
 
         if self.on_saved:
-            self.on_saved(DayBounds.from_settings(self.settings))
+            if self.db_manager is not None:
+                self.on_saved(DayBounds.from_settings(self.settings), renumbered=renumbered)
+            else:
+                self.on_saved(DayBounds.from_settings(self.settings))
 
         self.destroy()
