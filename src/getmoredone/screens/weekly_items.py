@@ -7,7 +7,6 @@ from tkinter import messagebox
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 import customtkinter as ctk
-import tkinter as tk
 
 from .. import week_options
 from ..app_settings import AppSettings

@@ -1655,6 +1655,17 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         block, the new one goes directly behind it; given ``at_top``, it goes
         in front of everything in the box and the rest move down one.
         """
+        placing_lunch = BlockType.normalize(block.block_type) == BlockType.LUNCH
+        if placing_lunch and any(
+            BlockType.normalize(other.block_type) == BlockType.LUNCH
+            for other in self.get_time_blocks(block.block_date)
+        ):
+            # BSF-M6 (LMM-A2): this is the only write that inserts a block, so
+            # refusing here is what keeps a date to one lunch. The screen moves
+            # the lunch it has (``place_block_at``) rather than adding one.
+            from .time_block_layout import SlotRefusal, SlotRefusedError
+
+            raise SlotRefusedError(SlotRefusal.LUNCH_EXISTS)
         self._refuse_unless_it_fits(
             block.block_date,
             slot_index,
@@ -1663,7 +1674,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             day_span=day_span,
             # PF-M8 -- a lunch block defines the lunch it sits on, so it cannot
             # be refused by the lunch it is replacing or moving.
-            placing_lunch=BlockType.normalize(block.block_type) == BlockType.LUNCH,
+            placing_lunch=placing_lunch,
         )
         with self.transaction() as conn:
             self._settle_block_on_slot(block, slot_index, bounds)

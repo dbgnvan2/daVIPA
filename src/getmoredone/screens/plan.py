@@ -203,6 +203,7 @@ REFUSAL_TEXT = {
     SlotRefusal.OUTSIDE_GRID: "That Time Block is outside the day — Day Settings sets its hours",
     SlotRefusal.CROSSES_LUNCH: "That Time Block runs into lunch — try a later one",
     SlotRefusal.SLOT_FULL: "That Time Block is full — try another one",
+    SlotRefusal.LUNCH_EXISTS: "This day already has a lunch — drag that one to move it",
 }
 
 #: Said when a refusal arrives with a reason nothing here words. Better than

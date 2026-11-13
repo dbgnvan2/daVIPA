@@ -409,6 +409,9 @@ class SlotRefusal:
     OUTSIDE_GRID = "outside_grid"
     CROSSES_LUNCH = "crosses_lunch"
     SLOT_FULL = "slot_full"
+    #: BSF-M6 (LMM-A2): ``lunch_window`` reads the first LUNCH block on a date
+    #: and ignores any other, so a second one would draw and shade nothing.
+    LUNCH_EXISTS = "lunch_exists"
 
 
 @dataclass(frozen=True)

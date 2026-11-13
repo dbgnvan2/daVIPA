@@ -165,9 +165,9 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/color_contrast.py:161` | `dark: str = "#000000",` |
-| `src/getmoredone/color_contrast.py:168` | `def pick_text_color(bg_hex: str, light: str = "#FFFFFF", dark: str = "#000000") -> str:` |
-| `src/getmoredone/color_contrast.py:173` | `return "#000000"` |
+| `src/getmoredone/color_contrast.py:158` | `dark: str = "#000000",` |
+| `src/getmoredone/color_contrast.py:165` | `def pick_text_color(bg_hex: str, light: str = "#FFFFFF", dark: str = "#000000") -> str:` |
+| `src/getmoredone/color_contrast.py:170` | `return "#000000"` |
 | `themes/apple_grey.json:5` | `"#000000"` |
 | `themes/apple_grey.json:11` | `"#000000"` |
 | `themes/apple_grey.json:38` | `"#000000",` |
@@ -2309,15 +2309,15 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/app_settings.py:127` | `drag_schedule_date_text_color: str = "#FFFFFF"` |
 | `src/getmoredone/brand.py:48` | `ON_DARK = "#FFFFFF"` |
-| `src/getmoredone/color_contrast.py:160` | `light: str = "#FFFFFF",` |
-| `src/getmoredone/color_contrast.py:168` | `def pick_text_color(bg_hex: str, light: str = "#FFFFFF", dark: str = "#000000") -> str:` |
+| `src/getmoredone/color_contrast.py:157` | `light: str = "#FFFFFF",` |
+| `src/getmoredone/color_contrast.py:165` | `def pick_text_color(bg_hex: str, light: str = "#FFFFFF", dark: str = "#000000") -> str:` |
 | `src/getmoredone/screens/drag_schedule.py:1050` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
 | `src/getmoredone/screens/drag_schedule.py:1070` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
 | `src/getmoredone/screens/drag_schedule.py:1200` | `text_color=date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
 | `src/getmoredone/screens/drag_schedule.py:1302` | `return normalized_date_text_color(getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
 | `src/getmoredone/screens/drag_schedule.py:1305` | `return date_text_color_for(bg_color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
-| `src/getmoredone/screens/drag_schedule_support.py:58` | `color = str(configured_value or "#FFFFFF").strip()` |
-| `src/getmoredone/screens/drag_schedule_support.py:62` | `return "#FFFFFF"` |
+| `src/getmoredone/screens/drag_schedule_support.py:63` | `color = str(configured_value or "#FFFFFF").strip()` |
+| `src/getmoredone/screens/drag_schedule_support.py:67` | `return "#FFFFFF"` |
 | `src/getmoredone/screens/settings.py:625` | `value=getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")` |
 | `src/getmoredone/screens/settings.py:713` | `color_value = self.drag_schedule_text_color_var.get().strip() or "#FFFFFF"` |
 | `src/getmoredone/screens/settings.py:717` | `color_value = "#FFFFFF"` |
@@ -3175,8 +3175,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
+| `src/getmoredone/screens/item_editor_weekly_tactic_dialog.py:390` | `return "white"` |
 | `src/getmoredone/screens/item_editor_weekly_tactic_dialog.py:393` | `return "black" if luminance > 160 else "white"` |
-| `src/getmoredone/screens/item_editor_weekly_tactic_dialog.py:396` | `return "white"` |
 | `src/getmoredone/theme.py:120` | `"chip_text": "white",` |
 | `src/getmoredone/theme.py:254` | `"white": palette["body_text"],` |
 

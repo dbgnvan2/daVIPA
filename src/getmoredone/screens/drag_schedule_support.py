@@ -5,7 +5,12 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from ..app_settings import AppSettings
-from ..color_contrast import pick_text_color, pick_text_color_with_meta
+from ..color_contrast import (
+    hex_to_rgb,
+    normalize_hex_color,
+    pick_text_color,
+    pick_text_color_with_meta,
+)
 from ..date_utils import future_date_targets
 from ..theme import schedule_colors
 
@@ -100,14 +105,21 @@ def interpolate_palette(colors: list[str], t: float) -> str:
     return interpolate_hex_color(colors[left_idx], colors[right_idx], local_t)
 
 
+def _channels(value: str) -> "tuple[int, int, int]":
+    color = normalize_hex_color(value)
+    if color is None:
+        raise ValueError(f"not a #RRGGBB colour: {value!r}")
+    return hex_to_rgb(color)
+
+
 def interpolate_hex_color(start_hex: str, end_hex: str, t: float) -> str:
     t = min(max(t, 0.0), 1.0)
 
-    s = start_hex.lstrip("#")
-    e = end_hex.lstrip("#")
-
-    sr, sg, sb = int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16)
-    er, eg, eb = int(e[0:2], 16), int(e[2:4], 16), int(e[4:6], 16)
+    # BSF-M5 (SCV-A1): parsed by the colour authority, so a malformed end is
+    # a ValueError naming it rather than a misread channel or a bare
+    # "invalid literal for int()".
+    sr, sg, sb = _channels(start_hex)
+    er, eg, eb = _channels(end_hex)
 
     r = round(sr + (er - sr) * t)
     g = round(sg + (eg - sg) * t)

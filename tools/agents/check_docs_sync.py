@@ -29,10 +29,26 @@ DOC_FILES = {
 }
 
 
+#: Seconds a git command may take. A local ``git diff --name-only`` returns in
+#: well under a second; one that has not after this long is hung (a lock, a
+#: credential prompt), and waiting longer does not help. No retry: a hung or
+#: failed local git is not transient, and ``main`` reports it as skipped.
+GIT_TIMEOUT_SECONDS = 60
+
+
 def run(cmd: List[str]) -> str:
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    """A command's stdout, or ``RuntimeError`` saying why there is none.
+
+    Tests: tests/test_docs_sync_rule.py::test_bsfm3_a_hung_git_is_an_error_with_its_output_on_its_own_line
+    """
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=GIT_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"Command timed out after {exc.timeout}s: {' '.join(cmd)}") from exc
     if result.returncode != 0:
-        raise RuntimeError(f"Command failed: {' '.join(cmd)}\\n{result.stderr}")
+        raise RuntimeError(f"Command failed: {' '.join(cmd)}\n{result.stderr}")
     return result.stdout.strip()
 
 

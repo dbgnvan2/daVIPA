@@ -12,7 +12,7 @@ import customtkinter as ctk
 from .. import week_calendar
 from ..paths import app_data_dir_path
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
-from ..color_contrast import pick_text_color
+from ..color_contrast import hex_to_rgb, normalize_hex_color, pick_text_color
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .title_format import split_action_item_title
 
@@ -383,17 +383,14 @@ class SetWeeklyTacticDialog(ctk.CTkToplevel):
         return label
 
     def _text_color_for_background(self, color_hex: str) -> str:
-        value = (color_hex or "").strip()
-        if value.startswith("#") and len(value) == 7:
-            try:
-                r = int(value[1:3], 16)
-                g = int(value[3:5], 16)
-                b = int(value[5:7], 16)
-                luminance = (0.299 * r) + (0.587 * g) + (0.114 * b)
-                return "black" if luminance > 160 else "white"
-            except ValueError:
-                pass
-        return "white"
+        # BSF-M5 (SCV-A3): the slice-and-parse this replaced read "#+12345"
+        # as a colour, because int() accepts a sign. The authority refuses it.
+        value = normalize_hex_color(color_hex)
+        if value is None:
+            return "white"
+        r, g, b = hex_to_rgb(value)
+        luminance = (0.299 * r) + (0.587 * g) + (0.114 * b)
+        return "black" if luminance > 160 else "white"
 
     def _build_month_options(self) -> list:
         self.month_lookup = {}

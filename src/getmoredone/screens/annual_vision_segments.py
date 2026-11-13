@@ -47,7 +47,6 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         super().__init__(parent)
         self.vps_manager = vps_manager
         self.app = app
-        self.drag_index: Optional[int] = None
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
@@ -390,15 +389,6 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         if len(shown) == len(self.right_items):
             return base
         return f"{base} ({len(shown)} of {len(self.right_items)}, filtered by tick)"
-
-    def _create_from_index(self, idx: int):
-        year = self._parse_year()
-        if year is None:
-            return
-        if idx < 0 or idx >= len(self.left_items):
-            return
-        item = self.left_items[idx]
-        self._create_from_row(item)
 
     def _create_from_row(self, row: dict):
         """Create a dropped Vision Element's annual records, and say what happened.
