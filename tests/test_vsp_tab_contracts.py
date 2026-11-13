@@ -154,13 +154,25 @@ def test_vtfm71_annual_plan_elements_controls(tmp_path):
 
 
 def test_vtfm71_ape_quarter_assignment_controls(tmp_path):
-    """VTF-M7.1 — Load and Refresh on top, Assign APE to Quarter at the bottom."""
+    """VTF-M7.1 — Load and Refresh on top, Add APE Quarter at the bottom left.
+
+    The button moved from under the right panel to under the left one and was
+    renamed: the dialog it opens asks which Annual Plan Element to assign, and
+    the Annual Plan Elements are the left panel. The right panel keeps no
+    button of its own, which is asserted here so a later change cannot quietly
+    grow a second add control at the other end of the screen.
+    """
     vps = make_vps(tmp_path)
     try:
         root, screen = _screen(APEAssignmentScreen, vps)
         try:
             assert _buttons(_header(screen)) == ["Load", "Refresh"]
-            assert _buttons(screen.right_actions) == ["Assign APE to Quarter"]
+            assert _buttons(screen.left_actions) == ["Add APE Quarter"]
+            assert screen.left_actions.grid_info()["column"] == \
+                screen.left_frame.grid_info()["column"], (
+                "the add button must sit in the left panel's column")
+            assert not hasattr(screen, "right_actions"), (
+                "the right panel must carry no action row of its own")
         finally:
             root.destroy()
     finally:
@@ -168,13 +180,21 @@ def test_vtfm71_ape_quarter_assignment_controls(tmp_path):
 
 
 def test_vtfm71_ape_month_assignment_controls(tmp_path):
-    """VTF-M7.1 — Load and Refresh on top, Assign APE to Month at the bottom."""
+    """VTF-M7.1 — Load and Refresh on top, Add APE Month at the bottom left.
+
+    The month screen's half of the same move; see the quarter test above.
+    """
     vps = make_vps(tmp_path)
     try:
         root, screen = _screen(APEPeriodViewScreen, vps)
         try:
             assert _buttons(_header(screen)) == ["Load", "Refresh"]
-            assert _buttons(screen.right_actions) == ["Assign APE to Month"]
+            assert _buttons(screen.left_actions) == ["Add APE Month"]
+            assert screen.left_actions.grid_info()["column"] == \
+                screen.left_frame.grid_info()["column"], (
+                "the add button must sit in the left panel's column")
+            assert not hasattr(screen, "right_actions"), (
+                "the right panel must carry no action row of its own")
         finally:
             root.destroy()
     finally:
@@ -311,18 +331,21 @@ def test_vtfs11_every_new_button_is_wired_to_its_handler(tmp_path):
     vps = make_vps(tmp_path)
     try:
         seed_ape(vps, year=YEAR)
-        for cls, label, attr in (
+        for cls, label, attr, frame in (
                 (AnnualVisionSegmentsScreen, "Add New Annual Plan Element",
-                 "open_add_dialog"),
-                (APEAssignmentScreen, "Assign APE to Quarter",
-                 "open_add_dialog"),
-                (APEPeriodViewScreen, "Assign APE to Month",
-                 "open_add_dialog"),
-                (WeeklyItemsScreen, "Add Weekly Tactic", "open_add_dialog"),
+                 "open_add_dialog", "right_actions"),
+                # The two APE tabs keep the same command on the row they
+                # moved to, under the left panel.
+                (APEAssignmentScreen, "Add APE Quarter",
+                 "open_add_dialog", "left_actions"),
+                (APEPeriodViewScreen, "Add APE Month",
+                 "open_add_dialog", "left_actions"),
+                (WeeklyItemsScreen, "Add Weekly Tactic", "open_add_dialog",
+                 "right_actions"),
         ):
             root, screen = _screen(cls, vps)
             try:
-                assert _command_of(screen.right_actions, label) == getattr(
+                assert _command_of(getattr(screen, frame), label) == getattr(
                     screen, attr), f"{cls.__name__}'s {label} is not wired"
             finally:
                 root.destroy()
