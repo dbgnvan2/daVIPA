@@ -15,7 +15,12 @@ from ..models import ActionItem
 from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
 from .project_link_notice import confirm_exclusive_relink
-from .week_collision_notice import notify_weekly_tactic_changes
+from .week_collision_notice import (
+    cascade_needs_attention,
+    describe_cascade,
+    describe_week_collision,
+    notify_weekly_tactic_changes,
+)
 from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
 from .drag_schedule_support import (
     color_for_day_stats,
@@ -1427,15 +1432,26 @@ class DragScheduleScreen(ctk.CTkFrame):
             try:
                 notify_weekly_tactic_changes(self.db_manager, self)
             except tk.TclError:
-                # DRP-M3: the move is already written; a notice that cannot
-                # be shown must not stop the list showing it.
-                logger.warning("Scheduler date drop: a Weekly Tactic notice could not be shown")
-                self.set_status(
-                    "Moved — a Weekly Tactic notice could not be shown; see the log",
-                    "warning")
+                # DRP-M3: whatever was written stays written; a notice that
+                # cannot be shown must not stop the list showing it. The
+                # status says what the notices would have said -- including a
+                # refused week, where nothing moved.
+                text = self._weekly_tactic_notice_text()
+                logger.warning("Scheduler date drop: notice could not be shown: %s", text)
+                self.set_status(text, "warning")
             self.refresh()
         elif target_project_id:
             self._drop_onto_project(target_project_id)
+
+    def _weekly_tactic_notice_text(self) -> str:
+        """The text ``notify_weekly_tactic_changes`` would have shown."""
+        db = self.db_manager
+        report = getattr(db, "last_cascade_report", None)
+        parts = [
+            describe_week_collision(getattr(db, "last_week_collision", None)),
+            describe_cascade(report) if cascade_needs_attention(report) else None,
+        ]
+        return " ".join(p for p in parts if p) or "A Weekly Tactic notice could not be shown."
 
     def _drop_onto_project(self, target_project_id: str):
         """File the dragged items under one project, or clear their project.
