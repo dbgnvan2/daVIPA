@@ -31,7 +31,7 @@ rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkg
 - Named colors (match count): **629**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
-- Widget explicit overrides (line count): **509**
+- Widget explicit overrides (line count): **510**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -46,7 +46,7 @@ and theme_files line counts.
 | `theme_api` | 2 |
 | `theme_files` | 1292 |
 | `tuples` | 2 |
-| `widget` | 509 |
+| `widget` | 510 |
 
 Widget override property breakdown:
 
@@ -56,7 +56,7 @@ Widget override property breakdown:
 | `corner_radius` | 56 |
 | `fg_color` | 235 |
 | `hover_color` | 2 |
-| `text_color` | 205 |
+| `text_color` | 206 |
 
 AppSettings persisted color/theme fields:
 
@@ -2311,11 +2311,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/brand.py:48` | `ON_DARK = "#FFFFFF"` |
 | `src/getmoredone/color_contrast.py:157` | `light: str = "#FFFFFF",` |
 | `src/getmoredone/color_contrast.py:165` | `def pick_text_color(bg_hex: str, light: str = "#FFFFFF", dark: str = "#000000") -> str:` |
-| `src/getmoredone/screens/drag_schedule.py:1052` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
-| `src/getmoredone/screens/drag_schedule.py:1072` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
-| `src/getmoredone/screens/drag_schedule.py:1202` | `text_color=date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
-| `src/getmoredone/screens/drag_schedule.py:1304` | `return normalized_date_text_color(getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
-| `src/getmoredone/screens/drag_schedule.py:1307` | `return date_text_color_for(bg_color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
+| `src/getmoredone/screens/drag_schedule.py:1060` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
+| `src/getmoredone/screens/drag_schedule.py:1080` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
+| `src/getmoredone/screens/drag_schedule.py:1210` | `text_color=date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
+| `src/getmoredone/screens/drag_schedule.py:1312` | `return normalized_date_text_color(getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
+| `src/getmoredone/screens/drag_schedule.py:1315` | `return date_text_color_for(bg_color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
 | `src/getmoredone/screens/drag_schedule_support.py:63` | `color = str(configured_value or "#FFFFFF").strip()` |
 | `src/getmoredone/screens/drag_schedule_support.py:67` | `return "#FFFFFF"` |
 | `src/getmoredone/screens/settings.py:625` | `value=getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")` |

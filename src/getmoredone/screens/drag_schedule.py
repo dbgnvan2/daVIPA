@@ -16,7 +16,7 @@ from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
 from .project_link_notice import confirm_exclusive_relink
 from .week_collision_notice import notify_weekly_tactic_changes
-from ..theme import button_style, combo_box_style, semantic_colors
+from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
 from .drag_schedule_support import (
     color_for_day_stats,
     date_background_for,
@@ -110,7 +110,15 @@ class DragScheduleScreen(ctk.CTkFrame):
 
         self.create_header()
         self.create_body()
+        # DRP-M3: where a drop reports when the platform will not show a
+        # dialog from inside a drag release (PD-M12). Not modal, so it cannot
+        # fail the way the dialog did.
+        self.status_label = ctk.CTkLabel(self, text="", anchor="w")
+        self.status_label.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 6))
         self.refresh()
+
+    def set_status(self, text: str, kind: str = "muted"):
+        self.status_label.configure(text=text, text_color=status_text_color(kind))
 
     def _sync_ui_sizing_from_settings(self):
         """Sync Drag Schedule sizing options from persisted settings."""
@@ -1400,6 +1408,7 @@ class DragScheduleScreen(ctk.CTkFrame):
             self.drag_items = []
 
     def _apply_drop(self):
+        self.set_status("")
         target_date, target_project_id = self.get_drop_target()
         self.clear_hover_target()
 
@@ -1415,7 +1424,15 @@ class DragScheduleScreen(ctk.CTkFrame):
                         target_date,
                         "Drag-and-drop schedule"
                     )
-            notify_weekly_tactic_changes(self.db_manager, self)
+            try:
+                notify_weekly_tactic_changes(self.db_manager, self)
+            except tk.TclError:
+                # DRP-M3: the move is already written; a notice that cannot
+                # be shown must not stop the list showing it.
+                logger.warning("Scheduler date drop: a Weekly Tactic notice could not be shown")
+                self.set_status(
+                    "Moved — a Weekly Tactic notice could not be shown; see the log",
+                    "warning")
             self.refresh()
         elif target_project_id:
             self._drop_onto_project(target_project_id)
@@ -1468,6 +1485,7 @@ class DragScheduleScreen(ctk.CTkFrame):
                 # DRP-M2: a notice, not a question -- the rest of the drag
                 # still goes through, and the log keeps what was said.
                 logger.warning("Weekly Tactic notice could not be shown: %s", text)
+                self.set_status(text, "warning")
         if not item_ids:
             self.refresh()
             return
@@ -1482,6 +1500,8 @@ class DragScheduleScreen(ctk.CTkFrame):
             logger.warning(
                 "Project drop not applied: the confirmation could not be shown "
                 "(%d item(s) left where they were)", len(item_ids))
+            self.set_status(
+                "Not moved — the confirmation could not be shown", "warning")
             return
         if not proceed:
             return
@@ -1494,11 +1514,12 @@ class DragScheduleScreen(ctk.CTkFrame):
                     else:
                         self.db_manager.link_item_to_project_exclusive(board_id, item_id)
         except Exception as exc:
-            messagebox.showerror(
-                "Move Failed",
-                f"None of the {len(item_ids)} dragged items were moved: {exc}",
-                parent=self,
-            )
+            text = f"None of the {len(item_ids)} dragged items were moved: {exc}"
+            try:
+                messagebox.showerror("Move Failed", text, parent=self)
+            except tk.TclError:
+                logger.warning("Move Failed notice could not be shown: %s", text)
+                self.set_status(text, "error")
         self.refresh()
 
     def update_drag_position(self):
