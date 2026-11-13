@@ -61,9 +61,9 @@ MAX_DEPTH_BARS = 3
 # priority_score is the *product* of importance x urgency x size x value,
 # so it runs 4 .. 9999 -- not 1 .. 10. PRI-M2 capped it at
 # PriorityFactors.MAX_SCORE; before that the product ran to 102400
-# (20 x 20 x 16 x 16), and rows written then still hold the raw number, so
-# these thresholds have to keep classifying scores above the cap. Bands are
-# thresholds on that product, lowest bound first match wins from the top.
+# (20 x 20 x 16 x 16). Rows written then are capped when the database opens
+# (PRC-M1). Bands are thresholds on that product, lowest bound first match
+# wins from the top.
 # No screen draws these bands since PBG-M5 (2026-11-12) and their three colour
 # tables are deleted. The thresholds stay because they are what the score's cap
 # is measured against -- ``test_priority_floor_and_cap`` reads the top one.

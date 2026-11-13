@@ -247,7 +247,7 @@ class ShowRelatedDialog(ctk.CTkToplevel):
         ).grid(
             row=0, column=0, sticky="w", padx=10, pady=5
         )
-        ctk.CTkLabel(header_frame, text="Priority", width=70, font=ctk.CTkFont(weight="bold"), text_color=self.palette["body_text"]).grid(
+        ctk.CTkLabel(header_frame, text="Priority", width=PICKER_SCORE_CELL_WIDTH_PX, font=ctk.CTkFont(weight="bold"), text_color=self.palette["body_text"]).grid(
             row=0, column=1, padx=5, pady=5
         )
         ctk.CTkLabel(header_frame, text="Due Date", width=110, font=ctk.CTkFont(weight="bold"), text_color=self.palette["body_text"]).grid(
@@ -423,7 +423,7 @@ class SetParentDialog(ctk.CTkToplevel):
         ctk.CTkLabel(header_frame, text="Immediate Step (Who)", anchor="w", font=ctk.CTkFont(weight="bold")).grid(
             row=0, column=0, sticky="w", padx=10, pady=5
         )
-        ctk.CTkLabel(header_frame, text="Priority", width=70, font=ctk.CTkFont(weight="bold")).grid(
+        ctk.CTkLabel(header_frame, text="Priority", width=PICKER_SCORE_CELL_WIDTH_PX, font=ctk.CTkFont(weight="bold")).grid(
             row=0, column=1, padx=5, pady=5
         )
         ctk.CTkLabel(header_frame, text="Due Date", width=110, font=ctk.CTkFont(weight="bold")).grid(
