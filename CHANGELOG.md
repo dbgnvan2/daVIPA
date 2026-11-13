@@ -7,6 +7,8 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-11-13
+
 ### Added — Google Calendar meetings on the Plan (2026-11-13)
 
 - **↻ Calendar** on the Plan screen reads the selected day from Google
@@ -1638,7 +1640,8 @@ published release.
 - No auto-update. New versions are downloaded manually.
 - No bundled music. Point Settings at a folder of your own.
 
-[Unreleased]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.2...v0.3.4
 [0.3.1]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/dbgnvan2/daVIPA/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dbgnvan2/daVIPA/releases/tag/v0.2.0
