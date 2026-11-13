@@ -255,6 +255,35 @@ what keeps `tests/test_ci_contract.py`'s mapped-window count at 23, so the
 duplication is four places a future copy can forget it. A shared fixture in
 `conftest.py` would make that impossible rather than merely conventional.
 
+## Adjacent issue — the add button's panel on the other two VSP tabs (APB, filed 2026-11-12)
+
+Raised by the cold sweep over the batch that moved APE Quarter Assignment's
+and APE Month Assignment's add buttons under their left panels (`632cd7c`),
+and not fixed, under global rule 10.
+
+### APB-A1 — APE Week Assignment's add button is under the right panel against the same rule (medium)
+
+The move was justified by "the control sits with the records it reads", and
+that is equally true of `screens/weekly_items.py`: its `_add_options` builds
+the dialog's options from `self.left_items` and `open_add_dialog` prompts
+"Which Annual Plan Element is the tactic for ...?" off an `APE_LEFT_COLUMNS`
+left panel, yet `Add Weekly Tactic` sits under the right one
+(`weekly_items.py:229`). Nothing ties it there: that screen's `status_label`
+is parented to the header (`weekly_items.py:161`), so moving the button moves
+nothing else.
+
+Annual Plan Elements is a different case and is **not** part of this item: its
+`status_label` is parented to `right_actions`
+(`annual_vision_segments.py:196`) and pinned there by
+`tests/test_vsp_tab_contracts.py:147`, so moving that button moves the status
+line with it, or breaks the contract that says the outcome is reported beside
+the button.
+
+Not fixed because the request named the two APE assignment screens only, and
+moving a third tab's control is a user-visible change on a screen nobody asked
+about. Either move it for consistency, or record that APE Week Assignment adds
+a right-panel record from the right panel on purpose.
+
 ## Open decision — what the colour inventory counts (CIV, filed 2026-11-11)
 
 Both raised by the sweep over the gray-scale batch, and both about what the

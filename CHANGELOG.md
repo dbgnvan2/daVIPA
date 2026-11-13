@@ -12,11 +12,18 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **APE Quarter Assignment and APE Month Assignment add from the left.** The
   bottom button moved from under the right panel to under the left one and was
   renamed: `Assign APE to Quarter` is now **Add APE Quarter**, and `Assign APE
-  to Month` is now **Add APE Month**. The dialog, its options and what it
-  writes are unchanged. The left panel holds the Annual Plan Elements the
+  to Month` is now **Add APE Month**. The dialog's options and what it writes
+  are unchanged. The left panel holds the Annual Plan Elements the
   dialog asks you to choose from, so the control now sits with the records it
-  reads rather than at the opposite end of the screen. Annual Plan Elements and
-  APE Week Assignment keep their buttons under the right panel.
+  reads rather than at the opposite end of the screen. The dialog's own title
+  follows its button — "Add APE Quarter Q4", where it used to read "Assign APE
+  to Quarter Q4" under a button that no longer said that.
+- **The other two tabs keep their buttons under the right panel.** Annual Plan
+  Elements has to: its status line is parented to that same row, so the button
+  cannot move without taking the outcome message with it. APE Week Assignment
+  has no such tie and the rule above applies to it just as well, so it is
+  filed as an adjacent issue (`BACKLOG.md`, APB-A1) rather than moved inside a
+  batch about the two APE assignment tabs.
 
 ### Changed — the VSP Plan tabs: the tick is a filter, and every tab adds (2026-11-11)
 
