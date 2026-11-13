@@ -117,6 +117,8 @@ def test_wt_m6b1_drag_schedule_refiles(tmp_path):
             refresh=lambda: None,
             drag_label=None,
         )
+        # DRP-M1 split the drop into a helper; bind the real one onto the stub.
+        stub._apply_drop = lambda: DragScheduleScreen._apply_drop(stub)
         # The handler now calls the real notifier; a stub is not a Tk parent, and
         # a fixture that crossed a year boundary would raise TclError here.
         with patch("src.getmoredone.screens.drag_schedule.notify_weekly_tactic_changes",

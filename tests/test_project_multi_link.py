@@ -1790,3 +1790,61 @@ def test_p12_a_blank_board_title_is_a_filing_on_the_editor_too(tmp_path, monkeyp
         assert "“the selected project”" not in message, message
     finally:
         vps.close()
+
+
+def test_drpm2_a_refused_dialog_on_a_project_drop_writes_nothing_and_ends_the_drag(
+    tmp_path, monkeypatch, answers
+):
+    """DRP-M1, DRP-M2 — a dialog the platform refuses cannot take the drop with it.
+
+    Spec: docs/spec_coverage.md#plan-and-scheduler-drops-lm3-2026-11-13
+
+    On the Plan screen ``tk_messageBox`` raised ``TclError`` when opened from
+    a drag release (PD-M12). Here the tactic notice may fail and the drag
+    goes on; the relink question may fail and nothing is written, because it
+    guards a write that removes project links. Either way the drag ends.
+    """
+    import tkinter as tk
+    from types import SimpleNamespace
+    import src.getmoredone.screens.drag_schedule as ds
+    from tests.weekly_tactic_fixtures import make_week_item
+
+    vps = make_vps(tmp_path)
+    try:
+        manager = vps.db_manager
+        ape_id = seed_ape(vps)
+        other_ape = seed_ape(vps, subsegment="Elsewhere", key_field="Other")
+        first = _board(manager, "First", other_ape)
+        second = _board(manager, "Second", other_ape)
+        tactic = make_week_item(vps, ape_id)
+        daily = make_daily_item(vps, "An ordinary task")
+        manager.link_item_to_project_exclusive(first.id, daily.id)
+
+        def refused(*args, **kwargs):
+            raise tk.TclError("")
+
+        monkeypatch.setattr(ds.messagebox, "showinfo", refused)
+        monkeypatch.setattr(ds, "confirm_exclusive_relink", refused)
+
+        hidden = []
+        stub = SimpleNamespace(
+            db_manager=manager,
+            drag_item=daily,
+            drag_items=[tactic, daily],
+            drag_label=SimpleNamespace(place_forget=lambda: hidden.append(True)),
+            get_drop_target=lambda: (None, second.id),
+            clear_hover_target=lambda: None,
+            refresh=lambda: None,
+        )
+        stub._apply_drop = lambda: ds.DragScheduleScreen._apply_drop(stub)
+        stub._drop_onto_project = (
+            lambda board_id: ds.DragScheduleScreen._drop_onto_project(stub, board_id))
+
+        ds.DragScheduleScreen.on_drag_release(stub, None)
+
+        assert manager.get_project_board_ids_for_item(daily.id) == [first.id]
+        assert manager.get_project_board_ids_for_item(tactic.id) == []
+        assert hidden == [True]
+        assert (stub.drag_item, stub.drag_items) == (None, [])
+    finally:
+        vps.close()

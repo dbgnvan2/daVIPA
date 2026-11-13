@@ -602,7 +602,8 @@ def test_awam53_row_behaviours_are_inherited_not_copied():
         assert getattr(WeekTacticActionsPanel, name) is \
             getattr(TodayScreen, name)
 
-    # The four seams, and only those four, override anything of Today's.
+    # The five seams, and only those five, override anything of Today's.
+    # PIN_DRAG_ENABLED is the fifth, added by AWA2-M1 (AWA-A4).
     # A set *intersection* only proved those four were present; it could not
     # see a fifth override appear, which is the drift this criterion is about.
     # The panel's own new names (set_tactic, add_action_item, ...) shadow
@@ -611,7 +612,8 @@ def test_awam53_row_behaviours_are_inherited_not_copied():
                         if not name.startswith("__")
                         and hasattr(TodayScreen, name))
     assert overridden == [
-        "COLUMN_PREFIX", "EMPTY_TEXT", "_build_toolbar", "get_todays_items"
+        "COLUMN_PREFIX", "EMPTY_TEXT", "PIN_DRAG_ENABLED", "_build_toolbar",
+        "get_todays_items",
     ]
 
 
@@ -1232,5 +1234,37 @@ def test_awam23_an_empty_string_link_counts_as_no_link(tmp_path):
 
         # And the same row, counted by the other consumer of the predicate.
         assert _child_count(vps.db.conn, tactic.id) == 1
+    finally:
+        vps.close()
+
+def test_awa2m1_the_week_actions_rows_have_no_pin_grip(tmp_path):
+    """AWA2-M1 (AWA-A4) — no grip, so a drag here cannot re-order Today.
+
+    Spec: docs/spec_coverage.md#plan-and-scheduler-drops-lm3-2026-11-13
+
+    The grip writes ``today_pin_rank``, Today's order. Inherited, it floated
+    an item to the top of Today from this panel. The row is still drawn: its
+    checkbox is there.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        tactic, _ = _tactic_and_ape(vps)
+        make_daily_item(vps, title="child", weekly_tactic_id=tactic.id, refile=False)
+        root, panel = _panel(tmp_path, vps, tactic.id)
+        try:
+            found = {"grips": 0, "checkboxes": 0}
+
+            def walk(widget):
+                for child in widget.winfo_children():
+                    if isinstance(child, ctk.CTkLabel) and str(child.cget("cursor")) == "fleur":
+                        found["grips"] += 1
+                    if isinstance(child, ctk.CTkCheckBox):
+                        found["checkboxes"] += 1
+                    walk(child)
+
+            walk(panel)
+            assert found == {"grips": 0, "checkboxes": 1}, found
+        finally:
+            root.destroy()
     finally:
         vps.close()

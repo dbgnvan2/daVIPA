@@ -7396,3 +7396,30 @@ def test_pscm4_the_day_badge_carries_the_level_colour(
     cell = level_cell_fill(settings, item)
     assert cell.fill, "the test item must have a coloured level"
     assert _as_hex(badge, badge.cget("fg_color")) == _as_hex(badge, cell.fill)
+
+
+def test_lm3m1_lunch_dropped_on_an_end_of_the_day_says_why_it_did_nothing(
+    screen, manager, monkeypatch
+):
+    """LM3-M1 (LMM-A3) — the lunch chip on Earlier/Later is refused out loud.
+
+    Spec: docs/spec_coverage.md#plan-and-scheduler-drops-lm3-2026-11-13
+
+    An Action Item or a block dropped there lengthens the day; the lunch chip
+    did nothing and said nothing. It still writes nothing.
+    """
+    from src.getmoredone.screens.plan import LUNCH_EDGE_TEXT
+
+    frame = _virtual(screen, DAY_EXTEND_LATER)
+    _pointer_at(screen, monkeypatch, 0, 0)
+    monkeypatch.setattr(
+        "src.getmoredone.screens.plan.widget_contains_pointer",
+        lambda widget, x, y: widget is frame,
+    )
+
+    screen.start_lunch_drag(None)
+    screen.on_drag_release(None)
+    screen.update_idletasks()
+
+    assert _lunch_blocks(manager) == []
+    assert screen.status_label.cget("text") == LUNCH_EDGE_TEXT
