@@ -4058,18 +4058,13 @@ def test_pdm11_the_item_row_uses_the_chips_column_order(root, manager):
         f"the row is missing a part: found {sorted(columns)} -- an incomplete "
         "row would make the comparison below vacuous"
     )
-    # PBG-M1: the badge's column reaches both panes, and the item row is the
-    # pane that draws in it -- the badge was asked for in the listing. The
-    # marker column is empty in a box for the older reason: the mark is about
-    # the item list, and a box the task is already in has nothing to say about
-    # whether it is scheduled. So the comparison is over what both panes draw.
+    # PSC-M4 (2026-11-12): a box chip draws the badge too, asked for on the
+    # day side, so it is compared like every other part. The marker column is
+    # empty in a box: the mark is about the item list, and a box the task is
+    # already in has nothing to say about whether it is scheduled.
     chip_columns = _row_columns(chip, item.title)
-    assert "badge" not in chip_columns, (
-        "a day box draws the badge; it was asked for in the item listing"
-    )
     shared = {
-        role: column for role, column in columns.items()
-        if role not in ("marker", "badge")
+        role: column for role, column in columns.items() if role != "marker"
     }
     assert shared == chip_columns, (
         f"the item row puts its parts in {shared} and a box chip in "
@@ -7332,3 +7327,72 @@ def test_pscm1_the_plan_screen_passes_each_items_category_colour(
     assert linked.segment_description_id == "seg-1"
     assert fills["Linked"] == PSC_CATEGORY
     assert fills["Unlinked"] != PSC_CATEGORY
+
+
+def _psc_day_screen(root, manager, settings):
+    """A Plan screen whose app resolves ``seg-1`` to ``PSC_CATEGORY``."""
+
+    class _Vps:
+        def get_segment_colors_by_id(self):
+            return {"seg-1": PSC_CATEGORY}
+
+        def get_segment_color_map(self):
+            return {}
+
+    app = _App(settings)
+    app.vps_manager = _Vps()
+    panel = PlanScreen(root, manager, app)
+    panel.selected_date = THURSDAY
+    panel.refresh()
+    return panel
+
+
+def _chip_holding(panel, title):
+    for widget, _block_id in panel._block_widgets:
+        if _find_label(widget, title) is not None:
+            return widget
+    raise AssertionError(f"no day chip for {title!r}")
+
+
+def test_pscm3_a_day_chip_takes_its_items_category_colour(
+    root, manager, settings, light_appearance
+):
+    """PSC-M3 — a block on the day is filled like its item row; text follows.
+
+    An unlinked block keeps a theme surface. Both carry the badge (PSC-M4).
+    """
+    from src.getmoredone.color_contrast import pick_text_color
+
+    linked = _scored_item(manager, "Linked", segment_description_id="seg-1")
+    plain = _scored_item(manager, "Plain")
+    _add_block(manager, 30, linked.title, 0, item_id=linked.id)
+    _add_block(manager, 30, plain.title, 1, item_id=plain.id)
+    panel = _psc_day_screen(root, manager, settings)
+
+    chip = _chip_holding(panel, "Linked")
+    assert chip.cget("fg_color") == PSC_CATEGORY
+    title = _find_label(chip, "Linked")
+    assert title.cget("text_color") == pick_text_color(PSC_CATEGORY)
+    assert _chip_holding(panel, "Plain").cget("fg_color") != PSC_CATEGORY
+
+    for name, item in (("Linked", linked), ("Plain", plain)):
+        assert _find_label(
+            _chip_holding(panel, name), f"P:{item.priority_score}"
+        ) is not None, f"{name}: no badge on the day chip"
+
+
+def test_pscm4_the_day_badge_carries_the_level_colour(
+    root, manager, settings, light_appearance
+):
+    """PSC-M4 — the badge on the day is the item row's: same level fill."""
+    item = _scored_item(manager, "Draft the proposal")
+    _add_block(manager, 30, item.title, 0, item_id=item.id)
+    panel = _psc_day_screen(root, manager, settings)
+
+    badge = _find_label(
+        _chip_holding(panel, item.title), f"P:{item.priority_score}"
+    )
+    assert badge.grid_info().get("column") == CHIP_BADGE_COLUMN, "badge not placed"
+    cell = level_cell_fill(settings, item)
+    assert cell.fill, "the test item must have a coloured level"
+    assert _as_hex(badge, badge.cget("fg_color")) == _as_hex(badge, cell.fill)
