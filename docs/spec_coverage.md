@@ -2426,7 +2426,6 @@ five list screens draw. No plan file; this table is the record.
 | ID | Criterion | Status | Where | Proof |
 |---|---|---|---|---|
 | **PSC-M1** | a Plan item row linked to a Category is filled with its colour, text derived from the fill; unlinked rows unchanged | done | `screens/plan.py::_segment_color_resolver`, `screens/plan_blocks.py::build_item_row` | `tests/test_plan_screen.py::test_pscm1_a_category_colour_fills_the_item_row`, `::test_pscm1_the_plan_screen_passes_each_items_category_colour`; red with the hand-off removed |
-| **PSC-M2** | the ✓/? mark stays ≥3:1 on a Category fill | done | `screens/plan_blocks.py::_mark_color` | `::test_pscm1_a_category_colour_fills_the_item_row`; red with the fallback removed |
+| **PSC-M2** | the ✓/? mark and the depth bars follow a Category fill (mark ≥3:1; bars in the row text and a blend toward it) | done | `screens/plan_blocks.py::_mark_color`, `DepthBarStack(colors=)` | `::test_pscm1_a_category_colour_fills_the_item_row`; red with either removed |
 
-Not covered: the day-pane blocks are not Category-coloured (not asked for), and
-the depth bars were not measured on a fill.
+Not covered: the day-pane blocks are not Category-coloured (not asked for).
