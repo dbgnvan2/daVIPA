@@ -7293,6 +7293,14 @@ def test_pscm1_a_category_colour_fills_the_item_row(
     assert title.cget("text_color") == pick_text_color(PSC_CATEGORY)
     mark = _find_label(row, PD_BLOCKED_TEXT)
     assert contrast_ratio(PSC_CATEGORY, _as_hex(row, mark.cget("text_color"))) >= 3.0
+    bars = [w for w in row.winfo_children() if isinstance(w, DepthBarStack)]
+    assert len(bars) == 1
+    bar_fills = [b.cget("fg_color") for b in bars[0].winfo_children()]
+    assert len(bar_fills) == 3 and len(set(bar_fills)) == 2, bar_fills
+    for colour in bar_fills:
+        assert contrast_ratio(PSC_CATEGORY, colour) >= 1.5, bar_fills
+    assert contrast_ratio(PSC_CATEGORY, pick_text_color(PSC_CATEGORY)) >= 3.0
+    assert pick_text_color(PSC_CATEGORY) in bar_fills
 
 
 def test_pscm1_the_plan_screen_passes_each_items_category_colour(
