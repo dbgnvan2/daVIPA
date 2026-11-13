@@ -320,8 +320,8 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   Every block **on the grid** that has a length goes out — items, buffers and
   breaks alike — titled the way the block is titled on screen, and timed from
   **the box it is drawn in**, not from any time stored with it. That matters
-  because the grid moves: change *Day Start* and the whole day shifts on
-  screen, and what goes on the calendar is the time you can see, every time.
+  because a block's box is the one fact the screen draws from, and what goes
+  on the calendar is the time you can see, every time.
 
   Blocks under *Outside the day* are skipped and counted — a block with no box
   has no time the app knows, and putting work on your calendar at an hour
@@ -651,9 +651,11 @@ Day pane (right):
   column, as an item above it.
 
 Day Settings modal:
-- **Day Start** — What: The time of the first box. Why: A block remembers
-  **which box** it is in, not what time that was, so moving Day Start moves the
-  whole day's times with it and writes nothing to your blocks.
+- **Day Start** — What: The time of the first box on a blank day. Why: The
+  hours are a template. Moving Day Start keeps every planned block at the time
+  you planned it, on every date, and the status line says how many blocks kept
+  their times. While any block is planned, Day Start moves in 30-minute steps
+  only, because a block cannot keep 09:00 on a grid that starts at 08:45.
 - **Lunch Start** and **Lunch (minutes)** — What: When the gap is and how long.
   Why: The boxes it covers are marked and take no tasks; nothing is split across
   it. Set the minutes to 0 for no lunch.
@@ -688,12 +690,18 @@ Day Settings modal:
   modal with the field named, never silently replaced. A settings file that
   already holds such a value from an older version loads as the default for
   that field rather than being taken as given.
-- **Save** writes **nothing** to your blocks, on any day. Why: every block's box
-  is stored relative to Day Start, so every day re-times itself the next time you
-  open it. There is no day left showing times that no longer follow from your
-  settings, and no day that can be "too full to re-time". If a block no longer
-  fits the day you have just described, it appears under **Outside the day** and
-  the status line says how many — drag it onto a box, or shorten it.
+- **Save** renumbers your blocks when Day Start moves, so each keeps its clock
+  time, and writes the settings in the same step: if either fails, neither
+  happens and the dialog says so. A block that was planned before Day Start
+  draws above the first box, as a drop on **Earlier** does. If a block no
+  longer fits the day you have just described, it appears under **Outside the
+  day** and the status line says how many — drag it onto a box, or shorten it.
+- **Blocks from before 2026-11-13** — An earlier version kept each block's box
+  and moved its time when Day Start changed. The first time you open such a
+  day, blocks go back to the times they were planned at, and the status line
+  says how many. If putting them back would not fit (a full box, or lunch), the
+  day is left as it is and the status line says so: drag those blocks where you
+  want them.
 
 **Days planned in an older version** are mapped onto the grid the first time you
 open them. A block with a readable start time goes on the box that time names,

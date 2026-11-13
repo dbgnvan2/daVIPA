@@ -494,32 +494,3 @@ in the batch that found them — rule 10.
 **Effort:** [Small/Medium/Large]
 **Notes:**
 ```
-
-### SBN-A3 — PD-M14.4 and PD-M14.7: build them, or withdraw them (medium — a decision)
-
-**Recommendation (2026-11-13): build PD-M14.4, with PD-M14.7, in a batch you
-can walk.** Your 2026-11-08 instruction was that the Day Settings hours "are
-solely for starting a blank plan for the day"; PD-M14.4 is what that implies,
-since moving the template should not move work already planned. It was not
-built unattended because it reverses two `done` criteria (TG-M6.4, TG-M6.4a:
-a Day Start change re-times every day on read and writes no rows), and because
-it would rewrite `slot_index` on every date in the database on a settings save.
-The alternative is to withdraw both and keep TG-M6.4 as the design.
-
-Found by repairing `docs/unused-docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`:
-ten of its criteria name tests that were never written. Measured per criterion
-after the cold pass corrected an over-broad first claim:
-
-- **PD-M14.5's first bullet** and **PD-M14.3's break/buffer clause** *are*
-  covered, by `tests/test_plan_screen.py::test_pdm34_autoload_does_not_run_past_the_day_end`,
-  `::test_pdm36_a_full_day_writes_nothing` and
-  `::test_pdm8_clear_day_leaves_breaks_and_buffers`.
-- **PD-M14.3's span clause** (the day still starts at −1) is not.
-- **PD-M14.4** and **PD-M14.7** are not covered at all. There is no production
-  caller of `shift_all_slots`, and no repair pass exists in `src/`: `grep -rn
-  "def .*repair" src/` finds only VPS and weekly-tactic ones. So the question
-  is not only "write the test" but whether the criteria describe code that was
-  ever built.
-
-A product judgement, which is why it is filed rather than answered.
-

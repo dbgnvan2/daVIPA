@@ -42,12 +42,18 @@ screen. Tests pass for each batch, but no session drove the app.
 8. **Priority cells (PRC).** Today, Upcoming, Hierarchical, Completed and All
    Items show `P:n` in the same width. The Set Parent and Show Related pickers
    colour the score cell.
+9. **Day Start keeps clock times (PD-M14.4, PD-M14.7).** Plan three items on a
+   day. In Day Settings, move Day Start an hour earlier and save. All three
+   stay at the times you planned them, and the status line says *3 blocks kept
+   their times*. Try 07:45: it is refused, with the 30-minute-steps message.
+   Then open 5, 6 and 7 November in the demo data. Blocks are at the times
+   they were planned at, and the status line says how many were put back.
 
 ## Risks / Known gaps
 - DRP-M2/M3 and LPR-M1 are `partial` in `docs/spec_coverage.md` until the walk.
-- SBN-A3 is open as a decision, with a recommendation: build PD-M14.4 in a
-  batch that can be walked. It rewrites `slot_index` on every date when Day
-  Start changes, so it was not built unattended.
+- PD-M14.4d and PD-M14.7e are `partial` until step 9 is walked. Back up the
+  database first: the renumber writes every date, and the repair writes the
+  dates you open.
 
 ## Next agent actions
 - Mark DRP-M2, DRP-M3 and LPR-M1 `done` in `docs/spec_coverage.md` once the

@@ -25,8 +25,9 @@ each slotted block's box from its stored `start_time`
 (`slot_index_for_time(..., allow_before=True)`). Unreadable times are skipped
 and counted. If any moved block would not fit the repaired day (`can_place`:
 outside the date, crossing lunch, full box) the date is left as it is and the
-refusal is reported. Plan calls it on load, after adoption, under the same
-`_day_shape_is_the_users()` gate. It writes nothing when slots and times agree,
+refusal is reported. Plan calls it on load, before adoption (so adoption sees the repaired
+boxes), under the same `_day_shape_is_the_users()` gate. A refused repair
+outranks every other load or save message on the status line. It writes nothing when slots and times agree,
 so "once" is idempotence, not a stored flag.
 
 ## Criteria → tests

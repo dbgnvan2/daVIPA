@@ -1,7 +1,9 @@
 # Implementation plan — the day's hours are a template (PD-M14)
 
 Date: 2026-11-08
-Status: **built and on `main`, except PD-M14.4.** PD-M14 is the surviving
+Status: **built and on `main`.** PD-M14.4 and PD-M14.7 were built 2026-11-13 under
+`implementation_plan_2026-11-13_day_start_keeps_clock_times.md`; the "not built"
+notes below are history. Before that, the line read: built, except PD-M14.4. PD-M14 is the surviving
 plan-day design: the drawn day derives from the date's own blocks, and Day
 Settings hours are a template for a blank day.
 `docs/unused-docs/spec_coverage_2026-11-08_plan_calendar_export.md` heads its re-run
