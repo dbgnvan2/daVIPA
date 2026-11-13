@@ -7,6 +7,13 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — list screens redraw in place (2026-11-13)
+
+- **Today, Upcoming, All Items, Completed, Hierarchical and VPS Planning
+  rebuild their rows without taking the list out of the window first.** Taking
+  it out could leave the list blank until the mouse moved, the fault fixed on
+  the Plan screen as PD-M11.1. Not yet walked on screen. (LPR-M1)
+
 ### Fixed — Plan and Scheduler drops (2026-11-13)
 
 - **APE Week Actions rows have no drag-to-reorder grip.** The grip wrote the

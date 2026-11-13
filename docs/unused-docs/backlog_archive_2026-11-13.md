@@ -477,3 +477,58 @@ belong to, in the document) or leaving it as the weaker check it is. The first
 is a documentation change across 34 documents, not a guard change.
 
 **Closed:** 2026-11-13, accepted as the weaker check it is. The per-document convention would touch 34 documents to tighten a guard over citations, and the anchoring rule was measured and rejected (SAG-A17). The path arm remains the strong form; a writer who wants the check cites with a path.
+
+## Adjacent issue from the PD-M11 batch (2026-11-07)
+
+### 2026-11-07 - Type: Bug
+
+**Title:** Six other screens rebuild a scrolling pane by taking it out of the grid
+**Description:** `today.py`, `upcoming.py`, `all_items.py`, `completed.py`,
+`hierarchical.py` and `vps_planning.py` all call `grid_remove()` on a
+`CTkScrollableFrame`, destroy and rebuild its rows, and put it back in a
+`finally`. All six come from `9525d94` ("Fix GUI flickering by preventing
+intermediate renders during screen refresh"), which is where the Plan screen
+got the pattern too. Taking that frame out of the grid unmaps the canvas its
+rows are drawn in, and the width of the canvas window and the scrollregion are
+both restored by `<Configure>` handlers that run only when the event queue is
+next serviced - which is the blank-pane defect PD-M11.1 fixed on the Plan
+screen.
+**Priority:** Medium
+**Effort:** Medium - six screens, each with its own on-screen contract
+**Notes:** Not fixed with PD-M11. None of the six was reported, and six
+screens' worth of UI regression is not a change to make alongside a fix to a
+seventh. The fix is mechanical and identical in each: delete the
+`grid_info()`/`grid_remove()` pair and the `grid(**grid_info)` in the
+`finally`, keep the destroy-and-rebuild. What it needs is a walk of each
+screen afterwards, which is the actual cost.
+
+**Closed:** LPR-M1 (2026-11-13): the pair is removed on all six; `git diff -w` is the pair and nothing else. Not walked on screen.
+
+## Weekly Tactic scheduling — carried forward
+
+### 2026-08-18 - Type: Bug
+
+**Title:** A week item that cannot snap to its week start is never repaired
+**Description:** `normalize_week_item_starts` (`weekly_tactic_maintenance.py`) snaps
+every week item onto its week boundary at start-up. On the very first run the
+WT-INV5 unique index does not exist yet, so a collision simply happens and the
+dedupe merges the pair. On every run afterwards the index does exist, the UPDATE
+raises, the row is left mid-week, and it is counted in the returned `collisions`
+list. `dedupe_weekly_tactics` will never see it, because it groups by the raw
+`start_date` the row still holds — so the WT-INV5 violation is permanent and its
+only trace is a warning in `weekly_tactic_debug.log`.
+**Priority:** Medium
+**Effort:** Small
+**Status:** [x] **Done 2026-08-19 (BC2).** The stated cause had moved on: the
+repair *does* consume `week_start_normalization["collisions"]`, but only to mark
+that tactic's children unrepairable. The real gap was that
+`find_duplicate_weekly_tactics` grouped by the raw `start_date`, so a tactic left
+mid-week formed a group of one and was never merged. It now groups by the *week*
+each row belongs to, and the survivor is snapped onto its week start once the
+duplicate holding that date is gone. Tests:
+`tests/test_weekly_tactic_dedupe.py::test_bc2_*` (three, including a dirty-state
+and an idempotency case).
+**Notes:** Found by the learning-qa sweep of commit 55f1b36 (finding 8, P1/P3 — a
+repairable condition recorded as a terminal one).
+
+**Closed:** 2026-11-13 -- already done (BC2, 2026-08-19); BACKLOG.md holds open work only.

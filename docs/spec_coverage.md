@@ -2444,6 +2444,14 @@ Plan: `docs/unused-docs/implementation_plan_2026-11-13_backlog_small_fixes.md`.
 | **BSF-M6** | a second LUNCH block on one date is refused (LMM-A2) | done | `db_manager.py::add_block_at` | `tests/test_time_block_crud.py::test_bsfm6_a_second_lunch_block_on_one_date_is_refused` |
 | **BSF-M7** | apt retries inside a step time limit (CI-A1) | done | `.github/workflows/tests.yml` | `tests/test_ci_contract.py::test_bsfm7_every_apt_call_retries_inside_a_time_limit` |
 
+## List pane rebuild (LPR, 2026-11-13)
+
+Backlog item "Six other screens rebuild a scrolling pane by taking it out of the grid". No plan file; this table is the record.
+
+| ID | Criterion | Status | Where | Proof |
+|---|---|---|---|---|
+| **LPR-M1** | the six list screens' refresh rebuilds rows with the scroll pane left in the grid | partial — not walked on screen | `screens/today.py`, `upcoming.py`, `all_items.py`, `completed.py`, `hierarchical.py`, `vps_planning.py` | `tests/test_list_pane_rebuild.py::test_lprm1_a_refresh_leaves_the_list_pane_in_the_grid` |
+
 ## Plan and Scheduler drops (LM3, 2026-11-13)
 
 Backlog items LMM-A3, AWA-A4 and "The Scheduler asks through the platform's dialog inside a drag release". No plan file; this table is the record.
