@@ -192,11 +192,12 @@ def test_vtfm71_annual_plan_elements_controls(tmp_path):
 
 
 def test_vtfm71_ape_quarter_assignment_controls(tmp_path):
-    """VTF-M7.1 — Load and Refresh on top, Add APE Quarter at the bottom left.
+    """VTF-M7.1 — Load and Refresh on top, the assign button at the bottom left.
 
     The button moved from under the right panel to under the left one and was
-    renamed: the dialog it opens asks which Annual Plan Element to assign, and
-    the Annual Plan Elements are the left panel. The right panel keeps no
+    renamed: it is the left panel's Annual Plan Element that gets assigned the
+    quarter the screen is showing, so the label names both ends and the panel
+    it acts on is the one it now sits under. The right panel keeps no
     button of its own, which is asserted here so a later change cannot quietly
     grow a second add control at the other end of the screen.
     """
@@ -205,7 +206,8 @@ def test_vtfm71_ape_quarter_assignment_controls(tmp_path):
         root, screen = _screen(APEAssignmentScreen, vps)
         try:
             assert _buttons(_header(screen)) == ["Load", "Refresh"]
-            assert _buttons(screen.left_actions) == ["Add APE Quarter"]
+            assert _buttons(screen.left_actions) == [
+                "Assign APE Annual to Quarter"]
             _assert_bottom_left(screen)
         finally:
             root.destroy()
@@ -214,7 +216,7 @@ def test_vtfm71_ape_quarter_assignment_controls(tmp_path):
 
 
 def test_vtfm71_ape_month_assignment_controls(tmp_path):
-    """VTF-M7.1 — Load and Refresh on top, Add APE Month at the bottom left.
+    """VTF-M7.1 — Load and Refresh on top, the assign button at the bottom left.
 
     The month screen's half of the same move; see the quarter test above.
     """
@@ -223,7 +225,8 @@ def test_vtfm71_ape_month_assignment_controls(tmp_path):
         root, screen = _screen(APEPeriodViewScreen, vps)
         try:
             assert _buttons(_header(screen)) == ["Load", "Refresh"]
-            assert _buttons(screen.left_actions) == ["Add APE Month"]
+            assert _buttons(screen.left_actions) == [
+                "Assign APE Quarter to Month"]
             _assert_bottom_left(screen)
         finally:
             root.destroy()
@@ -235,8 +238,8 @@ def test_the_add_dialog_is_titled_for_its_button(tmp_path):
     """The dialog's title carries the label of the button that opened it.
 
     The two APE tabs' buttons were renamed and their dialog titles were not,
-    so "Add APE Quarter" opened a window titled "Assign APE to Quarter Q4" —
-    the only VSP tabs where the two disagreed, and no test read either string.
+    so the button said one thing and the window it opened said another — the
+    only VSP tabs where the two disagreed, and no test read either string.
     The button's label is read off the live widget rather than written out
     here, so the two cannot drift apart again.
 
@@ -246,7 +249,7 @@ def test_the_add_dialog_is_titled_for_its_button(tmp_path):
 
     The whole title is pinned, not just the label prefix. A prefix assertion
     leaves the period free, and the period is the half of this string that
-    varies and the half a user checks: ``Add APE Quarter Q1`` over a picker
+    varies and the half a user checks: a title ending ``Q1`` over a picker
     showing Q4 would pass. This screen's own constructor comment says why that
     matters — two screens disagreeing about which quarter you are in is how an
     APE ends up filed in one quarter and worked in another.
@@ -276,6 +279,37 @@ def test_the_add_dialog_is_titled_for_its_button(tmp_path):
                     f"{cls.__name__}: the button says {label!r} over "
                     f"{period(screen)} and the dialog is titled "
                     f"{captured['title']!r}")
+            finally:
+                root.destroy()
+    finally:
+        vps.close()
+
+
+def test_the_assign_buttons_are_wide_enough_for_their_labels(tmp_path):
+    """Neither APE tab's bottom button clips its own label.
+
+    The labels went from "Assign APE to Quarter" to "Assign APE Annual to
+    Quarter" on a button whose ``width`` was chosen for the shorter string,
+    and a CustomTkinter button does not grow to fit: the text is simply cut
+    off. The widths were 200 and 190 for labels of 21 and 19 characters, so
+    the next rename was going to do it. Measured with the button's own font
+    rather than against a number written here, so it holds wherever the suite
+    runs; the margin asserted is only the button's own padding, which is why
+    the two buttons are 250 wide and not 230.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        for cls in (APEAssignmentScreen, APEPeriodViewScreen):
+            root, screen = _screen(cls, vps)
+            try:
+                button = [child for child in screen.left_actions.winfo_children()
+                          if isinstance(child, ctk.CTkButton)][0]
+                text = button.cget("text")
+                needed = button.cget("font").measure(text)
+                assert button.cget("width") >= needed, (
+                    f"{cls.__name__}: {text!r} measures {needed}px in the "
+                    f"button's own font and the button is "
+                    f"{button.cget('width')}px wide")
             finally:
                 root.destroy()
     finally:
@@ -417,9 +451,9 @@ def test_vtfs11_every_new_button_is_wired_to_its_handler(tmp_path):
                  "open_add_dialog", "right_actions"),
                 # The two APE tabs keep the same command on the row they
                 # moved to, under the left panel.
-                (APEAssignmentScreen, "Add APE Quarter",
+                (APEAssignmentScreen, "Assign APE Annual to Quarter",
                  "open_add_dialog", "left_actions"),
-                (APEPeriodViewScreen, "Add APE Month",
+                (APEPeriodViewScreen, "Assign APE Quarter to Month",
                  "open_add_dialog", "left_actions"),
                 (WeeklyItemsScreen, "Add Weekly Tactic", "open_add_dialog",
                  "right_actions"),
