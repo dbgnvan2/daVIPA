@@ -1024,8 +1024,8 @@ def test_bsfm5_the_two_last_hand_parses_go_through_the_authority():
     and answered white on a white background. (A signed value is not asserted
     for the dialog: the old parse also answered white for it.)
     """
-    from getmoredone.screens.drag_schedule_support import interpolate_hex_color
-    from getmoredone.screens.item_editor_weekly_tactic_dialog import (
+    from src.getmoredone.screens.drag_schedule_support import interpolate_hex_color
+    from src.getmoredone.screens.item_editor_weekly_tactic_dialog import (
         SetWeeklyTacticDialog,
     )
 

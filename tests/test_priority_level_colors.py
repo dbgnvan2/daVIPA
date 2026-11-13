@@ -1819,13 +1819,12 @@ def parse_label_line(line):
 def _cell_for(rows, score):
     """The ``(fg_color, text_color)`` of the Priority cell showing ``score``.
 
-    All Items draws the bare number under a ``"Priority"`` header; the other
-    four draw ``P:n`` with no header (``PRI-A3``). Both spellings are accepted,
-    so one assertion covers all five screens.
+    All five draw ``P:n`` since PRC-M2 (``PRI-A3``); All Items drew the bare
+    number until then, and this accepted both.
     """
     for _row_fill, labels in rows:
         for text, fg_color, text_color in labels:
-            if text in (f"P:{score}", str(score)):
+            if text == f"P:{score}":
                 return fg_color, text_color
     raise AssertionError(f"no Priority cell for score {score}")
 
@@ -2188,3 +2187,44 @@ def test_pcca3_a_filled_cell_has_an_edge_on_every_row_surface():
         assert weak == [], weak
     finally:
         root.destroy()
+
+
+def test_prcm2_every_screen_writes_the_score_as_p_n(rendered_rows):
+    """PRC-M2 (PRI-A3) — the five screens write a score one way.
+
+    Spec: docs/spec_coverage.md#priority-column-prc-2026-11-13
+
+    All Items wrote the bare number while the other four wrote ``P:n``. Each
+    rendered score must appear once per screen as ``P:n``, and never bare.
+    """
+    for module, rows in rendered_rows.rows.items():
+        texts = [text for _fill, labels in rows for text, _fg, _tc in labels]
+        for score in RENDERED_SCORES.values():
+            assert texts.count(f"P:{score}") == 1, (module, score, texts)
+            assert texts.count(str(score)) == 0, (module, score, texts)
+
+
+def test_prcm3_a_picker_row_draws_the_level_colour():
+    """PRC-M3 (PCC-A1) — the parent/child pickers colour the score cell.
+
+    Spec: docs/spec_coverage.md#priority-column-prc-2026-11-13
+
+    They drew ``P:n`` on the plain surface while the list screens coloured it.
+    """
+    from conftest import withdrawn_root
+    from src.getmoredone.screens.item_editor_dialogs import _priority_cell
+
+    settings = AppSettings()
+    item = _item(importance=CRITICAL, urgency=LOW, priority_score=1600)
+    expected = level_cell_fill(settings, item)
+    assert expected.fill, "the shipped Any Critical colour is empty"
+
+    root = withdrawn_root()
+    frame = ctk.CTkFrame(root)
+    dialog = SimpleNamespace(_priority_settings=settings)
+    _priority_cell(dialog, frame, item, "#000000")
+
+    (outer,) = frame.winfo_children()
+    assert outer.cget("fg_color") == expected.fill
+    labels = [w for w in outer.winfo_children() if isinstance(w, ctk.CTkLabel)]
+    assert [w.cget("text") for w in labels] == ["P:1600"]

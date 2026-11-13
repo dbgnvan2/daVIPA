@@ -551,3 +551,35 @@ def test_prim26_the_label_says_capped_only_above_the_cap():
         f"{lowest_capped!r} does not say it was capped, so the breakdown reads "
         "as arithmetic that does not add up"
     )
+
+
+def test_prcm1_a_pre_cap_score_is_capped_when_the_database_opens(tmp_path):
+    """PRC-M1 (PBG-A10) — a score stored before the cap is capped by migration.
+
+    Spec: docs/spec_coverage.md#priority-column-prc-2026-11-13
+
+    Rows written before PRI-M2 hold the raw product, up to 102400, which is
+    wider than the score cell and sorts above every capped row. A score at or
+    under the cap is left alone.
+    """
+    import sqlite3
+
+    path = str(tmp_path / "precap.db")
+    db = DatabaseManager(path)
+    try:
+        old = db.create_action_item(ActionItem(who="Self", title="old"))
+        new = db.create_action_item(ActionItem(who="Self", title="new"))
+    finally:
+        db.close()
+    raw = sqlite3.connect(path)
+    raw.execute("UPDATE action_items SET priority_score = 102400 WHERE id = ?", (old,))
+    raw.execute("UPDATE action_items SET priority_score = 400 WHERE id = ?", (new,))
+    raw.commit()
+    raw.close()
+
+    db = DatabaseManager(path)
+    try:
+        assert _stored(db, old).priority_score == PriorityFactors.MAX_SCORE
+        assert _stored(db, new).priority_score == 400
+    finally:
+        db.close()
