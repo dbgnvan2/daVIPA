@@ -52,6 +52,10 @@ class TodayScreen(ctk.CTkFrame):
     # Minimum upward travel (pixels) of a grip drag that counts as "drag to top"
     # rather than an accidental click.
     PIN_DRAG_THRESHOLD = 12
+    #: AWA2-M1 (AWA-A4): the grip writes ``today_pin_rank``, the order of the
+    #: Today screen. A subclass that lists something else turns it off, so a
+    #: drag there does not re-order Today.
+    PIN_DRAG_ENABLED = True
 
     # AWA-M6 — the three seams a subclass needs to reuse this screen's list
     # without reimplementing it. Everything in ``load_items`` and
@@ -539,18 +543,23 @@ class TodayScreen(ctk.CTkFrame):
             # gesture, so no toplevel binding is needed.
             col0 = ctk.CTkFrame(frame, fg_color="transparent")
             col0.grid(row=0, column=0, padx=5, pady=5, sticky="w")
-            grip = ctk.CTkLabel(
-                col0,
-                text="⣿",  # Braille dots — a compact drag handle
-                width=14,
-                cursor="fleur",
-                text_color=fill.text_color or palette["border"],
-                font=list_row_font(),
-            )
-            grip.pack(side="left", padx=(0, 2))
-            grip.bind("<ButtonPress-1>",
-                      lambda e, iid=item.id: self._start_pin_drag(iid, e))
-            grip.bind("<ButtonRelease-1>", self._finish_pin_drag)
+            if self.PIN_DRAG_ENABLED:
+                grip = ctk.CTkLabel(
+                    col0,
+                    text="⣿",  # Braille dots — a compact drag handle
+                    width=14,
+                    cursor="fleur",
+                    text_color=fill.text_color or palette["border"],
+                    font=list_row_font(),
+                )
+                grip.pack(side="left", padx=(0, 2))
+                grip.bind("<ButtonPress-1>",
+                          lambda e, iid=item.id: self._start_pin_drag(iid, e))
+                grip.bind("<ButtonRelease-1>", self._finish_pin_drag)
+            else:
+                # The grip's width, held empty, so the checkbox and every
+                # column after it stay where they are on Today.
+                ctk.CTkLabel(col0, text="", width=14).pack(side="left", padx=(0, 2))
 
             var = ctk.BooleanVar(value=False)
             checkbox = ctk.CTkCheckBox(

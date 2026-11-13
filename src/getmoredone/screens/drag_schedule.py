@@ -32,6 +32,8 @@ from .column_resize import ColumnResizer, ColumnSpec
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
 
+logger = logging.getLogger(__name__)
+
 
 class DragScheduleScreen(ctk.CTkFrame):
     """Screen with drag-and-drop scheduling onto date boxes."""
@@ -579,7 +581,7 @@ class DragScheduleScreen(ctk.CTkFrame):
 
         self.unlinked_shown, self.unlinked_total = shown, total
         if fetched_total > len(fetched):
-            logging.getLogger(__name__).warning(
+            logger.warning(
                 "[scheduler] unlinked list capped: searched %s of %s items%s",
                 len(fetched), fetched_total,
                 " before the segment filter" if segment_filtered else "",
@@ -1386,6 +1388,18 @@ class DragScheduleScreen(ctk.CTkFrame):
         if not self.drag_item or not self.drag_items:
             return
 
+        # DRP-M1: the drag ends whatever the drop does. A dialog raised from
+        # inside a release handler is the call that failed on the Plan screen
+        # (PD-M12); if one escapes here, the label must not stay on screen.
+        try:
+            self._apply_drop()
+        finally:
+            if self.drag_label:
+                self.drag_label.place_forget()
+            self.drag_item = None
+            self.drag_items = []
+
+    def _apply_drop(self):
         target_date, target_project_id = self.get_drop_target()
         self.clear_hover_target()
 
@@ -1405,11 +1419,6 @@ class DragScheduleScreen(ctk.CTkFrame):
             self.refresh()
         elif target_project_id:
             self._drop_onto_project(target_project_id)
-
-        if self.drag_label:
-            self.drag_label.place_forget()
-        self.drag_item = None
-        self.drag_items = []
 
     def _drop_onto_project(self, target_project_id: str):
         """File the dragged items under one project, or clear their project.
@@ -1453,13 +1462,28 @@ class DragScheduleScreen(ctk.CTkFrame):
                         "belong to their Annual Plan Element rather than to a "
                         "project. They were left where they are."
                         % len(tactics))
-            messagebox.showinfo("Weekly Tactic", text, parent=self)
+            try:
+                messagebox.showinfo("Weekly Tactic", text, parent=self)
+            except tk.TclError:
+                # DRP-M2: a notice, not a question -- the rest of the drag
+                # still goes through, and the log keeps what was said.
+                logger.warning("Weekly Tactic notice could not be shown: %s", text)
         if not item_ids:
             self.refresh()
             return
 
-        if not confirm_exclusive_relink(self, self.db_manager, item_ids, board_id,
-                                        verb="dragged"):
+        try:
+            proceed = confirm_exclusive_relink(
+                self, self.db_manager, item_ids, board_id, verb="dragged")
+        except tk.TclError:
+            # DRP-M2: the question guards a write that removes project links,
+            # so an unasked question is a no, not a yes. Logged, because the
+            # platform that refused the dialog has nowhere else to say it.
+            logger.warning(
+                "Project drop not applied: the confirmation could not be shown "
+                "(%d item(s) left where they were)", len(item_ids))
+            return
+        if not proceed:
             return
 
         try:

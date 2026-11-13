@@ -206,6 +206,9 @@ REFUSAL_TEXT = {
     SlotRefusal.LUNCH_EXISTS: "This day already has a lunch — drag that one to move it",
 }
 
+#: LM3-M1 (LMM-A3) -- the lunch chip dropped on Earlier or Later.
+LUNCH_EDGE_TEXT = "Lunch stays inside the day — drop it on a Time Block"
+
 #: Said when a refusal arrives with a reason nothing here words. Better than
 #: showing the user the reason's internal name, and loud enough to be noticed.
 UNKNOWN_REFUSAL = "That Action Item cannot go there"
@@ -2826,6 +2829,12 @@ class PlanScreen(ctk.CTkFrame):
             # block this date was standing in for; later ones move it.
             if target is not None:
                 self.after_idle(lambda: self.place_lunch_at(target))
+            elif edge is not None:
+                # LM3-M1 (LMM-A3): an Action Item or a block dropped on
+                # Earlier/Later lengthens the day. Lunch does not -- a lunch
+                # outside the working day means nothing -- and this says so
+                # rather than doing nothing.
+                self.set_status(LUNCH_EDGE_TEXT, "warning")
             elif self.pointer_over_day():
                 self.set_status("Drop lunch on a Time Block", "muted")
 

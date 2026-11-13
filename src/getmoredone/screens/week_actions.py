@@ -61,6 +61,10 @@ class WeekTacticActionsPanel(TodayScreen):
     # does not move the Today screen's column, and vice versa.
     COLUMN_PREFIX = "week_actions"
 
+    # AWA2-M1 (AWA-A4) -- no pin grip: the pin is Today's order, and a drag
+    # here floated the item to the top of Today as well.
+    PIN_DRAG_ENABLED = False
+
     # AWA-M5.7 — what the list says before anything is selected. Replaced per
     # selection by ``set_tactic``, which names the tactic (AWA-M5.6).
     EMPTY_TEXT = "Select a Weekly Tactic on the left to see its Action Items."
