@@ -218,6 +218,23 @@ Fix when touched: scan the argument pairs rather than `args[0]`, and drop the
 `-topmost` pair while passing the rest through. Found by the third cold pass
 of the CGH batch, which was reviewing the spy, not the wrapper.
 
+## Adjacent issue — child processes redirect the data directory by hand (CIG, filed 2026-11-12)
+
+Found while fixing CIG-M1, the CI guard failure on `weekly_tactic_debug.log`,
+and not fixed, under global rule 10.
+
+### CIG-A1 — every test subprocess that imports the app must remember `GETMOREDONE_DATA_DIR` (low)
+
+`conftest.py` isolates the weekly-tactic log in-process only
+(`_preattach_weekly_tactic_log`). A child Python process gets no conftest, so
+each call site sets the override itself: `test_first_run.py`,
+`test_selftest_cli.py`, the two render helpers, and now `test_ci_contract.py`'s
+import probe. The probe was the one that forgot, and it went unseen locally
+because the real file already exists there. A session-wide child environment
+would make this structural, but `pytest_sessionstart` deliberately unsets the
+variable and `tests/test_demo_install.py::test_d1_the_suite_runs_with_no_data_dir_override`
+pins that, so it is a design change, not a one-line fix.
+
 ## Open decision — what the colour inventory counts (CIV, filed 2026-11-11)
 
 Both raised by the sweep over the gray-scale batch, and both about what the

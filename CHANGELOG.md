@@ -7,6 +7,13 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — the CI guard on the weekly-tactic log (2026-11-12)
+
+- **Tests no longer create the real `weekly_tactic_debug.log`.** The test that
+  imports every test file in a child process gave the child no data-directory
+  override, so on a fresh CI runner it created the user's log file, and the
+  session guard failed the run. App behaviour is unchanged. (CIG-M1)
+
 ### Removed — code no screen reached (2026-11-12)
 
 - **The old Vision Planning screen.** `screens/vision_planning.py` and
