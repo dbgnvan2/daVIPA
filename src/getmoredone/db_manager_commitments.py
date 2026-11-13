@@ -59,7 +59,7 @@ class DBManagerCommitmentsMixin:
         """
         row = self.db.conn.execute(
             """
-            SELECT fetched_at, last_error, attempted_at
+            SELECT fetched_at, last_error, attempted_at, warning
             FROM calendar_commitment_fetches WHERE commitment_date = ?
             """,
             (str(commitment_date),),
@@ -70,6 +70,7 @@ class DBManagerCommitmentsMixin:
             "fetched_at": row["fetched_at"],
             "last_error": row["last_error"],
             "attempted_at": row["attempted_at"],
+            "warning": row["warning"],
         }
 
     def replace_commitments_for_dates(
@@ -77,6 +78,10 @@ class DBManagerCommitmentsMixin:
         dates: Iterable[str],
         commitments: Iterable[CalendarCommitment],
         fetched_at: str,
+        *,
+        keep_calendars: Iterable[str] = (),
+        keep_event_ids: Iterable[str] = (),
+        warning: Optional[str] = None,
     ) -> int:
         """Replace exactly these dates' commitments with these, in one transaction.
 
@@ -91,7 +96,15 @@ class DBManagerCommitmentsMixin:
         fetch never read. ``dismissed`` is carried over from the row it
         replaces, keyed on ``event_id`` and date; everything else comes from
         the fetch. Returns how many rows were written.
+
+        D6 -- a read that skipped a calendar, or an event it could not parse,
+        did not learn those meetings are gone. Their cached rows
+        (``keep_calendars``, ``keep_event_ids``) stay, unless the read found
+        the same event elsewhere, and ``warning`` is recorded so the screen
+        does not call the date fully read.
         """
+        keep_calendars = {str(c) for c in keep_calendars}
+        keep_event_ids = {str(e) for e in keep_event_ids}
         dates = sorted({str(d) for d in dates})
         commitments = list(commitments)
         covered = set(dates)
@@ -103,23 +116,48 @@ class DBManagerCommitmentsMixin:
         now = datetime.now().isoformat()
         written = 0
         with self.transaction() as conn:
+            # Take the write lock before reading what to carry over. A plain
+            # SELECT starts no transaction, so a dismissal committed by the
+            # screen between that read and the DELETE below would be lost.
+            conn.execute("UPDATE calendar_commitment_fetches SET warning = warning WHERE 0")
             for day in dates:
-                dismissed = {
-                    row["event_id"]
+                existing = {
+                    row["event_id"]: (row["id"], bool(row["dismissed"]))
                     for row in conn.execute(
-                        "SELECT event_id FROM calendar_commitments"
-                        " WHERE commitment_date = ? AND dismissed = 1",
+                        "SELECT id, event_id, dismissed FROM calendar_commitments"
+                        " WHERE commitment_date = ?",
                         (day,),
                     )
                 }
+                fresh_ids = {c.event_id for c in commitments if c.commitment_date == day}
+                kept = [
+                    self._row_to_commitment(row)
+                    for row in conn.execute(
+                        "SELECT * FROM calendar_commitments WHERE commitment_date = ?",
+                        (day,),
+                    )
+                    if (row["calendar_id"] in keep_calendars or row["event_id"] in keep_event_ids)
+                    and row["event_id"] not in fresh_ids
+                ]
                 conn.execute(
                     "DELETE FROM calendar_commitments WHERE commitment_date = ?",
                     (day,),
                 )
+                for commitment in kept:
+                    self._insert_commitment(conn, commitment)
                 for commitment in commitments:
                     if commitment.commitment_date != day:
                         continue
-                    commitment.dismissed = commitment.event_id in dismissed
+                    previous = existing.get(commitment.event_id)
+                    if previous is not None:
+                        # The same row id across reads, so a menu opened
+                        # before a read still names its meeting after it.
+                        commitment.id = previous[0]
+                    # D9 -- an ignore holds only while the meeting is someone
+                    # else's; one the user can now edit is changed in Google.
+                    commitment.dismissed = bool(
+                        previous is not None and previous[1] and not commitment.can_edit
+                    )
                     commitment.fetched_at = fetched_at
                     commitment.updated_at = now
                     self._insert_commitment(conn, commitment)
@@ -127,14 +165,15 @@ class DBManagerCommitmentsMixin:
                 conn.execute(
                     """
                     INSERT INTO calendar_commitment_fetches
-                        (commitment_date, fetched_at, last_error, attempted_at)
-                    VALUES (?, ?, NULL, ?)
+                        (commitment_date, fetched_at, last_error, attempted_at, warning)
+                    VALUES (?, ?, NULL, ?, ?)
                     ON CONFLICT(commitment_date) DO UPDATE SET
                         fetched_at = excluded.fetched_at,
                         last_error = NULL,
-                        attempted_at = excluded.attempted_at
+                        attempted_at = excluded.attempted_at,
+                        warning = excluded.warning
                     """,
-                    (day, fetched_at, fetched_at),
+                    (day, fetched_at, fetched_at, warning),
                 )
         return written
 

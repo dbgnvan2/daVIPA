@@ -931,3 +931,7 @@ def ensure_calendar_commitment_tables(conn: sqlite3.Connection) -> None:
             attempted_at    TEXT NOT NULL
         )
     """)
+    # A read that worked but skipped a calendar or an event says so (D6).
+    fetch_columns = {row[1] for row in conn.execute("PRAGMA table_info(calendar_commitment_fetches)")}
+    if "warning" not in fetch_columns:
+        conn.execute("ALTER TABLE calendar_commitment_fetches ADD COLUMN warning TEXT")

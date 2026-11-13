@@ -249,7 +249,10 @@ def _with_retry(description: str, call):
             if status in CONFLICT_STATUSES:
                 raise CalendarEventExists(f"{description}: {status}") from error
             if not _is_retryable(error, status):
-                if status == 403:
+                # D6 -- only a 403 whose reason was read and is not a rate
+                # limit is "forbidden for good". One with no readable reason
+                # is an ordinary failure, so a reader keeps what it knew.
+                if status == 403 and _reasons_of(error):
                     raise CalendarForbidden(f"Failed to {description}: {error}") from error
                 raise RuntimeError(f"Failed to {description}: {error}") from error
             last_error = error

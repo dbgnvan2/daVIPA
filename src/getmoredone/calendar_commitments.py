@@ -228,6 +228,8 @@ class FetchResult:
     commitments: List[CalendarCommitment] = field(default_factory=list)
     excluded: Dict[str, int] = field(default_factory=dict)
     unparseable: List[str] = field(default_factory=list)
+    #: The ids of those events, so their cached rows are kept (D6).
+    unparseable_ids: List[str] = field(default_factory=list)
     #: D6 -- a calendar that refused for good (gone, or forbidden), and why.
     skipped_calendars: Dict[str, str] = field(default_factory=dict)
 
@@ -268,7 +270,11 @@ def fetch_commitments(
     time_max = _local_midnight(_parse_day(dates[-1]) + timedelta(days=1), tz)
     result = FetchResult(dates=dates, excluded={reason: 0 for reason in EXCLUSION_REASONS})
     by_key: Dict[Tuple[str, str], CalendarCommitment] = {}
-    seen_excluded = set()
+    # M2.8 -- one event on two calendars is one decision, made by the copy on
+    # the calendar listed first. ``attendees[].self`` and ``organizer.self``
+    # describe the calendar a copy is on, so a colleague's copy of a meeting
+    # the user declined says "accepted" and "organizer" (learning-qa, CIP).
+    decided = set()
     read_any = False
 
     for calendar_id in calendar_ids:
@@ -285,27 +291,25 @@ def fetch_commitments(
             if not isinstance(event, dict):
                 result.unparseable.append(repr(event)[:60])
                 continue
+            event_id = event.get("id")
+            if event_id:
+                if event_id in decided:
+                    continue
+                decided.add(event_id)
             reason = exclusion_of(event)
             if reason is not None:
-                # Counted once per event, however many calendars it is on.
-                key = (reason, str(event.get("id")))
-                if key not in seen_excluded:
-                    seen_excluded.add(key)
-                    result.excluded[reason] += 1
+                result.excluded[reason] += 1
                 continue
             try:
                 parts = parse_event(event, calendar_id=calendar_id, dates=dates, tz=tz)
             except CommitmentParseError as error:
                 result.unparseable.append(event_name(event))
+                if event_id:
+                    result.unparseable_ids.append(str(event_id))
                 logger.warning("CIP-M2.6: skipped %r: %s", event_name(event), error)
                 continue
             for part in parts:
-                key = (part.event_id, part.commitment_date)
-                held = by_key.get(key)
-                if held is None:
-                    by_key[key] = part
-                elif part.can_edit and not held.can_edit:
-                    held.can_edit = True
+                by_key[(part.event_id, part.commitment_date)] = part
 
     if not read_any:
         named = "; ".join(f"{cid}: {why}" for cid, why in result.skipped_calendars.items())
@@ -375,7 +379,10 @@ def refresh_commitments(
             return outcome
         outcome.result = result
         outcome.written = db_manager.replace_commitments_for_dates(
-            dates, result.commitments, stamp
+            dates, result.commitments, stamp,
+            keep_calendars=result.skipped_calendars,
+            keep_event_ids=result.unparseable_ids,
+            warning=partial_warning(result),
         )
         return outcome
     except Exception as error:  # noqa: BLE001 - the write failed; say so
@@ -383,6 +390,16 @@ def refresh_commitments(
         return outcome
     finally:
         db_manager.close()
+
+
+def partial_warning(result: "FetchResult") -> Optional[str]:
+    """D6 -- what a read that worked did not read, or ``None`` if it read everything."""
+    parts = []
+    if result.skipped_calendars:
+        parts.append("not read: " + ", ".join(sorted(result.skipped_calendars)))
+    if result.unparseable:
+        parts.append("could not read " + ", ".join(result.unparseable))
+    return "; ".join(parts) or None
 
 
 # ----------------------------------------------------------------- the grid
@@ -459,19 +476,27 @@ def is_stale(fetch: Optional[dict], stale_minutes: int, now: datetime) -> bool:
     return now - read > timedelta(minutes=max(1, int(stale_minutes)))
 
 
-def age_text(fetch: Optional[dict]) -> Tuple[str, str]:
-    """CIP-M5.4 -- the age of the answer, as a sentence and a status kind."""
+def age_text(fetch: Optional[dict], now: Optional[datetime] = None) -> Tuple[str, str]:
+    """CIP-M5.4 -- the age of the answer, as a sentence and a status kind.
+
+    The time alone when the read was today; with its date otherwise, so a
+    day-old answer does not read as this morning's (learning-qa, CIP).
+    """
     if not fetch:
         return "Calendar not read for this day", "muted"
+    today = (now or datetime.now()).date()
     as_of = None
     if fetch.get("fetched_at"):
         try:
-            as_of = datetime.fromisoformat(str(fetch["fetched_at"])).strftime("%H:%M")
+            read = datetime.fromisoformat(str(fetch["fetched_at"]))
+            as_of = read.strftime("%H:%M" if read.date() == today else "%Y-%m-%d %H:%M")
         except ValueError:
             as_of = None
     if fetch.get("last_error"):
         known = f"showing what was known at {as_of}" if as_of else "nothing known yet"
         return f"Calendar read failed — {fetch['last_error']} ({known})", "warning"
+    if as_of and fetch.get("warning"):
+        return f"Calendar as of {as_of} — {fetch['warning']}", "warning"
     if as_of:
         return f"Calendar as of {as_of}", "muted"
     return "Calendar not read for this day", "muted"

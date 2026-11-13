@@ -18,7 +18,7 @@ import logging
 import threading
 import tkinter as tk
 from datetime import datetime
-from typing import List, Optional, Sequence, Tuple
+from typing import AbstractSet, List, Optional, Sequence, Tuple
 
 import customtkinter as ctk
 
@@ -121,20 +121,30 @@ def commitments_by_slot(commitments: Sequence[CalendarCommitment], bounds) -> di
     return drawn
 
 
-def strip_entries(commitments: Sequence[CalendarCommitment], bounds) -> List[str]:
+def strip_entries(
+    commitments: Sequence[CalendarCommitment], bounds, drawn: Optional[AbstractSet[int]] = None
+) -> List[Tuple[str, CalendarCommitment]]:
     """CIP-M3.8 and D4 -- what the strip above the grid lists, in order.
 
-    All-day events, which hold no box, and timed ones some of which is where
-    no box can be (before midnight's first box, or after 23:30).
+    All-day events, which hold no box; timed ones some of which is where no
+    box can be (before midnight's first box, or after 23:30); and, given the
+    ``drawn`` boxes, timed ones none of whose boxes is drawn. The last is an
+    ignored meeting before Day Start or after Day End: it no longer widens the
+    day, and without this it would be shown nowhere and could not be held
+    again (CIP-M3.4).
     """
     lines = []
     for commitment in commitments:
         if commitment.is_all_day:
-            lines.append(commitment_label(commitment))
+            lines.append((commitment_label(commitment), commitment))
         elif is_off_grid(commitment, bounds):
-            lines.append(
-                commitment_label(commitment) + " (part of it is outside the grid)"
-            )
+            lines.append((
+                commitment_label(commitment) + " (part of it is outside the grid)", commitment
+            ))
+        elif drawn is not None and not drawn.intersection(
+            _boxes_touched(commitment.start_minutes, commitment.end_minutes, bounds)
+        ):
+            lines.append((commitment_label(commitment) + " (outside the drawn day)", commitment))
     return lines
 
 
@@ -202,9 +212,13 @@ class PlanCommitmentsMixin:
         self.calendar_age_label.grid(row=0, column=0, sticky="w")
         self._strip_labels = []
         palette = semantic_colors()
-        for row, line in enumerate(strip_entries(self._commitments, self.bounds), start=1):
+        grid = getattr(self, "_grid", None)
+        drawn = {entry.slot.index for entry in grid.slots} if grid is not None else None
+        entries = strip_entries(self._commitments, self.bounds, drawn)
+        for row, (line, commitment) in enumerate(entries, start=1):
             label = ctk.CTkLabel(strip, text=line, anchor="w", text_color=palette["body_text"])
             label.grid(row=row, column=0, sticky="w")
+            self.bind_commitment_handlers(label, commitment)
             self._strip_labels.append(label)
 
     # ------------------------------------------------------------ dismissing
