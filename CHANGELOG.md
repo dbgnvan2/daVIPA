@@ -7,6 +7,23 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — backlog items that named their fix (2026-11-13)
+
+- **A date holds one lunch block.** The write that adds a time block refuses a
+  second lunch on the same date; the Plan screen already moved the one it had,
+  so nothing on screen changes. (BSF-M6, LMM-A2)
+- **Two colour parses** — the drag gradient and the weekly tactic dialog's text
+  colour — now go through `color_contrast`, so `#+12345` is refused and `#FFF`
+  is read. (BSF-M5, SCV-A1, SCV-A3)
+- **CI retries a failed apt install** instead of going red on a mirror outage.
+  (BSF-M7, CI-A1)
+- **The docs-sync check** has a 60-second git timeout and puts git's error on
+  its own line. (BSF-M3, SAG-A5, SAG-A11)
+- **Tests:** the `-topmost` silencer catches the attribute anywhere in a call.
+  (BSF-M4, CGH-A1)
+- **Removed:** two dead members in the annual Vision Elements screen and an
+  unused import in Weekly Items. (BSF-M1, BSF-M2)
+
 ### Fixed — the CI guard on the weekly-tactic log (2026-11-12)
 
 - **Tests no longer create the real `weekly_tactic_debug.log`.** The test that

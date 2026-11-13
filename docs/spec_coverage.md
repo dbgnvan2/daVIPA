@@ -2429,3 +2429,17 @@ five list screens draw. No plan file; this table is the record.
 | **PSC-M2** | the ✓/? mark and the depth bars follow a Category fill (mark ≥3:1; bars in the row text and a blend toward it) | done | `screens/plan_blocks.py::_mark_color`, `DepthBarStack(colors=)` | `::test_pscm1_a_category_colour_fills_the_item_row`; red with either removed |
 | **PSC-M3** | a day-pane task chip (and its continuations) takes its item's Category colour; text and bars follow | done | `screens/plan_blocks.py::_build_block_chip`, `plan.py::load_blocks` | `::test_pscm3_a_day_chip_takes_its_items_category_colour`; red with the fill removed |
 | **PSC-M4** | a day-pane task chip draws the item row's priority badge, in the badge column | done | `screens/plan_blocks.py::_build_block_chip` | `::test_pscm4_the_day_badge_carries_the_level_colour`; red with the badge ungridded. `test_pdm11_…` now compares the badge column too (case b) |
+
+## Backlog small fixes (BSF, 2026-11-13)
+
+Plan: `docs/unused-docs/implementation_plan_2026-11-13_backlog_small_fixes.md`.
+
+| ID | Criterion | Status | Where | Proof |
+|---|---|---|---|---|
+| **BSF-M1** | `drag_index` and `_create_from_index` deleted (UPD-A7) | done | `screens/annual_vision_segments.py` | deletion; `tests/test_vsp_tab_adds.py` green |
+| **BSF-M2** | unused `tkinter` import deleted (UPD-A8) | done | `screens/weekly_items.py` | deletion; `tests/test_weekly_item_filters.py` green |
+| **BSF-M3** | `run` times out after 60s and breaks its error line (SAG-A5, SAG-A11) | done | `tools/agents/check_docs_sync.py::run` | `tests/test_docs_sync_rule.py::test_bsfm3_a_hung_git_is_an_error_with_its_output_on_its_own_line` |
+| **BSF-M4** | `-topmost` dropped anywhere in a call, and as a 3.13 keyword (CGH-A1) | done | `conftest.py` | `tests/test_tk_offscreen.py::test_bsfm4_topmost_is_silenced_inside_a_call_that_sets_several` |
+| **BSF-M5** | the last two hex parses go through `color_contrast` (SCV-A1, SCV-A3) | done | `screens/drag_schedule_support.py`, `screens/item_editor_weekly_tactic_dialog.py` | `tests/test_segment_colour_validation.py::test_bsfm5_the_two_last_hand_parses_go_through_the_authority` |
+| **BSF-M6** | a second LUNCH block on one date is refused (LMM-A2) | done | `db_manager.py::add_block_at` | `tests/test_time_block_crud.py::test_bsfm6_a_second_lunch_block_on_one_date_is_refused` |
+| **BSF-M7** | apt retries inside a step time limit (CI-A1) | done | `.github/workflows/tests.yml` | `tests/test_ci_contract.py::test_bsfm7_every_apt_call_retries_inside_a_time_limit` |
