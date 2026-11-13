@@ -505,7 +505,7 @@ def test_rm3d_all_test_files_are_collected():
     )
 
 
-def test_rm3d_every_test_file_is_importable_on_its_own():
+def test_rm3d_every_test_file_is_importable_on_its_own(tmp_path):
     """Guards the bug the repo-root conftest.py fixed.
 
     Two relocated files imported ``getmoredone`` before their own sys.path
@@ -523,6 +523,14 @@ def test_rm3d_every_test_file_is_importable_on_its_own():
     which is what the guarantee actually needs: a file that only works because
     an alphabetically earlier one already inserted `src/` on the path fails
     here, exactly as it did before.
+
+    CIG-M1: the child gets ``GETMOREDONE_DATA_DIR``. It has no conftest, and
+    six modules attach the weekly-tactic ``FileHandler`` at import time, so
+    without the override this probe created the user's real
+    ``weekly_tactic_debug.log`` -- on a fresh CI runner, where none existed,
+    the session guard then failed the run. Asserted by the log appearing in
+    ``tmp_path``: on a machine where the real file already exists, an
+    append-mode open writes nothing, so watching the real file proves nothing.
     """
     probe = r"""
 import importlib.util, pathlib, sys
@@ -557,13 +565,18 @@ for path in sorted(root.glob("tests/test_*.py")):
 for line in failures:
     print(line)
 """
+    env = dict(os.environ)
+    env["GETMOREDONE_DATA_DIR"] = str(tmp_path)
     result = subprocess.run(
         [sys.executable, "-c", probe],
-        cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=300,
+        cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=300, env=env,
     )
     assert result.returncode == 0, (
         f"the import probe itself failed:\n{result.stdout}\n{result.stderr}"
     )
+    assert (tmp_path / "weekly_tactic_debug.log").exists(), (
+        "the probe's child did not log into the redirected data directory, "
+        "so its imports opened the user's real weekly_tactic_debug.log")
     failures = [
         line[len("FAIL "):] for line in result.stdout.splitlines()
         if line.startswith("FAIL ")
