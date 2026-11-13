@@ -888,7 +888,12 @@ def test_bsfm4_topmost_is_silenced_inside_a_call_that_sets_several():
             _RecordingTk._flatten(call) for call in spy.calls
             if "-alpha" in _RecordingTk._flatten(call)
         ]
-        assert alpha_writes, "the -alpha half of the call never reached Tk"
+        # Exact: one per call made, so the 3.13 keyword call's -alpha is
+        # checked too, not covered by the positional one.
+        expected = 2 if sys.version_info >= (3, 13) else 1
+        assert len(alpha_writes) == expected, (
+            f"the -alpha half of a call did not reach Tk: {alpha_writes}"
+        )
         assert spy.topmost_writes == [], (
             f"-topmost reached Tk inside a multi-attribute call: {spy.topmost_writes}"
         )

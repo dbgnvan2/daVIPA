@@ -1021,7 +1021,8 @@ def test_bsfm5_the_two_last_hand_parses_go_through_the_authority():
 
     ``interpolate_hex_color`` read ``#+12345`` as a colour, because ``int``
     accepts a sign. The dialog's text colour treated ``#FFF`` as unreadable
-    and answered white on a white background.
+    and answered white on a white background. (A signed value is not asserted
+    for the dialog: the old parse also answered white for it.)
     """
     from getmoredone.screens.drag_schedule_support import interpolate_hex_color
     from getmoredone.screens.item_editor_weekly_tactic_dialog import (
@@ -1034,4 +1035,3 @@ def test_bsfm5_the_two_last_hand_parses_go_through_the_authority():
 
     text_for = SetWeeklyTacticDialog._text_color_for_background
     assert text_for(None, "#FFF") == "black"
-    assert text_for(None, "#+12345") == "white"
