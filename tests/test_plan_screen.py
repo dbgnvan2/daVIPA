@@ -7270,3 +7270,57 @@ def test_pfm94_clearing_the_hover_restores_the_border_colour(screen, manager, mo
     after = (hovered.cget("border_width"), hovered.cget("border_color"))
     assert after == before, f"the outline stayed: {after} against {before}"
     screen._end_drag()
+
+
+#: A dark Category colour: white derived text, and dark enough to swallow the
+#: light theme's dark-green ✓ mark (#166534 on it is under 3:1).
+PSC_CATEGORY = "#1E3A8A"
+
+
+def test_pscm1_a_category_colour_fills_the_item_row(
+    root, manager, settings, light_appearance
+):
+    """PSC-M1 — the row takes its Category colour; text and mark follow it."""
+    from src.getmoredone.color_contrast import pick_text_color
+
+    item = _scored_item(manager, "Draft the proposal")
+    row = build_item_row(
+        root, item, 0, already_blocked=True, work_block_minutes=30,
+        settings=settings, segment_color=PSC_CATEGORY,
+    )
+    assert row.cget("fg_color") == PSC_CATEGORY
+    title = _find_label(row, "Draft the proposal")
+    assert title.cget("text_color") == pick_text_color(PSC_CATEGORY)
+    mark = _find_label(row, PD_BLOCKED_TEXT)
+    assert contrast_ratio(PSC_CATEGORY, _as_hex(row, mark.cget("text_color"))) >= 3.0
+
+
+def test_pscm1_the_plan_screen_passes_each_items_category_colour(
+    root, manager, settings, light_appearance
+):
+    """PSC-M1 — PlanScreen looks the colour up, as the list screens do."""
+
+    class _Vps:
+        def get_segment_colors_by_id(self):
+            return {"seg-1": PSC_CATEGORY}
+
+        def get_segment_color_map(self):
+            return {}
+
+    linked = _scored_item(manager, "Linked", segment_description_id="seg-1")
+    _scored_item(manager, "Unlinked")
+    app = _App(settings)
+    app.vps_manager = _Vps()
+    panel = PlanScreen(root, manager, app)
+    panel.selected_date = THURSDAY
+    panel.refresh()
+
+    fills = {}
+    for row in panel.items_scroll.winfo_children():
+        if isinstance(row, ctk.CTkFrame):
+            for title in ("Linked", "Unlinked"):
+                if _find_label(row, title) is not None:
+                    fills[title] = row.cget("fg_color")
+    assert linked.segment_description_id == "seg-1"
+    assert fills["Linked"] == PSC_CATEGORY
+    assert fills["Unlinked"] != PSC_CATEGORY
