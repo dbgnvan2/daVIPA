@@ -10,6 +10,7 @@ Plan:    docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_
 from __future__ import annotations
 
 import threading
+from datetime import datetime
 
 import pytest
 
@@ -389,3 +390,41 @@ def test_cipm45_a_failed_write_is_logged(root, manager, settings, ready, asked, 
     assert [r.getMessage() for r in caplog.records if r.name == pce.logger.name] == [
         "Calendar change to ev1 not completed: quota exceeded"
     ]
+
+
+def test_cipm44_a_meeting_over_midnight_offers_no_change(root, manager, settings, ready):
+    """Re-sweep -- every write to an event over two dates is refused, so its
+    menu offers none, rather than asking questions for a change that cannot
+    happen."""
+    event = _event(start=(23, 0), end=(23, 30))
+    event["end"] = {"dateTime": datetime(2026, 11, 6, 1, 0).astimezone().isoformat()}
+    parts = parse_event(event, calendar_id="primary", dates=[THURSDAY, "2026-11-06"])
+    manager.replace_commitments_for_dates([THURSDAY, "2026-11-06"], parts, "2026-11-05T09:00:00")
+    screen = _open(root, manager, settings, Factory(EditCalendar(event, zone=None)))
+    [tonight] = manager.get_commitments(THURSDAY)
+
+    assert screen.commitment_edit_entries(tonight) == [(pce.MULTI_DAY_TEXT, None)]
+
+
+def test_cipm45_the_result_is_handed_over_after_the_claim_and_the_log(
+    root, manager, settings, ready, asked, monkeypatch
+):
+    """Re-sweep -- the poll clears ``_edit_result`` the moment it sees it, so
+    the worker must not hand it over before it has logged and released."""
+    screen, _factory, commitment = _screen(root, manager, settings, _event())
+    seen = []
+    real_release = pce.release_refresh
+
+    def release(path):
+        seen.append(screen._edit_result)
+        real_release(path)
+
+    monkeypatch.setattr(pce, "release_refresh", release)
+    monkeypatch.setattr(screen, "slot_under_pointer", lambda: ONE_PM)
+    monkeypatch.setattr(screen, "virtual_under_pointer", lambda: None)
+    screen.start_commitment_drag(None, commitment)
+    screen.on_drag_release(None)
+    _finish(screen, root)
+
+    assert seen == [None]
+    assert manager.get_commitments(THURSDAY)[0].start_time == "13:00"
