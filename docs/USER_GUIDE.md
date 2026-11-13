@@ -413,8 +413,32 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   day, so it is listed in the line above the grid instead, where the same
   right-click finds it. *Hold this time again* undoes it, and a later read keeps
   the choice. A meeting you organised, or one whose guests may change it,
-  offers no ignore: change it in Google Calendar and read again. If a meeting
-  you ignored later becomes one you can change, the ignore lapses.
+  offers no ignore: change it from the Plan instead (below). If a meeting you
+  ignored later becomes one you can change, the ignore lapses.
+
+  **Your own meeting can be changed from the Plan**, and the change is made
+  in Google Calendar. "Your own" means you organised it, or its guests may
+  change it. Someone else's meeting cannot be dragged and offers no changes.
+  - **Move:** drag it from the box where it starts to another box. It starts
+    at that box's start and keeps its length, so a 45-minute meeting stays
+    45 minutes.
+  - **Length:** right-click → a length, or *Custom length…*.
+  - **Title:** right-click → *Rename…*.
+  - **Delete:** right-click → *Delete from Google Calendar…*. This always
+    asks first, naming the meeting.
+
+  A move or a new length is refused, with the reason, if any box it would
+  hold has a Time Block, lunch or another meeting in it. Move the block first.
+  All-day meetings and meetings that run past midnight can be renamed or
+  deleted, not moved. If the meeting has other guests, you are asked whether
+  to email them about the change; *Cancel* changes nothing. One occurrence of
+  a repeating meeting is changed on its own, and the question says so.
+
+  **The grid changes only once Google confirms**, and it shows what Google
+  sent back. If Google refuses, or the meeting changed in Google Calendar
+  since it was last read, nothing is written and the status line says why;
+  for a changed meeting, press **↻ Calendar** and try again. While a read or a
+  change is running, the other waits.
 
   The line above the grid says how old the answer is — *Calendar as of
   09:40*, *Calendar not read for this day*, or *Calendar read failed — … (showing

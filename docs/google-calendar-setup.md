@@ -248,6 +248,13 @@ can then be placed in those boxes. The full behaviour is in
 - List your own calendar first. A meeting on two listed calendars is taken
   from the first one, because whether you declined it, and whether you can
   change it, is recorded per calendar.
+- **Changing a meeting from the Plan** (moving it, changing its length or
+  title, deleting it) writes to the calendar the meeting was read from, through
+  the same token. Only a meeting you organised, or one whose guests may change
+  it, can be changed. Google emails the other guests only if you answer *Yes*
+  when asked; the Plan day export never emails anyone. Before each write the
+  event is read again, and if it changed in Google since it was last read,
+  nothing is written.
 - What was read is kept in the app's database, so the Plan opens without
   waiting on Google. When credentials and a token are present, a day not read
   in the last `plan_commitment_stale_minutes` (default 15) is read once in the

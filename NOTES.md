@@ -295,6 +295,16 @@ and are corrected in `BACKLOG.md` item 1 with the measurements.
 
 ## Recent Changes (2026-11-13)
 
+### Google Calendar into the Plan, editing - CIP batch 2
+
+Built from `docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_editing.md`
+(CIP-M4.1 to M4.8, M1.6, M0.3b; decisions E1 to E10). The write logic is
+`calendar_commitment_edits.py` and the screen half `screens/plan_commitment_edits.py`.
+Each write reads the event and refuses if it changed (E6); the cache changes only
+from Google's reply (E9). New column `calendar_commitments.guest_count`. Known gaps:
+**not walked on screen, and no write has reached live Google** (checklist in
+`docs/unused-docs/changes/2026-11-13-cip-editing.md`).
+
 ### Google Calendar into the Plan, read half - CIP batch 1
 
 Built from `docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_read_half.md`

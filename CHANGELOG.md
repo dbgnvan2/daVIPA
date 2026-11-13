@@ -7,6 +7,17 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — change your own meetings from the Plan (2026-11-13)
+
+- A meeting you organised, or one whose guests may change it, can be dragged
+  to another box, given a new length, renamed or deleted from the Plan. The
+  change is made in Google Calendar, and the grid changes only once Google
+  confirms. (CIP-M4)
+- A move onto a Time Block, lunch or another meeting is refused before
+  anything is sent. A meeting that changed in Google since it was read is not
+  overwritten. Deleting always asks first; guests are emailed only if you say
+  so. (CIP E1, E5, E6, E7)
+
 ## [0.3.4] - 2026-11-13
 
 ### Added — Google Calendar meetings on the Plan (2026-11-13)

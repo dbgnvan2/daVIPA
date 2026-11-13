@@ -3,8 +3,10 @@
 Status: **read half built 2026-11-13** (batch 1: CIP-M0.1, M0.3a, M1 to M3,
 M5), from `docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_read_half.md`,
 which also records the decisions this spec left open (D1 to D13). Not walked
-on screen. **Batch 2, editing (CIP-M4), and the week view (M6) are not
-started.** Criteria and tests: `docs/spec_coverage.md`, *Google Calendar into
+on screen. **Batch 2, editing (CIP-M4, M1.6, M0.3b), built 2026-11-13**
+from `docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_editing.md`,
+which records decisions E1 to E10; not walked, and no write has reached live
+Google. **The week view (M6) is not started.** Criteria and tests: `docs/spec_coverage.md`, *Google Calendar into
 the Plan, read half*.
 
 Source: user requirement, 2026-11-08 — *"I want to read my google calendar and
@@ -226,6 +228,13 @@ leaving the app.
 | CIP-M4.6 | An edit to one occurrence of a recurring event changes **that occurrence only**, and says so before it is made. Attendees, conferencing, reminders, recurrence and description are carried through the update untouched — the Plan screen edits a time and a title, and flattens nothing |
 | CIP-M4.7 | One calendar write at a time per database, keyed outside the screen instance, and never concurrent with a fetch of the same dates. The export's `_EXPORTS_IN_FLIGHT` is the pattern; the reason is the same — leaving Plan and returning builds a new screen |
 | CIP-M4.8 | Every write path refuses cleanly with no credentials, no libraries, or a lapsed sign-in, the way the export's four prerequisite refusals do, and re-enables the UI rather than leaving it dead |
+
+*Built 2026-11-13 (batch 2).* How the plan settled what this table leaves open:
+a move is a drag to a box and keeps the meeting's length; a length is chosen
+from the right-click menu; a move may land only on empty boxes; an all-day or
+over-midnight meeting is renamed or deleted, not moved; guests are emailed only
+when the user says yes; and every write first checks Google's copy against the
+Plan's. Decisions E1 to E10 in the plan.
 
 ---
 
