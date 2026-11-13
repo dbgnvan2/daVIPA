@@ -2444,6 +2444,14 @@ Plan: `docs/unused-docs/implementation_plan_2026-11-13_backlog_small_fixes.md`.
 | **BSF-M6** | a second LUNCH block on one date is refused (LMM-A2) | done | `db_manager.py::add_block_at` | `tests/test_time_block_crud.py::test_bsfm6_a_second_lunch_block_on_one_date_is_refused` |
 | **BSF-M7** | apt retries inside a step time limit (CI-A1) | done | `.github/workflows/tests.yml` | `tests/test_ci_contract.py::test_bsfm7_every_apt_call_retries_inside_a_time_limit` |
 
+## Filter label wording (UPD-A12, 2026-11-13)
+
+Backlog item UPD-A12, settled for the long forms. No plan file; this table is the record.
+
+| ID | Criterion | Status | Where | Proof |
+|---|---|---|---|---|
+| **UPD-A12** | every lineage filter row labels its filters Segment / SubSegment / Category | done | `screens/weekly_items.py`, `screens/lineage_filters.py::build_combos` | `tests/test_vsp_tab_filters.py::test_upda12_weekly_items_writes_the_filter_labels_out`, `::test_upda12_the_shared_filter_combos_write_the_labels_out` |
+
 ## Break and Buffer buttons (PBB, 2026-11-13)
 
 The plan day-controls note "`+ Break` and `+ Buffer` place at the first box that is not full", settled. No plan file; this table is the record.

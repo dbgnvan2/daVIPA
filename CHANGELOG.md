@@ -7,6 +7,12 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — one wording for the lineage filters (2026-11-13)
+
+- APE Week Assignment and APE Week Actions label their filters
+  **SubSegment:** and **Category:**, as the other APE tabs and the column
+  headings do, instead of **Sub:** and **Cat:**. (UPD-A12)
+
 ### Changed — + Break and + Buffer find an empty half hour (2026-11-13)
 
 - The two Plan toolbar buttons used to put the block in the first box that was

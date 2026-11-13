@@ -562,3 +562,22 @@ normalising wrapper on the maps, which would hide which readers needed one.
 **Effort:** Low
 
 **Closed:** 2026-11-13, surveyed. All 15 reader sites normalise the value (normalize_hex_color directly, or via _chip_color, segment_color_utils._normalize_color or _derive_subsegment_color) before any Tk call or hex_to_rgb; no fix needed. Adjacent, not fixed: item_editor_weekly_tactic_dialog.py passes vision_categories.color_hex to fg_color only stripped (about :274-284). Unreachable while get_vision_categories() rewrites malformed rows before returning them; the one-line guard is _normalize_color, as resolve_chip_colors does. Belongs with UPD-A9.
+
+### 2026-11-08 - Type: Technical Debt
+
+**Title:** UPD-A12 - weekly_items.py abbreviates two filter labels the APE tabs write out
+**Description:** `src/getmoredone/screens/weekly_items.py` labels its three
+lineage filters "Segment:", **"Sub:"** and **"Cat:"**, where
+`ape_assignment.py` and `ape_period_view.py` write "Segment:",
+"SubSegment:" and "Category:". `screens/lineage_filters.build_combos`, which
+APE Week Actions uses, also writes the short forms - so three tabs say "Sub"
+and two say "SubSegment" for the same filter.
+
+UPD-F2 moved all of those labels onto a new row without touching their text.
+Which wording is right is a decision about the design, and the unification is
+UPD-A9's work: that entry already owns the five remaining copies of the filter
+triple, and the wording should be settled once, there, rather than twice.
+**Priority:** Low
+**Effort:** Low
+
+**Closed:** UPD-A12 (2026-11-13): settled for the long forms, which the two APE tabs and the column headings already used. The rest of UPD-A9 (the five copies of the filter triple) stays open.

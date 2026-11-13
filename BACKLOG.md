@@ -165,23 +165,6 @@ Scheduler screens, which use `ColumnResizer` without a `SplitPanel` at all.
 **Priority:** Low
 **Effort:** Medium
 
-### 2026-11-08 - Type: Technical Debt
-
-**Title:** UPD-A12 - weekly_items.py abbreviates two filter labels the APE tabs write out
-**Description:** `src/getmoredone/screens/weekly_items.py` labels its three
-lineage filters "Segment:", **"Sub:"** and **"Cat:"**, where
-`ape_assignment.py` and `ape_period_view.py` write "Segment:",
-"SubSegment:" and "Category:". `screens/lineage_filters.build_combos`, which
-APE Week Actions uses, also writes the short forms - so three tabs say "Sub"
-and two say "SubSegment" for the same filter.
-
-UPD-F2 moved all of those labels onto a new row without touching their text.
-Which wording is right is a decision about the design, and the unification is
-UPD-A9's work: that entry already owns the five remaining copies of the filter
-triple, and the wording should be settled once, there, rather than twice.
-**Priority:** Low
-**Effort:** Low
-
 ## Adjacent issues — Plan day calendar export (CE, 2026-11-08)
 
 Found while building CE-M1 to CE-M5. Flagged, not fixed (global rule 10): each
