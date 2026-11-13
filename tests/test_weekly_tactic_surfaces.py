@@ -133,7 +133,9 @@ def test_wt_m6b1_drag_schedule_refiles(tmp_path):
 
 def test_drpm3_a_refused_notice_on_a_date_drop_still_refreshes_and_says_so(tmp_path):
     """DRP-M3 — the move is written before the notice; a notice that cannot be
-    shown must not leave the list showing the old dates.
+    shown must not leave the list showing the old dates, and the status line
+    carries what the notice would have said -- a refused week included, where
+    nothing moved and "Moved" would be false.
 
     Spec: docs/spec_coverage.md#plan-and-scheduler-drops-lm3-2026-11-13
     """
@@ -147,7 +149,10 @@ def test_drpm3_a_refused_notice_on_a_date_drop_still_refreshes_and_says_so(tmp_p
         dragged = manager.get_action_item(item.id)
         refreshed, statuses = [], []
 
-        def refused(*args, **kwargs):
+        collision = {"kept_start": "2026-03-02", "rejected_start": "2026-03-09"}
+
+        def refused(db, parent=None):
+            db.last_week_collision = collision
             raise tk.TclError("")
 
         stub = SimpleNamespace(
@@ -161,15 +166,18 @@ def test_drpm3_a_refused_notice_on_a_date_drop_still_refreshes_and_says_so(tmp_p
             set_status=lambda text, kind="muted": statuses.append((text, kind)),
         )
         stub._apply_drop = lambda: DragScheduleScreen._apply_drop(stub)
+        stub._weekly_tactic_notice_text = (
+            lambda: DragScheduleScreen._weekly_tactic_notice_text(stub))
         with patch("src.getmoredone.screens.drag_schedule.notify_weekly_tactic_changes",
                    refused):
             DragScheduleScreen.on_drag_release(stub, SimpleNamespace())
 
         _assert_refiled(manager, item.id, "2026-03-02")
         assert refreshed == [True]
-        assert statuses[-1] == (
-            "Moved — a Weekly Tactic notice could not be shown; see the log",
-            "warning")
+        text, kind = statuses[-1]
+        assert kind == "warning"
+        assert "stayed on 2026-03-02 instead of moving to 2026-03-09" in text
+        assert not text.startswith("Moved")
     finally:
         vps.close()
 
