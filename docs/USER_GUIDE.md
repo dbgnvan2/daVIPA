@@ -181,7 +181,7 @@ Main area:
 
 Drag behavior:
 - **Drag onto Date** — What: Drag an item title onto a date box or calendar day. Why: Sets both Start Date and Due Date to the drop date.
-- **Drag onto Project** — What: Drag an item title onto a project box. Why: Links the item to that project and synchronizes its planning lineage (APE).
+- **Drag onto Project** — What: Drag an item title onto a project box. Why: Links the item to that project and synchronizes its planning lineage (APE). If the app asks whether to move items off another project and the question cannot be shown, nothing is filed and the status line under the screen says *Not moved — the confirmation could not be shown*.
 - **Drag onto No Project** — What: Drag a linked item onto the "Unlinked" box. Why: Removes existing project links and clears planning lineage.
 - **Drag a group (checkboxes)** — What: Check one or more item rows, then drag any *checked* row. Why: Every checked item moves together to the dropped date or project in one action. Dragging an *unchecked* row still moves just that one item, so single-item drag is unchanged. While dragging a group the drag label shows the count (e.g. "3 items").
 
@@ -632,7 +632,9 @@ Day pane (right):
   onto the day wherever you want them.
 - **A refusal always says which** — What: One of *That Time Block is outside
   the day — Day Settings sets its hours*, *That Time Block runs into lunch —
-  try a later one*, or *That Time Block is full — try another one*. Choosing a length for a block that
+  try a later one*, or *That Time Block is full — try another one*. The Day
+  Settings lunch chip dropped on *Earlier* or *Later* says *Lunch stays inside
+  the day — drop it on a Time Block*. Choosing a length for a block that
   is not on a box yet says *That block is not on a box yet — drag it onto a half
   hour first*. Why: Nothing is written, nothing is moved, and you are told what
   stopped it, in the screen's own words rather than the database's.
@@ -936,11 +938,10 @@ APE Week Actions behavior:
 - **Week Start picker** — What: Opens on the current week, and offers the same week starts APE Week Assignment offers: the current week, any week that already has tactics, and up to 3 future weeks. `This Week` jumps back to today's week. Why: One rule for what a week is, shared by both tabs.
 - **Left panel** — What: Lists the selected week's Weekly Tactics, with the count in the panel heading and in the status line. Why: An empty list and a list you cannot see the end of look the same without a count.
 - **Every tactic in the week is listed** — What: Including a tactic whose Annual Plan Element has since been detached. Why: Hiding it would leave its Action Items unreachable from this tab with nothing on screen to say they exist.
-- **Right panel** — What: The Action Items linked to the tactic you clicked, in the same rows the Today tab uses — same checkbox, same inline Title, Who and Date editing, same timer, same push buttons, same drag-to-reorder grip, same column widths you can drag. Why: It is the Today screen, filtered by tactic instead of by date, rather than a second screen that looks like it.
+- **Right panel** — What: The Action Items linked to the tactic you clicked, in the same rows the Today tab uses — same checkbox, same inline Title, Who and Date editing, same timer, same push buttons, same column widths you can drag. It has no drag-to-reorder grip (2026-11-13): the order that grip wrote was the Today tab's own, so reordering here reordered Today. Why: It is the Today screen, filtered by tactic instead of by date, rather than a second screen that looks like it.
 - **Column widths are its own** — What: Dragging a column divider here does not change the Today tab's columns, and the width is remembered between launches. Why: The panel is half a window wide; Today is a whole one.
 - **A row's date is not filtered** — What: A completed Action Item stays listed whatever day it was completed on. Why: Once the list is filtered by tactic, "completed today" has no meaning.
 - **Add Action Item** — What: Asks for a title, creates the item linked to the selected tactic and dated to the week start, then opens it in the editor. An empty title creates nothing. Since 2026-11-11 the button sits at the bottom of the right panel rather than above the list, with the other tabs' Add buttons; it is the same button with the same behaviour. Why: Most of what a new item needs is in the editor, not in a one-field dialog.
-- **Known gap** — What: Dragging a row to the top of this panel also floats it to the top of the Today tab, because the pin it writes is the one Today orders by. Why: Recorded in `BACKLOG.md` as AWA-A4; both fixes are behaviour changes beyond what the tab was asked to do.
 
 Appearance:
 - **Theme** — What: Dark/light/system. Why: Choose a comfortable look.

@@ -805,8 +805,8 @@ three layout items here, and UPD-F1, the only defect among them, merged at
   it is walked that criterion is `not done`.
 - ⚠️ **Known gap (AWA-A4):** the inherited drag grip writes `today_pin_rank`,
   the column Today orders by, so dragging a row to the top of the new panel
-  also floats it to the top of Today. In `BACKLOG.md`; both fixes are
-  behaviour changes beyond what the tab was asked to do.
+  also floats it to the top of Today. Closed 2026-11-13 by AWA2-M1: the
+  panel builds no grip.
 - ⚠️ **AWA-A1 is open and is now user-visible:** APE Week Assignment's Add
   button still writes `parent_id` while the new tab's writes
   `weekly_tactic_id`. Both are read, so nothing is lost, but the two buttons

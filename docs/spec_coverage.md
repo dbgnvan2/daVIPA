@@ -2444,6 +2444,18 @@ Plan: `docs/unused-docs/implementation_plan_2026-11-13_backlog_small_fixes.md`.
 | **BSF-M6** | a second LUNCH block on one date is refused (LMM-A2) | done | `db_manager.py::add_block_at` | `tests/test_time_block_crud.py::test_bsfm6_a_second_lunch_block_on_one_date_is_refused` |
 | **BSF-M7** | apt retries inside a step time limit (CI-A1) | done | `.github/workflows/tests.yml` | `tests/test_ci_contract.py::test_bsfm7_every_apt_call_retries_inside_a_time_limit` |
 
+## Plan and Scheduler drops (LM3, 2026-11-13)
+
+Backlog items LMM-A3, AWA-A4 and "The Scheduler asks through the platform's dialog inside a drag release". No plan file; this table is the record.
+
+| ID | Criterion | Status | Where | Proof |
+|---|---|---|---|---|
+| **LM3-M1** | the lunch chip dropped on Earlier/Later writes nothing and sets a warning saying why | done | `screens/plan.py::on_drag_release`, `LUNCH_EDGE_TEXT` | `tests/test_plan_screen.py::test_lm3m1_lunch_dropped_on_an_end_of_the_day_says_why_it_did_nothing` |
+| **AWA2-M1** | APE Week Actions rows build no pin grip; Today keeps it | done | `screens/today.py::PIN_DRAG_ENABLED`, `screens/week_actions.py` | `tests/test_ape_week_actions.py::test_awa2m1_the_week_actions_rows_have_no_pin_grip` |
+| **DRP-M1** | the Scheduler drag label is hidden and drag state cleared even when the drop raises | done | `screens/drag_schedule.py::on_drag_release` | `tests/test_project_multi_link.py::test_drpm2_a_refused_dialog_on_a_project_drop_writes_nothing_and_ends_the_drag` |
+| **DRP-M2** | a `TclError` from the relink question writes nothing and says so on the status line; one from the tactic notice is logged and the drop continues | partial — not walked on screen | `screens/drag_schedule.py::_drop_onto_project` | same test |
+| **DRP-M3** | a `TclError` from a date drop's notice leaves what was written, redraws the list, and puts the notice's own text on the status line (a refused week included); the Move Failed error is guarded the same way | partial — not walked on screen | `screens/drag_schedule.py::_apply_drop`, `set_status` | `tests/test_weekly_tactic_surfaces.py::test_drpm3_a_refused_notice_on_a_date_drop_still_refreshes_and_says_so` |
+
 ## Priority column (PRC, 2026-11-13)
 
 Backlog items PBG-A10, PRI-A2, PRI-A3 and PCC-A1. No plan file; this table is the record.

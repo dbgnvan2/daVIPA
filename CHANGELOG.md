@@ -7,6 +7,22 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — Plan and Scheduler drops (2026-11-13)
+
+- **APE Week Actions rows have no drag-to-reorder grip.** The grip wrote the
+  pin the Today tab sorts by, so reordering here reordered Today. (AWA2-M1,
+  AWA-A4)
+- **A Scheduler drag always ends.** If a drop raises, the drag label is still
+  taken off the screen. (DRP-M1)
+- **A project drop whose question cannot be shown files nothing** and says so
+  on a new status line under the Scheduler, instead of the error leaving the
+  drag handler. A notice that cannot be shown is logged, written to the same
+  line, and the drop goes on; a date drop still redraws the list, and the
+  line says what the notice would have said. (DRP-M2,
+  DRP-M3)
+- **Lunch dropped past either end of the day says why nothing happened**:
+  *Lunch stays inside the day — drop it on a Time Block*. (LM3-M1, LMM-A3)
+
 ### Changed — one Priority cell across the app (2026-11-13)
 
 - **All Items writes the score as `P:n`**, as Today, Upcoming, Hierarchical

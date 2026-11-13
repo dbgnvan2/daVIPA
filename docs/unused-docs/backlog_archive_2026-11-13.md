@@ -346,3 +346,85 @@ is worth knowing before anyone tests it that way.
 **Effort:** Low
 
 **Closed:** Closed 2026-11-13 as a note: correct as designed, and the entry itself says so.
+
+## Adjacent issues — the Day Plan's lunch and drag moves (LMM, filed 2026-11-12)
+
+Found while building the lunch-block move fix (`3adfc91`) and not fixed, under
+global rule 10. None of the three was reproduced on the running screen, and
+they do not rest on the same evidence. LMM-A1's refusal was executed, not only
+read: `can_place` called with `day_span` omitted and a slot outside the
+template span returns `outside_grid`, so its mechanism is observed and only the
+screen-level sequence -- extend the day, drag a block onto the new outer box --
+was predicted. LMM-A1 and LMM-A2 are fixed and filed in
+`docs/unused-docs/backlog_archive_2026-11-13.md`. LMM-A3 was located by
+reading and not executed.
+
+### LMM-A3 — the Day Settings lunch chip cannot be dropped on Earlier/Later (low)
+
+The `kind == "lunch"` branch of `on_drag_release` (`screens/plan.py:2766`)
+handles `target` and `pointer_over_day()` and has no `edge` case. The two
+branches above it both do — `item` at `plan.py:2736` and `block` at `:2753` —
+so dropping the lunch chip past either end of the day silently does nothing,
+while the same gesture with an Action Item or a scheduled block extends the
+day.
+
+Whether lunch *should* be able to extend the day is a product question, not
+only a defect: a lunch outside the drawn day is arguably meaningless. But the
+present behaviour answers it by doing nothing at all and saying nothing, which
+is the one answer a user cannot read.
+
+**Closed:** LM3-M1 (2026-11-13): the lunch chip dropped on an edge now says why nothing happened; lunch still does not extend the day.
+
+## Adjacent issues — APE Week Assignment / APE Week Actions (AWA, 2026-11-07)
+
+Found while reading the surrounding code for the AWA batch, recorded under the
+standing rule rather than fixed in a sweeping diff. Full text, with the line
+numbers and the reasoning, in `docs/spec_2026-11-07_ape_week_actions.md` §7.
+One of the five, AWA-A5, was fixed in that batch instead of recorded, because
+it made the meta test suite red and blocked verification.
+
+### 2026-11-07 - Type: Bug
+
+**Title:** AWA-A4 - the APE Week Actions panel inherits Today's pin, and the pin is shared
+**Description:** `create_item_row` binds the drag grip to `_start_pin_drag` /
+`_finish_pin_drag` (`today.py:541-542`), which write
+`action_items.today_pin_rank` — the column the Today screen orders by.
+Inherited unchanged, as AWA-M5.3 requires, dragging a row to the top of the new
+panel also floats it to the top of Today. Found after implementation, by
+reading the inherited row builder, not by a test. Either fix — suppressing the
+grip on this panel, or giving the panel its own rank column — is a behaviour
+change beyond what the tab was asked to do, so neither was made.
+**Priority:** Medium
+**Effort:** Small
+
+**Closed:** AWA2-M1 (2026-11-13): the grip is suppressed on APE Week Actions; no second rank column was added.
+
+### 2026-11-07 - Type: Bug
+
+**Title:** The Scheduler asks through the platform's dialog inside a drag release
+**Description:** `drag_schedule.py::on_drag_release` calls `_drop_onto_project`
+directly, which calls `messagebox.showinfo` for a dragged Weekly Tactic and
+`confirm_exclusive_relink` (→ `messagebox.askyesno` in
+`project_link_notice.py`) before filing items under a project. That is the same
+call from the same kind of place as the fault PD-M12 fixed on the Plan screen:
+on macOS `tk_messageBox` raised `_tkinter.TclError` with no message when it was
+opened from the idle callback following a drag release, and here it is opened
+from inside the release handler itself. If it fails the same way, the
+exception leaves the Tk callback and the drop files nothing and says nothing.
+**Priority:** High if it reproduces - a silent no-op on a write gesture
+**Effort:** Small - take the modal off that release path the way PD-M13 did:
+file the link, say what happened where the screen already reports, and wrap any
+question that remains in `try/except tk.TclError` so a dialog that fails cannot
+take the gesture with it. **Not** by swapping in an in-app toplevel: PD-M12 tried
+that on the Plan screen and it hung the application, and `confirm_dialog.py` is
+deleted.
+**Notes:** Not fixed with PD-M12 or PD-M13. It has not been reported and it is a
+second screen's confirmation UI; fixing it there before anyone has walked the
+Plan screen's own remedy is how one unverified fix becomes two - and the first
+two remedies here were both wrong on screen. **Worth a walk before anything
+else:** drag an item onto a project on the Scheduler screen and see whether it
+files. The other
+twenty `messagebox` call sites in the app, Clear Day on the Plan screen
+included, are reached from a button or a menu and are not in this class.
+
+**Closed:** DRP-M1..M3 (2026-11-13): every dialog on the release path is wrapped in try/except TclError, logs, and writes to a new Scheduler status line; the drag ends in a finally. The relink question stays modal; a refused question writes nothing. Not walked on screen.
