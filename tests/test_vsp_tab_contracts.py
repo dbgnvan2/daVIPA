@@ -78,6 +78,32 @@ def _buttons(frame):
             if isinstance(child, ctk.CTkButton)]
 
 
+def _gridded_buttons(frame):
+    """The text of every CTkButton ``frame`` actually **grids**, in grid order.
+
+    ``_buttons`` reads ``winfo_children()``, which holds a widget whose
+    ``grid()`` was never called — so it reports a button that exists and is
+    nowhere on screen. Found by mutation: deleting the ``refresh_btn.grid(...)``
+    line from ``vision_segments.py`` left the Vision Elements control contract
+    green while the button had no place in the layout. Ordering is read from
+    the grid too, so "New, then Refresh" means left-to-right and not merely
+    the order the two were constructed in.
+
+    Only for frames that lay their buttons out with ``grid``; the frames that
+    ``pack`` theirs report no grid info at all.
+    """
+    placed = []
+    for child in frame.winfo_children():
+        if not isinstance(child, ctk.CTkButton):
+            continue
+        info = child.grid_info()
+        if not info:
+            continue
+        placed.append((int(info["row"]), int(info["column"]),
+                       child.cget("text")))
+    return [text for _row, _column, text in sorted(placed)]
+
+
 def _all_buttons(frame):
     """The text of every CTkButton anywhere under a frame, in child order."""
     out = []
@@ -139,21 +165,22 @@ def _row_buttons(table):
 # ------------------------------------------------------- VTF-M7.1, tab by tab
 
 def test_vtfm71_vision_elements_controls(tmp_path):
-    """VTF-M7.1 / VTF-M6 — Refresh on top, the switcher, New at the bottom.
+    """VTF-M7.1 / VTF-M6 — the switcher, the list, then New and Refresh.
 
     This tab is three lists shown one at a time, so decision D1 kept its
     structure and moved the buttons only: the New button's label still
     follows the active view, from the bottom row rather than the top one.
+    Refresh joined it there on 2026-11-12 (by request) and the top row went
+    with it, which is why nothing here reads a header any more.
     """
     vps = make_vps(tmp_path)
     try:
         seed_ape(vps, year=YEAR)
         root, screen = _screen(VisionSegmentsScreen, vps)
         try:
-            assert _buttons(screen.refresh_btn.master) == ["Refresh"], (
-                "the top row is Refresh alone")
-            assert _buttons(screen.bottom_actions) == ["+ New Category"], (
-                "the New button must be the bottom row, labelled for the view")
+            assert _gridded_buttons(screen.bottom_actions) == [
+                "+ New Category", "Refresh"], (
+                "the bottom row is New, labelled for the view, then Refresh")
             assert sorted(screen.view_buttons) == [
                 "categories", "segments", "subsegments"]
             assert _all_buttons(screen.cat_list)[-2:] == ["Edit", "Delete"], (
@@ -401,19 +428,32 @@ def test_vtfm61_the_new_buttons_sit_at_the_bottom(tmp_path):
         vps.close()
 
 
-def test_vtfm62_the_switcher_and_refresh_do_not_move(tmp_path):
-    """VTF-M6.2 — Refresh stays in the top row, the switcher stays on row 1.
+def test_refresh_sits_beside_the_new_button(tmp_path):
+    """Refresh is in the bottom row, to the right of New; the switcher is row 1.
 
-    Refresh acts on the whole panel rather than on a record, so it is not an
-    Add New and does not move with one.
+    This replaces ``test_vtfm62_the_switcher_and_refresh_do_not_move``, which
+    asserted the opposite: VTF-M6.2 kept Refresh in a header of its own on the
+    grounds that it acts on the whole panel rather than on a record. The
+    behaviour changed intentionally — asked for on 2026-11-12 — so the test
+    changed with it rather than the code being bent to the old assertion. The
+    header is gone, so this also pins that Refresh did not leave a second row
+    behind: it is parented to ``bottom_actions`` itself.
+
+    The switcher half of the old test is kept verbatim. It did not move, and
+    the row it sits on is the one the removed header used to sit above.
     """
     vps = make_vps(tmp_path)
     try:
         root, screen = _screen(VisionSegmentsScreen, vps)
         try:
-            top = screen.refresh_btn.master
-            assert int(top.grid_info()["row"]) == 0, "Refresh left the top row"
-            assert _buttons(top) == ["Refresh"]
+            assert screen.refresh_btn.master is screen.bottom_actions, (
+                "Refresh must be in the bottom row, not a row of its own")
+            assert int(screen.refresh_btn.grid_info()["column"]) > \
+                int(screen.primary_action_btn.grid_info()["column"]), (
+                "Refresh sits beside New, to its right")
+            assert int(screen.refresh_btn.grid_info()["row"]) == \
+                int(screen.primary_action_btn.grid_info()["row"]), (
+                "beside it, not under it")
 
             switcher = screen.view_buttons["segments"].master
             assert int(switcher.grid_info()["row"]) == 1, "the switcher moved"
