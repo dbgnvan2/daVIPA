@@ -7,6 +7,12 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Development — pytest-timeout (2026-11-13)
+
+- `pytest-timeout` is a development dependency, for finding a test that hangs
+  (`--timeout=60 --timeout-method=thread` dumps every thread's stack). Not
+  shipped in the app.
+
 ### Added — change your own meetings from the Plan (2026-11-13)
 
 - A meeting you organised, or one whose guests may change it, can be dragged
