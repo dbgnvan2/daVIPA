@@ -18,7 +18,11 @@ would look exactly like a passing suite.
 import customtkinter as ctk
 import pytest
 
-from conftest import reapply_transparency, wrap_reapplying_transparency
+from conftest import (
+    reapply_transparency,
+    withdrawn_root,
+    wrap_reapplying_transparency,
+)
 
 
 class _FakeWindow:
@@ -833,3 +837,25 @@ def test_b52_a_failing_timer_ending_does_not_hang_the_run(tmp_path, messageboxes
     finally:
         root.destroy()
         manager.close()
+
+
+def test_vtfa3_the_shared_root_takes_the_size_it_is_given(monkeypatch):
+    """VTF-A3 — one builder replaces eight copies, so its size must be right.
+
+    The eight copies set 1400x900, 1200x800 or nothing. Recorded as the call
+    the builder makes, not read back from the window: a withdrawn window's
+    ``wm_geometry`` reports ``1x1`` or the requested size depending on what
+    ran before it, so a read-back passes alone and fails in the file.
+    """
+    asked = []
+    monkeypatch.setattr(ctk.CTk, "geometry",
+                        lambda self, spec=None: asked.append(spec))
+    sized = withdrawn_root("1234x567+0+0")
+    unsized = withdrawn_root(geometry=None)
+    default = withdrawn_root()
+    try:
+        assert asked == ["1234x567+0+0", "1400x900+0+0"], asked
+        assert sized.state() == "withdrawn"
+    finally:
+        for root in (sized, unsized, default):
+            root.destroy()

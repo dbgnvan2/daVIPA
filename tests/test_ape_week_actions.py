@@ -45,22 +45,12 @@ from tests.weekly_tactic_fixtures import (
     seed_ape,
     seed_second_ape,
 )
+from conftest import withdrawn_root
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "getmoredone"
 
 
 # --------------------------------------------------------------------- helpers
-
-def _root():
-    """A withdrawn Tk root, or a skip when there is no display."""
-    try:
-        root = ctk.CTk()
-    except Exception as exc:  # Headless without a display.
-        pytest.skip(f"Tk display unavailable: {exc}")
-    root.geometry("1200x800+0+0")
-    root.withdraw()
-    return root
-
 
 def _app_stub(db=None, vps_manager=None):
     """An app double with the two colour maps every list screen reads."""
@@ -77,7 +67,7 @@ def _app_stub(db=None, vps_manager=None):
 
 
 def _make_today(tmp_path, titles=()):
-    root = _root()
+    root = withdrawn_root("1200x800+0+0")
     db = DatabaseManager(str(tmp_path / "today.db"))
     for title in titles:
         db.create_action_item(
@@ -429,7 +419,7 @@ def test_awam25_orphaned_child_is_not_returned(tmp_path):
 def _panel(tmp_path, vps, tactic_id=None):
     """A WeekTacticActionsPanel on a withdrawn root (AWA-M3.3)."""
     from src.getmoredone.screens.week_actions import WeekTacticActionsPanel
-    root = _root()
+    root = withdrawn_root("1200x800+0+0")
     panel = WeekTacticActionsPanel(root, vps.db_manager, _app_stub(vps.db_manager, vps))
     if tactic_id is not None:
         panel.set_tactic(_tactic_row(vps, tactic_id))
@@ -717,7 +707,7 @@ def _settings_stub(first_day=0):
 def _week_screen(tmp_path, vps, first_day=0):
     """A WeekActionsScreen on a withdrawn root, Monday-start by default."""
     from src.getmoredone.screens.week_actions import WeekActionsScreen
-    root = _root()
+    root = withdrawn_root("1200x800+0+0")
     app = _app_stub(vps.db_manager, vps)
     app.settings = _settings_stub(first_day)
     screen = WeekActionsScreen(root, vps, app)
@@ -895,7 +885,7 @@ def _hub(tmp_path, vps):
     from src.getmoredone.screens.vision_planning_hub import (
         VisionPlanningHubScreen,
     )
-    root = _root()
+    root = withdrawn_root("1200x800+0+0")
     app = _app_stub(vps.db_manager, vps)
     app.settings = _settings_stub()
     hub = VisionPlanningHubScreen(root, vps, app)
@@ -940,7 +930,7 @@ def test_awam12_screen_header_matches_the_tab(tmp_path):
 
     vps = make_vps(tmp_path)
     try:
-        root = _root()
+        root = withdrawn_root("1200x800+0+0")
         app = _app_stub(vps.db_manager, vps)
         app.settings = _settings_stub()
         try:

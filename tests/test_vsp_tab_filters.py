@@ -37,22 +37,12 @@ from src.getmoredone.screens.annual_vision_segments import (  # noqa: E402
 from src.getmoredone.screens.ape_assignment import APEAssignmentScreen  # noqa: E402
 from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen  # noqa: E402
 from src.getmoredone.screens.weekly_items import WeeklyItemsScreen  # noqa: E402
+from conftest import withdrawn_root
 
 YEAR = 2026
 
 
 # --------------------------------------------------------------------- helpers
-
-def _root():
-    """A withdrawn Tk root, or a skip when there is no display."""
-    try:
-        root = ctk.CTk()
-    except Exception as exc:  # Headless without a display.
-        pytest.skip(f"Tk display unavailable: {exc}")
-    root.geometry("1400x900+0+0")
-    root.withdraw()
-    return root
-
 
 def _vision_element(idx, category):
     """One left-hand row: a vision element the annual tab can create from."""
@@ -96,7 +86,7 @@ def _fake_annual_vps(left_rows, right_rows):
 
 def _annual_screen(left_rows=(), right_rows=()):
     """The Annual Plan Elements tab on a withdrawn root, already rendered."""
-    root = _root()
+    root = withdrawn_root()
     vps = _fake_annual_vps(left_rows, right_rows)
     app = SimpleNamespace(vps_manager=vps)
     screen = AnnualVisionSegmentsScreen(root, vps, app)
@@ -312,7 +302,7 @@ def _fake_period_vps(left_rows, right_rows):
 
 def _quarter_screen(left_rows=(), right_rows=()):
     """APE Quarter Assignment on a withdrawn root, already rendered."""
-    root = _root()
+    root = withdrawn_root()
     vps = _fake_period_vps(left_rows, right_rows)
     # The quarter tab's right panel is the quarter query, not the month one.
     vps.get_annual_plan_elements_for_quarter = lambda year, quarter: list(right_rows)
@@ -325,7 +315,7 @@ def _quarter_screen(left_rows=(), right_rows=()):
 
 def _month_screen(left_rows=(), right_rows=()):
     """APE Month Assignment on a withdrawn root, already rendered."""
-    root = _root()
+    root = withdrawn_root()
     vps = _fake_period_vps(left_rows, right_rows)
     app = SimpleNamespace(vps_manager=vps)
     screen = APEPeriodViewScreen(root, vps, app)
@@ -335,7 +325,7 @@ def _month_screen(left_rows=(), right_rows=()):
 
 def _week_screen(left_rows=(), right_rows=()):
     """APE Week Assignment on a withdrawn root, already rendered."""
-    root = _root()
+    root = withdrawn_root()
     vps = SimpleNamespace(
         get_weekly_action_items=lambda **_kw: list(right_rows),
         get_annual_plan_elements_for_month=lambda year, month: list(left_rows),

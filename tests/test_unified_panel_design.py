@@ -53,22 +53,12 @@ from tests.weekly_tactic_fixtures import (  # noqa: E402
     seed_ape,
     seed_second_ape,
 )
+from conftest import withdrawn_root  # noqa: E402
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "getmoredone"
 
 
 # --------------------------------------------------------------------- helpers
-
-def _root():
-    """A withdrawn Tk root, or a skip when there is no display."""
-    try:
-        root = ctk.CTk()
-    except Exception as exc:  # Headless without a display.
-        pytest.skip(f"Tk display unavailable: {exc}")
-    root.geometry("1400x900+0+0")
-    root.withdraw()
-    return root
-
 
 def _ape_row(idx, segment="Purposeful Work", subsegment="Living Systems",
              category="Blog"):
@@ -108,7 +98,7 @@ def _quarter_screen(left_rows=(), right_rows=(), settings=None):
     hands over its own instance; without one it loads its own, which
     conftest.py's settings isolation points at a temporary file.
     """
-    root = _root()
+    root = withdrawn_root()
     vps = _fake_vps(left_rows, right_rows)
     app = SimpleNamespace(vps_manager=vps)
     if settings is not None:
@@ -367,7 +357,7 @@ def _fake_annual_vps(left_rows, right_rows):
 
 def _month_screen(left_rows=(), right_rows=(), settings=None):
     """APE Month Assignment on a withdrawn root, already rendered."""
-    root = _root()
+    root = withdrawn_root()
     vps = _fake_month_vps(left_rows, right_rows)
     app = SimpleNamespace(vps_manager=vps)
     if settings is not None:
@@ -379,7 +369,7 @@ def _month_screen(left_rows=(), right_rows=(), settings=None):
 
 def _annual_screen(left_rows=(), right_rows=(), settings=None):
     """Annual Vision Segments on a withdrawn root, already rendered."""
-    root = _root()
+    root = withdrawn_root()
     vps = _fake_annual_vps(left_rows, right_rows)
     app = SimpleNamespace(vps_manager=vps)
     if settings is not None:
@@ -537,7 +527,7 @@ def test_updm41_annual_right_row_keeps_edit_beside_delete():
 
 def _table(prefix="ape_quarter_left", columns=None, settings=None):
     """A ChipTable in a scrollable frame on a withdrawn root."""
-    root = _root()
+    root = withdrawn_root()
     frame = ctk.CTkScrollableFrame(root)
     frame.grid(row=0, column=0, sticky="nsew")
     cols = columns if columns is not None else list(chip_table.APE_LEFT_COLUMNS)
@@ -816,7 +806,7 @@ def test_updm31_the_table_makes_its_container_stretch():
     it, so the table setting it changes nothing for them -- it stops the next
     adopter getting a ragged panel and no clue why.
     """
-    root = _root()
+    root = withdrawn_root()
     try:
         frame = ctk.CTkScrollableFrame(root)
         frame.grid(row=0, column=0, sticky="nsew")
@@ -836,7 +826,7 @@ def test_updm36_panels_keep_their_own_widths():
     widths; one store for both would make a drag in one panel move the other.
     """
     settings = FakeSettings()
-    root = _root()
+    root = withdrawn_root()
     try:
         left_frame = ctk.CTkScrollableFrame(root)
         right_frame = ctk.CTkScrollableFrame(root)
@@ -953,7 +943,7 @@ def _splitter(body_width=1208, ratio=None, settings=None, prefix=None):
     `winfo_width()` and writes grid minsizes, and a double would assert the
     test's own idea of what Tk reports rather than what it reports.
     """
-    root = _root()
+    root = withdrawn_root()
     body = ctk.CTkFrame(root, width=body_width, height=400)
     body.grid(row=0, column=0)
     body.grid_propagate(False)
@@ -1097,7 +1087,7 @@ def test_updm14_zero_width_body_is_a_noop():
             # root's `wm geometry` — were both withdrawn after measurement,
             # the first because the body then reported 1px whatever the holder
             # did, the second because the root's geometry is not what the body
-            # follows (`_root()` sets 1400x900, and 1208 is the body's own
+            # follows (`withdrawn_root()` sets 1400x900, and 1208 is the body's own
             # request). The X11 cause is still undiagnosed, and a comment
             # asserting a cause nobody measured is the defect this batch is
             # about.
@@ -1721,7 +1711,7 @@ def _fake_week_vps(left_rows, right_rows):
 
 def _week_screen(left_rows=(), right_rows=(), settings=None):
     """APE Week Assignment on a withdrawn root, already rendered."""
-    root = _root()
+    root = withdrawn_root()
     vps = _fake_week_vps(left_rows, right_rows)
     app = SimpleNamespace(vps_manager=vps)
     if settings is not None:
@@ -2161,7 +2151,7 @@ def _week_actions_screen(tmp_path, vps, settings=None, first_day=0):
     the right panel is a `TodayScreen` subclass and queries items for real.
     """
     from src.getmoredone.screens.week_actions import WeekActionsScreen
-    root = _root()
+    root = withdrawn_root()
     app = SimpleNamespace(
         vps_manager=vps,
         db_manager=vps.db_manager,
@@ -2851,7 +2841,7 @@ def test_updf32_the_pick_column_fits_its_heading_and_has_no_handle():
     keeps its grid index: give it a handle and the header gains a widget in
     column 0, which is what `_cells` would then read first.
     """
-    root = _root()
+    root = withdrawn_root()
     try:
         font = ctk.CTkFont(weight="bold")
         checkbox = chip_table.APE_LEFT_COLUMNS[0]

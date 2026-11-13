@@ -37,6 +37,7 @@ from tests.weekly_tactic_fixtures import (  # noqa: E402
     make_week_item,
     seed_ape,
 )
+from conftest import withdrawn_root  # noqa: E402
 
 
 # ---------------------------------------------------------------- WTP-M1 ----
@@ -437,17 +438,6 @@ def test_wtpm34_status_filter_unchanged(tmp_path):
 # the mapped window count tests/test_ci_contract.py pins at 22.
 
 
-def _root():
-    """A withdrawn Tk root, or a skip when there is no display."""
-    try:
-        root = ctk.CTk()
-    except Exception as exc:  # Headless without a display.
-        pytest.skip(f"Tk display unavailable: {exc}")
-    root.geometry("1400x900+0+0")
-    root.withdraw()
-    return root
-
-
 def _tree_rows(screen):
     """[(grid row, indent level)] for every rendered row, in grid order.
 
@@ -501,7 +491,7 @@ def test_wtpm35_tree_nests_week_filed_items(tmp_path):
         tactic = make_week_item(vps, ape, title="W1 tactic")
         make_daily_item(vps, title="Write the post", weekly_tactic_id=tactic.id)
 
-        root = _root()
+        root = withdrawn_root()
         screen = HierarchicalScreen(root, vps.db_manager,
                                     SimpleNamespace(vps_manager=vps))
         screen.update_idletasks()
@@ -535,7 +525,7 @@ def test_wtpm36_tactic_row_shows_child_count(tmp_path):
         make_daily_item(vps, title="One", weekly_tactic_id=tactic.id)
         make_daily_item(vps, title="Two", weekly_tactic_id=tactic.id)
 
-        root = _root()
+        root = withdrawn_root()
         screen = HierarchicalScreen(root, vps.db_manager,
                                     SimpleNamespace(vps_manager=vps))
         screen.update_idletasks()
@@ -1098,7 +1088,7 @@ def test_wtpm52_confirmation_names_the_child_count(tmp_path, monkeypatch):
     and is asserted here against the database rather than against a call log.
     """
     vps = make_vps(tmp_path)
-    root = _root()
+    root = withdrawn_root()
     try:
         tactic = _seed_tactic_with_progress(vps)
         screen = _week_assignment_screen(root, vps)
@@ -1134,7 +1124,7 @@ def test_wtpm52_confirmation_says_so_when_nothing_is_filed(tmp_path, monkeypatch
     delete that destroys one row. The branch is asserted, not just the count.
     """
     vps = make_vps(tmp_path)
-    root = _root()
+    root = withdrawn_root()
     try:
         ape = seed_ape(vps)
         tactic = make_week_item(vps, ape, title="Empty week")
@@ -1160,7 +1150,7 @@ def test_wtpm52_confirmation_says_so_when_nothing_is_filed(tmp_path, monkeypatch
 def test_wtpm52_one_item_is_singular(tmp_path, monkeypatch):
     """WTP-M5.2 — "1 Action Item", not "1 Action Items"."""
     vps = make_vps(tmp_path)
-    root = _root()
+    root = withdrawn_root()
     try:
         ape = seed_ape(vps)
         tactic = make_week_item(vps, ape, title="One under it")
@@ -1191,7 +1181,7 @@ def test_wtpm64_week_assignment_row_shows_progress(tmp_path):
     making the fixture agree with a date combo would test the picker instead.
     """
     vps = make_vps(tmp_path)
-    root = _root()
+    root = withdrawn_root()
     try:
         _seed_tactic_with_progress(vps)
         screen = _week_assignment_screen(root, vps)
@@ -1216,7 +1206,7 @@ def test_wtpm64_a_tactic_with_nothing_under_it_shows_a_dash(tmp_path):
     under it yet, and the dash is the difference between the two.
     """
     vps = make_vps(tmp_path)
-    root = _root()
+    root = withdrawn_root()
     try:
         ape = seed_ape(vps)
         make_week_item(vps, ape, title="Empty week")
@@ -1242,7 +1232,7 @@ def test_wtpm65_week_actions_list_shows_progress(tmp_path):
     from src.getmoredone.screens.week_actions import WeekActionsScreen
 
     vps = make_vps(tmp_path)
-    root = _root()
+    root = withdrawn_root()
     try:
         tactic = _seed_tactic_with_progress(vps)
         screen = WeekActionsScreen(root, vps, _app_for(vps))

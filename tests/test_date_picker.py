@@ -23,27 +23,14 @@ from datetime import date, datetime
 
 import pytest
 
-import customtkinter as ctk
 
 from src.getmoredone.widgets.date_picker import DatePickerButton
+from conftest import withdrawn_root
 
 
 # --------------------------------------------------------------------------
 # Helpers
 # --------------------------------------------------------------------------
-
-def _root():
-    # Teardown is owned by conftest's _destroy_windows_left_behind_by_this_test,
-    # which destroys any window created during a test that is still alive at
-    # its end. This helper returns a window to many call sites and had nothing
-    # anywhere to destroy it; that was 29 of the 37 leaked windows in a run.
-    try:
-        root = ctk.CTk()
-    except Exception as exc:  # Headless without a display.
-        pytest.skip(f"Tk display unavailable: {exc}")
-    root.withdraw()
-    return root
-
 
 # --------------------------------------------------------------------------
 # R-M2.B.1 — the public interface must survive the swap
@@ -80,7 +67,7 @@ def test_rm2b1_optional_params_keep_their_defaults():
 
 def test_rm2b1_picker_returns_selected_date():
     """Behavioural: what set_date stores is what get_date returns."""
-    root = _root()
+    root = withdrawn_root(geometry=None)
     try:
         picker = DatePickerButton(root)
         picker.set_date("2026-03-17")
@@ -90,7 +77,7 @@ def test_rm2b1_picker_returns_selected_date():
 
 
 def test_rm2b1_picker_accepts_a_datetime_for_set_date():
-    root = _root()
+    root = withdrawn_root(geometry=None)
     try:
         picker = DatePickerButton(root)
         picker.set_date(datetime(2026, 12, 1, 9, 30))
@@ -100,7 +87,7 @@ def test_rm2b1_picker_accepts_a_datetime_for_set_date():
 
 
 def test_rm2b1_initial_date_is_honoured():
-    root = _root()
+    root = withdrawn_root(geometry=None)
     try:
         picker = DatePickerButton(root, initial_date="2025-01-02")
         assert picker.get_date() == "2025-01-02"
@@ -109,7 +96,7 @@ def test_rm2b1_initial_date_is_honoured():
 
 
 def test_rm2b1_picker_defaults_to_today():
-    root = _root()
+    root = withdrawn_root(geometry=None)
     try:
         picker = DatePickerButton(root)
         assert picker.get_date() == datetime.now().strftime("%Y-%m-%d")
@@ -118,7 +105,7 @@ def test_rm2b1_picker_defaults_to_today():
 
 
 def test_rm2b1_on_date_changed_fires_with_the_new_value():
-    root = _root()
+    root = withdrawn_root(geometry=None)
     try:
         seen = []
         picker = DatePickerButton(root, on_date_changed=seen.append)
@@ -131,7 +118,7 @@ def test_rm2b1_on_date_changed_fires_with_the_new_value():
 
 def test_rm2b1_open_calendar_builds_a_popup_and_reuses_it():
     """A second click must lift the existing popup, not stack a new one."""
-    root = _root()
+    root = withdrawn_root(geometry=None)
     try:
         picker = DatePickerButton(root, initial_date="2026-05-15")
         picker.open_calendar()
@@ -205,7 +192,7 @@ def test_rm2b2_picker_uses_the_injected_settings_first_day_of_week():
     a value that exists but never reaches the call is decoration)."""
     from src.getmoredone.widgets.date_picker import weekday_headers
 
-    root = _root()
+    root = withdrawn_root(geometry=None)
     try:
         settings = type("S", (), {"first_day_of_week": 6})()
         picker = DatePickerButton(root, initial_date="2026-05-15", settings=settings)
@@ -223,7 +210,7 @@ def test_rm2b2_picker_uses_the_injected_settings_first_day_of_week():
 
 
 def test_rm2b2_picker_grid_renders_the_month_of_the_current_value():
-    root = _root()
+    root = withdrawn_root(geometry=None)
     try:
         picker = DatePickerButton(root, initial_date="2024-02-15")
         picker.open_calendar()
@@ -239,7 +226,7 @@ def test_rm2b2_picker_grid_renders_the_month_of_the_current_value():
 # --------------------------------------------------------------------------
 
 def test_rm2b1_selecting_a_day_sets_the_date_and_closes_the_popup():
-    root = _root()
+    root = withdrawn_root(geometry=None)
     try:
         picker = DatePickerButton(root, initial_date="2026-05-15")
         picker.open_calendar()
@@ -255,7 +242,7 @@ def test_rm2b1_selecting_a_day_sets_the_date_and_closes_the_popup():
 
 
 def test_rm2b1_month_navigation_moves_across_a_year_boundary():
-    root = _root()
+    root = withdrawn_root(geometry=None)
     try:
         picker = DatePickerButton(root, initial_date="2026-12-10")
         picker.open_calendar()
@@ -273,7 +260,7 @@ def test_rm2b1_month_navigation_moves_across_a_year_boundary():
 
 def test_rm2b1_navigating_months_does_not_change_the_stored_date():
     """Browsing is not selecting — the entry must not move until a day is clicked."""
-    root = _root()
+    root = withdrawn_root(geometry=None)
     try:
         picker = DatePickerButton(root, initial_date="2026-12-10")
         picker.open_calendar()
@@ -287,7 +274,7 @@ def test_rm2b1_navigating_months_does_not_change_the_stored_date():
 
 
 def test_rm2b1_today_button_jumps_to_today():
-    root = _root()
+    root = withdrawn_root(geometry=None)
     try:
         picker = DatePickerButton(root, initial_date="2020-01-01")
         picker.open_calendar()
@@ -301,7 +288,7 @@ def test_rm2b1_today_button_jumps_to_today():
 
 def test_rm2b1_open_calendar_survives_a_corrupt_entry_value():
     """The entry is free text; a bad value must fall back to today, not raise."""
-    root = _root()
+    root = withdrawn_root(geometry=None)
     try:
         picker = DatePickerButton(root)
         picker.date_entry.delete(0, "end")

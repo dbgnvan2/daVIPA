@@ -42,22 +42,12 @@ from src.getmoredone.screens.vision_segments import VisionSegmentsScreen  # noqa
 from src.getmoredone.screens.week_actions import WeekActionsScreen  # noqa: E402
 from src.getmoredone.screens.weekly_items import WeeklyItemsScreen  # noqa: E402
 from tests.weekly_tactic_fixtures import make_vps, seed_ape  # noqa: E402
+from conftest import withdrawn_root
 
 YEAR = 2026
 
 
 # --------------------------------------------------------------------- helpers
-
-def _root():
-    """A withdrawn Tk root, or a skip when there is no display."""
-    try:
-        root = ctk.CTk()
-    except Exception as exc:  # Headless without a display.
-        pytest.skip(f"Tk display unavailable: {exc}")
-    root.geometry("1400x900+0+0")
-    root.withdraw()
-    return root
-
 
 def _screen(cls, vps):
     """One tab on a withdrawn root, built the way the app builds it.
@@ -65,7 +55,7 @@ def _screen(cls, vps):
     ``settings`` is left off the app stub on purpose: each screen that wants
     one loads its own, and conftest.py points that at a temporary file.
     """
-    root = _root()
+    root = withdrawn_root()
     app = SimpleNamespace(vps_manager=vps, db_manager=vps.db_manager)
     screen = cls(root, vps, app)
     screen.update_idletasks()

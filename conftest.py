@@ -917,6 +917,32 @@ def mapped_windows():
         _WINDOWS_MAY_BE_MAPPED = False
 
 
+def withdrawn_root(geometry="1400x900+0+0"):
+    """A withdrawn CustomTkinter root, or a skip when there is no display.
+
+    VTF-A3: eight test files each carried their own copy of this. Every
+    window is already withdrawn at creation by ``_keep_tk_windows_off_screen``;
+    the ``withdraw()`` here is a second layer, not the protection. What the
+    helper owns is the skip and the size: the VSP tab tests lay out at
+    1400x900, and ``geometry=None`` leaves the size to Tk, as the date-picker
+    tests want.
+
+    Teardown is owned by ``_destroy_windows_left_behind_by_this_test``, which
+    destroys any window still alive at a test's end, so a caller that returns
+    the root to many call sites need not destroy it.
+    """
+    import customtkinter as ctk
+
+    try:
+        root = ctk.CTk()
+    except Exception as exc:  # Headless without a display.
+        pytest.skip(f"Tk display unavailable: {exc}")
+    if geometry:
+        root.geometry(geometry)
+    root.withdraw()
+    return root
+
+
 def reapply_transparency(window) -> None:
     """Re-assert alpha 0 on a window that has just been (re-)mapped.
 

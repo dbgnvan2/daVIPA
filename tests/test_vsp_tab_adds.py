@@ -37,7 +37,6 @@ for _entry in (str(_ROOT), str(_ROOT / "src")):
 
 import pytest  # noqa: E402
 
-import customtkinter as ctk  # noqa: E402
 
 from src.getmoredone.screens import annual_vision_segments as annual_mod  # noqa: E402
 from src.getmoredone.screens import ape_assignment as quarter_mod  # noqa: E402
@@ -55,23 +54,13 @@ from src.getmoredone.screens.pick_record_dialog import (  # noqa: E402
 )
 from src.getmoredone.screens.weekly_items import WeeklyItemsScreen  # noqa: E402
 from tests.weekly_tactic_fixtures import make_vps, seed_ape  # noqa: E402
+from conftest import withdrawn_root
 
 YEAR = 2026
 WEEK_START = "2026-02-23"
 
 
 # --------------------------------------------------------------------- helpers
-
-def _root():
-    """A withdrawn Tk root, or a skip when there is no display."""
-    try:
-        root = ctk.CTk()
-    except Exception as exc:  # Headless without a display.
-        pytest.skip(f"Tk display unavailable: {exc}")
-    root.geometry("1400x900+0+0")
-    root.withdraw()
-    return root
-
 
 def _bind(stub, cls, *names):
     """Put real methods on a stub, bound to it.
@@ -496,7 +485,7 @@ def test_vtfm38_the_new_record_appears_at_once():
         right.append(_annual_row(2, vision_element_id, "Pod"))
         return {"annual_plan_element_id": "ape-2"}
 
-    root = _root()
+    root = withdrawn_root()
     try:
         vps = _fake_annual_vps(left, right)
         vps.create_annual_records_from_vision_element = create
