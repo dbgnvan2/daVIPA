@@ -2444,6 +2444,14 @@ Plan: `docs/unused-docs/implementation_plan_2026-11-13_backlog_small_fixes.md`.
 | **BSF-M6** | a second LUNCH block on one date is refused (LMM-A2) | done | `db_manager.py::add_block_at` | `tests/test_time_block_crud.py::test_bsfm6_a_second_lunch_block_on_one_date_is_refused` |
 | **BSF-M7** | apt retries inside a step time limit (CI-A1) | done | `.github/workflows/tests.yml` | `tests/test_ci_contract.py::test_bsfm7_every_apt_call_retries_inside_a_time_limit` |
 
+## Break and Buffer buttons (PBB, 2026-11-13)
+
+The plan day-controls note "`+ Break` and `+ Buffer` place at the first box that is not full", settled. No plan file; this table is the record.
+
+| ID | Criterion | Status | Where | Proof |
+|---|---|---|---|---|
+| **PBB-M1** | the buttons place in the first empty box; with none empty, in the first box with room | done | `screens/plan.py::add_padding_block` | `tests/test_plan_screen.py::test_pbbm1_the_break_button_takes_an_empty_half_hour`, `::test_pbbm1_a_day_with_no_empty_box_still_takes_the_break` |
+
 ## List pane rebuild (LPR, 2026-11-13)
 
 Backlog item "Six other screens rebuild a scrolling pane by taking it out of the grid". No plan file; this table is the record.

@@ -7,6 +7,13 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — + Break and + Buffer find an empty half hour (2026-11-13)
+
+- The two Plan toolbar buttons used to put the block in the first box that was
+  not full, which on a planned day meant on top of work. They now take the
+  first empty half hour, and fall back to a box with room only when none is
+  empty. (PBB-M1)
+
 ### Fixed — list screens redraw in place (2026-11-13)
 
 - **Today, Upcoming, All Items, Completed, Hierarchical and VPS Planning

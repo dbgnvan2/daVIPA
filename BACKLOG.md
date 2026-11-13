@@ -255,23 +255,6 @@ each is real, none is what was asked for, and a fix for any of them would be a
 silent sweep of behaviour nobody asked about. `SCV-A1`, `SCV-A2` and `SCV-A3` were
 added 2026-11-11 on the same terms, by the batch that closed `LRR-A1`.
 
-### SCV-A2 — the two segment colour maps hand callers the raw stored value (medium)
-
-`get_segment_color_map` (`vps_manager.py:1394`) and `get_segment_colors_by_id`
-(`:1406`) both return `row["color_hex"] or "#334155"`, i.e. whatever the
-database holds. The by-name one is the load-bearing half — it feeds
-`resolve_segment_color`, and so `_derive_subsegment_color` and `row_fill`.
-
-`SCV-M4` closed the row-fill reader, `SCV-M6.3` closed the accent stripe and
-the screens' own `segment_color_utils._normalize_color`, and `SCV-M5` gated
-every writer of `segment_descriptions.color_hex`, so a malformed value has to
-predate 2026-11-11 to be in there at all and no code path can add one. What is
-left is a survey of the maps' *other* readers, which is the work here — not a
-normalising wrapper on the maps, which would hide which readers needed one.
-
-**Priority:** Medium
-**Effort:** Low
-
 ### PLC-A2 — Hierarchical and Completed ignore their own segment colour for the fill (low)
 
 Both resolve `segment_color`, apply it as an accent, and then never consider it
@@ -367,6 +350,11 @@ different batch, with its own tests. This is the P5 shape: one rule, six
 places, easy to get subtly wrong in one and not another.
 **Priority:** Medium
 **Effort:** Medium
+**Also (2026-11-13, from the SCV-A2 survey):** the weekly tactic picker
+(`item_editor_weekly_tactic_dialog.py`, about :274-284) passes
+`vision_categories.color_hex` to `fg_color` only stripped. Unreachable today,
+because `get_vision_categories()` repairs malformed rows first; moving the
+dialog onto `resolve_chip_colors` closes it.
 
 ## Reported from the running screen — Plan / Day Plan (2026-11-07)
 
@@ -402,14 +390,6 @@ step 4 settles it.
 Found while building PD-M2 and PD-M3, not introduced by either, and not fixed
 in the batch that found them — rule 10.
 
-- **`+ Break` and `+ Buffer` place at the first box that is not full.** Both
-  toolbar buttons use `first_free_slot`, so a 30m break lands in the earliest
-  box with fewer than four tasks in it — on a planned day that is on top of
-  work, not in an empty half hour. PD-M3's AutoLoad uses `first_clear_slot`
-  instead. Low, and a decision rather than a defect: a break deliberately
-  dropped beside a task is a thing people do, and it is not obvious the button
-  should refuse to do what a drag can. Worth settling before the two paths
-  drift further apart.
 - **A Settings screen left open holds a stale copy of the settings.** The
   Settings screen builds its fields from its own `AppSettings.load()` at the
   time it is built. Dragging the Plan divider writes

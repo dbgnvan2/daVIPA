@@ -1327,9 +1327,10 @@ class PlanScreen(ctk.CTkFrame):
     def add_padding_block(self, block_type: str, slot_index: Optional[int] = None):
         """TB-M10/TG-M9 — put a buffer or a break on a box.
 
-        With no ``slot_index`` it goes on the first box that will hold it,
-        which is what the toolbar buttons want: they are a click, not a drop,
-        so there is no box under a pointer to read.
+        With no ``slot_index`` it goes on the first empty box, or, when none
+        is empty, the first box that will hold it (PBB-M1). That is what the
+        toolbar buttons want: they are a click, not a drop, so there is no box
+        under a pointer to read.
         """
         if not self._require_block_day():
             return

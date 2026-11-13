@@ -373,8 +373,10 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
 
   The status line it writes to is the full-width line **under the day**, not in
   the header: with seven controls up there the header had no room left for it.
-- **+ Break** / **+ Buffer** — What: Puts a 30-minute padding block in the first
-  box that will hold it. Why: Real days are not back-to-back. These carry no
+- **+ Break** / **+ Buffer** — What: Puts a padding block in the first empty
+  half hour, as AutoLoad does; only when no half hour is empty does it go beside
+  work, in the first box with room (2026-11-13). Drag it if you want it beside a
+  particular task. Why: Real days are not back-to-back. These carry no
   item, so they keep a neutral bar where a task's bar draws nothing — the same
   bar colour as lunch, because the three are one kind of thing: time the day is
   not working. An empty box is not drawn

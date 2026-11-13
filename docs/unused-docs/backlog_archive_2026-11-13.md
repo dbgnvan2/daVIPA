@@ -532,3 +532,33 @@ and an idempotency case).
 repairable condition recorded as a terminal one).
 
 **Closed:** 2026-11-13 -- already done (BC2, 2026-08-19); BACKLOG.md holds open work only.
+
+- **`+ Break` and `+ Buffer` place at the first box that is not full.** Both
+  toolbar buttons use `first_free_slot`, so a 30m break lands in the earliest
+  box with fewer than four tasks in it — on a planned day that is on top of
+  work, not in an empty half hour. PD-M3's AutoLoad uses `first_clear_slot`
+  instead. Low, and a decision rather than a defect: a break deliberately
+  dropped beside a task is a thing people do, and it is not obvious the button
+  should refuse to do what a drag can. Worth settling before the two paths
+  drift further apart.
+
+**Closed:** PBB-M1 (2026-11-13): settled for an empty half hour first, falling back to room beside work; a drag still places where dropped.
+
+### SCV-A2 — the two segment colour maps hand callers the raw stored value (medium)
+
+`get_segment_color_map` (`vps_manager.py:1394`) and `get_segment_colors_by_id`
+(`:1406`) both return `row["color_hex"] or "#334155"`, i.e. whatever the
+database holds. The by-name one is the load-bearing half — it feeds
+`resolve_segment_color`, and so `_derive_subsegment_color` and `row_fill`.
+
+`SCV-M4` closed the row-fill reader, `SCV-M6.3` closed the accent stripe and
+the screens' own `segment_color_utils._normalize_color`, and `SCV-M5` gated
+every writer of `segment_descriptions.color_hex`, so a malformed value has to
+predate 2026-11-11 to be in there at all and no code path can add one. What is
+left is a survey of the maps' *other* readers, which is the work here — not a
+normalising wrapper on the maps, which would hide which readers needed one.
+
+**Priority:** Medium
+**Effort:** Low
+
+**Closed:** 2026-11-13, surveyed. All 15 reader sites normalise the value (normalize_hex_color directly, or via _chip_color, segment_color_utils._normalize_color or _derive_subsegment_color) before any Tk call or hex_to_rgb; no fix needed. Adjacent, not fixed: item_editor_weekly_tactic_dialog.py passes vision_categories.color_hex to fg_color only stripped (about :274-284). Unreachable while get_vision_categories() rewrites malformed rows before returning them; the one-line guard is _normalize_color, as resolve_chip_colors does. Belongs with UPD-A9.
