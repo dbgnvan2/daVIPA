@@ -185,14 +185,18 @@ class APEAssignmentScreen(ctk.CTkFrame):
 
         # UPD-M1 — the ratio, the clamp, the three divider handlers and the
         # body's resize handler all live in screens/split_panel.py.
-        # VTF-M3/M3.7 — the Add New that replaced the header Save, under the
-        # right panel, because the assignment it makes is a right-panel row.
-        right_actions = ctk.CTkFrame(body, fg_color="transparent")
-        right_actions.grid(row=2, column=2, sticky="ew", padx=(2, 8), pady=(0, 8))
-        self.right_actions = right_actions
+        # The add button sits under the **left** panel, because the record it
+        # asks you to choose is a left-panel row: the Annual Plan Element being
+        # assigned. It was under the right panel (VTF-M3/M3.7), named for the
+        # row the assignment creates, which put the control at the opposite end
+        # of the screen from the list it reads.
+        # Tests: tests/test_vsp_tab_contracts.py::test_vtfm71_ape_quarter_assignment_controls
+        left_actions = ctk.CTkFrame(body, fg_color="transparent")
+        left_actions.grid(row=2, column=0, sticky="ew", padx=(8, 2), pady=(0, 8))
+        self.left_actions = left_actions
         ctk.CTkButton(
-            right_actions,
-            text="Assign APE to Quarter",
+            left_actions,
+            text="Add APE Quarter",
             width=200,
             command=self.open_add_dialog,
             **button_style("primary"),

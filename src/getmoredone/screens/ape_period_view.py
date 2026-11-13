@@ -193,14 +193,16 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         # UPD-M1 — the ratio, the clamp and the four handlers live in
         # screens/split_panel.py. UPD-M4 is where this screen stopped keeping
         # its own copy of them, and gained the persistence it never had.
-        # VTF-M3/M3.7 — the Add New that replaced the header Save, under the
-        # right panel, because the assignment it makes is a right-panel row.
-        right_actions = ctk.CTkFrame(body, fg_color="transparent")
-        right_actions.grid(row=2, column=2, sticky="ew", padx=(2, 8), pady=(0, 8))
-        self.right_actions = right_actions
+        # Under the **left** panel, with the Annual Plan Elements the dialog
+        # asks you to choose from; the quarter screen's button moved for the
+        # same reason and carries the same comment.
+        # Tests: tests/test_vsp_tab_contracts.py::test_vtfm71_ape_month_assignment_controls
+        left_actions = ctk.CTkFrame(body, fg_color="transparent")
+        left_actions.grid(row=2, column=0, sticky="ew", padx=(8, 2), pady=(0, 8))
+        self.left_actions = left_actions
         ctk.CTkButton(
-            right_actions,
-            text="Assign APE to Month",
+            left_actions,
+            text="Add APE Month",
             width=190,
             command=self.open_add_dialog,
             **button_style("primary"),
