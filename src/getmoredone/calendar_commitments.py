@@ -230,6 +230,9 @@ class FetchResult:
     unparseable: List[str] = field(default_factory=list)
     #: The ids of those events, so their cached rows are kept (D6).
     unparseable_ids: List[str] = field(default_factory=list)
+    #: Every event this read decided on, held or left out, over the whole
+    #: range: a kept row for one of these is out of date (D6).
+    settled_ids: List[str] = field(default_factory=list)
     #: D6 -- a calendar that refused for good (gone, or forbidden), and why.
     skipped_calendars: Dict[str, str] = field(default_factory=dict)
 
@@ -263,7 +266,7 @@ def fetch_commitments(
     ``CommitmentFetchError`` is raised rather than an empty answer returned.
 
     The same event on two calendars (an invitation on a shared calendar) is
-    one commitment per date, editable if any copy is (M2.8).
+    one commitment per date, as the calendar listed first has it (M2.8).
     """
     dates = dates_between(start_date, end_date)
     time_min = _local_midnight(_parse_day(dates[0]), tz)
@@ -314,6 +317,8 @@ def fetch_commitments(
     if not read_any:
         named = "; ".join(f"{cid}: {why}" for cid, why in result.skipped_calendars.items())
         raise CommitmentFetchError(f"no calendar could be read ({named or 'none configured'})")
+    unread = set(result.unparseable_ids)
+    result.settled_ids = sorted(e for e in decided if e not in unread)
     result.commitments = sorted(
         by_key.values(), key=lambda c: (c.commitment_date, c.start_minutes, c.end_minutes)
     )
@@ -382,6 +387,7 @@ def refresh_commitments(
             dates, result.commitments, stamp,
             keep_calendars=result.skipped_calendars,
             keep_event_ids=result.unparseable_ids,
+            settled_event_ids=result.settled_ids,
             warning=partial_warning(result),
         )
         return outcome

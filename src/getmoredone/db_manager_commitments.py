@@ -81,6 +81,7 @@ class DBManagerCommitmentsMixin:
         *,
         keep_calendars: Iterable[str] = (),
         keep_event_ids: Iterable[str] = (),
+        settled_event_ids: Iterable[str] = (),
         warning: Optional[str] = None,
     ) -> int:
         """Replace exactly these dates' commitments with these, in one transaction.
@@ -100,11 +101,15 @@ class DBManagerCommitmentsMixin:
         D6 -- a read that skipped a calendar, or an event it could not parse,
         did not learn those meetings are gone. Their cached rows
         (``keep_calendars``, ``keep_event_ids``) stay, unless the read found
-        the same event elsewhere, and ``warning`` is recorded so the screen
+        the same event on this date or settled it anywhere in the range
+        (``settled_event_ids``), and ``warning`` is recorded so the screen
         does not call the date fully read.
         """
         keep_calendars = {str(c) for c in keep_calendars}
         keep_event_ids = {str(e) for e in keep_event_ids}
+        # Read this time, anywhere in the range: held on another date, or
+        # left out (declined, say). A kept copy of one of those is stale.
+        settled = {str(e) for e in settled_event_ids}
         dates = sorted({str(d) for d in dates})
         commitments = list(commitments)
         covered = set(dates)
@@ -138,6 +143,7 @@ class DBManagerCommitmentsMixin:
                     )
                     if (row["calendar_id"] in keep_calendars or row["event_id"] in keep_event_ids)
                     and row["event_id"] not in fresh_ids
+                    and row["event_id"] not in settled
                 ]
                 conn.execute(
                     "DELETE FROM calendar_commitments WHERE commitment_date = ?",
