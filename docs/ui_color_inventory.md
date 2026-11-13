@@ -31,7 +31,7 @@ rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkg
 - Named colors (match count): **649**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
-- Widget explicit overrides (line count): **533**
+- Widget explicit overrides (line count): **536**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -46,17 +46,17 @@ and theme_files line counts.
 | `theme_api` | 2 |
 | `theme_files` | 1292 |
 | `tuples` | 2 |
-| `widget` | 533 |
+| `widget` | 536 |
 
 Widget override property breakdown:
 
 | Property | Count |
 |---|---:|
 | `border_color` | 15 |
-| `corner_radius` | 60 |
-| `fg_color` | 250 |
+| `corner_radius` | 61 |
+| `fg_color` | 251 |
 | `hover_color` | 9 |
-| `text_color` | 215 |
+| `text_color` | 216 |
 
 AppSettings persisted color/theme fields:
 

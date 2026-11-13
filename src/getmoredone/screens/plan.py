@@ -1152,6 +1152,7 @@ class PlanScreen(ctk.CTkFrame):
             blocks = self.db_manager.get_time_blocks(self.selected_date)
             self._grid = build_day_grid(blocks, self.bounds)
             items_by_id = self._items_by_id(blocks)
+            segment_color_for = self._segment_color_resolver()
 
             self.update_day_summary(blocks)
 
@@ -1217,6 +1218,8 @@ class PlanScreen(ctk.CTkFrame):
                     row,
                     chip_height=self.box_height(),
                     title_width=self.box_title_width(),
+                    segment_color_for=segment_color_for,
+                    settings=self.settings,
                 )
                 self._slot_frames.append((rendered.frame, entry.slot.index))
                 for block, widget in rendered.block_widgets:
@@ -1257,6 +1260,8 @@ class PlanScreen(ctk.CTkFrame):
                     0,
                     chip_height=self.box_height(),
                     title_width=self.box_title_width(),
+                    segment_color_for=segment_color_for,
+                    settings=self.settings,
                 ):
                     self.bind_block_handlers(widget, block)
                     self._block_widgets.append((widget, block.id))

@@ -286,6 +286,16 @@ def _mark_color(mark: str, row_fill_hex: Optional[str], row_text: str) -> str:
     return row_text
 
 
+def _bar_colors_on(fill_hex: Optional[str], row_text: str) -> Optional[Dict[str, str]]:
+    """Depth-bar colours for a Category fill, or ``None`` for the theme pair."""
+    if not fill_hex:
+        return None
+    return {
+        "filled": row_text,
+        "empty": interpolate_hex_color(fill_hex, row_text, 0.35),
+    }
+
+
 def build_item_row(
     parent,
     item: ActionItem,
@@ -426,18 +436,7 @@ def build_item_row(
         font=ctk.CTkFont(size=12, weight="bold"),
     ).grid(row=0, column=CHIP_MARKER_COLUMN, sticky="w", pady=(5, 0))
 
-    bars = DepthBarStack(
-        frame,
-        item.depth,
-        colors=(
-            {
-                "filled": row_text,
-                "empty": interpolate_hex_color(fill.fill, row_text, 0.35),
-            }
-            if fill.fill
-            else None
-        ),
-    )
+    bars = DepthBarStack(frame, item.depth, colors=_bar_colors_on(fill.fill, row_text))
     # The title's own vertical alignment, not the top of the row and not the
     # bottom of it: "justify vertically like TEXT on the line". The stack is
     # shorter than a line of text, so the sticky is the whole of where it
@@ -594,6 +593,8 @@ def build_slot_row(
     *,
     chip_height: int = SLOT_CHIP_HEIGHT_PX,
     title_width: int = SLOT_TITLE_WIDTH_PX,
+    segment_color_for: Any = None,
+    settings: Any = None,
 ) -> SlotRow:
     """One half-hour box of the day.
 
@@ -704,6 +705,8 @@ def build_slot_row(
             last_box=last_box,
             chip_height=chip_height,
             title_width=title_width,
+            segment_color_for=segment_color_for,
+            settings=settings,
         )
         inner += 1
     for block in grid_slot.starting:
@@ -716,6 +719,8 @@ def build_slot_row(
             box_fill=fill,
             chip_height=chip_height,
             title_width=title_width,
+            segment_color_for=segment_color_for,
+            settings=settings,
         )
         rendered.block_widgets.append((block, chip))
         inner += 1
@@ -844,6 +849,8 @@ def _build_block_chip(
     last_box: bool = True,
     chip_height: int = SLOT_CHIP_HEIGHT_PX,
     title_width: int = SLOT_TITLE_WIDTH_PX,
+    segment_color_for: Any = None,
+    settings: Any = None,
 ) -> ctk.CTkFrame:
     """One task inside a box.
 
@@ -877,6 +884,18 @@ def _build_block_chip(
         else palette["surface_subtle"]
     )
     body_text = palette["body_text"]
+    # PSC-M3 -- a task chip takes its item's Category colour, as the item row
+    # does; text and bars follow the fill. Padding and lunch never have one.
+    segment = (
+        segment_color_for(item)
+        if segment_color_for is not None and item is not None
+        and kind == BlockType.ITEM
+        else None
+    )
+    category = row_fill(palette, use_completed_tint=False, segment_color=segment)
+    if category.fill:
+        fill = category.fill
+        body_text = category.text_color or body_text
 
     chip = ctk.CTkFrame(
         parent,
@@ -936,9 +955,23 @@ def _build_block_chip(
         return chip
 
     if kind == BlockType.ITEM:
-        DepthBarStack(chip, item.depth if item else None).grid(
-            row=0, column=CHIP_BARS_COLUMN, padx=(4, 6)
-        )
+        DepthBarStack(
+            chip,
+            item.depth if item else None,
+            colors=_bar_colors_on(category.fill, body_text),
+        ).grid(row=0, column=CHIP_BARS_COLUMN, padx=(4, 6))
+
+    if kind == BlockType.ITEM and item is not None:
+        # PSC-M4 -- the item row's priority badge, in the same column.
+        cell = level_cell_fill(settings, item)
+        ctk.CTkLabel(
+            chip,
+            text=f"P:{item.priority_score}",
+            width=SLOT_BADGE_WIDTH_PX,
+            fg_color=cell.fill or "transparent",
+            text_color=cell.text_color or body_text,
+            corner_radius=6 if cell.fill else 0,
+        ).grid(row=0, column=CHIP_BADGE_COLUMN, sticky="e")
 
     ctk.CTkLabel(
         chip,
@@ -1046,6 +1079,8 @@ def build_outside_group(
     *,
     chip_height: int = SLOT_CHIP_HEIGHT_PX,
     title_width: int = SLOT_TITLE_WIDTH_PX,
+    segment_color_for: Any = None,
+    settings: Any = None,
 ) -> List[Tuple[TimeBlock, ctk.CTkFrame]]:
     """Blocks no box can hold, drawn beneath the item list rather than dropped.
 
@@ -1099,6 +1134,8 @@ def build_outside_group(
             box_fill=palette["surface_subtle"],
             chip_height=chip_height,
             title_width=title_width,
+            segment_color_for=segment_color_for,
+            settings=settings,
         )
         widgets.append((block, holder))
     return widgets
