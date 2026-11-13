@@ -960,16 +960,24 @@ def test_awam12_screen_header_matches_the_tab(tmp_path):
 
 
 def test_awam13_no_ape_weekly_label_remains():
-    """AWA-M1.3 — the old name is gone from both files, counted exactly.
+    """AWA-M1.3 — the old name is gone from every source file, counted exactly.
 
     Parsed from the AST's string constants rather than grepped, and asserted
-    as a count of zero rather than a floor. vision_planning.py keeps its own
-    "APE Weekly" placeholder caption on a screen no sidebar entry reaches;
-    that is AWA-A2, recorded and deliberately out of scope.
+    as a count of zero rather than a floor. This read two files until
+    2026-11-12: ``screens/vision_planning.py`` still captioned a placeholder
+    tab "APE Weekly" on a screen no sidebar entry reached (AWA-A2), so the
+    guard was scoped around it. That module is deleted (VTF-A1), so the scope
+    is all of ``src/`` — a rename that has to dodge a file is a rename that
+    can be undone inside it.
     """
+    paths = sorted(SRC.rglob("*.py"))
+    # Not a count: a wrong SRC would walk nothing and pass with no offenders.
+    # The two files this guard used to read must be inside the walk.
+    for anchor in ("vision_planning_hub.py", "weekly_items.py"):
+        assert SRC / "screens" / anchor in paths, (
+            f"the walk under {SRC} missed screens/{anchor}")
     offenders = []
-    for path in (SRC / "screens" / "vision_planning_hub.py",
-                 SRC / "screens" / "weekly_items.py"):
+    for path in paths:
         for node in ast.walk(ast.parse(path.read_text())):
             if isinstance(node, ast.Constant) and isinstance(node.value, str):
                 if "APE Weekly" in node.value:
