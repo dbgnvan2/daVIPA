@@ -62,42 +62,31 @@ class VisionSegmentsScreen(ctk.CTkFrame):
         self.container.grid_columnconfigure(0, weight=1)
         self.container.grid_rowconfigure(2, weight=1)
 
-        self._create_action_row()
         self._create_view_switcher()
         self._create_lists()
         self._create_bottom_actions()
         self.refresh_all()
         self._set_active_view(self.active_view)
 
-    def _create_action_row(self):
-        """The top row, which is Refresh alone now.
-
-        VTF-M6.1 — the New button moved to the bottom of the list it adds to,
-        so it sits where the other five VSP tabs put theirs. Refresh stays
-        here (VTF-M6.2): it acts on the whole panel, not on a record.
-        """
-        top = ctk.CTkFrame(self.container)
-        top.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 6))
-        top.grid_columnconfigure(1, weight=1)
-        self.refresh_btn = ctk.CTkButton(
-            top,
-            text="Refresh",
-            width=self.ACTION_BUTTON_WIDTH,
-            height=self.TAB_BUTTON_HEIGHT,
-            command=self._refresh_active_view,
-            **button_style("secondary"),
-        )
-        self.refresh_btn.grid(row=0, column=0, padx=(4, 8), pady=6, sticky="w")
-
     def _create_bottom_actions(self):
-        """The New button, under the list.
+        """The New button and Refresh, under the list.
 
-        Purpose: VTF-M6.1 — one button whose label follows the active view, as
-                 it always has; what changed is where it sits. The container's
-                 row 2 is the only weighted one, so this row stays at the
-                 bottom whatever the list does.
+        Purpose: VTF-M6.1 — one New button whose label follows the active
+                 view, as it always has; what changed is where it sits. The
+                 container's row 2 is the only weighted one, so this row stays
+                 at the bottom whatever the list does.
         Spec:    docs/unused-docs/implementation_plan_2026-11-11_vsp_tab_filters.md
         Tests:   tests/test_vsp_tab_contracts.py::test_vtfm61_the_new_buttons_sit_at_the_bottom
+                 tests/test_vsp_tab_contracts.py::test_refresh_sits_beside_the_new_button
+
+        Refresh joined it on 2026-11-12, by request, and the top row it used
+        to sit in alone is gone with it — VTF-M6.2 had kept it up there on the
+        grounds that it acts on the panel rather than on a record. The two
+        controls a user presses on this tab are now in one place, and the
+        switcher moved up into the space the row left. ``container`` row 0 is
+        deliberately left empty rather than renumbered: the switcher's row 1
+        and the list's weighted row 2 are read by the tab's contract tests,
+        and an unoccupied grid row is zero pixels high.
         """
         self.bottom_actions = ctk.CTkFrame(self.container, fg_color="transparent")
         self.bottom_actions.grid(row=3, column=0, sticky="ew", padx=8, pady=(0, 8))
@@ -110,10 +99,19 @@ class VisionSegmentsScreen(ctk.CTkFrame):
             **button_style("primary"),
         )
         self.primary_action_btn.grid(row=0, column=0, padx=(4, 8), pady=6, sticky="w")
+        self.refresh_btn = ctk.CTkButton(
+            self.bottom_actions,
+            text="Refresh",
+            width=self.ACTION_BUTTON_WIDTH,
+            height=self.TAB_BUTTON_HEIGHT,
+            command=self._refresh_active_view,
+            **button_style("secondary"),
+        )
+        self.refresh_btn.grid(row=0, column=1, padx=(0, 8), pady=6, sticky="w")
 
     def _create_view_switcher(self):
         switcher = ctk.CTkFrame(self.container, fg_color="transparent")
-        switcher.grid(row=1, column=0, sticky="w", padx=8, pady=(0, 8))
+        switcher.grid(row=1, column=0, sticky="w", padx=8, pady=(8, 8))
         self.view_buttons = {}
         for idx, (key, label) in enumerate((
             ("segments", "Segments"),
