@@ -19,8 +19,9 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   follows its button — "Add APE Quarter Q4", where it used to read "Assign APE
   to Quarter Q4" under a button that no longer said that.
 - **The other two tabs keep their buttons under the right panel.** Annual Plan
-  Elements has to: its status line is parented to that same row, so the button
-  cannot move without taking the outcome message with it. APE Week Assignment
+  Elements reports the outcome of an add *beside* its button, on a status line
+  parented to that same row, so moving the button there means moving the
+  status line with it or giving up that contract. APE Week Assignment
   has no such tie and the rule above applies to it just as well, so it is
   filed as an adjacent issue (`BACKLOG.md`, APB-A1) rather than moved inside a
   batch about the two APE assignment tabs.

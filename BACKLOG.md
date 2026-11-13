@@ -275,7 +275,8 @@ nothing else.
 Annual Plan Elements is a different case and is **not** part of this item: its
 `status_label` is parented to `right_actions`
 (`annual_vision_segments.py:196`) and pinned there by
-`tests/test_vsp_tab_contracts.py:147`, so moving that button moves the status
+`tests/test_vsp_tab_contracts.py::test_vtfm71_annual_plan_elements_controls`,
+so moving that button moves the status
 line with it, or breaks the contract that says the outcome is reported beside
 the button.
 
