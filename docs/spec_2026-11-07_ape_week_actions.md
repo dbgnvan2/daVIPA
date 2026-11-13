@@ -53,6 +53,9 @@ mapping = {                                     # line 88
 `app.show_vision_planning`, which no sidebar entry calls. It is not what the
 user sees. See §7.
 
+*Updated 2026-11-12:* that screen and its entry point were deleted (VTF-A1);
+the paragraph above records what was true when this spec was written.
+
 ### 1.2 The screen behind the tab
 
 `screens/weekly_items.py` (611 lines, `WeeklyItemsScreen`) is a two-pane
@@ -674,6 +677,10 @@ They are **not** fixed by this spec, and none is a prerequisite.
   grep for "APE Weekly" still hits. **Recommendation:** leave the label, and
   decide separately whether `vision_planning.py` should exist at all — it is a
   whole screen of placeholders behind an unreachable entry point.
+  **Moot 2026-11-12.** `vision_planning.py` and `app.show_vision_planning` were
+  deleted (VTF-A1), so the label went with them;
+  `tests/test_ape_week_actions.py::test_awam13_no_ape_weekly_label_remains`
+  now walks all of `src/`.
 - **AWA-A4 — the panel inherits Today's drag-to-top pin, and the pin is
   shared.** `create_item_row` binds the grip to `_start_pin_drag` /
   `_finish_pin_drag` (`today.py:541-542`), which write `action_items`.`today_pin_rank`
