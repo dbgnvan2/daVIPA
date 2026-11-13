@@ -96,7 +96,7 @@ class LineageFilters:
     def build_combos(self, parent, start_column: int, on_change: Callable[[], None],
                      width: int = 150, row: int = 1,
                      pady: Tuple[int, int] = (0, 8)) -> int:
-        """Grid `Segment: [ ] Sub: [ ] Cat: [ ]` and return the next free column.
+        """Grid `Segment: [ ] SubSegment: [ ] Category: [ ]` and return the next free column.
 
         Six widgets go in, a label and a combo per filter, starting at
         `start_column`. The caller keeps the returned column so whatever it
@@ -105,8 +105,8 @@ class LineageFilters:
         column = start_column
         pairs = (
             ("Segment:", self.segment_var, "segment_combo", (10, 4)),
-            ("Sub:", self.subsegment_var, "subsegment_combo", (8, 4)),
-            ("Cat:", self.category_var, "category_combo", (8, 4)),
+            ("SubSegment:", self.subsegment_var, "subsegment_combo", (8, 4)),
+            ("Category:", self.category_var, "category_combo", (8, 4)),
         )
         for text, variable, attr, label_padx in pairs:
             ctk.CTkLabel(parent, text=text).grid(

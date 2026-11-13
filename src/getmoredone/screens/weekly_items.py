@@ -132,7 +132,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         )
         self.segment_filter_combo.grid(row=0, column=1, padx=4, sticky="w")
 
-        ctk.CTkLabel(self.filter_row, text="Sub:").grid(row=0, column=2, padx=(8, 4), sticky="e")
+        ctk.CTkLabel(self.filter_row, text="SubSegment:").grid(row=0, column=2, padx=(8, 4), sticky="e")
         self.subsegment_filter_combo = ctk.CTkComboBox(
             self.filter_row,
             width=150,
@@ -143,7 +143,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         )
         self.subsegment_filter_combo.grid(row=0, column=3, padx=4, sticky="w")
 
-        ctk.CTkLabel(self.filter_row, text="Cat:").grid(row=0, column=4, padx=(8, 4), sticky="e")
+        ctk.CTkLabel(self.filter_row, text="Category:").grid(row=0, column=4, padx=(8, 4), sticky="e")
         self.category_filter_combo = ctk.CTkComboBox(
             self.filter_row,
             width=150,
