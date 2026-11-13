@@ -1827,10 +1827,12 @@ def test_drpm2_a_refused_dialog_on_a_project_drop_writes_nothing_and_ends_the_dr
         monkeypatch.setattr(ds, "confirm_exclusive_relink", refused)
 
         hidden = []
+        statuses = []
         stub = SimpleNamespace(
             db_manager=manager,
             drag_item=daily,
             drag_items=[tactic, daily],
+            set_status=lambda text, kind="muted": statuses.append((text, kind)),
             drag_label=SimpleNamespace(place_forget=lambda: hidden.append(True)),
             get_drop_target=lambda: (None, second.id),
             clear_hover_target=lambda: None,
@@ -1846,5 +1848,7 @@ def test_drpm2_a_refused_dialog_on_a_project_drop_writes_nothing_and_ends_the_dr
         assert manager.get_project_board_ids_for_item(tactic.id) == []
         assert hidden == [True]
         assert (stub.drag_item, stub.drag_items) == (None, [])
+        assert statuses[-1] == (
+            "Not moved — the confirmation could not be shown", "warning")
     finally:
         vps.close()

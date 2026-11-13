@@ -116,6 +116,7 @@ def test_wt_m6b1_drag_schedule_refiles(tmp_path):
             clear_hover_target=lambda: None,
             refresh=lambda: None,
             drag_label=None,
+            set_status=lambda *a, **k: None,
         )
         # DRP-M1 split the drop into a helper; bind the real one onto the stub.
         stub._apply_drop = lambda: DragScheduleScreen._apply_drop(stub)
@@ -126,6 +127,49 @@ def test_wt_m6b1_drag_schedule_refiles(tmp_path):
             DragScheduleScreen.on_drag_release(stub, SimpleNamespace())
 
         _assert_refiled(manager, item.id, "2026-03-02")
+    finally:
+        vps.close()
+
+
+def test_drpm3_a_refused_notice_on_a_date_drop_still_refreshes_and_says_so(tmp_path):
+    """DRP-M3 — the move is written before the notice; a notice that cannot be
+    shown must not leave the list showing the old dates.
+
+    Spec: docs/spec_coverage.md#plan-and-scheduler-drops-lm3-2026-11-13
+    """
+    import tkinter as tk
+    from src.getmoredone.screens.drag_schedule import DragScheduleScreen
+
+    vps = make_vps(tmp_path)
+    try:
+        manager = vps.db_manager
+        ape_id, tactic, item = _filed(vps)
+        dragged = manager.get_action_item(item.id)
+        refreshed, statuses = [], []
+
+        def refused(*args, **kwargs):
+            raise tk.TclError("")
+
+        stub = SimpleNamespace(
+            db_manager=manager,
+            drag_item=dragged,
+            drag_items=[dragged],
+            get_drop_target=lambda: ("2026-03-04", None),
+            clear_hover_target=lambda: None,
+            refresh=lambda: refreshed.append(True),
+            drag_label=None,
+            set_status=lambda text, kind="muted": statuses.append((text, kind)),
+        )
+        stub._apply_drop = lambda: DragScheduleScreen._apply_drop(stub)
+        with patch("src.getmoredone.screens.drag_schedule.notify_weekly_tactic_changes",
+                   refused):
+            DragScheduleScreen.on_drag_release(stub, SimpleNamespace())
+
+        _assert_refiled(manager, item.id, "2026-03-02")
+        assert refreshed == [True]
+        assert statuses[-1] == (
+            "Moved — a Weekly Tactic notice could not be shown; see the log",
+            "warning")
     finally:
         vps.close()
 
