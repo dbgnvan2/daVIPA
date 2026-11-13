@@ -41,6 +41,11 @@ read half*. Nothing was seen on screen, and nothing has read a real calendar.
   under a meeting; a Refresh can be refused in the instant after a read ends;
   `local_zone()` (tzlocal, D5) has no caller, so the OS zone is used;
   `focusTime`/`outOfOffice` events are not filtered and hold boxes.
+- Cold re-sweep of the fixes: a kept row from a skipped calendar survived
+  when the read found that meeting on another date, or declined; now dropped
+  (`settled_event_ids`), with a test. Dropped as low: a zero-length meeting is
+  labelled "(outside the drawn day)"; a dismissal can land on a row a
+  concurrent read just made editable.
 
 ## Risks / Known gaps
 - Times are converted to this machine's zone once, when read (D5). A laptop
