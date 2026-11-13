@@ -438,14 +438,21 @@ class APEAssignmentScreen(ctk.CTkFrame):
             [ape_id], claimed, self._ids_in_quarter(), quarter)
 
     def open_add_dialog(self):
-        """VTF-M3.2 — pick an APE and assign it to the selected quarter."""
+        """VTF-M3.2 — pick an APE and assign it to the selected quarter.
+
+        The title is the button's own label plus the period. It read "Assign
+        APE to Quarter Q3" after the button became "Add APE Quarter", which is
+        the one place on this screen the two disagreed; the other VSP tabs
+        title the dialog with their button's label.
+        Tests: tests/test_vsp_tab_contracts.py::test_the_add_dialog_is_titled_for_its_button
+        """
         parsed = self._parse_period()
         if not parsed:
             return None
         _year, quarter = parsed
         return open_pick_record_dialog(
             self,
-            title=f"Assign APE to Quarter Q{quarter}",
+            title=f"Add APE Quarter Q{quarter}",
             prompt=f"Which Annual Plan Element should Q{quarter} carry?",
             options=self._add_options(),
             initial=self._add_default(),

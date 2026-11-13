@@ -491,14 +491,19 @@ class APEPeriodViewScreen(ctk.CTkFrame):
             [ape_id], claimed, self._ids_in_month(), month)
 
     def open_add_dialog(self):
-        """VTF-M3.3 — pick an APE and assign it to the selected month."""
+        """VTF-M3.3 — pick an APE and assign it to the selected month.
+
+        The title is the button's label plus the month, for the reason the
+        quarter screen's ``open_add_dialog`` gives.
+        Tests: tests/test_vsp_tab_contracts.py::test_the_add_dialog_is_titled_for_its_button
+        """
         parsed = self._parse_period()
         if not parsed:
             return None
         _year, _quarter, month = parsed
         return open_pick_record_dialog(
             self,
-            title=f"Assign APE to Month M{month}",
+            title=f"Add APE Month M{month}",
             prompt=f"Which Annual Plan Element should M{month} carry?",
             options=self._add_options(),
             initial=self._add_default(),
