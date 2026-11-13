@@ -177,113 +177,105 @@ class UpcomingScreen(ctk.CTkFrame):
         # Settings > Priority Colours shows the next time this screen is
         # opened rather than only after a relaunch (PLC-M4).
         self.settings = AppSettings.load()
-        # Temporarily remove scroll_frame from grid to prevent flickering during rebuild
-        grid_info = self.scroll_frame.grid_info()
-        self.scroll_frame.grid_remove()
+        # Clear current items
+        for widget in self.scroll_frame.winfo_children():
+            widget.destroy()
 
-        try:
-            # Clear current items
-            for widget in self.scroll_frame.winfo_children():
-                widget.destroy()
+        # Refresh VSP segment color cache
+        self.segment_colors_by_id = self.app.vps_manager.get_segment_colors_by_id()
+        self.segment_colors_by_name = self.app.vps_manager.get_segment_color_map()
+        self._parent_segment_cache = {}
+        self._ape_segment_cache = {}
+        self._ape_lineage_cache = {}
+        self._week_action_segment_cache = {}
+        self._item_lineage_cache = {}
 
-            # Refresh VSP segment color cache
-            self.segment_colors_by_id = self.app.vps_manager.get_segment_colors_by_id()
-            self.segment_colors_by_name = self.app.vps_manager.get_segment_color_map()
-            self._parent_segment_cache = {}
-            self._ape_segment_cache = {}
-            self._ape_lineage_cache = {}
-            self._week_action_segment_cache = {}
-            self._item_lineage_cache = {}
+        # Get filters
+        n_days = int(self.days_var.get())
+        who_filter = None if self.who_var.get() == "All" else self.who_var.get()
+        who_filter_norm = who_filter.strip().lower() if who_filter else None
 
-            # Get filters
-            n_days = int(self.days_var.get())
-            who_filter = None if self.who_var.get() == "All" else self.who_var.get()
-            who_filter_norm = who_filter.strip().lower() if who_filter else None
+        # Keep Who dropdown up-to-date with newest values.
+        current_who = self.who_var.get()
+        who_values = ["All"] + self.db_manager.get_distinct_who_values()
+        self.who_combo.configure(values=who_values)
+        if current_who in who_values:
+            self.who_var.set(current_who)
+        else:
+            self.who_var.set("All")
+            who_filter = None
+            who_filter_norm = None
 
-            # Keep Who dropdown up-to-date with newest values.
-            current_who = self.who_var.get()
-            who_values = ["All"] + self.db_manager.get_distinct_who_values()
-            self.who_combo.configure(values=who_values)
-            if current_who in who_values:
-                self.who_var.set(current_who)
-            else:
-                self.who_var.set("All")
-                who_filter = None
-                who_filter_norm = None
-
-            # Get items (use search if query exists, otherwise get upcoming)
-            if self.search_query:
-                items = self.db_manager.search_items(self.search_query)
-                # Apply filters to search results
-                today = datetime.now().date()
-                end_date = today + timedelta(days=n_days)
-                filtered_items = []
-                for item in items:
-                    # Only include open items
-                    if item.status != "open":
-                        continue
-                    # Check date range
-                    item_date = item.start_date or item.due_date
-                    if item_date and item_date <= end_date.isoformat():
-                        # Apply who filter
-                        item_who_norm = (item.who or "").strip().lower()
-                        if who_filter_norm is None or item_who_norm == who_filter_norm:
-                            filtered_items.append(item)
-                items = filtered_items
-            else:
-                items = self.db_manager.get_upcoming_items(n_days, who_filter)
-
-            if not items:
-                label = ctk.CTkLabel(
-                    self.scroll_frame,
-                    text="No upcoming items",
-                    font=ctk.CTkFont(size=14)
-                )
-                label.grid(row=0, column=0, pady=20)
-                return
-
-            # Group by start date (or due date if no start date)
-            grouped = {}
+        # Get items (use search if query exists, otherwise get upcoming)
+        if self.search_query:
+            items = self.db_manager.search_items(self.search_query)
+            # Apply filters to search results
+            today = datetime.now().date()
+            end_date = today + timedelta(days=n_days)
+            filtered_items = []
             for item in items:
-                date_key = item.start_date or item.due_date or "No start date"
-                if date_key not in grouped:
-                    grouped[date_key] = []
-                grouped[date_key].append(item)
+                # Only include open items
+                if item.status != "open":
+                    continue
+                # Check date range
+                item_date = item.start_date or item.due_date
+                if item_date and item_date <= end_date.isoformat():
+                    # Apply who filter
+                    item_who_norm = (item.who or "").strip().lower()
+                    if who_filter_norm is None or item_who_norm == who_filter_norm:
+                        filtered_items.append(item)
+            items = filtered_items
+        else:
+            items = self.db_manager.get_upcoming_items(n_days, who_filter)
 
-            # Display grouped items
-            row = 0
-            for start_date in sorted(grouped.keys()):
-                items_for_date = grouped[start_date]
+        if not items:
+            label = ctk.CTkLabel(
+                self.scroll_frame,
+                text="No upcoming items",
+                font=ctk.CTkFont(size=14)
+            )
+            label.grid(row=0, column=0, pady=20)
+            return
 
-                # Date header
-                total_planned = sum(
-                    item.planned_minutes or 0 for item in items_for_date)
-                date_label = self.format_date_header(
-                    start_date, len(items_for_date), total_planned)
+        # Group by start date (or due date if no start date)
+        grouped = {}
+        for item in items:
+            date_key = item.start_date or item.due_date or "No start date"
+            if date_key not in grouped:
+                grouped[date_key] = []
+            grouped[date_key].append(item)
 
-                header_frame = ctk.CTkFrame(
-                    self.scroll_frame, fg_color=self.palette["surface_subtle"])
-                header_frame.grid(row=row, column=0,
-                                  sticky="ew", pady=(10, 0), padx=5)
-                header_frame.grid_columnconfigure(0, weight=1)
+        # Display grouped items
+        row = 0
+        for start_date in sorted(grouped.keys()):
+            items_for_date = grouped[start_date]
 
-                ctk.CTkLabel(
-                    header_frame,
-                    text=date_label,
-                    font=ctk.CTkFont(size=14, weight="bold")
-                ).grid(row=0, column=0, sticky="w", padx=10, pady=5)
+            # Date header
+            total_planned = sum(
+                item.planned_minutes or 0 for item in items_for_date)
+            date_label = self.format_date_header(
+                start_date, len(items_for_date), total_planned)
 
+            header_frame = ctk.CTkFrame(
+                self.scroll_frame, fg_color=self.palette["surface_subtle"])
+            header_frame.grid(row=row, column=0,
+                              sticky="ew", pady=(10, 0), padx=5)
+            header_frame.grid_columnconfigure(0, weight=1)
+
+            ctk.CTkLabel(
+                header_frame,
+                text=date_label,
+                font=ctk.CTkFont(size=14, weight="bold")
+            ).grid(row=0, column=0, sticky="w", padx=10, pady=5)
+
+            row += 1
+
+            # Items for this date
+            for item in items_for_date:
+                item_frame = self.create_item_row(item)
+                item_frame.grid(row=row, column=0,
+                                sticky="ew", pady=2, padx=5)
                 row += 1
-
-                # Items for this date
-                for item in items_for_date:
-                    item_frame = self.create_item_row(item)
-                    item_frame.grid(row=row, column=0,
-                                    sticky="ew", pady=2, padx=5)
-                    row += 1
-        finally:
-            # Restore scroll_frame to grid - this ensures it's shown even if an error occurs
-            self.scroll_frame.grid(**grid_info)
 
     def create_item_row(self, item: ActionItem) -> ctk.CTkFrame:
         """Create a row for an action item."""

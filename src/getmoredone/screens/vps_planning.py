@@ -237,50 +237,42 @@ class VPSPlanningScreen(ctk.CTkFrame):
 
     def refresh(self):
         """Refresh the planning tree."""
-        # Temporarily remove scroll_frame from grid to prevent flickering during rebuild
-        grid_info = self.scroll_frame.grid_info()
-        self.scroll_frame.grid_remove()
+        # Clear current tree
+        for widget in self.scroll_frame.winfo_children():
+            widget.destroy()
 
-        try:
-            # Clear current tree
-            for widget in self.scroll_frame.winfo_children():
-                widget.destroy()
+        # Get all segments
+        segments = self.vps_manager.get_all_segments()
+        self.segment_colors_by_id = {}
+        for segment in segments:
+            color = (segment.get('color_hex') or '').strip()
+            if color:
+                self.segment_colors_by_id[segment['id']] = color
 
-            # Get all segments
-            segments = self.vps_manager.get_all_segments()
-            self.segment_colors_by_id = {}
-            for segment in segments:
-                color = (segment.get('color_hex') or '').strip()
-                if color:
-                    self.segment_colors_by_id[segment['id']] = color
+        # Initialize selected_segments if empty
+        if not self.selected_segments:
+            self.selected_segments = {seg['id'] for seg in segments}
 
-            # Initialize selected_segments if empty
-            if not self.selected_segments:
-                self.selected_segments = {seg['id'] for seg in segments}
+        # Filter segments by selection
+        segments = [seg for seg in segments if seg['id']
+                    in self.selected_segments]
 
-            # Filter segments by selection
-            segments = [seg for seg in segments if seg['id']
-                        in self.selected_segments]
+        # Update the filter button text
+        self.update_segment_filter()
 
-            # Update the filter button text
-            self.update_segment_filter()
+        if not segments:
+            label = ctk.CTkLabel(
+                self.scroll_frame,
+                text="No life segments defined. Create your first vision!",
+                font=ctk.CTkFont(size=14)
+            )
+            label.grid(row=0, column=0, pady=20)
+            return
 
-            if not segments:
-                label = ctk.CTkLabel(
-                    self.scroll_frame,
-                    text="No life segments defined. Create your first vision!",
-                    font=ctk.CTkFont(size=14)
-                )
-                label.grid(row=0, column=0, pady=20)
-                return
-
-            # Display each segment tree
-            row = 0
-            for segment in segments:
-                row = self.display_segment_tree(segment, row)
-        finally:
-            # Restore scroll_frame to grid - this ensures it's shown even if an error occurs
-            self.scroll_frame.grid(**grid_info)
+        # Display each segment tree
+        row = 0
+        for segment in segments:
+            row = self.display_segment_tree(segment, row)
 
     def display_segment_tree(self, segment: Dict[str, Any], row: int) -> int:
         """Display a segment and its complete hierarchy."""

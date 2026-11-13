@@ -281,110 +281,102 @@ class TodayScreen(ctk.CTkFrame):
     def load_items(self):
         """Load and display today's items."""
         self.palette = semantic_colors()
-        # Temporarily remove scroll_frame from grid to prevent flickering during rebuild
-        grid_info = self.scroll_frame.grid_info()
-        self.scroll_frame.grid_remove()
+        # Clear existing items
+        for widget in self.scroll_frame.winfo_children():
+            widget.destroy()
+        self.resizer.clear_rows()
 
-        try:
-            # Clear existing items
-            for widget in self.scroll_frame.winfo_children():
-                widget.destroy()
-            self.resizer.clear_rows()
+        # Get today's items (start_date <= today, includes completed)
+        items = self.get_todays_items()
 
-            # Get today's items (start_date <= today, includes completed)
-            items = self.get_todays_items()
+        # Refresh VSP color caches
+        self.segment_colors_by_id = self.app.vps_manager.get_segment_colors_by_id()
+        self.segment_colors_by_name = self.app.vps_manager.get_segment_color_map()
+        self._parent_segment_cache = {}
+        self._ape_segment_cache = {}
+        self._ape_lineage_cache = {}
+        self._week_action_segment_cache = {}
+        self._item_lineage_cache = {}
 
-            # Refresh VSP color caches
-            self.segment_colors_by_id = self.app.vps_manager.get_segment_colors_by_id()
-            self.segment_colors_by_name = self.app.vps_manager.get_segment_color_map()
-            self._parent_segment_cache = {}
-            self._ape_segment_cache = {}
-            self._ape_lineage_cache = {}
-            self._week_action_segment_cache = {}
-            self._item_lineage_cache = {}
+        if not items:
+            label = ctk.CTkLabel(
+                self.scroll_frame,
+                text=self.EMPTY_TEXT,
+                font=ctk.CTkFont(size=14)
+            )
+            label.grid(row=0, column=0, pady=20)
+            return
 
-            if not items:
-                label = ctk.CTkLabel(
-                    self.scroll_frame,
-                    text=self.EMPTY_TEXT,
-                    font=ctk.CTkFont(size=14)
-                )
-                label.grid(row=0, column=0, pady=20)
-                return
+        # Separate open and completed items
+        open_items = [item for item in items if item.status == "open"]
+        completed_items = [
+            item for item in items if item.status == "completed"]
 
-            # Separate open and completed items
-            open_items = [item for item in items if item.status == "open"]
-            completed_items = [
-                item for item in items if item.status == "completed"]
+        # Order open items: pinned rows first (drag-to-top), then the usual
+        # date/priority ordering. Top-3 mode keeps its priority-only ranking
+        # but still floats pinned rows to the front.
+        if self.show_top_3_only and len(open_items) > 3:
+            open_items = sorted(
+                open_items, key=self._today_top3_sort_key)[:3]
+        else:
+            open_items = sorted(
+                open_items, key=self._today_open_sort_key)
 
-            # Order open items: pinned rows first (drag-to-top), then the usual
-            # date/priority ordering. Top-3 mode keeps its priority-only ranking
-            # but still floats pinned rows to the front.
-            if self.show_top_3_only and len(open_items) > 3:
-                open_items = sorted(
-                    open_items, key=self._today_top3_sort_key)[:3]
-            else:
-                open_items = sorted(
-                    open_items, key=self._today_open_sort_key)
+        row = 0
 
-            row = 0
+        # Open items section
+        if open_items:
+            open_header = ctk.CTkFrame(
+                self.scroll_frame, fg_color=self.palette["surface_subtle"])
+            open_header.grid(row=row, column=0,
+                             sticky="ew", pady=(10, 0), padx=5)
+            ctk.CTkLabel(
+                open_header,
+                text=f"To Do ({len(open_items)} items)",
+                font=ctk.CTkFont(size=14, weight="bold")
+            ).pack(padx=10, pady=5, anchor="w")
+            row += 1
 
-            # Open items section
-            if open_items:
-                open_header = ctk.CTkFrame(
-                    self.scroll_frame, fg_color=self.palette["surface_subtle"])
-                open_header.grid(row=row, column=0,
-                                 sticky="ew", pady=(10, 0), padx=5)
-                ctk.CTkLabel(
-                    open_header,
-                    text=f"To Do ({len(open_items)} items)",
-                    font=ctk.CTkFont(size=14, weight="bold")
-                ).pack(padx=10, pady=5, anchor="w")
+            for item in open_items:
+                item_frame = self.create_item_row(item)
+                item_frame.grid(row=row, column=0,
+                                sticky="ew", pady=2, padx=5)
                 row += 1
 
-                for item in open_items:
-                    item_frame = self.create_item_row(item)
-                    item_frame.grid(row=row, column=0,
-                                    sticky="ew", pady=2, padx=5)
-                    row += 1
+        # Completed items section
+        if completed_items:
+            # Calculate total time for completed items
+            total_minutes = sum(
+                item.planned_minutes for item in completed_items if item.planned_minutes)
 
-            # Completed items section
-            if completed_items:
-                # Calculate total time for completed items
-                total_minutes = sum(
-                    item.planned_minutes for item in completed_items if item.planned_minutes)
-
-                # Format time
-                if total_minutes >= 60:
-                    hours = total_minutes // 60
-                    minutes = total_minutes % 60
-                    if minutes > 0:
-                        time_str = f"{hours}h {minutes}m"
-                    else:
-                        time_str = f"{hours}h"
+            # Format time
+            if total_minutes >= 60:
+                hours = total_minutes // 60
+                minutes = total_minutes % 60
+                if minutes > 0:
+                    time_str = f"{hours}h {minutes}m"
                 else:
-                    time_str = f"{total_minutes}m" if total_minutes > 0 else "0m"
+                    time_str = f"{hours}h"
+            else:
+                time_str = f"{total_minutes}m" if total_minutes > 0 else "0m"
 
-                completed_header = ctk.CTkFrame(
-                    self.scroll_frame, fg_color=self.palette["success_strong"])
-                completed_header.grid(
-                    row=row, column=0, sticky="ew", pady=(20, 0), padx=5)
-                ctk.CTkLabel(
-                    completed_header,
-                    text=f"Completed ({len(completed_items)} items | Time: {time_str})",
-                    font=ctk.CTkFont(size=14, weight="bold"),
-                    text_color=self.palette["on_strong"]
-                ).pack(padx=10, pady=5, anchor="w")
+            completed_header = ctk.CTkFrame(
+                self.scroll_frame, fg_color=self.palette["success_strong"])
+            completed_header.grid(
+                row=row, column=0, sticky="ew", pady=(20, 0), padx=5)
+            ctk.CTkLabel(
+                completed_header,
+                text=f"Completed ({len(completed_items)} items | Time: {time_str})",
+                font=ctk.CTkFont(size=14, weight="bold"),
+                text_color=self.palette["on_strong"]
+            ).pack(padx=10, pady=5, anchor="w")
+            row += 1
+
+            for item in completed_items:
+                item_frame = self.create_item_row(item, is_completed=True)
+                item_frame.grid(row=row, column=0,
+                                sticky="ew", pady=2, padx=5)
                 row += 1
-
-                for item in completed_items:
-                    item_frame = self.create_item_row(item, is_completed=True)
-                    item_frame.grid(row=row, column=0,
-                                    sticky="ew", pady=2, padx=5)
-                    row += 1
-        finally:
-            # Restore scroll_frame to grid - this ensures it's shown even if an error occurs
-            self.scroll_frame.grid(**grid_info)
 
     def get_todays_items(self):
         """Get items for today (start_date <= today for open items, completed_at = today for completed items)."""

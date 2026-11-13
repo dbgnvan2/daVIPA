@@ -134,67 +134,59 @@ class HierarchicalScreen(ctk.CTkFrame):
         # Settings > Priority Colours shows the next time this screen is
         # opened rather than only after a relaunch (PLC-M4).
         self.settings = AppSettings.load()
-        # Temporarily remove scroll_frame from grid to prevent flickering during rebuild
-        grid_info = self.scroll_frame.grid_info()
-        self.scroll_frame.grid_remove()
+        # Clear current items
+        for widget in self.scroll_frame.winfo_children():
+            widget.destroy()
 
-        try:
-            # Clear current items
-            for widget in self.scroll_frame.winfo_children():
-                widget.destroy()
+        # Refresh VSP segment color cache
+        self.segment_colors_by_id = self.app.vps_manager.get_segment_colors_by_id()
+        self.segment_colors_by_name = self.app.vps_manager.get_segment_color_map()
+        self._parent_segment_cache = {}
+        self._ape_segment_cache = {}
+        self._ape_lineage_cache = {}
+        self._week_action_segment_cache = {}
+        self._item_lineage_cache = {}
 
-            # Refresh VSP segment color cache
-            self.segment_colors_by_id = self.app.vps_manager.get_segment_colors_by_id()
-            self.segment_colors_by_name = self.app.vps_manager.get_segment_color_map()
-            self._parent_segment_cache = {}
-            self._ape_segment_cache = {}
-            self._ape_lineage_cache = {}
-            self._week_action_segment_cache = {}
-            self._item_lineage_cache = {}
+        # Get status filter
+        status = self.status_var.get()
+        status_filter = None if status == "all" else status
 
-            # Get status filter
-            status = self.status_var.get()
-            status_filter = None if status == "all" else status
+        # Get items (use search if query exists, otherwise get root items)
+        if self.search_query:
+            all_items = self.db_manager.search_items(self.search_query)
+            # Apply status filter to search results
+            if status_filter:
+                all_items = [
+                    item for item in all_items if item.status == status_filter]
+            # For search results, show all matching items (not just roots)
+            root_items = all_items
+        else:
+            # Get root items (items with no parent)
+            root_items = self.db_manager.get_root_items(
+                status_filter=status_filter)
 
-            # Get items (use search if query exists, otherwise get root items)
-            if self.search_query:
-                all_items = self.db_manager.search_items(self.search_query)
-                # Apply status filter to search results
-                if status_filter:
-                    all_items = [
-                        item for item in all_items if item.status == status_filter]
-                # For search results, show all matching items (not just roots)
-                root_items = all_items
-            else:
-                # Get root items (items with no parent)
-                root_items = self.db_manager.get_root_items(
-                    status_filter=status_filter)
+        if not root_items:
+            label = ctk.CTkLabel(
+                self.scroll_frame,
+                text="No root items found",
+                font=ctk.CTkFont(size=14)
+            )
+            label.grid(row=0, column=0, pady=20)
+            return
 
-            if not root_items:
-                label = ctk.CTkLabel(
-                    self.scroll_frame,
-                    text="No root items found",
-                    font=ctk.CTkFont(size=14)
-                )
-                label.grid(row=0, column=0, pady=20)
-                return
-
-            # Display each item
-            row = 0
-            if self.search_query:
-                # For search results, display items in a flat list
-                for item in root_items:
-                    item_frame = self.create_item_row(item, 0)
-                    item_frame.grid(row=row, column=0,
-                                    sticky="ew", pady=2, padx=5)
-                    row += 1
-            else:
-                # Display root items and their children recursively
-                for item in root_items:
-                    row = self.display_item_tree(item, row, 0)
-        finally:
-            # Restore scroll_frame to grid - this ensures it's shown even if an error occurs
-            self.scroll_frame.grid(**grid_info)
+        # Display each item
+        row = 0
+        if self.search_query:
+            # For search results, display items in a flat list
+            for item in root_items:
+                item_frame = self.create_item_row(item, 0)
+                item_frame.grid(row=row, column=0,
+                                sticky="ew", pady=2, padx=5)
+                row += 1
+        else:
+            # Display root items and their children recursively
+            for item in root_items:
+                row = self.display_item_tree(item, row, 0)
 
     def display_item_tree(self, item: ActionItem, row: int, indent_level: int) -> int:
         """

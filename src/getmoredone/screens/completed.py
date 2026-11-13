@@ -142,196 +142,188 @@ class CompletedScreen(ctk.CTkFrame):
         # Settings > Priority Colours shows the next time this screen is
         # opened rather than only after a relaunch (PLC-M4).
         self.settings = AppSettings.load()
-        # Temporarily remove scroll_frame from grid to prevent flickering during rebuild
-        grid_info = self.scroll_frame.grid_info()
-        self.scroll_frame.grid_remove()
+        # Clear current items
+        for widget in self.scroll_frame.winfo_children():
+            widget.destroy()
 
-        try:
-            # Clear current items
-            for widget in self.scroll_frame.winfo_children():
-                widget.destroy()
+        # Refresh VSP segment color cache
+        self.segment_colors_by_id = self.app.vps_manager.get_segment_colors_by_id()
+        self.segment_colors_by_name = self.app.vps_manager.get_segment_color_map()
+        self._parent_segment_cache = {}
+        self._ape_segment_cache = {}
+        self._week_action_segment_cache = {}
 
-            # Refresh VSP segment color cache
-            self.segment_colors_by_id = self.app.vps_manager.get_segment_colors_by_id()
-            self.segment_colors_by_name = self.app.vps_manager.get_segment_color_map()
-            self._parent_segment_cache = {}
-            self._ape_segment_cache = {}
-            self._week_action_segment_cache = {}
+        # Get filters
+        days_back = int(self.days_var.get())
+        who_filter = None if self.who_var.get() == "All" else self.who_var.get()
 
-            # Get filters
-            days_back = int(self.days_var.get())
-            who_filter = None if self.who_var.get() == "All" else self.who_var.get()
+        # Get items
+        items = self.db_manager.get_completed_items(days_back, who_filter)
 
-            # Get items
-            items = self.db_manager.get_completed_items(days_back, who_filter)
+        # Calculate stats
+        count = len(items)
+        total_minutes = sum(
+            item.planned_minutes for item in items if item.planned_minutes)
 
-            # Calculate stats
-            count = len(items)
-            total_minutes = sum(
-                item.planned_minutes for item in items if item.planned_minutes)
-
-            # Format total time
-            if total_minutes >= 60:
-                hours = total_minutes // 60
-                minutes = total_minutes % 60
-                if minutes > 0:
-                    time_str = f"{hours}h {minutes}m"
-                else:
-                    time_str = f"{hours}h"
+        # Format total time
+        if total_minutes >= 60:
+            hours = total_minutes // 60
+            minutes = total_minutes % 60
+            if minutes > 0:
+                time_str = f"{hours}h {minutes}m"
             else:
-                time_str = f"{total_minutes}m" if total_minutes > 0 else "0m"
+                time_str = f"{hours}h"
+        else:
+            time_str = f"{total_minutes}m" if total_minutes > 0 else "0m"
 
-            # Update stats label
-            self.stats_label.configure(
-                text=f"Count: {count} | Time: {time_str}")
+        # Update stats label
+        self.stats_label.configure(
+            text=f"Count: {count} | Time: {time_str}")
 
-            if not items:
-                label = ctk.CTkLabel(
-                    self.scroll_frame,
-                    text="No completed items",
-                    font=ctk.CTkFont(size=14)
-                )
-                label.grid(row=0, column=0, pady=20)
-                return
+        if not items:
+            label = ctk.CTkLabel(
+                self.scroll_frame,
+                text="No completed items",
+                font=ctk.CTkFont(size=14)
+            )
+            label.grid(row=0, column=0, pady=20)
+            return
 
-            # Display items
-            palette = self.palette
-            row_text = palette["row_text"]
-            for idx, item in enumerate(items):
-                segment_color = resolve_segment_color_for_item(
-                    item,
-                    self.segment_colors_by_id,
-                    self.segment_colors_by_name,
-                    self.db_manager,
-                    self._parent_segment_cache,
-                    self._ape_segment_cache,
-                    self._week_action_segment_cache,
-                )
-                # Every row here is completed and none of them has ever
-                # taken the completed tint -- it would be the whole screen --
-                # and the segment colour is an accent only (BACKLOG).
-                fill = row_fill(
-                    palette,
-                    use_completed_tint=False,
-                    segment_color=None,
-                )
-                bg_color = fill.fill
-                row_text = fill.text_color or palette["row_text"]
-                item_frame = ctk.CTkFrame(self.scroll_frame, fg_color=bg_color)
-                apply_segment_accent(item_frame, segment_color)
-                item_frame.grid(row=idx, column=0, sticky="ew", pady=2, padx=5)
-                item_frame.grid_columnconfigure(1, weight=1)
-                parsed = split_action_item_title(item.title)
+        # Display items
+        palette = self.palette
+        row_text = palette["row_text"]
+        for idx, item in enumerate(items):
+            segment_color = resolve_segment_color_for_item(
+                item,
+                self.segment_colors_by_id,
+                self.segment_colors_by_name,
+                self.db_manager,
+                self._parent_segment_cache,
+                self._ape_segment_cache,
+                self._week_action_segment_cache,
+            )
+            # Every row here is completed and none of them has ever
+            # taken the completed tint -- it would be the whole screen --
+            # and the segment colour is an accent only (BACKLOG).
+            fill = row_fill(
+                palette,
+                use_completed_tint=False,
+                segment_color=None,
+            )
+            bg_color = fill.fill
+            row_text = fill.text_color or palette["row_text"]
+            item_frame = ctk.CTkFrame(self.scroll_frame, fg_color=bg_color)
+            apply_segment_accent(item_frame, segment_color)
+            item_frame.grid(row=idx, column=0, sticky="ew", pady=2, padx=5)
+            item_frame.grid_columnconfigure(1, weight=1)
+            parsed = split_action_item_title(item.title)
 
-                # Checkmark
-                ctk.CTkLabel(item_frame, text="✓", width=30, text_color=palette["success_strong"]).grid(
-                    row=0, column=0, padx=5, pady=5)
+            # Checkmark
+            ctk.CTkLabel(item_frame, text="✓", width=30, text_color=palette["success_strong"]).grid(
+                row=0, column=0, padx=5, pady=5)
 
-                title_cell = ctk.CTkFrame(item_frame, fg_color="transparent")
-                title_cell.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
-                title_cell.grid_columnconfigure(1, weight=1)
-                if item.item_type == "week":
-                    ctk.CTkLabel(
-                        title_cell,
-                        text="WT",
-                        width=28,
-                        corner_radius=6,
-                        fg_color=palette["success_strong"],
-                        text_color=palette["on_strong"],
-                        font=ctk.CTkFont(size=11, weight="bold"),
-                    ).grid(row=0, column=0, padx=(0, 6), sticky="w")
-                title_label = ctk.CTkLabel(
-                    title_cell,
-                    text=parsed.title,
-                    font=list_row_font(),
-                    anchor="w",
-                    text_color=row_text,
-                )
-                title_label.grid(row=0, column=1, sticky="ew")
-                title_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_item(item_id))
-
-                # Who
+            title_cell = ctk.CTkFrame(item_frame, fg_color="transparent")
+            title_cell.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+            title_cell.grid_columnconfigure(1, weight=1)
+            if item.item_type == "week":
                 ctk.CTkLabel(
+                    title_cell,
+                    text="WT",
+                    width=28,
+                    corner_radius=6,
+                    fg_color=palette["success_strong"],
+                    text_color=palette["on_strong"],
+                    font=ctk.CTkFont(size=11, weight="bold"),
+                ).grid(row=0, column=0, padx=(0, 6), sticky="w")
+            title_label = ctk.CTkLabel(
+                title_cell,
+                text=parsed.title,
+                font=list_row_font(),
+                anchor="w",
+                text_color=row_text,
+            )
+            title_label.grid(row=0, column=1, sticky="ew")
+            title_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_item(item_id))
+
+            # Who
+            ctk.CTkLabel(
+                item_frame,
+                text=format_column_text(item.who, CONTACT_COL_CHARS),
+                width=110,
+                anchor="w",
+                text_color=row_text,
+                font=list_row_font(),
+            ).grid(row=0, column=2, padx=5, pady=5, sticky="w")
+
+            # Completed date
+            if item.completed_at:
+                completed_label = ctk.CTkLabel(
                     item_frame,
-                    text=format_column_text(item.who, CONTACT_COL_CHARS),
-                    width=110,
-                    anchor="w",
+                    text=f"Completed: {item.completed_at[:10]}",
+                    width=150,
                     text_color=row_text,
-                    font=list_row_font(),
-                ).grid(row=0, column=2, padx=5, pady=5, sticky="w")
-
-                # Completed date
-                if item.completed_at:
-                    completed_label = ctk.CTkLabel(
-                        item_frame,
-                        text=f"Completed: {item.completed_at[:10]}",
-                        width=150,
-                        text_color=row_text,
-                        font=list_row_font()
-                    )
-                    completed_label.grid(row=0, column=3, padx=5, pady=5)
-
-                # Priority score
-                # PCC-M3 -- the Priority cell's background is the priority colour
-                # scheme, and the only place it is drawn. A cell with no colour of
-                # its own keeps the row's text, which the row may have derived
-                # from a segment fill.
-                cell = level_cell_fill(self.settings, item)
-                score_label_box, score_label = build_level_cell(
-                    item_frame, cell, score_text(item.priority_score), SCORE_CELL_WIDTH_PX, row_text, list_row_font(),
+                    font=list_row_font()
                 )
-                score_label_box.grid(row=0, column=4, padx=5, pady=5)
+                completed_label.grid(row=0, column=3, padx=5, pady=5)
 
-                # Factor chips (I, U, E, V) - only shown when expanded
-                col_offset = 0
-                if self.columns_expanded:
-                    factors_frame = ctk.CTkFrame(
-                        item_frame, fg_color="transparent")
-                    factors_frame.grid(row=0, column=5, padx=5, pady=5)
-                    columns = [
-                        ("G", item.group, 120),
-                        ("C", item.category, 120),
-                        ("I", item.importance, 40),
-                        ("U", item.urgency, 40),
-                        ("E", item.size, 40),
-                        ("V", item.value, 40),
-                    ]
-                    # PCC-M4 -- a critical factor chip takes the Any Critical level
-                    # colour, the same scheme the Priority cell carries. Asked once
-                    # per row, not once per chip.
-                    critical_chip = fill_for_level(self.settings, LEVEL_ANY_CRITICAL)
-                    for factor_col, (label, value, width) in enumerate(columns):
-                        text = f"{label}:{value}" if value not in (None, "") else ""
-                        label_kwargs = {
-                            "text": text,
-                            "width": width,
-                            "anchor": "w",
-                            "font": list_row_font(),
-                            "text_color": row_text,
-                        }
-                        if is_critical_factor(label, value):
-                            chip, _ = build_level_cell(
-                                factors_frame, critical_chip, text, width, row_text,
-                                list_row_font(), anchor="w",
-                            )
-                        else:
-                            chip = ctk.CTkLabel(factors_frame, **label_kwargs)
-                        chip.grid(
-                            row=0, column=factor_col, padx=2)
-                    col_offset = 1
+            # Priority score
+            # PCC-M3 -- the Priority cell's background is the priority colour
+            # scheme, and the only place it is drawn. A cell with no colour of
+            # its own keeps the row's text, which the row may have derived
+            # from a segment fill.
+            cell = level_cell_fill(self.settings, item)
+            score_label_box, score_label = build_level_cell(
+                item_frame, cell, score_text(item.priority_score), SCORE_CELL_WIDTH_PX, row_text, list_row_font(),
+            )
+            score_label_box.grid(row=0, column=4, padx=5, pady=5)
 
-                # Uncomplete button
-                btn_uncomplete = ctk.CTkButton(
-                    item_frame,
-                    text="Reopen",
-                    width=70,
-                    **button_style("secondary"),
-                    command=lambda i=item.id: self.uncomplete_item(i)
-                )
-                btn_uncomplete.grid(row=0, column=6+col_offset, padx=2, pady=5)
-        finally:
-            # Restore scroll_frame to grid - this ensures it's shown even if an error occurs
-            self.scroll_frame.grid(**grid_info)
+            # Factor chips (I, U, E, V) - only shown when expanded
+            col_offset = 0
+            if self.columns_expanded:
+                factors_frame = ctk.CTkFrame(
+                    item_frame, fg_color="transparent")
+                factors_frame.grid(row=0, column=5, padx=5, pady=5)
+                columns = [
+                    ("G", item.group, 120),
+                    ("C", item.category, 120),
+                    ("I", item.importance, 40),
+                    ("U", item.urgency, 40),
+                    ("E", item.size, 40),
+                    ("V", item.value, 40),
+                ]
+                # PCC-M4 -- a critical factor chip takes the Any Critical level
+                # colour, the same scheme the Priority cell carries. Asked once
+                # per row, not once per chip.
+                critical_chip = fill_for_level(self.settings, LEVEL_ANY_CRITICAL)
+                for factor_col, (label, value, width) in enumerate(columns):
+                    text = f"{label}:{value}" if value not in (None, "") else ""
+                    label_kwargs = {
+                        "text": text,
+                        "width": width,
+                        "anchor": "w",
+                        "font": list_row_font(),
+                        "text_color": row_text,
+                    }
+                    if is_critical_factor(label, value):
+                        chip, _ = build_level_cell(
+                            factors_frame, critical_chip, text, width, row_text,
+                            list_row_font(), anchor="w",
+                        )
+                    else:
+                        chip = ctk.CTkLabel(factors_frame, **label_kwargs)
+                    chip.grid(
+                        row=0, column=factor_col, padx=2)
+                col_offset = 1
+
+            # Uncomplete button
+            btn_uncomplete = ctk.CTkButton(
+                item_frame,
+                text="Reopen",
+                width=70,
+                **button_style("secondary"),
+                command=lambda i=item.id: self.uncomplete_item(i)
+            )
+            btn_uncomplete.grid(row=0, column=6+col_offset, padx=2, pady=5)
 
     def edit_item(self, item_id: str):
         """Edit item details."""
