@@ -37,12 +37,12 @@ def lineage_for_item(
         # column directly meant an item with no Annual Plan Element of its own
         # — one attached to a tactic in the editor, or a legacy row the link
         # migration moved — showed no lineage chips at all, though its tactic
-        # could answer for it. Both Add buttons copy the tactic's APE onto the
-        # item, so they are not that shape; the editor's attach is.
+        # could answer for it. APE Week Actions' Add copies the tactic's APE
+        # onto the item, so it is not that shape; the editor's attach is.
         # Imported here rather than at module scope: `weekly_tactic` opens a
         # log file in the real application-support directory at import time,
         # and this helper is a pure function that tools and tests import alone.
-        # Tests: tests/test_weekly_items_title.py::test_bp6_lineage_survives_even_with_the_annual_plan_element_missing
+        # Tests: tests/test_week_filed_item_lineage.py::test_bp6_lineage_survives_even_with_the_annual_plan_element_missing
         from ..weekly_tactic import parent_of
         parent_id = parent_of(item)
         if parent_id:

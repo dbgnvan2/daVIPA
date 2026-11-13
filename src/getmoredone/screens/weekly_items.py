@@ -28,7 +28,6 @@ from .segment_color_utils import (
     resolve_chip_colors,
 )
 from .split_panel import SPLITTER_WIDTH, SplitPanel
-from .week_collision_notice import notify_weekly_tactic_changes
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
@@ -757,66 +756,6 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         self.on_select_weekly_item(idx)
         self.open_selected_weekly_item()
 
-    def create_action_item_for_selected_weekly(self):
-        if not self.selected_weekly_item:
-            messagebox.showwarning("No Weekly Item Selected", "Select a weekly tactic on the right first.")
-            return
-
-        from ..models import ActionItem
-
-        dialog = ctk.CTkInputDialog(text="Immediate Step:", title="New Related Action")
-        title = (dialog.get_input() or "").strip()
-        if not title:
-            return
-
-        # BP6 — the title is what the user typed, not "<tactic context> - <it>".
-        # No screen has offered a Context field since PL-era; the prefix was a
-        # third-choice lineage fallback that ``lineage_for_item`` never reaches
-        # for these rows, because they carry both an Annual Plan Element and a
-        # parent. It only ever fired for a legacy-shaped tactic title.
-        # Spec:  docs/unused-docs/implementation_plan_2026-08-19_backlog_clearance.md#bp6
-        # Tests: tests/test_weekly_items_title.py
-        weekly = self.selected_weekly_item
-        item = ActionItem(
-            who=weekly.get("who") or "",
-            title=title,
-            description=f"Related to weekly item: {weekly.get('title') or ''}",
-            # AWA-A1 — the link is `weekly_tactic_id`, as the APE Week Actions
-            # tab's own Add writes it. `parent_id` alone left
-            # `weekly_tactic.tactic_of` — the one predicate WT-M3.D.1 names as
-            # the authority on "is this item week-filed" — answering no for
-            # every row this button made, so two buttons on two tabs produced
-            # two row shapes for one relationship. `parent_of` still answers
-            # the tactic, because it falls back to `tactic_of`, so the tree is
-            # unchanged. Closes AWA-A3's remainder.
-            #
-            # Not *both* columns, which is what the spec's recommendation and
-            # the backlog entry proposed: `migrate_parent_links_to_weekly_tactic`
-            # runs from `Database.initialize_schema` on every launch and clears
-            # `parent_id` on a row that already names a tactic explicitly
-            # (`kept_explicit_link`), so a row written with both is rewritten
-            # at the next launch and logs a write to the user's data for every
-            # item this button ever made. One column is the shape the app keeps.
-            # Spec:  docs/spec_2026-11-07_ape_week_actions.md#awa-m5
-            # Tests: tests/test_weekly_items_tactic_link.py::test_awaa1_the_add_button_links_by_weekly_tactic_id
-            weekly_tactic_id=weekly["id"],
-            start_date=weekly.get("start_date"),
-            due_date=weekly.get("start_date"),
-            category=weekly.get("category"),
-            annual_plan_element_id=weekly.get("annual_plan_element_id"),
-            item_type="daily",
-        )
-        self.app.db_manager.create_action_item(item, apply_defaults=False)
-        # Writing the tactic link puts this create on the re-file cascade
-        # (`create_action_item`'s `refile` defaults True, and it acts when
-        # `tactic_of` answers), which can refuse a week or build plan records
-        # and records what it did on the manager. Fourteen other screens
-        # report that; this one had nothing to report because it never
-        # re-filed, and reporting success over a swept-away report is the
-        # defect its sibling in `week_actions.py` already fixed (P5, P2).
-        notify_weekly_tactic_changes(self.app.db_manager, self)
-        self.status_label.configure(text="Added a related Action Item for the selected weekly tactic.")
-
     def open_selected_weekly_item(self):
         if not self.selected_weekly_item:
             messagebox.showwarning("No Weekly Item Selected", "Select a weekly tactic on the right first.")
@@ -824,21 +763,14 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         from .item_editor import ItemEditorDialog
         ItemEditorDialog(self, self.app.db_manager, item_id=self.selected_weekly_item["id"], vps_manager=self.vps_manager, on_close_callback=self.on_weekly_editor_closed)
 
-    def delete_selected_weekly_item(self):
-        """The Delete Weekly button: delete whatever is selected."""
-        if not self.selected_weekly_item:
-            messagebox.showwarning("No Weekly Item Selected", "Select a weekly tactic on the right first.")
-            return
-        self.delete_weekly_row(self.selected_weekly_item)
-
     def delete_weekly_row(self, row: Dict[str, object]):
         """Delete one weekly tactic, after asking — naming what will go with it.
 
-        Purpose: UPD-M5.2, UPD-M5.3 — the row's own Delete button and the
-                 Delete Weekly button below the list are two ways to delete
-                 the same thing, so they are one method with two callers
-                 rather than two copies of the confirmation (P5). A refused
-                 confirmation deletes nothing and says nothing.
+        Purpose: UPD-M5.2, UPD-M5.3 — the row's own Delete button calls
+                 this with its own row. The Delete Weekly button below the
+                 list was a second caller until VTF-M5 removed it, and its
+                 method went with VTF-A2. A refused confirmation deletes
+                 nothing and says nothing.
 
                  WTP-M5.2 — the confirmation names the count. WTP-M5.3 widened
                  what this delete destroys: a tactic is a parent now, so the
