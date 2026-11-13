@@ -209,7 +209,9 @@ but nobody has yet watched it write a real event.
 ## Next feature — Google Calendar into the Plan (CIP, specced 2026-11-08)
 
 Spec: [`docs/spec_2026-11-08_calendar_into_the_plan.md`](docs/spec_2026-11-08_calendar_into_the_plan.md).
-**Not started, and not to be started from the session that wrote the spec.**
+**Batch 1, the read half, is built (2026-11-13)** and owes an on-screen walk:
+`docs/unused-docs/changes/2026-11-13-cip-read-half.md`. What is left is batch 2,
+editing a commitment from the Plan (CIP-M4), and the week view (M6).
 
 Read the connected calendars, show each day's commitments on the Plan grid so
 the day is planned around the hours that are already gone, and let a commitment
@@ -225,8 +227,8 @@ Two things the plan step has to settle, both recorded in the spec:
   self-contained and provable with a fake client. The editing half (CIP-M4)
   writes to other people's calendars and deletes events, so it should get its
   own review sweeps rather than riding along with the plumbing.
-- **It cannot start while PD-M14 is in flight.** CIP-M3.3 and CIP-M3.7 extend
-  exactly the `time_block_layout.py` surface that batch is changing.
+- ~~It cannot start while PD-M14 is in flight.~~ PD-M14 is done; batch 1
+  extended `time_block_layout.py` after it.
 
 **Priority:** Next feature
 **Effort:** High (two batches)

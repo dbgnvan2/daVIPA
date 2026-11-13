@@ -302,8 +302,9 @@ Three things follow from the grid, and they are the whole model:
 
 Header, in two rows. The first holds the date, **Clear Day** and **AutoLoad** —
 the three controls that are about the day as a whole. The second holds
-**+ Buffer**, **+ Break**, **⤴ Google Calendar** and **⚙ Day Settings**, the
-four that add something to the day or open something else. Every button on both
+**+ Buffer**, **+ Break**, **⤴ Google Calendar**, **↻ Calendar** and
+**⚙ Day Settings**, the five that add something to the day or open something
+else. Every button on both
 rows takes an equal share of the width, so widening the window widens the
 buttons together instead of leaving them at a fixed size beside panes that grew.
 
@@ -373,6 +374,53 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
 
   The status line it writes to is the full-width line **under the day**, not in
   the header: with seven controls up there the header had no room left for it.
+
+- **↻ Calendar** — What: Reads this day's meetings from Google Calendar and
+  draws them on the grid. Why: a day is planned around the hours that are
+  already gone, and those are on your calendar, not in daVIPA.
+
+  A meeting is drawn in the boxes it covers with its real times and title and
+  a purple stripe — *10:15–11:00 Board meeting* in the first box,
+  *↳ Board meeting* in the next. It is not a block: it is not counted in the
+  day summary, it is never exported, and **no block can be put in a box a
+  meeting holds**. Dropping, moving, lengthening or adding a block there is
+  refused with *"A calendar event holds that Time Block — try another one"*,
+  and AutoLoad, + Break and + Buffer skip those boxes. A meeting at 07:00 pulls
+  the drawn day up to 07:00, as a block there would.
+
+  Left out, and counted on the status line after a read: events you have
+  **declined**, **cancelled** ones, ones marked **free**, and the events
+  daVIPA's own export made (they are your blocks, and read back they would
+  block themselves). An event the app cannot read is named there too, not
+  guessed at. All-day events hold no box; they are listed in the line above
+  the grid, as is any meeting some of which is past the last box (23:30).
+
+  **A meeting that lands on work you had already planned** does not move or
+  delete that work. The box is marked *⚠ overlaps a meeting*, the day summary
+  says *1 block overlaps a meeting*, and you can still shorten that block or
+  drag it somewhere free. It is still exported.
+
+  **Someone else's meeting** can be set aside for one day: right-click it and
+  choose *Ignore on this day (stays on your calendar)*. It stays drawn, marked
+  *(ignored)*, and its boxes are free for that date; nothing is sent to Google.
+  *Hold this time again* undoes it, and a later read keeps the choice. A
+  meeting you organised, or one whose guests may change it, offers no ignore:
+  change it in Google Calendar and read again.
+
+  The line above the grid says how old the answer is — *Calendar as of
+  09:40*, *Calendar not read for this day*, or *Calendar read failed — … (showing
+  what was known at 09:40)*. Opening a day never waits on Google: it draws what
+  was read last. When Google is set up (libraries, credentials **and** a
+  signed-in token), a day not read in the last 15 minutes is read once in the
+  background a moment after it opens; the answer appears on that line, not on
+  the status line. It is tried once per day per session — after a failure, the
+  next try is the button. Without Google set up, nothing is read and nothing
+  is said.
+
+  Which calendars are read is `plan_commitment_calendar_ids` in the settings
+  file (default: your primary calendar), and the 15 minutes is
+  `plan_commitment_stale_minutes`. There is no control for either yet. One read
+  runs at a time; a second press while one runs is refused and said.
 - **+ Break** / **+ Buffer** — What: Puts a padding block in the first empty
   half hour, as AutoLoad does; only when no half hour is empty does it go beside
   work, in the first box with room (2026-11-13). Drag it if you want it beside a

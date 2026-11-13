@@ -12,6 +12,7 @@ daVIPA can create Google Calendar events directly from action items, making it e
 - 🔄 Events appear as links in the item editor
 - ✅ **Meeting tracking** - automatically marks items as meetings with scheduled time
 - ⤴ **Export a planned day** - push the Plan screen's time blocks for one date out as timed events, and re-export the same day without duplicating anything
+- ↻ **Read meetings into the Plan** - draw one day's calendar events on the Plan grid so no block is planned over them
 
 ## Configuration Directory
 
@@ -223,6 +224,30 @@ are simply created on the new calendar. If a move cannot complete — the old
 calendar is unreachable, say — that block is reported as failed and keeps its
 old event, so running the export again finishes the job rather than leaving two
 events for one block.
+
+### Reading Meetings into the Plan
+
+The Plan screen's **↻ Calendar** button reads the selected day from the
+calendars in `plan_commitment_calendar_ids` (a list in the settings file;
+default `["primary"]`) and draws each event in the boxes it covers. No block
+can then be placed in those boxes. The full behaviour is in
+`docs/USER_GUIDE.md`, under *Plan (Time Blocks)*.
+
+- It uses the same credentials and token as the export, and the same
+  `calendar` scope; nothing new has to be authorised.
+- It never opens a browser to sign in. If the token has lapsed it says so —
+  *"Google Calendar is set up but not connected yet"* — and you sign in from an
+  item's *Add to Calendar* dialog, as for the export.
+- Times are converted to this computer's time zone once, when read.
+- Declined, cancelled and *free* events are left out, as are the events the
+  export made, and each is counted on the status line.
+- A calendar in the list that you can no longer see (removed, or shared access
+  revoked) is skipped and named on the status line; the others are still read.
+  If none can be read, nothing is replaced and the failure is shown.
+- What was read is kept in the app's database, so the Plan opens without
+  waiting on Google. When credentials and a token are present, a day not read
+  in the last `plan_commitment_stale_minutes` (default 15) is read once in the
+  background when you open it.
 
 ## Troubleshooting
 

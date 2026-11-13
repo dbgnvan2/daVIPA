@@ -1,10 +1,11 @@
 # Spec — Google Calendar into the Plan (2026-11-08)
 
-Status: **draft, not approved, on the backlog.** No code written, and none to be
-written from this session — the user will start a session for it later. Per the
-planning rules in `~/.claude/CLAUDE.md` this is the Spec step: approval here,
-then an implementation plan with acceptance criteria mapped to named tests,
-then code.
+Status: **read half built 2026-11-13** (batch 1: CIP-M0.1, M0.3a, M1 to M3,
+M5), from `docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_read_half.md`,
+which also records the decisions this spec left open (D1 to D13). Not walked
+on screen. **Batch 2, editing (CIP-M4), and the week view (M6) are not
+started.** Criteria and tests: `docs/spec_coverage.md`, *Google Calendar into
+the Plan, read half*.
 
 Source: user requirement, 2026-11-08 — *"I want to read my google calendar and
 put items in the day plan so I know what to plan around. Eventually i want to

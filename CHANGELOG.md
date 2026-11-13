@@ -7,6 +7,21 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Google Calendar meetings on the Plan (2026-11-13)
+
+- **↻ Calendar** on the Plan screen reads the selected day from Google
+  Calendar and draws each meeting in the boxes it covers, with its real times.
+  No block can be placed in a box a meeting holds. Declined, cancelled, *free*
+  and daVIPA's own exported events are left out and counted. (CIP-M1 to M3)
+- Meetings are kept in the database, so the Plan opens without waiting on
+  Google; with Google set up, a day not read for 15 minutes is read once in the
+  background. The line above the grid says how old the answer is. (CIP-M5)
+- Work already planned under a meeting stays, is marked *⚠ overlaps a meeting*
+  and counted in the day summary. Someone else's meeting can be ignored for one
+  day from its right-click menu. (CIP D12, CIP-M3.4)
+- Two settings, `plan_commitment_calendar_ids` and
+  `plan_commitment_stale_minutes`, with no control yet. (CIP D7)
+
 ### Changed — one wording for the lineage filters (2026-11-13)
 
 - APE Week Assignment and APE Week Actions label their filters

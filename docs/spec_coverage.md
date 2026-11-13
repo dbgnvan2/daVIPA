@@ -2512,3 +2512,44 @@ Backlog item SBN-A3. Plan: `docs/unused-docs/implementation_plan_2026-11-13_day_
 | **PD-M14.4e** | a failed restore says the file holds the new hours; any other error restores the hours in memory | done | `screens/plan_settings_dialog.py::save` | `tests/test_plan_screen.py::test_pdm144_a_failed_restore_says_the_file_holds_the_new_hours`, `::test_pdm144_an_unexpected_error_puts_the_hours_back_in_memory` |
 
 Review: learning-qa and a cold correctness pass, both over `4aef168...61d86fb`/`194211e`. Medium findings fixed above (status overwritten, restore unchecked, floor to an unrecorded time, lunch over a block that stays). A cold pass over the fix commit found two more (PD-M14.7i), fixed. Dropped as low: the renumber count covers all dates; repaired blocks keep their old `position`; one historic block refuses a part-box Day Start move.
+
+## Google Calendar into the Plan, read half (CIP batch 1, 2026-11-13)
+
+Spec: `docs/spec_2026-11-08_calendar_into_the_plan.md`. Plan, with decisions D1 to D13: `docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_read_half.md`. `TC` is `tests/test_calendar_commitments.py`, `TS` is `tests/test_plan_screen_commitments.py`, `TG` is `tests/test_time_grid.py`.
+
+| ID | Criterion | Status | Where | Proof |
+|---|---|---|---|---|
+| **CIP-M0.1** | one event is both an action item and a commitment | done | `calendar_importer.py`, `calendar_commitments.py` | `TC::test_cipm01_one_event_is_both_an_item_and_a_commitment` |
+| **CIP-M0.3a** | deleting the item leaves the commitment | done | `db_manager_commitments.py` | `TC::test_cipm03_deleting_the_item_leaves_the_commitment` |
+| **CIP-M1.1** | table on a fresh and a migrated database, twice | done | `database.py::ensure_calendar_commitment_tables` | `TC::test_cipm11_the_table_exists_fresh_and_migrated`, `TC::test_cipm11_the_migration_runs_twice_safely` |
+| **CIP-M1.2** | `CalendarCommitment` appended; existing models unchanged | done | `models.py` | `TC::test_cipm12_existing_models_construct_positionally` |
+| **CIP-M1.3** | never read, read and empty, read and failed | done | `db_manager_commitments.py` | `TC::test_cipm13_three_states_of_a_date` |
+| **CIP-M1.4** | only the fetched dates change, in one transaction | done | `replace_commitments_for_dates` | `TC::test_cipm14_only_the_fetched_dates_change`, `TC::test_cipm14_a_failure_part_way_writes_nothing` |
+| **CIP-M1.5** | dismissal survives a refetch | done | same | `TC::test_cipm15_dismissal_survives_a_refetch` |
+| **CIP-M2.1** | one paginated call per calendar for the range | done | `calendar_commitments.py::fetch_commitments`, `google_calendar.py::list_events_between` | `TC::test_cipm21_seven_days_is_one_call_per_calendar`, `TC::test_cipm21_every_page_is_read` |
+| **CIP-M2.2** | a lapsed sign-in is reported, not raised | done | `refresh_commitments`, `screens/plan_commitments.py::refresh_status` | `TS::test_cipm22_a_lapsed_sign_in_is_reported`, `TC::test_cipm22_a_lapsed_sign_in_is_recorded_not_raised` |
+| **CIP-M2.3** | offset times stored as local wall clock; split at midnight (D4, D5) | done | `parse_event` | `TC::test_cipm23_an_offset_time_is_stored_as_local_wall_clock`, `TC::test_cipm23_an_event_over_midnight_is_two_commitments` |
+| **CIP-M2.4** | all-day events hold no box | done | same | `TC::test_cipm24_an_all_day_event_holds_no_slot` |
+| **CIP-M2.5** | four exclusions, each counted | done | `exclusion_of` | `TC::test_cipm25_each_exclusion_is_counted` |
+| **CIP-M2.6** | an unparseable event is named, not guessed | done | `fetch_commitments` | `TC::test_cipm26_an_unparseable_event_is_named_not_guessed` |
+| **CIP-M2.7** | a failed read keeps the cache and records the failure | done | `refresh_commitments` | `TC::test_cipm27_a_failed_fetch_keeps_what_was_known` |
+| **CIP-M2.8** | one event on two calendars is one commitment | done | `fetch_commitments` | `TC::test_cipm28_one_event_on_two_calendars_is_one_commitment` |
+| **CIP-M3.1** | an exported day read back holds no box | done (fake calendar) — partial live, walk item 4 | `exclusion_of` | `TC::test_cipm31_an_exported_day_read_back_holds_no_slot` |
+| **CIP-M3.2** | a commitment holds every box it touches | done | `calendar_commitments.py::slots_held_by` | `TG::test_cipm32_a_commitment_holds_every_slot_it_touches` |
+| **CIP-M3.3** | `SLOT_COMMITTED` on every write path, worded, and in the finders | done | `time_block_layout.py::can_place`, `db_manager.py` | `TC::test_cipm33_every_write_path_refuses_a_committed_slot`, `TS::test_cipm33_every_refusal_has_a_sentence`, `TS::test_cipm33_the_free_slot_finders_skip_committed_slots`, `TG::test_tgm23_each_refusal_has_its_own_reason` |
+| **CIP-M3.4** | someone else's meeting can be ignored for a date; editable ones cannot | done | `set_commitment_dismissed`, `commitment_menu_entries` | `TC::test_cipm34_dismissing_frees_the_slots_locally`, `TC::test_cipm34_can_edit_comes_from_the_event`, `TS::test_cipm34_an_editable_commitment_offers_no_dismiss`, `TS::test_cipm34_a_dismissed_commitment_is_drawn_as_ignored` |
+| **CIP-M3.5** | not counted in the summary or the box's occupants | done | `build_day_grid` | `TS::test_cipm35_the_day_summary_does_not_count_a_commitment`, `TG::test_cipm35_slot_occupancy_does_not_count_a_commitment` |
+| **CIP-M3.6** | drawn with its times, in its own colour token | partial — not walked, walk item 1 | `screens/plan_blocks.py::build_slot_row`, `build_commitment_chip` | `TS::test_cipm36_a_commitment_is_drawn_with_its_times`, `TS::test_cipm36_its_colour_is_the_commitment_token_not_a_priority_fill` |
+| **CIP-M3.7** | an early commitment widens the day (D8) | done | `span_for_blocks` | `TG::test_cipm37_an_early_commitment_widens_the_day` |
+| **CIP-M3.8** | all-day events in the strip | done | `strip_entries` | `TS::test_cipm38_all_day_events_are_in_the_strip` |
+| **CIP-M3.9** | overlapping commitments both drawn, union held | done | `committed_slots` | `TG::test_cipm39_overlaps_hold_the_union`, `TS::test_cipm39_both_overlapping_commitments_are_drawn` |
+| **CIP-D4** | range edge, and past the last box | done | `parse_event`, `is_off_grid` | `TC::test_cipd4_a_date_before_the_range_is_not_written`, `TS::test_cipd4_a_commitment_past_the_last_box_is_listed_in_the_strip` |
+| **CIP-D6** | a forbidden calendar is skipped and named | done | `fetch_commitments`, `google_calendar.py::_with_retry` | `TC::test_cipd6_a_forbidden_calendar_is_skipped_and_named`, `TC::test_cipd6_a_non_retryable_403_is_forbidden` |
+| **CIP-D7** | a malformed setting falls back to the default | done | `app_settings.py::_normalize_commitment_settings` | `tests/test_plan_settings.py::test_cipd7_a_string_calendar_list_falls_back` |
+| **CIP-D12** | planned work under a new meeting stays, is marked, counted, movable, exported | done | `held_by_block`, `DayGrid.overlapping` | `TC::test_cipd12_a_block_under_a_new_commitment_can_still_be_shortened`, `TS::test_cipd12_an_overlapping_block_is_marked_and_counted`, `TS::test_cipd12_the_export_still_sends_it` |
+| **CIP-M5.1** | the Plan paints with no network call | done | `load_commitments` | `TS::test_cipm51_opening_plan_makes_no_call` |
+| **CIP-M5.2** | Refresh disabled first, back on success and refusal; a rebuilt screen sees a read in flight | done | `refresh_calendar`, `sync_refresh_button` | `TS::test_cipm52_refresh_disables_first`, `TS::test_cipm52_a_rebuilt_screen_sees_the_fetch_in_flight` |
+| **CIP-M5.3** | one read per database at a time | done | `claim_refresh` | `TS::test_cipm53_a_second_fetch_of_the_same_range_is_refused` |
+| **CIP-M5.4** | the age of the answer is shown | partial — failure case not walked, walk item 2 | `age_text`, `draw_commitment_strip` | `TS::test_cipm54_the_age_of_the_answer_is_shown` |
+| **CIP-M5.5** | a stale date is read once, behind the D13 gate | done | `maybe_auto_refresh`, `_auto_refresh_due` | `TS::test_cipm55_a_stale_day_refreshes_once`, `TS::test_cipm55_no_credentials_means_no_auto_refresh`, `TS::test_cipm55_a_failed_auto_refresh_is_not_retried` |
+| **CIP-M7.1** | docs | done | `USER_GUIDE.md`, `google-calendar-setup.md`, `CHANGELOG.md`, `NOTES.md`, `DOCUMENTATION_INDEX.md`, the spec's status, `BACKLOG.md` | no test (no guard reads prose) |

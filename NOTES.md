@@ -293,6 +293,18 @@ and are corrected in `BACKLOG.md` item 1 with the measurements.
   up to.
   See `docs/unused-docs/changes/2026-11-09-bare-name-citations.md`.
 
+## Recent Changes (2026-11-13)
+
+### Google Calendar into the Plan, read half - CIP batch 1
+
+Built from `docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_read_half.md`
+(CIP-M0.1, M0.3a, M1 to M3, M5; decisions D1 to D13). Meetings are a separate
+table, `calendar_commitments`, not `time_blocks` rows; `can_place` refuses a
+committed box with `SLOT_COMMITTED`, and every db writer reads the date's
+commitments itself. Known gaps: **not walked on screen** (the handoff note
+`docs/unused-docs/changes/2026-11-13-cip-read-half.md` has the checklist), and
+batch 2, editing a meeting from the Plan (CIP-M4), is not built.
+
 ## Recent Changes (2026-11-08)
 
 ### What the walk asked for - UPD-F1 to UPD-F4 all built and on `main`

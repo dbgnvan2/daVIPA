@@ -255,14 +255,21 @@ handoff note is `docs/unused-docs/changes/2026-11-08-priority-level-colours.md`:
 
 Spec for the other direction: reading the connected calendars, showing their
 commitments on the Plan grid so a day is planned around what is already gone,
-and editing those commitments in place (CIP-M0 - CIP-M7). **Draft, not
-approved, no code written, on the backlog.** Phase 1 is the selected day;
+and editing those commitments in place (CIP-M0 - CIP-M7). **Read half built
+2026-11-13 (batch 1); editing (CIP-M4) and the week view not started.** Phase 1 is the selected day;
 phase 2 is a seven-day planning view over the same cache. Holds the decision
 that a commitment is *not* a `time_blocks` row and the five reasons, the rule
 that keeps the export's own events from returning as constraints on the blocks
 that made them, why `calendar_importer.py` stays alongside it (an action item
 is *what*, a commitment is *when*), and the four scope decisions taken
 2026-11-08.
+
+### docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_read_half.md
+
+Implementation plan for CIP batch 1, the read half of Google Calendar into the
+Plan (CIP-M0.1, M0.3a, M1 to M3, M5). Holds decisions D1 to D13 the spec left
+open, the criteria-to-tests table and the walk items. **Approved and built
+2026-11-13**; walk owed, in `docs/unused-docs/changes/2026-11-13-cip-read-half.md`.
 
 ### docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md
 
