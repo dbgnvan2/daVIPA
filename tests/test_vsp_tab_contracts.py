@@ -100,6 +100,14 @@ def _assert_bottom_left(screen):
     frame stored under any other name, passed all three assertions — and a
     later refactor onto a shared row *named* ``right_actions`` would have
     reddened it for a reason that has nothing to do with where a button sits.
+
+    The last arm reads ``right_frame``'s **direct** children only. The first
+    version walked the whole subtree, which passes here only because an
+    unseeded database renders no right-panel rows: every rendered row parents
+    its own Edit and Delete inside that subtree (``ape_assignment.py``'s
+    ``_render_rows``), so a later test that assigns an APE and refreshes would
+    have turned a button-placement guard red over a row control. An action row
+    gridded onto the panel is what this is about, and that is a direct child.
     """
     body = screen.body
     assert screen.left_actions.master is body, (
@@ -113,8 +121,8 @@ def _assert_bottom_left(screen):
     right_col = int(screen.right_frame.grid_info()["column"])
     assert body.grid_slaves(row=int(actions["row"]), column=right_col) == [], (
         "the right panel must carry no action row of its own")
-    assert _all_buttons(screen.right_frame) == [], (
-        "no button may be parented inside the right panel either")
+    assert _buttons(screen.right_frame) == [], (
+        "no action button may be parented straight onto the right panel")
 
 
 def _header(screen):
@@ -235,11 +243,23 @@ def test_the_add_dialog_is_titled_for_its_button(tmp_path):
     ``open_pick_record_dialog`` is replaced in the screen's own module for the
     call, the way tests/test_vsp_tab_adds.py does it: no window opens, and the
     title is read from what the screen passed.
+
+    The whole title is pinned, not just the label prefix. A prefix assertion
+    leaves the period free, and the period is the half of this string that
+    varies and the half a user checks: ``Add APE Quarter Q1`` over a picker
+    showing Q4 would pass. This screen's own constructor comment says why that
+    matters — two screens disagreeing about which quarter you are in is how an
+    APE ends up filed in one quarter and worked in another.
     """
     vps = make_vps(tmp_path)
     try:
-        for cls, module in ((APEAssignmentScreen, quarter_mod),
-                            (APEPeriodViewScreen, month_mod)):
+        cases = (
+            (APEAssignmentScreen, quarter_mod,
+             lambda s: f"Q{s.quarter_var.get()}"),
+            (APEPeriodViewScreen, month_mod,
+             lambda s: f"M{s.month_var.get()}"),
+        )
+        for cls, module, period in cases:
             root, screen = _screen(cls, vps)
             try:
                 label = _buttons(screen.left_actions)[0]
@@ -252,9 +272,10 @@ def test_the_add_dialog_is_titled_for_its_button(tmp_path):
                 finally:
                     module.open_pick_record_dialog = original
                 assert captured, f"{cls.__name__} opened no dialog"
-                assert captured["title"].startswith(label), (
-                    f"{cls.__name__}: the button says {label!r} and the "
-                    f"dialog is titled {captured['title']!r}")
+                assert captured["title"] == f"{label} {period(screen)}", (
+                    f"{cls.__name__}: the button says {label!r} over "
+                    f"{period(screen)} and the dialog is titled "
+                    f"{captured['title']!r}")
             finally:
                 root.destroy()
     finally:
