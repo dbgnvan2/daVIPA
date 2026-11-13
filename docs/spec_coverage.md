@@ -2427,5 +2427,5 @@ five list screens draw. No plan file; this table is the record.
 |---|---|---|---|---|
 | **PSC-M1** | a Plan item row linked to a Category is filled with its colour, text derived from the fill; unlinked rows unchanged | done | `screens/plan.py::_segment_color_resolver`, `screens/plan_blocks.py::build_item_row` | `tests/test_plan_screen.py::test_pscm1_a_category_colour_fills_the_item_row`, `::test_pscm1_the_plan_screen_passes_each_items_category_colour`; red with the hand-off removed |
 | **PSC-M2** | the ✓/? mark and the depth bars follow a Category fill (mark ≥3:1; bars in the row text and a blend toward it) | done | `screens/plan_blocks.py::_mark_color`, `DepthBarStack(colors=)` | `::test_pscm1_a_category_colour_fills_the_item_row`; red with either removed |
-
-Not covered: the day-pane blocks are not Category-coloured (not asked for).
+| **PSC-M3** | a day-pane task chip (and its continuations) takes its item's Category colour; text and bars follow | done | `screens/plan_blocks.py::_build_block_chip`, `plan.py::load_blocks` | `::test_pscm3_a_day_chip_takes_its_items_category_colour`; red with the fill removed |
+| **PSC-M4** | a day-pane task chip draws the item row's priority badge, in the badge column | done | `screens/plan_blocks.py::_build_block_chip` | `::test_pscm4_the_day_badge_carries_the_level_colour`; red with the badge ungridded. `test_pdm11_…` now compares the badge column too (case b) |

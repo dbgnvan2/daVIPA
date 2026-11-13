@@ -538,9 +538,11 @@ Day pane (right):
   Day End, each labelled with its own start time. Why: An empty box is a place
   you can drop work; a pane that drew only the filled hours would give you
   nothing to aim at.
-- **A task in a box** — What: Its title, its depth as a three-bar stack, and its
-  length in minutes. Why: The box tells you the time; the chip tells you the
-  task.
+- **A task in a box** — What: Its title, its depth as a three-bar stack, its
+  priority badge (`P:n`, coloured like the item list's), and its length in
+  minutes. A task linked to a Vision Planning Category is filled with that
+  Category's colour, here and in every box it runs through (since 2026-11-12).
+  Why: The box tells you the time; the chip tells you the task.
 - **A task that runs through a box** — What: The later boxes of a longer task
   are drawn on the same surface as the box that starts it, and marked with `↳`.
   Each reads `same task`, except the final one, which reads how many minutes of
