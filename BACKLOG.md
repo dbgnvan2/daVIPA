@@ -397,34 +397,6 @@ behaviour it replaces. `docs/unused-docs/implementation_plan_2026-11-10_plan_wal
 step 4 settles it.
 
 
-## Adjacent issues from the PD-M12 batch (2026-11-07)
-
-### 2026-11-07 - Type: Test quality
-
-**Title:** The messagebox stub cannot fail, so no test can see a dialog that does
-**Description:** `conftest.py::_messageboxes_never_block` replaces every
-function in `tkinter.messagebox`, session-wide, with a recorder that returns a
-canned answer and cannot raise. It exists for a good reason - a real modal
-blocks a test run until someone clicks it - but it means the only call that
-fails in the running app is a call no test makes. PD-M12 is what that costs: a
-`TclError` out of `askyesno` killed two write paths on every weekend day, while
-the PD-M7 test (then named `test_pdm7_a_non_work_day_asks_before_scheduling`,
-now `::test_pdm132_a_button_still_asks_on_a_non_work_day`) passed throughout,
-asserting the block was written by code that could not ask the question at all.
-PD-M13 is what the second half costs: nothing in the suite could show that an
-in-app toplevel never returns from that callback either, because conftest
-withdraws every window, so the second remedy shipped as unseen as the first.
-**Priority:** Medium
-**Effort:** Medium - a decision, then a sweep
-**Notes:** Two ways out, and they are not exclusive. (a) Where a dialog gates a
-write, call it through an app-owned seam like `widgets/confirm_dialog`, which a
-test can make raise - PD-M12 does this for one guard. (b) Give the recorder a
-way to be told to raise, and use it in at least one test per gated write path,
-so the failure mode is exercised somewhere. The general lesson belongs in
-`~/.claude/standards/learnings.md`: a stub installed for safety that cannot
-reproduce the failure it stands in for turns the untested path into an
-*invisible* one, which is P25 one layer down.
-
 ## Adjacent issue from the PD-M11 batch (2026-11-07)
 
 ### 2026-11-07 - Type: Bug
@@ -611,24 +583,16 @@ repairable condition recorded as a terminal one).
 **Notes:**
 ```
 
-### SBN-A1 — a bare `::name` citation resolves against the whole suite, not against its own file (medium)
+### SBN-A3 — PD-M14.4 and PD-M14.7: build them, or withdraw them (medium — a decision)
 
-`tests/test_traceability_refs.py`'s bare arm (`SBN-M1`) accepts a name defined
-anywhere under `tests/`. The path arm resolves inside the file the citation
-names, which is the stronger check. So a row citing `` `::test_x` `` under a
-table that named `tests/test_a.py` passes even when `test_x` lives in
-`tests/test_z.py` and has nothing to do with the criterion — and the batch's
-own plan demonstrated it: `SBN-M2.1` cited the path arm's test while meaning
-the bare arm's, and the guard was green on it.
-
-Not fixed because the anchoring rule was measured and rejected: see the closed
-`SAG-A17` above and §1.2 of
-`docs/unused-docs/implementation_plan_2026-11-09_bare_name_citations.md`. The honest
-options are a per-document convention (declare the file a table's bare names
-belong to, in the document) or leaving it as the weaker check it is. The first
-is a documentation change across 34 documents, not a guard change.
-
-### SBN-A3 — PD-M14.4 and PD-M14.7 have no automated test, under any name (medium)
+**Recommendation (2026-11-13): build PD-M14.4, with PD-M14.7, in a batch you
+can walk.** Your 2026-11-08 instruction was that the Day Settings hours "are
+solely for starting a blank plan for the day"; PD-M14.4 is what that implies,
+since moving the template should not move work already planned. It was not
+built unattended because it reverses two `done` criteria (TG-M6.4, TG-M6.4a:
+a Day Start change re-times every day on read and writes no rows), and because
+it would rewrite `slot_index` on every date in the database on a settings save.
+The alternative is to withdraw both and keep TG-M6.4 as the design.
 
 Found by repairing `docs/unused-docs/implementation_plan_2026-11-08_day_hours_are_a_template.md`:
 ten of its criteria name tests that were never written. Measured per criterion

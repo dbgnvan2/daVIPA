@@ -428,3 +428,52 @@ twenty `messagebox` call sites in the app, Clear Day on the Plan screen
 included, are reached from a button or a menu and are not in this class.
 
 **Closed:** DRP-M1..M3 (2026-11-13): every dialog on the release path is wrapped in try/except TclError, logs, and writes to a new Scheduler status line; the drag ends in a finally. The relink question stays modal; a refused question writes nothing. Not walked on screen.
+
+## Adjacent issues from the PD-M12 batch (2026-11-07)
+
+### 2026-11-07 - Type: Test quality
+
+**Title:** The messagebox stub cannot fail, so no test can see a dialog that does
+**Description:** `conftest.py::_messageboxes_never_block` replaces every
+function in `tkinter.messagebox`, session-wide, with a recorder that returns a
+canned answer and cannot raise. It exists for a good reason - a real modal
+blocks a test run until someone clicks it - but it means the only call that
+fails in the running app is a call no test makes. PD-M12 is what that costs: a
+`TclError` out of `askyesno` killed two write paths on every weekend day, while
+the PD-M7 test (then named `test_pdm7_a_non_work_day_asks_before_scheduling`,
+now `::test_pdm132_a_button_still_asks_on_a_non_work_day`) passed throughout,
+asserting the block was written by code that could not ask the question at all.
+PD-M13 is what the second half costs: nothing in the suite could show that an
+in-app toplevel never returns from that callback either, because conftest
+withdraws every window, so the second remedy shipped as unseen as the first.
+**Priority:** Medium
+**Effort:** Medium - a decision, then a sweep
+**Notes:** Two ways out, and they are not exclusive. (a) Where a dialog gates a
+write, call it through an app-owned seam like `widgets/confirm_dialog`, which a
+test can make raise - PD-M12 does this for one guard. (b) Give the recorder a
+way to be told to raise, and use it in at least one test per gated write path,
+so the failure mode is exercised somewhere. The general lesson belongs in
+`~/.claude/standards/learnings.md`: a stub installed for safety that cannot
+reproduce the failure it stands in for turns the untested path into an
+*invisible* one, which is P25 one layer down.
+
+**Closed:** 2026-11-13. Option (b) in the form the item asked for, per path: every write path that asks from a drag release has a test that makes its dialog raise -- `tests/test_plan_screen.py::test_pdm132_a_question_that_raises_does_not_take_the_gesture`, `::test_pfm15_a_question_that_raises_still_schedules`, `tests/test_project_multi_link.py::test_drpm2_a_refused_dialog_on_a_project_drop_writes_nothing_and_ends_the_drag`, `tests/test_weekly_tactic_surfaces.py::test_drpm3_a_refused_notice_on_a_date_drop_still_refreshes_and_says_so`. Dialogs reached from a button or menu are not in the failure class. The general lesson is `~/.claude/standards/learnings.md` P45.
+
+### SBN-A1 — a bare `::name` citation resolves against the whole suite, not against its own file (medium)
+
+`tests/test_traceability_refs.py`'s bare arm (`SBN-M1`) accepts a name defined
+anywhere under `tests/`. The path arm resolves inside the file the citation
+names, which is the stronger check. So a row citing `` `::test_x` `` under a
+table that named `tests/test_a.py` passes even when `test_x` lives in
+`tests/test_z.py` and has nothing to do with the criterion — and the batch's
+own plan demonstrated it: `SBN-M2.1` cited the path arm's test while meaning
+the bare arm's, and the guard was green on it.
+
+Not fixed because the anchoring rule was measured and rejected: see the closed
+`SAG-A17` above and §1.2 of
+`docs/unused-docs/implementation_plan_2026-11-09_bare_name_citations.md`. The honest
+options are a per-document convention (declare the file a table's bare names
+belong to, in the document) or leaving it as the weaker check it is. The first
+is a documentation change across 34 documents, not a guard change.
+
+**Closed:** 2026-11-13, accepted as the weaker check it is. The per-document convention would touch 34 documents to tighten a guard over citations, and the anchoring rule was measured and rejected (SAG-A17). The path arm remains the strong form; a writer who wants the check cites with a path.
