@@ -646,3 +646,41 @@ def test_vtfs10_the_count_on_the_status_line_follows_the_tick():
         ), screen.status_label.cget("text")
     finally:
         root.destroy()
+
+
+# ------------------------------------------ UPD-A12, one wording for the filter labels
+
+def _label_texts(widget):
+    import customtkinter as ctk
+
+    return [child.cget("text") for child in widget.winfo_children()
+            if isinstance(child, ctk.CTkLabel)]
+
+
+def test_upda12_weekly_items_writes_the_filter_labels_out():
+    """UPD-A12 — APE Week Assignment says SubSegment and Category, as the
+    APE tabs and the column headings do, not Sub and Cat.
+
+    Spec: docs/spec_coverage.md#filter-label-wording-upd-a12-2026-11-13
+    """
+    root, screen = _week_screen()
+    try:
+        texts = _label_texts(screen.filter_row)
+        assert ["Segment:", "SubSegment:", "Category:"] == [
+            t for t in texts if t in ("Segment:", "SubSegment:", "Category:", "Sub:", "Cat:")]
+    finally:
+        root.destroy()
+
+
+def test_upda12_the_shared_filter_combos_write_the_labels_out():
+    """UPD-A12 — ``LineageFilters.build_combos`` (APE Week Actions) uses the same words."""
+    import customtkinter as ctk
+    from src.getmoredone.screens.lineage_filters import LineageFilters
+
+    root = withdrawn_root()
+    try:
+        frame = ctk.CTkFrame(root)
+        LineageFilters(lambda row: ("", "", "")).build_combos(frame, 0, lambda: None)
+        assert _label_texts(frame) == ["Segment:", "SubSegment:", "Category:"]
+    finally:
+        root.destroy()
