@@ -1877,11 +1877,13 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             if target is None:
                 unreadable += 1
                 continue
-            if target == int(block.slot_index):
-                continue
+            # Before the same-box test: a 09:00 block in the 08:45 box of an
+            # 08:15 day agrees with the floor and still is not at 09:00.
             recorded = parse_hhmm(block.start_time)
             if bounds.day_start_minutes + target * SLOT_MINUTES != recorded:
                 misaligned += 1
+                continue
+            if target == int(block.slot_index):
                 continue
             targets[block.id] = target
 

@@ -1007,25 +1007,18 @@ class PlanScreen(ctk.CTkFrame):
     def on_settings_saved(self, bounds: DayBounds, renumbered: int = 0):
         """The day's shape changed; redraw it and say what that did.
 
-        PD-M14.4 superseded the paragraph below at the dialog: the dialog now
-        renumbers every block so each keeps its clock time
-        (``DatabaseManager.shift_day_start``) and passes ``renumbered``, the
-        count. This callback still writes nothing itself.
-
-        Purpose: TG-M6.4 -- a block's box is stored relative to Day Start, so
-                 moving Day Start re-times every day on read. There is no
-                 stored clock time to go stale, nothing to re-pack, and no
-                 transaction that can leave one day's times derived from one
-                 set of bounds and another's from a different set.
-        Spec:    docs/unused-docs/implementation_plan_2026-11-05_time_grid.md#tg-m6
+        Purpose: TG-M6.4 as PD-M14.4 left it -- the dialog has already
+                 renumbered every block so each keeps its clock time
+                 (``DatabaseManager.shift_day_start``) and passes
+                 ``renumbered``, the count. This callback writes nothing
+                 itself; the redraw runs PD-M14.7's repair on the open date,
+                 and what that did is said here, a refusal first.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-13_day_start_keeps_clock_times.md
         Tests:   tests/test_plan_screen.py::test_tgm64_the_settings_callback_writes_no_blocks
                  tests/test_plan_screen.py::test_pdm144_the_dialog_keeps_planned_work_on_its_clock
 
-        The stored ``start_time``/``end_time`` columns are still written when a
-        block is placed or resized, and they are still the block's own times --
-        but they are a record, not the truth, and the screen draws from the
-        grid. A day whose boxes no longer exist under the new bounds is
-        surfaced as outside the day rather than re-timed into one that does.
+        The screen draws from the box. A block that no longer fits the new
+        hours is surfaced as outside the day and counted here.
         """
         self.bounds = bounds
         self._last_repair = None
@@ -1237,16 +1230,18 @@ class PlanScreen(ctk.CTkFrame):
             # the assumption it baked in is visible and checkable rather than
             # something to infer from blocks that moved.
             repair_said = repair_status(repair)
-            if repair_said is not None and repair_said[1] == "warning":
-                # First: a refused repair leaves work at an hour nobody chose,
-                # which outranks a report of what did go right.
-                self.set_status(*repair_said)
-            elif adopted:
-                self.set_status(
+            warned = repair_said is not None and repair_said[1] == "warning"
+            if adopted:
+                # Adoption is said once and never again, so a repair warning
+                # (which repeats on every load) is added to it, not put first.
+                placed = (
                     f"Placed {len(adopted)} block(s) from an earlier version"
-                    f" on the grid, using a day start of {self.bounds.day_start}",
-                    "muted",
+                    f" on the grid, using a day start of {self.bounds.day_start}"
                 )
+                if warned:
+                    self.set_status(f"{placed} — {repair_said[0]}", "warning")
+                else:
+                    self.set_status(placed, "muted")
             elif repair_said is not None:
                 self.set_status(*repair_said)
             elif self._day_shape_is_unconfirmed() and any(
