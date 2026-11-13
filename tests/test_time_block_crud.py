@@ -1158,3 +1158,15 @@ def test_pdm147_lunch_put_back_over_a_block_that_stays_writes_nothing(manager):
 
     assert result.moved == [] and result.refused is not None
     assert _rows(manager) == before
+
+
+def test_pdm147_an_off_box_time_is_counted_even_when_the_floor_agrees(manager):
+    """PD-M14.7 — 09:00 stored in the 08:45 box of an 08:15 day is not at 09:00.
+
+    Found by the cold pass over the fix commit: the same-box test ran first.
+    """
+    _recorded(manager, "nine", 1, "09:00")
+
+    result = manager.repair_slots_from_times(DAY, DayBounds(day_start="08:15"))
+
+    assert result.misaligned == 1 and result.moved == []

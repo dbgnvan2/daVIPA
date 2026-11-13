@@ -7656,3 +7656,20 @@ def test_pdm144_an_unexpected_error_puts_the_hours_back_in_memory(
         if dialog.winfo_exists():
             dialog.destroy()
     assert settings.plan_day_start == "08:00"
+
+
+def test_pdm147_adoption_is_still_said_beside_a_repair_warning(root, manager, settings):
+    """PD-M14.7 — adoption is said once only, so a repair warning is added to it.
+
+    Found by the cold pass over the fix commit.
+    """
+    _legacy_block(manager)
+    _raw_block(manager, "nine", 1, "09:15")  # 09:15 is no box under 08:00
+
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+
+    status = panel.status_label.cget("text")
+    assert "Placed 1 block(s) from an earlier version" in status, status
+    assert "no box starts at" in status, status
