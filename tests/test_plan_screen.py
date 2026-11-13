@@ -1175,6 +1175,41 @@ def test_tbm101_buffer_and_break_blocks_are_typed(screen, manager, settings):
     assert all(b.item_id is None for b in blocks)
 
 
+def test_pbbm1_the_break_button_takes_an_empty_half_hour(screen, manager):
+    """PBB-M1 — ``+ Break`` lands in the first empty box, not on top of work.
+
+    Spec: docs/spec_coverage.md#break-and-buffer-buttons-pbb-2026-11-13
+
+    The first box holds a task and has room for three more; the old rule
+    (first box not full) put the break beside it.
+    """
+    _add_block(manager, 30, "Work", 0)
+    screen.refresh()
+
+    screen.add_padding_block(BlockType.BREAK)
+
+    breaks = [b for b in manager.get_time_blocks(THURSDAY) if b.block_type == BlockType.BREAK]
+    assert [b.slot_index for b in breaks] == [1]
+
+
+def test_pbbm1_a_day_with_no_empty_box_still_takes_the_break(screen, manager):
+    """PBB-M1 — with every box occupied, the button falls back to room beside work."""
+    from src.getmoredone.time_block_layout import SlotRefusedError
+
+    for index in [entry.slot.index for entry in screen._grid.slots]:
+        try:
+            _add_block(manager, 30, f"Work {index}", index)
+        except SlotRefusedError:
+            pass  # lunch takes no work
+    screen.refresh()
+    assert screen.first_clear_slot(5) is None, "the setup left a box empty"
+
+    screen.add_padding_block(BlockType.BREAK)
+
+    breaks = [b for b in manager.get_time_blocks(THURSDAY) if b.block_type == BlockType.BREAK]
+    assert [b.slot_index for b in breaks] == [screen._grid.slots[0].slot.index]
+
+
 def test_padding_blocks_are_refused_on_a_non_block_day(root, manager, settings):
     panel = PlanScreen(root, manager, _App(settings))
     panel.selected_date = SATURDAY
