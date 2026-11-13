@@ -16,6 +16,7 @@ from __future__ import annotations
 import gc
 import logging
 import threading
+from datetime import date, timedelta
 from tkinter import messagebox
 from typing import List, Optional, Tuple
 
@@ -63,6 +64,7 @@ NOT_READY_TEXT = (
     "Google Calendar is not connected — Settings → Google Calendar, then try again"
 )
 NOT_MOVABLE_TEXT = "All day or over midnight — cannot be moved here"
+MULTI_DAY_TEXT = "Over more than one day — change it in Google Calendar"
 
 
 class PlanCommitmentEditsMixin:
@@ -81,6 +83,9 @@ class PlanCommitmentEditsMixin:
         """
         if not commitment.can_edit:
             return []
+        if self._cached_on_another_date(commitment):
+            # Every write to it is refused (E6), so offer none to refuse.
+            return [(MULTI_DAY_TEXT, None)]
         entries: List[Tuple[str, Optional[object]]] = []
         if movable(commitment):
             current = length_of(commitment)
@@ -98,6 +103,23 @@ class PlanCommitmentEditsMixin:
             lambda c=commitment: self.change_commitment(c, EditRequest(delete=True)),
         ))
         return entries
+
+    def _cached_on_another_date(self, commitment: CalendarCommitment) -> bool:
+        """Whether the cache holds this event on the day before or after.
+
+        Only a meeting that cannot move can span dates, so only that one costs
+        the two reads. A neighbour never read is not known here; the write's
+        own check (``verify_unchanged``) still refuses it.
+        """
+        if movable(commitment):
+            return False
+        day = date.fromisoformat(commitment.commitment_date)
+        for offset in (-1, 1):
+            other = (day + timedelta(days=offset)).isoformat()
+            if any(c.event_id == commitment.event_id
+                   for c in self.db_manager.get_commitments(other)):
+                return True
+        return False
 
     def ask_commitment_minutes(self, commitment: CalendarCommitment) -> None:
         raw = ctk.CTkInputDialog(text="Meeting length in minutes:", title="Meeting Length").get_input()
@@ -264,21 +286,26 @@ class PlanCommitmentEditsMixin:
 
         def work():
             # Nothing here touches a widget.
+            # Built in a local and handed over last: the poll clears
+            # ``_edit_result`` as soon as it sees it, so reading it back here
+            # would race the main thread.
             try:
-                self._edit_result = write_commitment_edit(
-                    commitment, request,
-                    client_factory=client_factory, db_path=db_path,
-                    send_updates=send_updates,
-                )
-            except Exception as error:  # noqa: BLE001 - P15
-                self._edit_result = EditOutcome(failure=str(error) or type(error).__name__)
+                try:
+                    result = write_commitment_edit(
+                        commitment, request,
+                        client_factory=client_factory, db_path=db_path,
+                        send_updates=send_updates,
+                    )
+                except Exception as error:  # noqa: BLE001 - P15
+                    result = EditOutcome(failure=str(error) or type(error).__name__)
+                if result.failure:
+                    # Logged here as well as shown: the screen may be gone by
+                    # the time the poll would show it (P2).
+                    logger.warning("Calendar change to %s not completed: %s",
+                                   commitment.event_id, result.failure)
             finally:
                 release_refresh(db_path)
-            if self._edit_result.failure:
-                # Logged here as well as shown: the screen may be gone by the
-                # time the poll would show it (P2).
-                logger.warning("Calendar change to %s not completed: %s",
-                               commitment.event_id, self._edit_result.failure)
+            self._edit_result = result
 
         try:
             gc.collect()
