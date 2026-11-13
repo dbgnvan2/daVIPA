@@ -39,6 +39,24 @@ each with a mutation-checked guard:
 - **F5:** with tzlocal failing, `update_event` names UTC; the edit path now
   sends an aware start in the zone the reader used.
 
+Cold re-sweep of the fixes (`a124f57...240de8e`, `learning-qa`): two medium,
+both fixed with mutation-checked guards. The worker read `_edit_result` back
+after handing it over, racing the poll that clears it; it now logs from a
+local and hands over last. The menu still offered Rename and Delete on an
+event cached on a neighbouring date; it now shows only "Over more than one
+day — change it in Google Calendar". No high finding, so no further pass.
+
+Adjacent issues found, not fixed (outside this batch):
+- `calendar_exporter.py` and `screens/calendar_dialog.py` pass naive times to
+  `create_event`/`update_event`, so they share the UTC fallback F5 closed here.
+- If `update_event`'s PUT reaches Google and every retry then fails on
+  transport, the edit reports "Not changed" though Google may hold it.
+
+Test hang (pre-existing, batch 1): `test_cipm51` called a full `update()` on a
+withdrawn root; on macOS that spins forever in Tk's run loop
+(`TkMacOSXDrawAllViews`) when it is not the first Tk test in the process. Now
+`update_idletasks()`. Found with pytest-timeout and `sample`.
+
 Dropped as low, with reasons:
 - No `If-Match` etag on update/delete: the gap is the seconds between GET and
   PUT, and the app is the only writer the user drives at that moment.
