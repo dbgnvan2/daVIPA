@@ -21,6 +21,7 @@ import customtkinter as ctk
 
 from ..models import ActionItem, BlockType, Status, TimeBlock
 from ..color_contrast import contrast_ratio
+from .drag_schedule_support import interpolate_hex_color
 from ..priority_levels import level_cell_fill, row_fill
 from ..theme import (
     block_type_colors,
@@ -211,11 +212,13 @@ class DepthBarStack(ctk.CTkFrame):
     BAR_HEIGHT_PX = 3
     BAR_GAP_PX = 2
 
-    def __init__(self, parent, depth: Optional[str], **kwargs):
+    def __init__(self, parent, depth: Optional[str], colors=None, **kwargs):
         kwargs.setdefault("fg_color", "transparent")
         super().__init__(parent, **kwargs)
         self.filled = depth_bars(depth)
-        colors = depth_bar_colors()
+        # ``colors`` -- PSC-M2: an item row on a Category fill passes its own,
+        # because the theme pair is tuned to the theme surface.
+        colors = colors or depth_bar_colors()
 
         # Drawn top-heavy: the deepest bar sits at the top of the stack, so a
         # column of blocks reads as a bar chart down the day.
@@ -423,7 +426,18 @@ def build_item_row(
         font=ctk.CTkFont(size=12, weight="bold"),
     ).grid(row=0, column=CHIP_MARKER_COLUMN, sticky="w", pady=(5, 0))
 
-    bars = DepthBarStack(frame, item.depth)
+    bars = DepthBarStack(
+        frame,
+        item.depth,
+        colors=(
+            {
+                "filled": row_text,
+                "empty": interpolate_hex_color(fill.fill, row_text, 0.35),
+            }
+            if fill.fill
+            else None
+        ),
+    )
     # The title's own vertical alignment, not the top of the row and not the
     # bottom of it: "justify vertically like TEXT on the line". The stack is
     # shorter than a line of text, so the sticky is the whole of where it
