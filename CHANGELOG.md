@@ -9,15 +9,16 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed — the APE add button moved to the left panel (2026-11-12)
 
-- **APE Quarter Assignment and APE Month Assignment add from the left.** The
+- **APE Quarter Assignment and APE Month Assignment assign from the left.** The
   bottom button moved from under the right panel to under the left one and was
-  renamed: `Assign APE to Quarter` is now **Add APE Quarter**, and `Assign APE
-  to Month` is now **Add APE Month**. The dialog's options and what it writes
-  are unchanged. The left panel holds the Annual Plan Elements the
-  dialog asks you to choose from, so the control now sits with the records it
-  reads rather than at the opposite end of the screen. The dialog's own title
-  follows its button — "Add APE Quarter Q4", where it used to read "Assign APE
-  to Quarter Q4" under a button that no longer said that.
+  renamed to say what gets assigned to what: `Assign APE to Quarter` is now
+  **Assign APE Annual to Quarter**, and `Assign APE to Month` is now **Assign
+  APE Quarter to Month**. It is the left panel's record that is being assigned
+  the quarter or month the screen is showing — nothing creates a quarter or a
+  month — so the control now sits under the panel it acts on rather than at the
+  opposite end of the screen. The dialog's options and what it writes are
+  unchanged, and its title follows the button: "Assign APE Annual to Quarter
+  Q4", where it used to read "Assign APE to Quarter Q4".
 - **The other two tabs keep their buttons under the right panel.** Annual Plan
   Elements reports the outcome of an add *beside* its button, on a status line
   parented to that same row, so moving the button there means moving the
