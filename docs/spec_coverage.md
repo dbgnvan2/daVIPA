@@ -2147,6 +2147,8 @@ chose to file one:
   that approval, so the numbers were put to the user, who chose to ship and
   file rather than alter the colours or add a border. Dark mode improves
   (13.4:1 against 2.27:1). No assertion covers it; it is the plan's §8 item 4.
+  **Fixed 2026-11-12:** bordered cell, `screens/priority_cell.py`; guard
+  `test_pcca3_a_filled_cell_has_an_edge_on_every_row_surface`.
 
 ## LM — lunch moves to any box, in either direction (2026-11-12)
 

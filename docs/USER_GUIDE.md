@@ -856,6 +856,8 @@ Priority Colours (added 2026-11-08; moved from the row to the Priority cell 2026
 - One colour per level, used in both light and dark mode. The cell's *text*
   colour is chosen automatically for contrast against whatever you pick, so a
   pale colour gets dark text in either mode.
+- A coloured cell or chip has a thin border in its text colour (2026-11-12), so
+  a pale colour still stands out on a white row or a completed row's green.
 - **A VSP segment colour no longer competes with these.** It fills the row;
   these colour one cell on it, so both can show at once. Where Today, Upcoming
   and All Items colour a row from its segment, that row picks its own text
