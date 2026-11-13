@@ -7,6 +7,17 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — the APE add button moved to the left panel (2026-11-12)
+
+- **APE Quarter Assignment and APE Month Assignment add from the left.** The
+  bottom button moved from under the right panel to under the left one and was
+  renamed: `Assign APE to Quarter` is now **Add APE Quarter**, and `Assign APE
+  to Month` is now **Add APE Month**. The dialog, its options and what it
+  writes are unchanged. The left panel holds the Annual Plan Elements the
+  dialog asks you to choose from, so the control now sits with the records it
+  reads rather than at the opposite end of the screen. Annual Plan Elements and
+  APE Week Assignment keep their buttons under the right panel.
+
 ### Changed — the VSP Plan tabs: the tick is a filter, and every tab adds (2026-11-11)
 
 - **A tick on the left now filters the right panel.** On Annual Plan Elements,
