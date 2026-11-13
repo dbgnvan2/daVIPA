@@ -237,3 +237,112 @@ function.
 **Effort:** Small
 
 **Closed:** Fixed 2026-11-13, BSF-M3: a 60-second timeout, reported as skipped. The only subprocess call in `tools/agents/`.
+
+## Closed by the PRC batch (priority score cell, 2026-11-13)
+
+### PBG-A1 — `PRIORITY_BANDS` has no reader in `src/` (low)
+
+PBG-M5 deleted `priority_band` and the three colour tables it fed, because the
+Plan screen was their only user and it draws the priority *level* badge now.
+`PRIORITY_BANDS` (`time_block_layout.py:66`) survived: it is the arithmetic,
+and `tests/test_priority_floor_and_cap.py:231` measures the score's cap against
+the top threshold, as does
+`test_priority_level_colors.py::test_plcm14_a_big_score_is_not_a_critical_level`.
+`UNSCORED_BAND` did not — the PBG sweep deleted it, because `priority_band`
+was its only reader and nothing was left to use the name.
+
+So `PRIORITY_BANDS` is not dead, but its only readers are tests. Either is
+defensible — it is a true statement about `priority_score` whether or not
+anything colours it — and the decision is worth making deliberately rather
+than by default.
+
+Fix when touched: either delete it and rewrite those two tests against
+`PriorityFactors.MAX_SCORE`, or keep it and say in the comment that it is a
+scale with no renderer. The comment says the second today.
+
+**Closed:** Closed 2026-11-13 as deliberate: the comment on `PRIORITY_BANDS` already says it is a scale with no renderer, which is the second option the entry offered.
+
+### PBG-A10 — a pre-cap score is wider than the cell reserved for it (low)
+
+`priority_score` is capped at `PriorityFactors.MAX_SCORE`, but rows written
+before PRI-M2 still hold the raw product, up to 102400. `P:102400` is 59px of
+text and 71px with the badge's corner-radius padding, against the 60px the
+Plan row and the five list screens each reserve — so such a row overflows its
+column and takes the width out of its neighbour. Pre-existing on the five list
+screens; the Plan badge inherits it.
+
+Fix when touched: either migrate the stored scores to the cap once, which is
+the only way the displayed number stops disagreeing with what the app can
+produce, or render `min(score, MAX_SCORE)` and say in the guide that it is
+capped.
+
+**Closed:** Fixed 2026-11-13, PRC-M1: a migration sets any stored score above `PriorityFactors.MAX_SCORE` to the cap, which is what recomputing it gives.
+
+### PCC-A1 — the parent/child pickers draw an uncoloured priority score (low)
+
+`screens/item_editor_dialogs.py:257` and `:476` draw a `P:{priority_score}`
+label under a `"Priority"` header with no colour at all. They are the only
+other place in the app where a priority score appears in a list, so after PCC
+the same number is colour-coded on the five list screens and plain here.
+
+Left alone deliberately: the user named the list screens, and a dialog that has
+never been coloured is not the red PCC replaced. Whether a picker dialog should
+carry the scheme at all is a design question, not a defect.
+
+Fix when touched: call `priority_levels.level_cell_fill(settings, item)` and
+pass `fill`/`text_color` to the label, as the five row builders now do. The
+authority already derives legible text for any colour the user picks, so there
+is nothing to work out — only the decision to do it.
+
+The other finding, the score column's width (`width=60` in four screens,
+`width=80` in All Items), is already open as `PRI-A2` and is not filed twice.
+
+**Closed:** Fixed 2026-11-13, PRC-M3: both pickers draw the cell through `build_level_cell` with `level_cell_fill`.
+
+### PRI-A2 — the score column's width is a magic number in five places (low)
+
+```
+grep -n "priority_score" src/getmoredone/screens/*.py
+```
+
+Five render sites, not the six the plan says: `width=60` in `today.py`,
+`completed.py`, `hierarchical.py` and `upcoming.py`, and `width=80` in
+`all_items.py`. The plan's sixth figure, `70`, is the Timer button in
+`today.py`, not a score column — that is the plan's error, not a width that has
+since moved.
+
+**Priority:** Low
+**Effort:** Low
+
+**Closed:** Fixed 2026-11-13, PRC-M2: `SCORE_CELL_WIDTH_PX` and `ALL_ITEMS_SCORE_CELL_WIDTH_PX` in `screens/priority_cell.py`; the Plan badge uses the first.
+
+### PRI-A3 — All Items shows the bare score, the other four show `P:n` (low)
+
+`all_items.py` renders `str(item.priority_score)` in an 80px slot with a
+`"Priority"` column header; the other four render `f"P:{item.priority_score}"`
+in 60px with **no** header. The plan has this the wrong way round: it says
+"only `today.py` has a header to match", and `grep -rn '"Priority"'
+src/getmoredone/screens/` shows the header is `all_items.py`'s and nobody
+else's. So the one screen whose column is labelled is also the one that drops
+the `P:` prefix, which is the opposite of the reasoning the plan gives.
+
+With a four-digit score now possible, the 60px slot is the one to measure
+first: `PRI-M3` was specced for exactly this and is not built (`PRIT-N1`).
+
+**Priority:** Low
+**Effort:** Low
+
+**Closed:** Fixed 2026-11-13, PRC-M2: All Items writes `P:n` through `score_text`, as the other four do.
+
+### PRI-A4 — demo data bypasses the defaults and the floor (low — a note, not a defect)
+
+`src/getmoredone/demo_data.py` calls `create_action_item(..., apply_defaults=False)`
+at both of its two call sites and hard-codes its factors, so a demo database
+demonstrates neither Defaults nor the floor. Correct as designed; filed because
+it is why `python tools/create_demo_data.py` will not show this feature, which
+is worth knowing before anyone tests it that way.
+
+**Priority:** Low
+**Effort:** Low
+
+**Closed:** Closed 2026-11-13 as a note: correct as designed, and the entry itself says so.

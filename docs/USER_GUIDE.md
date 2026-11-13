@@ -827,7 +827,11 @@ Priority Colours (added 2026-11-08; moved from the row to the Priority cell 2026
   **priority levels**. A priority level is a rule on an item's own Importance
   and Urgency, and it colours the Priority cell in Today, Upcoming, All Items,
   Hierarchical and Completed, and in the Action Items panel of APE Week
-  Assignment, which draws Today's rows.
+  Assignment, which draws Today's rows. Since 2026-11-13 it also colours the
+  Priority cell in the Set Parent and Show Related pickers, and every one of
+  those screens writes the score as `P:n` (All Items wrote the bare number).
+  A score is never more than 9999; an item saved before the cap that held a
+  larger number is set to 9999 when the app next opens its database.
 - Why: The old behaviour had one tint, a pale red, for Critical items only, with
   no way to change it and no tier between Critical and nothing.
 - **Changed on 2026-11-11.** Between 2026-11-08 and then these colours tinted

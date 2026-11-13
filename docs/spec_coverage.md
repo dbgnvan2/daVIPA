@@ -2443,3 +2443,13 @@ Plan: `docs/unused-docs/implementation_plan_2026-11-13_backlog_small_fixes.md`.
 | **BSF-M5** | the last two hex parses go through `color_contrast` (SCV-A1, SCV-A3) | done | `screens/drag_schedule_support.py`, `screens/item_editor_weekly_tactic_dialog.py` | `tests/test_segment_colour_validation.py::test_bsfm5_the_two_last_hand_parses_go_through_the_authority` |
 | **BSF-M6** | a second LUNCH block on one date is refused (LMM-A2) | done | `db_manager.py::add_block_at` | `tests/test_time_block_crud.py::test_bsfm6_a_second_lunch_block_on_one_date_is_refused` |
 | **BSF-M7** | apt retries inside a step time limit (CI-A1) | done | `.github/workflows/tests.yml` | `tests/test_ci_contract.py::test_bsfm7_every_apt_call_retries_inside_a_time_limit` |
+
+## Priority column (PRC, 2026-11-13)
+
+Backlog items PBG-A10, PRI-A2, PRI-A3 and PCC-A1. No plan file; this table is the record.
+
+| ID | Criterion | Status | Where | Proof |
+|---|---|---|---|---|
+| **PRC-M1** | a stored score above the cap is set to the cap when the database opens; others untouched | done | `database.py::_run_migrations` | `tests/test_priority_floor_and_cap.py::test_prcm1_a_pre_cap_score_is_capped_when_the_database_opens` |
+| **PRC-M2** | all five list screens write `P:n` through `score_text`; widths are named constants shared with the Plan badge | done | `screens/priority_cell.py`, the five row builders, `screens/plan_blocks.py` | `tests/test_priority_level_colors.py::test_prcm2_every_screen_writes_the_score_as_p_n` |
+| **PRC-M3** | the Set Parent and Show Related pickers colour the score cell by level | done | `screens/item_editor_dialogs.py::_priority_cell` | `tests/test_priority_level_colors.py::test_prcm3_a_picker_row_draws_the_level_colour` |

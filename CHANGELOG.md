@@ -7,6 +7,17 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — one Priority cell across the app (2026-11-13)
+
+- **All Items writes the score as `P:n`**, as Today, Upcoming, Hierarchical
+  and Completed do. (PRC-M2, PRI-A3)
+- **The Set Parent and Show Related pickers colour the Priority cell** by
+  priority level, as the list screens do. (PRC-M3, PCC-A1)
+- **A score saved before the 9999 cap is capped** when the database opens, so
+  it fits its cell and sorts with the rest. (PRC-M1, PBG-A10)
+- The score cell's width is one named constant, not a number in five places.
+  (PRC-M2, PRI-A2)
+
 ### Fixed — backlog items that named their fix (2026-11-13)
 
 - **A date holds one lunch block.** The write that adds a time block refuses a
