@@ -212,11 +212,21 @@ def test_cipm53_a_second_fetch_of_the_same_range_is_refused(screen, root, factor
     ("never", "Calendar not read for this day"),
     ("read", "Calendar as of 09:00"),
     ("failed", "Calendar read failed — 503 (showing what was known at 09:00)"),
+    ("partial", "Calendar as of 09:00 — not read: team"),
 ])
 def test_cipm54_the_age_of_the_answer_is_shown(screen, manager, state, expected):
-    """CIP-M5.4 -- the line above the grid says how old the answer is."""
+    """CIP-M5.4 -- the line above the grid says how old the answer is.
+
+    Read "today", so the time is shown alone; another day's read shows its
+    date (``test_cipm54_an_answer_from_another_day_shows_its_date``).
+    """
+    today_at_nine = datetime.now().replace(hour=9, minute=0, second=0, microsecond=0)
     if state in ("read", "failed"):
-        _hold(manager)
+        _hold(manager, at=today_at_nine.isoformat())
+    if state == "partial":
+        manager.replace_commitments_for_dates(
+            [THURSDAY], [], today_at_nine.isoformat(), warning="not read: team"
+        )
     if state == "failed":
         manager.record_commitment_fetch_failure([THURSDAY], "503", "2026-11-05T09:30:00")
 
@@ -418,3 +428,23 @@ def test_cipm39_both_overlapping_commitments_are_drawn(screen, manager):
     assert "10:00–10:30  One" in texts
     assert "10:00–11:00  Two" in texts
     assert screen._committed == frozenset({TEN, TEN + 1})
+
+
+def test_cipm34_an_ignored_meeting_before_the_day_is_listed_and_can_be_held_again(
+    screen, manager, monkeypatch
+):
+    """CIP-M3.4 -- ignored, it no longer widens the day; the strip shows it, with its menu."""
+    _hold(manager, _commitment(420, 450, title="Standup"))  # 07:00, Day Start 08:00
+    screen.load_blocks()
+    assert "07:00–07:30  Standup" in _drawn_texts(screen.blocks_scroll)
+    [(_label, ignore)] = screen.commitment_menu_entries(manager.get_commitments(THURSDAY)[0])
+
+    bound = []
+    monkeypatch.setattr(screen, "bind_commitment_handlers",
+                        lambda widget, commitment: bound.append((widget, commitment.title)))
+
+    ignore()
+
+    [line] = screen._strip_labels
+    assert line.cget("text") == "(ignored) 07:00–07:30  Standup (outside the drawn day)"
+    assert (line, "Standup") in bound

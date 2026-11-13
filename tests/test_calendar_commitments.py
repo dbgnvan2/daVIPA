@@ -167,7 +167,7 @@ def test_cipm13_three_states_of_a_date(manager):
     manager.replace_commitments_for_dates([DAY], [], "2026-11-13T09:00:00")
     empty = manager.get_commitment_fetch(DAY)
     assert empty == {"fetched_at": "2026-11-13T09:00:00", "last_error": None,
-                     "attempted_at": "2026-11-13T09:00:00"}
+                     "attempted_at": "2026-11-13T09:00:00", "warning": None}
     assert manager.get_commitments(DAY) == []
 
     manager.record_commitment_fetch_failure([DAY], "503", "2026-11-13T09:20:00")
@@ -359,6 +359,7 @@ def test_cipm27_a_failed_fetch_keeps_what_was_known(manager):
         "fetched_at": "2026-11-13T08:00:00",
         "last_error": "Failed after 3 attempts: 503",
         "attempted_at": "2026-11-13T09:00:00",
+        "warning": None,
     }
 
 
@@ -398,15 +399,32 @@ def test_cipd6_a_non_retryable_403_is_forbidden():
 
 
 def test_cipm28_one_event_on_two_calendars_is_one_commitment():
-    """CIP-M2.8 -- deduplicated on the event, editable if any copy is."""
-    invitation = _event(organizer={"self": False})
-    shared = _event(organizer={"self": False}, guestsCanModify=True)
+    """CIP-M2.8 -- one commitment, decided by the copy on the calendar listed first.
 
-    result = fetch_commitments(DAY, DAY, client=FakeCalendar({"a": [invitation], "b": [shared]}),
+    ``organizer.self`` describes the calendar a copy is on: a colleague's
+    shared calendar says "organizer" for a meeting the user only attends.
+    """
+    mine = _event(organizer={"self": False})
+    colleagues = _event(organizer={"self": True})
+
+    result = fetch_commitments(DAY, DAY, client=FakeCalendar({"a": [mine], "b": [colleagues]}),
                                calendar_ids=["a", "b"], tz=TZ)
 
     assert len(result.commitments) == 1
-    assert result.commitments[0].can_edit is True
+    assert result.commitments[0].can_edit is False
+    assert result.commitments[0].calendar_id == "a"
+
+
+def test_cipm28_declined_on_my_calendar_is_left_out_whatever_a_shared_copy_says():
+    """CIP-M2.8 -- the user's own copy decides; the colleague's "accepted" does not."""
+    declined = _event(attendees=[{"self": True, "responseStatus": "declined"}])
+    accepted = _event(attendees=[{"self": True, "responseStatus": "accepted"}])
+    client = FakeCalendar({"primary": [declined], "team": [accepted]})
+
+    result = fetch_commitments(DAY, DAY, client=client, calendar_ids=["primary", "team"], tz=TZ)
+
+    assert result.commitments == []
+    assert result.excluded["declined"] == 1
 
 
 @pytest.mark.parametrize("event_fields, editable", [
@@ -491,16 +509,6 @@ def _resize(manager):
     manager.set_block_length(block.id, 60, BOUNDS)
 
 
-def _adopt(manager):
-    _hold_ten(manager)
-    manager.create_time_block(TimeBlock(
-        block_date=DAY, start_time="10:00", end_time="10:30", planned_minutes=30,
-        label="Old", block_type=BlockType.BREAK,
-    ))
-    assert manager.adopt_legacy_day(DAY, BOUNDS) == []
-    raise SlotRefusedError(SlotRefusal.SLOT_COMMITTED)
-
-
 def _repair(manager):
     block = _block(manager, 1)
     # A row from before PD-M14.4: box 1 (08:30), recorded as planned at 10:00.
@@ -516,8 +524,8 @@ def _repair(manager):
     raise SlotRefusedError(repair.refused)
 
 
-@pytest.mark.parametrize("write", [_add, _move, _resize, _adopt, _repair],
-                         ids=["add", "move", "resize", "adopt", "repair"])
+@pytest.mark.parametrize("write", [_add, _move, _resize, _repair],
+                         ids=["add", "move", "resize", "repair"])
 def test_cipm33_every_write_path_refuses_a_committed_slot(manager, write):
     """CIP-M3.3 / D2 -- each db writer reads the date's commitments itself."""
     with pytest.raises(SlotRefusedError) as refused:
@@ -525,6 +533,26 @@ def test_cipm33_every_write_path_refuses_a_committed_slot(manager, write):
 
     assert refused.value.reason == SlotRefusal.SLOT_COMMITTED
     assert all(b.slot_index != 4 for b in manager.get_time_blocks(DAY))
+
+
+@pytest.mark.parametrize("held", [True, False], ids=["under-a-meeting", "control"])
+def test_cipm33_adoption_does_not_put_a_block_under_a_meeting(manager, held):
+    """CIP-M3.3 -- adoption asks ``can_place`` with the date's commitments.
+
+    ``adopt_legacy_day`` returns only what it adopted, so the control case
+    shows the same row is adopted when no meeting is there.
+    """
+    if held:
+        _hold_ten(manager)
+    old_id = manager.create_time_block(TimeBlock(
+        block_date=DAY, start_time="10:00", end_time="10:30", planned_minutes=30,
+        label="Old", block_type=BlockType.BREAK,
+    ))
+
+    adopted = manager.adopt_legacy_day(DAY, BOUNDS)
+
+    assert adopted == ([] if held else [old_id])
+    assert manager.get_time_block(old_id).slot_index == (None if held else 4)
 
 
 def test_cipd12_a_block_under_a_new_commitment_can_still_be_shortened(manager):
@@ -623,3 +651,119 @@ def test_cipm31_an_exported_day_read_back_holds_no_slot(manager):
     assert manager._committed_for(DAY, BOUNDS) == frozenset()
     manager.place_block_at(first.id, 3, BOUNDS)
     manager.place_block_at(second.id, 2, BOUNDS)
+
+
+# =====================================================================
+# D6 -- a read that worked but did not read everything (learning-qa, CIP)
+# =====================================================================
+
+
+def test_cipd6_a_skipped_calendar_keeps_its_known_meetings(manager):
+    """D6 -- a revoked calendar did not say its meetings are gone; they stay, and the date says so."""
+    manager.replace_commitments_for_dates([DAY], [
+        _commitment(600, 630, event_id="team-1"),
+        _commitment(700, 730, event_id="old-primary"),
+    ], "2026-11-13T08:00:00")
+    with manager.transaction() as conn:
+        conn.execute("UPDATE calendar_commitments SET calendar_id = 'team' WHERE event_id = 'team-1'")
+    client = FakeCalendar({"primary": []}, errors={"team": CalendarForbidden("403 forbidden")})
+
+    outcome = refresh_commitments(DAY, DAY, client_factory=lambda: client,
+                                  db_path=manager.db.db_path, calendar_ids=["primary", "team"],
+                                  tz=TZ, now=lambda: datetime(2026, 11, 13, 9, 0))
+
+    assert outcome.failure is None
+    assert [c.event_id for c in manager.get_commitments(DAY)] == ["team-1"]
+    fetch = manager.get_commitment_fetch(DAY)
+    assert fetch["warning"] == "not read: team"
+    assert fetch["last_error"] is None
+    assert cc.age_text(fetch, now=datetime(2026, 11, 13, 9, 5)) == (
+        "Calendar as of 09:00 — not read: team", "warning"
+    )
+
+
+def test_cipd6_an_unparseable_event_keeps_its_known_row(manager):
+    manager.replace_commitments_for_dates([DAY], [_commitment(600, 630, event_id="odd")], "t1")
+    broken = _event("odd", summary="Odd one", start="2026-11-13T09:00:00")  # no offset
+
+    refresh_commitments(DAY, DAY, client_factory=lambda: FakeCalendar({"primary": [broken]}),
+                        db_path=manager.db.db_path, calendar_ids=["primary"], tz=TZ)
+
+    assert [c.event_id for c in manager.get_commitments(DAY)] == ["odd"]
+    assert manager.get_commitment_fetch(DAY)["warning"] == "could not read Odd one"
+
+
+def test_cipd6_a_403_with_no_readable_reason_is_not_forbidden():
+    """D6 -- only a 403 whose reason is known is "forbidden for good"."""
+    service = FakeService(errors={"list": [_http_error(403)]})  # body "{}": no reason
+
+    with pytest.raises(RuntimeError) as raised:
+        _manager(service).list_events_between("t0", "t1", "shared")
+
+    assert not isinstance(raised.value, CalendarForbidden)
+
+
+def test_cipm54_an_answer_from_another_day_shows_its_date():
+    """CIP-M5.4 -- yesterday's 16:40 does not read as this afternoon's."""
+    fetch = {"fetched_at": "2026-11-12T16:40:00", "last_error": "offline", "warning": None}
+
+    text, kind = cc.age_text(fetch, now=datetime(2026, 11, 13, 9, 0))
+
+    assert text == "Calendar read failed — offline (showing what was known at 2026-11-12 16:40)"
+    assert kind == "warning"
+
+
+# =====================================================================
+# Dismissal across reads (cold review, CIP)
+# =====================================================================
+
+
+def test_cipm15_a_row_keeps_its_id_across_reads(manager):
+    """A menu opened before a read still names its meeting after it."""
+    manager.replace_commitments_for_dates([DAY], [_commitment(600, 630, can_edit=False)], "t1")
+    before = manager.get_commitments(DAY)[0].id
+
+    manager.replace_commitments_for_dates([DAY], [_commitment(600, 630, can_edit=False)], "t2")
+
+    assert manager.get_commitments(DAY)[0].id == before
+    assert manager.set_commitment_dismissed(before, True).dismissed is True
+
+
+def test_cipm15_an_ignored_meeting_that_becomes_editable_holds_again(manager):
+    """D9 -- an ignore is for someone else's meeting; once editable it holds its time."""
+    manager.replace_commitments_for_dates([DAY], [_commitment(600, 630, can_edit=False)], "t1")
+    manager.set_commitment_dismissed(manager.get_commitments(DAY)[0].id, True)
+
+    manager.replace_commitments_for_dates([DAY], [_commitment(600, 630, can_edit=True)], "t2")
+
+    assert manager.get_commitments(DAY)[0].dismissed is False
+    assert manager._committed_for(DAY, BOUNDS) == frozenset({4})
+
+
+def test_cipm15_a_read_holds_the_write_lock_before_it_reads_dismissals(manager, monkeypatch):
+    """A dismissal saved by the screen mid-read must wait, not be overwritten."""
+    manager.replace_commitments_for_dates([DAY], [
+        _commitment(600, 630, can_edit=False),
+        _commitment(700, 730, event_id="kept", can_edit=False),
+    ], "t1")
+    row_id = [c.id for c in manager.get_commitments(DAY) if c.event_id == "ev1"][0]
+    blocked = []
+    real = manager._row_to_commitment
+
+    def dismiss_from_another_connection(row):
+        other = sqlite3.connect(manager.db.db_path, timeout=0)
+        try:
+            other.execute("UPDATE calendar_commitments SET dismissed = 1 WHERE id = ?", (row_id,))
+            other.commit()
+        except sqlite3.OperationalError as error:
+            blocked.append(str(error))
+        finally:
+            other.close()
+        return real(row)
+
+    monkeypatch.setattr(manager, "_row_to_commitment", dismiss_from_another_connection)
+    manager.replace_commitments_for_dates(
+        [DAY], [_commitment(600, 630, can_edit=False)], "t2", keep_event_ids=["kept"]
+    )
+
+    assert blocked == ["database is locked"]
