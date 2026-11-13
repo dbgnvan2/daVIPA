@@ -463,7 +463,10 @@ Items pane (left):
   from. Each row is one line, laid out exactly like a task inside a day box:
   title, a mark saying whether the item is scheduled, the depth bars, the
   priority badge, and the block length it would get (`30m`) at the right-hand
-  end. The
+  end. Since 2026-11-12 a row linked to a Vision Planning Category is filled
+  with that Category's colour, as on Today and the other list screens, with
+  its text recoloured to stay readable; an unlinked row keeps the plain row
+  colour. The
   mark is a **green ✓** when the day already holds a block for this item and a
   **red ?** when it holds none, so the column says something about every row
   rather than only about the scheduled ones. It is a mark rather than the words

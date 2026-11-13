@@ -2417,3 +2417,16 @@ override out of that helper turns it red. The identical one-line override in
 `tests/test_first_run.py::_run_selftest` has no guard of its own:
 `effort-budget.md` §9 allows one guard per finding, and a second copy of the
 same assertion would buy the second call site at the cost of the ratio.
+
+## Plan item rows take the Category colour (PSC, 2026-11-12)
+
+User-reported: Plan's item rows ignored the Vision Planning Category colour the
+five list screens draw. No plan file; this table is the record.
+
+| ID | Criterion | Status | Where | Proof |
+|---|---|---|---|---|
+| **PSC-M1** | a Plan item row linked to a Category is filled with its colour, text derived from the fill; unlinked rows unchanged | done | `screens/plan.py::_segment_color_resolver`, `screens/plan_blocks.py::build_item_row` | `tests/test_plan_screen.py::test_pscm1_a_category_colour_fills_the_item_row`, `::test_pscm1_the_plan_screen_passes_each_items_category_colour`; red with the hand-off removed |
+| **PSC-M2** | the ✓/? mark stays ≥3:1 on a Category fill | done | `screens/plan_blocks.py::_mark_color` | `::test_pscm1_a_category_colour_fills_the_item_row`; red with the fallback removed |
+
+Not covered: the day-pane blocks are not Category-coloured (not asked for), and
+the depth bars were not measured on a fill.
