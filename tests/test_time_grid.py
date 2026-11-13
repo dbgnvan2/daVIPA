@@ -193,11 +193,15 @@ def test_a_block_may_not_start_on_lunch_either():
 
 
 def test_tgm23_each_refusal_has_its_own_reason():
-    """TG-M2.3 — three refusals, three distinct named values.
+    """TG-M2.3 / CIP-M3.3 — four refusals, four distinct named values.
 
-    One shared "no" would reach the user as one sentence for three different
+    One shared "no" would reach the user as one sentence for four different
     situations, which is the thing the single ``DAY_TOO_FULL`` string was
     written to avoid in the previous model.
+
+    Rewritten 2026-11-13 (reason b): ``SLOT_COMMITTED`` is a fourth answer
+    ``can_place`` gives. ``LUNCH_EXISTS`` is raised only by ``add_block_at``,
+    so it is not one of these, and the exact count says so.
     """
     full_slot = [_block(30, slot_index=0, position=n) for n in range(MAX_BLOCKS_PER_SLOT)]
 
@@ -206,14 +210,16 @@ def test_tgm23_each_refusal_has_its_own_reason():
         can_place([], BOUNDS, 17, 2),
         can_place([], BOUNDS, 8, 1),
         can_place(full_slot, BOUNDS, 0, 1),
+        can_place([], BOUNDS, 2, 1, committed=frozenset({2})),
     }
 
     assert reasons == {
         SlotRefusal.OUTSIDE_GRID,
         SlotRefusal.CROSSES_LUNCH,
         SlotRefusal.SLOT_FULL,
+        SlotRefusal.SLOT_COMMITTED,
     }
-    assert len({SlotRefusal.OUTSIDE_GRID, SlotRefusal.CROSSES_LUNCH, SlotRefusal.SLOT_FULL}) == 3
+    assert len(reasons) == 4
 
 
 def test_a_block_running_past_the_last_box_is_outside_the_grid():
@@ -542,3 +548,88 @@ def test_a_time_that_cannot_be_placed_returns_none(start_time):
     "the first box" and use the row's position instead of inventing a slot.
     """
     assert slot_index_for_time(start_time, BOUNDS) is None
+
+
+# =====================================================================
+# CIP-M3 -- calendar commitments hold boxes
+# =====================================================================
+
+
+def _commitment(start: str, end: str, *, dismissed=False, all_day=False, title="Meeting"):
+    from src.getmoredone.models import CalendarCommitment
+    from src.getmoredone.time_block_layout import parse_hhmm
+
+    return CalendarCommitment(
+        event_id=f"ev-{start}-{end}-{title}",
+        calendar_id="primary",
+        commitment_date=DAY,
+        start_time=start,
+        end_time=end,
+        start_minutes=0 if all_day else parse_hhmm(start),
+        end_minutes=0 if all_day else (1440 if end == "24:00" else parse_hhmm(end)),
+        title=title,
+        is_all_day=all_day,
+        dismissed=dismissed,
+    )
+
+
+def test_cipm32_a_commitment_holds_every_slot_it_touches():
+    """CIP-M3.2 — start rounded down, end rounded up: 09:50--10:00 holds 09:30."""
+    from src.getmoredone.calendar_commitments import committed_slots, slots_held_by
+
+    assert slots_held_by(_commitment("09:50", "10:00"), BOUNDS) == [3]
+    assert slots_held_by(_commitment("09:00", "10:00"), BOUNDS) == [2, 3]
+    assert slots_held_by(_commitment("09:10", "10:05"), BOUNDS) == [2, 3, 4]
+    # Dismissed and all-day commitments hold nothing (CIP-M3.4, CIP-M3.8).
+    assert committed_slots(
+        [_commitment("09:00", "10:00", dismissed=True), _commitment("", "", all_day=True)],
+        BOUNDS,
+    ) == frozenset()
+
+
+def test_cipm39_overlaps_hold_the_union():
+    """CIP-M3.9 — two overlapping meetings hold every box either touches."""
+    from src.getmoredone.calendar_commitments import committed_slots
+
+    held = committed_slots(
+        [_commitment("09:00", "10:00"), _commitment("09:30", "11:00", title="Other")],
+        BOUNDS,
+    )
+
+    assert held == frozenset({2, 3, 4, 5})
+
+
+def test_cipm35_slot_occupancy_does_not_count_a_commitment():
+    """CIP-M3.5 — a committed box is refused outright, not counted as an occupant.
+
+    Three blocks in a box leave room for a fourth; a meeting there must say
+    SLOT_COMMITTED, not SLOT_FULL, and must not appear among the occupants.
+    """
+    three = [_block(30, slot_index=2, position=n) for n in range(MAX_BLOCKS_PER_SLOT - 1)]
+    committed = frozenset({2})
+
+    occupancy = slot_occupancy(three, BOUNDS)
+    grid = build_day_grid(three, BOUNDS, committed=committed)
+
+    assert len(occupancy[2]) == MAX_BLOCKS_PER_SLOT - 1
+    assert can_place(three, BOUNDS, 2, 1) is None
+    assert can_place(three, BOUNDS, 2, 1, committed=committed) == SlotRefusal.SLOT_COMMITTED
+    assert grid.slots_used == 1
+    assert grid.minutes_occupied == SLOT_MINUTES
+
+
+def test_cipm37_an_early_commitment_widens_the_day():
+    """CIP-M3.7 / D8 — a 07:00 standup pulls the drawn day up to 07:00."""
+    from src.getmoredone.calendar_commitments import committed_slots
+    from src.getmoredone.time_block_layout import span_for_blocks
+
+    committed = committed_slots([_commitment("07:00", "07:15")], BOUNDS)
+
+    span = span_for_blocks([], BOUNDS, committed=committed)
+    grid = build_day_grid([], BOUNDS, committed=committed)
+
+    assert committed == frozenset({-2})
+    assert span.first == -2
+    assert grid.slots[0].slot.start_time == "07:00"
+    assert span_for_blocks([], BOUNDS).first == 0
+

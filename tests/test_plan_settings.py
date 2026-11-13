@@ -889,3 +889,21 @@ def test_pdm54_an_already_confirmed_day_stays_confirmed(settings_file, tmp_path)
     finally:
         root.destroy()
         manager.close()
+
+
+@pytest.mark.parametrize("ids, stale, expected_ids, expected_stale", [
+    ("primary", "soon", ["primary"], 15),
+    ([" work@example.com ", "", 7], 0, ["work@example.com"], 15),
+    (["primary", "team"], 30, ["primary", "team"], 30),
+])
+def test_cipd7_a_string_calendar_list_falls_back(settings_file, ids, stale, expected_ids, expected_stale):
+    """CIP D7 -- a string is not read one letter at a time as calendars "p", "r", ...
+
+    Spec: docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_read_half.md#d7
+    """
+    _write(settings_file, plan_commitment_calendar_ids=ids, plan_commitment_stale_minutes=stale)
+
+    settings = AppSettings.load()
+
+    assert settings.plan_commitment_calendar_ids == expected_ids
+    assert settings.plan_commitment_stale_minutes == expected_stale

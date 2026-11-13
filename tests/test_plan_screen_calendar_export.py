@@ -583,12 +583,18 @@ def test_cem424_destroying_the_screen_cancels_the_poll(screen, monkeypatch):
     """
     screen._export_poll_id = screen.after(60_000, lambda: None)
     pending = screen._export_poll_id
+    # CIP D13: with credentials present the screen has also queued its
+    # automatic calendar read, and destroy cancels that too.
+    commitment_jobs = [
+        getattr(screen, name) for name in ("_refresh_poll_id", "_auto_refresh_id", "_claim_watch_id")
+        if getattr(screen, name, None) is not None
+    ]
     cancelled = []
     monkeypatch.setattr(screen, "after_cancel", cancelled.append)
 
     screen.destroy()
 
-    assert cancelled == [pending]
+    assert cancelled == [pending] + commitment_jobs
     assert screen._export_poll_id is None
 
 

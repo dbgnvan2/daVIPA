@@ -537,6 +537,9 @@ def test_cem343_every_event_call_goes_through_the_retry_helper():
 
     assert executing_functions == {
         "create_event", "update_event", "delete_event", "list_day_events",
+        # CIP-M2.1 / D11 -- the Plan's commitment read (reason b: a new call,
+        # through the retry helper like the rest).
+        "list_events_between",
     }, (
         "a method that calls the Google API appeared or disappeared; if it is "
         "new it needs the retry helper, and this list needs updating"
