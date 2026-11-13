@@ -196,8 +196,8 @@ class APEAssignmentScreen(ctk.CTkFrame):
         self.left_actions = left_actions
         ctk.CTkButton(
             left_actions,
-            text="Add APE Quarter",
-            width=200,
+            text="Assign APE Annual to Quarter",
+            width=250,
             command=self.open_add_dialog,
             **button_style("primary"),
         ).pack(side="left", padx=(0, 8))
@@ -440,10 +440,9 @@ class APEAssignmentScreen(ctk.CTkFrame):
     def open_add_dialog(self):
         """VTF-M3.2 — pick an APE and assign it to the selected quarter.
 
-        The title is the button's own label plus the period. It read "Assign
-        APE to Quarter Q3" after the button became "Add APE Quarter", which is
-        the one place on this screen the two disagreed; the other VSP tabs
-        title the dialog with their button's label.
+        The title is the button's own label plus the period. The two
+        disagreed once -- the button said one thing and the dialog another --
+        and the other VSP tabs title the dialog with their button's label.
         Tests: tests/test_vsp_tab_contracts.py::test_the_add_dialog_is_titled_for_its_button
         """
         parsed = self._parse_period()
@@ -452,7 +451,7 @@ class APEAssignmentScreen(ctk.CTkFrame):
         _year, quarter = parsed
         return open_pick_record_dialog(
             self,
-            title=f"Add APE Quarter Q{quarter}",
+            title=f"Assign APE Annual to Quarter Q{quarter}",
             prompt=f"Which Annual Plan Element should Q{quarter} carry?",
             options=self._add_options(),
             initial=self._add_default(),

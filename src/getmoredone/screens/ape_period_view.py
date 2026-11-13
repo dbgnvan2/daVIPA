@@ -202,8 +202,8 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         self.left_actions = left_actions
         ctk.CTkButton(
             left_actions,
-            text="Add APE Month",
-            width=190,
+            text="Assign APE Quarter to Month",
+            width=250,
             command=self.open_add_dialog,
             **button_style("primary"),
         ).pack(side="left", padx=(0, 8))
@@ -503,7 +503,7 @@ class APEPeriodViewScreen(ctk.CTkFrame):
         _year, _quarter, month = parsed
         return open_pick_record_dialog(
             self,
-            title=f"Add APE Month M{month}",
+            title=f"Assign APE Quarter to Month M{month}",
             prompt=f"Which Annual Plan Element should M{month} carry?",
             options=self._add_options(),
             initial=self._add_default(),
