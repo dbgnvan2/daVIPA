@@ -1951,7 +1951,7 @@ def test_updm52_a_row_delete_removes_that_row_not_the_selection():
     """UPD-M5.2 — the row's Delete deletes the row it is on.
 
     The screen already had a Delete that acted on the selection, so a per-row
-    button wired to `delete_selected_weekly_item` would look right and delete
+    button wired to the selection instead of its own row would look right and delete
     the wrong tactic. Row 2's button is pressed with row 1 selected, and the
     id the manager is given is the assertion.
     """
@@ -1978,12 +1978,11 @@ def test_updm52_a_row_delete_removes_that_row_not_the_selection():
 
 
 def test_updm53_delete_is_confirmed_before_it_happens():
-    """UPD-M5.3 — a refused confirmation deletes nothing, from either button.
+    """UPD-M5.3 — a refused confirmation deletes nothing.
 
-    Both the row's Delete and Delete Weekly go through one method, so the
-    confirmation cannot be present on one path and missing on the other. Both
-    are driven here: one method with two callers is only safe while both
-    callers really use it.
+    This drove two callers, the row's Delete and Delete Weekly. VTF-M5 removed
+    the Delete Weekly button and VTF-A2 its method, so the row's path is the
+    only one left to drive (case (b): the behaviour changed on purpose).
     """
     import src.getmoredone.screens.weekly_items as wi
 
@@ -1993,46 +1992,14 @@ def test_updm53_delete_is_confirmed_before_it_happens():
     wi.messagebox.askyesno = lambda title, msg, **_k: asked.append(msg) or False
     try:
         screen.delete_weekly_row({"id": "wt-1", "title": "Tactic 1"})
-        screen.on_select_weekly_item(0)
-        screen.delete_selected_weekly_item()
 
-        assert len(asked) == 2, asked
+        assert len(asked) == 1, asked
         assert all("Tactic 1" in msg for msg in asked), asked
         assert not any(call[0] == "delete" for call in screen.vps_manager.calls), (
             screen.vps_manager.calls
         )
     finally:
         wi.messagebox.askyesno = original
-        root.destroy()
-
-
-def test_updm54_delete_weekly_still_deletes_the_selection():
-    """UPD-M5.4 — the selection Delete survives the per-row one.
-
-    UPD-D5 keeps Edit Weekly Tactic and Add Action Item below the list; the
-    spec's §5 keeps Delete Weekly beside them and says both delete paths have
-    to pass, because two ways to delete one thing is the easy mistake here.
-    This is the second way.
-    """
-    import src.getmoredone.screens.weekly_items as wi
-
-    root, screen = _week_screen(right_rows=[_weekly_row(1), _weekly_row(2)])
-    original_ask = wi.messagebox.askyesno
-    original_warn = wi.messagebox.showwarning
-    warned = []
-    wi.messagebox.askyesno = lambda *_a, **_k: True
-    wi.messagebox.showwarning = lambda title, msg: warned.append(title)
-    try:
-        screen.delete_selected_weekly_item()
-        assert warned == ["No Weekly Item Selected"]
-        assert not any(c[0] == "delete" for c in screen.vps_manager.calls)
-
-        screen.on_select_weekly_item(1)
-        screen.delete_selected_weekly_item()
-        assert ("delete", "wt-2") in screen.vps_manager.calls
-    finally:
-        wi.messagebox.askyesno = original_ask
-        wi.messagebox.showwarning = original_warn
         root.destroy()
 
 
