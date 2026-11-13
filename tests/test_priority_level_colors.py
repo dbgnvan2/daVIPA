@@ -1369,7 +1369,7 @@ def _factor_chip_condition(builder):
     """The row builder's own test for "paint this factor chip red", compiled.
 
     Found by its effect rather than by its text: the one ``if`` in the builder
-    whose body writes ``label_kwargs["fg_color"]``. Returns a callable taking
+    whose body calls ``build_level_cell`` (PCC-A3; it wrote ``label_kwargs["fg_color"]`` before). Returns a callable taking
     the loop's own two names, so the screen's real condition runs against
     adversarial factors -- the same approach as ``_cell_fill_expression``, and for
     the same reason: the condition sits inside a ``for`` over a list of
@@ -1383,18 +1383,9 @@ def _factor_chip_condition(builder):
         # Only the branch that writes it *directly*. ``ast.walk`` descends, so
         # matching anywhere in the subtree also matched the enclosing
         # ``if self.columns_expanded:`` that draws the factor row at all.
-        for statement in node.body:
-            if (
-                isinstance(statement, ast.Assign)
-                and isinstance(target := statement.targets[0], ast.Subscript)
-                and isinstance(target.value, ast.Name)
-                and target.value.id == "label_kwargs"
-                and isinstance(target.slice, ast.Constant)
-                and target.slice.value == "fg_color"
-            ):
-                found.append(node.test)
-                break
-    assert len(found) == 1, f"found {len(found)} fg_color branches, not 1"
+        if any(_level_cell_call(statement) for statement in node.body):
+            found.append(node.test)
+    assert len(found) == 1, f"found {len(found)} level-cell branches, not 1"
     expression = ast.fix_missing_locations(ast.Expression(body=found[0]))
     code = compile(expression, "<factor-chip-condition>", "eval")
     module_globals = vars(inspect.getmodule(builder))
@@ -1533,66 +1524,28 @@ def test_scvm41_a_malformed_segment_colour_does_not_become_a_fill():
 #: The Priority cell's expected ``ctk.CTkLabel`` colour options, as
 #: ``ast.unparse`` renders them. Text and not a shape, so a swapped attribute
 #: or a dropped fallback fails -- ``None`` is a colour Tk rejects.
-EXPECTED_CELL_OPTIONS = {
-    "fg_color": "cell.fill or 'transparent'",
-    "text_color": "cell.text_color or row_text",
-    "corner_radius": "6 if cell.fill else 0",
-}
-
-#: The same, for a critical I/U factor chip.
-EXPECTED_CHIP_OPTIONS = {
-    "fg_color": "critical_chip.fill or 'transparent'",
-    "text_color": "critical_chip.text_color or row_text",
-    "corner_radius": "6",
-}
+def _level_cell_call(statement):
+    """The ``build_level_cell(...)`` call ``statement`` assigns, or ``None``."""
+    if isinstance(statement, ast.Assign) and isinstance(statement.value, ast.Call):
+        func = statement.value.func
+        if isinstance(func, ast.Name) and func.id == "build_level_cell":
+            return statement.value
+    return None
 
 
-def _label_calls_using(builder, name):
-    """Every ``ctk.CTkLabel`` call in ``builder`` that mentions ``name``.
+def _level_cell_colours(builder):
+    """The colour argument of every ``build_level_cell`` call in ``builder``.
 
-    Each is returned as ``{keyword: source text}``. Found by effect rather than
-    by position, for the reason ``_factor_chip_condition`` gives: these calls
-    sit inside loops in builders that cannot run without a Tk root.
+    PCC-A3: the cell and the chip are drawn by ``screens/priority_cell.py``, so
+    what a screen chooses is which ``RowFill`` it hands over, and that the
+    fallback text is the row's. Each call returned as ``(colour, row text)``.
     """
     tree = ast.parse(textwrap.dedent(inspect.getsource(builder)))
-    found = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        func = node.func
-        if not (isinstance(func, ast.Attribute) and func.attr == "CTkLabel"):
-            continue
-        if name not in {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}:
-            continue
-        found.append({kw.arg: ast.unparse(kw.value) for kw in node.keywords})
-    return found
-
-
-def _factor_chip_options(builder):
-    """What the critical-chip branch writes into ``label_kwargs``.
-
-    The same branch ``_factor_chip_condition`` finds, read for its assignments
-    instead of its test.
-    """
-    tree = ast.parse(textwrap.dedent(inspect.getsource(builder)))
-    found = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.If):
-            continue
-        written = {}
-        for statement in node.body:
-            if (
-                isinstance(statement, ast.Assign)
-                and isinstance(target := statement.targets[0], ast.Subscript)
-                and isinstance(target.value, ast.Name)
-                and target.value.id == "label_kwargs"
-                and isinstance(target.slice, ast.Constant)
-            ):
-                written[target.slice.value] = ast.unparse(statement.value)
-        if "fg_color" in written:
-            found.append(written)
-    assert len(found) == 1, f"found {len(found)} fg_color branches, not 1"
-    return found[0]
+    return [
+        (ast.unparse(call.args[1]), ast.unparse(call.args[4]))
+        for node in ast.walk(tree)
+        if (call := _level_cell_call(node)) is not None
+    ]
 
 
 def _danger_subscripts(builder):
@@ -1738,17 +1691,14 @@ def test_pccm3_every_priority_cell_calls_the_helper():
 
 
 def test_pccm3_the_cell_options_come_from_the_helper():
-    """PCC-M3 — the three colour options, by name, on all five screens.
+    """PCC-M3 — each screen hands ``build_level_cell`` its ``cell``, once.
 
-    Exact text, not a shape: ``fg_color=cell.text_color`` is a shape-correct
-    swap, and dropping a fallback yields ``None``, which Tk rejects mid-build.
+    With the row's own text as the fallback. The colour options themselves are
+    ``screens/priority_cell.py``'s since PCC-A3, held by ``test_pcca3_…``.
     """
     for name, builder in ROW_BUILDERS:
-        calls = _label_calls_using(builder, "cell")
-        assert len(calls) == 1, f"{name}: {len(calls)} CTkLabel calls use `cell`"
-        options = calls[0]
-        for keyword, expected in EXPECTED_CELL_OPTIONS.items():
-            assert options.get(keyword) == expected, f"{name}: {keyword}"
+        cells = [c for c in _level_cell_colours(builder) if c[0] == "cell"]
+        assert cells == [("cell", "row_text")], f"{name}: {cells}"
 
 
 def test_pccm4_the_chip_options_come_from_the_level():
@@ -1762,8 +1712,8 @@ def test_pccm4_the_chip_options_come_from_the_level():
     """
     assert len(FACTOR_CHIP_BUILDERS) == 4, FACTOR_CHIP_BUILDERS
     for name, builder in FACTOR_CHIP_BUILDERS:
-        options = _factor_chip_options(builder)
-        assert options == EXPECTED_CHIP_OPTIONS, f"{name}: {options}"
+        chips = [c for c in _level_cell_colours(builder) if c[0] != "cell"]
+        assert chips == [("critical_chip", "row_text")], f"{name}: {chips}"
         assert count_calls(builder, "fill_for_level") == 1, name
 
     # Hierarchical has no chips, so it must not ask for the chip colour either.
@@ -2188,3 +2138,53 @@ def test_pccm3_an_uncoloured_cell_keeps_the_rows_text(rendered_rows):
             checked += 1
 
     assert checked == len(RENDER_TARGETS), f"only {checked} screens had a plain row"
+
+
+def test_pcca3_a_filled_cell_has_an_edge_on_every_row_surface():
+    """PCC-A3 — a pale level fill still reads as a cell on any row behind it.
+
+    Measured against each bundled theme's ``CTkFrame.fg_color`` and the
+    completed tint, mode by mode: the edge is the better of the fill and the
+    border against the row, held to the 3:1 a non-text indicator needs. Built
+    through ``build_level_cell`` so the border is the widget's, not a guess.
+    """
+    import json
+
+    from src.getmoredone.screens.priority_cell import build_level_cell
+    from src.getmoredone.theme import priority_level_fill_colors
+
+    try:
+        root = ctk.CTk()
+    except Exception as exc:  # no display
+        pytest.skip(f"No GUI display available: {exc}")
+    root.withdraw()
+
+    def hex_of(colour):
+        r, g, b = root.winfo_rgb(colour)
+        return "#{:02X}{:02X}{:02X}".format(r // 257, g // 257, b // 257)
+
+    completed_tint = ("#E8F5EE", "#1F2B24")  # semantic_colors()["success_tint"]
+    themes = sorted(Path("themes").glob("*.json"))
+    assert len(themes) == 10, themes
+    fills = [c for c in priority_level_fill_colors().values() if c]
+    assert len(fills) == 2, fills
+    try:
+        weak = []
+        for fill in fills:
+            cell = SimpleNamespace(fill=fill, text_color=pick_text_color(fill))
+            outer, _ = build_level_cell(root, cell, "P:1600", 60, "#000000", None)
+            border = hex_of(outer.cget("border_color"))
+            if int(outer.cget("border_width")) < 1:
+                border = fill
+            for path in themes:
+                surface = json.loads(path.read_text())["CTkFrame"]["fg_color"]
+                for mode in (0, 1):
+                    for row in (surface[mode], completed_tint[mode]):
+                        bg = hex_of(row)
+                        edge = max(contrast_ratio(bg, fill), contrast_ratio(bg, border))
+                        if edge < 3.0:
+                            weak.append((path.stem, mode, bg, fill, round(edge, 2)))
+            outer.destroy()
+        assert weak == [], weak
+    finally:
+        root.destroy()
