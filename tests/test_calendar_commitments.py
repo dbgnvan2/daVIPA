@@ -767,3 +767,22 @@ def test_cipm15_a_read_holds_the_write_lock_before_it_reads_dismissals(manager, 
     )
 
     assert blocked == ["database is locked"]
+
+
+@pytest.mark.parametrize("seen_as", ["moved", "declined"])
+def test_cipd6_a_kept_row_the_read_settled_elsewhere_is_dropped(manager, seen_as):
+    """D6 -- keep a skipped calendar's meeting only if this read learned nothing about it."""
+    manager.replace_commitments_for_dates([DAY], [_commitment(600, 630, event_id="x")], "t1")
+    with manager.transaction() as conn:
+        conn.execute("UPDATE calendar_commitments SET calendar_id = 'team' WHERE event_id = 'x'")
+    if seen_as == "moved":
+        on_primary = _event("x", start="2026-11-14T10:00:00-08:00", end="2026-11-14T10:30:00-08:00")
+    else:
+        on_primary = _event("x", attendees=[{"self": True, "responseStatus": "declined"}])
+    client = FakeCalendar({"primary": [on_primary]}, errors={"team": CalendarForbidden("403")})
+
+    refresh_commitments(DAY, NEXT, client_factory=lambda: client, db_path=manager.db.db_path,
+                        calendar_ids=["primary", "team"], tz=TZ)
+
+    assert manager.get_commitments(DAY) == []
+    assert [c.event_id for c in manager.get_commitments(NEXT)] == (["x"] if seen_as == "moved" else [])
