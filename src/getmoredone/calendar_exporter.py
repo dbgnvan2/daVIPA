@@ -265,13 +265,13 @@ def build_export_plan(
             plan.skipped_no_minutes += 1
             continue
 
-        # Derived from the box, never read from ``block.start_time``. The
-        # stored clock columns are "a record, not the truth" -- the screen's
-        # own words (``PlanScreen.on_settings_saved``): a block's box is
-        # stored relative to Day Start and every day is re-timed on read, so
-        # moving Day Start leaves every stored time behind. Exporting the
-        # record put the block on other people's calendars at an hour the Plan
-        # screen does not show (P19 -- a derived value read as truth).
+        # Derived from the box, never read from ``block.start_time``: the box
+        # is what the Plan screen draws. Before PD-M14.4 (2026-11-13) a Day
+        # Start change left every stored time behind, and exporting the record
+        # put blocks on other people's calendars at an hour the screen did not
+        # show (P19). PD-M14.4 now renumbers and PD-M14.7 repairs old rows, but
+        # a box with an unreadable or off-box time still exists, so the box
+        # stays the source.
         start_minutes = parse_hhmm(times_for_slot(block.slot_index, minutes, bounds)[0])
         start = day.replace(hour=start_minutes // 60, minute=start_minutes % 60)
         item = items_by_id.get(block.item_id) if block.item_id else None

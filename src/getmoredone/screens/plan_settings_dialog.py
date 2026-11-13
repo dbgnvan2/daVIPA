@@ -239,13 +239,18 @@ class PlanSettingsDialog(ctk.CTkToplevel):
             # The renumber failed after, or while, the settings were written.
             # Put the old hours back on disk too, or the file would describe a
             # day the blocks were never renumbered for.
-            logger.exception("Day Start renumber failed; settings restored")
             for field, value in previous.items():
                 setattr(self.settings, field, value)
-            if any(written):
-                self.settings.save()
+            restored = self.settings.save() if any(written) else True
+            logger.exception(
+                "Day Start renumber failed; settings file %s",
+                "restored" if restored else "NOT restored: it holds the new hours",
+            )
             self.error_label.configure(
                 text="Could not renumber the Time Blocks — see the log"
+                if restored
+                else "Could not renumber the Time Blocks, and the settings file"
+                " still holds the new hours — see the log"
             )
             return
         except SettingsNotWrittenError:
@@ -266,6 +271,14 @@ class PlanSettingsDialog(ctk.CTkToplevel):
                 or "Could not write the settings file — see the log"
             )
             return
+        except Exception:
+            # Anything else: put the in-memory hours back before it escapes,
+            # or the next save from any screen writes them without a renumber.
+            for field, value in previous.items():
+                setattr(self.settings, field, value)
+            if any(written):
+                self.settings.save()
+            raise
 
         if self.on_saved:
             if self.db_manager is not None:

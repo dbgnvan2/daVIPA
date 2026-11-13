@@ -221,6 +221,38 @@ UNKNOWN_REFUSAL = "That Action Item cannot go there"
 EXPORT_POLL_INTERVAL_MS = 100
 
 
+def repair_status(repair):
+    """PD-M14.7 -- the status line for a ``SlotRepair``, or ``None``.
+
+    ``(text, kind)``. One wording for the load and for a settings save, which
+    both run the repair and both have to say what it did.
+    """
+    if repair is None:
+        return None
+    if repair.refused:
+        return (
+            f"{repair.mismatched} block(s) here are not at the time they were"
+            " planned at, and moving them back would not fit — drag them where"
+            " you want them",
+            "warning",
+        )
+    stuck = getattr(repair, "misaligned", 0)
+    if stuck:
+        put = f"put {len(repair.moved)} back; " if repair.moved else ""
+        return (
+            f"{put}{stuck} block(s) here were planned at a time no box starts at"
+            " under this Day Start — drag them where you want them",
+            "warning",
+        )
+    if repair.moved:
+        count = len(repair.moved)
+        noun = "block back on the time it was" if count == 1 else (
+            "blocks back on the times they were"
+        )
+        return (f"Put {count} {noun} planned at", "muted")
+    return None
+
+
 def refusal_text(reason: str) -> str:
     """The screen's wording for a grid refusal."""
     return REFUSAL_TEXT.get(reason, UNKNOWN_REFUSAL)
@@ -331,6 +363,7 @@ class PlanScreen(ctk.CTkFrame):
         #: The grid last drawn, so the summary and the drop rules read the
         #: same object the user is looking at.
         self._grid: DayGrid = DayGrid()
+        self._last_repair = None
         self._items: List[ActionItem] = []
 
         #: PD-M2 drag state: where the grip was pressed, the width it was
@@ -995,7 +1028,15 @@ class PlanScreen(ctk.CTkFrame):
         surfaced as outside the day rather than re-timed into one that does.
         """
         self.bounds = bounds
+        self._last_repair = None
         self.refresh()
+
+        # PD-M14.7 -- the redraw may have repaired the open date, or refused
+        # to. Said here, or "saved" below would cover it.
+        repair_said = repair_status(self._last_repair)
+        if repair_said is not None and repair_said[1] == "warning":
+            self.set_status(f"Day settings saved — {repair_said[0]}", "warning")
+            return
 
         outside = len(self._grid.outside)
         if outside:
@@ -1009,11 +1050,13 @@ class PlanScreen(ctk.CTkFrame):
                 "warning",
             )
             return
+        said = ["Day settings saved"]
         if renumbered:
             noun = "block kept its time" if renumbered == 1 else "blocks kept their times"
-            self.set_status(f"Day settings saved — {renumbered} {noun}", "success")
-            return
-        self.set_status("Day settings saved", "success")
+            said.append(f"{renumbered} {noun}")
+        if repair_said is not None:
+            said.append(repair_said[0])
+        self.set_status(" — ".join(said), "success")
 
     def _segment_color_resolver(self):
         """A function giving each item its Vision Planning Category colour.
@@ -1171,6 +1214,16 @@ class PlanScreen(ctk.CTkFrame):
                 adopted = self.db_manager.adopt_legacy_day(
                     self.selected_date, self.bounds
                 )
+                if repair.unreadable:
+                    logger.warning(
+                        "PD-M14.7: %d block(s) on %s have a box but no readable"
+                        " start time; left where they are",
+                        repair.unreadable,
+                        self.selected_date,
+                    )
+            # Kept so on_settings_saved, which redraws through here, can say
+            # what the repair did rather than cover it with "saved".
+            self._last_repair = repair
 
             blocks = self.db_manager.get_time_blocks(self.selected_date)
             self._grid = build_day_grid(blocks, self.bounds)
@@ -1183,25 +1236,19 @@ class PlanScreen(ctk.CTkFrame):
             # returns were thrown away. Named with the Day Start it used, so
             # the assumption it baked in is visible and checkable rather than
             # something to infer from blocks that moved.
-            if adopted:
+            repair_said = repair_status(repair)
+            if repair_said is not None and repair_said[1] == "warning":
+                # First: a refused repair leaves work at an hour nobody chose,
+                # which outranks a report of what did go right.
+                self.set_status(*repair_said)
+            elif adopted:
                 self.set_status(
                     f"Placed {len(adopted)} block(s) from an earlier version"
                     f" on the grid, using a day start of {self.bounds.day_start}",
                     "muted",
                 )
-            elif repair is not None and repair.moved:
-                count = len(repair.moved)
-                noun = "block back on the time it was" if count == 1 else (
-                    "blocks back on the times they were"
-                )
-                self.set_status(f"Put {count} {noun} planned at", "muted")
-            elif repair is not None and repair.refused:
-                self.set_status(
-                    f"{repair.mismatched} block(s) here are not at the time they"
-                    " were planned at, and moving them back would not fit"
-                    " — drag them where you want them",
-                    "warning",
-                )
+            elif repair_said is not None:
+                self.set_status(*repair_said)
             elif self._day_shape_is_unconfirmed() and any(
                 block.slot_index is None for block in blocks
             ):

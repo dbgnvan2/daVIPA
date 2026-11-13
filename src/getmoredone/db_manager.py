@@ -41,12 +41,14 @@ class SlotRepair:
 
     ``mismatched`` blocks had a box their recorded time did not name;
     ``moved`` are the ids put back, empty when ``refused`` says why none were.
+    ``misaligned`` blocks were recorded at a time no box starts at, and stay.
     """
 
     moved: List[str]
     refused: Optional[str]
     mismatched: int
     unreadable: int
+    misaligned: int = 0
 
 
 class DatabaseManager(DBManagerProjectBoardsMixin):
@@ -1816,8 +1818,8 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             ).fetchone()[0]
             if planned:
                 raise DayStartStepError(
-                    "Day Start can only move in 30-minute steps while Time Blocks"
-                    " are planned"
+                    f"Day Start can only move in {SLOT_MINUTES}-minute steps while"
+                    " Time Blocks are planned"
                 )
             by = 0
         with self.transaction():
@@ -1841,15 +1843,24 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         Writes nothing when every box agrees with its time, so running it on
         every load is the "once": the second run finds nothing to do. Blocks
         with no box are adoption's (TG-M5), and a time that cannot be read is
-        left where it is and counted in ``unreadable``.
+        left where it is and counted in ``unreadable``. A time that is not the
+        start of any box under this Day Start (09:00 on a day that starts at
+        08:15) cannot be put back exactly, so it is left too and counted in
+        ``misaligned``: flooring it would move the block to a time nobody
+        recorded and then report it as put back.
 
         All or nothing per date. If any moved block would not fit the repaired
         day -- outside the date, across lunch, a full box -- nothing is written
         and ``refused`` names why, so the day is never half on one clock and
-        half on another.
+        half on another. That includes a block that does not move: a lunch
+        block put back over it would push it off the grid.
         """
         from .time_block_layout import (
+            SLOT_MINUTES,
+            SlotRefusal,
+            build_day_grid,
             can_place,
+            parse_hhmm,
             slot_index_for_time,
             slot_span_of,
             span_for_blocks,
@@ -1858,6 +1869,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
         blocks = self.get_time_blocks(block_date)
         targets: dict = {}
         unreadable = 0
+        misaligned = 0
         for block in blocks:
             if block.slot_index is None:
                 continue
@@ -1865,10 +1877,25 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             if target is None:
                 unreadable += 1
                 continue
-            if target != int(block.slot_index):
-                targets[block.id] = target
+            if target == int(block.slot_index):
+                continue
+            recorded = parse_hhmm(block.start_time)
+            if bounds.day_start_minutes + target * SLOT_MINUTES != recorded:
+                misaligned += 1
+                continue
+            targets[block.id] = target
+
+        def result(moved, refused):
+            return SlotRepair(
+                moved=moved,
+                refused=refused,
+                mismatched=len(targets),
+                unreadable=unreadable,
+                misaligned=misaligned,
+            )
+
         if not targets:
-            return SlotRepair(moved=[], refused=None, mismatched=0, unreadable=unreadable)
+            return result([], None)
 
         repaired = [
             replace(block, slot_index=targets[block.id]) if block.id in targets else block
@@ -1888,9 +1915,14 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
                 placing_lunch=BlockType.normalize(block.block_type) == BlockType.LUNCH,
             )
             if reason is not None:
-                return SlotRepair(
-                    moved=[], refused=reason, mismatched=len(targets), unreadable=unreadable
-                )
+                return result([], reason)
+
+        # A block that does not move is not checked above, and a lunch put
+        # back over it would take it off the grid with nothing said.
+        off_now = {block.id for block in build_day_grid(blocks, bounds).outside}
+        off_after = {block.id for block in build_day_grid(repaired, bounds, drawn).outside}
+        if off_after - off_now:
+            return result([], SlotRefusal.CROSSES_LUNCH)
 
         now = datetime.now().isoformat()
         with self.transaction() as conn:
@@ -1899,9 +1931,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
                     "UPDATE time_blocks SET slot_index = ?, updated_at = ? WHERE id = ?",
                     (int(target), now, block_id),
                 )
-        return SlotRepair(
-            moved=list(targets), refused=None, mismatched=len(targets), unreadable=unreadable
-        )
+        return result(list(targets), None)
 
     def place_block_at(
         self, block_id: str, slot_index: int, bounds, day_span=None
