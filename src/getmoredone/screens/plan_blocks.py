@@ -20,7 +20,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import customtkinter as ctk
 
 from ..models import ActionItem, BlockType, Status, TimeBlock
-from ..priority_levels import level_cell_fill
+from ..color_contrast import contrast_ratio
+from ..priority_levels import level_cell_fill, row_fill
 from ..theme import (
     block_type_colors,
     depth_bar_colors,
@@ -268,6 +269,20 @@ def item_row_height(span: int, box_height: int = SLOT_CHIP_HEIGHT_PX) -> int:
     return max(ITEM_ROW_MIN_HEIGHT_PX, as_the_day_draws_it)
 
 
+def _mark_color(mark: str, row_fill_hex: Optional[str], row_text: str) -> str:
+    """The ✓/? mark's colour: its own, unless a Category fill swallows it.
+
+    PSC-M2 -- the marks are tuned to the theme surface. On a Category fill
+    below 3:1 (a non-text indicator's bar) the mark takes the row's derived
+    text colour, which is chosen for contrast against that fill.
+    """
+    if not row_fill_hex:
+        return mark
+    if contrast_ratio(row_fill_hex, mark) >= 3.0:
+        return mark
+    return row_text
+
+
 def build_item_row(
     parent,
     item: ActionItem,
@@ -278,6 +293,7 @@ def build_item_row(
     box_height: int = SLOT_CHIP_HEIGHT_PX,
     title_width: int = SLOT_TITLE_WIDTH_PX,
     settings: Any = None,
+    segment_color: Optional[str] = None,
 ) -> ctk.CTkFrame:
     """One action item in the left pane, ready to be dragged onto the day.
 
@@ -339,11 +355,16 @@ def build_item_row(
     # ``surface_subtle`` on an ``items_scroll`` that *names* ``surface``
     # (SEP-M5; it used to inherit it): with no tint and no border that pair is
     # the row's only edge, so PBG-A4 measures it rather than restating it.
+    # PSC-M1 -- a Vision Planning Category colour fills the row, by the same
+    # ``row_fill`` the five list screens use; text follows the fill. No
+    # Category keeps the theme surface above.
     palette = semantic_colors()
+    fill = row_fill(palette, use_completed_tint=False, segment_color=segment_color)
+    row_text = fill.text_color or palette["body_text"]
     span = slots_for_minutes(work_block_minutes)
     frame = ctk.CTkFrame(
         parent,
-        fg_color=palette["surface_subtle"],
+        fg_color=fill.fill or palette["surface_subtle"],
         corner_radius=6,
         height=item_row_height(span, box_height),
     )
@@ -372,7 +393,7 @@ def build_item_row(
         text=item.title,
         anchor="w",
         justify="left",
-        text_color=palette["body_text"],
+        text_color=row_text,
     )
     title.grid(row=0, column=CHIP_TITLE_COLUMN, sticky="ew", pady=(5, 0))
 
@@ -392,9 +413,13 @@ def build_item_row(
         # the dark theme's surface is deep enough to swallow it. The priority
         # fills this was first measured against are gone with the band
         # scheme; `semantic_colors` carries the surface measurement now.
-        text_color=semantic_colors()[
-            "scheduled_mark" if already_blocked else "unscheduled_mark"
-        ],
+        text_color=_mark_color(
+            semantic_colors()[
+                "scheduled_mark" if already_blocked else "unscheduled_mark"
+            ],
+            fill.fill,
+            row_text,
+        ),
         font=ctk.CTkFont(size=12, weight="bold"),
     ).grid(row=0, column=CHIP_MARKER_COLUMN, sticky="w", pady=(5, 0))
 
@@ -419,7 +444,7 @@ def build_item_row(
         text=f"P:{item.priority_score}",
         width=SLOT_BADGE_WIDTH_PX,
         fg_color=cell.fill or "transparent",
-        text_color=cell.text_color or palette["body_text"],
+        text_color=cell.text_color or row_text,
         corner_radius=6 if cell.fill else 0,
     ).grid(row=0, column=CHIP_BADGE_COLUMN, sticky="e", pady=(5, 0))
 
@@ -430,7 +455,7 @@ def build_item_row(
         text=f"{work_block_minutes}m",
         width=SLOT_LENGTH_WIDTH_PX,
         anchor="e",
-        text_color=palette["body_text"],
+        text_color=row_text,
     ).grid(
         row=0, column=CHIP_LENGTH_COLUMN, sticky="ne",
         padx=(0, CHIP_RIGHT_INSET_PX), pady=(5, 0),

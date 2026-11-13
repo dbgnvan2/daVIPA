@@ -80,6 +80,7 @@ from .plan_blocks import (
     chip_column_minsizes,
 )
 from .plan_settings_dialog import PlanSettingsDialog
+from .segment_color_utils import resolve_segment_color_for_item
 
 logger = logging.getLogger(__name__)
 
@@ -998,6 +999,23 @@ class PlanScreen(ctk.CTkFrame):
             return
         self.set_status("Day settings saved", "success")
 
+    def _segment_color_resolver(self):
+        """A function giving each item its Vision Planning Category colour.
+
+        The same lookup and caches the five list screens use, built fresh per
+        refresh so a colour changed in Vision Planning shows on the next one.
+        With no ``vps_manager`` (a test's stand-in app) every item gets none.
+        """
+        vps = getattr(self.app, "vps_manager", None)
+        if vps is None:
+            return lambda item: None
+        by_id = vps.get_segment_colors_by_id()
+        by_name = vps.get_segment_color_map()
+        caches = ({}, {}, {})
+        return lambda item: resolve_segment_color_for_item(
+            item, by_id, by_name, self.db_manager, *caches
+        )
+
     def load_items(self):
         """Draw the items that start on the selected date.
 
@@ -1010,6 +1028,7 @@ class PlanScreen(ctk.CTkFrame):
 
             self._items = self.db_manager.get_items_for_start_date(self.selected_date)
             blocked = self.db_manager.get_blocked_item_ids(self.selected_date)
+            segment_color_for = self._segment_color_resolver()
 
             self.items_heading.configure(
                 text=f"Items starting {self.selected_date}"
@@ -1051,6 +1070,7 @@ class PlanScreen(ctk.CTkFrame):
                         # scheme, which lives here as it does on the five
                         # list screens. ``None`` resolves to the defaults.
                         settings=self.settings,
+                        segment_color=segment_color_for(item),
                     )
                     self.bind_item_drag(frame, item)
 
