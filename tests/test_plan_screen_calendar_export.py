@@ -990,8 +990,18 @@ def test_cem441c_the_exported_time_is_the_box_the_screen_draws(screen, manager):
     writes nothing. The export was reading that column, so a day the screen
     drew from 10:00 went onto other people's calendars from 08:00. This pins
     the whole path: the screen's bounds, through the thread, to the event.
+
+    Fixture changed 2026-11-13, reason (b): PD-M14.7 now puts a block whose
+    readable ``start_time`` disagrees with its box back on that time when the
+    day loads, so a Day Start change no longer leaves a readable stale column.
+    The one it still leaves is a column that cannot be read, so that is what
+    this sets up; the export must still use the box.
     """
     block = _block(manager, 0, label="Reading")
+    manager.db.conn.execute(
+        "UPDATE time_blocks SET start_time = '', end_time = '' WHERE id = ?", (block.id,)
+    )
+    manager.db.conn.commit()
     client = FakeClient()
     screen.calendar_client_factory = lambda: client
 
@@ -999,8 +1009,8 @@ def test_cem441c_the_exported_time_is_the_box_the_screen_draws(screen, manager):
     screen.winfo_toplevel().update_idletasks()
 
     stored = manager.get_time_blocks(THURSDAY)[0]
-    assert stored.start_time == "08:00", (
-        "the fixture has to leave a stale column behind for this to prove anything"
+    assert stored.start_time == "", (
+        "the fixture has to leave a column the export cannot use for this to prove anything"
     )
     assert "10:00" in _drawn_texts(screen), "the day is not drawn from 10:00"
 

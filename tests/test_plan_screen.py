@@ -1766,33 +1766,31 @@ def test_tgm121_the_summary_separates_occupied_from_planned(screen, manager):
     assert "45m planned" in text
 
 
-def test_tgm64_saving_settings_writes_no_blocks(screen, manager):
-    """TG-M6.4 — a Day Start change re-times the day without touching a row.
+def test_tgm64_the_settings_callback_writes_no_blocks(screen, manager):
+    """TG-M6.4, as PD-M14.4 left it — the redraw after a save writes nothing.
 
-    The box is stored relative to Day Start, so the clock times follow from it
-    on read. This is what retired the packing machinery: there is no stored
-    time to go stale, nothing to renumber, and no half-written day.
+    Rewritten 2026-11-13, reason (b): the old version passed new bounds to the
+    callback with the blocks still numbered for the old Day Start and asserted
+    the blocks moved on the clock. PD-M14.4 reversed that -- the dialog
+    renumbers so each block keeps its time -- and PD-M14.7 now repairs the
+    state the old test set up. What still holds is that the callback itself
+    writes no row.
     """
     _add_block(manager, 30, "first", 0)
     _add_block(manager, 30, "second", 3)
-    screen.load_blocks()
+    manager.shift_day_start("08:00", "07:00", lambda: True)
     before = _stored(manager)
-    assert [row[3] for row in before] == ["08:00", "09:30"]
 
-    screen.on_settings_saved(DayBounds(day_start="07:00"))
+    screen.on_settings_saved(DayBounds(day_start="07:00"), renumbered=2)
 
-    assert _stored(manager) == before, "a settings change wrote to the blocks table"
-    drawn = _label_texts(screen.blocks_scroll)
-    assert "07:00" in drawn, "the grid did not re-time to the new Day Start"
-    assert "Day settings saved" in screen.status_label.cget("text")
-
-    grid = build_day_grid(manager.get_time_blocks(THURSDAY), DayBounds(day_start="07:00"))
+    assert _stored(manager) == before, "the settings callback wrote to the blocks table"
     starting = {
         block.label: entry.slot.start_time
-        for entry in grid.slots
+        for entry in screen._grid.slots
         for block in entry.starting
     }
-    assert starting == {"first": "07:00", "second": "08:30"}
+    assert starting == {"first": "08:00", "second": "09:30"}
+    assert "2 blocks kept their times" in screen.status_label.cget("text")
 
 
 def test_tgm111_a_real_drag_moves_a_block_between_slots(
@@ -7458,3 +7456,125 @@ def test_lm3m1_lunch_dropped_on_an_end_of_the_day_says_why_it_did_nothing(
 
     assert _lunch_blocks(manager) == []
     assert screen.status_label.cget("text") == LUNCH_EDGE_TEXT
+
+
+# --- PD-M14.4 / PD-M14.7 : the hours are a template ------------------------
+# Spec: docs/unused-docs/implementation_plan_2026-11-13_day_start_keeps_clock_times.md
+
+
+def _raw_block(manager, label, slot_index, start_time, block_date=THURSDAY):
+    """A block whose stored box and recorded time disagree, as TG-M6.4 left them."""
+    block_id = manager.create_time_block(
+        TimeBlock(
+            block_date=block_date, start_time=start_time, end_time="",
+            planned_minutes=30, label=label,
+        )
+    )
+    manager.db.conn.execute(
+        "UPDATE time_blocks SET slot_index = ? WHERE id = ?", (slot_index, block_id)
+    )
+    manager.db.conn.commit()
+
+
+def test_pdm144_the_dialog_keeps_planned_work_on_its_clock(root, manager, settings):
+    """PD-M14.4 — Day Start 08:00 → 07:00 in the dialog; the 09:30 task stays at 09:30."""
+    _add_block(manager, 30, "standup", 3)  # 09:30 under the default 08:00 day
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+
+    dialog = PlanSettingsDialog(
+        panel, settings, on_saved=panel.on_settings_saved, db_manager=manager
+    )
+    try:
+        dialog.day_start_entry.delete(0, tk.END)
+        dialog.day_start_entry.insert(0, "07:00")
+        dialog.save()
+    finally:
+        if dialog.winfo_exists():
+            dialog.destroy()
+
+    assert settings.plan_day_start == "07:00"
+    stored = manager.get_time_blocks(THURSDAY)[0]
+    assert (stored.slot_index, stored.start_time) == (5, "09:30")
+    starting = {
+        block.label: entry.slot.start_time
+        for entry in panel._grid.slots
+        for block in entry.starting
+    }
+    assert starting == {"standup": "09:30"}
+    assert "1 block kept its time" in panel.status_label.cget("text")
+
+
+def test_pdm144_a_failed_settings_write_renumbers_nothing(
+    root, manager, settings, tmp_path, monkeypatch
+):
+    """PD-M14.4 — the write fails, so the boxes and the hours both stay as they were."""
+    _add_block(manager, 30, "standup", 3)
+    before = _stored(manager)
+    unwritable = tmp_path / "is_a_directory"
+    unwritable.mkdir()
+    monkeypatch.setattr(
+        AppSettings, "get_settings_path", classmethod(lambda cls: unwritable)
+    )
+
+    told = []
+    dialog = PlanSettingsDialog(
+        root, settings, on_saved=lambda *a, **k: told.append(a), db_manager=manager
+    )
+    try:
+        dialog.day_start_entry.delete(0, tk.END)
+        dialog.day_start_entry.insert(0, "07:00")
+        dialog.save()
+        assert "Could not write" in dialog.error_label.cget("text")
+    finally:
+        if dialog.winfo_exists():
+            dialog.destroy()
+
+    assert told == []
+    assert settings.plan_day_start == "08:00", "the in-memory hours kept a value never saved"
+    assert _stored(manager) == before, "the blocks were renumbered for hours never saved"
+
+
+def test_pdm144_a_part_box_move_is_refused_in_the_dialog(root, manager, settings):
+    """PD-M14.4 — 08:00 → 07:45 with work planned is refused and says why."""
+    _add_block(manager, 30, "standup", 3)
+    before = _stored(manager)
+
+    dialog = PlanSettingsDialog(root, settings, db_manager=manager)
+    try:
+        dialog.day_start_entry.delete(0, tk.END)
+        dialog.day_start_entry.insert(0, "07:45")
+        dialog.save()
+        assert "30-minute steps" in dialog.error_label.cget("text")
+    finally:
+        if dialog.winfo_exists():
+            dialog.destroy()
+
+    assert settings.plan_day_start == "08:00"
+    assert _stored(manager) == before
+
+
+def test_pdm147_opening_a_day_puts_blocks_back_and_says_so(root, manager, settings):
+    """PD-M14.7 — box 6 recorded 09:30 under an 08:00 day goes back to box 3."""
+    _raw_block(manager, "drifted", 6, "09:30")
+
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+
+    stored = manager.get_time_blocks(THURSDAY)[0]
+    assert (stored.slot_index, stored.start_time) == (3, "09:30")
+    assert "Put 1 block back on the time it was planned at" in panel.status_label.cget("text")
+
+
+def test_pdm147_an_unconfirmed_day_shape_repairs_nothing(root, manager, settings):
+    """PD-M14.7 — against a guessed Day Start, the recorded time proves nothing."""
+    _raw_block(manager, "drifted", 6, "09:30")
+    settings.plan_day_shape_unconfirmed = True
+
+    panel = PlanScreen(root, manager, _App(settings))
+    panel.selected_date = THURSDAY
+    panel.refresh()
+
+    assert manager.get_time_blocks(THURSDAY)[0].slot_index == 6

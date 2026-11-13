@@ -977,3 +977,152 @@ def test_bsfm6_a_second_lunch_block_on_one_date_is_refused(manager):
                if BlockType.normalize(b.block_type) == BlockType.LUNCH]
     assert [b.slot_index for b in lunches] == [4]
     assert _lunch_at(manager, 4, block_date=NEXT_DAY).block_date == NEXT_DAY
+
+
+# --- PD-M14.4 / PD-M14.7 : the hours are a template ------------------------
+# Spec: docs/unused-docs/implementation_plan_2026-11-13_day_start_keeps_clock_times.md
+
+NINE = DayBounds(day_start="09:00")
+EIGHT = DayBounds(day_start="08:00")
+
+
+def _drawn_times(manager, block_date, bounds):
+    """label -> the time the grid draws it at, under ``bounds``."""
+    grid = build_day_grid(manager.get_time_blocks(block_date), bounds)
+    return {
+        block.label: entry.slot.start_time
+        for entry in grid.slots
+        for block in entry.starting
+    }
+
+
+def test_pdm144_changing_the_hours_keeps_clock_times(manager):
+    """PD-M14.4 — moving Day Start an hour earlier does not move planned work.
+
+    Three dates, because Day Start is one setting: a renumber that missed a
+    date would leave that date drawn an hour off.
+    """
+    for block_date, label in (("2026-11-05", "thu"), ("2026-11-06", "fri"), ("2026-11-09", "mon")):
+        block = TimeBlock(
+            block_date=block_date, start_time="", end_time="",
+            planned_minutes=30, label=label,
+        )
+        manager.add_block_at(block, 1, NINE)  # 09:30
+    before = _rows(manager)
+    written = []
+
+    moved = manager.shift_day_start("09:00", "08:00", lambda: written.append(1) or True)
+
+    assert moved == 3
+    assert written == [1], "the settings write was not made"
+    after = _rows(manager)
+    for label, (slot, start, end) in before.items():
+        assert after[label] == (slot + 2, start, end), (label, before[label], after[label])
+    for block_date, label in (("2026-11-05", "thu"), ("2026-11-06", "fri"), ("2026-11-09", "mon")):
+        assert _drawn_times(manager, block_date, EIGHT) == {label: "09:30"}
+
+
+def test_pdm144_a_renumber_that_fails_leaves_the_hours_alone(manager):
+    """PD-M14.4 — the settings write and the renumber land together or not at all."""
+    from src.getmoredone.db_manager import SettingsNotWrittenError
+
+    manager.add_block_at(
+        TimeBlock(block_date=DAY, start_time="", end_time="", planned_minutes=30, label="a"),
+        2, NINE,
+    )
+    before = _rows(manager)
+
+    with pytest.raises(SettingsNotWrittenError):
+        manager.shift_day_start("09:00", "08:00", lambda: False)
+    assert _rows(manager) == before, "a failed settings write left the blocks renumbered"
+
+    def explode():
+        raise OSError("disk full")
+
+    with pytest.raises(OSError):
+        manager.shift_day_start("09:00", "08:00", explode)
+    assert _rows(manager) == before, "a raising settings write left the blocks renumbered"
+
+
+def test_pdm144_a_part_box_move_is_refused_while_blocks_are_planned(manager):
+    """PD-M14.4 — a 15-minute move cannot keep a time on a 30-minute grid."""
+    from src.getmoredone.db_manager import DayStartStepError
+
+    written = []
+    # Nothing planned: any Day Start is fine, and the settings are written.
+    assert manager.shift_day_start("09:00", "08:45", lambda: written.append(1) or True) == 0
+    assert written == [1]
+
+    manager.add_block_at(
+        TimeBlock(block_date=DAY, start_time="", end_time="", planned_minutes=30, label="a"),
+        2, NINE,
+    )
+    before = _rows(manager)
+    with pytest.raises(DayStartStepError):
+        manager.shift_day_start("09:00", "08:45", lambda: written.append(2) or True)
+    assert written == [1], "the settings were written for a move that was refused"
+    assert _rows(manager) == before
+
+
+def _recorded(manager, label, slot_index, start_time, block_date=DAY, minutes=30, **kwargs):
+    """A block whose stored box and stored time may disagree, written raw."""
+    block = TimeBlock(
+        block_date=block_date, start_time=start_time, end_time="",
+        planned_minutes=minutes, label=label, **kwargs,
+    )
+    block_id = manager.create_time_block(block)
+    manager.db.conn.execute(
+        "UPDATE time_blocks SET slot_index = ? WHERE id = ?", (slot_index, block_id)
+    )
+    manager.db.conn.commit()
+    return block_id
+
+
+def test_pdm147_a_block_is_put_back_on_the_time_it_was_planned_at(manager):
+    """PD-M14.7 — slot 6 recorded 08:30 under a 09:00 day is box −1."""
+    _recorded(manager, "early", 6, "08:30")
+
+    result = manager.repair_slots_from_times(DAY, NINE)
+
+    assert len(result.moved) == 1 and result.refused is None
+    assert _rows(manager)["early"][:2] == (-1, "08:30"), _rows(manager)
+    assert _drawn_times(manager, DAY, NINE) == {"early": "08:30"}
+
+
+def test_pdm147_a_day_that_agrees_is_not_touched(manager):
+    """PD-M14.7 — no write when the box and the time agree, on any load."""
+    manager.add_block_at(
+        TimeBlock(block_date=DAY, start_time="", end_time="", planned_minutes=30, label="a"),
+        3, NINE,
+    )
+    snapshot = "SELECT id, slot_index, position, start_time, updated_at FROM time_blocks"
+    before = [tuple(row) for row in manager.db.conn.execute(snapshot)]
+
+    for _ in range(2):
+        result = manager.repair_slots_from_times(DAY, NINE)
+        assert result.moved == [] and result.refused is None
+
+    assert [tuple(row) for row in manager.db.conn.execute(snapshot)] == before
+
+
+def test_pdm147_a_repair_that_does_not_fit_writes_nothing(manager):
+    """PD-M14.7 — a box that would hold too many blocks refuses the whole date.
+
+    Moving some of a date's blocks and not others would leave the day half
+    on one clock and half on another; the user drags the rest instead.
+    """
+    for n in range(MAX_BLOCKS_PER_SLOT):
+        manager.add_block_at(
+            TimeBlock(block_date=DAY, start_time="", end_time="", planned_minutes=30, label=f"full{n}"),
+            2, NINE,
+        )
+    _recorded(manager, "late", 5, "10:00")  # 10:00 is box 2, which is full
+    _recorded(manager, "fine", 7, "13:30")  # 13:30 is box 9, which is free
+    before = _rows(manager)
+
+    result = manager.repair_slots_from_times(DAY, NINE)
+
+    assert result.moved == []
+    assert result.refused == SlotRefusal.SLOT_FULL
+    assert result.mismatched == 2
+    assert _rows(manager) == before
