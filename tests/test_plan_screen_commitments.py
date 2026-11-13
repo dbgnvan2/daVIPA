@@ -354,9 +354,12 @@ def test_cipd4_a_commitment_past_the_last_box_is_listed_in_the_strip(screen, man
 
 def test_cipm34_an_editable_commitment_offers_no_dismiss(screen):
     """CIP-M3.4 / D9 -- the user's own meeting is changed in Google, not ignored here."""
-    entries = screen.commitment_menu_entries(_commitment(600, 630, can_edit=True))
+    # Reason (b), batch 2: the menu now offers the change itself (CIP-M4),
+    # and still no dismissal.
+    labels = [label for label, _ in screen.commitment_menu_entries(_commitment(600, 630, can_edit=True))]
 
-    assert entries == [("Change this meeting in Google Calendar, then Refresh", None)]
+    assert not any("Ignore" in label or "Hold this time" in label for label in labels)
+    assert "Rename…" in labels
 
 
 def test_cipm34_a_dismissed_commitment_is_drawn_as_ignored(screen, manager, factory):

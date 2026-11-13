@@ -540,6 +540,8 @@ def test_cem343_every_event_call_goes_through_the_retry_helper():
         # CIP-M2.1 / D11 -- the Plan's commitment read (reason b: a new call,
         # through the retry helper like the rest).
         "list_events_between",
+        # CIP-E6 -- batch 2 reads an event before deleting it (reason b).
+        "get_event",
     }, (
         "a method that calls the Google API appeared or disappeared; if it is "
         "new it needs the retry helper, and this list needs updating"

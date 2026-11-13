@@ -120,6 +120,8 @@ def test_cipm11_the_table_exists_fresh_and_migrated(tmp_path):
         "start_minutes", "end_minutes", "title", "is_all_day", "response_status",
         "transparency", "can_edit", "is_recurring_instance", "dismissed",
         "fetched_at", "created_at", "updated_at",
+        # Reason (b), CIP batch 2: E1 asks about guests from the cache.
+        "guest_count",
     }
 
     raw = sqlite3.connect(path)
