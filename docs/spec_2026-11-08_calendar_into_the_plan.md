@@ -231,8 +231,10 @@ leaving the app.
 
 *Built 2026-11-13 (batch 2).* How the plan settled what this table leaves open:
 a move is a drag to a box and keeps the meeting's length; a length is chosen
-from the right-click menu; a move may land only on empty boxes; an all-day or
-over-midnight meeting is renamed or deleted, not moved; guests are emailed only
+from the right-click menu; a move may land only on empty boxes; an all-day
+meeting on one date is renamed or deleted, not moved; a meeting over more than
+one date (past midnight, or a multi-day all-day event) is refused for every
+change, because a rename or delete reaches all of its dates; guests are emailed only
 when the user says yes; and every write first checks Google's copy against the
 Plan's. Decisions E1 to E10 in the plan.
 

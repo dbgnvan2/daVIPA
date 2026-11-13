@@ -21,6 +21,35 @@ Where the build departs from the plan:
   guest added since the read refuses the write rather than emailing someone
   the user was not asked about.
 
+Sweep (2026-11-13): cold `learning-qa`, cold correctness and `/security-review`
+passes over `3af9d33...a124f57`. Security: nothing at confidence 8+. Fixed,
+each with a mutation-checked guard:
+- **F1 (high):** a plain click on a meeting off the half hour (10:15) moved it
+  to the box start in Google with no question. `drop_commitment` now compares
+  boxes, not minutes.
+- **F2 (high):** delete or rename of one date of a multi-date event changed
+  the whole event after a question naming one date, and left the other dates'
+  cache rows stale. `verify_unchanged` now refuses any write to an event over
+  more than one date. This narrows E2: an over-midnight meeting is no longer
+  renamed or deleted from the Plan.
+- **F3:** a database that would not open after Google took the change said
+  "Not changed". The `DatabaseManager` is now built inside the guarded block.
+- **F4:** a failed write is logged as well as shown, so leaving the screen
+  mid-write does not lose it.
+- **F5:** with tzlocal failing, `update_event` names UTC; the edit path now
+  sends an aware start in the zone the reader used.
+
+Dropped as low, with reasons:
+- No `If-Match` etag on update/delete: the gap is the seconds between GET and
+  PUT, and the app is the only writer the user drives at that moment.
+- Rows cached before the `guest_count` column hold 0, so the first edit of a
+  meeting with guests is refused as "changed"; nothing is written, one
+  Refresh clears it.
+- Choosing the current length or title still writes (and may ask about
+  email); harmless, the user chose it.
+- A meeting moved to end at 24:00 or start at 00:00 cannot be moved again
+  (`movable` is stricter than `move_refusal`); rename and delete still work.
+
 ## Verification
 - Command: the touched test files, with `GETMOREDONE_NO_MAPPED_WINDOWS=1`. The full suite runs on CI.
 - Mutation: every new test was turned red by a mutation of the verbatim line it

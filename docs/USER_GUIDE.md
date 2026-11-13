@@ -429,8 +429,10 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
 
   A move or a new length is refused, with the reason, if any box it would
   hold has a Time Block, lunch or another meeting in it. Move the block first.
-  All-day meetings and meetings that run past midnight can be renamed or
-  deleted, not moved. If the meeting has other guests, you are asked whether
+  An all-day meeting on one day can be renamed or deleted, not moved. A
+  meeting that runs past midnight, or over more than one day, is changed in
+  Google Calendar itself: a rename or delete would change every day of it,
+  so the Plan refuses rather than act on days you are not looking at. If the meeting has other guests, you are asked whether
   to email them about the change; *Cancel* changes nothing. One occurrence of
   a repeating meeting is changed on its own, and the question says so.
 
