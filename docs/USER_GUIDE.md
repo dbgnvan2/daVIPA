@@ -395,6 +395,12 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   guessed at. All-day events hold no box; they are listed in the line above
   the grid, as is any meeting some of which is past the last box (23:30).
 
+  If a read could not see one of your calendars (removed, or its sharing
+  revoked) or could not read an event, the meetings already known from it
+  **stay** rather than being dropped, and the line above the grid says so —
+  *Calendar as of 09:40 — not read: team@…*. A meeting on two of the
+  calendars you read is drawn once, as the calendar listed first has it.
+
   **A meeting that lands on work you had already planned** does not move or
   delete that work. The box is marked *⚠ overlaps a meeting*, the day summary
   says *1 block overlaps a meeting*, and you can still shorten that block or
@@ -403,13 +409,16 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   **Someone else's meeting** can be set aside for one day: right-click it and
   choose *Ignore on this day (stays on your calendar)*. It stays drawn, marked
   *(ignored)*, and its boxes are free for that date; nothing is sent to Google.
-  *Hold this time again* undoes it, and a later read keeps the choice. A
-  meeting you organised, or one whose guests may change it, offers no ignore:
-  change it in Google Calendar and read again.
+  An ignored meeting before Day Start or after Day End no longer stretches the
+  day, so it is listed in the line above the grid instead, where the same
+  right-click finds it. *Hold this time again* undoes it, and a later read keeps
+  the choice. A meeting you organised, or one whose guests may change it,
+  offers no ignore: change it in Google Calendar and read again. If a meeting
+  you ignored later becomes one you can change, the ignore lapses.
 
   The line above the grid says how old the answer is — *Calendar as of
   09:40*, *Calendar not read for this day*, or *Calendar read failed — … (showing
-  what was known at 09:40)*. Opening a day never waits on Google: it draws what
+  what was known at 09:40)*; a read from an earlier day shows its date too. Opening a day never waits on Google: it draws what
   was read last. When Google is set up (libraries, credentials **and** a
   signed-in token), a day not read in the last 15 minutes is read once in the
   background a moment after it opens; the answer appears on that line, not on

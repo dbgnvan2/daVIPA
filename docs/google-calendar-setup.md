@@ -242,8 +242,12 @@ can then be placed in those boxes. The full behaviour is in
 - Declined, cancelled and *free* events are left out, as are the events the
   export made, and each is counted on the status line.
 - A calendar in the list that you can no longer see (removed, or shared access
-  revoked) is skipped and named on the status line; the others are still read.
-  If none can be read, nothing is replaced and the failure is shown.
+  revoked) is skipped; the others are still read. The meetings already known
+  from it stay, and the line above the grid names it until it can be read
+  again. If none can be read, nothing is replaced and the failure is shown.
+- List your own calendar first. A meeting on two listed calendars is taken
+  from the first one, because whether you declined it, and whether you can
+  change it, is recorded per calendar.
 - What was read is kept in the app's database, so the Plan opens without
   waiting on Google. When credentials and a token are present, a day not read
   in the last `plan_commitment_stale_minutes` (default 15) is read once in the

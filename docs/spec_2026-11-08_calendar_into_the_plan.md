@@ -167,7 +167,7 @@ places is how the two answers drift apart. One parse, at write time, stored.
 | CIP-M2.5 | Exclusion rules, each independently tested and each **counted** so the user can be told what was left out: `status == "cancelled"`; the user's own `responseStatus == "declined"`; `transparency == "transparent"` (the calendar's own word for "this does not make me busy"); and any event carrying the app's own `gmd_block_id` marker (§6.1) |
 | CIP-M2.6 | An event that cannot be parsed is skipped and counted by name, never guessed at — the rule the export follows for a block it cannot time |
 | CIP-M2.7 | A failed fetch leaves the previous cache in place and records the failure. A day whose refresh failed shows what it last knew, labelled with when (CIP-M5.4), and never silently shows an empty day |
-| CIP-M2.8 | Where several calendars are read, the same event appearing on two of them (a shared calendar plus an invitation) is one commitment, deduplicated on `event_id` — and `can_edit` is the most permissive of the copies |
+| CIP-M2.8 | Where several calendars are read, the same event appearing on two of them (a shared calendar plus an invitation) is one commitment, deduplicated on `event_id`, and **the copy on the calendar listed first decides** whether it is left out and whether it is editable. *(Changed 2026-11-13 from "`can_edit` is the most permissive of the copies": `organizer.self` and `attendees[].self` describe the calendar a copy is on, so a colleague's shared copy of a meeting the user declined says accepted and organiser. Found by the batch-1 review.)* |
 
 ---
 

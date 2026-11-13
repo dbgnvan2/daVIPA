@@ -28,6 +28,20 @@ read half*. Nothing was seen on screen, and nothing has read a real calendar.
 5. Open a day not read before, with Google set up: about 1.5 s later the line
    above the grid changes to *Calendar as of …*, and the status line does not.
 
+## Review findings fixed before push
+- learning-qa (cold) and a cold correctness pass found: a read that skipped a
+  calendar or event deleted its known meetings and showed the date as fully
+  read; one meeting on two calendars took its declined/editable state from the
+  wrong copy; a day-old read time showed without its date; an ignored meeting
+  outside the day was shown nowhere; a dismissal could be lost to a concurrent
+  read; an ignored meeting that became editable could never hold again. All
+  fixed with tests. **CIP-M2.8 changed**: the first-listed calendar's copy
+  decides, not the most permissive copy; the spec records why.
+- Dropped as low: the slot repair refuses the whole date when one block is
+  under a meeting; a Refresh can be refused in the instant after a read ends;
+  `local_zone()` (tzlocal, D5) has no caller, so the OS zone is used;
+  `focusTime`/`outOfOffice` events are not filtered and hold boxes.
+
 ## Risks / Known gaps
 - Times are converted to this machine's zone once, when read (D5). A laptop
   moved across zones shows the old wall-clock times until the day is read
