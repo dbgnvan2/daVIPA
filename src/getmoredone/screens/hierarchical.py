@@ -12,6 +12,7 @@ from ..priority_levels import (
     row_fill,
 )
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
+from .priority_cell import build_level_cell
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import (
     confirm_weekly_tactic_completion,
@@ -314,16 +315,10 @@ class HierarchicalScreen(ctk.CTkFrame):
         # its own keeps the row's text, which the row may have derived
         # from a segment fill.
         cell = level_cell_fill(self.settings, item)
-        score_label = ctk.CTkLabel(
-            frame,
-            text=f"P:{item.priority_score}",
-            width=60,
-            fg_color=cell.fill or "transparent",
-            text_color=cell.text_color or row_text,
-            corner_radius=6 if cell.fill else 0,
-            font=list_row_font()
+        score_label_box, score_label = build_level_cell(
+            frame, cell, f"P:{item.priority_score}", 60, row_text, list_row_font(),
         )
-        score_label.grid(row=0, column=4, padx=5, pady=5)
+        score_label_box.grid(row=0, column=4, padx=5, pady=5)
 
         # Due date
         if item.due_date:

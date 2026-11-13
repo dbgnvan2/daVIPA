@@ -13,6 +13,7 @@ from ..priority_levels import (
     level_cell_fill,
     row_fill,
 )
+from .priority_cell import build_level_cell
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import notify_weekly_tactic_changes
 from ..theme import apply_segment_accent, semantic_colors, button_style, combo_box_style, list_row_font
@@ -276,16 +277,10 @@ class CompletedScreen(ctk.CTkFrame):
                 # its own keeps the row's text, which the row may have derived
                 # from a segment fill.
                 cell = level_cell_fill(self.settings, item)
-                score_label = ctk.CTkLabel(
-                    item_frame,
-                    text=f"P:{item.priority_score}",
-                    width=60,
-                    fg_color=cell.fill or "transparent",
-                    text_color=cell.text_color or row_text,
-                    corner_radius=6 if cell.fill else 0,
-                    font=list_row_font()
+                score_label_box, score_label = build_level_cell(
+                    item_frame, cell, f"P:{item.priority_score}", 60, row_text, list_row_font(),
                 )
-                score_label.grid(row=0, column=4, padx=5, pady=5)
+                score_label_box.grid(row=0, column=4, padx=5, pady=5)
 
                 # Factor chips (I, U, E, V) - only shown when expanded
                 col_offset = 0
@@ -315,10 +310,13 @@ class CompletedScreen(ctk.CTkFrame):
                             "text_color": row_text,
                         }
                         if is_critical_factor(label, value):
-                            label_kwargs["fg_color"] = critical_chip.fill or "transparent"
-                            label_kwargs["text_color"] = critical_chip.text_color or row_text
-                            label_kwargs["corner_radius"] = 6
-                        ctk.CTkLabel(factors_frame, **label_kwargs).grid(
+                            chip, _ = build_level_cell(
+                                factors_frame, critical_chip, text, width, row_text,
+                                list_row_font(), anchor="w",
+                            )
+                        else:
+                            chip = ctk.CTkLabel(factors_frame, **label_kwargs)
+                        chip.grid(
                             row=0, column=factor_col, padx=2)
                     col_offset = 1
 

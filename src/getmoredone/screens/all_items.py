@@ -15,6 +15,7 @@ from ..priority_levels import (
     row_control_kwargs,
     row_fill,
 )
+from .priority_cell import build_level_cell
 from .segment_color_utils import resolve_segment_color_for_item
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
 from .week_collision_notice import (
@@ -381,17 +382,11 @@ class AllItemsScreen(ctk.CTkFrame):
                 # its own keeps the row's text, which the row may have derived
                 # from a segment fill.
                 cell = level_cell_fill(self.settings, item)
-                priority_label = ctk.CTkLabel(
-                    item_frame,
-                    text=str(item.priority_score),
-                    width=80,
-                    fg_color=cell.fill or "transparent",
-                    text_color=cell.text_color or row_text,
-                    corner_radius=6 if cell.fill else 0,
-                    font=list_row_font(),
+                priority_label_box, priority_label = build_level_cell(
+                    item_frame, cell, str(item.priority_score), 80, row_text, list_row_font(),
+                    on_click=lambda _event, item_id=item.id: self.edit_priority_inline(item_id),
                 )
-                priority_label.grid(row=0, column=7, padx=5, pady=5)
-                priority_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_priority_inline(item_id))
+                priority_label_box.grid(row=0, column=7, padx=5, pady=5)
 
                 # Estimated time (planned_minutes) - ALWAYS shown (not collapsed)
                 time_text = f"{item.planned_minutes}m" if item.planned_minutes else "-"
@@ -431,10 +426,13 @@ class AllItemsScreen(ctk.CTkFrame):
                             "text_color": row_text,
                         }
                         if is_critical_factor(label, value):
-                            label_kwargs["fg_color"] = critical_chip.fill or "transparent"
-                            label_kwargs["text_color"] = critical_chip.text_color or row_text
-                            label_kwargs["corner_radius"] = 6
-                        ctk.CTkLabel(factors_frame, **label_kwargs).grid(
+                            chip, _ = build_level_cell(
+                                factors_frame, critical_chip, text, width, row_text,
+                                list_row_font(), anchor="w",
+                            )
+                        else:
+                            chip = ctk.CTkLabel(factors_frame, **label_kwargs)
+                        chip.grid(
                             row=0, column=factor_col, padx=2)
                     col_offset = 1
 

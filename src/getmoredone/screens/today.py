@@ -20,6 +20,7 @@ from ..priority_levels import (
     row_fill,
 )
 from ..date_utils import increment_date
+from .priority_cell import build_level_cell
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import (
     confirm_weekly_tactic_completion,
@@ -663,17 +664,11 @@ class TodayScreen(ctk.CTkFrame):
         # its own keeps the row's text, which the row may have derived
         # from a segment fill.
         cell = level_cell_fill(self.settings, item)
-        score_label = ctk.CTkLabel(
-            frame,
-            text=f"P:{item.priority_score}",
-            width=60,
-            fg_color=cell.fill or "transparent",
-            text_color=cell.text_color or row_text,
-            corner_radius=6 if cell.fill else 0,
-            font=list_row_font(),
+        score_label_box, score_label = build_level_cell(
+            frame, cell, f"P:{item.priority_score}", 60, row_text, list_row_font(),
+            on_click=lambda _event, item_id=item.id: self.edit_priority_inline(item_id),
         )
-        score_label.grid(row=0, column=7, padx=5, pady=5)
-        score_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_priority_inline(item_id))
+        score_label_box.grid(row=0, column=7, padx=5, pady=5)
 
         # Estimated time (planned_minutes) - ALWAYS shown (not collapsed)
         time_text = f"{item.planned_minutes}m" if item.planned_minutes else "-"
@@ -713,10 +708,13 @@ class TodayScreen(ctk.CTkFrame):
                     "text_color": row_text,
                 }
                 if is_critical_factor(label, value):
-                    label_kwargs["fg_color"] = critical_chip.fill or "transparent"
-                    label_kwargs["text_color"] = critical_chip.text_color or row_text
-                    label_kwargs["corner_radius"] = 6
-                ctk.CTkLabel(factors_frame, **label_kwargs).grid(
+                    chip, _ = build_level_cell(
+                        factors_frame, critical_chip, text, width, row_text,
+                        list_row_font(), anchor="w",
+                    )
+                else:
+                    chip = ctk.CTkLabel(factors_frame, **label_kwargs)
+                chip.grid(
                     row=0, column=col, padx=2)
 
         # Action buttons (only for open items)

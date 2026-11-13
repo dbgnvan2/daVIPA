@@ -27,11 +27,11 @@ rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkg
 
 ## 1) Summary Counts By Type
 
-- Hex colors (match count): **1063**
+- Hex colors (match count): **1064**
 - Named colors (match count): **649**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
-- Widget explicit overrides (line count): **542**
+- Widget explicit overrides (line count): **533**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -41,22 +41,22 @@ and theme_files line counts.
 | Scan | Lines |
 |---|---:|
 | `app_settings` | 25 |
-| `hex` | 162 |
+| `hex` | 163 |
 | `named` | 57 |
 | `theme_api` | 2 |
 | `theme_files` | 1292 |
 | `tuples` | 2 |
-| `widget` | 542 |
+| `widget` | 533 |
 
 Widget override property breakdown:
 
 | Property | Count |
 |---|---:|
-| `border_color` | 14 |
-| `corner_radius` | 62 |
-| `fg_color` | 254 |
-| `hover_color` | 11 |
-| `text_color` | 218 |
+| `border_color` | 15 |
+| `corner_radius` | 60 |
+| `fg_color` | 250 |
+| `hover_color` | 9 |
+| `text_color` | 215 |
 
 AppSettings persisted color/theme fields:
 
@@ -1611,7 +1611,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/project_boards.py:1268` | `text_color="#B91C1C",` |
+| `src/getmoredone/screens/project_boards.py:1266` | `text_color="#B91C1C",` |
 | `src/getmoredone/theme.py:131` | `"danger": "#B91C1C",` |
 | `src/getmoredone/theme.py:150` | `# #B91C1C measured 4.15:1 on that surface, under the 4.5:1 a glyph` |
 
@@ -1834,6 +1834,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/app_settings.py:82` | `priority_level_color_any_critical: str = "#DCFCE7"` |
+| `src/getmoredone/screens/priority_cell.py:3` | ```Purpose: PCC-A3 -- a level colour is pale (Any Critical ``#DCFCE7``), and on a``` |
 | `src/getmoredone/theme.py:137` | `"on_strong": "#ECFDF5" if mode == "light" else "#DCFCE7",` |
 | `src/getmoredone/theme.py:321` | `LEVEL_ANY_CRITICAL: "#DCFCE7",` |
 
@@ -1930,7 +1931,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/project_boards.py:1267` | `hover_color="#EAB308",` |
+| `src/getmoredone/screens/project_boards.py:1265` | `hover_color="#EAB308",` |
 
 ### `#ecfdf5`
 
@@ -2099,7 +2100,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/project_boards.py:1266` | `fg_color="#FACC15",` |
+| `src/getmoredone/screens/project_boards.py:1264` | `fg_color="#FACC15",` |
 
 ### `#fbbf24`
 
