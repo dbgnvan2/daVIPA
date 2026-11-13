@@ -15,7 +15,7 @@ condition the rule exists to prevent, not a style preference.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import customtkinter as ctk
 
@@ -554,6 +554,11 @@ class SlotRow:
     #: its own. Handed back so the screen can make it draggable; a date with a
     #: lunch block returns that block in ``block_widgets`` instead.
     lunch_chip: Optional[ctk.CTkFrame] = None
+    #: CIP-M3.6 -- the calendar commitments drawn in this box, for the screen
+    #: to bind its menu to (CIP-M3.4).
+    commitment_widgets: List[Tuple[Any, ctk.CTkFrame]] = field(default_factory=list)
+    #: D12 -- the mark on a box where a meeting has landed on planned work.
+    conflict_label: Optional[ctk.CTkLabel] = None
 
 
 def _configure_slot_columns(frame: ctk.CTkFrame) -> None:
@@ -596,6 +601,7 @@ def build_slot_row(
     title_width: int = SLOT_TITLE_WIDTH_PX,
     segment_color_for: Any = None,
     settings: Any = None,
+    commitments: Sequence[Tuple[Any, bool]] = (),
 ) -> SlotRow:
     """One half-hour box of the day.
 
@@ -608,12 +614,22 @@ def build_slot_row(
     longer task runs through shows that task greyed and marked, so the user can
     see what the box is spent on without it looking like a second copy of the
     task.
+
+    ``commitments`` (CIP-M3.6) is the calendar events drawn in this box, as
+    ``(commitment, starts_here)``, from ``plan_commitments.commitments_by_slot``.
+    They are drawn first, in their own colour, and a box where one that still
+    holds its time sits over planned work says so (D12).
     """
     palette = semantic_colors()
     slot = grid_slot.slot
-    chips = len(grid_slot.starting) + len(grid_slot.continued)
+    holding = [c for c, _ in commitments if not c.dismissed]
+    conflict = bool(holding) and bool(grid_slot.starting or grid_slot.continued) and not slot.is_lunch
+    chips = (
+        len(grid_slot.starting) + len(grid_slot.continued)
+        + len(commitments) + (1 if conflict else 0)
+    )
 
-    if slot.is_lunch or slot_is_padding(grid_slot):
+    if slot.is_lunch or slot_is_padding(grid_slot) or holding:
         fill = palette["surface"]
     elif grid_slot.is_empty:
         fill = "transparent"
@@ -659,6 +675,23 @@ def build_slot_row(
 
     rendered = SlotRow(frame=frame, slot_index=slot.index)
 
+    inner = 0
+    if commitments:
+        from .plan_commitments import CONFLICT_TEXT, build_commitment_chip
+
+        for commitment, starts_here in commitments:
+            chip = build_commitment_chip(body, commitment, inner, starts_here=starts_here)
+            rendered.commitment_widgets.append((commitment, chip))
+            inner += 1
+        if conflict:
+            rendered.conflict_label = ctk.CTkLabel(
+                body, text=CONFLICT_TEXT, anchor="w",
+                text_color=status_text_color("warning"),
+                font=ctk.CTkFont(size=11),
+            )
+            rendered.conflict_label.grid(row=inner, column=0, sticky="w")
+            inner += 1
+
     if slot.is_lunch:
         lunch_block = next(
             (
@@ -668,7 +701,7 @@ def build_slot_row(
             ),
             None,
         )
-        chip = _build_lunch_chip(body, row=0)
+        chip = _build_lunch_chip(body, row=inner)
         if lunch_block is None:
             # PF-M8 -- the settings' lunch: drawn the same way, and handed back
             # so the screen can let a drag give this date a lunch of its own.
@@ -679,7 +712,6 @@ def build_slot_row(
             rendered.block_widgets.append((lunch_block, chip))
         return rendered
 
-    inner = 0
     # PF-M7 -- continuations first. A box a longer task runs through draws that
     # task's greyed chip, and it used to be drawn *after* everything that starts
     # in the box: every new task dropped there pushed the continuation down, so

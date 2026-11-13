@@ -79,6 +79,7 @@ from .plan_blocks import (
     build_virtual_slot_row,
     chip_column_minsizes,
 )
+from .plan_commitments import PlanCommitmentsMixin, commitments_by_slot
 from .plan_settings_dialog import PlanSettingsDialog
 from .segment_color_utils import resolve_segment_color_for_item
 
@@ -204,6 +205,8 @@ REFUSAL_TEXT = {
     SlotRefusal.CROSSES_LUNCH: "That Time Block runs into lunch — try a later one",
     SlotRefusal.SLOT_FULL: "That Time Block is full — try another one",
     SlotRefusal.LUNCH_EXISTS: "This day already has a lunch — drag that one to move it",
+    # CIP-M3.3 -- a Google Calendar event holds the box.
+    SlotRefusal.SLOT_COMMITTED: "A calendar event holds that Time Block — try another one",
 }
 
 #: LM3-M1 (LMM-A3) -- the lunch chip dropped on Earlier or Later.
@@ -293,7 +296,7 @@ def _clock(minutes: int) -> str:
     return f"{hours}h {remainder:02d}m" if hours else f"{remainder}m"
 
 
-class PlanScreen(ctk.CTkFrame):
+class PlanScreen(PlanCommitmentsMixin, ctk.CTkFrame):
     """Screen for planning time blocks."""
 
     def __init__(self, parent, db_manager: 'DatabaseManager', app: 'GetMoreDoneApp'):
@@ -305,6 +308,19 @@ class PlanScreen(ctk.CTkFrame):
         self.bounds = DayBounds.from_settings(self.settings) if self.settings else DayBounds()
 
         self.selected_date = date.today().strftime("%Y-%m-%d")
+
+        # CIP-M3 -- this date's calendar commitments, read from the cache by
+        # ``load_commitments`` on every redraw. Empty until then, so a gesture
+        # before the first draw is checked against no meetings rather than
+        # raising; the database writers read their own copy regardless (D2).
+        self._commitments: list = []
+        self._commitment_fetch = None
+        self._committed: frozenset = frozenset()
+        # Pending ``after`` ids for the read's poll, the automatic read and the
+        # wait on another screen's read; ``destroy`` cancels whichever is set.
+        self._refresh_poll_id = None
+        self._auto_refresh_id = None
+        self._claim_watch_id = None
 
         # DatePickerButton calls its on_date_changed from its own __init__,
         # which lands here before the panes it would reload exist. The flag is
@@ -400,6 +416,9 @@ class PlanScreen(ctk.CTkFrame):
 
         self._ready = True
         self.refresh()
+        # D10 -- a screen rebuilt while another one's calendar read is running
+        # comes up with Refresh disabled, and re-enables when that read ends.
+        self.sync_refresh_button()
 
     def items_col_width(self) -> int:
         """Width (px) of the items column, from Settings.
@@ -571,10 +590,10 @@ class PlanScreen(ctk.CTkFrame):
         )
         self.btn_autoload.grid(row=0, column=4, sticky="ew", pady=4)
 
-        # -- row 2: the four that add or open something ---------------------
+        # -- row 2: the five that add, read or open something --------------
         tools_row = ctk.CTkFrame(header, fg_color="transparent")
         tools_row.grid(row=1, column=0, sticky="ew", padx=10, pady=(6, 10))
-        for column in range(4):
+        for column in range(5):
             tools_row.grid_columnconfigure(column, weight=1, uniform="tools_row")
 
         self.btn_add_buffer = ctk.CTkButton(
@@ -608,6 +627,19 @@ class PlanScreen(ctk.CTkFrame):
         )
         self.btn_export_calendar.grid(row=0, column=2, sticky="ew", padx=(0, 8))
 
+        # CIP-M5.2 -- reads this date's meetings from Google Calendar into the
+        # cache the grid draws from. Secondary, beside the export it mirrors.
+        # Spec:  docs/spec_2026-11-08_calendar_into_the_plan.md#8-m5--the-plan-screen-phase-1-m6--the-week-phase-2-m7--docs
+        # Tests: tests/test_plan_screen_commitments.py::test_cipm52_refresh_disables_first
+        self.btn_refresh_calendar = ctk.CTkButton(
+            tools_row,
+            text="↻ Calendar",
+            width=100,
+            command=self.refresh_calendar,
+            **button_style("secondary"),
+        )
+        self.btn_refresh_calendar.grid(row=0, column=3, sticky="ew", padx=(0, 8))
+
         self.btn_settings = ctk.CTkButton(
             tools_row,
             text="⚙ Day Settings",
@@ -615,7 +647,7 @@ class PlanScreen(ctk.CTkFrame):
             command=self.open_settings,
             **button_style("secondary"),
         )
-        self.btn_settings.grid(row=0, column=3, sticky="ew", padx=(0, 8))
+        self.btn_settings.grid(row=0, column=4, sticky="ew", padx=(0, 8))
 
         # CE-M4.1 -- the status line is NOT in the header.
         # Spec:  docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md#ce-m41
@@ -905,9 +937,9 @@ class PlanScreen(ctk.CTkFrame):
             padx=(0, PLAN_PANE_EDGE_PAD_PX), pady=10,
         )
         frame.grid_columnconfigure(0, weight=1)
-        # Row 3 is the scrolling grid. The two ends of the day (PD-M11.2) sit
-        # in rows 2 and 4 and keep their own height, so the grid gets the rest.
-        frame.grid_rowconfigure(3, weight=1)
+        # Row 4 is the scrolling grid. The two ends of the day (PD-M11.2) sit
+        # in rows 3 and 5 and keep their own height, so the grid gets the rest.
+        frame.grid_rowconfigure(4, weight=1)
 
         self.day_heading = ctk.CTkLabel(
             frame, text="Day Plan", font=ctk.CTkFont(size=16, weight="bold")
@@ -923,6 +955,13 @@ class PlanScreen(ctk.CTkFrame):
         )
         self.day_summary.grid(row=1, column=0, padx=10, pady=(0, 6), sticky="w")
 
+        # CIP-M5.4 / CIP-M3.8 -- how old the calendar's answer is, and the
+        # meetings no box can show: all-day ones, and any part of a meeting
+        # outside the boxes a date can have. Above the grid, never scrolled off.
+        self.commitment_strip = ctk.CTkFrame(frame, fg_color="transparent")
+        self.commitment_strip.grid(row=2, column=0, padx=10, pady=(0, 4), sticky="ew")
+        self.commitment_strip.grid_columnconfigure(0, weight=1)
+
         # PD-M11.2 -- the two ends of the day are drawn outside the scrolling
         # grid, one above it and one below it, so neither can be scrolled off
         # the screen. Inside the grid they were part of its content: on a day
@@ -930,7 +969,7 @@ class PlanScreen(ctk.CTkFrame):
         # bottom of the pane, and with no way to scroll while dragging there
         # was no gesture that reached it at all.
         self.earlier_holder = ctk.CTkFrame(frame, fg_color="transparent")
-        self.earlier_holder.grid(row=2, column=0, sticky="ew", padx=5)
+        self.earlier_holder.grid(row=3, column=0, sticky="ew", padx=5)
         self.earlier_holder.grid_columnconfigure(0, weight=1)
 
         # The drop target for an item drag, and the container a block drag is
@@ -938,11 +977,11 @@ class PlanScreen(ctk.CTkFrame):
         self.blocks_scroll = ctk.CTkScrollableFrame(
             frame, fg_color=pane_fill
         )
-        self.blocks_scroll.grid(row=3, column=0, sticky="nsew", padx=5, pady=4)
+        self.blocks_scroll.grid(row=4, column=0, sticky="nsew", padx=5, pady=4)
         self.blocks_scroll.grid_columnconfigure(0, weight=1)
 
         self.later_holder = ctk.CTkFrame(frame, fg_color="transparent")
-        self.later_holder.grid(row=4, column=0, sticky="ew", padx=5, pady=(0, 5))
+        self.later_holder.grid(row=5, column=0, sticky="ew", padx=5, pady=(0, 5))
         self.later_holder.grid_columnconfigure(0, weight=1)
 
         self.day_drop_frame = frame
@@ -1219,7 +1258,11 @@ class PlanScreen(ctk.CTkFrame):
             self._last_repair = repair
 
             blocks = self.db_manager.get_time_blocks(self.selected_date)
-            self._grid = build_day_grid(blocks, self.bounds)
+            # CIP-M5.1 -- from the cache only; nothing here reaches Google.
+            self.load_commitments()
+            self._grid = build_day_grid(blocks, self.bounds, committed=self._committed)
+            drawn_commitments = commitments_by_slot(self._commitments, self.bounds)
+            self.draw_commitment_strip()
             items_by_id = self._items_by_id(blocks)
             segment_color_for = self._segment_color_resolver()
 
@@ -1298,8 +1341,11 @@ class PlanScreen(ctk.CTkFrame):
                     title_width=self.box_title_width(),
                     segment_color_for=segment_color_for,
                     settings=self.settings,
+                    commitments=drawn_commitments.get(entry.slot.index, ()),
                 )
                 self._slot_frames.append((rendered.frame, entry.slot.index))
+                for commitment, widget in rendered.commitment_widgets:
+                    self.bind_commitment_handlers(widget, commitment)
                 for block, widget in rendered.block_widgets:
                     self.bind_block_handlers(widget, block)
                     self._block_widgets.append((widget, block.id))
@@ -1347,6 +1393,8 @@ class PlanScreen(ctk.CTkFrame):
                 self.outside_frame.grid_remove()
         finally:
             self._flush_redraw()
+        # CIP-M5.5 -- after the paint, never before it (M5.1).
+        self.maybe_auto_refresh()
 
     def _items_by_id(self, blocks) -> Dict[str, ActionItem]:
         """The items behind these blocks, including ones not in the left pane.
@@ -1390,6 +1438,12 @@ class PlanScreen(ctk.CTkFrame):
             )
         if self._grid.outside:
             parts.append(f"{len(self._grid.outside)} outside the day")
+        # D12 -- planned work a meeting has since landed on. It stays where
+        # it is; this is how the user hears about it on every redraw.
+        overlapping = len(self._grid.overlapping)
+        if overlapping:
+            noun = "block overlaps" if overlapping == 1 else "blocks overlap"
+            parts.append(f"{overlapping} {noun} a meeting")
 
         self.day_summary.configure(text="  ·  ".join(parts))
 
@@ -1591,6 +1645,7 @@ class PlanScreen(ctk.CTkFrame):
             slot_index,
             slots_for_minutes(minutes),
             day_span=self._grid.span,
+            committed=self._committed,
         )
         return refusal_text(reason) if reason else None
 
@@ -1998,6 +2053,7 @@ class PlanScreen(ctk.CTkFrame):
             except Exception:  # noqa: BLE001 - already fired, or already gone
                 pass
             self._export_poll_id = None
+        self.cancel_commitment_callbacks()
         super().destroy()
 
     def autoload_day(self):
@@ -2250,9 +2306,14 @@ class PlanScreen(ctk.CTkFrame):
         blocks = self.db_manager.get_time_blocks(self.selected_date)
         span = slots_for_minutes(minutes)
         occupancy = slot_occupancy(blocks, self.bounds)
-        for entry in self._grid.slots or build_day_grid(blocks, self.bounds).slots:
+        for entry in (
+            self._grid.slots
+            or build_day_grid(blocks, self.bounds, committed=self._committed).slots
+        ):
             index = entry.slot.index
-            if can_place(blocks, self.bounds, index, span) is not None:
+            if can_place(
+                blocks, self.bounds, index, span, committed=self._committed
+            ) is not None:
                 continue
             if any(occupancy.get(index + step) for step in range(span)):
                 continue
@@ -2270,8 +2331,13 @@ class PlanScreen(ctk.CTkFrame):
 
         blocks = self.db_manager.get_time_blocks(self.selected_date)
         span = slots_for_minutes(minutes)
-        for entry in self._grid.slots or build_day_grid(blocks, self.bounds).slots:
-            if not can_place(blocks, self.bounds, entry.slot.index, span):
+        for entry in (
+            self._grid.slots
+            or build_day_grid(blocks, self.bounds, committed=self._committed).slots
+        ):
+            if not can_place(
+                blocks, self.bounds, entry.slot.index, span, committed=self._committed
+            ):
                 return entry.slot.index
         return None
 

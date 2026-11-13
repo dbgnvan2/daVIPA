@@ -150,6 +150,11 @@ def semantic_colors() -> Dict[str, str]:
         # #B91C1C measured 4.15:1 on that surface, under the 4.5:1 a glyph
         # needs; this is 5.33:1.
         "unscheduled_mark": "#991B1B" if mode == "light" else "#FCA5A5",
+        # CIP-M3.6 -- the stripe on a Google Calendar commitment in a Plan box.
+        # Its own hue: not the primary, not a status colour, and not a
+        # priority fill, because a meeting carries no priority and a colour
+        # the eye reads as information must carry some.
+        "commitment": "#6D28D9" if mode == "light" else "#C4B5FD",
     }
 
 

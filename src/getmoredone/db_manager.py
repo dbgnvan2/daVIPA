@@ -14,6 +14,7 @@ import re
 from .database import Database
 from .link_integrity import resolve_segment_id_exact
 from .db_manager_project_boards import DBManagerProjectBoardsMixin
+from .db_manager_commitments import DBManagerCommitmentsMixin
 from .weekly_tactic import LINK_PREDICATE_SQL, parent_of, tactic_of
 from .models import (
     ActionItem, ItemLink, ContactLink, Defaults, RescheduleHistory,
@@ -51,7 +52,7 @@ class SlotRepair:
     misaligned: int = 0
 
 
-class DatabaseManager(DBManagerProjectBoardsMixin):
+class DatabaseManager(DBManagerProjectBoardsMixin, DBManagerCommitmentsMixin):
     """Manages database operations for GetMoreDone."""
 
     # Allowed sort columns (security: prevent SQL injection)
@@ -1654,6 +1655,9 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             ignoring=ignoring,
             day_span=day_span,
             placing_lunch=placing_lunch,
+            # CIP D2 -- read here, so no caller of this writer can forget the
+            # date's calendar events.
+            committed=self._committed_for(block_date, bounds),
         )
         if reason:
             raise SlotRefusedError(reason)
@@ -1903,10 +1907,19 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             replace(block, slot_index=targets[block.id]) if block.id in targets else block
             for block in blocks
         ]
-        drawn = span_for_blocks(repaired, bounds)
+        committed = self._committed_for(block_date, bounds)
+        drawn = span_for_blocks(repaired, bounds, committed=committed)
         for block in repaired:
             if block.id not in targets:
                 continue
+            # CIP-M3.3 -- a block put back onto a meeting refuses the date, as
+            # a full box does. Checked here rather than through ``can_place``,
+            # whose D12 exemption would read the block's *new* box as one it
+            # already covers.
+            if committed.intersection(
+                range(block.slot_index, block.slot_index + slot_span_of(block))
+            ):
+                return result([], SlotRefusal.SLOT_COMMITTED)
             reason = can_place(
                 repaired,
                 bounds,
@@ -2064,6 +2077,8 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
             return []
 
         every_box = range(len(day_grid(bounds)))
+        # CIP D2 -- a block is never adopted onto a box a meeting holds.
+        committed = self._committed_for(block_date, bounds)
         adopted: List[str] = []
         with self.transaction():
             for row in rows:
@@ -2084,7 +2099,8 @@ class DatabaseManager(DBManagerProjectBoardsMixin):
 
                 for candidate in candidates:
                     if can_place(
-                        self.get_time_blocks(block_date), bounds, candidate, span
+                        self.get_time_blocks(block_date), bounds, candidate, span,
+                        committed=committed,
                     ):
                         continue
                     self._settle_block_on_slot(block, candidate, bounds)

@@ -312,6 +312,14 @@ class Database:
             )
         """)
 
+        # CIP-M1.1 / M1.3 -- what Google Calendar said each date holds, and
+        # when each date was last read. Two tables because "never read",
+        # "read and empty" and "read and failed" are three different answers,
+        # and a date with no rows in the first table cannot say which.
+        # Spec:  docs/spec_2026-11-08_calendar_into_the_plan.md#4-m1--the-commitment-store
+        # Tests: tests/test_calendar_commitments.py::test_cipm11_the_table_exists_fresh_and_migrated
+        ensure_calendar_commitment_tables(conn)
+
         # Work logs table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS work_logs (
@@ -862,3 +870,64 @@ class Database:
         else:
             self.conn.rollback()
         self.close()
+
+
+#: CIP-M1.1 -- the commitment table's columns after ``id``, in the order the
+#: spec lists them. A database created by a build that had fewer gains the rest
+#: here, one guarded ``ALTER`` per column, which is how ``time_blocks`` grows.
+CALENDAR_COMMITMENT_COLUMNS = (
+    ("event_id", "TEXT NOT NULL DEFAULT ''"),
+    ("calendar_id", "TEXT NOT NULL DEFAULT 'primary'"),
+    ("commitment_date", "TEXT NOT NULL DEFAULT ''"),
+    ("start_time", "TEXT NOT NULL DEFAULT ''"),
+    ("end_time", "TEXT NOT NULL DEFAULT ''"),
+    ("start_minutes", "INTEGER NOT NULL DEFAULT 0"),
+    ("end_minutes", "INTEGER NOT NULL DEFAULT 0"),
+    ("title", "TEXT NOT NULL DEFAULT ''"),
+    ("is_all_day", "INTEGER NOT NULL DEFAULT 0"),
+    ("response_status", "TEXT"),
+    ("transparency", "TEXT"),
+    ("can_edit", "INTEGER NOT NULL DEFAULT 0"),
+    ("is_recurring_instance", "INTEGER NOT NULL DEFAULT 0"),
+    ("dismissed", "INTEGER NOT NULL DEFAULT 0"),
+    ("fetched_at", "TEXT"),
+    ("created_at", "TEXT NOT NULL DEFAULT ''"),
+    ("updated_at", "TEXT NOT NULL DEFAULT ''"),
+)
+
+
+def ensure_calendar_commitment_tables(conn: sqlite3.Connection) -> None:
+    """Create the commitment cache and its per-date read record, idempotently.
+
+    Purpose: CIP-M1.1, CIP-M1.3.
+    Spec:    docs/spec_2026-11-08_calendar_into_the_plan.md#4-m1--the-commitment-store
+    Tests:   tests/test_calendar_commitments.py::test_cipm11_the_migration_runs_twice_safely
+
+    ``calendar_commitment_fetches`` holds one row per date ever read.
+    ``fetched_at`` is the last read that **succeeded**; a failed read sets
+    ``last_error`` and leaves ``fetched_at`` alone (D6), so the screen can say
+    both "it failed" and "this is what we knew, as of then".
+    """
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS calendar_commitments (
+            id TEXT PRIMARY KEY
+        )
+    """)
+    present = {row[1] for row in conn.execute("PRAGMA table_info(calendar_commitments)")}
+    for column, definition in CALENDAR_COMMITMENT_COLUMNS:
+        if column not in present:
+            conn.execute(
+                f"ALTER TABLE calendar_commitments ADD COLUMN {column} {definition}"
+            )
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_commitments_date
+        ON calendar_commitments(commitment_date, start_minutes)
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS calendar_commitment_fetches (
+            commitment_date TEXT PRIMARY KEY,
+            fetched_at      TEXT,
+            last_error      TEXT,
+            attempted_at    TEXT NOT NULL
+        )
+    """)

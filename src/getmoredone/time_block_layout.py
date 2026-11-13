@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import AbstractSet, Iterable, List, Optional, Sequence, Tuple
 
 from .models import ActionItem, BlockType, SchedulingOptions, TimeBlock
 
@@ -409,6 +409,9 @@ class SlotRefusal:
     OUTSIDE_GRID = "outside_grid"
     CROSSES_LUNCH = "crosses_lunch"
     SLOT_FULL = "slot_full"
+    #: CIP-M3.3 -- a Google Calendar event already holds the box. Refused
+    #: outright, not counted as one of ``MAX_BLOCKS_PER_SLOT`` (CIP-M3.5).
+    SLOT_COMMITTED = "slot_committed"
     #: BSF-M6 (LMM-A2): ``lunch_window`` reads the first LUNCH block on a date
     #: and ignores any other, so a second one would draw and shade nothing.
     LUNCH_EXISTS = "lunch_exists"
@@ -514,7 +517,12 @@ def _stays_inside_the_date(slot_index: int, span: int, bounds: DayBounds) -> boo
     )
 
 
-def span_for_blocks(blocks: Iterable[TimeBlock], bounds: DayBounds) -> DaySpan:
+def span_for_blocks(
+    blocks: Iterable[TimeBlock],
+    bounds: DayBounds,
+    *,
+    committed: AbstractSet[int] = frozenset(),
+) -> DaySpan:
     """The hours you set, stretched to cover what this date holds.
 
     Purpose: PD-M14.2 -- the day on screen. Derived on every read from the
@@ -533,7 +541,31 @@ def span_for_blocks(blocks: Iterable[TimeBlock], bounds: DayBounds) -> DaySpan:
         if not _stays_inside_the_date(start, length, bounds):
             continue
         span = span.widened_to(start, length)
+    # CIP-M3.7 / D8 -- a 07:00 standup pulls the day up to 07:00 the way a
+    # block there would. ``committed`` holds only boxes the date can have.
+    for index in committed:
+        span = span.widened_to(index)
     return span
+
+
+def held_by_block(blocks: Iterable[TimeBlock], block_id: Optional[str]) -> frozenset:
+    """The boxes a stored block covers now, or none if it is not in ``blocks``.
+
+    Purpose: D12 -- a block a meeting has since landed on can still be
+             shortened, nudged or moved off. A gesture on it does not count
+             the committed boxes it already covers; only boxes it would newly
+             enter are refused.
+    Tests:   tests/test_calendar_commitments.py::test_cipd12_a_block_under_a_new_commitment_can_still_be_shortened
+    """
+    if block_id is None:
+        return frozenset()
+    for block in blocks:
+        if str(getattr(block, "id", "")) == str(block_id):
+            start = _slot_index_of(block)
+            if start is None:
+                return frozenset()
+            return frozenset(range(start, start + slot_span_of(block)))
+    return frozenset()
 
 
 def lunch_window(
@@ -743,6 +775,7 @@ def can_place(
     ignoring: Optional[str] = None,
     day_span: Optional[DaySpan] = None,
     placing_lunch: bool = False,
+    committed: AbstractSet[int] = frozenset(),
 ) -> Optional[str]:
     """``None`` if a block of ``span`` boxes may sit at ``slot_index``.
 
@@ -765,6 +798,12 @@ def can_place(
     ``placing_lunch``: the block being placed *is* this date's lunch, so
     neither reason a box can be taken applies -- it defines where lunch is, and
     a lunch box holds the lunch alone (``build_day_grid`` surfaces the rest).
+
+    ``committed`` (CIP-M3.3, D1) is the boxes the date's calendar events
+    hold, from ``calendar_commitments.committed_slots``. A box in it is
+    refused with ``SLOT_COMMITTED`` -- lunch included, since a lunch put on
+    a meeting is no lunch. The boxes the ``ignoring`` block already covers
+    are exempt (D12, ``held_by_block``).
     """
     span = max(1, int(span))
     drawn = template_span(bounds) if day_span is None else day_span
@@ -780,6 +819,11 @@ def can_place(
     covered = grid[at : at + span]
     if any(slot.is_lunch for slot in covered):
         return SlotRefusal.CROSSES_LUNCH
+
+    if committed:
+        in_the_way = set(committed) - held_by_block(blocks, ignoring)
+        if any(slot.index in in_the_way for slot in covered):
+            return SlotRefusal.SLOT_COMMITTED
 
     # PF-M8 -- a lunch box holds the lunch alone, so the room in it is moot.
     if placing_lunch:
@@ -871,6 +915,11 @@ class DayGrid:
     # different answer: ``slots[0].slot.index`` is the same number, but a day
     # with no boxes at all has no slots to read it from.
     span: DaySpan = field(default_factory=lambda: DaySpan(0, -1))
+    #: CIP-M3 -- the boxes calendar events hold on this date, as passed in.
+    committed: frozenset = field(default_factory=frozenset)
+    #: D12 -- blocks on the grid that a commitment has since landed on. They
+    #: stay where they are, marked and counted; they are still the plan.
+    overlapping: List[TimeBlock] = field(default_factory=list)
 
     @property
     def slots_used(self) -> int:
@@ -886,6 +935,8 @@ def build_day_grid(
     blocks: Iterable[TimeBlock],
     bounds: DayBounds,
     span: Optional[DaySpan] = None,
+    *,
+    committed: AbstractSet[int] = frozenset(),
 ) -> DayGrid:
     """Lay a day's blocks onto its grid.
 
@@ -910,11 +961,15 @@ def build_day_grid(
     hide it exactly as dropping it would.
     """
     blocks = list(blocks)
-    drawn = span_for_blocks(blocks, bounds) if span is None else span
+    committed = frozenset(committed)
+    drawn = (
+        span_for_blocks(blocks, bounds, committed=committed) if span is None else span
+    )
     # PF-M8 -- the date's own lunch, when it has one. ``None`` is the settings'.
     lunch = lunch_window(blocks, bounds)
     grid = [GridSlot(slot=slot) for slot in day_grid(bounds, drawn, lunch)]
     outside: List[TimeBlock] = []
+    overlapping: List[TimeBlock] = []
 
     for block in sort_blocks_by_slot(blocks):
         start = _slot_index_of(block)
@@ -932,8 +987,13 @@ def build_day_grid(
         grid[at].starting.append(block)
         for offset in range(1, length):
             grid[at + offset].continued.append(block)
+        if not is_lunch and committed.intersection(range(start, start + length)):
+            overlapping.append(block)
 
-    return DayGrid(slots=grid, outside=outside, span=drawn)
+    return DayGrid(
+        slots=grid, outside=outside, span=drawn,
+        committed=committed, overlapping=overlapping,
+    )
 
 
 def sort_blocks_by_slot(blocks: Iterable[TimeBlock]) -> List[TimeBlock]:

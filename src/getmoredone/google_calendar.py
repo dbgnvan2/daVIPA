@@ -103,6 +103,16 @@ class CalendarEventExists(Exception):
     """
 
 
+class CalendarForbidden(RuntimeError):
+    """A 403 that is not a rate limit: this account may not read that calendar.
+
+    Purpose: CIP D6 -- a permanent refusal, told apart from one worth trying
+             again, so one revoked shared calendar is skipped rather than
+             blocking every other calendar's read for good. A ``RuntimeError``,
+             so every caller that already catches that is unchanged.
+    """
+
+
 class AuthenticationRequired(Exception):
     """Signing in is needed, and this caller is not allowed to ask for it.
 
@@ -239,6 +249,8 @@ def _with_retry(description: str, call):
             if status in CONFLICT_STATUSES:
                 raise CalendarEventExists(f"{description}: {status}") from error
             if not _is_retryable(error, status):
+                if status == 403:
+                    raise CalendarForbidden(f"Failed to {description}: {error}") from error
                 raise RuntimeError(f"Failed to {description}: {error}") from error
             last_error = error
             if attempt < RETRY_ATTEMPTS:
@@ -827,6 +839,43 @@ class GoogleCalendarManager:
                     calendarId=calendar_id,
                     privateExtendedProperty=f"{BLOCK_DATE_PROPERTY}={block_date}",
                     singleEvents=True,
+                    showDeleted=False,
+                    pageToken=token,
+                ).execute(),
+            )
+            events.extend(response.get('items') or [])
+            page_token = response.get('nextPageToken')
+            if not page_token:
+                return events
+
+    def list_events_between(
+        self,
+        time_min: str,
+        time_max: str,
+        calendar_id: str = DEFAULT_CALENDAR_ID,
+    ) -> List[Dict[str, Any]]:
+        """Every event on one calendar that overlaps a time range, one occurrence each.
+
+        Purpose: CIP-M2.1 / D11 -- the read the Plan's commitments come from.
+                 One paginated call for the whole range, however many days.
+        Spec:    docs/spec_2026-11-08_calendar_into_the_plan.md#5-m2--the-read
+        Tests:   tests/test_calendar_commitments.py::test_cipm21_every_page_is_read
+
+        ``singleEvents`` so a weekly meeting arrives as its occurrences, and
+        through ``_with_retry`` like every other call here (P5).
+        """
+        events: List[Dict[str, Any]] = []
+        page_token = None
+
+        while True:
+            response = _with_retry(
+                f"list calendar {calendar_id} events",
+                lambda token=page_token: self.service.events().list(
+                    calendarId=calendar_id,
+                    timeMin=time_min,
+                    timeMax=time_max,
+                    singleEvents=True,
+                    orderBy='startTime',
                     showDeleted=False,
                     pageToken=token,
                 ).execute(),

@@ -547,3 +547,39 @@ class ProjectBoardStatus:
     ACTIVE = "active"
     PENDING = "pending"
     COMPLETED = "completed"
+
+
+@dataclass
+class CalendarCommitment:
+    """A stretch of a date that a Google Calendar event has already taken.
+
+    Purpose: CIP-M1.2 -- a commitment is *when* something was decided for the
+             user. It is not a ``TimeBlock``: it has no item, no priority and
+             no colour from one, and it is never exported (spec section 3).
+    Spec:    docs/spec_2026-11-08_calendar_into_the_plan.md#4-m1--the-commitment-store
+    Tests:   tests/test_calendar_commitments.py::test_cipm12_existing_models_construct_positionally
+
+    ``start_minutes``/``end_minutes`` count from local midnight of
+    ``commitment_date``, and are what the grid uses. The ``HH:MM`` pair is the
+    same fact for a person reading the row; an event that runs past midnight
+    is split per date (D4), so the first part ends at ``24:00``.
+    """
+
+    event_id: str
+    calendar_id: str
+    commitment_date: str
+    start_time: str
+    end_time: str
+    start_minutes: int
+    end_minutes: int
+    title: str = ""
+    is_all_day: bool = False
+    response_status: Optional[str] = None
+    transparency: Optional[str] = None
+    can_edit: bool = False
+    is_recurring_instance: bool = False
+    dismissed: bool = False
+    fetched_at: Optional[str] = None
+    id: str = field(default_factory=lambda: str(uuid4()))
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())

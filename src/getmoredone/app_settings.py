@@ -4,6 +4,7 @@ Stores user preferences like Obsidian vault path.
 """
 
 import json
+import logging
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -11,6 +12,15 @@ from typing import Optional
 from dataclasses import dataclass, asdict, fields, field
 
 from .paths import default_settings_path
+
+logger = logging.getLogger(__name__)
+
+#: CIP D7 -- the calendars the Plan reads meetings from when nothing usable is
+#: configured: the account's own.
+DEFAULT_COMMITMENT_CALENDAR_IDS = ("primary",)
+#: CIP-M5.5 / Q4 -- how old a date's calendar answer may get before opening it
+#: reads it again.
+DEFAULT_COMMITMENT_STALE_MINUTES = 15
 
 
 @dataclass
@@ -224,6 +234,17 @@ class AppSettings:
     # Tests: tests/test_plan_screen_calendar_export.py::test_cem443_the_configured_calendar_is_the_one_written_to
     plan_export_calendar_id: str = "primary"
 
+    # CIP D7 / Q3 -- which Google Calendars the Plan reads meetings from. A
+    # list from the first commit, so a second calendar is a setting rather
+    # than a migration. Normalized on load (``_normalize_commitment_settings``).
+    # Spec:  docs/spec_2026-11-08_calendar_into_the_plan.md#9-decisions-taken-2026-11-08
+    # Tests: tests/test_plan_settings.py::test_cipd7_a_string_calendar_list_falls_back
+    plan_commitment_calendar_ids: list = field(
+        default_factory=lambda: list(DEFAULT_COMMITMENT_CALENDAR_IDS)
+    )
+    # CIP-M5.5 / Q4 -- minutes before a date's calendar answer counts as stale.
+    plan_commitment_stale_minutes: int = DEFAULT_COMMITMENT_STALE_MINUTES
+
     # Email → Action Items (Gmail importer)
     gmail_import_enabled: bool = True
     gmail_import_trigger_label: str = "GMD"
@@ -323,6 +344,7 @@ class AppSettings:
                 settings.first_week_of_year_rule = cls._normalize_first_week_of_year_rule(
                     getattr(settings, "first_week_of_year_rule", "iso")
                 )
+                settings._normalize_commitment_settings()
                 substituted = settings._normalize_plan_day_settings()
                 # Decided from the file, not from the fact that it parsed. A
                 # file can parse perfectly and still have nothing to say about
@@ -606,6 +628,34 @@ class AppSettings:
         except Exception:
             return True
         return False
+
+    def _normalize_commitment_settings(self) -> None:
+        """CIP D7 -- a usable calendar list and staleness window, or the defaults.
+
+        A string where a list belongs would otherwise be read one character
+        at a time, as calendars named "p", "r", "i" ... Each fallback is
+        logged, so a hand edit that did not take is findable.
+        """
+        ids = self.plan_commitment_calendar_ids
+        cleaned = (
+            [c.strip() for c in ids if isinstance(c, str) and c.strip()]
+            if isinstance(ids, list) else []
+        )
+        if not cleaned:
+            logger.warning(
+                "plan_commitment_calendar_ids %r is not a list of calendar ids;"
+                " using %r", ids, list(DEFAULT_COMMITMENT_CALENDAR_IDS),
+            )
+            cleaned = list(DEFAULT_COMMITMENT_CALENDAR_IDS)
+        self.plan_commitment_calendar_ids = cleaned
+
+        minutes = self.plan_commitment_stale_minutes
+        if isinstance(minutes, bool) or not isinstance(minutes, int) or minutes <= 0:
+            logger.warning(
+                "plan_commitment_stale_minutes %r is not a positive whole number;"
+                " using %d", minutes, DEFAULT_COMMITMENT_STALE_MINUTES,
+            )
+            self.plan_commitment_stale_minutes = DEFAULT_COMMITMENT_STALE_MINUTES
 
     def _normalize_plan_day_settings(self) -> bool:
         """TB-M4.1/4.2 — coerce the four day values and the seven weekday flags.
