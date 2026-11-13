@@ -3,14 +3,18 @@ Database module for GetMoreDone application.
 Handles SQLite schema creation and connection management.
 """
 
+import logging
 import sqlite3
 from pathlib import Path
 from typing import Optional
 
+from .models import PriorityFactors
 from .paths import resolve_db_path
 from .vps_schema import VPSSchema
 from .link_integrity import run_link_integrity_migrations
 from .weekly_tactic_migrations import run_weekly_tactic_migrations
+
+logger = logging.getLogger(__name__)
 
 
 class _DeferredCommitConnection:
@@ -519,6 +523,19 @@ class Database:
                 ALTER TABLE action_items
                 ADD COLUMN parent_id TEXT REFERENCES action_items(id) ON DELETE SET NULL
             """)
+
+        # PRC-M1 (PBG-A10): a score stored before the cap (PRI-M2) is the raw
+        # product, up to 102400. Recomputing it now gives the cap, so the
+        # stored value is set to what the app would compute. Idempotent.
+        capped = conn.execute(
+            "UPDATE action_items SET priority_score = ? WHERE priority_score > ?",
+            (PriorityFactors.MAX_SCORE, PriorityFactors.MAX_SCORE),
+        ).rowcount
+        if capped:
+            logger.info(
+                "Capped %d stored priority score(s) at %d",
+                capped, PriorityFactors.MAX_SCORE,
+            )
 
         # Keep weekly tactics grouped consistently for filtering/reporting.
         conn.execute("""

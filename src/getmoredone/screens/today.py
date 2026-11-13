@@ -20,7 +20,7 @@ from ..priority_levels import (
     row_fill,
 )
 from ..date_utils import increment_date
-from .priority_cell import build_level_cell
+from .priority_cell import SCORE_CELL_WIDTH_PX, build_level_cell, score_text
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import (
     confirm_weekly_tactic_completion,
@@ -665,7 +665,7 @@ class TodayScreen(ctk.CTkFrame):
         # from a segment fill.
         cell = level_cell_fill(self.settings, item)
         score_label_box, score_label = build_level_cell(
-            frame, cell, f"P:{item.priority_score}", 60, row_text, list_row_font(),
+            frame, cell, score_text(item.priority_score), SCORE_CELL_WIDTH_PX, row_text, list_row_font(),
             on_click=lambda _event, item_id=item.id: self.edit_priority_inline(item_id),
         )
         score_label_box.grid(row=0, column=7, padx=5, pady=5)

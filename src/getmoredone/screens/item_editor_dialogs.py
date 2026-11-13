@@ -13,6 +13,8 @@ import customtkinter as ctk
 from tkinter import filedialog, messagebox
 
 from ..app_settings import AppSettings
+from ..priority_levels import level_cell_fill
+from .priority_cell import build_level_cell, score_text
 from ..color_contrast import pick_text_color
 from ..models import ActionItem, ItemLink
 from ..paths import app_data_dir_path
@@ -40,6 +42,31 @@ def _get_weekly_debug_logger() -> logging.Logger:
     logger.addHandler(handler)
     logger.propagate = False
     return logger
+
+
+#: The pickers' Priority column, unchanged from before PRC-M3 so the header
+#: above it still lines up.
+PICKER_SCORE_CELL_WIDTH_PX = 70
+
+
+def _priority_cell(dialog, frame, item, row_text: str) -> None:
+    """One picker row's Priority cell, coloured by its level.
+
+    Purpose: PRC-M3 (PCC-A1) -- the score is colour-coded on the five list
+             screens and the Plan, and was plain here.
+    Tests:   tests/test_priority_level_colors.py::test_prcm3_a_picker_row_draws_the_level_colour
+
+    Settings are read once per dialog, the user's own Priority Colours.
+    """
+    settings = getattr(dialog, "_priority_settings", None)
+    if settings is None:
+        settings = AppSettings.load()
+        dialog._priority_settings = settings
+    outer, _label = build_level_cell(
+        frame, level_cell_fill(settings, item), score_text(item.priority_score),
+        PICKER_SCORE_CELL_WIDTH_PX, row_text, None,
+    )
+    outer.grid(row=0, column=1, padx=5, pady=5)
 
 
 class ShowRelatedDialog(ctk.CTkToplevel):
@@ -253,15 +280,8 @@ class ShowRelatedDialog(ctk.CTkToplevel):
         )
         title_label.grid(row=0, column=0, sticky="w", padx=10, pady=5)
 
-        # Priority
-        priority_label = ctk.CTkLabel(
-            frame,
-            text=f"P:{item.priority_score}",
-            width=70,
-            fg_color=self.palette["surface_subtle"],
-            text_color=self.palette["body_text"],
-        )
-        priority_label.grid(row=0, column=1, padx=5, pady=5)
+        # Priority -- PRC-M3 (PCC-A1): the level colour the list screens draw.
+        _priority_cell(self, frame, item, self.palette["body_text"])
 
         # Due date
         due_text = item.due_date if item.due_date else "-"
@@ -472,14 +492,8 @@ class SetParentDialog(ctk.CTkToplevel):
         )
         title_label.grid(row=0, column=0, sticky="w", padx=10, pady=5)
 
-        # Priority
-        priority_label = ctk.CTkLabel(
-            frame,
-            text=f"P:{item.priority_score}",
-            width=70,
-            fg_color=self.palette["surface_subtle"]
-        )
-        priority_label.grid(row=0, column=1, padx=5, pady=5)
+        # Priority -- PRC-M3 (PCC-A1): the level colour the list screens draw.
+        _priority_cell(self, frame, item, self.palette["body_text"])
 
         # Due date
         due_text = item.due_date if item.due_date else "-"

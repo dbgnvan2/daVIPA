@@ -15,7 +15,7 @@ from ..priority_levels import (
     row_control_kwargs,
     row_fill,
 )
-from .priority_cell import build_level_cell
+from .priority_cell import ALL_ITEMS_SCORE_CELL_WIDTH_PX, build_level_cell, score_text
 from .segment_color_utils import resolve_segment_color_for_item
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
 from .week_collision_notice import (
@@ -383,7 +383,7 @@ class AllItemsScreen(ctk.CTkFrame):
                 # from a segment fill.
                 cell = level_cell_fill(self.settings, item)
                 priority_label_box, priority_label = build_level_cell(
-                    item_frame, cell, str(item.priority_score), 80, row_text, list_row_font(),
+                    item_frame, cell, score_text(item.priority_score), ALL_ITEMS_SCORE_CELL_WIDTH_PX, row_text, list_row_font(),
                     on_click=lambda _event, item_id=item.id: self.edit_priority_inline(item_id),
                 )
                 priority_label_box.grid(row=0, column=7, padx=5, pady=5)

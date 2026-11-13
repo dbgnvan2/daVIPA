@@ -22,6 +22,7 @@ import customtkinter as ctk
 from ..models import ActionItem, BlockType, Status, TimeBlock
 from ..color_contrast import contrast_ratio
 from .drag_schedule_support import interpolate_hex_color
+from .priority_cell import SCORE_CELL_WIDTH_PX, score_text
 from ..priority_levels import level_cell_fill, row_fill
 from ..theme import (
     block_type_colors,
@@ -80,7 +81,7 @@ SLOT_LENGTH_WIDTH_PX = 48
 #: the same text. Measured: ``P:9999`` (the cap) is 45px, and a filled badge
 #: asks 57px with ``corner_radius`` as padding. At 44px it overflowed the
 #: title column, which has no slack at the pane's floor. Tests: PBG-A5.
-SLOT_BADGE_WIDTH_PX = 60
+SLOT_BADGE_WIDTH_PX = SCORE_CELL_WIDTH_PX
 
 #: The column left of the depth bars. In the left pane it carries the marker
 #: that says the day already holds a block for this item; in a day box it is
@@ -454,7 +455,7 @@ def build_item_row(
     cell = level_cell_fill(settings, item)
     ctk.CTkLabel(
         frame,
-        text=f"P:{item.priority_score}",
+        text=score_text(item.priority_score),
         width=SLOT_BADGE_WIDTH_PX,
         fg_color=cell.fill or "transparent",
         text_color=cell.text_color or row_text,
@@ -966,7 +967,7 @@ def _build_block_chip(
         cell = level_cell_fill(settings, item)
         ctk.CTkLabel(
             chip,
-            text=f"P:{item.priority_score}",
+            text=score_text(item.priority_score),
             width=SLOT_BADGE_WIDTH_PX,
             fg_color=cell.fill or "transparent",
             text_color=cell.text_color or body_text,

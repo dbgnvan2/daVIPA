@@ -13,7 +13,7 @@ from ..priority_levels import (
     level_cell_fill,
     row_fill,
 )
-from .priority_cell import build_level_cell
+from .priority_cell import SCORE_CELL_WIDTH_PX, build_level_cell, score_text
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import notify_weekly_tactic_changes
 from ..theme import apply_segment_accent, semantic_colors, button_style, combo_box_style, list_row_font
@@ -278,7 +278,7 @@ class CompletedScreen(ctk.CTkFrame):
                 # from a segment fill.
                 cell = level_cell_fill(self.settings, item)
                 score_label_box, score_label = build_level_cell(
-                    item_frame, cell, f"P:{item.priority_score}", 60, row_text, list_row_font(),
+                    item_frame, cell, score_text(item.priority_score), SCORE_CELL_WIDTH_PX, row_text, list_row_font(),
                 )
                 score_label_box.grid(row=0, column=4, padx=5, pady=5)
 

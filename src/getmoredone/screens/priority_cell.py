@@ -19,6 +19,18 @@ CELL_INSET_PX = 2
 CELL_CORNER_RADIUS = 6
 CELL_HEIGHT_PX = 28
 
+#: PRC-M2 (PRI-A2) -- the Priority cell's width on the four list screens with
+#: no header row, and the Plan badge. ``P:9999``, the capped maximum, fits.
+SCORE_CELL_WIDTH_PX = 60
+#: All Items alone has a header row, and its bold "Priority" heading needs more
+#: than the score does.
+ALL_ITEMS_SCORE_CELL_WIDTH_PX = 80
+
+
+def score_text(score: Any) -> str:
+    """How a priority score reads in a cell: ``P:n`` on every screen (PRC-M2, PRI-A3)."""
+    return f"P:{score}"
+
 
 def build_level_cell(
     master: Any,
