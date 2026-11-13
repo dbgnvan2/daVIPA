@@ -1336,7 +1336,13 @@ class PlanScreen(ctk.CTkFrame):
 
         minutes = default_minutes_for_block_type(block_type, self.settings)
         if slot_index is None:
-            slot_index = self.first_free_slot(minutes)
+            # PBB-M1: a click has no pointer to say "beside this task", so it
+            # takes an empty half hour, as AutoLoad does; only a day with none
+            # left falls back to the first box with room. A drag still puts
+            # it exactly where it is dropped.
+            slot_index = self.first_clear_slot(minutes)
+            if slot_index is None:
+                slot_index = self.first_free_slot(minutes)
             if slot_index is None:
                 self.set_status(
                     f"No Time Block free for a {minutes}m {block_type}", "warning"
