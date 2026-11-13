@@ -34,6 +34,8 @@ import customtkinter as ctk  # noqa: E402
 from src.getmoredone.screens.annual_vision_segments import (  # noqa: E402
     AnnualVisionSegmentsScreen,
 )
+from src.getmoredone.screens import ape_assignment as quarter_mod  # noqa: E402
+from src.getmoredone.screens import ape_period_view as month_mod  # noqa: E402
 from src.getmoredone.screens.ape_assignment import APEAssignmentScreen  # noqa: E402
 from src.getmoredone.screens.ape_period_view import APEPeriodViewScreen  # noqa: E402
 from src.getmoredone.screens.vision_segments import VisionSegmentsScreen  # noqa: E402
@@ -85,6 +87,34 @@ def _all_buttons(frame):
         else:
             out.extend(_all_buttons(child))
     return out
+
+
+def _assert_bottom_left(screen):
+    """The action row is under the left panel, and the right panel has none.
+
+    Three cells of ``screen.body``, read off the live grid rather than off an
+    attribute name. The first version of this check compared two column
+    numbers and asserted ``not hasattr(screen, "right_actions")``, which the
+    cold sweep found guards much less than it claims: a button gridded
+    straight into ``body`` row 2 column 2, or into ``right_frame``, or into a
+    frame stored under any other name, passed all three assertions — and a
+    later refactor onto a shared row *named* ``right_actions`` would have
+    reddened it for a reason that has nothing to do with where a button sits.
+    """
+    body = screen.body
+    assert screen.left_actions.master is body, (
+        "the action row belongs to the body grid, not inside a panel")
+    left_col = int(screen.left_frame.grid_info()["column"])
+    actions = screen.left_actions.grid_info()
+    assert int(actions["column"]) == left_col, (
+        "the add button must sit in the left panel's column")
+    assert int(actions["row"]) > int(screen.left_frame.grid_info()["row"]), (
+        "the add button must sit below the left panel, not above it")
+    right_col = int(screen.right_frame.grid_info()["column"])
+    assert body.grid_slaves(row=int(actions["row"]), column=right_col) == [], (
+        "the right panel must carry no action row of its own")
+    assert _all_buttons(screen.right_frame) == [], (
+        "no button may be parented inside the right panel either")
 
 
 def _header(screen):
@@ -168,11 +198,7 @@ def test_vtfm71_ape_quarter_assignment_controls(tmp_path):
         try:
             assert _buttons(_header(screen)) == ["Load", "Refresh"]
             assert _buttons(screen.left_actions) == ["Add APE Quarter"]
-            assert screen.left_actions.grid_info()["column"] == \
-                screen.left_frame.grid_info()["column"], (
-                "the add button must sit in the left panel's column")
-            assert not hasattr(screen, "right_actions"), (
-                "the right panel must carry no action row of its own")
+            _assert_bottom_left(screen)
         finally:
             root.destroy()
     finally:
@@ -190,13 +216,47 @@ def test_vtfm71_ape_month_assignment_controls(tmp_path):
         try:
             assert _buttons(_header(screen)) == ["Load", "Refresh"]
             assert _buttons(screen.left_actions) == ["Add APE Month"]
-            assert screen.left_actions.grid_info()["column"] == \
-                screen.left_frame.grid_info()["column"], (
-                "the add button must sit in the left panel's column")
-            assert not hasattr(screen, "right_actions"), (
-                "the right panel must carry no action row of its own")
+            _assert_bottom_left(screen)
         finally:
             root.destroy()
+    finally:
+        vps.close()
+
+
+def test_the_add_dialog_is_titled_for_its_button(tmp_path):
+    """The dialog's title carries the label of the button that opened it.
+
+    The two APE tabs' buttons were renamed and their dialog titles were not,
+    so "Add APE Quarter" opened a window titled "Assign APE to Quarter Q4" —
+    the only VSP tabs where the two disagreed, and no test read either string.
+    The button's label is read off the live widget rather than written out
+    here, so the two cannot drift apart again.
+
+    ``open_pick_record_dialog`` is replaced in the screen's own module for the
+    call, the way tests/test_vsp_tab_adds.py does it: no window opens, and the
+    title is read from what the screen passed.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        for cls, module in ((APEAssignmentScreen, quarter_mod),
+                            (APEPeriodViewScreen, month_mod)):
+            root, screen = _screen(cls, vps)
+            try:
+                label = _buttons(screen.left_actions)[0]
+                captured = {}
+                original = module.open_pick_record_dialog
+                module.open_pick_record_dialog = \
+                    lambda _parent, **kw: captured.update(kw)
+                try:
+                    screen.open_add_dialog()
+                finally:
+                    module.open_pick_record_dialog = original
+                assert captured, f"{cls.__name__} opened no dialog"
+                assert captured["title"].startswith(label), (
+                    f"{cls.__name__}: the button says {label!r} and the "
+                    f"dialog is titled {captured['title']!r}")
+            finally:
+                root.destroy()
     finally:
         vps.close()
 
