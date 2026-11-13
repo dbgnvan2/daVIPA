@@ -347,3 +347,45 @@ def test_cipm42_releasing_a_dragged_meeting_on_a_box_starts_the_move(
 
     assert screen._drag_commitment is None
     assert manager.get_commitments(THURSDAY)[0].start_time == "13:00"
+
+
+# ------------------------------------------------------- sweep, 2026-11-13
+
+def test_cipm42_a_click_on_a_meeting_off_the_half_hour_moves_nothing(
+    root, manager, settings, ready, asked, monkeypatch
+):
+    """Sweep F1 -- press and release on a 10:15 meeting's own box is no move.
+
+    Comparing minutes made the 10:00 box a move to 10:00, written to Google
+    on a plain click with no question."""
+    screen, factory, commitment = _screen(
+        root, manager, settings, _event(start=(10, 15), end=(10, 45))
+    )
+    monkeypatch.setattr(screen, "slot_under_pointer", lambda: TEN)
+    monkeypatch.setattr(screen, "virtual_under_pointer", lambda: None)
+    screen.start_commitment_drag(None, commitment)
+
+    screen.on_drag_release(None)
+    _finish(screen, root)
+
+    assert factory.calls == 0
+    assert manager.get_commitments(THURSDAY)[0].start_time == "10:15"
+
+
+def test_cipm45_a_failed_write_is_logged(root, manager, settings, ready, asked, monkeypatch, caplog):
+    """Sweep F4 -- the outcome is logged, so leaving the screen mid-write
+    does not lose it."""
+    screen, _factory, commitment = _screen(
+        root, manager, settings, _event(), fail={"update": RuntimeError("quota exceeded")}
+    )
+    monkeypatch.setattr(screen, "slot_under_pointer", lambda: ONE_PM)
+    monkeypatch.setattr(screen, "virtual_under_pointer", lambda: None)
+    screen.start_commitment_drag(None, commitment)
+
+    with caplog.at_level("WARNING", logger=pce.logger.name):
+        screen.on_drag_release(None)
+        _finish(screen, root)
+
+    assert [r.getMessage() for r in caplog.records if r.name == pce.logger.name] == [
+        "Calendar change to ev1 not completed: quota exceeded"
+    ]

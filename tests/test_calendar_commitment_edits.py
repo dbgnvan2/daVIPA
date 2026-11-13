@@ -119,7 +119,7 @@ def test_cipm42_a_move_writes_the_new_start_and_the_same_length(manager):
 
     assert outcome.done, outcome.failure
     [(_, _, _, _, start, minutes, _)] = client.writes()
-    assert (start, minutes) == (datetime(2026, 11, 13, 13, 0), 45)
+    assert (start, minutes) == (datetime(2026, 11, 13, 13, 0, tzinfo=TZ), 45)
     [stored] = manager.get_commitments(DAY)
     assert (stored.start_time, stored.end_time) == ("13:00", "13:45")
 
@@ -393,3 +393,41 @@ def test_cipm16_apply_commitment_edit_replaces_only_that_event_on_that_date(mana
     assert after["a"].id == before["a"].id
     assert after["b"] == before["b"]
     assert manager.get_commitment_fetch(DAY) == fetch_before
+
+
+# ------------------------------------------------------- sweep, 2026-11-13
+
+@pytest.mark.parametrize("request_", [EditRequest(delete=True), EditRequest(title="Away")])
+def test_cipm44_an_event_over_several_days_is_not_changed_from_one_day(manager, request_):
+    """Sweep F2 -- a delete or rename changes the whole Google event, so an
+    event over more than one day is refused rather than lost from three days
+    after a question that named one."""
+    event = {"id": "ev1", "summary": "Conference", "organizer": {"self": True},
+             "start": {"date": "2026-11-12"}, "end": {"date": "2026-11-15"}}
+    commitment = _cached(manager, event)
+    client = EditCalendar(event)
+
+    outcome = _write(manager, client, commitment, request_)
+
+    assert not outcome.done
+    assert "more than one day" in outcome.failure
+    assert client.writes() == []
+
+
+def test_cipm45_a_database_that_will_not_open_after_the_write_says_google_changed(
+    manager, monkeypatch
+):
+    """Sweep F3 -- once Google has the change, no failure may say "not changed"."""
+    event = _event()
+    commitment = _cached(manager, event)
+    client = EditCalendar(event)
+
+    def locked(*_args, **_kwargs):
+        raise RuntimeError("database is locked")
+
+    monkeypatch.setattr("src.getmoredone.db_manager.DatabaseManager", locked)
+    outcome = _write(manager, client, commitment, EditRequest(title="Renamed"))
+
+    assert not outcome.done
+    assert outcome.failure.startswith("Google Calendar was changed, but the Plan could not save it")
+    assert len(client.writes()) == 1

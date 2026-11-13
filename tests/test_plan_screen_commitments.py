@@ -152,7 +152,11 @@ def test_cipm51_opening_plan_makes_no_call(root, manager, settings, factory, rea
     _hold(manager, _commitment(600, 630))
 
     screen = _open(root, manager, settings, factory)
-    root.update()
+    # update_idletasks, not update(): a full update() on a withdrawn root that
+    # is not the process's first Tk window spins forever in Tk's macOS run loop
+    # (TkMacOSXDrawAllViews), hanging any run where this is not the first Tk
+    # test. The automatic read is 1.5 s away, so update() ran nothing more.
+    root.update_idletasks()
 
     assert factory.calls == 0
     assert "10:00–10:30  Board meeting" in _drawn_texts(_box(screen, TEN))
