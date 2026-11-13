@@ -27,11 +27,11 @@ rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkg
 
 ## 1) Summary Counts By Type
 
-- Hex colors (match count): **1064**
-- Named colors (match count): **649**
+- Hex colors (match count): **1061**
+- Named colors (match count): **629**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
-- Widget explicit overrides (line count): **536**
+- Widget explicit overrides (line count): **512**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -41,22 +41,22 @@ and theme_files line counts.
 | Scan | Lines |
 |---|---:|
 | `app_settings` | 25 |
-| `hex` | 163 |
-| `named` | 57 |
+| `hex` | 160 |
+| `named` | 39 |
 | `theme_api` | 2 |
 | `theme_files` | 1292 |
 | `tuples` | 2 |
-| `widget` | 536 |
+| `widget` | 512 |
 
 Widget override property breakdown:
 
 | Property | Count |
 |---|---:|
 | `border_color` | 15 |
-| `corner_radius` | 61 |
-| `fg_color` | 251 |
-| `hover_color` | 9 |
-| `text_color` | 216 |
+| `corner_radius` | 56 |
+| `fg_color` | 237 |
+| `hover_color` | 2 |
+| `text_color` | 206 |
 
 AppSettings persisted color/theme fields:
 
@@ -88,7 +88,7 @@ src/getmoredone/app_settings.py:715:        from .theme import normalize_theme_n
 src/getmoredone/app_settings.py:717:        return normalize_theme_name(value)
 ```
 
-Hex top values (20 of 230 distinct):
+Hex top values (20 of 229 distinct):
 
 | Color | Count |
 |---|---:|
@@ -113,7 +113,7 @@ Hex top values (20 of 230 distinct):
 | `#f0e7ff` | 12 |
 | `#42386d` | 11 |
 
-Named top values (all 40 distinct):
+Named top values (all 39 distinct):
 
 | Color | Count |
 |---|---:|
@@ -121,12 +121,12 @@ Named top values (all 40 distinct):
 | `gray14` | 68 |
 | `gray60` | 48 |
 | `gray45` | 32 |
-| `gray` | 31 |
 | `gray20` | 29 |
 | `gray40` | 28 |
 | `gray41` | 28 |
 | `gray90` | 25 |
 | `gray74` | 24 |
+| `gray` | 22 |
 | `gray53` | 19 |
 | `gray55` | 19 |
 | `gray100` | 18 |
@@ -140,19 +140,18 @@ Named top values (all 40 distinct):
 | `gray62` | 9 |
 | `gray75` | 9 |
 | `gray80` | 9 |
-| `green` | 9 |
-| `white` | 9 |
 | `gray16` | 8 |
 | `gray50` | 8 |
 | `gray52` | 8 |
 | `gray13` | 7 |
 | `gray65` | 7 |
 | `gray85` | 7 |
-| `red` | 7 |
+| `green` | 7 |
 | `orange` | 5 |
+| `red` | 5 |
 | `blue` | 4 |
+| `white` | 4 |
 | `gray30` | 3 |
-| `darkred` | 2 |
 | `grey` | 2 |
 | `yellow` | 2 |
 | `black` | 1 |
@@ -629,7 +628,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/segment_color_utils.py:10` | `DEFAULT_SEGMENT_COLOR = "#334155"` |
 | `src/getmoredone/screens/settings_vsp_segments.py:13` | `DEFAULT_INDICATOR_COLOR = "#334155"` |
 | `src/getmoredone/screens/vision_segments.py:13` | `DEFAULT_SWATCH_COLOR = "#334155"` |
-| `src/getmoredone/screens/vision_segments.py:399` | `color_row, color = self._color_input(f, (row or {}).get("color_hex", "#334155"))` |
+| `src/getmoredone/screens/vision_segments.py:397` | `color_row, color = self._color_input(f, (row or {}).get("color_hex", "#334155"))` |
 | `src/getmoredone/vps_manager.py:1433` | `color_map[name] = row["color_hex"] or "#334155"` |
 | `src/getmoredone/vps_manager.py:1443` | `color = (row["color_hex"] or "").strip() or "#334155"` |
 | `src/getmoredone/vps_manager_taxonomy.py:1010` | `COALESCE(sd.color_hex, '#334155') AS color_hex,` |
@@ -1255,14 +1254,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/theme.py:263` | `"date_today": "#86EFAC",` |
 
-### `#888888`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/screens/vision_planning.py:280` | `color = item.get('segment_color') or "#888888"` |
-| `src/getmoredone/screens/vision_planning.py:542` | `color = item.get('segment_color') or "#888888"` |
-| `src/getmoredone/screens/vision_planning.py:561` | `color = item.get('segment_color') or "#888888"` |
-
 ### `#897cb2`
 
 | File:Line | Snippet |
@@ -1370,7 +1361,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/vision_segments.py:538` | `color_row, color = self._color_input(f, (row or {}).get("color_hex", "#94A3B8"))` |
+| `src/getmoredone/screens/vision_segments.py:536` | `color_row, color = self._color_input(f, (row or {}).get("color_hex", "#94A3B8"))` |
 
 ### `#97208c`
 
@@ -2388,26 +2379,10 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/theme.py:249` | `"blue": palette["primary"],` |
 | `tools/generate_ctk_themes.py:48` | `"blue": ["#3B8ED0", "#1F6AA5"],` |
 
-### `darkred`
-
-| File:Line | Snippet |
-|---|---|
-| `src/getmoredone/screens/vision_planning.py:315` | `fg_color="darkred", hover_color="red",` |
-| `src/getmoredone/screens/vision_planning.py:577` | `fg_color="darkred", hover_color="red",` |
-
 ### `gray`
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/vision_planning.py:83` | `fg_color="gray", width=120).pack(side="left", padx=5)` |
-| `src/getmoredone/screens/vision_planning.py:171` | `text_color="gray"` |
-| `src/getmoredone/screens/vision_planning.py:227` | `toolbar, text="Refresh", width=80, fg_color="gray",` |
-| `src/getmoredone/screens/vision_planning.py:249` | `text_color="gray"` |
-| `src/getmoredone/screens/vision_planning.py:381` | `ctrl, text="Refresh", width=80, fg_color="gray",` |
-| `src/getmoredone/screens/vision_planning.py:409` | `sep = ctk.CTkFrame(body, width=2, fg_color="gray")` |
-| `src/getmoredone/screens/vision_planning.py:463` | `text_color="gray"` |
-| `src/getmoredone/screens/vision_planning.py:500` | `text_color="gray"` |
-| `src/getmoredone/screens/vision_planning.py:629` | `text_color="gray"` |
 | `src/getmoredone/screens/vps_editors.py:1289` | `separator = ctk.CTkFrame(main_frame, height=2, fg_color="gray")` |
 | `src/getmoredone/theme.py:251` | `"gray": palette["muted_text"],` |
 | `themes/apple_grey.json:176` | `"gray",` |
@@ -3165,8 +3140,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/timer_window.py:892` | `status_color = "green" if self.timer_state == self.RUNNING else "blue"` |
 | `src/getmoredone/screens/timer_window.py:1059` | `self._update_status_label("Recording...", "green")` |
 | `src/getmoredone/screens/timer_window.py:1097` | `self._update_status_label("Working...", "green")` |
-| `src/getmoredone/screens/vision_planning.py:81` | `fg_color="green", width=120).pack(side="left", padx=5)` |
-| `src/getmoredone/screens/vision_planning.py:376` | `ctrl, text="Save", width=70, fg_color="green",` |
 | `src/getmoredone/theme.py:16` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:241` | `"green": palette["success_strong"],` |
 | `tools/generate_ctk_themes.py:44` | `"green": ["#2CC985", "#2FA572"],` |
@@ -3196,8 +3169,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/timer_window.py:919` | `self._update_status_label("Stopped", "red")` |
 | `src/getmoredone/screens/timer_window.py:971` | `self._update_status_label("⏰ BREAK OVER! ⏰", "red")` |
 | `src/getmoredone/screens/timer_window.py:1074` | `self._update_status_label("Not saved — try Done again", "red")` |
-| `src/getmoredone/screens/vision_planning.py:315` | `fg_color="darkred", hover_color="red",` |
-| `src/getmoredone/screens/vision_planning.py:577` | `fg_color="darkred", hover_color="red",` |
 | `src/getmoredone/theme.py:244` | `"red": palette["danger"],` |
 
 ### `white`
@@ -3206,11 +3177,6 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/screens/item_editor_weekly_tactic_dialog.py:393` | `return "black" if luminance > 160 else "white"` |
 | `src/getmoredone/screens/item_editor_weekly_tactic_dialog.py:396` | `return "white"` |
-| `src/getmoredone/screens/vision_planning.py:285` | `text_color="white", width=130, height=28, corner_radius=6,` |
-| `src/getmoredone/screens/vision_planning.py:294` | `text_color="white", width=130, height=28, corner_radius=6,` |
-| `src/getmoredone/screens/vision_planning.py:303` | `text_color="white", width=130, height=28, corner_radius=6,` |
-| `src/getmoredone/screens/vision_planning.py:547` | `text_color="white", width=120, height=28, corner_radius=6,` |
-| `src/getmoredone/screens/vision_planning.py:566` | `text_color="white", width=120, height=28, corner_radius=6,` |
 | `src/getmoredone/theme.py:120` | `"chip_text": "white",` |
 | `src/getmoredone/theme.py:254` | `"white": palette["body_text"],` |
 
