@@ -2065,3 +2065,28 @@ def test_the_opt_out_parsing_handles_whitespace_and_case(monkeypatch):
 # instruction, 2026-11-09: records are filed, not tested. The CI contract
 # above — the workflow's own python versions, its secrets, the mapped-window
 # count — is kept, because it is about CI and not about prose.
+
+
+def test_bsfm7_every_apt_call_retries_inside_a_time_limit():
+    """BSF-M7 (CI-A1) — a mirror outage is retried, not a red build.
+
+    Spec: docs/unused-docs/implementation_plan_2026-11-13_backlog_small_fixes.md
+
+    Source text, because the alternative is running apt against a broken
+    mirror. Anchored per line and counted exactly: the two apt calls each
+    carry ``Acquire::Retries``, they sit in a retry loop, and the step has a
+    time limit so the loop cannot hang the job.
+    """
+    lines = TESTS_WORKFLOW.read_text(encoding="utf-8").splitlines()
+    apt_lines = [line for line in lines
+                 if re.match(r"\s*sudo apt-get\b", line)]
+    assert len(apt_lines) == 2, apt_lines
+    assert all("-o Acquire::Retries=" in line for line in apt_lines), apt_lines
+
+    step = next(i for i, line in enumerate(lines)
+                if line.strip().startswith("- name: Install system packages"))
+    end = next(i for i in range(step + 1, len(lines))
+               if lines[i].strip().startswith("- name:"))
+    body = [line.strip() for line in lines[step:end]]
+    assert body.count("timeout-minutes: 15") == 1, body
+    assert body.count("for attempt in 1 2 3; do") == 1, body

@@ -1081,9 +1081,21 @@ def _keep_tk_windows_off_screen():
         _original_attributes = cls.attributes
 
         def _attributes(self, *args, __original=_original_attributes, **kwargs):
-            if args and args[0] == "-topmost" and len(args) > 1:
+            # BSF-M4 (CGH-A1): one call can set several attributes, so the
+            # -topmost pair is dropped wherever it sits and the rest pass
+            # through. Python 3.13 also takes ``topmost=True`` as a keyword.
+            # A lone "-topmost" is a read, and is passed through.
+            kept, dropped = [], "topmost" in kwargs
+            kwargs.pop("topmost", None)
+            for index in range(0, len(args), 2):
+                pair = args[index:index + 2]
+                if pair[0] == "-topmost" and len(pair) == 2:
+                    dropped = True
+                else:
+                    kept.extend(pair)
+            if dropped and not kept and not kwargs:
                 return None
-            return __original(self, *args, **kwargs)
+            return __original(self, *kept, **kwargs)
 
         for _name in ("attributes", "wm_attributes"):
             patched.append((cls, _name, getattr(cls, _name)))

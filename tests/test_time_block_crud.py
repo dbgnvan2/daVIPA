@@ -957,3 +957,23 @@ def test_lmm4_a_lunch_block_can_be_lengthened_on_the_settings_hour(manager):
     assert (resized.planned_minutes, resized.start_time, resized.end_time) == (
         60, "12:00", "13:00",
     )
+
+
+def test_bsfm6_a_second_lunch_block_on_one_date_is_refused(manager):
+    """BSF-M6 (LMM-A2) — a date holds one lunch block.
+
+    Spec: docs/unused-docs/implementation_plan_2026-11-13_backlog_small_fixes.md
+
+    ``lunch_window`` reads the first and ignores the rest, so a second one
+    would sit in its box shading nothing. Another date is unaffected.
+    """
+    _lunch_at(manager, 4)
+
+    with pytest.raises(SlotRefusedError) as refusal:
+        _lunch_at(manager, 10)
+
+    assert refusal.value.reason == SlotRefusal.LUNCH_EXISTS
+    lunches = [b for b in manager.get_time_blocks(DAY)
+               if BlockType.normalize(b.block_type) == BlockType.LUNCH]
+    assert [b.slot_index for b in lunches] == [4]
+    assert _lunch_at(manager, 4, block_date=NEXT_DAY).block_date == NEXT_DAY

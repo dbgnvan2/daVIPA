@@ -205,3 +205,35 @@ def test_sagm24_every_outcome_the_tool_can_return_has_a_fixture():
         "the outcomes of the docs-sync rule and the fixtures in CASES "
         f"disagree. No fixture: {sorted(defined - covered)}. Fixtures for an "
         f"outcome the tool cannot return: {sorted(covered - defined)}")
+
+
+def test_bsfm3_a_hung_git_is_an_error_with_its_output_on_its_own_line(monkeypatch):
+    """BSF-M3 (SAG-A5, SAG-A11) — ``run`` has a timeout, and its error breaks a line.
+
+    Spec: docs/unused-docs/implementation_plan_2026-11-13_backlog_small_fixes.md
+
+    A hung git used to hang the check; now it is a ``RuntimeError``, which
+    ``main`` reports as skipped. A failed git's stderr used to follow a literal
+    backslash-n on the command's own line.
+    """
+    import subprocess
+
+    gate = _gate()
+    seen = {}
+
+    def hung(cmd, **kwargs):
+        seen.update(kwargs)
+        raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout"))
+
+    monkeypatch.setattr(gate.subprocess, "run", hung)
+    with pytest.raises(RuntimeError, match="timed out"):
+        gate.run(["git", "diff"])
+    assert seen.get("timeout") == gate.GIT_TIMEOUT_SECONDS
+
+    def failed(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, 128, stdout="", stderr="fatal: bad ref")
+
+    monkeypatch.setattr(gate.subprocess, "run", failed)
+    with pytest.raises(RuntimeError) as raised:
+        gate.run(["git", "diff"])
+    assert str(raised.value) == "Command failed: git diff\nfatal: bad ref"

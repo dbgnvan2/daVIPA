@@ -755,9 +755,12 @@ def test_civm3_the_workflow_installs_the_scanner_the_generator_needs():
     # substring match, and a floor would hide a package being dropped.
     install_lines = [
         line.strip() for line in workflow.splitlines()
-        if re.match(r"^\s*sudo apt-get install\b", line)
+        if re.match(r"^\s*sudo apt-get (-o \S+ )*install\b", line)
     ]
-    assert install_lines == ["sudo apt-get install -y xvfb python3-tk ripgrep"], (
+    # BSF-M7 added the retry option and the `&&` of the retry loop.
+    assert install_lines == [
+        "sudo apt-get -o Acquire::Retries=3 install -y xvfb python3-tk ripgrep &&"
+    ], (
         "tests.yml's system-package line is not what the suite needs. ripgrep "
         "is there because tools/color_audit.py shells out to it and the gate "
         f"below regenerates the inventory. Found: {install_lines}"

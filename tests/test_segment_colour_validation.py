@@ -80,24 +80,17 @@ def _slice_parse_sites(path: Path) -> int:
 
 
 def test_scvm11_no_hand_rolled_hex_validator_survives():
-    """SCV-M1.1 — a colour is sliced into ``int(…, 16)`` in three places only.
+    """SCV-M1.1 — a colour is sliced into ``int(…, 16)`` in one place only.
 
     Spec:  docs/unused-docs/implementation_plan_2026-11-11_segment_colour_validation.md#scv-m1
 
     Exact counts per module, not a floor: a floor passes on a build where a
-    fourth copy of the parse was added, which is the whole failure this
-    batch closes. The three modules that keep one:
-
-    * ``color_contrast.hex_to_rgb`` -- the authority. One function, reached by
-      ``relative_luminance`` and by ``_derive_subsegment_color``, and it
-      refuses anything ``_HEX_COLOR_RE`` does not match before it slices.
-    * ``screens/drag_schedule_support.py`` -- ``interpolate_hex_color``
-      (``SCV-A1``, filed not fixed: its only caller is the gradient in its own
-      module, over theme colours, so it is not on the stored-colour path).
-    * ``screens/item_editor_weekly_tactic_dialog.py`` --
-      ``_text_color_for_background`` (``SCV-A3``: already wrapped in
-      ``try/except ValueError`` with a fallback, so it is correct as it
-      stands and is listed here so the next reader does not "fix" it).
+    second copy of the parse was added, which is the whole failure this
+    batch closes. ``color_contrast.hex_to_rgb`` is the authority, and it
+    refuses anything ``_HEX_COLOR_RE`` does not match before it slices.
+    ``drag_schedule_support.interpolate_hex_color`` and the weekly tactic
+    dialog's ``_text_color_for_background`` kept their own until BSF-M5
+    (``SCV-A1``, ``SCV-A3``) moved them onto it.
 
     ``vps_manager.py``, ``vps_manager_taxonomy.py``,
     ``screens/vps_segment_editor.py`` and ``priority_levels.py`` are the four
@@ -105,8 +98,6 @@ def test_scvm11_no_hand_rolled_hex_validator_survives():
     """
     expected = {
         "color_contrast.py": 3,
-        "screens/drag_schedule_support.py": 6,
-        "screens/item_editor_weekly_tactic_dialog.py": 3,
     }
     found = {}
     for path in sorted(SRC_ROOT.rglob("*.py")):
@@ -1021,3 +1012,26 @@ def test_scvm74_the_settings_segment_list_renders_a_malformed_colour():
             f"a malformed colour stopped a row being built: {len(built)} of 5")
     finally:
         root.destroy()
+
+
+def test_bsfm5_the_two_last_hand_parses_go_through_the_authority():
+    """BSF-M5 (SCV-A1, SCV-A3) — a malformed end is refused, a short form is read.
+
+    Spec: docs/unused-docs/implementation_plan_2026-11-13_backlog_small_fixes.md
+
+    ``interpolate_hex_color`` read ``#+12345`` as a colour, because ``int``
+    accepts a sign. The dialog's text colour treated ``#FFF`` as unreadable
+    and answered white on a white background.
+    """
+    from getmoredone.screens.drag_schedule_support import interpolate_hex_color
+    from getmoredone.screens.item_editor_weekly_tactic_dialog import (
+        SetWeeklyTacticDialog,
+    )
+
+    with pytest.raises(ValueError, match="#RRGGBB"):
+        interpolate_hex_color("#+12345", "#000000", 0.5)
+    assert interpolate_hex_color("#000000", "#FFFFFF", 0.5) == "#808080"
+
+    text_for = SetWeeklyTacticDialog._text_color_for_background
+    assert text_for(None, "#FFF") == "black"
+    assert text_for(None, "#+12345") == "white"

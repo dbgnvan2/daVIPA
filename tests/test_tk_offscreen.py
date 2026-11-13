@@ -859,3 +859,38 @@ def test_vtfa3_the_shared_root_takes_the_size_it_is_given(monkeypatch):
     finally:
         for root in (sized, unsized, default):
             root.destroy()
+
+
+def test_bsfm4_topmost_is_silenced_inside_a_call_that_sets_several():
+    """BSF-M4 (CGH-A1) — ``-topmost`` after another attribute is still dropped.
+
+    Spec: docs/unused-docs/implementation_plan_2026-11-13_backlog_small_fixes.md
+
+    The wrapper looked at the first argument only, so
+    ``attributes("-alpha", 0.0, "-topmost", True)`` went to Tk whole. The
+    ``-alpha`` half must still arrive: dropping the whole call would hide a
+    real write. On Python 3.13 the keyword form ``topmost=True`` is checked too.
+    """
+    import sys
+
+    root = ctk.CTk()
+    try:
+        window = ctk.CTkToplevel(root)
+        real, spy = window.tk, _RecordingTk(window.tk)
+        try:
+            window.tk = spy
+            window.attributes("-alpha", 0.0, "-topmost", True)
+            if sys.version_info >= (3, 13):
+                window.attributes(alpha=0.0, topmost=True)
+        finally:
+            window.tk = real
+        alpha_writes = [
+            _RecordingTk._flatten(call) for call in spy.calls
+            if "-alpha" in _RecordingTk._flatten(call)
+        ]
+        assert alpha_writes, "the -alpha half of the call never reached Tk"
+        assert spy.topmost_writes == [], (
+            f"-topmost reached Tk inside a multi-attribute call: {spy.topmost_writes}"
+        )
+    finally:
+        root.destroy()
