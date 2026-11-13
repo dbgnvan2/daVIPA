@@ -652,8 +652,8 @@ characters where it showed 15, and Category 14.
 |---|---|---|
 | M5.1 | `done` | `::test_updm51_right_panel_has_the_actions_column`. The right panel had four columns and three buttons in a bar below the list; it has five columns now, with the row's Delete in the Actions one. |
 | M5.2 | `done` | `::test_updm52_a_row_delete_removes_that_row_not_the_selection`. Driven with a *different* row selected, because a per-row button wired to `delete_selected_weekly_item` would look right and delete the wrong tactic. |
-| M5.3 | `done` | `::test_updm53_delete_is_confirmed_before_it_happens`, which refuses the confirmation from both entry points and asserts nothing was deleted. |
-| M5.4 | `done`, superseded in part on 2026-11-11 | `::test_updm54_the_bottom_row_is_one_add_and_the_selection_still_works` and `::test_updm54_delete_weekly_still_deletes_the_selection`. VTF-M5 took the three bottom buttons off this tab — two were second routes to the row's own controls and the third created a record the panel cannot show — so what is asserted now is the one bottom button plus the selection the editor and the delete still read. |
+| M5.3 | `done` | `::test_updm53_delete_is_confirmed_before_it_happens`, which refuses the confirmation from the row's Delete and asserts nothing was deleted. It drove a second entry point, Delete Weekly, until VTF-A2 removed that method on 2026-11-12. |
+| M5.4 | `done`, superseded in part on 2026-11-11 | `::test_updm54_the_bottom_row_is_one_add_and_the_selection_still_works`. `test_updm54_delete_weekly_still_deletes_the_selection` was deleted with the method it drove (VTF-A2, 2026-11-12). VTF-M5 took the three bottom buttons off this tab — two were second routes to the row's own controls and the third created a record the panel cannot show — so what is asserted now is the one bottom button plus the selection the editor still reads. |
 | M5.5 | `done` | `::test_updm55_left_header_matches_the_other_tabs`, asserted as text *and* pixels: a cell that was merely blanked would leave every row's cells one place to the right of the other tabs'. |
 | M5.6 | `done` | `::test_updm56_week_assignment_uses_the_shared_table_and_module_wiring`, `::..._columns_resize_and_persist`, `::..._the_week_assignment_prefixes_have_settings_fields`, `::..._a_left_row_is_a_drag_source_on_this_tab_too`, `::..._both_panels_still_say_when_they_are_empty`, `::..._a_row_with_no_category_colour_takes_the_subsegments`. |
 | M5.7 | `done` | `::test_updm57_clicking_a_right_row_selects_it_and_double_click_opens_it` and `::test_updm57_selecting_a_row_repaints_the_panel_instead_of_stacking_it`. |
@@ -685,8 +685,10 @@ cannot be undone by a later step. The risk §5 named — two ways to delete the
 same thing — is handled by making them one method, `delete_weekly_row`, with
 two callers: the row's button passes its own row, `delete_selected_weekly_item`
 passes the selection, and the confirmation exists once.
-`::test_updm53_delete_is_confirmed_before_it_happens` drives both callers for
-that reason.
+`::test_updm53_delete_is_confirmed_before_it_happens` drove both callers for
+that reason. VTF-M5 (2026-11-11) removed the Delete Weekly button and VTF-A2
+(2026-11-12) its method, so the row's button is the one caller left and the
+test drives that.
 
 **The three differences §1.4 listed are all closed.** The right panel is a
 table in the image's shape; the left header's first cell is empty; and the

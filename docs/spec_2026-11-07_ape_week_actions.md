@@ -665,7 +665,8 @@ They are **not** fixed by this spec, and none is a prerequisite.
   `db_manager._stamp_segment_from_relationships` — onto `parent_of`, without
   which a week-filed item with no Annual Plan Element of its own lost its
   chips, its segment accent and Plan Day's Segment filter.
-  Tests: `tests/test_weekly_items_tactic_link.py`.
+  Tests: `tests/test_weekly_items_tactic_link.py`. The button's own two tests
+  were deleted with its method (VTF-A2, 2026-11-12); the readers' test remains.
 - **AWA-A2 — a second "APE Weekly" label in dead code.**
   `screens/vision_planning.py:186` captions a placeholder tab `"APE Weekly"`.
   `VisionPlanningScreen` is reachable only through `app.show_vision_planning`,
