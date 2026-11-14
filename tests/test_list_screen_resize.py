@@ -437,6 +437,72 @@ def test_lsrm10_narrow_window_wraps_and_nothing_clips(make, name, mapped_windows
     assert not wrap.frame.grid_info(), f"{name}: still two rows when wide"
 
 
+def _pending(root, after_id):
+    return after_id is not None and after_id in root.tk.splitlist(
+        root.tk.call("after", "info"))
+
+
+def _row_px(layout):
+    return sum(layout.width(k) for k in STRETCH_KEYS) + layout.reserved_px()
+
+
+@pytest.mark.parametrize("name", EXPANDABLE)
+def test_lsrm2_expand_and_collapse_refit(make, name, monkeypatch):
+    """LSR-M2c — Expand and Collapse change the fixed columns without a
+    <Configure>; the list still refits to its width."""
+    root, screen = make(name)
+    layout = screen.layout
+    monkeypatch.setattr(layout._measured, "winfo_width", lambda: 1600)
+    layout._run_fit()
+    for _toggle in range(2):
+        screen.toggle_columns()
+        assert _pending(root, layout._after_id), f"{name}: toggling queued no refit"
+        layout._run_fit()
+        assert _row_px(layout) <= 1600, f"{name}: rows overflow after toggling"
+
+
+def test_lsrm5_releasing_a_divider_refits(make, monkeypatch):
+    """LSR-M5 — a fit skipped during a drag runs once the divider is let go."""
+    root, screen = make("today")
+    layout = screen.layout
+    resizer = layout.resizer
+    monkeypatch.setattr(layout._measured, "winfo_width", lambda: 1500)
+    layout._run_fit()
+    resizer._on_start(SimpleNamespace(x_root=500), "title")
+    resizer._on_drag(SimpleNamespace(x_root=650), "title")
+    resizer._on_stop(SimpleNamespace(x_root=650), "title")
+    assert _pending(root, layout._after_id), "releasing the divider queued no refit"
+    layout._run_fit()
+    assert _row_px(layout) <= 1500
+
+
+def test_lsrm2_fit_uses_unscaled_width(make, monkeypatch):
+    """LSR-M2d — winfo_width is in screen pixels; at 150% scaling the fit
+    shares out the width in CTk's unscaled units."""
+    _root, screen = make("all_items")
+    layout = screen.layout
+    monkeypatch.setattr(layout._measured, "winfo_width", lambda: 2400)
+    monkeypatch.setattr(screen, "_get_widget_scaling", lambda: 1.5)
+    layout._run_fit()
+    assert _row_px(layout) == 1600
+
+
+@pytest.mark.parametrize("name", SCREENS)
+def test_lsrm10_toolbar_configure_is_bound_on_the_toolbar(make, name):
+    """LSR-M10 — the wrap's <Configure> handler is in the toolbar's own Tk
+    binding, where a resize of the toolbar reaches it.
+
+    CTkFrame.bind binds the frame's inner canvas instead, whose events name
+    the canvas. A withdrawn window gets no generated <Configure>, so this
+    reads Tk's binding table; the mapped test below drives a real resize.
+    """
+    _root, screen = make(name)
+    toolbar = screen.toolbar_wrap.toolbar
+    script = toolbar.tk.call("bind", str(toolbar), "<Configure>")
+    # tkinter names a bound method's Tcl command <id><method name>.
+    handlers = [line for line in str(script).splitlines() if "_on_configure " in line]
+    assert len(handlers) == 1, f"{name}: toolbar's own <Configure> binding: {script!r}"
+
 TOOLBAR_TEXTS = {
     "today": {"Today's Items", "Search", "Top 3", "+ New Item", "Refresh"},
     "upcoming": {"Upcoming Items", "Search", "Next", "days", "Who:", "+ New Item"},
