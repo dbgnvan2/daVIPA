@@ -16,7 +16,9 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   box's date with the same checks as the day. (CIP-M6.5)
 - A Time Block in the week shows its item's title, cut to fit. A week box is
   never shorter than that title's line and the drag outline, 16 px on a Mac,
-  up from 12 px. (CIP-M6.3, M6.6)
+  up from 12 px. The title and that floor follow the display scaling, so they
+  are the same size relative to the window on a Windows screen at 150%.
+  (CIP-M6.3, M6.6)
 
 ### Added — the week on the Plan (2026-11-13)
 

@@ -243,3 +243,18 @@ only at CustomTkinter's widget scaling of 1, the Mac default. At 1.5 the box
 is taller than it needs to be; below 1 the title could cover the outline
 again. The title test also compares a scaled height with a real one, and
 checks the title's height, not where it sits.
+
+### Scaling (2026-11-14, asked after the floor)
+
+The title was a plain Tk label, which CustomTkinter does not scale, so at
+150% it stayed 9 real px while its box grew. The title font is now built at
+`round(9 × scaling)` px, as `CTkFont.create_scaled_tuple` scales one, and its
+inset is scaled too. The floor is `ceil(line ÷ scaling)` units plus the
+outline and margin, so it stays 16 at scaling 1. Measured at 1.5 on an
+unmapped screen: the box is 26 px and the title 17 px, so 3 px is left after
+the 6 px outline. This fixes the low findings above that titles ignored
+scaling and that the floor mixed units. The test compares line heights,
+not sizes, because this Tk reads a -14 px font's size back as 14.
+Recorded, not fixed (low): if the window moves to a screen with a different
+scaling while the week is open, the titles keep the old size until the week
+redraws.

@@ -474,8 +474,9 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   same half-hour boxes. The columns share the pane's width and the boxes grow
   with its height, so dragging the divider or resizing the window resizes the
   week. A box is never shorter than a line of its title, with room for the
-  drag outline above and below it (16 px on a Mac); below that, the week
-  scrolls. A column is never narrower than its heading and totals: in the week,
+  drag outline above and below it (16 px on a Mac, and scaled with the
+  rest of the window on a screen set above 100%, as Windows often is); below
+  that, the week scrolls. Titles scale with the window too. A column is never narrower than its heading and totals: in the week,
   the divider stops where they would be cut off. Purple is a meeting. A Time Block for an Action Item is that item's
   Category colour (from Vision Planning), and grey is lunch, a Buffer or
   Break, or an item with no Category colour. The pane's light fill is a free
