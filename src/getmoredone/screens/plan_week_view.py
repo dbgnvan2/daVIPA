@@ -19,6 +19,7 @@ the day: clicking a column opens it.
 from __future__ import annotations
 
 import logging
+import math
 from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 
@@ -82,12 +83,15 @@ def fit_text(text: str, measure, width: int) -> str:
     return text[:low].rstrip() + ELLIPSIS
 
 
-def week_box_floor(linespace: int) -> int:
+def week_box_floor(linespace: int, scaling: float = 1.0) -> int:
     """The least box height that shows a title of ``linespace`` px whole.
 
     Its line, clear of the drag outline at top and bottom, with a margin.
+    ``linespace`` is real pixels of the scaled title font; the result is in
+    CustomTkinter units, which the box multiplies by ``scaling``.
     """
-    return linespace + 2 * DRAG_HOVER_BORDER_PX + WEEK_TITLE_MARGIN_PX
+    line = math.ceil(linespace / scaling)
+    return line + 2 * DRAG_HOVER_BORDER_PX + WEEK_TITLE_MARGIN_PX
 
 
 def week_title_text(title: str, others: int) -> str:
@@ -420,13 +424,14 @@ class PlanWeekViewMixin:
             box, text="", font=font, anchor="w", padx=0, pady=0, bd=0,
             bg=background, fg=pick_text_color(background),
         )
-        text.place(x=WEEK_TITLE_INSET_PX, rely=0.5, anchor="w",
-                   relwidth=1, width=-2 * WEEK_TITLE_INSET_PX)
+        # place() is real pixels, so the inset is scaled as the box is.
+        inset = round(WEEK_TITLE_INSET_PX * self.week_scaling())
+        text.place(x=inset, rely=0.5, anchor="w", relwidth=1, width=-2 * inset)
         text.full_title = full
         text.title_parts = (title, others)
         text.title_font = font
         text.bind("<Configure>", lambda event, w=text: self._fit_week_title(w, event.width))
-        self._fit_week_title(text, WEEK_COLUMN_WIDTH_PX - 2 * WEEK_TITLE_INSET_PX)
+        self._fit_week_title(text, round(WEEK_COLUMN_WIDTH_PX * self.week_scaling()) - 2 * inset)
         self._bind_open(text, day)
         self._week_titles[(day, index)] = text
 
@@ -466,16 +471,31 @@ class PlanWeekViewMixin:
         """What the week's grid needs across, or 0 outside the week."""
         return getattr(self, "_week_width_need", 0) if self._week_mode else 0
 
+    def week_scaling(self) -> float:
+        """CustomTkinter's widget scaling for this screen (1 on a Mac)."""
+        return self._get_widget_scaling()
+
     def week_title_font(self):
-        """The one font every week title uses, made on first use."""
-        font = getattr(self, "_week_title_font", None)
-        if font is None:
-            font = self._week_title_font = ctk.CTkFont(size=WEEK_TITLE_FONT_SIZE)
-        return font
+        """The one font every week title uses, at the widget scaling.
+
+        A plain Tk label gets no scaling from CustomTkinter, so the font is
+        scaled here the way a CTk label scales its own. Made again only when
+        the scaling has changed.
+        """
+        scaling = self.week_scaling()
+        cached = getattr(self, "_week_title_font", None)
+        if cached is None or cached[0] != scaling:
+            # A CTkFont's size is pixels (negative to Tk), and round() is how
+            # CTkFont.create_scaled_tuple scales one for a CTk label.
+            size = round(WEEK_TITLE_FONT_SIZE * scaling)
+            cached = self._week_title_font = (scaling, ctk.CTkFont(size=size))
+        return cached[1]
 
     def week_box_min_height(self) -> int:
         """The floor for this screen's title font (``week_box_floor``)."""
-        return week_box_floor(self.week_title_font().metrics("linespace"))
+        return week_box_floor(
+            self.week_title_font().metrics("linespace"), self.week_scaling()
+        )
 
     def week_box_height(self) -> int:
         """Box height for the pane's visible height, never below the floor."""
