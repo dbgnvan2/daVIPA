@@ -17,9 +17,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from .calendar_commitments import committed_slots
+from .models import BlockType
 from .time_block_layout import (
     SLOT_MINUTES,
     DayBounds,
@@ -54,6 +55,20 @@ def box_kind(entry: GridSlot, committed: frozenset, *, read: bool) -> str:
     return FREE if read else UNREAD
 
 
+def box_item_id(entry: GridSlot) -> Optional[str]:
+    """CIP-M6.4 -- the item behind the box's earliest block, or ``None``.
+
+    A continued block started before this box, so it comes first; then the
+    blocks starting here, in grid order. A buffer, break or lunch block first
+    gives ``None``: padding is not coloured by an item (C2).
+    """
+    for block in [*entry.continued, *entry.starting]:
+        if block.block_type == BlockType.ITEM and block.item_id:
+            return block.item_id
+        return None
+    return None
+
+
 @dataclass
 class DaySummary:
     """One week column: its boxes by slot index, and what they add up to."""
@@ -65,6 +80,11 @@ class DaySummary:
     outside: int = 0
     #: All-day events: they hold no box, so no box can show them.
     all_day: int = 0
+    #: CIP-M6.4 -- the item whose block sets each box's colour, by slot index.
+    items: Dict[int, str] = field(default_factory=dict)
+    #: CIP-M6.5 -- the grid this column was counted from, so a drop on it is
+    #: checked against this date's own span and meetings, not rebuilt.
+    grid: Optional[DayGrid] = field(default=None, repr=False, compare=False)
 
     def _minutes(self, kind: str) -> int:
         return sum(SLOT_MINUTES for _, k in self.boxes if k == kind)
@@ -96,6 +116,9 @@ def week_summary(day: str, grid: DayGrid, bounds: DayBounds, *, read: bool,
         block_day=is_block_day(day, bounds),
         outside=len(grid.outside),
         all_day=all_day,
+        items={entry.slot.index: item for entry in grid.slots
+               if (item := box_item_id(entry)) is not None},
+        grid=grid,
     )
 
 

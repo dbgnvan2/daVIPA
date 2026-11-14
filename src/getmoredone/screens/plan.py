@@ -1545,7 +1545,9 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
             "success",
         )
 
-    def block_item(self, item: ActionItem, slot_index: Optional[int] = None):
+    def block_item(
+        self, item: ActionItem, slot_index: Optional[int] = None, day: Optional[str] = None
+    ):
         """TG-M9 — make a block for this item on the box it was dropped on.
 
         Purpose: the half hour the user chose, not the end of the day.
@@ -1559,8 +1561,11 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         An earlier version of this docstring claimed an item-row double-click
         used it; there has never been such a binding (`BACKLOG.md`).
         """
+        # CIP-M6.5 -- a drop on the week names the box's date; every other
+        # caller means the day on screen.
+        day = day or self.selected_date
         # PD-M13 -- a drop never asks; see _require_block_day.
-        if not self._require_block_day(ask=False):
+        if not self._require_block_day(ask=False, day=day):
             return
 
         # PF-M2 -- one block per item per day, said out loud. Nothing refused
@@ -1568,7 +1573,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         # blocks in it, not an item that is already on the day, so dropping an
         # item that is already blocked wrote a second block on any free box
         # and was refused as a full box on its own.
-        blocked = self._already_blocked_text(item)
+        blocked = self._already_blocked_text(item, day)
         if blocked is not None:
             # The note is one-shot and belongs to a gesture that wrote
             # something; this gesture wrote nothing, so it is cleared rather
@@ -1587,14 +1592,14 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
                 return
 
         # PF-M3 -- a follow-on task lands with the work it follows.
-        after = self._linked_block_in_slot(item, slot_index)
+        after = self._linked_block_in_slot(item, slot_index, day)
         # ... and when its partner is in another box, a continuation goes to
         # the top of the one it was dropped on rather than under everything
         # already there.
-        top = after is None and self._continues_a_block(item)
+        top = after is None and self._continues_a_block(item, day)
 
         block = TimeBlock(
-            block_date=self.selected_date,
+            block_date=day,
             start_time="",
             end_time="",
             planned_minutes=minutes,
@@ -1611,7 +1616,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
                 # exists because the day was extended earlier or later is on
                 # screen and accepts a drop; reading only the template refused
                 # it as "outside the day" while the user was looking at it.
-                day_span=self._grid.span,
+                day_span=self._placement_for(day)[0],
                 after_block_id=after.id if after is not None else None,
                 at_top=top,
             )
@@ -1622,7 +1627,12 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
 
         boxes = slots_for_minutes(minutes)
         spare = boxes * SLOT_MINUTES - minutes
-        text = f"Blocked {minutes}m for {item.title} at {block.start_time}"
+        text = f"Blocked {minutes}m for {item.title}"
+        if self._week_mode:
+            text += f" on {date.fromisoformat(day).strftime('%a %d')}"
+        text += f" at {block.start_time}"
+        if self._week_mode and not self._week_day_read(day):
+            text += " — calendar not read for that day"
         text += self._take_non_work_note()
         if spare:
             # Said out loud, because the box the task does not fill is still
@@ -1631,7 +1641,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
             text += f" — {boxes} boxes, {spare}m spare"
         self.set_status(text, "success")
 
-    def _blocked_today(self, item_id: str) -> Optional[TimeBlock]:
+    def _blocked_today(self, item_id: str, day: Optional[str] = None) -> Optional[TimeBlock]:
         """The block this item already has on the date on screen, if any.
 
         Purpose: PF-M2 -- one block per item per day, so a second drag says
@@ -1642,14 +1652,14 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         Item blocks only. A break or a buffer carries no ``item_id``, and the
         two of them repeating across a day is what they are for.
         """
-        for block in self.db_manager.get_time_blocks(self.selected_date):
+        for block in self.db_manager.get_time_blocks(day or self.selected_date):
             if block.block_type != BlockType.ITEM:
                 continue
             if block.item_id == item_id:
                 return block
         return None
 
-    def _already_blocked_text(self, item: ActionItem) -> Optional[str]:
+    def _already_blocked_text(self, item: ActionItem, day: Optional[str] = None) -> Optional[str]:
         """The sentence a drop of an item already on the day leaves, if it is.
 
         Purpose: PF-M2 -- one wording for three call sites, so the box drop,
@@ -1657,7 +1667,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         Spec:    docs/unused-docs/implementation_plan_2026-11-10_plan_walk_followups.md#pf-m2
         Tests:   tests/test_plan_screen.py::test_pfm22_the_refusal_says_where_the_block_is
         """
-        sitting = self._blocked_today(item.id)
+        sitting = self._blocked_today(item.id, day)
         if sitting is None:
             return None
         return (
@@ -1665,7 +1675,9 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
             " — drag that Time Block to move it"
         )
 
-    def _drop_refusal(self, item: ActionItem, slot_index: int) -> Optional[str]:
+    def _drop_refusal(
+        self, item: ActionItem, slot_index: int, day: Optional[str] = None
+    ) -> Optional[str]:
         """Why a drop on this box would write nothing, or ``None`` if it would.
 
         Purpose: PF-M1 -- the question is about a day, but it is asked about a
@@ -1680,22 +1692,24 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         checks again, because they are the write paths and a caller that is not
         this handler must get the same answers.
         """
-        blocked = self._already_blocked_text(item)
+        day = day or self.selected_date
+        blocked = self._already_blocked_text(item, day)
         if blocked is not None:
             return blocked
 
         minutes = duration_for_item(item, self.bounds.default_block_minutes)
+        span, committed = self._placement_for(day)
         reason = can_place(
-            self.db_manager.get_time_blocks(self.selected_date),
+            self.db_manager.get_time_blocks(day),
             self.bounds,
             slot_index,
             slots_for_minutes(minutes),
-            day_span=self._grid.span,
-            committed=self._committed,
+            day_span=span,
+            committed=committed,
         )
         return refusal_text(reason) if reason else None
 
-    def _allow_this_day(self) -> bool:
+    def _allow_this_day(self, day: Optional[str] = None) -> bool:
         """Ask about a day outside the working week, and never lose the drop.
 
         Purpose: PF-M1 -- ``_require_block_day`` catches the ``TclError`` the
@@ -1708,14 +1722,14 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         Tests:   tests/test_plan_screen.py::test_pfm15_a_question_that_raises_still_schedules
         """
         try:
-            return self._require_block_day()
+            return self._require_block_day(day=day)
         except Exception:  # noqa: BLE001 - a dialog may not eat the drop
             logger.exception("the non-work-day question raised on a drop")
-            self._work_anyway.add(self.selected_date)
+            self._work_anyway.add(day or self.selected_date)
             self._non_work_day = True
             return True
 
-    def _continues_a_block(self, item: ActionItem) -> bool:
+    def _continues_a_block(self, item: ActionItem, day: Optional[str] = None) -> bool:
         """Is this item a continuation of work already blocked on this day?
 
         Purpose: PF-M3 -- "continuation from previous block" goes to the top of
@@ -1730,13 +1744,13 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         parent = getattr(item, "parent_id", None)
         if not parent:
             return False
-        for block in self.db_manager.get_time_blocks(self.selected_date):
+        for block in self.db_manager.get_time_blocks(day or self.selected_date):
             if block.block_type == BlockType.ITEM and block.item_id == parent:
                 return True
         return False
 
     def _linked_block_in_slot(
-        self, item: ActionItem, slot_index: int
+        self, item: ActionItem, slot_index: int, day: Optional[str] = None
     ) -> Optional[TimeBlock]:
         """The block in this box that ``item`` should follow, if there is one.
 
@@ -1755,7 +1769,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         here: the box is ordered by position and the walk follows it.
         """
         mine = {"parent": getattr(item, "parent_id", None)}
-        for block in self.db_manager.get_time_blocks(self.selected_date):
+        for block in self.db_manager.get_time_blocks(day or self.selected_date):
             if block.slot_index != slot_index:
                 continue
             if block.block_type != BlockType.ITEM or not block.item_id:
@@ -2395,7 +2409,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
                 return entry.slot.index
         return None
 
-    def _require_block_day(self, *, ask: bool = True) -> bool:
+    def _require_block_day(self, *, ask: bool = True, day: Optional[str] = None) -> bool:
         """Allow a write onto a day the user does not work, and say so.
 
         Purpose: PD-M7 -- a day outside the working week is a warning, not a
@@ -2440,9 +2454,10 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         the weekday list is in it: the answer to "why did nothing happen" is
         the days the week is set to.
         """
-        if is_block_day(self.selected_date, self.bounds):
+        day = day or self.selected_date
+        if is_block_day(day, self.bounds):
             return True
-        if self.selected_date in self._work_anyway:
+        if day in self._work_anyway:
             return True
 
         allowed = [
@@ -2456,7 +2471,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         try:
             said_yes = messagebox.askyesno(
                 "Not a work day",
-                f"{self.selected_date} is not a regular work day.\n\n"
+                f"{day} is not a regular work day.\n\n"
                 f"Day Settings allows {week}.\n\n"
                 "Schedule anyway?",
                 icon="warning",
@@ -2468,16 +2483,16 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
             # refused one, but a dialog that raises must not take the gesture
             # with it -- that is the whole of what went wrong before.
             logger.warning("the non-work-day question could not be asked: %s", problem)
-            self._work_anyway.add(self.selected_date)
+            self._work_anyway.add(day)
             self._non_work_day = True
             return True
 
         if said_yes:
-            self._work_anyway.add(self.selected_date)
+            self._work_anyway.add(day)
             return True
 
         self.set_status(
-            f"{self.selected_date} is not a block day (Day Settings allows "
+            f"{day} is not a block day (Day Settings allows "
             f"{week})",
             "warning",
         )
@@ -2968,7 +2983,9 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         # exclusive by construction, and a precedence nothing can get wrong is
         # also a precedence no test can check.
         edge = self.virtual_under_pointer()
-        if kind == "item" and item is not None:
+        if kind == "item" and item is not None and self._week_mode:
+            self.drop_on_week(item)
+        elif kind == "item" and item is not None:
             # PF-M1 -- the question the buttons ask, asked here.
             #
             # PD-M13 took it off this path because a modal opened from the
@@ -3009,11 +3026,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
                 # summary, or the "outside the day" group below the grid.
                 # Reported rather than guessed at: picking a box for them
                 # would put the work somewhere they did not point.
-                self.set_status(
-                    "The week is read-only — click a day to plan it"
-                    if self._week_mode else "Drop an Action Item on a Time Block",
-                    "muted",
-                )
+                self.set_status("Drop an Action Item on a Time Block", "muted")
         elif kind == "block" and block is not None:
             if target is not None:
                 self.after_idle(lambda: self.move_block_to_slot(block.id, target))
@@ -3355,7 +3368,10 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
             return
         target = self.slot_under_pointer()
         hovered = None
-        if target is not None:
+        if self._week_mode:
+            # CIP-M6.5 -- the week's box, by date and half hour.
+            hovered = self.week_box_frame(self.week_box_under_pointer())
+        elif target is not None:
             for frame, slot_index in self._slot_frames:
                 if slot_index == target:
                     hovered = frame
