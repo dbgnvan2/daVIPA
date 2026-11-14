@@ -21,17 +21,24 @@ import pytest
 from src.getmoredone.app_settings import AppSettings
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem
-from src.getmoredone.screens.column_resize import min_column_width
 from src.getmoredone.screens.item_list_columns import (
     FIT_DELAY_MS,
     SEARCH_MIN_PX,
+    LIST_MIN_CHARS,
     STRETCH_KEYS,
-    TITLE_MIN_PX,
     row_char_px,
 )
 
 SCREENS = ("today", "upcoming", "all_items", "hierarchical")
 EXPANDABLE = ("today", "upcoming", "all_items")
+
+# LSR2: every text column resizes (plan 2026-11-14, D1/D2).
+RESIZABLE = {
+    "today": STRETCH_KEYS + ("start", "due", "pri", "time"),
+    "upcoming": STRETCH_KEYS + ("start", "due", "pri", "time"),
+    "all_items": STRETCH_KEYS + ("start", "due", "pri", "time", "status"),
+    "hierarchical": STRETCH_KEYS + ("pri", "due", "subitems"),
+}
 
 
 def _screen_class(name):
@@ -102,7 +109,7 @@ def make(tmp_path):
 
 
 def _managed_cols(layout):
-    cols = [layout.grid_col(k) for k in STRETCH_KEYS]
+    cols = [layout.grid_col(k) for k in layout.keys]
     return cols + [c.grid_col for c in layout.lead + layout.fixed]
 
 
@@ -134,7 +141,7 @@ def test_lsrm1_header_and_rows_agree_per_column(make, name, expanded):
             assert frame.grid_columnconfigure(col)["minsize"] == want, (
                 f"{name}: row column {col} is "
                 f"{frame.grid_columnconfigure(col)['minsize']}, header {want}")
-    for key in STRETCH_KEYS:
+    for key in layout.keys:
         assert layout.header_labels[key].cget("width") == layout.width(key)
     for _frame, cells in _rows(layout):
         for key, label, _full, _reserve, delta in cells:
@@ -149,16 +156,16 @@ def test_lsrm2_wider_list_widens_only_stretch_columns(make, name):
     fixed_before = {c.grid_col: c.column_px for c in layout.lead + layout.fixed}
 
     layout.fit(1100)
-    narrow = {k: layout.width(k) for k in STRETCH_KEYS}
+    narrow = {k: layout.width(k) for k in layout.keys}
     layout.fit(1700)
-    wide = {k: layout.width(k) for k in STRETCH_KEYS}
+    wide = {k: layout.width(k) for k in layout.keys}
 
-    for key in STRETCH_KEYS:
+    for key in layout.keys:
         assert wide[key] > narrow[key], f"{name}: {key} did not widen"
     assert sum(wide.values()) == 1700 - layout.reserved_px()
-    # Proportional: Title keeps its share of the four to within a pixel per column.
+    # Proportional: Title keeps its share to within a pixel per column.
     share = narrow["title"] / sum(narrow.values())
-    assert abs(wide["title"] - share * sum(wide.values())) <= len(STRETCH_KEYS)
+    assert abs(wide["title"] - share * sum(wide.values())) <= len(layout.keys)
     for frame, _cells in _rows(layout):
         assert frame.grid_columnconfigure(layout.grid_col("title"))["minsize"] == wide["title"]
         for col, px in fixed_before.items():
@@ -200,14 +207,13 @@ def test_lsrm3_floor_holds_and_shortfall_is_counted(make, caplog):
     """LSR-M3 — below the floors the columns stop, and the shortfall is logged once."""
     _root, screen = make("today")
     layout = screen.layout
-    floor = min_column_width(row_char_px())
+    floor = LIST_MIN_CHARS * row_char_px()
     with caplog.at_level("INFO", logger="src.getmoredone.screens.item_list_columns"):
         over = layout.fit(300)
         layout.fit(310)
     assert over > 0
-    assert layout.width("title") == TITLE_MIN_PX
-    for key in STRETCH_KEYS[1:]:
-        assert layout.width(key) == floor
+    for key in layout.keys:
+        assert layout.width(key) == floor, key
     assert len([r for r in caplog.records if "narrower" in r.getMessage()]) == 1
     caplog.clear()
     with caplog.at_level("INFO", logger="src.getmoredone.screens.item_list_columns"):
@@ -252,10 +258,10 @@ def test_lsrm5_resize_ignored_mid_drag(make):
     _root, screen = make("today")
     resizer = screen.layout.resizer
     resizer._on_start(SimpleNamespace(x_root=500), "title")
-    held = {k: resizer.width(k) for k in STRETCH_KEYS}
+    held = {k: resizer.width(k) for k in screen.layout.keys}
     count = screen.layout.fit_count
     assert screen.layout.fit(2000) == 0
-    assert {k: resizer.width(k) for k in STRETCH_KEYS} == held
+    assert {k: resizer.width(k) for k in screen.layout.keys} == held
     assert screen.layout.fit_count == count
     resizer._on_stop(SimpleNamespace(x_root=500), "title")
 
@@ -316,7 +322,7 @@ def test_lsrm7_upcoming_and_hierarchical_have_headers(make, name):
     dividers = [w for w in header.winfo_children()
                 if isinstance(w, ctk.CTkFrame)
                 and str(w.cget("cursor")) == "sb_h_double_arrow"]
-    assert len(dividers) == len(STRETCH_KEYS)
+    assert len(dividers) == len(screen.layout.keys)
 
 
 def test_lsrm8_indent_once_and_columns_align_across_levels(make):
@@ -443,7 +449,7 @@ def _pending(root, after_id):
 
 
 def _row_px(layout):
-    return sum(layout.width(k) for k in STRETCH_KEYS) + layout.reserved_px()
+    return sum(layout.width(k) for k in layout.keys) + layout.reserved_px()
 
 
 @pytest.mark.parametrize("name", EXPANDABLE)
@@ -533,3 +539,126 @@ def test_lsrm11_controls_preserved(make, name):
     if name != "hierarchical":
         assert "⏱ Timer" in buttons
         assert any(isinstance(w, ctk.CTkCheckBox) for w in children)
+
+
+# --------------------------------------------------------------------- LSR2
+# Plan: docs/unused-docs/implementation_plan_2026-11-14_all_columns_resize.md
+
+def _floor():
+    # Stated, not read from LIST_MIN_CHARS: the user asked for 6 characters.
+    return 6 * row_char_px()
+
+
+@pytest.mark.parametrize("name", SCREENS)
+def test_lsr2m1_every_text_column_follows_the_width(make, name):
+    """LSR2-M1 — every text column, not only the first four, follows the list."""
+    _root, screen = make(name)
+    layout = screen.layout
+    assert layout.keys == RESIZABLE[name]
+    layout.fit(1200)
+    narrow = {k: layout.width(k) for k in layout.keys}
+    layout.fit(1800)
+    for key in layout.keys:
+        assert layout.width(key) > narrow[key], f"{name}: {key} did not widen"
+    for _frame, cells in _rows(layout)[:2]:
+        keys = {key for key, *_ in cells}
+        assert keys == set(layout.keys), f"{name}: row cells {keys} lack a column"
+
+
+@pytest.mark.parametrize("name", SCREENS)
+def test_lsr2m2_floor_is_six_characters(make, name):
+    """LSR2-M2 — no resizable column goes below 6 characters, at any width."""
+    _root, screen = make(name)
+    layout = screen.layout
+    for width in (2000, 1100, 700, 300, 1):
+        layout.fit(width)
+        for key in layout.keys:
+            assert layout.width(key) >= _floor(), f"{name}@{width}: {key}"
+    assert {layout.width(k) for k in layout.keys} == {_floor()}
+
+
+@pytest.mark.parametrize("name,expanded", _params())
+def test_lsr2m3_controls_keep_their_size(make, name, expanded):
+    """LSR2-M3 — the checkbox, Timer/Actions and factor chips do not resize (D2)."""
+    _root, screen = make(name, expanded=expanded)
+    layout = screen.layout
+    controls = {c.grid_col: c.column_px for c in layout.lead + layout.fixed}
+    assert set(controls).isdisjoint(layout.grid_col(k) for k in layout.keys)
+    for width in (1800, 900):
+        layout.fit(width)
+        for frame, _cells in _rows(layout):
+            for col, px in controls.items():
+                assert frame.grid_columnconfigure(col)["minsize"] == px
+
+
+@pytest.mark.parametrize("name", SCREENS)
+def test_lsr2m4_every_resizable_column_has_a_divider(make, name):
+    """LSR2-M4 — a divider per resizable column; a drag moves only its column."""
+    _root, screen = make(name)
+    layout = screen.layout
+    dividers = [w for w in screen.column_header.winfo_children()
+                if isinstance(w, ctk.CTkFrame)
+                and str(w.cget("cursor")) == "sb_h_double_arrow"]
+    assert sorted(int(d.grid_info()["column"]) for d in dividers) == sorted(
+        layout.grid_col(k) for k in layout.keys)
+    layout.fit(1500)
+    key = "due"
+    before = {k: layout.width(k) for k in layout.keys}
+    resizer = layout.resizer
+    resizer._on_start(SimpleNamespace(x_root=500), key)
+    resizer._on_drag(SimpleNamespace(x_root=540), key)
+    after = {k: layout.width(k) for k in layout.keys}
+    resizer._on_stop(SimpleNamespace(x_root=540), key)
+    assert after[key] == before[key] + 40
+    assert {k: v for k, v in after.items() if k != key} == {
+        k: v for k, v in before.items() if k != key}
+
+
+@pytest.mark.parametrize("name", SCREENS)
+def test_lsr2m5_shape_survives_a_narrow_window(make, name):
+    """LSR2-M5 — down to the floors in steps and back: the shape returns (D6).
+
+    The steps matter: columns reach their floors one at a time on the way
+    down, and a fit that wrote those floors into the weights lost the shape
+    before the whole row was floored (measured 2026-11-14 on All Items).
+    """
+    _root, screen = make(name)
+    layout = screen.layout
+    layout.fit(1600)
+    before = {k: layout.width(k) for k in layout.keys}
+    for width in range(1500, 0, -100):
+        layout.fit(width)
+    layout.fit(1600)
+    assert {k: layout.width(k) for k in layout.keys} == before
+
+
+def test_lsr2m7_saved_lsr_widths_carry_over(make, monkeypatch):
+    """LSR2-M7 — widths saved before LSR2 load as weights; new columns use defaults."""
+    stored = {"title": 400, "subsegment": 100, "category": 100, "who": 100}
+    real_load = AppSettings.load
+
+    def _load(*args, **kwargs):
+        settings = real_load(*args, **kwargs)
+        settings.all_items_col_widths = dict(stored)
+        return settings
+
+    monkeypatch.setattr(AppSettings, "load", _load)
+    _root, screen = make("all_items")
+    layout = screen.layout
+    assert {k: layout.width(k) for k in STRETCH_KEYS} == stored
+    assert layout.width("start") == 60
+    layout.fit(1800)
+    assert abs(layout.width("title") / layout.width("subsegment") - 4) < 0.1
+
+
+@pytest.mark.parametrize("name", ("today", "upcoming"))
+def test_lsr2m8_date_cells_have_no_prefix(make, name):
+    """LSR2-M8 — Start and Due read "11/14", not "S:11/14" (D5)."""
+    _root, screen = make(name)
+    want = date.today().strftime("%m/%d")
+    cells = [c for _f, cells in _rows(screen.layout) for c in cells
+             if c[0] in ("start", "due")]
+    assert cells, f"{name}: no date cells registered"
+    for key, label, full, _reserve, _delta in cells:
+        assert full == want, f"{name}: {key} full text {full!r}"
+        assert label.cget("text") == want

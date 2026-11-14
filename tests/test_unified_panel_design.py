@@ -3487,19 +3487,22 @@ def test_updf43b_the_floor_suspends_the_shape_it_does_not_destroy_it():
         dragged = table.width("segment")
         assert dragged == min_column_width() + 120, (
             f"the drag did not land: {dragged}px")
-        assert dragged < remembered, (
-            f"this drag has to leave segment narrower than the {remembered}px "
-            f"it is remembered at, or the next assertion proves nothing")
+        on_screen = {key: table.width(key) for key in
+                     (c.key for c in table.columns if c.resizable)}
 
-        # The dragged width is segment's weight now, so a weight of 160
-        # against the 290 and 233 beside it gives it less than the 251 the
-        # remembered shape would have. Without the drop from `_pre_floor` it
-        # comes back at exactly `remembered`, which the first half shows.
+        # LSR2-D6 (2026-11-14): a drag sets the shape to the widths on screen
+        # when it ends -- here 160 against two 40px floors -- so the restore
+        # shares 900px out in that proportion, not the remembered one.
         table.fit_to_panel(900)
-        assert table.width("segment") < remembered, (
-            "the restore undid a drag made while the panel was floored: "
-            f"segment came back at {table.width('segment')}px, the "
-            f"remembered {remembered}px")
+        wide = {key: table.width(key) for key in on_screen}
+        assert wide["segment"] != remembered, (
+            "the restore undid a drag made while the panel was floored")
+        for key, px in on_screen.items():
+            if key != "segment":
+                ratio = wide["segment"] / wide[key]
+                assert abs(ratio - dragged / px) < 0.05, (
+                    f"segment:{key} is {ratio:.2f}, the drag left "
+                    f"{dragged / px:.2f}: {on_screen} -> {wide}")
     finally:
         root.destroy()
 

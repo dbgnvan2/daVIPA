@@ -1527,9 +1527,20 @@ def test_scvm41_a_malformed_segment_colour_does_not_become_a_fill():
 def _level_cell_call(statement):
     """The ``build_level_cell(...)`` call ``statement`` assigns, or ``None``."""
     if isinstance(statement, ast.Assign) and isinstance(statement.value, ast.Call):
-        func = statement.value.func
+        call = statement.value
+        func = call.func
         if isinstance(func, ast.Name) and func.id == "build_level_cell":
-            return statement.value
+            return call
+        # LSR2 (2026-11-14): the four list screens build their Priority cell
+        # through ``self.layout.add_level_cell(frame, key, cell, text,
+        # row_text)``, which passes the same ``cell`` and ``row_text`` on.
+        # Returned in ``build_level_cell``'s argument order, the column key
+        # dropped and the width (which the layout supplies) left as None.
+        if isinstance(func, ast.Attribute) and func.attr == "add_level_cell":
+            frame, _key, cell, text, row_text, *rest = call.args
+            return ast.Call(func=func, args=[frame, cell, text, ast.Constant(None),
+                                             row_text, *rest],
+                            keywords=call.keywords)
     return None
 
 
