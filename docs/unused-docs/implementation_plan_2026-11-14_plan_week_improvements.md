@@ -258,3 +258,18 @@ not sizes, because this Tk reads a -14 px font's size back as 14.
 Recorded, not fixed (low): if the window moves to a screen with a different
 scaling while the week is open, the titles keep the old size until the week
 redraws.
+
+Cold review of the scaling change: no high findings. One medium, older than
+this change and fixed with a test: above the floor, `week_box_height` divided
+the canvas's real pixels into CustomTkinter units, so at 150% each box was
+1.5 times too tall and the week always scrolled. The room is now divided by
+the scaling first. Recorded, not fixed (low):
+
+- `0 < spare <= 2 × scaling` in the 150% test holds at 1.5 only; at a scaling
+  such as 1.1, Tk's whole-pixel rounding could break it with nothing wrong.
+- That test assumes a DPI factor of 1 (macOS, Linux CI). On a Windows
+  machine at 125% its boxes would get 1.875.
+- `test_cipm63_at_the_floor_a_title_clears_the_drag_outline` compares CTk
+  units with real pixels, so it holds at scaling 1 only.
+- `fit_week_columns` adds unscaled label and column padding to real-pixel
+  widths, so at 150% the week's width need is about 9 px short.
