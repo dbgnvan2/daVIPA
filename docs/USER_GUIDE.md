@@ -172,7 +172,8 @@ Header controls:
 Main area:
 - **Action Items list (left)** — What: Open items with no dates plus upcoming items in the selected window. Why: A short list of items worth scheduling.
   - Columns: `(checkbox)`, `Title`, `Segment`, `SubSegment`, `Category`, `Start`
-  - **Resizable columns** — What: Every data column (Title, Segment, SubSegment, Category, Start Date) has a draggable divider at its right edge; drag it to widen or narrow the column, spreadsheet-style. Cell text expands to fill the new width (so a wide Title shows the full title instead of "…"). Widths are remembered between sessions. Same reusable resizer as the Today view.
+  - **Columns fill the list** — What: Title, Segment, SubSegment, Category and Start Date always fill the list's width, starting in the proportions 220 : 170 : 170 : 170 : 120. When the window grows or shrinks, or you move the divider between the list and the date boxes, every column changes width in proportion, down to 6 characters. The list and the date boxes share a change in window width, so the divider between them keeps its place. Why: Use the whole width of the list at any window size.
+  - **Resizable columns** — What: Every data column has a draggable divider at its right edge; drag it to change that column's share of the width. Cell text expands to fill the new width (so a wide Title shows the full title instead of "…"). The shape is remembered between sessions. Same reusable resizer as the Today view.
   - **Row checkbox** — What: A checkbox in the first column of each item row. Why: Select several items to move them together (see "Drag a group" below). Optional — leave them all unchecked to drag items one at a time.
 - **Date Boxes (right)** — What: Drop targets for dates. Why: Reschedule by drag-and-drop.
   - Date box columns: `Day`, `Date`, `Items`, `Time`

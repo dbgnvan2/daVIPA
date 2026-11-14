@@ -32,12 +32,24 @@ from .drag_schedule_support import (
 )
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .title_format import split_action_item_title, format_column_text
-from .column_resize import ColumnResizer, ColumnSpec
+from .column_resize import CHAR_PX, ColumnResizer, ColumnSpec
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
 
 logger = logging.getLogger(__name__)
+
+# SCR-D4: no item column goes below 6 characters at the row font (size 14,
+# 8px a character), as on the other item lists.
+ITEM_COLUMN_FLOOR_PX = 6 * CHAR_PX
+# No ceiling worth stating: the columns fill the list however wide it is.
+ITEM_COLUMN_MAX_PX = 10000
+# A <Configure> refit waits for the window edge to stop (as LSR's lists do).
+ITEM_FIT_DELAY_MS = 120
+# What a row spends outside the five columns (SCR-M1): the checkbox cell
+# (30px + padx 8+4), the title's padx 8+4, four cells at padx 4+4, the row's
+# own padx 2+2, and a margin so the last cell is never clipped.
+ITEM_ROW_RESERVED_PX = (30 + 12) + 12 + 4 * 8 + 4 + 6
 
 
 class DragScheduleScreen(ctk.CTkFrame):
@@ -101,14 +113,17 @@ class DragScheduleScreen(ctk.CTkFrame):
             settings=self.settings,
             prefix="drag_schedule",
             text_pad=" ",
+            # SCR-D3: the defaults are the weights a first open shares the
+            # list out by; the columns then fill it (SCR-D2).
             specs=[
-                ColumnSpec("title", grid_col=1, default_width=220, min_width=120),
-                ColumnSpec("segment", grid_col=2, default_width=170, min_width=90),
-                ColumnSpec("subsegment", grid_col=3, default_width=170, min_width=90),
-                ColumnSpec("category", grid_col=4, default_width=170, min_width=90),
-                ColumnSpec("start_date", grid_col=5, default_width=120, min_width=80),
+                ColumnSpec(key, grid_col=col, default_width=width,
+                           min_width=ITEM_COLUMN_FLOOR_PX, max_width=ITEM_COLUMN_MAX_PX)
+                for col, (key, width) in enumerate((
+                    ("title", 220), ("segment", 170), ("subsegment", 170),
+                    ("category", 170), ("start_date", 120)), start=1)
             ],
         )
+        self._items_fit_after = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -310,9 +325,43 @@ class DragScheduleScreen(ctk.CTkFrame):
         self.projects_frame.grid(row=1, column=0, sticky="nsew")
         self.projects_frame.grid_columnconfigure(0, weight=1)
 
-        self.splitter.add(left_frame, minsize=320)
-        self.splitter.add(right_frame, minsize=320)
+        # SCR-D1: both panes take a share of a window change. Tk's default
+        # gives it all to the last pane, so the item list never widened.
+        self.splitter.add(left_frame, minsize=320, stretch="always")
+        self.splitter.add(right_frame, minsize=320, stretch="always")
+        self.items_frame.bind("<Configure>", self._on_items_configure, add="+")
         self.after(100, self._init_splitter_position)
+
+    # ------------------------------------------------------ item column fit
+    def _items_reserved_px(self) -> int:
+        return ITEM_ROW_RESERVED_PX
+
+    def _fit_items(self, list_px) -> int:
+        """Share a list `list_px` wide across the five item columns (SCR-D2).
+
+        Purpose: SCR-M1/M2/M3 — the columns fill the list and follow its width.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-14_scheduler_columns_resize.md
+        Tests:   tests/test_scheduler_column_resize.py
+        Returns the overflow in pixels; ignored while a divider is dragged.
+        """
+        if self.resizer.dragging:
+            return 0
+        return self.resizer.fit_to_width(int(list_px) - self._items_reserved_px())
+
+    def _on_items_configure(self, _event=None) -> None:
+        # Many <Configure> events arrive per drag of the window edge; each
+        # restarts the wait, so the rows are refitted once the edge stops.
+        if self._items_fit_after is not None:
+            self.after_cancel(self._items_fit_after)
+        self._items_fit_after = self.after(ITEM_FIT_DELAY_MS, self._run_items_fit)
+
+    def _run_items_fit(self) -> None:
+        self._items_fit_after = None
+        if not self.items_frame.winfo_exists():
+            return
+        width = self.items_frame.winfo_width()
+        if width > 1:
+            self._fit_items(width / self._get_widget_scaling())
 
     def _init_splitter_position(self):
         if not hasattr(self, "splitter"):
@@ -354,6 +403,8 @@ class DragScheduleScreen(ctk.CTkFrame):
 
         items = self.load_items()
         self.resizer.clear_rows()
+        # Fit before the rows are built, so they are created at their widths.
+        self._run_items_fit()
         if not items:
             ctk.CTkLabel(
                 self.items_frame,
@@ -365,7 +416,6 @@ class DragScheduleScreen(ctk.CTkFrame):
             self.items_header.grid(row=0, column=0, sticky="ew", padx=2, pady=(0, 4))
             self.items_header.grid_columnconfigure(0, minsize=40)
             self.resizer.apply_grid(self.items_header)
-            self.items_header.grid_columnconfigure(6, weight=1)  # trailing slack
 
             header_font = ctk.CTkFont(weight="bold")
             # "Select all" toggle: checking it checks every row; unchecking
@@ -377,7 +427,7 @@ class DragScheduleScreen(ctk.CTkFrame):
                 variable=self.select_all_var,
                 command=self._on_select_all_toggled,
             )
-            self.select_all_checkbox.grid(row=0, column=0, sticky="w", padx=(10, 4), pady=5)
+            self.select_all_checkbox.grid(row=0, column=0, sticky="w", padx=(8, 4), pady=5)
             header_labels = {}
             for key, text in (
                 ("title", "Title"),
@@ -390,8 +440,10 @@ class DragScheduleScreen(ctk.CTkFrame):
                     self.items_header, text=text, anchor="w",
                     width=self.resizer.width(key), font=header_font,
                 )
+                # The same padding as the row's cell, so each heading sits
+                # over its column.
                 lbl.grid(row=0, column=self.resizer.specs[key].grid_col,
-                         sticky="w", padx=(10, 4), pady=5)
+                         sticky="w", padx=(8, 4) if key == "title" else 4, pady=5)
                 header_labels[key] = lbl
             # Draggable dividers at each column's right edge ("end of column" lines).
             self.resizer.build_dividers(
@@ -917,7 +969,6 @@ class DragScheduleScreen(ctk.CTkFrame):
         frame.grid_propagate(False)
         frame.grid_columnconfigure(0, minsize=40)
         self.resizer.apply_grid(frame)
-        frame.grid_columnconfigure(6, weight=1)  # trailing slack
 
         parsed = split_action_item_title(item.title)
         segment_name, subsegment_name, category_name = self._lineage_for_item(item)

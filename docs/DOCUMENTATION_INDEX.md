@@ -303,6 +303,13 @@ controls keep their size; a column shape survives a narrow window (D6).
 Holds decisions D1 to D8. **Approved and built 2026-11-14**; walk owed, in
 the plan's checklist.
 
+### docs/unused-docs/implementation_plan_2026-11-14_scheduler_columns_resize.md
+
+Implementation plan for SCR-M1 to M7: the Scheduler's item columns (Title,
+Segment, SubSegment, Category, Start Date) fill the list and follow its
+width, down to 6 characters; both splitter panes grow with the window.
+**Approved and built 2026-11-14**; walk owed, in the plan's checklist.
+
 ### docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md
 
 Implementation plan for exporting a planned day to Google Calendar
