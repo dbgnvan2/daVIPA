@@ -109,3 +109,23 @@ def test_persist_round_trips_over_dirty_state():
 
     # A fresh resizer reads back the persisted width.
     assert _resizer(settings).width("title") == 400
+
+
+def test_saved_weights_round_trip_outside_the_pixel_limits():
+    """LSR2-D8 — a saved weight loads back as it was, not clamped to pixels.
+
+    Found by the csdp sweep (2026-11-14): a drag in a narrow panel saves a
+    weight above the column's max width, and clamping it on load changed the
+    shape after every restart. The drawn width is still clamped.
+    """
+    specs = [ColumnSpec("a", grid_col=1, default_width=200, min_width=40, max_width=600),
+             ColumnSpec("b", grid_col=2, default_width=200, min_width=40, max_width=600)]
+    settings = FakeSettings(drag_schedule_col_widths={"a": 1533, "b": 200})
+    r = _resizer(settings, specs=specs)
+    assert r.width("a") == 600
+    r.fit_to_width(700)
+    assert (r.width("a"), r.width("b")) == (600, 100)
+    r._persist()
+    assert settings.drag_schedule_col_widths == {"a": 1533, "b": 200}
+    r.fit_to_width(400)
+    assert abs(r.width("a") / r.width("b") - 1533 / 200) < 0.1
