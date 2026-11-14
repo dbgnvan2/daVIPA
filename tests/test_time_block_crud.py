@@ -1178,7 +1178,7 @@ def test_cipm67_a_block_moves_to_another_date(manager):
     block = _at(manager, 30, "mover", 2)
     _at(manager, 30, "already there", 4, block_date=NEXT_DAY)
 
-    moved = manager.move_block_to_date(block.id, NEXT_DAY, 4, BOUNDS)
+    moved, forgotten = manager.move_block_to_date(block.id, NEXT_DAY, 4, BOUNDS)
 
     assert _day(manager) == []
     stored = manager.get_time_block(block.id)
@@ -1186,6 +1186,7 @@ def test_cipm67_a_block_moves_to_another_date(manager):
     assert [b.label for b in manager.get_time_blocks(NEXT_DAY)] == ["already there", "mover"]
     assert (stored.start_time, stored.end_time) == ("10:00", "10:30")
     assert (moved.block_date, moved.slot_index) == (NEXT_DAY, 4)
+    assert forgotten is None
 
 
 def test_cipm67_a_move_that_does_not_fit_writes_nothing(manager):
@@ -1216,10 +1217,28 @@ def test_cipm67_a_move_to_another_date_forgets_its_event(manager):
     manager.set_block_calendar_event_id(away.id, "gcal-away", "cal")
     manager.set_block_calendar_event_id(stays.id, "gcal-stays", "cal")
 
-    manager.move_block_to_date(away.id, NEXT_DAY, 4, BOUNDS)
-    manager.move_block_to_date(stays.id, DAY, 5, BOUNDS)
+    _moved, forgot_away = manager.move_block_to_date(away.id, NEXT_DAY, 4, BOUNDS)
+    _moved, forgot_stays = manager.move_block_to_date(stays.id, DAY, 5, BOUNDS)
+
+    # The id is reported from the row, so a caller drawn before the export
+    # still learns there was one.
+    assert (forgot_away, forgot_stays) == ("gcal-away", None)
 
     gone = manager.get_time_block(away.id)
     assert (gone.calendar_event_id, gone.calendar_event_calendar_id) == (None, None)
     kept = manager.get_time_block(stays.id)
     assert (kept.calendar_event_id, kept.slot_index) == ("gcal-stays", 5)
+
+
+def test_cipm67_lunch_does_not_move_to_another_date(manager):
+    lunch = manager.add_block_at(
+        TimeBlock(block_date=DAY, start_time="", end_time="", planned_minutes=30,
+                  label="Lunch", block_type=BlockType.LUNCH),
+        2, BOUNDS,
+    )
+
+    with pytest.raises(ValueError, match="Lunch stays on its own date"):
+        manager.move_block_to_date(lunch.id, NEXT_DAY, 4, BOUNDS)
+
+    assert manager.get_time_block(lunch.id).block_date == DAY
+    assert _day(manager, NEXT_DAY) == []

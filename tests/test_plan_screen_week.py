@@ -911,7 +911,9 @@ def _item_block(manager, slot, title, day=THURSDAY, minutes=30):
 
 
 def _drop_block(screen, root, block):
+    """A drag that moved: the armed label is cleared on the first motion."""
     screen._drag_kind, screen._drag_item, screen._drag_block = "block", None, block
+    screen._drag_label_text = None
     screen.on_drag_release(None)
     root.update_idletasks()
 
@@ -1094,6 +1096,79 @@ def test_cipm67_a_drop_on_no_box_writes_nothing(screen, manager, root, monkeypat
 
     assert manager.get_time_block(block.id).slot_index == 2
     assert screen.status_label.cget("text") == "Drop on a box to move it — click a date to open it"
+
+
+def test_cipm67_a_click_on_a_box_is_not_a_move(screen, manager, root, monkeypatch):
+    """Cold review -- every box a block covers picks it up, so a click with
+    no motion on the box it continues into must not move its start there."""
+    _fresh(manager)
+    _item, block = _item_block(manager, 2, "Long", minutes=60)
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, (THURSDAY, 3))
+    screen.set_status("before", "info")
+
+    screen.start_block_drag(None, block)
+    screen.on_drag_release(None)
+
+    assert manager.get_time_block(block.id).slot_index == 2
+    assert screen.status_label.cget("text") == "before"
+
+
+def test_cipm67_a_day_with_unplaced_blocks_refuses_a_block(screen, manager, root, monkeypatch):
+    _fresh(manager)
+    _item, block = _item_block(manager, 2, "Mover")
+    _boxless_block(manager, FRIDAY)
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, (FRIDAY, TEN))
+
+    _drop_block(screen, root, block)
+
+    assert manager.get_time_block(block.id).block_date == THURSDAY
+    assert screen.status_label.cget("text") == (
+        f"Open {wv.short_date(FRIDAY)} first — 1 block(s) from an earlier version need a box"
+    )
+
+
+def test_cipm67_a_move_waits_for_an_export_of_either_date(screen, manager, root, monkeypatch):
+    from src.getmoredone.screens import plan as plan_module
+
+    _fresh(manager)
+    _item, block = _item_block(manager, 2, "Busy")
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, (FRIDAY, TEN))
+    db_path = manager.db.db_path
+
+    for busy in (THURSDAY, FRIDAY):
+        assert plan_module._claim_export(db_path, busy)
+        try:
+            queued = []
+            monkeypatch.setattr(screen, "after_idle", queued.append)
+            _drop_block(screen, root, block)
+            assert queued == [], "the drop scheduled a write"
+            assert screen.status_label.cget("text") == \
+                f"Wait for the Google Calendar export of {wv.short_date(busy)} to finish"
+            screen.move_block_to_day(block, TEN, FRIDAY)   # the write path checks too
+            assert screen.status_label.cget("text").startswith("Wait for the Google Calendar export")
+        finally:
+            plan_module._release_export(db_path, busy)
+        assert manager.get_time_block(block.id).block_date == THURSDAY
+
+    _run_idle(screen, root, monkeypatch)
+    _drop_block(screen, root, block)
+    assert manager.get_time_block(block.id).block_date == FRIDAY
+
+
+def test_cipm67_a_deleted_block_is_reported_not_raised(screen, manager, root, monkeypatch):
+    _item, block = _item_block(manager, 2, "Gone")
+    manager.delete_time_block(block.id)
+
+    screen.move_block_to_day(block, TEN, FRIDAY)
+
+    assert screen.status_label.cget("text") == "That Time Block is no longer there"
+    assert manager.get_time_blocks(FRIDAY) == []
 
 
 def test_cipm68_only_the_date_heading_opens_the_day(screen, manager, root, monkeypatch):
