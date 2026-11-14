@@ -209,11 +209,12 @@ but nobody has yet watched it write a real event.
 ## Next feature — Google Calendar into the Plan (CIP, specced 2026-11-08)
 
 Spec: [`docs/spec_2026-11-08_calendar_into_the_plan.md`](docs/spec_2026-11-08_calendar_into_the_plan.md).
-**Batch 1, the read half, and batch 2, editing a meeting from the Plan
-(CIP-M4), are built (2026-11-13).** Both owe an on-screen walk:
-`docs/unused-docs/changes/2026-11-13-cip-read-half.md` and
-`docs/unused-docs/changes/2026-11-13-cip-editing.md`. What is left is the week view (M6),
-batch 3.
+**All three batches are built (2026-11-13)**: the read half, editing a
+meeting from the Plan (CIP-M4), and the week view (CIP-M6). What is left is
+the on-screen walk each owes:
+`docs/unused-docs/changes/2026-11-13-cip-read-half.md`,
+`docs/unused-docs/changes/2026-11-13-cip-editing.md` and
+`docs/unused-docs/changes/2026-11-13-cip-week.md`.
 
 Read the connected calendars, show each day's commitments on the Plan grid so
 the day is planned around the hours that are already gone, and let a commitment

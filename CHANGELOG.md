@@ -7,6 +7,14 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — the week on the Plan (2026-11-13)
+
+- A Day / Week toggle on the Plan shows the selected date and the six after
+  it as seven columns of half hours, with each day's meeting hours and free
+  hours. A date never read from the calendar says so rather than looking
+  free. Read-only; clicking a day opens it. (CIP-M6)
+- ↻ Calendar in the week reads the seven dates in one call. (CIP-M6.1)
+
 ### Development — pytest-timeout (2026-11-13)
 
 - `pytest-timeout` is a development dependency, for finding a test that hangs

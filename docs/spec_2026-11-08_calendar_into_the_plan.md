@@ -6,8 +6,10 @@ which also records the decisions this spec left open (D1 to D13). Not walked
 on screen. **Batch 2, editing (CIP-M4, M1.6, M0.3b), built 2026-11-13**
 from `docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_editing.md`,
 which records decisions E1 to E10; not walked, and no write has reached live
-Google. **The week view (M6) is not started.** Criteria and tests: `docs/spec_coverage.md`, *Google Calendar into
-the Plan, read half*.
+Google. **Batch 3, the week view (CIP-M6), built 2026-11-13** from
+`docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_week.md`
+(decisions W1 to W8); not walked. Criteria and tests: `docs/spec_coverage.md`,
+the three *Google Calendar into the Plan* sections.
 
 Source: user requirement, 2026-11-08 — *"I want to read my google calendar and
 put items in the day plan so I know what to plan around. Eventually i want to
@@ -252,6 +254,13 @@ Plan's. Decisions E1 to E10 in the plan.
 | CIP-M6.1 | A seven-day planning view: for each of the next seven days, its committed hours and its free hours, from one fetch over the range |
 | CIP-M6.2 | The week view reads the same cache and the same functions as the day. No second parse, no second occupancy rule |
 | CIP-M7.1 | Docs in the same change: `docs/USER_GUIDE.md`, `docs/google-calendar-setup.md`, `CHANGELOG.md`, `NOTES.md`, `docs/DOCUMENTATION_INDEX.md`, and a handoff note from `.agents/templates/handoff-note.md` |
+
+*M6 built 2026-11-13 (batch 3).* A Day / Week toggle beside the day pane's
+heading; the week is the selected date and the six after it, read-only, each
+column drawn from the same `build_day_grid` call as the day. Free is a box
+with no meeting, lunch or block; a date never read has no free count; a day
+Day Settings closes says "no blocks". ↻ Calendar in the week reads the seven
+dates in one call under the same claim. Decisions W1 to W8 in the plan.
 
 ---
 

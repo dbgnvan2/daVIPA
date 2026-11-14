@@ -256,8 +256,8 @@ handoff note is `docs/unused-docs/changes/2026-11-08-priority-level-colours.md`:
 Spec for the other direction: reading the connected calendars, showing their
 commitments on the Plan grid so a day is planned around what is already gone,
 and editing those commitments in place (CIP-M0 - CIP-M7). **Read half
-(batch 1) and editing (CIP-M4, batch 2) built 2026-11-13; the week view not
-started.** Phase 1 is the selected day;
+(batch 1), editing (CIP-M4, batch 2) and the week view (CIP-M6, batch 3)
+built 2026-11-13.** Phase 1 is the selected day;
 phase 2 is a seven-day planning view over the same cache. Holds the decision
 that a commitment is *not* a `time_blocks` row and the five reasons, the rule
 that keeps the export's own events from returning as constraints on the blocks
@@ -278,6 +278,13 @@ Implementation plan for CIP batch 2, changing a Google Calendar meeting from
 the Plan (CIP-M4, M1.6, M0.3b). Holds decisions E1 to E10 (guest email asked
 each time, what can move, the stale-write check) and the walk items. **Approved
 and built 2026-11-13**; walk owed, in `docs/unused-docs/changes/2026-11-13-cip-editing.md`.
+
+### docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_week.md
+
+Implementation plan for CIP batch 3, the Plan's week view (CIP-M6). Holds
+decisions W1 to W8 (what counts as free, unread and closed days, one read for
+the week). **Approved and built 2026-11-13**; walk owed, in
+`docs/unused-docs/changes/2026-11-13-cip-week.md`.
 
 ### docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md
 

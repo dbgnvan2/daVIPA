@@ -456,6 +456,25 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   file (default: your primary calendar), and the 15 minutes is
   `plan_commitment_stale_minutes`. There is no control for either yet. One read
   runs at a time; a second press while one runs is refused and said.
+- **Day / Week** — What: beside the *Day Plan* heading, switches the right
+  pane between the day's grid and a week of it. Why: to see where in the next
+  seven days there is room, before planning any one of them.
+
+  The week is the selected date and the six after it, as seven narrow columns
+  of the same half-hour boxes: purple for a meeting, grey for a Time Block or
+  lunch, the pane's light fill for a free box. Under each column: *Meetings
+  3h* and *Free 2½h*. A box with a meeting and a block in it counts as a
+  meeting. A date the calendar has never been read for is drawn in a flat
+  border grey and says *not read* instead of a free count, so an unread day
+  never looks empty; a day Day Settings closes (by default Saturday and
+  Sunday) says *no blocks*. The line above the grid says *Calendar not read
+  for N of 7 days*, or the oldest read time, or a failed read.
+
+  The week is read-only: nothing can be dragged onto it or moved in it. Click
+  a day's heading, boxes or totals to open that date as a day; **‹** and
+  **›** move a week back or forward. **↻ Calendar** in the week reads all
+  seven dates at once, and a week with any date older than 15 minutes is read
+  once in the background, as a day is.
 - **+ Break** / **+ Buffer** — What: Puts a padding block in the first empty
   half hour, as AutoLoad does; only when no half hour is empty does it go beside
   work, in the first box with room (2026-11-13). Drag it if you want it beside a

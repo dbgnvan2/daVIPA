@@ -295,6 +295,15 @@ and are corrected in `BACKLOG.md` item 1 with the measurements.
 
 ## Recent Changes (2026-11-13)
 
+### Google Calendar into the Plan, week view - CIP batch 3
+
+Built from `docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_week.md`
+(CIP-M6.1, M6.2; decisions W1 to W8). The counting is `plan_week.py`, the
+drawing `screens/plan_week_view.py`; `load_blocks` hands over to `load_week`
+while the week is up, so every redraw draws the view that is showing. Each
+column is the day grid's own `build_day_grid` call. Known gap: **not walked
+on screen** (checklist in `docs/unused-docs/changes/2026-11-13-cip-week.md`).
+
 ### Google Calendar into the Plan, editing - CIP batch 2
 
 Built from `docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_editing.md`

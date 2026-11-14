@@ -230,7 +230,8 @@ events for one block.
 The Plan screen's **↻ Calendar** button reads the selected day from the
 calendars in `plan_commitment_calendar_ids` (a list in the settings file;
 default `["primary"]`) and draws each event in the boxes it covers. No block
-can then be placed in those boxes. The full behaviour is in
+can then be placed in those boxes. In the Plan's **Week** view the same
+button reads the seven dates shown in one call. The full behaviour is in
 `docs/USER_GUIDE.md`, under *Plan (Time Blocks)*.
 
 - It uses the same credentials and token as the export, and the same

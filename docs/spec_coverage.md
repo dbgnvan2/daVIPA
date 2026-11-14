@@ -2572,3 +2572,13 @@ Spec: `docs/spec_2026-11-08_calendar_into_the_plan.md` §7. Plan, with decisions
 | **CIP-M1.6** | `apply_commitment_edit` replaces one event on one date, keeps its id | done | `db_manager_commitments.py::apply_commitment_edit` | `TE::test_cipm16_apply_commitment_edit_replaces_only_that_event_on_that_date` |
 | **CIP-M0.3b** | deleting a meeting leaves its action item | done | `delete_commitment` | `TE::test_cipm03b_deleting_a_commitment_leaves_its_action_item` |
 | **CIP-M7.1** | docs | done | `USER_GUIDE.md`, `google-calendar-setup.md`, `CHANGELOG.md`, `NOTES.md`, `DOCUMENTATION_INDEX.md`, the spec, `BACKLOG.md` | no test (no guard reads prose) |
+
+## Google Calendar into the Plan, week view (CIP batch 3, 2026-11-13)
+
+Spec: `docs/spec_2026-11-08_calendar_into_the_plan.md` §8. Plan, with decisions W1 to W8: `docs/unused-docs/implementation_plan_2026-11-13_calendar_into_the_plan_week.md`. `TW` is `tests/test_plan_week.py`, `TV` is `tests/test_plan_screen_week.py`. Not walked on screen: `docs/unused-docs/changes/2026-11-13-cip-week.md`.
+
+| ID | Criterion | Status | Where | Proof |
+|---|---|---|---|---|
+| **CIP-M6.1** | seven days from the selected date; meetings and free time per day; one read over the range under the shared claim; unread and closed days have no free count; a click opens the day | done | `plan_week.py`, `screens/plan_week_view.py`, `plan_commitments.py::refresh_range`, `maybe_auto_refresh` | `TV::test_cipm61_the_week_is_seven_days_from_the_selected_date`, `TW::test_cipm61_free_excludes_meetings_lunch_and_blocks`, `TW::test_cipm61_a_box_with_a_meeting_and_a_block_counts_once`, `TV::test_cipm61_refresh_fetches_the_range_once`, `TV::test_cipm61_week_refresh_is_refused_while_an_edit_runs`, `TW::test_cipm61_an_unread_day_has_no_free_count`, `TV::test_cipm61_an_unread_day_says_so`, `TW::test_cipm61_a_non_block_day_has_no_free_count`, `TV::test_cipm61_a_non_block_day_says_no_blocks`, `TV::test_cipm61_a_click_on_a_day_opens_it`, `TV::test_cipm61_the_toggle_returns_to_the_same_day`, `TV::test_cipm61_the_arrows_move_by_a_week`, `TV::test_cipm61_opening_the_week_makes_no_call`, `TV::test_cipm61_a_stale_week_is_read_once`, `TV::test_cipm61_a_day_read_does_not_stand_for_the_week`, `TV::test_cipm61_leaving_the_week_cancels_its_automatic_read` |
+| **CIP-M6.2** | a week column and the day grid agree box for box | done | `plan_week.py::read_week` | `TV::test_cipm62_the_week_column_matches_the_day_grid` |
+| **CIP-M7.1** | docs | done | `USER_GUIDE.md`, `google-calendar-setup.md`, `CHANGELOG.md`, `NOTES.md`, `DOCUMENTATION_INDEX.md`, the spec, `BACKLOG.md` | no test (no guard reads prose) |
