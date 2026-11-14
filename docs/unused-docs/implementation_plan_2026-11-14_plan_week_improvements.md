@@ -204,3 +204,19 @@ without a separate plan, because the change is small:
   `<Configure>`. Its text colour is `pick_text_color` of the fill, which
   meets the AGENTS.md rule for a data-colour fill.
 - At the 12 px box floor the 9 pt title is tight. A taller pane gives it room.
+
+### M6.6 cold review (2026-11-14)
+
+No high findings. One medium, fixed with a test: "+N" was cut off along with
+the end of a long title, so the count was almost never visible.
+`fit_title` now cuts the title and keeps the count, and falls back to the
+count alone. Recorded, not fixed (low):
+
+- `test_cipm66_a_wider_box_shows_more_of_the_title` calls `_fit_week_title`
+  directly, so deleting the `<Configure>` binding would not turn it red.
+- At the 12 px box floor the title label covers the top and bottom of the
+  hover outline.
+- Titles use an unscaled font and inset, so they look smaller at a widget
+  scaling other than 1.
+- If `normalize_hex_color` ever rejected a fill, the title would be dropped
+  silently. No current fill can reach that path.
