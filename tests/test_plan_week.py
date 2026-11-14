@@ -206,3 +206,35 @@ def test_cipm64_padding_first_colours_nothing(manager):
     summary = _day(manager)
 
     assert 2 not in summary.items
+
+
+# =====================================================================
+# CIP-M6.6 -- the box an item's title goes on
+# =====================================================================
+
+def test_cipm66_the_title_goes_on_the_box_the_block_starts_in(manager):
+    _item_block(manager, 2, "long", minutes=60)  # boxes 2 and 3
+    _item_block(manager, 3, "short")  # starts where "long" carries on
+    summary = _day(manager)
+
+    assert summary.starts[2] == ("long", "long", 0)
+    # Box 3 is coloured by "long" (C1), so it names nothing rather than "short".
+    assert summary.items[3] == "long"
+    assert 3 not in summary.starts, "a box coloured by a carried block took another block's title"
+
+
+def test_cipm66_others_starting_in_the_box_are_counted(manager):
+    _item_block(manager, 2, "first")
+    _item_block(manager, 2, "second")
+    _item_block(manager, 2, "third")
+    summary = _day(manager)
+
+    assert summary.starts[2] == ("first", "first", 2)
+
+
+def test_cipm66_padding_first_has_no_title(manager):
+    _block(manager, 2)  # a break
+    _item_block(manager, 2, "after")
+    summary = _day(manager)
+
+    assert 2 not in summary.starts

@@ -738,3 +738,80 @@ def test_cipm63_a_narrower_week_gives_width_back(screen, manager, root, monkeypa
 
     assert screen._items_width > wide, "the narrower week left the items pane where the wide one put it"
     assert screen._items_width == min(setting, room - PLAN_PANE_CHROME_PX - screen.day_width_floor())
+
+
+# =====================================================================
+# CIP-M6.6 -- an item's title on its week box
+# =====================================================================
+
+LONG_TITLE = "Write the quarterly report for the board"
+
+
+def test_cipm66_fit_text_cuts_to_the_width_with_an_ellipsis():
+    measure = len  # one pixel per character
+
+    assert wv.fit_text("Report", measure, 6) == "Report"
+    assert wv.fit_text("Report due", measure, 6) == "Repor…"
+    assert wv.fit_text("Report due", measure, 1) == "…"
+    assert wv.fit_text("Report due", measure, 0) == ""
+    assert wv.fit_text("Ab cd", measure, 4) == "Ab…", "a space before the ellipsis was kept"
+
+
+def test_cipm66_an_item_box_shows_its_title_cut_to_the_box(screen, manager, root):
+    item = _item(manager, LONG_TITLE)
+    _block(manager, TEN, block_type=BlockType.ITEM, item_id=item.id, label=item.title, minutes=60)
+    _week(screen, root)
+
+    label = screen._week_titles[(THURSDAY, TEN)]
+    # Re-cut by <Configure> to the width the label was placed at.
+    room = label.winfo_width()
+    assert room > 1
+    assert label.full_title == LONG_TITLE
+    assert label.cget("text") == wv.fit_text(LONG_TITLE, label.title_font.measure, room)
+    assert label.cget("text").endswith("…")
+    assert (THURSDAY, TEN + 1) not in screen._week_titles
+
+
+def test_cipm66_a_wider_box_shows_more_of_the_title(screen, manager, root):
+    item = _item(manager, LONG_TITLE)
+    _block(manager, TEN, block_type=BlockType.ITEM, item_id=item.id, label=item.title)
+    _week(screen, root)
+    label = screen._week_titles[(THURSDAY, TEN)]
+
+    screen._fit_week_title(label, 2000)
+
+    assert label.cget("text") == LONG_TITLE
+
+
+def test_cipm66_the_title_colour_is_derived_from_the_fill(screen, manager, root, monkeypatch):
+    from src.getmoredone.color_contrast import pick_text_color
+
+    item = _item(manager, "Pale")
+    _block(manager, TEN, block_type=BlockType.ITEM, item_id=item.id, label=item.title)
+    monkeypatch.setattr(screen, "_segment_color_resolver", lambda: lambda it: "#FDE68A")
+    _week(screen, root)
+    label = screen._week_titles[(THURSDAY, TEN)]
+
+    assert label.cget("bg").upper() == "#FDE68A"
+    assert label.cget("fg") == pick_text_color("#FDE68A") == "#000000"
+
+
+def test_cipm66_the_title_is_the_items_current_title(screen, manager, root):
+    item = _item(manager, "Old name")
+    _block(manager, TEN, block_type=BlockType.ITEM, item_id=item.id, label="Old name")
+    item.title = "New name"
+    manager.update_action_item(item)
+    screen.refresh()
+    _week(screen, root)
+
+    assert screen._week_titles[(THURSDAY, TEN)].full_title == "New name"
+
+
+def test_cipm66_more_than_one_block_says_how_many(screen, manager, root):
+    first = _item(manager, "First")
+    second = _item(manager, "Second")
+    _block(manager, TEN, block_type=BlockType.ITEM, item_id=first.id, label=first.title)
+    _block(manager, TEN, block_type=BlockType.ITEM, item_id=second.id, label=second.title)
+    _week(screen, root)
+
+    assert screen._week_titles[(THURSDAY, TEN)].full_title == "First +1"
