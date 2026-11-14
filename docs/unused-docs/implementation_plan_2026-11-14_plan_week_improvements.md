@@ -236,3 +236,10 @@ above that the title covered the outline at the floor. All week titles now
 share one font object, where each title made its own.
 `test_cipm63_boxes_follow_the_pane_height_to_a_floor` now expects
 `week_box_min_height()`, not 12 — reason (b).
+
+Cold review of this change: no high or medium findings. Recorded (low): the
+floor adds the font's real pixels to the box's scaled pixels, so it is exact
+only at CustomTkinter's widget scaling of 1, the Mac default. At 1.5 the box
+is taller than it needs to be; below 1 the title could cover the outline
+again. The title test also compares a scaled height with a real one, and
+checks the title's height, not where it sits.

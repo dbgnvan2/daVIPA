@@ -253,7 +253,7 @@ Plan's. Decisions E1 to E10 in the plan.
 | CIP-M5.5 | Opening a date whose cache is older than the staleness window (§9, 15 minutes, in config) refreshes it automatically, once, in the background |
 | CIP-M6.1 | A seven-day planning view: for each of the next seven days, its committed hours and its free hours, from one fetch over the range |
 | CIP-M6.2 | The week view reads the same cache and the same functions as the day. No second parse, no second occupancy rule |
-| CIP-M6.3 | The week's seven columns share the pane's width and its boxes follow the pane's height. A column is never narrower than its heading and totals text (and never under 40 px), and the day pane's floor holds the week; a box is never shorter than its title's line plus the drag outline above and below and 1 px (16 px at the 9 px title font) |
+| CIP-M6.3 | The week's seven columns share the pane's width and its boxes follow the pane's height. A column is never narrower than its heading and totals text (and never under 40 px), and the day pane's floor holds the week; a box is never shorter than its title's line plus the drag outline above and below and 1 px (16 px on a Mac, where the 9 px title font's line is 11 px) |
 | CIP-M6.4 | A box holding an Action Item's Time Block is filled with that item's Category colour; padding, lunch and an item with no colour keep the planned colour |
 | CIP-M6.5 | An Action Item dropped on a week box is blocked on that box's date, through the day's own checks for that date |
 | CIP-M6.6 | The box an item's Time Block starts in shows the item's title, cut to the box with "…", in a text colour derived from the fill; "+N" counts other blocks starting there, and the title is cut before the count is |
