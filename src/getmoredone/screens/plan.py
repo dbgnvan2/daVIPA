@@ -1633,7 +1633,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         text += f" at {block.start_time}"
         if self._week_mode and not self._week_day_read(day):
             text += " — calendar not read for that day"
-        text += self._take_non_work_note()
+        text += self._take_non_work_note(day)
         if spare:
             # Said out loud, because the box the task does not fill is still
             # spent: the next task starts at the following box, not at the
@@ -2498,7 +2498,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         )
         return False
 
-    def _take_non_work_note(self) -> str:
+    def _take_non_work_note(self, day: Optional[str] = None) -> str:
         """What a status line owes when the gesture was on a non-work day.
 
         Purpose: PD-M13 -- a drop on a day outside the working week is not
@@ -2525,7 +2525,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         ]
         week = ", ".join(allowed) if allowed else "no days"
         return (
-            f" — {self.selected_date} is not a regular work day"
+            f" — {day or self.selected_date} is not a regular work day"
             f" (Day Settings allows {week})"
         )
 

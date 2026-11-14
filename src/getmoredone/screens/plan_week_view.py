@@ -121,7 +121,7 @@ class PlanWeekViewMixin:
         """
         if not getattr(self, "_week_mode", False):
             return False
-        self.set_status("The week is read-only — click a day to plan it", "muted")
+        self.set_status("In the week, only an Action Item can be dropped — click a day to plan it", "muted")
         return True
 
     def _set_day_buttons(self, state: str) -> None:
@@ -383,6 +383,16 @@ class PlanWeekViewMixin:
                 self.set_status("Drop on a box to plan it — click a day to open it", "muted")
             return
         day, index = hit
+        # Sweep, 2026-11-14 -- the day places blocks from an earlier version
+        # (TG-M5) when it is opened, and the week runs no repair. A drop before
+        # that could take the box such a block is about to be given.
+        unplaced = sum(1 for block in self.db_manager.get_time_blocks(day) if block.slot_index is None)
+        if unplaced:
+            self.set_status(
+                f"Open {date.fromisoformat(day).strftime('%a %d')} first — {unplaced}"
+                " block(s) from an earlier version need a box", "warning",
+            )
+            return
         refusal = self._drop_refusal(item, index, day)
         if refusal is not None:
             self.set_status(refusal, "warning")
