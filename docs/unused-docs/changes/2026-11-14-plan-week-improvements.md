@@ -28,3 +28,13 @@ Open the Plan, choose **Week**.
 12. [ ] Make the window as short as it goes: the boxes stop at 16 px and the
     week scrolls; a title reads whole, and dragging an item over a titled box
     shows the outline on all four sides.
+13. [ ] In the week, drag a Time Block from Thursday onto a free box on
+    Friday: it moves there, the week stays up, and the status names Friday.
+14. [ ] Drag it onto a purple (meeting) box: refused, nothing moves.
+15. [ ] Drag it onto Saturday: asked first; yes moves it.
+16. [ ] Press on a lunch box and drag: nothing is picked up.
+17. [ ] Click a box and a total: the week stays up. Click a date heading: that
+    day opens.
+18. [ ] Export a day, then move one of its blocks to another day: the status
+    says to export the old day again. Do that: the old event is gone from
+    Google Calendar. Export the new day: the block's event is there.

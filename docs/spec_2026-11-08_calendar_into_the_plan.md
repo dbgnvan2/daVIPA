@@ -257,6 +257,8 @@ Plan's. Decisions E1 to E10 in the plan.
 | CIP-M6.4 | A box holding an Action Item's Time Block is filled with that item's Category colour; padding, lunch and an item with no colour keep the planned colour |
 | CIP-M6.5 | An Action Item dropped on a week box is blocked on that box's date, through the day's own checks for that date |
 | CIP-M6.6 | The box an item's Time Block starts in shows the item's title, cut to the box with "…", in a text colour derived from the fill; "+N" counts other blocks starting there, and the title is cut before the count is |
+| CIP-M6.7 | A Time Block dragged from a week box moves to the box it is dropped on, on that box's date, through that date's own checks; lunch does not move between days, and a block moved to another date forgets its Google Calendar event |
+| CIP-M6.8 | In the week only a column's date heading opens that day; a click on a box, a title or a total leaves the week up |
 | CIP-M7.1 | Docs in the same change: `docs/USER_GUIDE.md`, `docs/google-calendar-setup.md`, `CHANGELOG.md`, `NOTES.md`, `docs/DOCUMENTATION_INDEX.md`, and a handoff note from `.agents/templates/handoff-note.md` |
 
 *M6 built 2026-11-13 (batch 3).* A Day / Week toggle beside the day pane's
@@ -270,6 +272,10 @@ dates in one call under the same claim. Decisions W1 to W8 in the plan.
 box by its Category, and takes an Action Item dropped on a box. That reverses
 W4 for this one gesture; every other write stays on the day. Decisions R1–R4,
 C1–C4, D1–D7 in `docs/unused-docs/implementation_plan_2026-11-14_plan_week_improvements.md`.
+
+*M6.7 and M6.8 built 2026-11-14.* A Time Block can be dragged between days in
+the week, which reverses D7. Only the date heading opens a day. Decisions
+B1–B10 in `docs/unused-docs/implementation_plan_2026-11-14_week_block_drag.md`.
 
 ---
 
