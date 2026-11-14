@@ -108,6 +108,11 @@ class ColumnResizer:
     def width(self, key: str) -> int:
         return self._widths[key]
 
+    @property
+    def dragging(self) -> bool:
+        """True while a divider is held (LSR-M5: a resize then waits)."""
+        return self._drag is not None
+
     def chars(self, key: str, reserve: int = 0, width_delta: int = 0) -> int:
         """The character budget for a cell in this column.
 

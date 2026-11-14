@@ -27,8 +27,15 @@ from .inline_editors import InlineDateDialog, InlinePriorityDialog
 from .title_format import (
     split_action_item_title,
     format_column_text,
-    responsive_column_chars,
     CONTACT_COL_CHARS,
+)
+from .item_list_columns import (
+    ToolbarWrap,
+    FACTOR_CHIP_WIDTHS,
+    FixedColumn,
+    ItemListLayout,
+    factors_column,
+    timer_column,
 )
 
 if TYPE_CHECKING:
@@ -38,6 +45,8 @@ if TYPE_CHECKING:
 
 class AllItemsScreen(ctk.CTkFrame):
     """Screen showing all items in a table format."""
+
+    COLUMN_PREFIX = "all_items"
 
     def __init__(self, parent, db_manager: 'DatabaseManager', app: 'GetMoreDoneApp'):
         super().__init__(parent)
@@ -57,16 +66,23 @@ class AllItemsScreen(ctk.CTkFrame):
         self.palette = semantic_colors()
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        # Row 0 = toolbar, row 1 = pinned column header, row 2 = the list.
+        self.grid_rowconfigure(2, weight=1)
 
         # Create header
         self.create_header()
 
+        # LSR-M1/M2/M9: one column layout for the pinned header and the rows.
+        self.layout = ItemListLayout(
+            self, self.settings, self.COLUMN_PREFIX, first_col=1, title_default=260)
+        self.column_header = None
+
         # Create scrollable frame for items
         self.scroll_frame = ctk.CTkScrollableFrame(self, label_text="")
         self.scroll_frame.grid(
-            row=1, column=0, sticky="nsew", padx=10, pady=10)
+            row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.scroll_frame.grid_columnconfigure(0, weight=1)
+        self.layout.bind(self.scroll_frame)
 
         # Load items
         self.refresh()
@@ -75,7 +91,6 @@ class AllItemsScreen(ctk.CTkFrame):
         """Create header with filters and controls."""
         header = ctk.CTkFrame(self)
         header.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
-        header.grid_columnconfigure(7, weight=1)
 
         # Title
         title = ctk.CTkLabel(
@@ -150,6 +165,7 @@ class AllItemsScreen(ctk.CTkFrame):
             command=self.create_new_item
         )
         btn_new.grid(row=0, column=9, padx=10, pady=10)
+        self.toolbar_wrap = ToolbarWrap(header, self.search_entry, 1, 7)
 
     def perform_search(self):
         """Perform search and update the view."""
@@ -163,6 +179,40 @@ class AllItemsScreen(ctk.CTkFrame):
             text="Expand" if not self.columns_expanded else "Collapse")
         self.refresh()
 
+    def _build_column_header(self):
+        """The pinned column headings, over the same columns as the rows.
+
+        Purpose: LSR-M9 -- the header used to be a grid of its own inside the
+                 list, with unsized labels over fixed-width cells, so no
+                 heading sat over its column, and in expanded mode "Status"
+                 sat over the factor chips.
+        Tests:   tests/test_list_screen_resize.py::test_lsrm9_all_items_header_matches_rows_expanded
+        """
+        offset = 1 if self.columns_expanded else 0
+        fixed = [
+            FixedColumn(5, "Start", 60),
+            FixedColumn(6, "Due", 60),
+            FixedColumn(7, "Priority", ALL_ITEMS_SCORE_CELL_WIDTH_PX),
+            FixedColumn(8, "Est. Time", 60),
+        ]
+        if self.columns_expanded:
+            fixed.append(factors_column(9))
+        fixed.append(FixedColumn(9 + offset, "Status", 80))
+        fixed.append(timer_column(10 + offset, "Actions"))
+        self.layout.set_columns([FixedColumn(0, "✓", 30)], fixed)
+        if self.column_header is not None:
+            self.column_header.destroy()
+        hdr = self.layout.build_header(
+            self,
+            {"title": "Immediate Step", "subsegment": "SubSegment",
+             "category": "Category", "who": "Who"},
+            fg_color=self.palette["surface_subtle"],
+            border_color=self.palette["border"],
+        )
+        # padx 15 = the list's outer padx (10) + each row's padx (5).
+        hdr.grid(row=1, column=0, sticky="ew", padx=15, pady=(10, 4))
+        self.column_header = hdr
+
     def refresh(self):
         """Refresh the list of items."""
         self.palette = semantic_colors()
@@ -173,6 +223,8 @@ class AllItemsScreen(ctk.CTkFrame):
         # Clear current items
         for widget in self.scroll_frame.winfo_children():
             widget.destroy()
+        self.layout.clear_rows()
+        self._build_column_header()
 
         # Refresh VSP segment color cache
         self.segment_colors_by_id = self.app.vps_manager.get_segment_colors_by_id()
@@ -214,27 +266,9 @@ class AllItemsScreen(ctk.CTkFrame):
             label.grid(row=0, column=0, pady=20)
             return
 
-        # Create table header
-        header_frame = ctk.CTkFrame(self.scroll_frame, fg_color=self.palette["surface_subtle"])
-        header_frame.grid(row=0, column=0, sticky="ew",
-                          pady=(0, 5), padx=5)
-        header_frame.grid_columnconfigure(1, weight=1)
-
-        headers = ["✓", "Immediate Step", "SubSegment", "Category", "Who", "Start", "Due",
-                   "Priority", "Est. Time", "Status", "Actions"]
-        col_weights = [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-
-        for col, (header_text, weight) in enumerate(zip(headers, col_weights)):
-            header_frame.grid_columnconfigure(col, weight=weight)
-            ctk.CTkLabel(
-                header_frame,
-                text=header_text,
-                font=ctk.CTkFont(weight="bold")
-            ).grid(row=0, column=col, padx=5, pady=5, sticky="w")
-
         # Create item rows
         palette = self.palette
-        for idx, item in enumerate(items, start=1):
+        for idx, item in enumerate(items):
             segment_color = resolve_segment_color_for_item(
                 item,
                 self.segment_colors_by_id,
@@ -254,8 +288,7 @@ class AllItemsScreen(ctk.CTkFrame):
             item_frame = ctk.CTkFrame(self.scroll_frame, fg_color=bg_color)
             apply_segment_accent(item_frame, segment_color)
             item_frame.grid(row=idx, column=0, sticky="ew", pady=2, padx=5)
-            item_frame.grid_columnconfigure(1, weight=1)
-            limits = responsive_column_chars(max(self.winfo_width(), self.scroll_frame.winfo_width()))
+            self.layout.apply_grid(item_frame)
             parsed = split_action_item_title(item.title)
             _segment_name, subsegment_name, category_name = lineage_for_item(
                 item,
@@ -285,7 +318,8 @@ class AllItemsScreen(ctk.CTkFrame):
             title_cell = ctk.CTkFrame(item_frame, fg_color="transparent")
             title_cell.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
             title_cell.grid_columnconfigure(1, weight=1)
-            if item.item_type == "week":
+            has_badge = item.item_type == "week"
+            if has_badge:
                 ctk.CTkLabel(
                     title_cell,
                     text="WT",
@@ -295,9 +329,12 @@ class AllItemsScreen(ctk.CTkFrame):
                     text_color=palette["on_strong"],
                     font=ctk.CTkFont(size=11, weight="bold"),
                 ).grid(row=0, column=0, padx=(0, 6), sticky="w")
+            # The badge (28) and its gap (6) come out of the title's width.
+            title_delta = 34 if has_badge else 0
             title_label = ctk.CTkLabel(
                 title_cell,
-                text=parsed.title,
+                text=self.layout.cell_text("title", parsed.title, title_delta),
+                width=self.layout.cell_width("title", title_delta),
                 anchor="w",
                 text_color=row_text,
                 font=list_row_font()
@@ -305,33 +342,12 @@ class AllItemsScreen(ctk.CTkFrame):
             title_label.grid(row=0, column=1, sticky="ew")
             title_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_item(item_id))
 
-            ctk.CTkLabel(
-                item_frame,
-                text=format_column_text(subsegment_name or "-", limits["subsegment"]),
-                width=max(56, limits["subsegment"] * 8),
-                anchor="w",
-                text_color=row_text,
-                font=list_row_font()
-            ).grid(row=0, column=2, padx=5, pady=5, sticky="w")
-
-            ctk.CTkLabel(
-                item_frame,
-                text=format_column_text(category_name or "-", limits["category"]),
-                width=max(56, limits["category"] * 8),
-                anchor="w",
-                text_color=row_text,
-                font=list_row_font()
-            ).grid(row=0, column=3, padx=5, pady=5, sticky="w")
-
-            # Who
-            ctk.CTkLabel(
-                item_frame,
-                text=format_column_text(item.who, limits["who"]),
-                width=max(52, limits["who"] * 8),
-                text_color=row_text,
-                font=list_row_font(),
-            ).grid(
-                row=0, column=4, padx=5, pady=5)
+            # Every stretching cell follows its column live (LSR-M4).
+            self.layout.add_stretch_cells(
+                item_frame, (title_label, parsed.title, title_delta),
+                {"subsegment": subsegment_name or "-",
+                 "category": category_name or "-", "who": item.who},
+                row_text, list_row_font())
 
             # Start date
             start_text = item.start_date or "-"
@@ -399,14 +415,12 @@ class AllItemsScreen(ctk.CTkFrame):
                 factors_frame = ctk.CTkFrame(
                     item_frame, fg_color="transparent")
                 factors_frame.grid(row=0, column=9, padx=5, pady=5)
-                columns = [
-                    ("G", item.group, 120),
-                    ("C", item.category, 120),
-                    ("I", item.importance, 40),
-                    ("U", item.urgency, 40),
-                    ("E", item.size, 40),
-                    ("V", item.value, 40),
-                ]
+                columns = list(zip(
+                    ("G", "C", "I", "U", "E", "V"),
+                    (item.group, item.category, item.importance, item.urgency,
+                     item.size, item.value),
+                    FACTOR_CHIP_WIDTHS,
+                ))
                 # PCC-M4 -- a critical factor chip takes the Any Critical level
                 # colour, the same scheme the Priority cell carries. Asked once
                 # per row, not once per chip.

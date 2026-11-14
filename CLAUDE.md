@@ -27,7 +27,7 @@ pytest --cov=src/getmoredone                   # With coverage
 # interrupt a loop inside Tk (pytest-timeout is in requirements-dev.txt).
 pytest <files> -x --timeout=60 --timeout-method=thread
 
-# 25 tests build a real on-screen window and take keyboard focus: the
+# 28 tests build a real on-screen window and take keyboard focus: the
 # geometry checks, and the ones that drive real Tk button events. The count is
 # asserted against the suite by tests/test_ci_contract.py, so it cannot drift.
 # Skip them while working on the machine. CI never sets this.

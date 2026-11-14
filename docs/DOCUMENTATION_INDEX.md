@@ -286,6 +286,15 @@ decisions W1 to W8 (what counts as free, unread and closed days, one read for
 the week). **Approved and built 2026-11-13**; walk owed, in
 `docs/unused-docs/changes/2026-11-13-cip-week.md`.
 
+### docs/unused-docs/implementation_plan_2026-11-13_resizable_list_layouts.md
+
+Implementation plan for resizable list layouts (LSR-M1 to M12): Today,
+Upcoming, All Items and Hierarchical share their width out to Title,
+SubSegment, Category and Who, with pinned headers and drag dividers. Holds
+decisions D1 to D9 and the changes made while building (no window minsize;
+the toolbar wraps to a second row). **Approved and built 2026-11-13**; walk
+owed, in `docs/unused-docs/changes/2026-11-13-lsr.md`.
+
 ### docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md
 
 Implementation plan for exporting a planned day to Google Calendar

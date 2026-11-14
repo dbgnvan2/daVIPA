@@ -22,9 +22,12 @@ from ..theme import apply_segment_accent, semantic_colors, button_style, list_ro
 from .title_format import (
     split_action_item_title,
     format_column_text,
-    responsive_column_chars,
     CONTACT_COL_CHARS,
 )
+from .item_list_columns import FixedColumn, ItemListLayout, ToolbarWrap
+
+# Each tree level indents its title this far, inside the title column.
+INDENT_PX = 30
 
 if TYPE_CHECKING:
     from ..db_manager import DatabaseManager
@@ -33,6 +36,8 @@ if TYPE_CHECKING:
 
 class HierarchicalScreen(ctk.CTkFrame):
     """Screen showing action items in hierarchical tree view."""
+
+    COLUMN_PREFIX = "hierarchical"
 
     def __init__(self, parent, db_manager: 'DatabaseManager', app: 'GetMoreDoneApp'):
         super().__init__(parent)
@@ -52,16 +57,29 @@ class HierarchicalScreen(ctk.CTkFrame):
         self.palette = semantic_colors()
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        # Row 0 = toolbar, row 1 = pinned column header, row 2 = the tree.
+        self.grid_rowconfigure(2, weight=1)
 
         # Create header
         self.create_header()
 
+        # LSR-M1/M2/M7: a pinned column header with dividers, and one
+        # column layout for it and every row at every depth (LSR-M8).
+        self.layout = ItemListLayout(
+            self, self.settings, self.COLUMN_PREFIX, first_col=0, title_default=320)
+        self.layout.set_columns([], [
+            FixedColumn(4, "Pri", SCORE_CELL_WIDTH_PX),
+            FixedColumn(5, "Due", 110),
+            FixedColumn(6, "Sub-items", 70),
+        ])
+        self.column_header = None
+
         # Create scrollable frame for items
         self.scroll_frame = ctk.CTkScrollableFrame(self, label_text="")
         self.scroll_frame.grid(
-            row=1, column=0, sticky="nsew", padx=10, pady=10)
+            row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.scroll_frame.grid_columnconfigure(0, weight=1)
+        self.layout.bind(self.scroll_frame)
 
         # Load items
         self.refresh()
@@ -70,7 +88,6 @@ class HierarchicalScreen(ctk.CTkFrame):
         """Create header with controls."""
         header = ctk.CTkFrame(self)
         header.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
-        header.grid_columnconfigure(3, weight=1)
 
         # Title
         title = ctk.CTkLabel(
@@ -121,11 +138,27 @@ class HierarchicalScreen(ctk.CTkFrame):
             command=self.create_new_item
         )
         btn_new.grid(row=0, column=6, padx=10, pady=10)
+        self.toolbar_wrap = ToolbarWrap(header, self.search_entry, 1, 3)
 
     def perform_search(self):
         """Perform search and update the view."""
         self.search_query = self.search_entry.get().strip()
         self.refresh()
+
+    def _build_column_header(self):
+        """The pinned column headings, over the same columns as the rows (LSR-M7)."""
+        if self.column_header is not None:
+            self.column_header.destroy()
+        hdr = self.layout.build_header(
+            self,
+            {"title": "Title", "subsegment": "SubSegment",
+             "category": "Category", "who": "Who"},
+            fg_color=self.palette["surface_subtle"],
+            border_color=self.palette["border"],
+        )
+        # padx 15 = the list's outer padx (10) + each row's padx (5).
+        hdr.grid(row=1, column=0, sticky="ew", padx=15, pady=(10, 4))
+        self.column_header = hdr
 
     def refresh(self):
         """Refresh the hierarchical list."""
@@ -137,6 +170,8 @@ class HierarchicalScreen(ctk.CTkFrame):
         # Clear current items
         for widget in self.scroll_frame.winfo_children():
             widget.destroy()
+        self.layout.clear_rows()
+        self._build_column_header()
 
         # Refresh VSP segment color cache
         self.segment_colors_by_id = self.app.vps_manager.get_segment_colors_by_id()
@@ -202,8 +237,9 @@ class HierarchicalScreen(ctk.CTkFrame):
         """
         # Create item row
         item_frame = self.create_item_row(item, indent_level)
-        item_frame.grid(row=row, column=0, sticky="ew", pady=2,
-                        padx=(indent_level * 30 + 5, 5))
+        # Every depth starts at the same x, so its columns line up with the
+        # header's; the indent is inside the title cell (LSR-M8).
+        item_frame.grid(row=row, column=0, sticky="ew", pady=2, padx=5)
         row += 1
 
         # Get and display children
@@ -238,8 +274,7 @@ class HierarchicalScreen(ctk.CTkFrame):
         row_text = fill.text_color or palette["row_text"]
         frame = ctk.CTkFrame(self.scroll_frame, fg_color=bg_color)
         apply_segment_accent(frame, segment_color)
-        frame.grid_columnconfigure(0, weight=1)
-        limits = responsive_column_chars(max(self.winfo_width(), self.scroll_frame.winfo_width()))
+        self.layout.apply_grid(frame)
         parsed = split_action_item_title(item.title)
         _segment_name, subsegment_name, category_name = lineage_for_item(
             item,
@@ -249,8 +284,8 @@ class HierarchicalScreen(ctk.CTkFrame):
             self._week_action_segment_cache,
         )
 
-        # Calculate left padding for indentation
-        indent_padding = (indent_level * 30, 5)
+        # The indent comes out of the title's own width (LSR-M8).
+        indent = indent_level * INDENT_PX
 
         # Title with indentation indicator for child rows.
         title_text = parsed.title
@@ -262,44 +297,26 @@ class HierarchicalScreen(ctk.CTkFrame):
             indicator = "└─ "
             title_text = indicator + title_text
 
+        # The row font, not a fixed size-14 Courier: the text budget is
+        # counted at the row font's character width.
         title_label = ctk.CTkLabel(
             frame,
-            text=title_text,
-            font=ctk.CTkFont(
-                size=14, family="Courier" if indent_level > 0 else None),
+            text=self.layout.cell_text("title", title_text, indent),
+            width=self.layout.cell_width("title", indent),
+            font=list_row_font(),
             anchor="w",
             text_color=row_text,
         )
-        title_label.grid(row=0, column=0, sticky="ew",
-                         padx=indent_padding, pady=5)
+        title_label.grid(row=0, column=0, sticky="w",
+                         padx=(5 + indent, 5), pady=5)
         title_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_item(item_id))
 
-        ctk.CTkLabel(
-            frame,
-            text=format_column_text(subsegment_name or "-", limits["subsegment"]),
-            width=max(56, limits["subsegment"] * 8),
-            anchor="w",
-            text_color=row_text,
-            font=list_row_font(),
-        ).grid(row=0, column=1, padx=5, pady=5, sticky="w")
-
-        ctk.CTkLabel(
-            frame,
-            text=format_column_text(category_name or "-", limits["category"]),
-            width=max(56, limits["category"] * 8),
-            anchor="w",
-            text_color=row_text,
-            font=list_row_font(),
-        ).grid(row=0, column=2, padx=5, pady=5, sticky="w")
-
-        ctk.CTkLabel(
-            frame,
-            text=format_column_text(item.who, limits["who"]),
-            width=max(52, limits["who"] * 8),
-            anchor="w",
-            text_color=row_text,
-            font=list_row_font(),
-        ).grid(row=0, column=3, padx=5, pady=5, sticky="w")
+        # Every stretching cell follows its column live (LSR-M4).
+        self.layout.add_stretch_cells(
+            frame, (title_label, title_text, indent),
+            {"subsegment": subsegment_name or "-",
+             "category": category_name or "-", "who": item.who},
+            row_text, list_row_font())
 
         # Priority score
         # PCC-M3 -- the Priority cell's background is the priority colour

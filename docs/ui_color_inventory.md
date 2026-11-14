@@ -31,7 +31,7 @@ rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkg
 - Named colors (match count): **629**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
-- Widget explicit overrides (line count): **522**
+- Widget explicit overrides (line count): **519**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -46,17 +46,17 @@ and theme_files line counts.
 | `theme_api` | 2 |
 | `theme_files` | 1292 |
 | `tuples` | 2 |
-| `widget` | 522 |
+| `widget` | 519 |
 
 Widget override property breakdown:
 
 | Property | Count |
 |---|---:|
-| `border_color` | 15 |
+| `border_color` | 19 |
 | `corner_radius` | 58 |
-| `fg_color` | 239 |
+| `fg_color` | 243 |
 | `hover_color` | 2 |
-| `text_color` | 213 |
+| `text_color` | 202 |
 
 AppSettings persisted color/theme fields:
 
@@ -70,22 +70,22 @@ src/getmoredone/app_settings.py:93:    priority_level_color_any_high: str = "#FE
 src/getmoredone/app_settings.py:94:    priority_level_color_no_high_or_critical: str = ""
 src/getmoredone/app_settings.py:136:    # Drag Schedule date box text color (hex)
 src/getmoredone/app_settings.py:137:    drag_schedule_date_text_color: str = "#FFFFFF"
-src/getmoredone/app_settings.py:331:                settings.appearance_mode = cls._normalize_appearance_mode(
-src/getmoredone/app_settings.py:332:                    settings.appearance_mode)
-src/getmoredone/app_settings.py:333:                settings.theme_name = cls._normalize_theme_name(
-src/getmoredone/app_settings.py:334:                    settings.theme_name)
-src/getmoredone/app_settings.py:467:        self.appearance_mode = self._normalize_appearance_mode(
-src/getmoredone/app_settings.py:468:            self.appearance_mode)
-src/getmoredone/app_settings.py:469:        self.theme_name = self._normalize_theme_name(self.theme_name)
-src/getmoredone/app_settings.py:676:        _normalize_theme_name defers its import for the same reason.
-src/getmoredone/app_settings.py:746:    def _normalize_appearance_mode(value: Optional[str]) -> str:
-src/getmoredone/app_settings.py:752:    def _normalize_theme_name(value: Optional[str]) -> str:
-src/getmoredone/app_settings.py:753:        """Coerce a persisted theme name, using theme.py's list and no other.
-src/getmoredone/app_settings.py:755:        This held a SECOND hardcoded copy of the theme names. Adding a theme to
-src/getmoredone/app_settings.py:758:        load, because the new name was not in the copy. Picking a new theme
-src/getmoredone/app_settings.py:761:        Imported inside the function: theme.py pulls in customtkinter, and
-src/getmoredone/app_settings.py:765:        from .theme import normalize_theme_name
-src/getmoredone/app_settings.py:767:        return normalize_theme_name(value)
+src/getmoredone/app_settings.py:335:                settings.appearance_mode = cls._normalize_appearance_mode(
+src/getmoredone/app_settings.py:336:                    settings.appearance_mode)
+src/getmoredone/app_settings.py:337:                settings.theme_name = cls._normalize_theme_name(
+src/getmoredone/app_settings.py:338:                    settings.theme_name)
+src/getmoredone/app_settings.py:471:        self.appearance_mode = self._normalize_appearance_mode(
+src/getmoredone/app_settings.py:472:            self.appearance_mode)
+src/getmoredone/app_settings.py:473:        self.theme_name = self._normalize_theme_name(self.theme_name)
+src/getmoredone/app_settings.py:680:        _normalize_theme_name defers its import for the same reason.
+src/getmoredone/app_settings.py:750:    def _normalize_appearance_mode(value: Optional[str]) -> str:
+src/getmoredone/app_settings.py:756:    def _normalize_theme_name(value: Optional[str]) -> str:
+src/getmoredone/app_settings.py:757:        """Coerce a persisted theme name, using theme.py's list and no other.
+src/getmoredone/app_settings.py:759:        This held a SECOND hardcoded copy of the theme names. Adding a theme to
+src/getmoredone/app_settings.py:762:        load, because the new name was not in the copy. Picking a new theme
+src/getmoredone/app_settings.py:765:        Imported inside the function: theme.py pulls in customtkinter, and
+src/getmoredone/app_settings.py:769:        from .theme import normalize_theme_name
+src/getmoredone/app_settings.py:771:        return normalize_theme_name(value)
 ```
 
 Hex top values (20 of 231 distinct):
@@ -2662,7 +2662,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/column_resize.py:280` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
+| `src/getmoredone/screens/column_resize.py:285` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
 | `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
 | `src/getmoredone/theme.py:119` | `"chip_bg": "gray30",` |
 
@@ -2940,7 +2940,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/column_resize.py:280` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
+| `src/getmoredone/screens/column_resize.py:285` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
 | `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
 | `themes/apple_grey.json:286` | `"gray70",` |
 | `themes/base_dark_blue.json:117` | `"unselected_hover_color": ["gray70", "gray41"],` |

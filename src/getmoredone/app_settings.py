@@ -153,6 +153,10 @@ class AppSettings:
     # under ``today_col_widths``. It inherits the Today list, so without its
     # own key, resizing either panel would move the other.
     week_actions_col_widths: dict = field(default_factory=dict)
+    # LSR-D6 — the other three item lists each keep their own column shape.
+    upcoming_col_widths: dict = field(default_factory=dict)
+    all_items_col_widths: dict = field(default_factory=dict)
+    hierarchical_col_widths: dict = field(default_factory=dict)
 
     # UPD-D4 — where a two-panel VSP tab's vertical divider was left. The same
     # class of state as a column width, and stored the same way: one field per

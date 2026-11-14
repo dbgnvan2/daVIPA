@@ -4,8 +4,34 @@ Request (2026-11-13): "For the layouts for Today, Upcoming, All items,
 Hierarchical - make them so all items resize as the user changes the height or
 width of the whole screen or any resizable panels."
 
-Status: **plan, awaiting approval.** No code written. Tier: Full (`src/`), one
-cold pass at least (CLAUDE.md *Review sweeps*).
+Status: **built 2026-11-13, D1-D7 approved as defaults, then D2/D7 changed
+(below).** Tier: Full (`src/`), one cold pass at least (CLAUDE.md *Review
+sweeps*). The eight tests that need a mapped window (M2b, M10 x2, four
+screens each) have not run locally; CI runs them.
+
+## Changes from this plan, made while building
+
+- **D2/D7, window minsize dropped; the toolbar wraps.** A minsize that holds
+  Upcoming's toolbar on one row is about 1310 px, wider than the 1200 px default
+  window. Decided 2026-11-13, options A and C: no window minsize. The search
+  entry shrinks first (to 120 px). Below that, the controls right of each
+  toolbar's spacer column move to a second row (`ToolbarWrap`), and below two
+  rows the toolbar clips. M10 is now
+  `TR::test_lsrm10_search_gives_up_width_before_buttons` **(m)**,
+  `TR::test_lsrm10_toolbar_wraps_its_right_hand_group`,
+  `TR::test_lsrm10_narrow_window_wraps_and_nothing_clips` **(m)**.
+- **D8 debounce:** a 120 ms trailing delay after the last `<Configure>`, not
+  one fit per idle. One fit over 500 All Items rows takes about 1 s of
+  reconfiguring and 2.3 s of relayout, so fitting on every idle of an edge
+  drag would freeze the window.
+- **M6** uses 100 rows, not 500: building 500 rows takes about 20 s.
+- **Hierarchical** child titles use `list_row_font()`. The hard-coded
+  `size=14, family="Courier"` listed below as an adjacent issue is fixed,
+  because the title column's character budget depends on the row font.
+- **Character width** scales with `LIST_ROW_FONT_SIZE` (`row_char_px`), not a
+  flat `CHAR_PX = 8`.
+- **Mapped-window count** is 28 (was 25): two mapped test functions for M10
+  and one for M2b.
 
 ## What is there now (review)
 

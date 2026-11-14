@@ -33,10 +33,16 @@ from ..utils.icon_loader import IconLoader
 from .title_format import (
     split_action_item_title,
     format_column_text,
-    responsive_column_chars,
     CONTACT_COL_CHARS,
 )
-from .column_resize import ColumnResizer, ColumnSpec
+from .item_list_columns import (
+    ToolbarWrap,
+    FACTOR_CHIP_WIDTHS,
+    FixedColumn,
+    ItemListLayout,
+    factors_column,
+    timer_column,
+)
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
@@ -94,15 +100,12 @@ class TodayScreen(ctk.CTkFrame):
         self.show_top_3_only = False  # Track Top 3 mode
         self.search_query = ""  # Track search query
         self.palette = semantic_colors()
-        # Resizable Title column (shared spreadsheet-style resizer). Today only
-        # makes the Title column resizable; the rest keep responsive widths.
-        self.resizer = ColumnResizer(
-            owner=self,
-            settings=self.settings,
-            prefix=self.COLUMN_PREFIX,
-            set_cell_width=False,  # title label sits inside a sub-frame
-            specs=[ColumnSpec("title", grid_col=1, default_width=260, min_width=120)],
-        )
+        # LSR-M1/M2: Title, SubSegment, Category and Who stretch with the
+        # list and take a drag divider each; the rest hold fixed widths.
+        self.layout = ItemListLayout(
+            self, self.settings, self.COLUMN_PREFIX, first_col=1, title_default=260)
+        self.resizer = self.layout.resizer
+        self._set_list_columns()
 
         self.grid_columnconfigure(0, weight=1)
         # Row 0 = toolbar, row 1 = pinned column header, row 2 = scrolling list
@@ -120,6 +123,7 @@ class TodayScreen(ctk.CTkFrame):
         self.scroll_frame.grid(
             row=2, column=0, sticky="nsew", padx=20, pady=(0, 20))
         self.scroll_frame.grid_columnconfigure(0, weight=1)
+        self.layout.bind(self.scroll_frame)
 
         # Build the pinned header, then load items
         self._build_column_header()
@@ -136,7 +140,6 @@ class TodayScreen(ctk.CTkFrame):
         """
         header_frame = ctk.CTkFrame(parent, fg_color="transparent")
         header_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
-        header_frame.grid_columnconfigure(5, weight=1)
         self.toolbar_frame = header_frame
 
         ctk.CTkLabel(
@@ -203,52 +206,39 @@ class TodayScreen(ctk.CTkFrame):
             command=self.refresh
         )
         btn_refresh.grid(row=0, column=7, padx=5)
+        self.toolbar_wrap = ToolbarWrap(header_frame, self.search_entry, 1, 5)
+
+    def _set_list_columns(self):
+        """The fixed columns either side of the stretching ones (LSR-M1)."""
+        btn_col = 10 if self.columns_expanded else 9
+        fixed = [
+            FixedColumn(5, "Start", 60),
+            FixedColumn(6, "Due", 60),
+            FixedColumn(7, "Pri", SCORE_CELL_WIDTH_PX),
+            FixedColumn(8, "Time", 50),
+        ]
+        if self.columns_expanded:
+            fixed.append(factors_column(9))
+        fixed.append(timer_column(btn_col))
+        self.layout.set_columns(
+            [FixedColumn(0, "", self.COL0_WIDTH, pad_px=0)], fixed)
 
     def _build_column_header(self):
-        """Build the pinned column-heading row with a draggable Title divider."""
+        """Build the pinned column-heading row with draggable dividers."""
         if self.column_header is not None:
             self.column_header.destroy()
-
-        limits = responsive_column_chars(max(self.winfo_width(), 1))
-        header_font = ctk.CTkFont(size=12, weight="bold")
-
-        hdr = ctk.CTkFrame(self, fg_color=self.palette["surface_subtle"])
+        hdr = self.layout.build_header(
+            self,
+            {"title": "Title", "subsegment": "SubSegment",
+             "category": "Category", "who": "Who"},
+            fg_color=self.palette["surface_subtle"],
+            border_color=self.palette["border"],
+        )
         # padx (25) ≈ scroll_frame outer padx (20) + per-row padx (5), so the
         # header columns line up over the scrolled rows below.
         hdr.grid(row=1, column=0, sticky="ew", padx=25, pady=(0, 4))
-        hdr.grid_columnconfigure(0, minsize=self.COL0_WIDTH)
-        self.resizer.apply_grid(hdr)  # Title column minsize
-        hdr.grid_columnconfigure(99, weight=1)
         self.column_header = hdr
-
-        # Column 0 (grip / checkbox / badge) spacer
-        ctk.CTkLabel(hdr, text="", width=self.COL0_WIDTH).grid(
-            row=0, column=0, padx=5, pady=4)
-
-        # Title header cell + draggable divider (managed by the shared resizer)
-        self._header_title_label = ctk.CTkLabel(
-            hdr, text="Title", width=self.resizer.width("title"),
-            anchor="w", font=header_font)
-        self._header_title_label.grid(
-            row=0, column=1, sticky="w", padx=5, pady=4)
-        self.resizer.build_dividers(
-            hdr, {"title": self._header_title_label},
-            fg_color=self.palette["border"])
-
-        # Remaining column headers — widths match create_item_row()
-        header_cols = [
-            ("SubSegment", max(56, limits["subsegment"] * 8)),
-            ("Category", max(56, limits["category"] * 8)),
-            ("Who", max(52, limits["who"] * 8)),
-            ("Start", 60),
-            ("Due", 60),
-            ("Pri", 60),
-            ("Time", 50),
-        ]
-        for idx, (text, width) in enumerate(header_cols, start=2):
-            ctk.CTkLabel(
-                hdr, text=text, width=width, anchor="w", font=header_font
-            ).grid(row=0, column=idx, padx=5, pady=4, sticky="w")
+        self._header_title_label = self.layout.header_labels["title"]
 
     def perform_search(self):
         """Perform search and update the view."""
@@ -260,6 +250,8 @@ class TodayScreen(ctk.CTkFrame):
         self.columns_expanded = not self.columns_expanded
         self.expand_collapse_btn.configure(
             text="Expand" if not self.columns_expanded else "Collapse")
+        self._set_list_columns()
+        self._build_column_header()
         self.load_items()
 
     def toggle_top3(self):
@@ -284,7 +276,7 @@ class TodayScreen(ctk.CTkFrame):
         # Clear existing items
         for widget in self.scroll_frame.winfo_children():
             widget.destroy()
-        self.resizer.clear_rows()
+        self.layout.clear_rows()
 
         # Get today's items (start_date <= today, includes completed)
         items = self.get_todays_items()
@@ -493,12 +485,8 @@ class TodayScreen(ctk.CTkFrame):
 
         frame = ctk.CTkFrame(self.scroll_frame, fg_color=bg_color)
         apply_segment_accent(frame, segment_color)
-        # Fixed, resizable Title column (col 1); slack goes to a trailing spacer
-        # so the row still fills width and leading columns stay aligned.
-        frame.grid_columnconfigure(0, minsize=self.COL0_WIDTH)
-        frame.grid_columnconfigure(1, minsize=self.resizer.width("title"), weight=0)
-        frame.grid_columnconfigure(99, weight=1)
-        limits = responsive_column_chars(max(self.winfo_width(), self.scroll_frame.winfo_width()))
+        # Every column at the header's width; slack goes to a trailing spacer.
+        self.layout.apply_grid(frame)
         parsed = split_action_item_title(item.title)
         _segment_name, subsegment_name, category_name = lineage_for_item(
             item,
@@ -578,10 +566,12 @@ class TodayScreen(ctk.CTkFrame):
                 text_color=palette["on_strong"],
                 font=ctk.CTkFont(size=11, weight="bold"),
             ).grid(row=0, column=0, padx=(0, 6), sticky="w")
-        title_reserve = 4 if has_badge else 0
+        # The badge (28) and its gap (6) come out of the title's own width.
+        title_delta = 34 if has_badge else 0
         title_label = ctk.CTkLabel(
             title_cell,
-            text=self.resizer.cell_text("title", parsed.title, title_reserve),
+            text=self.layout.cell_text("title", parsed.title, title_delta),
+            width=self.layout.cell_width("title", title_delta),
             font=list_row_font(),
             anchor="w",
             text_color=row_text
@@ -589,37 +579,13 @@ class TodayScreen(ctk.CTkFrame):
         title_label.grid(row=0, column=1, sticky="ew")
         title_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_item(item_id))
 
-        # Register the title cell for live resizing (shared ColumnResizer)
         frame.item = item
-        self.resizer.register_row(frame, [("title", title_label, parsed.title, title_reserve)])
-
-        ctk.CTkLabel(
-            frame,
-            text=format_column_text(subsegment_name or "-", limits["subsegment"]),
-            width=max(56, limits["subsegment"] * 8),
-            anchor="w",
-            text_color=row_text,
-            font=list_row_font(),
-        ).grid(row=0, column=2, padx=5, pady=5, sticky="w")
-
-        ctk.CTkLabel(
-            frame,
-            text=format_column_text(category_name or "-", limits["category"]),
-            width=max(56, limits["category"] * 8),
-            anchor="w",
-            text_color=row_text,
-            font=list_row_font(),
-        ).grid(row=0, column=3, padx=5, pady=5, sticky="w")
-
-        # Who
-        ctk.CTkLabel(
-            frame,
-            text=format_column_text(item.who, limits["who"]),
-            width=max(52, limits["who"] * 8),
-            anchor="w",
-            text_color=row_text,
-            font=list_row_font(),
-        ).grid(row=0, column=4, padx=5, pady=5, sticky="w")
+        # Every stretching cell follows its column live (LSR-M4).
+        self.layout.add_stretch_cells(
+            frame, (title_label, parsed.title, title_delta),
+            {"subsegment": subsegment_name or "-",
+             "category": category_name or "-", "who": item.who},
+            row_text, list_row_font())
 
         # Start Date
         start_date_text = item.start_date if item.start_date else "-"
@@ -687,14 +653,12 @@ class TodayScreen(ctk.CTkFrame):
         factors_frame = ctk.CTkFrame(frame, fg_color="transparent")
         if self.columns_expanded:
             factors_frame.grid(row=0, column=9, padx=5, pady=5)
-            columns = [
-                ("G", item.group, 120),
-                ("C", item.category, 120),
-                ("I", item.importance, 40),
-                ("U", item.urgency, 40),
-                ("E", item.size, 40),
-                ("V", item.value, 40),
-            ]
+            columns = list(zip(
+                ("G", "C", "I", "U", "E", "V"),
+                (item.group, item.category, item.importance, item.urgency,
+                 item.size, item.value),
+                FACTOR_CHIP_WIDTHS,
+            ))
             # PCC-M4 -- a critical factor chip takes the Any Critical level
             # colour, the same scheme the Priority cell carries. Asked once
             # per row, not once per chip.
