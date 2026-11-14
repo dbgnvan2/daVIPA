@@ -662,3 +662,78 @@ def test_lsr2m8_date_cells_have_no_prefix(make, name):
     for key, label, full, _reserve, _delta in cells:
         assert full == want, f"{name}: {key} full text {full!r}"
         assert label.cget("text") == want
+
+
+# ------------------------------------------------------------ LSR2 sweep fixes
+
+def _partly_floored(layout):
+    """A list width at which some resizable columns are at the floor and some not."""
+    for width in range(1500, 0, -10):
+        layout.fit(width)
+        at_floor = [k for k in layout.keys if layout.width(k) == _floor()]
+        if at_floor and len(at_floor) < len(layout.keys):
+            return width
+    raise AssertionError("no width leaves the list partly floored")
+
+
+@pytest.mark.parametrize("name", ("today", "all_items"))
+def test_lsr2m4b_a_drag_changes_only_its_own_weight(make, name):
+    """LSR2-M4 — a click changes nothing; a drag changes only its column's weight.
+
+    Found by the csdp sweep (2026-11-14): a release wrote every drawn width
+    into the weights, so columns held at the floor took the floor as their
+    shape, and that was saved.
+    """
+    _root, screen = make(name)
+    layout = screen.layout
+    resizer = layout.resizer
+    layout.fit(1600)
+    wide = {k: layout.width(k) for k in layout.keys}
+    _partly_floored(layout)
+    weights = dict(resizer._weights)
+
+    resizer._on_start(SimpleNamespace(x_root=500), "title")
+    resizer._on_stop(SimpleNamespace(x_root=500), "title")
+    assert resizer._weights == weights, "a click with no motion moved the weights"
+    layout.fit(1600)
+    assert {k: layout.width(k) for k in layout.keys} == wide
+
+    _partly_floored(layout)
+    resizer._on_start(SimpleNamespace(x_root=500), "title")
+    resizer._on_drag(SimpleNamespace(x_root=540), "title")
+    resizer._on_stop(SimpleNamespace(x_root=540), "title")
+    assert resizer._weights["title"] > weights["title"]
+    assert {k: v for k, v in resizer._weights.items() if k != "title"} == {
+        k: v for k, v in weights.items() if k != "title"}
+
+
+@pytest.mark.parametrize("name", SCREENS)
+def test_lsr2_headings_are_cut_to_their_column(make, name):
+    """A heading wider than its column is cut with "...", and comes back whole.
+
+    Found by the csdp sweep (2026-11-14): a label grows to fit its text, so
+    an uncut heading pushed every heading after it off its rows.
+    """
+    _root, screen = make(name)
+    layout = screen.layout
+    labels = screen.layout.header_labels
+    layout.fit(1)
+    # 54px at 8px a character (bold 12) leaves 6 characters.
+    for key in layout.keys:
+        assert len(labels[key].cget("text")) <= 6, f"{name}: {key}"
+    if name == "all_items":
+        assert labels["pri"].cget("text") == "Pri..."
+        layout.fit(2400)
+        assert labels["pri"].cget("text") == "Priority"
+    if name == "hierarchical":
+        assert labels["subitems"].cget("text") == "Sub..."
+        layout.fit(2400)
+        assert labels["subitems"].cget("text") == "Sub-items"
+
+
+def test_lsr2_hierarchical_due_has_no_prefix(make):
+    """Hierarchical's Due cell holds the date alone (LSR2 sweep)."""
+    _root, screen = make("hierarchical")
+    cells = [c for _f, cells in _rows(screen.layout) for c in cells if c[0] == "due"]
+    assert cells
+    assert {full for _k, _l, full, *_ in cells} == {date.today().isoformat()}

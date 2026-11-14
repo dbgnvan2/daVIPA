@@ -98,7 +98,8 @@ def test_persist_round_trips_over_dirty_state():
     r = _resizer(settings)
     assert r.width("title") == 150
 
-    r._widths["title"] = 400
+    # LSR2-D8: what is saved is the weights, which load back as weights.
+    r._weights["title"] = 400
     r._persist()
 
     assert settings.saved == 1
