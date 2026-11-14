@@ -265,7 +265,7 @@ def test_cipm61_the_day_buttons_are_refused_in_the_week(screen, manager, root):
     screen.add_padding_block(BlockType.BUFFER)
     screen.autoload_day()
     assert manager.get_time_blocks(THURSDAY) == []
-    assert screen.status_label.cget("text") == "The week is read-only — click a day to plan it"
+    assert screen.status_label.cget("text") == "In the week, only an Action Item can be dropped — click a day to plan it"
 
     screen.view_toggle.set("Day")
     screen.set_view_mode("Day")
@@ -334,7 +334,7 @@ def test_cipm61_the_export_is_refused_in_the_week(screen, root):
     assert screen.btn_export_calendar.cget("state") == "disabled"
     screen.export_day_to_calendar()
     assert not getattr(screen, "_export_running", False)
-    assert screen.status_label.cget("text") == "The week is read-only — click a day to plan it"
+    assert screen.status_label.cget("text") == "In the week, only an Action Item can be dropped — click a day to plan it"
 
 
 def test_cipm61_leaving_the_week_mid_export_keeps_the_export_disabled(screen, root):
@@ -513,11 +513,14 @@ def test_cipm65_the_refusal_reads_the_boxs_date(screen, manager, root, monkeypat
     item = _item(manager, "Twice")
     _block(manager, 2, block_date=FRIDAY, block_type=BlockType.ITEM, item_id=item.id, label=item.title)
     _week(screen, root)
-    _run_idle(screen, root, monkeypatch)
+    queued = []
+    monkeypatch.setattr(screen, "after_idle", queued.append)
     _pointer_on_box(screen, monkeypatch, (FRIDAY, TEN))
 
     _drop(screen, root, item)
 
+    # Refused before the write is queued, from Friday's own blocks.
+    assert queued == []
     assert len([b for b in manager.get_time_blocks(FRIDAY) if b.item_id == item.id]) == 1
     assert screen.status_label.cget("text").startswith("Twice is already in a Time Block")
 
@@ -608,3 +611,43 @@ def test_cipm65_the_box_under_the_pointer_is_outlined(screen, root, monkeypatch)
     screen.update_hover_target()
 
     assert screen._drag_hover_frame is screen._week_boxes[(FRIDAY, TEN)][0]
+
+
+def test_cipm65_a_non_work_note_names_the_boxs_date(screen, manager, root, monkeypatch):
+    """Sweep -- the note for a question that could not be asked names the dropped date."""
+    from src.getmoredone.screens import plan as plan_module
+
+    def refuse(*_args, **_kwargs):
+        raise plan_module.tk.TclError("no dialog here")
+
+    monkeypatch.setattr(plan_module.messagebox, "askyesno", refuse)
+    _fresh(manager)
+    item = _item(manager, "Saturday note")
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, (SATURDAY, TEN))
+
+    _drop(screen, root, item)
+
+    assert screen.status_label.cget("text").endswith(
+        f"— {SATURDAY} is not a regular work day (Day Settings allows "
+        "Mon, Tue, Wed, Thu, Fri)"
+    )
+
+
+def test_cipm65_a_date_with_unplaced_blocks_is_refused(screen, manager, root, monkeypatch):
+    """Sweep -- a date never opened may hold blocks the day has not yet given a box."""
+    _fresh(manager)
+    _boxless_block(manager, FRIDAY)
+    item = _item(manager, "Too early")
+    _week(screen, root)
+    queued = []
+    monkeypatch.setattr(screen, "after_idle", queued.append)
+    _pointer_on_box(screen, monkeypatch, (FRIDAY, TEN))
+
+    _drop(screen, root, item)
+
+    assert queued == []
+    assert screen.status_label.cget("text") == (
+        "Open Fri 06 first — 1 block(s) from an earlier version need a box"
+    )
