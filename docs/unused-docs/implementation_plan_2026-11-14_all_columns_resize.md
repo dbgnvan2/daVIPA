@@ -1,8 +1,8 @@
 # Plan: every list column resizes with the window (LSR-2)
 
 - Date: 2026-11-14
-- Status: **approved 2026-11-14 with the default decisions, and built
-  2026-11-14.** The walk below is not yet done.
+- Status: **approved, built and pushed 2026-11-14.** Walked by the user
+  2026-11-14: "all good on the resizing".
 - Screens: Today, Upcoming, All Items, Hierarchical
 - Follows: `implementation_plan_2026-11-13_resizable_list_layouts.md` (LSR)
 
@@ -151,11 +151,11 @@ weights. The new test `test_lsr2m4b` covers the second.
 
 ## Walk checklist (by hand, after the build)
 
-- [ ] On each screen, narrow and widen the window. Every text column changes
+- [x] On each screen, narrow and widen the window. Every text column changes
       width, and the checkbox, Timer and chips do not.
-- [ ] Drag Start's divider, then resize the window. Start keeps its share.
-- [ ] Narrow the window until every column is at 6 characters, then widen it.
+- [x] Drag Start's divider, then resize the window. Start keeps its share.
+- [x] Narrow the window until every column is at 6 characters, then widen it.
       The columns return to the shape they had before.
-- [ ] Near the floor, headings are cut with "..." and stay over their
+- [x] Near the floor, headings are cut with "..." and stay over their
       columns (All Items expanded: Status and Actions headings line up).
-- [ ] Click a divider without dragging, then widen the window: nothing moves.
+- [x] Click a divider without dragging, then widen the window: nothing moves.

@@ -300,8 +300,7 @@ owed, in `docs/unused-docs/changes/2026-11-13-lsr.md`. Extended by LSR2 below.
 Implementation plan for LSR2-M1 to M8: every text column on the four item
 lists resizes with the window, down to 6 characters, with a divider each;
 controls keep their size; a column shape survives a narrow window (D6).
-Holds decisions D1 to D8. **Approved and built 2026-11-14**; walk owed, in
-the plan's checklist.
+Holds decisions D1 to D8. **Approved, built and walked 2026-11-14.**
 
 ### docs/unused-docs/implementation_plan_2026-11-14_scheduler_columns_resize.md
 
