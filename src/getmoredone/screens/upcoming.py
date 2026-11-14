@@ -209,7 +209,8 @@ class UpcomingScreen(ctk.CTkFrame):
             border_color=self.palette["border"],
         )
         # padx 15 = the list's outer padx (10) + each row's padx (5).
-        hdr.grid(row=1, column=0, sticky="ew", padx=15, pady=(10, 4))
+        hdr.grid(row=1, column=0, sticky="ew",
+                 padx=self.layout.header_padx(self.scroll_frame, 10), pady=(10, 4))
         self.column_header = hdr
 
     def refresh(self):

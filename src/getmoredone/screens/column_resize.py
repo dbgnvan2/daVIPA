@@ -78,6 +78,8 @@ class ColumnResizer:
         self._rows = []          # list[(frame, cells)] ; cells: [(key, label, full, reserve, width_delta)]
         self._header = None      # (header_frame, {key: label})
         self._drag = None        # (key, x_root_start, width_start)
+        # Called after a divider drag ends and the widths are saved.
+        self.on_drag_end = None
         # The widths held before a too-narrow panel pinned everything to the
         # floor, so the shape can be given back when the panel is wide enough
         # again. `_widths` is both the rendered width and the weight
@@ -347,6 +349,8 @@ class ColumnResizer:
     def _on_stop(self, event, key) -> None:
         self._drag = None
         self._persist()
+        if self.on_drag_end is not None:
+            self.on_drag_end()
 
     def _apply_live(self, key) -> None:
         """Push the dragged column's new width to the header and every row."""

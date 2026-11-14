@@ -121,7 +121,9 @@ class ToolbarWrap:
         toolbar.grid_columnconfigure(search_col, weight=1, minsize=SEARCH_MIN_PX)
         toolbar.grid_columnconfigure(spacer_col, weight=TOOLBAR_SPACER_WEIGHT)
         entry.grid_configure(sticky="ew")
-        toolbar.bind("<Configure>", self._on_configure, add="+")
+        # CTkFrame.bind would bind its inner canvas, whose events never
+        # name the toolbar; bind the toolbar's own Tk frame.
+        tkinter.Misc.bind(toolbar, "<Configure>", self._on_configure, "+")
 
     def _one_row_placements(self) -> list:
         """(widget, grid options) for every control, as in the one-row layout."""
@@ -232,12 +234,16 @@ class ItemListLayout:
         self._after_id = None
         self._short = False
         self.fit_count = 0
+        # A fit skipped during a drag runs once the divider is let go.
+        self.resizer.on_drag_end = self._on_configure
 
     # ----------------------------------------------------------------- columns
     def set_columns(self, lead, fixed) -> None:
         """The fixed columns before the stretching ones, and after them."""
         self.lead = list(lead)
         self.fixed = list(fixed)
+        if self._measured is not None:
+            self._on_configure()
 
     def grid_col(self, key: str) -> int:
         return self.resizer.specs[key].grid_col
@@ -318,6 +324,18 @@ class ItemListLayout:
         self.header_labels = labels
         return header
 
+    @staticmethod
+    def header_padx(scroll_frame, outer_padx: int) -> tuple:
+        """The header's padx so its columns sit over the scrolled rows.
+
+        A row starts at the scroll frame's own padx, plus the inset at which
+        CTkScrollableFrame grids its canvas (corner radius + border), plus
+        the row's padx of 5.
+        """
+        box = scroll_frame._parent_frame
+        inset = int(box.cget("corner_radius")) + int(box.cget("border_width"))
+        return (outer_padx + inset + ROW_PAD_PX // 2, outer_padx + ROW_PAD_PX // 2)
+
     # ----------------------------------------------------------------- fitting
     def reserved_px(self) -> int:
         """What a row spends on everything but the stretching columns."""
@@ -360,4 +378,4 @@ class ItemListLayout:
             return
         width = widget.winfo_width()
         if width > 1:
-            self.fit(width)
+            self.fit(width / self.owner._get_widget_scaling())

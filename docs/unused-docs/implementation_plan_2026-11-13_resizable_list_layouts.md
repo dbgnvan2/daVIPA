@@ -30,6 +30,11 @@ screens each) have not run locally; CI runs them.
   because the title column's character budget depends on the row font.
 - **Character width** scales with `LIST_ROW_FONT_SIZE` (`row_char_px`), not a
   flat `CHAR_PX = 8`.
+- **Expand/Collapse and a divider release refit** the list, since neither
+  produces a `<Configure>`; the fit converts screen pixels to CTk units; the
+  header's padx includes the scroll frame's inset (sweep fixes, handoff note).
+- **The Plan's Week actions panel** inherits Today's layout, so it has the
+  four stretching columns too.
 - **Mapped-window count** is 28 (was 25): two mapped test functions for M10
   and one for M2b.
 

@@ -234,9 +234,8 @@ class TodayScreen(ctk.CTkFrame):
             fg_color=self.palette["surface_subtle"],
             border_color=self.palette["border"],
         )
-        # padx (25) ≈ scroll_frame outer padx (20) + per-row padx (5), so the
-        # header columns line up over the scrolled rows below.
-        hdr.grid(row=1, column=0, sticky="ew", padx=25, pady=(0, 4))
+        hdr.grid(row=1, column=0, sticky="ew",
+                 padx=self.layout.header_padx(self.scroll_frame, 20), pady=(0, 4))
         self.column_header = hdr
         self._header_title_label = self.layout.header_labels["title"]
 
