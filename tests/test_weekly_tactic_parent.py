@@ -441,15 +441,18 @@ def test_wtpm34_status_filter_unchanged(tmp_path):
 def _tree_rows(screen):
     """[(grid row, indent level)] for every rendered row, in grid order.
 
-    The indent is read back out of the padding the screen gridded the frame
-    with — ``padx=(indent_level * 30 + 5, 5)`` in ``display_item_tree`` — which
-    is the only place the level survives into the widget tree.
+    The indent is read back out of the padding the screen grids each row's
+    title with — ``padx=(5 + indent_level * 30, 5)`` in ``create_item_row``
+    (LSR-M8 moved it there from the row frame) — which is the only place the
+    level survives into the widget tree.
     """
     frames = [c for c in screen.scroll_frame.winfo_children() if c.grid_info()]
     frames.sort(key=lambda c: int(c.grid_info()["row"]))
     out = []
     for frame in frames:
-        left = frame.grid_info()["padx"]
+        title = next(c for c in frame.winfo_children()
+                     if c.grid_info() and str(c.grid_info()["column"]) == "0")
+        left = title.grid_info()["padx"]
         left = int(str(left).strip("() ").split(",")[0]) if not isinstance(left, int) else left
         out.append((frame, (left - 5) // 30))
     return out

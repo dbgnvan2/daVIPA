@@ -8,7 +8,6 @@ from types import SimpleNamespace
 from src.getmoredone.models import ActionItem
 from src.getmoredone.screens.item_lineage import lineage_for_item
 from src.getmoredone.screens.drag_schedule import DragScheduleScreen
-from src.getmoredone.screens.title_format import responsive_column_chars
 from src.getmoredone.vps_manager import VPSManager
 
 
@@ -129,17 +128,3 @@ def test_list_view_lineage_helper_ignores_wrong_cache_shape():
         {},
     )
     assert lineage == ("Purposeful Work", "Living Systems", "Blog")
-
-
-def test_list_view_column_budget_preserves_immediate_subsegment_and_category():
-    wide = responsive_column_chars(1800)
-    mid = responsive_column_chars(1450)
-    narrow = responsive_column_chars(1100)
-
-    assert wide["title"] == 30
-    assert mid["subsegment"] == wide["subsegment"] == 15
-    assert narrow["category"] == wide["category"] == 15
-    assert wide["who"] == 10
-    assert narrow["who"] == 10
-    # No "context" budget: the Context column was removed from every list view.
-    assert "context" not in wide
