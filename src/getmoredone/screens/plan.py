@@ -769,12 +769,13 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         pane's number because the two panes are the same frame around the same
         scrollable frame, so what is not text is the same on both sides.
         """
-        return (
+        day = (
             SLOT_CHECK_WIDTH_PX
             + SLOT_TIME_WIDTH_PX
             + sum(chip_column_minsizes(self.box_title_width()))
-            + ITEMS_TEXT_INSET_PX
         )
+        # CIP-M6.3 -- in the week, its columns' text is the floor if wider.
+        return max(day, self.week_width_need()) + ITEMS_TEXT_INSET_PX
 
     def _clamp_items_width(self, width: int) -> int:
         """``width`` held inside what the two panes each need.

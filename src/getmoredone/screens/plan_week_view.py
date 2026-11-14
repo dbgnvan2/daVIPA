@@ -49,6 +49,8 @@ WEEK_VIEW = "Week"
 WEEK_BOX_HEIGHT_PX = 12
 WEEK_COLUMN_WIDTH_PX = 40
 WEEK_BOX_PAD_PX = 2  # pady=1 above and below each box
+WEEK_COLUMN_PAD_PX = 2  # padx=1 either side of each column
+WEEK_LABEL_PAD_PX = 4  # the time labels' and arrows' padx
 #: What the grid spends on height that is not boxes: the heading row and up
 #: to four lines of totals under each column.
 WEEK_CHROME_HEIGHT_PX = 100
@@ -194,6 +196,8 @@ class PlanWeekViewMixin:
             self.set_status(f"The week could not be read: {error}", "error")
         finally:
             self._flush_redraw()
+        if self._week_error is None:
+            self.fit_week_columns()
         self.maybe_auto_refresh()
 
     def _clear_day_pane(self) -> None:
@@ -321,6 +325,31 @@ class PlanWeekViewMixin:
         return fill
 
     # ----------------------------------------------------------- M6.3 resize
+    def fit_week_columns(self) -> int:
+        """Hold each column at its widest heading or totals text (M6.3).
+
+        Measured after the flush, when the labels have their requested
+        widths. The day pane's floor then follows (``day_width_floor``), so
+        the divider cannot squeeze the week until its text is cut off.
+        Returns the column width set.
+        """
+        texts = list(self._week_headers.values()) + list(self._week_totals.values())
+        column = max([WEEK_COLUMN_WIDTH_PX] + [label.winfo_reqwidth() for label in texts])
+        for index in range(1, WEEK_DAYS + 1):
+            self.blocks_scroll.grid_columnconfigure(index, minsize=column)
+        side = [self.week_back_button] + self._week_hour_labels
+        self._week_width_need = (
+            max(widget.winfo_reqwidth() for widget in side) + WEEK_LABEL_PAD_PX
+            + WEEK_DAYS * (column + WEEK_COLUMN_PAD_PX)
+            + self.week_forward_button.winfo_reqwidth() + WEEK_LABEL_PAD_PX
+        )
+        self.apply_items_width(self._items_width)
+        return column
+
+    def week_width_need(self) -> int:
+        """What the week's grid needs across, or 0 outside the week."""
+        return getattr(self, "_week_width_need", 0) if self._week_mode else 0
+
     def week_box_height(self) -> int:
         """Box height for the pane's visible height, never below the floor."""
         canvas = self._day_canvas()
