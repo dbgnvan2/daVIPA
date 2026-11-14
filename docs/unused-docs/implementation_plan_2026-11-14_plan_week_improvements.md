@@ -174,7 +174,13 @@ longer true. Recorded, not fixed (low):
   (`fit_week_columns`), and in the week `day_width_floor` holds what the
   week needs, so the divider stops before the text is cut. Measured on an
   unmapped screen: totals need 60 px, and the week needs 555 px against the
-  day's 518 px.
+  day's 518 px. Its cold review found that leaving the week kept the
+  narrower items pane, and that the clamp ratcheted down from week to week.
+  Both are fixed: each draw and leaving the week ask for the items setting
+  (`items_col_width`), with a test for each. Recorded, not fixed (low):
+  `fit_week_columns` does not catch the `TclError` a closing window raises,
+  as `_flush_redraw` does, and a column's minsize leaves out its 2 px of
+  label padding.
 - `WEEK_CHROME_HEIGHT_PX` is an estimate.
 - `_week_day_read` treats an unknown date as read.
 - A colour lookup that raises fails the whole week draw.
