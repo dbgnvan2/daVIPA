@@ -332,6 +332,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         # record while it is up, for the automatic read (W6).
         self._week_mode = False
         self._week_fetches: list = []
+        self._week_summaries: list = []
 
         # DatePickerButton calls its on_date_changed from its own __init__,
         # which lands here before the panes it would reload exist. The flag is
@@ -1076,6 +1077,21 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         self._last_repair = None
         self.refresh()
 
+        if self._week_mode:
+            # The week runs no repair and keeps no day grid; it counts what
+            # it drew. Each date is repaired when it is opened as a day.
+            outside = sum(summary.outside for summary in self._week_summaries)
+            if outside:
+                noun = "block" if outside == 1 else "blocks"
+                self.set_status(
+                    f"Day settings saved — {outside} {noun} this week no longer fit"
+                    " the day; open the day to place them",
+                    "warning",
+                )
+            else:
+                self.set_status("Day settings saved", "success")
+            return
+
         # PD-M14.7 -- the redraw may have repaired the open date, or refused
         # to. Said here, or "saved" below would cover it.
         repair_said = repair_status(self._last_repair)
@@ -1477,6 +1493,8 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         toolbar buttons want: they are a click, not a drop, so there is no box
         under a pointer to read.
         """
+        if self.refused_in_week():
+            return None
         if not self._require_block_day():
             return
 
@@ -2101,6 +2119,8 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         is a correction to the approved plan rather than what it said. See that
         method for why.
         """
+        if self.refused_in_week():
+            return None
         if not self._require_block_day():
             return
 
@@ -2236,6 +2256,8 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         transaction's commit gate suppresses -- that gate is what makes the
         rollback real here.
         """
+        if self.refused_in_week():
+            return None
         blocks = self.db_manager.get_time_blocks(self.selected_date)
         mine = [
             block for block in blocks

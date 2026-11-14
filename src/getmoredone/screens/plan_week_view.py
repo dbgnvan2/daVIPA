@@ -42,6 +42,8 @@ DAY_VIEW = "Day"
 WEEK_VIEW = "Week"
 WEEK_BOX_HEIGHT_PX = 12
 WEEK_COLUMN_WIDTH_PX = 64
+#: The header buttons that write to the selected day. Disabled in the week.
+WEEK_LOCKED_BUTTONS = ("btn_clear_day", "btn_autoload", "btn_add_buffer", "btn_add_break")
 
 
 def week_box_colors() -> Dict[str, str]:
@@ -56,20 +58,32 @@ def week_box_colors() -> Dict[str, str]:
 
 
 def column_total_text(summary) -> str:
-    """The two lines under a column (W4, W7, W8)."""
-    meetings = f"Meetings {hours_text(summary.meeting_minutes)}"
+    """The lines under a column (W4, W7, W8), then what no box shows.
+
+    An unread date's meetings are not known, so they are "—", not "0h".
+    """
+    meetings = f"Meetings {hours_text(summary.meeting_minutes if summary.read else None)}"
     if not summary.read:
-        return f"{meetings}\nnot read"
-    if not summary.block_day:
-        return f"{meetings}\nno blocks"
-    return f"{meetings}\nFree {hours_text(summary.free_minutes)}"
+        lines = [meetings, "not read"]
+    elif not summary.block_day:
+        lines = [meetings, "no blocks"]
+    else:
+        lines = [meetings, f"Free {hours_text(summary.free_minutes)}"]
+    # P2 -- a block outside the day and an all-day event hold no box here.
+    if summary.outside:
+        lines.append(f"{summary.outside} outside")
+    if summary.all_day:
+        lines.append(f"{summary.all_day} all-day")
+    return "\n".join(lines)
 
 
 def week_total_text(summaries) -> str:
-    """The summary line: the week's meetings, and free time where it is known."""
-    meetings = sum(summary.meeting_minutes for summary in summaries)
+    """The summary line: meetings and free time, each over the days it is known for."""
+    read = [summary for summary in summaries if summary.read]
+    meetings = sum(summary.meeting_minutes for summary in read)
     known = [summary.free_minutes for summary in summaries if summary.free_minutes is not None]
-    parts = [f"Meetings {hours_text(meetings)}"]
+    parts = [f"Meetings {hours_text(meetings)}"
+             + ("" if len(read) == len(summaries) else f" on {len(read)} of {len(summaries)} days")]
     if known:
         parts.append(f"free {hours_text(sum(known))} on {len(known)} of {len(summaries)} days")
     else:
@@ -88,12 +102,31 @@ class PlanWeekViewMixin:
         self.view_toggle.set(DAY_VIEW)
         self.view_toggle.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="e")
 
+    def refused_in_week(self) -> bool:
+        """The day's write buttons say no while the week is up (CIP sweep, batch 3).
+
+        They place by the day grid and the meetings of the last day drawn,
+        which the week does not rebuild; and which day they would act on is
+        not what the screen shows.
+        """
+        if not getattr(self, "_week_mode", False):
+            return False
+        self.set_status("The week is read-only — click a day to plan it", "muted")
+        return True
+
+    def _set_day_buttons(self, state: str) -> None:
+        for name in WEEK_LOCKED_BUTTONS:
+            button = getattr(self, name, None)
+            if button is not None:
+                button.configure(state=state)
+
     def set_view_mode(self, value: str) -> None:
         week = value == WEEK_VIEW
         if week == self._week_mode:
             return
         if week:
             self._week_mode = True
+            self._set_day_buttons("disabled")
         else:
             self._leave_week()
         self.load_blocks()
@@ -110,6 +143,8 @@ class PlanWeekViewMixin:
     def _leave_week(self) -> None:
         self._week_mode = False
         self._week_fetches = []
+        self._week_summaries = []
+        self._set_day_buttons("normal")
         self.view_toggle.set(DAY_VIEW)
         self.day_heading.configure(text="Day Plan")
         # The week set this to 0 for its narrow columns; the day's one
@@ -127,6 +162,7 @@ class PlanWeekViewMixin:
             self._clear_day_pane()
             summaries, fetches = read_week(self.db_manager, self.selected_date, self.bounds)
             self._week_fetches = fetches
+            self._week_summaries = summaries
             self.day_heading.configure(text="Week Plan")
             self.day_summary.configure(text=week_total_text(summaries))
             self._draw_week_strip(fetches)
@@ -134,6 +170,7 @@ class PlanWeekViewMixin:
         except Exception as error:  # noqa: BLE001 - said, not a blank pane (P2)
             logger.warning("CIP-M6: week from %s unreadable: %s", self.selected_date, error)
             self._week_fetches = []
+            self._week_summaries = []
             self.set_status(f"The week could not be read: {error}", "error")
         finally:
             self._flush_redraw()
@@ -222,4 +259,6 @@ class PlanWeekViewMixin:
             self._week_totals[day] = total
 
     def _bind_open(self, widget, day: str) -> None:
-        widget.bind("<Button-1>", lambda _event, d=day: self.open_day(d))
+        # After the click, not in it: open_day destroys the widget whose
+        # handler is running (the rule ``on_drag_release`` follows).
+        widget.bind("<Button-1>", lambda _event, d=day: self.after_idle(lambda: self.open_day(d)))

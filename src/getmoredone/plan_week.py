@@ -63,6 +63,8 @@ class DaySummary:
     read: bool = True
     block_day: bool = True
     outside: int = 0
+    #: All-day events: they hold no box, so no box can show them.
+    all_day: int = 0
 
     def _minutes(self, kind: str) -> int:
         return sum(SLOT_MINUTES for _, k in self.boxes if k == kind)
@@ -83,7 +85,8 @@ class DaySummary:
         return self._minutes(FREE)
 
 
-def week_summary(day: str, grid: DayGrid, bounds: DayBounds, *, read: bool) -> DaySummary:
+def week_summary(day: str, grid: DayGrid, bounds: DayBounds, *, read: bool,
+                 all_day: int = 0) -> DaySummary:
     """Count one date's grid into a week column."""
     committed = frozenset(grid.committed)
     return DaySummary(
@@ -92,6 +95,7 @@ def week_summary(day: str, grid: DayGrid, bounds: DayBounds, *, read: bool) -> D
         read=read,
         block_day=is_block_day(day, bounds),
         outside=len(grid.outside),
+        all_day=all_day,
     )
 
 
@@ -114,7 +118,8 @@ def read_week(db_manager, first: str, bounds: DayBounds) -> Tuple[List[DaySummar
         commitments = db_manager.get_commitments(day)
         fetch = db_manager.get_commitment_fetch(day)
         grid = build_day_grid(blocks, bounds, committed=committed_slots(commitments, bounds))
-        summaries.append(week_summary(day, grid, bounds, read=is_read(fetch)))
+        all_day = sum(1 for c in commitments if c.is_all_day and not c.dismissed)
+        summaries.append(week_summary(day, grid, bounds, read=is_read(fetch), all_day=all_day))
         fetches.append(fetch)
     return summaries, fetches
 
@@ -135,11 +140,18 @@ def hours_text(minutes: Optional[int]) -> str:
 
 
 def week_age_text(fetches: Sequence[Optional[dict]], age_text) -> Tuple[str, str]:
-    """W7 -- the header line: a failed read, else how many days are unread, else the oldest read."""
-    failed = [fetch for fetch in fetches if fetch and fetch.get("last_error")]
-    if failed:
-        return age_text(failed[0])
+    """W7 -- the header line: a failed read, then a partial one, then unread days, then the oldest read.
+
+    A failure or a warning on any one of the seven is said, with the count of
+    unread days after it, so neither hides the other (CIP sweep, batch 3).
+    """
     unread = sum(1 for fetch in fetches if not is_read(fetch))
+    suffix = f" · {unread} of {len(fetches)} days not read" if unread else ""
+    for field_name in ("last_error", "warning"):
+        flagged = [fetch for fetch in fetches if fetch and fetch.get(field_name)]
+        if flagged:
+            text, kind = age_text(flagged[0])
+            return text + suffix, kind
     if unread:
         return f"Calendar not read for {unread} of {len(fetches)} days — ↻ Calendar reads the week", "muted"
     oldest = min(fetches, key=lambda fetch: str(fetch["fetched_at"]))
