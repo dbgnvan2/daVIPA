@@ -856,3 +856,34 @@ def test_cipm63_at_the_floor_a_title_clears_the_drag_outline(screen, manager, ro
     title = screen._week_titles[(THURSDAY, TEN)]
     inside = box.cget("height") - 2 * wv.DRAG_HOVER_BORDER_PX
     assert title.winfo_reqheight() < inside
+
+
+def test_cipm63_the_floor_is_in_scaled_units():
+    # A 17 px line at 150% is 11⅓ units of line, rounded up to 12.
+    assert wv.week_box_floor(17, 1.5) == 12 + 2 * wv.DRAG_HOVER_BORDER_PX + wv.WEEK_TITLE_MARGIN_PX
+
+
+def test_cipm63_at_150_percent_the_title_scales_and_fits(screen, manager, root, monkeypatch):
+    from customtkinter.windows.widgets.scaling import ScalingTracker
+
+    scaling = 1.5
+    monkeypatch.setattr(ScalingTracker, "widget_scaling", scaling)  # boxes made from here on
+    monkeypatch.setattr(screen, "week_scaling", lambda: scaling)
+    item = _item(manager, LONG_TITLE)
+    _block(manager, TEN, block_type=BlockType.ITEM, item_id=item.id, label=item.title)
+    _week(screen, root)
+    monkeypatch.setattr(screen._day_canvas(), "winfo_height", lambda: 50)
+    screen.fit_week_boxes()
+    root.update_idletasks()
+
+    box, _kind = screen._week_boxes[(THURSDAY, TEN)]
+    title = screen._week_titles[(THURSDAY, TEN)]
+    # Tk reads a font's size back in points, so compare the lines it draws.
+    unscaled = wv.ctk.CTkFont(size=wv.WEEK_TITLE_FONT_SIZE).metrics("linespace")
+    assert abs(title.title_font.metrics("linespace") - unscaled * scaling) <= scaling
+    assert int(title.place_info()["x"]) == round(wv.WEEK_TITLE_INSET_PX * scaling)
+    outline = 2 * wv.DRAG_HOVER_BORDER_PX * scaling
+    spare = box.winfo_reqheight() - title.winfo_reqheight() - outline
+    # Clear of the outline, and no taller than the 1 unit margin plus the
+    # rounding of the line up to a whole unit.
+    assert 0 < spare <= 2 * scaling
