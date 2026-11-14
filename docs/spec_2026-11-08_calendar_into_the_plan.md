@@ -253,6 +253,9 @@ Plan's. Decisions E1 to E10 in the plan.
 | CIP-M5.5 | Opening a date whose cache is older than the staleness window (§9, 15 minutes, in config) refreshes it automatically, once, in the background |
 | CIP-M6.1 | A seven-day planning view: for each of the next seven days, its committed hours and its free hours, from one fetch over the range |
 | CIP-M6.2 | The week view reads the same cache and the same functions as the day. No second parse, no second occupancy rule |
+| CIP-M6.3 | The week's seven columns share the pane's width and its boxes follow the pane's height, above a floor of 40 px wide and 12 px high |
+| CIP-M6.4 | A box holding an Action Item's Time Block is filled with that item's Category colour; padding, lunch and an item with no colour keep the planned colour |
+| CIP-M6.5 | An Action Item dropped on a week box is blocked on that box's date, through the day's own checks for that date |
 | CIP-M7.1 | Docs in the same change: `docs/USER_GUIDE.md`, `docs/google-calendar-setup.md`, `CHANGELOG.md`, `NOTES.md`, `docs/DOCUMENTATION_INDEX.md`, and a handoff note from `.agents/templates/handoff-note.md` |
 
 *M6 built 2026-11-13 (batch 3).* A Day / Week toggle beside the day pane's
@@ -261,6 +264,11 @@ column drawn from the same `build_day_grid` call as the day. Free is a box
 with no meeting, lunch or block; a date never read has no free count; a day
 Day Settings closes says "no blocks". ↻ Calendar in the week reads the seven
 dates in one call under the same claim. Decisions W1 to W8 in the plan.
+
+*M6.3 to M6.5 built 2026-11-14.* The week follows the pane, colours an item's
+box by its Category, and takes an Action Item dropped on a box. That reverses
+W4 for this one gesture; every other write stays on the day. Decisions R1–R4,
+C1–C4, D1–D7 in `docs/unused-docs/implementation_plan_2026-11-14_plan_week_improvements.md`.
 
 ---
 
@@ -281,9 +289,10 @@ deleted, so the next reader sees what was chosen over what.
 - **Dismissal at all.** CIP-M3.4 keeps it only for events the user cannot edit.
   If that case turns out to be rare in practice, dropping it removes a column,
   a flag and a merge rule. Worth revisiting after phase 1 is in use.
-- **Whether the week view is editable.** M6 is specified read-only. Dragging a
-  meeting across days is a bigger gesture than moving it within one, and it is
-  not needed for "where is my room".
+- **Whether the week view is editable.** Answered 2026-11-14 (M6.5): an
+  Action Item can be dropped on a week box. Moving a Time Block or a meeting
+  across days is still not offered: it is a bigger gesture than moving one
+  within a day.
 
 ---
 

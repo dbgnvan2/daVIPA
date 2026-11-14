@@ -470,9 +470,13 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   pane between the day's grid and a week of it. Why: to see where in the next
   seven days there is room, before planning any one of them.
 
-  The week is the selected date and the six after it, as seven narrow columns
-  of the same half-hour boxes: purple for a meeting, grey for a Time Block or
-  lunch, the pane's light fill for a free box. Under each column: *Meetings
+  The week is the selected date and the six after it, as seven columns of the
+  same half-hour boxes. The columns share the pane's width and the boxes grow
+  with its height, so dragging the divider or resizing the window resizes the
+  week. Purple is a meeting. A Time Block for an Action Item is that item's
+  Category colour (from Vision Planning), and grey is lunch, a Buffer or
+  Break, or an item with no Category colour. The pane's light fill is a free
+  box. Under each column: *Meetings
   3h* and *Free 2½h*. A box with a meeting and a block in it counts as a
   meeting. A date the calendar has never been read for is drawn in a flat
   border grey and says *not read* instead of a free count, and its meetings
@@ -483,9 +487,14 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   failed or partial read first, then *N of 7 days not read*, else the oldest
   read time.
 
-  The week is read-only: nothing can be dragged onto it or moved in it, and
-  AutoLoad, Clear Day, + Buffer, + Break and ⤴ Google Calendar are greyed
-  out until you go back to a day. Click
+  Drag an Action Item from the left onto a box to block it on that box's date.
+  The week stays up, and the status line names the date. The same checks as a
+  day apply, for that date: an item already blocked that day, a full box, or
+  a box with a meeting is refused, and a day Day Settings closes asks first.
+  Dropping on a date the calendar has not been read for works, and the status
+  line says so. Nothing else changes in the week: Time Blocks and meetings are
+  moved on the day, and AutoLoad, Clear Day, + Buffer, + Break and ⤴ Google
+  Calendar are greyed out until you go back to a day. Click
   a day's heading, boxes or totals to open that date as a day; **‹** and
   **›** move a week back or forward. **↻ Calendar** in the week reads all
   seven dates at once, and a week with any date older than 15 minutes is read

@@ -293,6 +293,17 @@ and are corrected in `BACKLOG.md` item 1 with the measurements.
   up to.
   See `docs/unused-docs/changes/2026-11-09-bare-name-citations.md`.
 
+## Recent Changes (2026-11-14)
+
+### Plan week: resize, Category colours, drop - CIP-M6.3 to M6.5
+
+Built from `docs/unused-docs/implementation_plan_2026-11-14_plan_week_improvements.md`.
+The day's drop methods (`_drop_refusal`, `_allow_this_day`, `_require_block_day`,
+`block_item` and their helpers) take an optional `day`; a week drop passes the
+box's date and `_placement_for` gives that date's span and meetings from the
+grid its column was counted from. Known gap: **not walked on screen**
+(checklist in `docs/unused-docs/changes/2026-11-14-plan-week-improvements.md`).
+
 ## Recent Changes (2026-11-13)
 
 ### Google Calendar into the Plan, week view - CIP batch 3

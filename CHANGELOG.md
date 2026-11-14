@@ -7,6 +7,14 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — the Plan week (2026-11-14)
+
+- The week's columns now fill the pane and its boxes grow with it, so the week
+  resizes with the window and the divider. (CIP-M6.3)
+- A Time Block in the week is drawn in its item's Category colour. (CIP-M6.4)
+- An Action Item can be dragged onto a box in the week, and is blocked on that
+  box's date with the same checks as the day. (CIP-M6.5)
+
 ### Added — the week on the Plan (2026-11-13)
 
 - A Day / Week toggle on the Plan shows the selected date and the six after

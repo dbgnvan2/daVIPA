@@ -1,6 +1,6 @@
 # Implementation plan — Plan week view: resize, Category colours, drop (2026-11-14)
 
-Status: **proposed, awaiting approval.** No code written.
+Status: **approved and built 2026-11-14.** Not walked on screen.
 Spec: `docs/spec_2026-11-08_calendar_into_the_plan.md` §8 (CIP-M6) — this adds
 CIP-M6.3, M6.4, M6.5 and answers §9 "Whether the week view is editable".
 Builds on: `implementation_plan_2026-11-13_calendar_into_the_plan_week.md` (W1–W8).
@@ -117,9 +117,11 @@ against the verbatim line it names.
 | CIP-M6.5e | A drop on no box writes nothing and says so | `test_cipm65_a_drop_on_no_box_writes_nothing` |
 | CIP-M6.5f | The non-work-day question and its remembered yes are for the box's date | `test_cipm65_the_question_is_about_the_boxs_date` |
 | CIP-M6.5g | The day view's drop is unchanged | existing `tests/test_plan_screen.py` TG-M9 / PF-M1 / PF-M2 tests, run as they are |
+| CIP-M6.4 | Padding first in a box colours nothing | `test_cipm64_padding_first_colours_nothing` (logic) |
 
-The existing TV test that asserts a week drop is refused changes for reason
-(b): the behaviour changes on purpose.
+No existing test asserted a week drop is refused, so no test changed. Two
+tests were added during the build: `test_cipm65_an_unread_date_is_said` (D4)
+and `test_cipm65_the_box_under_the_pointer_is_outlined` (D6).
 
 ## Build order
 

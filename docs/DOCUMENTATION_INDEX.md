@@ -309,6 +309,13 @@ Segment, SubSegment, Category, Start Date) fill the list and follow its
 width, down to 6 characters; both splitter panes grow with the window.
 **Approved, built and walked 2026-11-14.**
 
+### docs/unused-docs/implementation_plan_2026-11-14_plan_week_improvements.md
+
+Implementation plan for CIP-M6.3 to M6.5: the Plan week follows the pane,
+colours an item's box by its Category, and takes an Action Item dropped on a
+box. Holds decisions R1–R4, C1–C4, D1–D7. **Approved and built 2026-11-14**;
+walk owed, in `docs/unused-docs/changes/2026-11-14-plan-week-improvements.md`.
+
 ### docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md
 
 Implementation plan for exporting a planned day to Google Calendar

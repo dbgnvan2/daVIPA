@@ -214,7 +214,9 @@ meeting from the Plan (CIP-M4), and the week view (CIP-M6). What is left is
 the on-screen walk each owes:
 `docs/unused-docs/changes/2026-11-13-cip-read-half.md`,
 `docs/unused-docs/changes/2026-11-13-cip-editing.md` and
-`docs/unused-docs/changes/2026-11-13-cip-week.md`.
+`docs/unused-docs/changes/2026-11-13-cip-week.md`. The week's resize, Category
+colours and item drop (CIP-M6.3 to M6.5, 2026-11-14) owe theirs too:
+`docs/unused-docs/changes/2026-11-14-plan-week-improvements.md`.
 
 Read the connected calendars, show each day's commitments on the Plan grid so
 the day is planned around the hours that are already gone, and let a commitment
