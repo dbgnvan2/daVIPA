@@ -44,6 +44,9 @@ logger = logging.getLogger(__name__)
 ITEM_COLUMN_FLOOR_PX = 6 * CHAR_PX
 # No ceiling worth stating: the columns fill the list however wide it is.
 ITEM_COLUMN_MAX_PX = 10000
+# Pixels per character of a heading (bold, CTk's default size 13): 8 at
+# size 13 by the 14px-is-8px estimate, plus one for bold.
+HEADER_CHAR_PX = round(CHAR_PX * 13 / 14) + 1
 # A <Configure> refit waits for the window edge to stop (as LSR's lists do).
 ITEM_FIT_DELAY_MS = 120
 # What a row spends outside the five columns (SCR-M1): the checkbox cell
@@ -124,6 +127,10 @@ class DragScheduleScreen(ctk.CTkFrame):
             ],
         )
         self._items_fit_after = None
+        self._items_short = False
+        # A drag leaves the columns wider or narrower than the list; refit
+        # once it ends (SCR-M6). The other item lists do the same.
+        self.resizer.on_drag_end = self._on_items_configure
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -346,7 +353,14 @@ class DragScheduleScreen(ctk.CTkFrame):
         """
         if self.resizer.dragging:
             return 0
-        return self.resizer.fit_to_width(int(list_px) - self._items_reserved_px())
+        overflow = self.resizer.fit_to_width(int(list_px) - self._items_reserved_px())
+        # The left pane's 320px minimum is narrower than the floors, so this
+        # happens; say so once per crossing, not on every <Configure> (P2).
+        if overflow and not self._items_short:
+            logger.info("Scheduler item list is %d px narrower than its column floors",
+                        overflow)
+        self._items_short = bool(overflow)
+        return overflow
 
     def _on_items_configure(self, _event=None) -> None:
         # Many <Configure> events arrive per drag of the window edge; each
@@ -429,13 +443,14 @@ class DragScheduleScreen(ctk.CTkFrame):
             )
             self.select_all_checkbox.grid(row=0, column=0, sticky="w", padx=(8, 4), pady=5)
             header_labels = {}
-            for key, text in (
-                ("title", "Title"),
-                ("segment", "Segment"),
-                ("subsegment", "SubSegment"),
-                ("category", "Category"),
-                ("start_date", "Start Date"),
-            ):
+            headings = {
+                "title": "Title",
+                "segment": "Segment",
+                "subsegment": "SubSegment",
+                "category": "Category",
+                "start_date": "Start Date",
+            }
+            for key, text in headings.items():
                 lbl = ctk.CTkLabel(
                     self.items_header, text=text, anchor="w",
                     width=self.resizer.width(key), font=header_font,
@@ -446,8 +461,12 @@ class DragScheduleScreen(ctk.CTkFrame):
                          sticky="w", padx=(8, 4) if key == "title" else 4, pady=5)
                 header_labels[key] = lbl
             # Draggable dividers at each column's right edge ("end of column" lines).
+            # Headings are cut to their column like the cells: a label grows to
+            # fit its text, and at the 48px floor an uncut bold heading pushed
+            # every heading after it off its column (SCR sweep).
             self.resizer.build_dividers(
-                self.items_header, header_labels, fg_color=self.palette["border"]
+                self.items_header, header_labels, fg_color=self.palette["border"],
+                header_texts=headings, header_char_px=HEADER_CHAR_PX,
             )
 
             row = 1

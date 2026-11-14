@@ -80,6 +80,25 @@ LSR or LSR2. Two things keep its columns fixed today:
 - **No column ceiling.** A column's maximum is 10000 px instead of 800, so
   a very wide list is still filled (`test_scrm1b_no_ceiling_on_a_wide_list`).
 
+## Fixes from the csdp sweep (2026-11-14)
+
+Cold learning-qa and correctness passes found:
+
+- **High: no refit after a column drag.** The columns ran past the list (or
+  left a gap) until the window next changed size, and a refit due during a
+  drag was dropped. The drag's end now schedules a refit, as on the other
+  lists (`test_scrm6_drag_sets_one_share`).
+- **Medium: headings not cut.** At the 48 px floor a bold heading widened its
+  header column and pushed the rest off their rows. Headings are cut with
+  "..." at 8 px a character (`test_scr_headings_are_cut_to_their_column`).
+- **Medium: overflow unlogged.** The pane's 320 px minimum is below the
+  floors, so the columns can overrun with nothing said. It is logged once per
+  crossing (`test_scr_overflow_is_logged_once`).
+
+Dropped as low: `RESERVED` in the test repeats the code's arithmetic rather
+than measuring a row, and `test_scrm6` leaves a saved shape in the
+session's shared settings file.
+
 ## Walk checklist (by hand, after the build)
 
 - [ ] Open the Scheduler: the five columns fill the list with no gap at the
@@ -88,3 +107,6 @@ LSR or LSR2. Two things keep its columns fixed today:
       proportion.
 - [ ] Drag the divider between the list and the date boxes: the columns
       refit to the new list width.
+- [ ] Drag a column divider: when you let go, the columns refit to fill the
+      list. Near the floor, headings are cut with "..." and stay over their
+      columns.
