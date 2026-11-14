@@ -69,6 +69,20 @@ def box_item_id(entry: GridSlot) -> Optional[str]:
     return None
 
 
+def box_first_block(entry: GridSlot):
+    """CIP-M6.7 -- the block a press on this box picks up, or ``None``.
+
+    The earliest, by the rule that colours the box (``box_item_id``): a block
+    carried in first, then grid order. Lunch is set per date from Day
+    Settings and does not move between days, so a lunch first gives ``None``.
+    """
+    for block in [*entry.continued, *entry.starting]:
+        if BlockType.normalize(block.block_type) == BlockType.LUNCH:
+            return None
+        return block
+    return None
+
+
 def box_start(entry: GridSlot) -> Optional[Tuple[str, str, int]]:
     """CIP-M6.6 -- ``(item id, label, others)`` when the box's item starts here.
 
@@ -100,6 +114,8 @@ class DaySummary:
     items: Dict[int, str] = field(default_factory=dict)
     #: CIP-M6.6 -- the boxes an item's block starts in: (item id, label, others).
     starts: Dict[int, Tuple[str, str, int]] = field(default_factory=dict)
+    #: CIP-M6.7 -- the block a press on each box picks up.
+    blocks: Dict[int, object] = field(default_factory=dict, repr=False, compare=False)
     #: CIP-M6.5 -- the grid this column was counted from, so a drop on it is
     #: checked against this date's own span and meetings, not rebuilt.
     grid: Optional[DayGrid] = field(default=None, repr=False, compare=False)
@@ -138,6 +154,8 @@ def week_summary(day: str, grid: DayGrid, bounds: DayBounds, *, read: bool,
                if (item := box_item_id(entry)) is not None},
         starts={entry.slot.index: start for entry in grid.slots
                 if (start := box_start(entry)) is not None},
+        blocks={entry.slot.index: block for entry in grid.slots
+                if (block := box_first_block(entry)) is not None},
         grid=grid,
     )
 

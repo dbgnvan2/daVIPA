@@ -42,7 +42,15 @@ from ..plan_week import (
 )
 from ..color_contrast import normalize_hex_color, pick_text_color
 from ..theme import block_type_colors, semantic_colors, status_text_color
-from ..time_block_layout import SLOT_MINUTES, build_day_grid, format_hhmm
+from ..models import BlockType
+from ..time_block_layout import (
+    SLOT_MINUTES,
+    SlotRefusedError,
+    build_day_grid,
+    can_place,
+    format_hhmm,
+    slots_for_minutes,
+)
 from .drag_schedule_support import widget_contains_pointer
 
 logger = logging.getLogger(__name__)
@@ -81,6 +89,16 @@ def fit_text(text: str, measure, width: int) -> str:
         else:
             high = middle - 1
     return text[:low].rstrip() + ELLIPSIS
+
+
+def short_date(day: str) -> str:
+    """"Fri 20" -- how the week names a date in its headings and status."""
+    return date.fromisoformat(day).strftime("%a %d")
+
+
+def block_label(block) -> str:
+    """What a status line calls a block: its label, else its kind."""
+    return block.label or str(block.block_type).title()
 
 
 def week_box_floor(linespace: int, scaling: float = 1.0) -> int:
@@ -189,7 +207,10 @@ class PlanWeekViewMixin:
         """
         if not getattr(self, "_week_mode", False):
             return False
-        self.set_status("In the week, only an Action Item can be dropped — click a day to plan it", "muted")
+        self.set_status(
+            "In the week, drag an Action Item or a Time Block — click a date to open the day",
+            "muted",
+        )
         return True
 
     def _set_day_buttons(self, state: str) -> None:
@@ -365,7 +386,13 @@ class PlanWeekViewMixin:
                 if start is not None:
                     self._draw_week_title(box, day, index, fill, start, title_for)
                 if kind:
-                    self._bind_open(box, day)
+                    # CIP-M6.8 -- only the date heading opens the day. A box
+                    # holding a block picks it up instead (M6.7).
+                    picked = summary.blocks.get(index) if kind == PLANNED else None
+                    self._bind_week_block_drag(box, picked)
+                    title_label = self._week_titles.get((day, index))
+                    if title_label is not None:
+                        self._bind_week_block_drag(title_label, picked)
                     self._week_boxes[(day, index)] = (box, kind)
                 else:
                     self._week_empty_boxes.append(box)
@@ -375,7 +402,6 @@ class PlanWeekViewMixin:
                 width=WEEK_COLUMN_WIDTH_PX,
             )
             total.grid(row=len(rows) + 1, column=column, padx=1, pady=(4, 0))
-            self._bind_open(total, day)
             self._week_totals[day] = total
 
     # ---------------------------------------------------------- M6.4 colours
@@ -433,7 +459,6 @@ class PlanWeekViewMixin:
         text.title_font = font
         text.bind("<Configure>", lambda event, w=text: self._fit_week_title(w, event.width))
         self._fit_week_title(text, round(WEEK_COLUMN_WIDTH_PX * self.week_scaling()) - 2 * inset)
-        self._bind_open(text, day)
         self._week_titles[(day, index)] = text
 
     @staticmethod
@@ -560,26 +585,136 @@ class PlanWeekViewMixin:
         hit = self.week_box_under_pointer()
         if hit is None:
             if self.pointer_over_day():
-                self.set_status("Drop on a box to plan it — click a day to open it", "muted")
+                self.set_status("Drop on a box to plan it — click a date to open it", "muted")
             return
         day, index = hit
-        # Sweep, 2026-11-14 -- the day places blocks from an earlier version
-        # (TG-M5) when it is opened, and the week runs no repair. A drop before
-        # that could take the box such a block is about to be given.
-        unplaced = sum(1 for block in self.db_manager.get_time_blocks(day) if block.slot_index is None)
-        if unplaced:
-            self.set_status(
-                f"Open {date.fromisoformat(day).strftime('%a %d')} first — {unplaced}"
-                " block(s) from an earlier version need a box", "warning",
-            )
-            return
-        refusal = self._drop_refusal(item, index, day)
+        refusal = self._unplaced_refusal(day) or self._drop_refusal(item, index, day)
         if refusal is not None:
             self.set_status(refusal, "warning")
             return
         if not self._allow_this_day(day):
             return
         self.after_idle(lambda: self.block_item(item, index, day))
+
+    def _unplaced_refusal(self, day: str) -> Optional[str]:
+        """Why a drop on ``day`` must wait for the day to be opened, if it must.
+
+        Sweep, 2026-11-14 -- the day places blocks from an earlier version
+        (TG-M5) when it is opened, and the week runs no repair. A drop before
+        that could take the box such a block is about to be given.
+        """
+        unplaced = sum(1 for block in self.db_manager.get_time_blocks(day) if block.slot_index is None)
+        if not unplaced:
+            return None
+        return (
+            f"Open {short_date(day)} first — {unplaced}"
+            " block(s) from an earlier version need a box"
+        )
+
+    # ------------------------------------------------------- M6.7 block drag
+    def _bind_week_block_drag(self, widget, block) -> None:
+        """A press on a week box picks up its block; nothing else happens.
+
+        No block (a meeting, lunch, free) binds nothing, so a click there does
+        nothing: only the date heading opens the day (M6.8). A press with no
+        motion shows no label (PD-M10.3), so a plain click on a box is not a
+        drag either.
+        """
+        if block is None:
+            return
+        widget.bind("<ButtonPress-1>", lambda event, b=block: self.start_block_drag(event, b))
+        widget.bind("<B1-Motion>", self.on_drag_motion)
+        widget.bind("<ButtonRelease-1>", self.on_drag_release)
+
+    def _item_on_date_refusal(self, block, day: str) -> Optional[str]:
+        """PF-M2 for a moved block: its item already has a block on ``day``."""
+        if day == block.block_date or block.block_type != BlockType.ITEM or not block.item_id:
+            return None
+        sitting = self._blocked_today(block.item_id, day)
+        if sitting is None:
+            return None
+        return (
+            f"{block_label(block)} is already in a Time Block on {short_date(day)}"
+            f" at {sitting.start_time} — drag that Time Block to move it"
+        )
+
+    def _block_move_refusal(self, block, index: int, day: str) -> Optional[str]:
+        """Why moving ``block`` to this box would write nothing, or ``None``.
+
+        Read, not enforced: ``move_block_to_day`` and
+        ``db_manager.move_block_to_date`` check again, as the write paths.
+        """
+        from .plan import refusal_text  # plan.py imports this module
+
+        refusal = self._item_on_date_refusal(block, day)
+        if refusal is not None:
+            return refusal
+        span, committed = self._placement_for(day)
+        reason = can_place(
+            self.db_manager.get_time_blocks(day),
+            self.bounds,
+            index,
+            slots_for_minutes(block.planned_minutes),
+            ignoring=block.id,
+            day_span=span,
+            committed=committed,
+        )
+        return refusal_text(reason) if reason else None
+
+    def drop_block_on_week(self, block) -> None:
+        """A Time Block released over the week: moved to that box's date.
+
+        Read now, refuse now, ask now, write after the handler returns -- the
+        order ``drop_on_week`` keeps. The non-work-day question is asked only
+        when the date changes: moving a block within its day never asked.
+        """
+        hit = self.week_box_under_pointer()
+        if hit is None:
+            if self.pointer_over_day():
+                self.set_status("Drop on a box to move it — click a date to open it", "muted")
+            return
+        day, index = hit
+        refusal = self._unplaced_refusal(day) or self._block_move_refusal(block, index, day)
+        if refusal is not None:
+            self.set_status(refusal, "warning")
+            return
+        if day != block.block_date and not self._allow_this_day(day):
+            return
+        self.after_idle(lambda: self.move_block_to_day(block, index, day))
+
+    def move_block_to_day(self, block, index: int, day: str) -> None:
+        """CIP-M6.7 -- the write behind a week block drop, and its status."""
+        from .plan import refusal_text  # plan.py imports this module
+
+        moving_date = day != block.block_date
+        if moving_date and not self._require_block_day(ask=False, day=day):
+            return
+        refusal = self._item_on_date_refusal(block, day)
+        if refusal is not None:
+            self._non_work_day = False
+            self.set_status(refusal, "warning")
+            return
+        was_exported = bool(getattr(block, "calendar_event_id", None))
+        old_day = block.block_date
+        try:
+            moved = self.db_manager.move_block_to_date(
+                block.id, day, index, self.bounds, day_span=self._placement_for(day)[0]
+            )
+        except SlotRefusedError as refused:
+            self.set_status(refusal_text(refused.reason), "error")
+            return
+        except ValueError as error:
+            self.set_status(str(error), "error")
+            return
+        self.refresh()
+        text = f"Moved {block_label(block)} to {short_date(day)} at {moved.start_time}"
+        if not self._week_day_read(day):
+            text += " — calendar not read for that day"
+        if moving_date:
+            text += self._take_non_work_note(day)
+            if was_exported:
+                text += f" — export {short_date(old_day)} again to remove it from Google Calendar"
+        self.set_status(text, "success")
 
     def _placement_for(self, day: str):
         """``(span, committed)`` the placement rules read for ``day``.

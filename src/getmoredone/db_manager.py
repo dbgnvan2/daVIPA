@@ -1984,6 +1984,50 @@ class DatabaseManager(DBManagerProjectBoardsMixin, DBManagerCommitmentsMixin):
             self.update_time_block(block)
         return block
 
+    def move_block_to_date(
+        self, block_id: str, to_date: str, slot_index: int, bounds, day_span=None
+    ) -> TimeBlock:
+        """Move a block to a box on another date, or on its own.
+
+        Purpose: CIP-M6.7 -- dragging a block from one day of the week to
+                 another.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-14_week_block_drag.md
+        Tests:   tests/test_time_block_crud.py::test_cipm67_a_block_moves_to_another_date
+
+        The fit is checked on ``to_date``, with ``day_span`` as that date is
+        drawn, before anything is written. The date, the box and the times
+        are then written together.
+
+        A block moved to **another** date forgets its Google Calendar event
+        (B8). The event carries a marker naming the old date, and an update
+        never rewrites it, so keeping the id would leave an event that no
+        later export of either date could clean up. The next export of the
+        new date makes a fresh one; the next export of the old date removes
+        the old one as an orphan. A move within one date keeps the id.
+        """
+        block = self.get_time_block(block_id)
+        if block is None:
+            raise ValueError(f"no time block {block_id!r}")
+        if block.block_date == to_date:
+            return self.place_block_at(block_id, slot_index, bounds, day_span=day_span)
+
+        self._refuse_unless_it_fits(
+            to_date, slot_index, block.planned_minutes, bounds,
+            day_span=day_span,
+            placing_lunch=BlockType.normalize(block.block_type) == BlockType.LUNCH,
+        )
+        with self.transaction() as conn:
+            block.block_date = to_date
+            self._settle_block_on_slot(block, slot_index, bounds)
+            conn.execute(
+                "UPDATE time_blocks SET block_date = ? WHERE id = ?", (to_date, block.id)
+            )
+            self.update_time_block(block)
+            self.set_block_calendar_event_id(block.id, None)
+        block.calendar_event_id = None
+        block.calendar_event_calendar_id = None
+        return block
+
     def set_block_length(
         self, block_id: str, minutes: int, bounds, day_span=None
     ) -> TimeBlock:

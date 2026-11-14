@@ -3028,6 +3028,8 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
                 # Reported rather than guessed at: picking a box for them
                 # would put the work somewhere they did not point.
                 self.set_status("Drop an Action Item on a Time Block", "muted")
+        elif kind == "block" and block is not None and self._week_mode:
+            self.drop_block_on_week(block)
         elif kind == "block" and block is not None:
             if target is not None:
                 self.after_idle(lambda: self.move_block_to_slot(block.id, target))
