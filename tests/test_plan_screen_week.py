@@ -439,7 +439,7 @@ def test_cipm63_boxes_follow_the_pane_height_to_a_floor(screen, root, monkeypatc
 
     monkeypatch.setattr(canvas, "winfo_height", lambda: 50)
     screen.fit_week_boxes()
-    assert box.cget("height") == wv.WEEK_BOX_HEIGHT_PX
+    assert box.cget("height") == screen.week_box_min_height()
 
 
 def test_cipm63_an_unchanged_size_sets_nothing(screen, root, monkeypatch):
@@ -838,3 +838,21 @@ def test_cipm66_a_long_title_on_screen_keeps_its_count(screen, manager, root):
     screen._fit_week_title(label, label.title_font.measure("Write the q… +1"))
 
     assert label.cget("text").endswith("… +1")
+
+
+def test_cipm63_the_floor_is_the_title_line_and_the_outline():
+    # An 11 px line, 2 px of outline above and below, 1 px to spare.
+    assert wv.week_box_floor(11) == 16
+
+
+def test_cipm63_at_the_floor_a_title_clears_the_drag_outline(screen, manager, root, monkeypatch):
+    item = _item(manager, LONG_TITLE)
+    _block(manager, TEN, block_type=BlockType.ITEM, item_id=item.id, label=item.title)
+    _week(screen, root)
+    monkeypatch.setattr(screen._day_canvas(), "winfo_height", lambda: 50)
+    screen.fit_week_boxes()
+
+    box, _kind = screen._week_boxes[(THURSDAY, TEN)]
+    title = screen._week_titles[(THURSDAY, TEN)]
+    inside = box.cget("height") - 2 * wv.DRAG_HOVER_BORDER_PX
+    assert title.winfo_reqheight() < inside
