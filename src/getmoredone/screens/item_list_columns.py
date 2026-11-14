@@ -271,6 +271,7 @@ class ItemListLayout:
         self.fit_count = 0
         # A fit skipped during a drag runs once the divider is let go.
         self.resizer.on_drag_end = self._on_configure
+        self.resizer.fill_after_drag = True
 
     # ----------------------------------------------------------------- columns
     @property

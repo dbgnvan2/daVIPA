@@ -95,6 +95,18 @@ Cold learning-qa and correctness passes found:
   floors, so the columns can overrun with nothing said. It is logged once per
   crossing (`test_scr_overflow_is_logged_once`).
 
+A cold review of those fixes found one more medium issue: the refit after a
+drag shrank the dragged column with the rest, so it slid back from where it
+was dropped (60 px of drag kept 45). The four item lists shared the
+behaviour. Now, on the lists that refit after a drag (`fill_after_drag` on
+`ColumnResizer`, set by the Scheduler and `ItemListLayout`), the dragged
+column keeps its dropped width and the others absorb the change. The
+APE/Week panels do not refit after a drag, so there the widths on screen at
+release stay the shape, as before. Guarded by
+`test_a_dropped_column_keeps_its_width_after_the_refit`,
+`test_scrm6_drag_sets_one_share` and
+`test_lsr2_a_dropped_column_keeps_its_width`.
+
 Dropped as low: `RESERVED` in the test repeats the code's arithmetic rather
 than measuring a row, and `test_scrm6` leaves a saved shape in the
 session's shared settings file.
@@ -107,6 +119,6 @@ session's shared settings file.
       proportion.
 - [ ] Drag the divider between the list and the date boxes: the columns
       refit to the new list width.
-- [ ] Drag a column divider: when you let go, the columns refit to fill the
-      list. Near the floor, headings are cut with "..." and stay over their
+- [ ] Drag a column divider: when you let go, that column stays where you
+      dropped it and the others refit to fill the list. Near the floor, headings are cut with "..." and stay over their
       columns.

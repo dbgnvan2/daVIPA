@@ -82,6 +82,12 @@ class ColumnResizer:
         self._drag = None        # (key, x_root_start, width_start)
         # Called after a divider drag ends and the widths are saved.
         self.on_drag_end = None
+        # True where the owner refits the columns to its width after a drag
+        # (the item lists and the Scheduler): the dragged column then keeps
+        # the width it was dropped at and the others absorb the change. False
+        # where nothing refits (the APE/Week panels): the widths on screen at
+        # release are the shape (`_set_weight_from_drag`).
+        self.fill_after_drag = False
         # LSR2-D6: the shape a fit shares the width out by. Only a drag (or
         # the stored widths, on load) sets it; a fit writes `_widths` alone.
         # When a fit wrote its result back as the next fit's weights, the
@@ -381,12 +387,12 @@ class ColumnResizer:
     def _on_stop(self, event, key) -> None:
         drag, self._drag = self._drag, None
         if drag is not None and self._widths[drag[0]] != drag[2]:
-            self._set_weight_from_drag(drag[0])
+            self._set_weight_from_drag(drag[0], drag[2])
             self._persist()
         if self.on_drag_end is not None:
             self.on_drag_end()
 
-    def _set_weight_from_drag(self, key) -> None:
+    def _set_weight_from_drag(self, key, start_width) -> None:
         """Turn the dragged width into a weight, leaving the other weights alone.
 
         Purpose: LSR2-D6 — only the column dragged changes its share. A
@@ -394,9 +400,13 @@ class ColumnResizer:
         Spec:    docs/unused-docs/implementation_plan_2026-11-14_all_columns_resize.md
         Tests:   tests/test_list_screen_resize.py::test_lsr2m4b_a_drag_changes_only_its_own_weight
 
-        When no other column is held at its floor or its maximum, the widths
-        on screen are in proportion to the weights, so they become the
-        weights and nothing is lost. When some are held, their drawn widths
+        When no other column is held at its floor or its maximum, the drawn
+        widths become the weights. With `fill_after_drag` the other columns
+        are then scaled to fill the total they shared before the drag, so the
+        refit that follows keeps the dragged column at the width it was
+        dropped at; without the scaling the refit shrank it with the rest and
+        it slid back from the cursor (SCR sweep, 2026-11-14). When some are
+        held, their drawn widths
         are not their shares: the dragged width is converted into weight
         units by the columns that are still sharing freely, or, when every
         other column is held, by the scale of the last fit that shared
@@ -408,7 +418,18 @@ class ColumnResizer:
         free = [k for k in others
                 if floors[k] < self._widths[k] < self.specs[k].max_width]
         if len(free) == len(others):
+            dropped = self._widths[key]
+            # The total the columns shared before the drag.
+            budget = sum(self._widths[k] for k in floors) - (dropped - start_width)
+            others_weight = sum(self._widths[k] for k in others)
             self._weights = {k: self._widths[k] for k in self._weights}
+            rest = budget - dropped
+            if self.fill_after_drag and others and others_weight > 0 and rest > 0:
+                # In pixels at that total: the dragged column at the width it
+                # was dropped at, the others scaled to fill the rest. So what
+                # is saved for it is the width the user set.
+                for k in others:
+                    self._weights[k] = self._widths[k] * rest / others_weight
             self._px_per_weight = 1.0
             return
         weight = sum(self._weights[k] for k in free)

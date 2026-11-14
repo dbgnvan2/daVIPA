@@ -44,8 +44,8 @@ logger = logging.getLogger(__name__)
 ITEM_COLUMN_FLOOR_PX = 6 * CHAR_PX
 # No ceiling worth stating: the columns fill the list however wide it is.
 ITEM_COLUMN_MAX_PX = 10000
-# Pixels per character of a heading (bold, CTk's default size 13): 8 at
-# size 13 by the 14px-is-8px estimate, plus one for bold.
+# Pixels per character of a heading (bold, CTk's default size 13): 7 at
+# size 13 by the 14px-is-8px estimate, plus one for bold, so 8.
 HEADER_CHAR_PX = round(CHAR_PX * 13 / 14) + 1
 # A <Configure> refit waits for the window edge to stop (as LSR's lists do).
 ITEM_FIT_DELAY_MS = 120
@@ -131,6 +131,7 @@ class DragScheduleScreen(ctk.CTkFrame):
         # A drag leaves the columns wider or narrower than the list; refit
         # once it ends (SCR-M6). The other item lists do the same.
         self.resizer.on_drag_end = self._on_items_configure
+        self.resizer.fill_after_drag = True
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
