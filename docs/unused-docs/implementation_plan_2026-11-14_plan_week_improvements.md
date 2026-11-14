@@ -220,3 +220,19 @@ count alone. Recorded, not fixed (low):
   scaling other than 1.
 - If `normalize_hex_color` ever rejected a fill, the title would be dropped
   silently. No current fill can reach that path.
+
+### Box floor follows the title (2026-11-14, asked after M6.6)
+
+The user asked for the title to be readable at the 12 px floor. Measured on
+this Mac, without mapping a window: the 9 px title font's line is 11 px, and a
+12 px box leaves 10 px inside its 1 px border. The floor is now
+`week_box_floor(linespace)` = line + 2 × the 2 px drag outline + 1 px = 16 px,
+read from the title's font, so a font change moves it. The rows still all
+share one height, so they line up across days. The cost is that a 40-row
+day needs about 720 px, not 560 px, before it stops scrolling. A smaller font
+and taller titled rows only were turned down: the first is no more readable,
+and the second breaks the row alignment. This also fixes the low finding
+above that the title covered the outline at the floor. All week titles now
+share one font object, where each title made its own.
+`test_cipm63_boxes_follow_the_pane_height_to_a_floor` now expects
+`week_box_min_height()`, not 12 — reason (b).

@@ -25,3 +25,6 @@ Open the Plan, choose **Week**.
 11. [ ] Each Action Item's Time Block shows its title on its first box, cut
     with "…"; widening the pane shows more of it; the text reads clearly on
     both a pale and a dark Category colour.
+12. [ ] Make the window as short as it goes: the boxes stop at 16 px and the
+    week scrolls; a title reads whole, and dragging an item over a titled box
+    shows the outline on all four sides.
