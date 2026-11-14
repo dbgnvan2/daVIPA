@@ -157,6 +157,8 @@ def test_cipm61_the_arrows_move_by_a_week(screen, root):
     _week(screen, root)
 
     screen.week_forward_button.invoke()
+    # Re-sweep (batch 3): the redraw waits for idle, as it destroys the button.
+    assert list(screen._week_headers) == WEEK, "the week moved inside the click"
     root.update_idletasks()
     assert list(screen._week_headers) == week_dates("2026-11-12")
 
@@ -298,3 +300,72 @@ def test_cipm61_a_column_click_opens_the_day_after_the_click(screen, root):
 
     root.update_idletasks()
     assert screen._week_mode is False and screen.selected_date == WEEK[3]
+
+
+def test_cipm61_saving_settings_says_when_the_week_could_not_be_read(screen, root, monkeypatch):
+    """Re-sweep (batch 3) -- a failed week is not reported as a successful save."""
+    from src.getmoredone.screens import plan_week_view
+
+    _week(screen, root)
+
+    def broken(*_args, **_kwargs):
+        raise RuntimeError("disk gone")
+
+    monkeypatch.setattr(plan_week_view, "read_week", broken)
+    screen.on_settings_saved(BOUNDS)
+
+    assert screen.status_label.cget("text") == (
+        "Day settings saved — the week could not be read: disk gone"
+    )
+
+
+def test_cipm61_saving_settings_in_the_week_says_what_kept_its_time(screen, root):
+    _week(screen, root)
+
+    screen.on_settings_saved(BOUNDS, renumbered=2)
+
+    assert screen.status_label.cget("text") == "Day settings saved — 2 blocks kept their times"
+
+
+def test_cipm61_the_export_is_refused_in_the_week(screen, root):
+    """Re-sweep (batch 3) -- it would export the first column's date only."""
+    _week(screen, root)
+
+    assert screen.btn_export_calendar.cget("state") == "disabled"
+    screen.export_day_to_calendar()
+    assert not getattr(screen, "_export_running", False)
+    assert screen.status_label.cget("text") == "The week is read-only — click a day to plan it"
+
+
+def test_cipm61_leaving_the_week_mid_export_keeps_the_export_disabled(screen, root):
+    _week(screen, root)
+    screen._export_running = True  # an export started before the week was opened
+
+    screen.view_toggle.set("Day")
+    screen.set_view_mode("Day")
+
+    assert screen.btn_export_calendar.cget("state") == "disabled"
+    assert screen.btn_autoload.cget("state") == "normal"
+
+
+def test_cipm61_an_export_ending_in_the_week_leaves_its_button_disabled(screen, root):
+    _week(screen, root)
+
+    screen._finish_export_refusal("Google Calendar is not connected")
+
+    assert screen.btn_export_calendar.cget("state") == "disabled"
+
+
+def test_cipm61_an_export_finishing_in_the_week_leaves_its_button_disabled(screen, root):
+    """An export started on a day, finishing after the switch to the week."""
+    from types import SimpleNamespace
+
+    _week(screen, root)
+    outcome = SimpleNamespace(
+        summary_line=lambda: "Exported 1 block", failed=0, errors=[], exported=1, deleted_orphans=0,
+    )
+
+    screen._report_export(outcome)
+
+    assert screen.btn_export_calendar.cget("state") == "disabled"
+    assert screen.status_label.cget("text") == "Exported 1 block"

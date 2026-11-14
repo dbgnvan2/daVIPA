@@ -164,3 +164,10 @@ def test_cipm61_a_column_lists_what_no_box_shows():
 
     summary = DaySummary(day=DAY, boxes=[(0, FREE)], read=True, outside=2, all_day=1)
     assert column_total_text(summary).splitlines()[2:] == ["2 outside", "1 all-day"]
+
+
+def test_cipm61_a_week_with_nothing_read_has_no_meeting_total():
+    from src.getmoredone.screens.plan_week_view import week_total_text
+
+    unread = DaySummary(day=DAY, boxes=[(0, UNREAD)], read=False)
+    assert week_total_text([unread]).startswith("Meetings — on 0 of 1 days")
