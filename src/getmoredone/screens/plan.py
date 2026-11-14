@@ -333,6 +333,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         self._week_mode = False
         self._week_fetches: list = []
         self._week_summaries: list = []
+        self._week_error: Optional[str] = None
 
         # DatePickerButton calls its on_date_changed from its own __init__,
         # which lands here before the panes it would reload exist. The flag is
@@ -1080,6 +1081,12 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         if self._week_mode:
             # The week runs no repair and keeps no day grid; it counts what
             # it drew. Each date is repaired when it is opened as a day.
+            if self._week_error:
+                self.set_status(
+                    f"Day settings saved — the week could not be read: {self._week_error}",
+                    "error",
+                )
+                return
             outside = sum(summary.outside for summary in self._week_summaries)
             if outside:
                 noun = "block" if outside == 1 else "blocks"
@@ -1089,7 +1096,11 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
                     "warning",
                 )
             else:
-                self.set_status("Day settings saved", "success")
+                said = ["Day settings saved"]
+                if renumbered:
+                    noun = "block kept its time" if renumbered == 1 else "blocks kept their times"
+                    said.append(f"{renumbered} {noun}")
+                self.set_status(" — ".join(said), "success")
             return
 
         # PD-M14.7 -- the redraw may have repaired the open date, or refused
@@ -1803,6 +1814,8 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         a disabled button and no explanation is the one outcome the user
         cannot do anything about.
         """
+        if self.refused_in_week():
+            return
         if getattr(self, "_export_running", False):
             return
 
@@ -2031,7 +2044,8 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         self._export_running = False
         if not self._still_on_screen():
             return
-        self.btn_export_calendar.configure(state="normal")
+        # CIP-M6 -- the week keeps it disabled (plan_week_view._set_day_buttons).
+        self.btn_export_calendar.configure(state="disabled" if self._week_mode else "normal")
 
         line = outcome.summary_line()
         if outcome.failed:
@@ -2047,7 +2061,8 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         self._export_running = False
         if not self._still_on_screen():
             return
-        self.btn_export_calendar.configure(state="normal")
+        # CIP-M6 -- the week keeps it disabled (plan_week_view._set_day_buttons).
+        self.btn_export_calendar.configure(state="disabled" if self._week_mode else "normal")
         self.set_status(message, kind)
 
     def _still_on_screen(self) -> bool:

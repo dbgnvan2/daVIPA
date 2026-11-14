@@ -82,7 +82,7 @@ def week_total_text(summaries) -> str:
     read = [summary for summary in summaries if summary.read]
     meetings = sum(summary.meeting_minutes for summary in read)
     known = [summary.free_minutes for summary in summaries if summary.free_minutes is not None]
-    parts = [f"Meetings {hours_text(meetings)}"
+    parts = [f"Meetings {hours_text(meetings if read else None)}"
              + ("" if len(read) == len(summaries) else f" on {len(read)} of {len(summaries)} days")]
     if known:
         parts.append(f"free {hours_text(sum(known))} on {len(known)} of {len(summaries)} days")
@@ -119,6 +119,11 @@ class PlanWeekViewMixin:
             button = getattr(self, name, None)
             if button is not None:
                 button.configure(state=state)
+        # The export disables its own button while it runs; leaving the week
+        # mid-export must not give it back early (re-sweep, batch 3).
+        export = getattr(self, "btn_export_calendar", None)
+        if export is not None and not (state == "normal" and getattr(self, "_export_running", False)):
+            export.configure(state=state)
 
     def set_view_mode(self, value: str) -> None:
         week = value == WEEK_VIEW
@@ -163,6 +168,7 @@ class PlanWeekViewMixin:
             summaries, fetches = read_week(self.db_manager, self.selected_date, self.bounds)
             self._week_fetches = fetches
             self._week_summaries = summaries
+            self._week_error = None
             self.day_heading.configure(text="Week Plan")
             self.day_summary.configure(text=week_total_text(summaries))
             self._draw_week_strip(fetches)
@@ -171,6 +177,7 @@ class PlanWeekViewMixin:
             logger.warning("CIP-M6: week from %s unreadable: %s", self.selected_date, error)
             self._week_fetches = []
             self._week_summaries = []
+            self._week_error = str(error) or type(error).__name__
             self.set_status(f"The week could not be read: {error}", "error")
         finally:
             self._flush_redraw()
@@ -213,9 +220,14 @@ class PlanWeekViewMixin:
         grid.grid_columnconfigure(0, weight=0)
         rows = week_rows(summaries)
 
-        back = ctk.CTkButton(grid, text="‹", width=28, command=lambda: self.step_week(-1))
+        # After the click: the redraw destroys the button whose click runs.
+        back = ctk.CTkButton(
+            grid, text="‹", width=28, command=lambda: self.after_idle(lambda: self.step_week(-1))
+        )
         back.grid(row=0, column=0, padx=2, pady=(0, 4))
-        forward = ctk.CTkButton(grid, text="›", width=28, command=lambda: self.step_week(1))
+        forward = ctk.CTkButton(
+            grid, text="›", width=28, command=lambda: self.after_idle(lambda: self.step_week(1))
+        )
         forward.grid(row=0, column=WEEK_DAYS + 1, padx=2, pady=(0, 4))
         self.week_back_button, self.week_forward_button = back, forward
 
