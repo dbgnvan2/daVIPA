@@ -118,6 +118,32 @@ dragging, on all four screens.
 - **Hierarchical's empty Due and Sub-items cells** are now registered text
   cells holding `""`, so they follow their columns like the rest.
 
+## Fixes from the csdp sweep (2026-11-14)
+
+Two cold passes ran over the build: learning-qa and a correctness review.
+They found three medium issues, all fixed:
+
+- **A drag reset every column's weight.** Releasing a divider, even
+  without moving it, copied every drawn width into the weights, so columns
+  held at their floor took the floor as their shape, and it was saved. Now a
+  click with no motion changes nothing, and a drag changes only its own
+  column's weight. The drag is converted into weight units by the columns
+  still sharing freely, or by the last fit's scale when every other column is
+  at its floor. What is saved is the weights (D8). This restores the first
+  form of the `updf43b` assertion, which the build had changed (described
+  above).
+- **Headings were never cut.** A heading wider than its column ("Est. Time"
+  or "Sub-items" near the floor) widened its label, which pushed every
+  heading after it out of line with the rows. Headings are now cut with "..."
+  like the cells, at 8 px a character for the bold 12 header font.
+- **Hierarchical's Due kept its "Due: " prefix** (D5 kept it). At the floor
+  that left "Due..." and no date, so the prefix is gone and the cell shows
+  `2026-11-14`.
+
+Two low findings were dropped as below medium: deep Hierarchical rows
+indenting past a floored Title column, and M4's test not reading the
+weights. The new test `test_lsr2m4b` covers the second.
+
 ## Walk checklist (by hand, after the build)
 
 - [ ] On each screen, narrow and widen the window. Every text column changes
@@ -125,3 +151,6 @@ dragging, on all four screens.
 - [ ] Drag Start's divider, then resize the window. Start keeps its share.
 - [ ] Narrow the window until every column is at 6 characters, then widen it.
       The columns return to the shape they had before.
+- [ ] Near the floor, headings are cut with "..." and stay over their
+      columns (All Items expanded: Status and Actions headings line up).
+- [ ] Click a divider without dragging, then widen the window: nothing moves.

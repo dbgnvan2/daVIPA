@@ -330,7 +330,9 @@ class HierarchicalScreen(ctk.CTkFrame):
         )
 
         # Due date, and the child count; an empty cell still holds its column.
-        due_text = f"Due: {item.due_date}" if item.due_date else ""
+        # No "Due: " prefix: the heading says Due, and at the 6-character
+        # floor the prefix was all that showed (LSR2 sweep).
+        due_text = item.due_date or ""
         self.layout.add_text_cell(frame, "due", due_text, row_text, list_row_font())
         children = self.db_manager.get_children(item.id)
         count_text = f"({len(children)} sub)" if children else ""

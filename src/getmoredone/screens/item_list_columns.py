@@ -205,6 +205,11 @@ def row_char_px() -> int:
     return max(1, round(CHAR_PX * theme.LIST_ROW_FONT_SIZE / CHAR_PX_FONT_SIZE))
 
 
+def header_char_px() -> int:
+    """Pixels per character for a heading: the header font, plus one for bold."""
+    return max(1, round(CHAR_PX * HEADER_FONT_SIZE / CHAR_PX_FONT_SIZE)) + 1
+
+
 @dataclass(frozen=True)
 class TextColumn:
     """A screen's own text column after Who: it resizes like the first four.
@@ -402,7 +407,10 @@ class ItemListLayout:
             label.grid(row=0, column=self.grid_col(key), padx=5, pady=4, sticky="w")
             labels[key] = label
         self.resizer.clear_header()
-        self.resizer.build_dividers(header, labels, fg_color=border_color)
+        self.resizer.build_dividers(
+            header, labels, fg_color=border_color,
+            header_texts={key: headings[key] for key in self.keys},
+            header_char_px=header_char_px())
         self.header_labels = labels
         return header
 

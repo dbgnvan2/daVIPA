@@ -77,6 +77,8 @@ class ColumnResizer:
         self._widths = self._load_widths()
         self._rows = []          # list[(frame, cells)] ; cells: [(key, label, full, reserve, width_delta)]
         self._header = None      # (header_frame, {key: label})
+        self._header_texts = {}  # key -> full heading, cut to the column
+        self._header_char_px = char_px
         self._drag = None        # (key, x_root_start, width_start)
         # Called after a divider drag ends and the widths are saved.
         self.on_drag_end = None
@@ -86,6 +88,7 @@ class ColumnResizer:
         # columns that reached their floor first lost their share, and a
         # narrow-then-wide window came back with a different shape.
         self._weights = dict(self._widths)
+        self._px_per_weight = 1.0
 
     # ------------------------------------------------------------------ widths
     def _setting_attr(self) -> str:
@@ -136,7 +139,10 @@ class ColumnResizer:
 
     def _persist(self) -> None:
         stored = dict(getattr(self.settings, self._setting_attr(), None) or {})
-        stored.update(self._widths)
+        # The weights, not the drawn widths: a list held partly at its floors
+        # draws widths that are not its shape, and saved values load as
+        # weights (LSR2-D8).
+        stored.update({k: round(v) for k, v in self._weights.items()})
         setattr(self.settings, self._setting_attr(), stored)
         self.settings.save()
 
@@ -234,6 +240,10 @@ class ColumnResizer:
 
             for key in free:
                 assigned[key] = int(shares[key])
+            # Pixels per unit of weight, for a drag made later while the
+            # other columns are all held (`_set_weight_from_drag`).
+            if weight > 0 and remaining > 0:
+                self._px_per_weight = remaining / weight
             # Integer division leaves up to one pixel per column unspent. It
             # goes to the widest free column, so the panel is filled exactly
             # and the rounding is where it shows least.
@@ -259,13 +269,22 @@ class ColumnResizer:
             frame.grid_columnconfigure(self.specs[key].grid_col, minsize=self._widths[key])
 
     # ------------------------------------------------------------------ header
-    def build_dividers(self, header_frame, header_labels, height=22, fg_color=None) -> None:
+    def build_dividers(self, header_frame, header_labels, height=22, fg_color=None,
+                       header_texts=None, header_char_px=None) -> None:
         """Add a draggable divider at each resizable column's right edge.
 
         header_labels maps column key -> the header CTkLabel (so its width can be
-        kept in sync during a drag).
+        kept in sync during a drag). header_texts, when given, maps a key to
+        its full heading, which is then cut to the column's width at
+        header_char_px: a label grows to fit its text, so a heading wider
+        than its column pushes every heading after it out of line with the
+        rows (LSR2 sweep). Callers that pass neither are unaffected.
         """
         self._header = (header_frame, dict(header_labels))
+        self._header_texts = dict(header_texts or {})
+        self._header_char_px = header_char_px or self.char_px
+        for key in self._header_texts:
+            self._cut_heading(key)
         for key in self.order:
             spec = self.specs[key]
             if not spec.resizable:
@@ -346,13 +365,53 @@ class ColumnResizer:
             self._apply_live(k)
 
     def _on_stop(self, event, key) -> None:
-        self._drag = None
-        # The shape the user set is the one on screen now: it becomes the
-        # weights every later fit shares out by (LSR2-D6).
-        self._weights = dict(self._widths)
-        self._persist()
+        drag, self._drag = self._drag, None
+        if drag is not None and self._widths[drag[0]] != drag[2]:
+            self._set_weight_from_drag(drag[0])
+            self._persist()
         if self.on_drag_end is not None:
             self.on_drag_end()
+
+    def _set_weight_from_drag(self, key) -> None:
+        """Turn the dragged width into a weight, leaving the other weights alone.
+
+        Purpose: LSR2-D6 — only the column dragged changes its share. A
+                 click with no motion changes nothing (the caller checks).
+        Spec:    docs/unused-docs/implementation_plan_2026-11-14_all_columns_resize.md
+        Tests:   tests/test_list_screen_resize.py::test_lsr2m4b_a_drag_changes_only_its_own_weight
+
+        When no other column is held at its floor or its maximum, the widths
+        on screen are in proportion to the weights, so they become the
+        weights and nothing is lost. When some are held, their drawn widths
+        are not their shares: the dragged width is converted into weight
+        units by the columns that are still sharing freely, or, when every
+        other column is held, by the scale of the last fit that shared
+        (UPD-F4.3).
+        """
+        floors = {k: max(self.specs[k].min_width, min_column_width(self.char_px))
+                  for k in self.order if self.specs[k].resizable}
+        others = [k for k in floors if k != key]
+        free = [k for k in others
+                if floors[k] < self._widths[k] < self.specs[k].max_width]
+        if len(free) == len(others):
+            self._weights = {k: self._widths[k] for k in self._weights}
+            self._px_per_weight = 1.0
+            return
+        weight = sum(self._weights[k] for k in free)
+        if free and weight > 0:
+            scale = sum(self._widths[k] for k in free) / weight
+        else:
+            scale = self._px_per_weight
+        self._weights[key] = self._widths[key] / scale
+
+    def _cut_heading(self, key) -> None:
+        """Cut a heading registered with `build_dividers` to its column."""
+        full = self._header_texts.get(key)
+        label = self._header[1].get(key) if self._header is not None else None
+        if full is None or label is None or not label.winfo_exists():
+            return
+        label.configure(text=format_column_text(
+            full, chars_for_width(self._widths[key], self._header_char_px)))
 
     def _apply_live(self, key) -> None:
         """Push the dragged column's new width to the header and every row."""
@@ -366,6 +425,7 @@ class ColumnResizer:
             label = header_labels.get(key)
             if label is not None and label.winfo_exists():
                 label.configure(width=width)
+                self._cut_heading(key)
 
         for frame, cells in self._rows:
             if not frame.winfo_exists():
