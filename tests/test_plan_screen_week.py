@@ -421,7 +421,7 @@ def test_cipm63_columns_follow_the_pane_width(screen, root):
 
     for column in range(1, 8):
         info = screen.blocks_scroll.grid_columnconfigure(column)
-        assert (info["weight"], info["uniform"], info["minsize"]) == (1, "week", wv.WEEK_COLUMN_WIDTH_PX), column
+        assert (info["weight"], info["uniform"]) == (1, "week"), column
     box, _kind = screen._week_boxes[(THURSDAY, TEN)]
     assert box.grid_info()["sticky"] == "ew"
 
@@ -450,14 +450,48 @@ def test_cipm63_an_unchanged_size_sets_nothing(screen, root, monkeypatch):
     assert screen.fit_week_boxes() is False
 
 
-def test_cipm63_the_week_fits_the_day_pane_floor(screen, root):
-    _week(screen, root)
-    labels = max([screen.week_back_button.winfo_reqwidth()]
-                 + [label.winfo_reqwidth() for label in screen._week_hour_labels]) + 4
-    arrows = screen.week_forward_button.winfo_reqwidth() + 4
-    columns = 7 * (wv.WEEK_COLUMN_WIDTH_PX + 2)
+def _widest_text(screen):
+    labels = list(screen._week_headers.values()) + list(screen._week_totals.values())
+    return max(label.winfo_reqwidth() for label in labels)
 
-    assert labels + columns + arrows <= screen.day_width_floor()
+
+def test_cipm63_no_column_is_narrower_than_its_text(screen, root):
+    """A column's floor is its widest heading or totals text, not a fixed 40 px."""
+    _week(screen, root)
+    widest = _widest_text(screen)
+
+    assert widest > wv.WEEK_COLUMN_WIDTH_PX, "the case this guards is the totals being wider"
+    for column in range(1, 8):
+        assert screen.blocks_scroll.grid_columnconfigure(column)["minsize"] == widest, column
+
+
+def test_cipm63_a_longer_total_widens_the_columns(screen, manager, root):
+    """A column showing more ("2 outside", "1 all-day") holds its widest line."""
+    _week(screen, root)
+    before = screen.blocks_scroll.grid_columnconfigure(1)["minsize"]
+    _boxless_block(manager, FRIDAY)
+    _boxless_block(manager, FRIDAY)
+    screen.load_week()
+    root.update_idletasks()
+
+    assert screen.blocks_scroll.grid_columnconfigure(1)["minsize"] == _widest_text(screen)
+    assert _widest_text(screen) >= before
+
+
+def test_cipm63_the_pane_floor_holds_the_week(screen, root):
+    """The divider cannot squeeze the week below what its text needs; the day's floor returns after."""
+    day_floor = screen.day_width_floor()
+    _week(screen, root)
+    side = max([screen.week_back_button.winfo_reqwidth()]
+               + [label.winfo_reqwidth() for label in screen._week_hour_labels]) + 4
+    need = side + 7 * (_widest_text(screen) + 2) + screen.week_forward_button.winfo_reqwidth() + 4
+
+    from src.getmoredone.screens.plan import ITEMS_TEXT_INSET_PX
+
+    assert need + ITEMS_TEXT_INSET_PX > day_floor, "the case this guards is the week being wider"
+    assert screen.day_width_floor() == need + ITEMS_TEXT_INSET_PX
+    screen.set_view_mode("Day")
+    assert screen.day_width_floor() == day_floor
 
 
 def test_cipm63_leaving_the_week_restores_the_columns(screen, root):
