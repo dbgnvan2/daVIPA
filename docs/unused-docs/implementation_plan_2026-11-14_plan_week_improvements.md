@@ -150,3 +150,30 @@ threaded through the six methods. About 15 tests.
 - `_drop_refusal` and `block_item` each read `get_time_blocks` for the same
   date in one gesture. This is harmless, and it is left alone because
   `block_item` must re-check as the write path.
+
+## Sweep (2026-11-14)
+
+A cold `learning-qa` pass and a cold correctness pass found no high findings
+and these mediums, all fixed with a test:
+
+- The non-work-day note named the selected date, not the box's date.
+  `_take_non_work_note` now takes `day`.
+- A never-opened date may hold blocks from an earlier version that have no
+  box yet. The day gives them one on opening (TG-M5), but the week runs no
+  repair, so a drop could take that box first. Such a drop is now refused:
+  "Open Fri 06 first".
+- `test_cipm65_the_refusal_reads_the_boxs_date` could not fail for the line in
+  `drop_on_week`, because `block_item` gives the same refusal. It now asserts
+  that nothing is queued.
+
+Fixed though low: the week buttons said "The week is read-only", which is no
+longer true. Recorded, not fixed (low):
+
+- The 40 px floor keeps the boxes but may cut off a column's totals text.
+- `WEEK_CHROME_HEIGHT_PX` is an estimate.
+- `_week_day_read` treats an unknown date as read.
+- A colour lookup that raises fails the whole week draw.
+- Two colour paths are untested: the item fetch for items outside the left
+  pane, and a meeting box keeping its colour.
+- A block whose recorded time disagrees with its box (PD-M14.7) is not
+  checked before a week drop.

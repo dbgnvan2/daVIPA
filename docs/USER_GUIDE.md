@@ -492,7 +492,8 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   day apply, for that date: an item already blocked that day, a full box, or
   a box with a meeting is refused, and a day Day Settings closes asks first.
   Dropping on a date the calendar has not been read for works, and the status
-  line says so. Nothing else changes in the week: Time Blocks and meetings are
+  line says so. A date that still holds blocks from an earlier version, not yet
+  given a box, says *Open Fri 06 first*: opening it as a day places them. Nothing else changes in the week: Time Blocks and meetings are
   moved on the day, and AutoLoad, Clear Day, + Buffer, + Break and ⤴ Google
   Calendar are greyed out until you go back to a day. Click
   a day's heading, boxes or totals to open that date as a day; **‹** and
