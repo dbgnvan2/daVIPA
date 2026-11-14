@@ -369,3 +369,242 @@ def test_cipm61_an_export_finishing_in_the_week_leaves_its_button_disabled(scree
 
     assert screen.btn_export_calendar.cget("state") == "disabled"
     assert screen.status_label.cget("text") == "Exported 1 block"
+
+
+# =====================================================================
+# Plan 2026-11-14 -- resize (M6.3), Category colours (M6.4), drop (M6.5)
+# =====================================================================
+
+from src.getmoredone.models import ActionItem  # noqa: E402
+from src.getmoredone.screens import plan_week_view as wv  # noqa: E402
+
+FRIDAY = WEEK[1]
+SATURDAY = WEEK[2]
+
+
+def _item(manager, title):
+    item = ActionItem(who="me", title=title, start_date=THURSDAY)
+    manager.create_action_item(item)
+    return item
+
+
+def _pointer_on_box(screen, monkeypatch, key):
+    """The pointer inside the week box ``key`` (and the scroll frame), nothing else."""
+    inside = {id(screen.blocks_scroll)}
+    if key is not None:
+        inside.add(id(screen._week_boxes[key][0]))
+    monkeypatch.setattr(screen, "winfo_pointerx", lambda: 0)
+    monkeypatch.setattr(screen, "winfo_pointery", lambda: 0)
+    monkeypatch.setattr(wv, "widget_contains_pointer", lambda w, x, y: id(w) in inside)
+    monkeypatch.setattr(
+        "src.getmoredone.screens.plan.widget_contains_pointer",
+        lambda w, x, y: id(w) in inside or w is screen.day_drop_frame,
+    )
+
+
+def _drop(screen, root, item):
+    screen._drag_kind, screen._drag_item, screen._drag_block = "item", item, None
+    screen.on_drag_release(None)
+    root.update_idletasks()
+    screen.update_idletasks()
+    # block_item runs from after_idle; run the queued callbacks.
+    root.update_idletasks()
+
+
+def _run_idle(screen, root, monkeypatch):
+    """after_idle callbacks, run at once: update() is not safe here."""
+    monkeypatch.setattr(screen, "after_idle", lambda fn: fn())
+
+
+def test_cipm63_columns_follow_the_pane_width(screen, root):
+    _week(screen, root)
+
+    for column in range(1, 8):
+        info = screen.blocks_scroll.grid_columnconfigure(column)
+        assert (info["weight"], info["uniform"], info["minsize"]) == (1, "week", wv.WEEK_COLUMN_WIDTH_PX), column
+    box, _kind = screen._week_boxes[(THURSDAY, TEN)]
+    assert box.grid_info()["sticky"] == "ew"
+
+
+def test_cipm63_boxes_follow_the_pane_height_to_a_floor(screen, root, monkeypatch):
+    _week(screen, root)
+    canvas = screen._day_canvas()
+    rows = screen._week_row_count
+
+    monkeypatch.setattr(canvas, "winfo_height", lambda: 100 + rows * 32)
+    assert screen.fit_week_boxes() is True
+    box, _kind = screen._week_boxes[(THURSDAY, TEN)]
+    assert box.cget("height") == 30
+    assert screen._week_hour_labels[0].cget("height") == 30
+
+    monkeypatch.setattr(canvas, "winfo_height", lambda: 50)
+    screen.fit_week_boxes()
+    assert box.cget("height") == wv.WEEK_BOX_HEIGHT_PX
+
+
+def test_cipm63_an_unchanged_size_sets_nothing(screen, root, monkeypatch):
+    _week(screen, root)
+    canvas = screen._day_canvas()
+    monkeypatch.setattr(canvas, "winfo_height", lambda: 100 + screen._week_row_count * 22)
+    assert screen.fit_week_boxes() is True
+    assert screen.fit_week_boxes() is False
+
+
+def test_cipm63_the_week_fits_the_day_pane_floor(screen, root):
+    _week(screen, root)
+    labels = max([screen.week_back_button.winfo_reqwidth()]
+                 + [label.winfo_reqwidth() for label in screen._week_hour_labels]) + 4
+    arrows = screen.week_forward_button.winfo_reqwidth() + 4
+    columns = 7 * (wv.WEEK_COLUMN_WIDTH_PX + 2)
+
+    assert labels + columns + arrows <= screen.day_width_floor()
+
+
+def test_cipm63_leaving_the_week_restores_the_columns(screen, root):
+    _week(screen, root)
+    screen.set_view_mode("Day")
+
+    for column in range(1, 9):
+        info = screen.blocks_scroll.grid_columnconfigure(column)
+        assert (info["weight"], info["uniform"], info["minsize"]) == (0, None, 0), column
+    assert screen.blocks_scroll.grid_columnconfigure(0)["weight"] == 1
+
+
+def test_cipm64_an_item_box_has_its_category_colour(screen, manager, root, monkeypatch):
+    item = _item(manager, "Coloured")
+    _block(manager, TEN, block_type=BlockType.ITEM, item_id=item.id, label=item.title)
+    monkeypatch.setattr(screen, "_segment_color_resolver",
+                        lambda: lambda it: "#336699" if it.id == item.id else None)
+    _week(screen, root)
+
+    box, kind = screen._week_boxes[(THURSDAY, TEN)]
+    assert kind == PLANNED
+    assert box.cget("fg_color") == "#336699"
+
+
+def test_cipm64_uncoloured_and_padding_keep_the_planned_token(screen, manager, root, monkeypatch):
+    plain = _item(manager, "Plain")
+    _block(manager, 2, block_type=BlockType.ITEM, item_id=plain.id, label=plain.title)
+    _block(manager, 3)  # a break
+    monkeypatch.setattr(screen, "_segment_color_resolver", lambda: lambda it: "#336699" if it is None else None)
+    _week(screen, root)
+
+    planned = wv.week_box_colors()[PLANNED]
+    assert screen._week_boxes[(THURSDAY, 2)][0].cget("fg_color") == planned
+    assert screen._week_boxes[(THURSDAY, 3)][0].cget("fg_color") == planned
+
+
+def test_cipm65_a_drop_writes_on_the_boxs_date(screen, manager, root, monkeypatch):
+    _fresh(manager)
+    item = _item(manager, "Week drop")
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, (FRIDAY, TEN))
+
+    _drop(screen, root, item)
+
+    written = [b for b in manager.get_time_blocks(FRIDAY) if b.item_id == item.id]
+    assert [b.slot_index for b in written] == [TEN]
+    assert not [b for b in manager.get_time_blocks(THURSDAY) if b.item_id == item.id]
+
+
+def test_cipm65_the_refusal_reads_the_boxs_date(screen, manager, root, monkeypatch):
+    _fresh(manager)
+    item = _item(manager, "Twice")
+    _block(manager, 2, block_date=FRIDAY, block_type=BlockType.ITEM, item_id=item.id, label=item.title)
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, (FRIDAY, TEN))
+
+    _drop(screen, root, item)
+
+    assert len([b for b in manager.get_time_blocks(FRIDAY) if b.item_id == item.id]) == 1
+    assert screen.status_label.cget("text").startswith("Twice is already in a Time Block")
+
+
+def test_cipm65_a_meeting_box_refuses(screen, manager, root, monkeypatch):
+    _fresh(manager)
+    from tests.test_plan_screen_commitments import _commitment
+
+    manager.replace_commitments_for_dates(
+        [FRIDAY], [_commitment(600, 630, day=FRIDAY)], datetime.now().isoformat(timespec="seconds")
+    )
+    item = _item(manager, "Into a meeting")
+    _week(screen, root)
+    assert _kinds(screen, FRIDAY)[TEN] == MEETING
+    queued = []
+    monkeypatch.setattr(screen, "after_idle", queued.append)
+    _pointer_on_box(screen, monkeypatch, (FRIDAY, TEN))
+
+    _drop(screen, root, item)
+
+    # Refused before the write is queued, from Friday's own meetings.
+    assert queued == []
+    assert not [b for b in manager.get_time_blocks(FRIDAY) if b.item_id == item.id]
+    assert screen.status_label.cget("text") == "A calendar event holds that Time Block — try another one"
+
+
+def test_cipm65_the_week_stays_and_names_the_date(screen, manager, root, monkeypatch):
+    _fresh(manager)
+    item = _item(manager, "Named")
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, (FRIDAY, TEN))
+
+    _drop(screen, root, item)
+
+    assert screen._week_mode is True
+    assert _kinds(screen, FRIDAY)[TEN] == PLANNED
+    assert screen.status_label.cget("text") == "Blocked 30m for Named on Fri 06 at 10:00"
+
+
+def test_cipm65_an_unread_date_is_said(screen, manager, root, monkeypatch):
+    item = _item(manager, "Unread")
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, (FRIDAY, TEN))
+
+    _drop(screen, root, item)
+
+    assert screen.status_label.cget("text").endswith("— calendar not read for that day")
+
+
+def test_cipm65_a_drop_on_no_box_writes_nothing(screen, manager, root, monkeypatch):
+    item = _item(manager, "Missed")
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, None)
+
+    _drop(screen, root, item)
+
+    assert all(not [b for b in manager.get_time_blocks(d) if b.item_id == item.id] for d in WEEK)
+    assert screen.status_label.cget("text") == "Drop on a box to plan it — click a day to open it"
+
+
+def test_cipm65_the_question_is_about_the_boxs_date(screen, manager, root, monkeypatch):
+    from src.getmoredone.screens import plan as plan_module
+
+    asked = []
+    monkeypatch.setattr(plan_module.messagebox, "askyesno",
+                        lambda title, text, **kw: asked.append(text) or True)
+    _fresh(manager)
+    item = _item(manager, "Weekend")
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, (SATURDAY, TEN))
+
+    _drop(screen, root, item)
+
+    assert len(asked) == 1 and asked[0].startswith(f"{SATURDAY} is not a regular work day")
+    assert SATURDAY in screen._work_anyway and THURSDAY not in screen._work_anyway
+    assert [b.slot_index for b in manager.get_time_blocks(SATURDAY) if b.item_id == item.id] == [TEN]
+
+
+def test_cipm65_the_box_under_the_pointer_is_outlined(screen, root, monkeypatch):
+    _week(screen, root)
+    _pointer_on_box(screen, monkeypatch, (FRIDAY, TEN))
+    screen._drag_kind = "item"
+
+    screen.update_hover_target()
+
+    assert screen._drag_hover_frame is screen._week_boxes[(FRIDAY, TEN)][0]

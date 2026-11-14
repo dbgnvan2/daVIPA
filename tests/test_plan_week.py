@@ -171,3 +171,38 @@ def test_cipm61_a_week_with_nothing_read_has_no_meeting_total():
 
     unread = DaySummary(day=DAY, boxes=[(0, UNREAD)], read=False)
     assert week_total_text([unread]).startswith("Meetings — on 0 of 1 days")
+
+
+# =====================================================================
+# CIP-M6.4 -- which item colours a box (plan 2026-11-14, C1/C2)
+# =====================================================================
+
+def _item_block(manager, slot, item_id, minutes=30, day=DAY):
+    from src.getmoredone.models import ActionItem, BlockType, TimeBlock
+
+    manager.create_action_item(ActionItem(id=item_id, who="me", title=item_id, start_date=day))
+    block = TimeBlock(
+        block_date=day, start_time="", end_time="", planned_minutes=minutes,
+        label=item_id, block_type=BlockType.ITEM, item_id=item_id,
+    )
+    return manager.add_block_at(block, slot, BOUNDS)
+
+
+def test_cipm64_a_box_names_its_earliest_item(manager):
+    """C1 -- a block carried into a box colours it before one starting there."""
+    _item_block(manager, 2, "long", minutes=60)  # boxes 2 and 3
+    _item_block(manager, 3, "short")
+    summary = _day(manager)
+
+    assert summary.items[2] == "long"
+    assert summary.items[3] == "long", "the block starting in the box won over the one carried in"
+    assert summary.grid is not None and summary.grid.span.first == 0
+
+
+def test_cipm64_padding_first_colours_nothing(manager):
+    """C2 -- a buffer or break before the item leaves the box uncoloured."""
+    _block(manager, 2)  # a break
+    _item_block(manager, 2, "after")
+    summary = _day(manager)
+
+    assert 2 not in summary.items
