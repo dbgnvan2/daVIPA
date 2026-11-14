@@ -183,6 +183,16 @@ def _claim_export(db_path, block_date) -> bool:
         return True
 
 
+def export_in_flight(db_path, block_date) -> bool:
+    """Whether an export of this day is running now, on any screen.
+
+    CIP-M6.7 -- a block moved off or onto a day mid-export would have an
+    event id written for the date it has just left (P39).
+    """
+    with _EXPORTS_LOCK:
+        return (str(db_path), str(block_date)) in _EXPORTS_IN_FLIGHT
+
+
 def _release_export(db_path, block_date) -> None:
     """Give the slot back. Called from whichever thread finishes with it."""
     with _EXPORTS_LOCK:
@@ -2966,6 +2976,9 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
     def on_drag_release(self, _event):
         kind, item, block = self._drag_kind, self._drag_item, self._drag_block
         commitment = getattr(self, "_drag_commitment", None)
+        # PD-M10.3 -- a label still armed means the pointer never moved: a
+        # click, not a drag.
+        moved = getattr(self, "_drag_label_text", None) is None
         self.clear_hover_target()
         self._end_drag()
 
@@ -3029,7 +3042,11 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
                 # would put the work somewhere they did not point.
                 self.set_status("Drop an Action Item on a Time Block", "muted")
         elif kind == "block" and block is not None and self._week_mode:
-            self.drop_block_on_week(block)
+            # CIP-M6.7 (cold review) -- every box a block covers picks it up,
+            # so a click on a box it only continues into would move its start
+            # there. A click is not a drop.
+            if moved:
+                self.drop_block_on_week(block)
         elif kind == "block" and block is not None:
             if target is not None:
                 self.after_idle(lambda: self.move_block_to_slot(block.id, target))

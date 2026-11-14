@@ -626,6 +626,23 @@ class PlanWeekViewMixin:
         widget.bind("<B1-Motion>", self.on_drag_motion)
         widget.bind("<ButtonRelease-1>", self.on_drag_release)
 
+    def _export_refusal(self, block, day: str) -> Optional[str]:
+        """A move between dates waits for an export of either date (P39).
+
+        The export writes the event id it made for a block read from the old
+        date; written after the move, it would name an event marked for a
+        date the block has left.
+        """
+        from .plan import export_in_flight  # plan.py imports this module
+
+        if day == block.block_date:
+            return None
+        db_path = self.db_manager.db.db_path
+        for busy in (block.block_date, day):
+            if export_in_flight(db_path, busy):
+                return f"Wait for the Google Calendar export of {short_date(busy)} to finish"
+        return None
+
     def _item_on_date_refusal(self, block, day: str) -> Optional[str]:
         """PF-M2 for a moved block: its item already has a block on ``day``."""
         if day == block.block_date or block.block_type != BlockType.ITEM or not block.item_id:
@@ -674,7 +691,11 @@ class PlanWeekViewMixin:
                 self.set_status("Drop on a box to move it — click a date to open it", "muted")
             return
         day, index = hit
-        refusal = self._unplaced_refusal(day) or self._block_move_refusal(block, index, day)
+        refusal = (
+            self._export_refusal(block, day)
+            or self._unplaced_refusal(day)
+            or self._block_move_refusal(block, index, day)
+        )
         if refusal is not None:
             self.set_status(refusal, "warning")
             return
@@ -689,21 +710,28 @@ class PlanWeekViewMixin:
         moving_date = day != block.block_date
         if moving_date and not self._require_block_day(ask=False, day=day):
             return
-        refusal = self._item_on_date_refusal(block, day)
+        refusal = self._export_refusal(block, day) or self._item_on_date_refusal(block, day)
         if refusal is not None:
             self._non_work_day = False
             self.set_status(refusal, "warning")
             return
-        was_exported = bool(getattr(block, "calendar_event_id", None))
         old_day = block.block_date
+        if self.db_manager.get_time_block(block.id) is None:
+            # Deleted since the week was drawn: say so, and draw it without.
+            self._non_work_day = False
+            self.refresh()
+            self.set_status("That Time Block is no longer there", "warning")
+            return
         try:
-            moved = self.db_manager.move_block_to_date(
+            moved, forgotten = self.db_manager.move_block_to_date(
                 block.id, day, index, self.bounds, day_span=self._placement_for(day)[0]
             )
         except SlotRefusedError as refused:
+            self._non_work_day = False
             self.set_status(refusal_text(refused.reason), "error")
             return
         except ValueError as error:
+            self._non_work_day = False
             self.set_status(str(error), "error")
             return
         self.refresh()
@@ -712,7 +740,7 @@ class PlanWeekViewMixin:
             text += " — calendar not read for that day"
         if moving_date:
             text += self._take_non_work_note(day)
-            if was_exported:
+            if forgotten:
                 text += f" — export {short_date(old_day)} again to remove it from Google Calendar"
         self.set_status(text, "success")
 

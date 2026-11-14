@@ -1986,7 +1986,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin, DBManagerCommitmentsMixin):
 
     def move_block_to_date(
         self, block_id: str, to_date: str, slot_index: int, bounds, day_span=None
-    ) -> TimeBlock:
+    ) -> Tuple[TimeBlock, Optional[str]]:
         """Move a block to a box on another date, or on its own.
 
         Purpose: CIP-M6.7 -- dragging a block from one day of the week to
@@ -2004,17 +2004,25 @@ class DatabaseManager(DBManagerProjectBoardsMixin, DBManagerCommitmentsMixin):
         later export of either date could clean up. The next export of the
         new date makes a fresh one; the next export of the old date removes
         the old one as an orphan. A move within one date keeps the id.
+
+        Returns the moved block and the event id it forgot (``None`` when it
+        had none), read from the row, not from whatever the caller drew.
+
+        Lunch does not move between dates: each date has one, set from Day
+        Settings, and moving it would leave one date with two and the other
+        with none (BSF-M6).
         """
         block = self.get_time_block(block_id)
         if block is None:
             raise ValueError(f"no time block {block_id!r}")
         if block.block_date == to_date:
-            return self.place_block_at(block_id, slot_index, bounds, day_span=day_span)
+            return self.place_block_at(block_id, slot_index, bounds, day_span=day_span), None
+        if BlockType.normalize(block.block_type) == BlockType.LUNCH:
+            raise ValueError("Lunch stays on its own date — move it on that day")
 
+        forgotten = block.calendar_event_id
         self._refuse_unless_it_fits(
-            to_date, slot_index, block.planned_minutes, bounds,
-            day_span=day_span,
-            placing_lunch=BlockType.normalize(block.block_type) == BlockType.LUNCH,
+            to_date, slot_index, block.planned_minutes, bounds, day_span=day_span,
         )
         with self.transaction() as conn:
             block.block_date = to_date
@@ -2026,7 +2034,7 @@ class DatabaseManager(DBManagerProjectBoardsMixin, DBManagerCommitmentsMixin):
             self.set_block_calendar_event_id(block.id, None)
         block.calendar_event_id = None
         block.calendar_event_calendar_id = None
-        return block
+        return block, forgotten
 
     def set_block_length(
         self, block_id: str, minutes: int, bounds, day_span=None
