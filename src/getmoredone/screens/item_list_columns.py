@@ -1,11 +1,13 @@
 """The column layout shared by the four item lists.
 
-Purpose: LSR-M1/M2/M3/M6 -- Today, Upcoming, All Items and Hierarchical give
-         their stretching columns (Title, SubSegment, Category, Who) to one
-         ``ColumnResizer`` each, hold their fixed columns at one width in the
-         header and every row, and refit the stretching columns whenever the
-         list area changes width.
-Spec:    docs/unused-docs/implementation_plan_2026-11-13_resizable_list_layouts.md
+Purpose: LSR-M1/M2/M3/M6, LSR2-M1..M8 -- Today, Upcoming, All Items and
+         Hierarchical give every text column (Title, SubSegment, Category,
+         Who, and each screen's dates, priority, time, status) to one
+         ``ColumnResizer`` each, hold their controls (checkbox, Timer, factor
+         chips) at one width in the header and every row, and refit the text
+         columns whenever the list area changes width.
+Spec:    docs/unused-docs/implementation_plan_2026-11-13_resizable_list_layouts.md,
+         docs/unused-docs/implementation_plan_2026-11-14_all_columns_resize.md
 Tests:   tests/test_list_screen_resize.py
 
 The rows stay each screen's own (plan D8); this module owns only widths.
@@ -18,13 +20,17 @@ from dataclasses import dataclass
 import customtkinter as ctk
 
 from .. import theme
-from .column_resize import CHAR_PX, ColumnResizer, ColumnSpec, min_column_width
+from .column_resize import CHAR_PX, ColumnResizer, ColumnSpec
+from .priority_cell import CELL_INSET_PX, build_level_cell
 
 logger = logging.getLogger(__name__)
 
 STRETCH_KEYS = ("title", "subsegment", "category", "who")
 
-TITLE_MIN_PX = 120
+# LSR2-D4: no list column is made narrower than this many characters at the
+# row font, Title included (user, 2026-11-14).
+LIST_MIN_CHARS = 6
+
 TITLE_MAX_PX = 2000
 # The widths these columns had before LSR: 15, 15 and 10 characters at
 # CHAR_PX, so an unresized list opens as it did.
@@ -199,12 +205,31 @@ def row_char_px() -> int:
     return max(1, round(CHAR_PX * theme.LIST_ROW_FONT_SIZE / CHAR_PX_FONT_SIZE))
 
 
-def stretch_specs(first_col: int, title_default: int) -> list:
-    """The four stretching columns, in grid order from ``first_col``."""
-    floor = min_column_width(row_char_px())
-    return [
+@dataclass(frozen=True)
+class TextColumn:
+    """A screen's own text column after Who: it resizes like the first four.
+
+    ``default_px`` is its width before LSR2, so an unresized list opens as it
+    did, and is its weight until the user drags it (LSR2-D8).
+    """
+
+    key: str
+    grid_col: int
+    heading: str
+    default_px: int
+
+
+def list_floor_px() -> int:
+    """The narrowest any list column is made: 6 characters at the row font."""
+    return LIST_MIN_CHARS * row_char_px()
+
+
+def stretch_specs(first_col: int, title_default: int, columns=()) -> list:
+    """Every resizable column: the four from ``first_col``, then ``columns``."""
+    floor = list_floor_px()
+    specs = [
         ColumnSpec("title", first_col, title_default,
-                   min_width=TITLE_MIN_PX, max_width=TITLE_MAX_PX),
+                   min_width=floor, max_width=TITLE_MAX_PX),
         ColumnSpec("subsegment", first_col + 1, LINEAGE_DEFAULT_PX,
                    min_width=floor, max_width=STRETCH_MAX_PX),
         ColumnSpec("category", first_col + 2, LINEAGE_DEFAULT_PX,
@@ -212,19 +237,24 @@ def stretch_specs(first_col: int, title_default: int) -> list:
         ColumnSpec("who", first_col + 3, WHO_DEFAULT_PX,
                    min_width=floor, max_width=STRETCH_MAX_PX),
     ]
+    for column in columns:
+        specs.append(ColumnSpec(column.key, column.grid_col, column.default_px,
+                                min_width=floor, max_width=STRETCH_MAX_PX))
+    return specs
 
 
 class ItemListLayout:
     """One list screen's column widths, header and resize binding."""
 
     def __init__(self, owner, settings, prefix: str, first_col: int,
-                 title_default: int = 260):
+                 title_default: int = 260, columns=()):
         self.owner = owner
+        self.headings = {column.key: column.heading for column in columns}
         self.resizer = ColumnResizer(
             owner=owner,
             settings=settings,
             prefix=prefix,
-            specs=stretch_specs(first_col, title_default),
+            specs=stretch_specs(first_col, title_default, columns),
             char_px=row_char_px(),
             set_cell_width=True,
         )
@@ -238,8 +268,18 @@ class ItemListLayout:
         self.resizer.on_drag_end = self._on_configure
 
     # ----------------------------------------------------------------- columns
+    @property
+    def keys(self) -> tuple:
+        """Every resizable column, in grid order."""
+        return tuple(self.resizer.order)
+
+    def move(self, key: str, grid_col: int) -> None:
+        """Put a resizable column at another grid index (All Items' Status,
+        which sits after the factor chips when they are shown)."""
+        self.resizer.specs[key].grid_col = grid_col
+
     def set_columns(self, lead, fixed) -> None:
-        """The fixed columns before the stretching ones, and after them."""
+        """The controls before the resizable columns, and after them."""
         self.lead = list(lead)
         self.fixed = list(fixed)
         if self._measured is not None:
@@ -260,7 +300,7 @@ class ItemListLayout:
     def apply_grid(self, frame) -> None:
         """Give a header or row frame every managed column's width."""
         self.resizer.apply_grid(frame)
-        for key in STRETCH_KEYS:
+        for key in self.keys:
             frame.grid_columnconfigure(self.grid_col(key), weight=0)
         for column in self.lead + self.fixed:
             frame.grid_columnconfigure(column.grid_col, minsize=column.column_px,
@@ -293,6 +333,47 @@ class ItemListLayout:
             cells.append((key, label, full, 0))
         self.register_row(frame, cells)
 
+    def add_text_cell(self, frame, key: str, full_text, text_color, font,
+                      **label_kwargs):
+        """Grid a text cell in column ``key`` of a registered row, at that
+        column's width, and keep it following the column (LSR2-M1)."""
+        full = "" if full_text is None else str(full_text)
+        label = ctk.CTkLabel(
+            frame,
+            text=self.cell_text(key, full),
+            width=self.cell_width(key),
+            anchor="w",
+            text_color=text_color,
+            font=font,
+            **label_kwargs,
+        )
+        label.grid(row=0, column=self.grid_col(key), padx=5, pady=5, sticky="w")
+        self.resizer.add_cells(frame, [(key, label, full, 0, 0)])
+        return label
+
+    def add_cell(self, frame, key: str, widget, full_text=None,
+                 width_delta: int = 0) -> None:
+        """Keep a widget the screen built itself at column ``key``'s width.
+
+        ``full_text`` re-cuts its text too; ``width_delta`` is how much
+        narrower than the column it sits, as in ``register_row``.
+        """
+        self.resizer.add_cells(frame, [(key, widget, full_text, 0, width_delta)])
+
+    def add_level_cell(self, frame, key: str, cell, text: str, row_text, font,
+                       on_click=None):
+        """Grid a priority-coloured cell in column ``key`` and keep it, and
+        the label inside it, at that column's width."""
+        box, label = build_level_cell(frame, cell, text, self.cell_width(key),
+                                      row_text, font, on_click=on_click)
+        box.grid(row=0, column=self.grid_col(key), padx=5, pady=5, sticky="w")
+        if box is label:
+            self.add_cell(frame, key, label, text)
+        else:
+            self.add_cell(frame, key, box)
+            self.add_cell(frame, key, label, text, 2 * CELL_INSET_PX)
+        return box, label
+
     def clear_rows(self) -> None:
         self.resizer.clear_rows()
 
@@ -300,9 +381,10 @@ class ItemListLayout:
     def build_header(self, parent, headings: dict, fg_color, border_color):
         """A header row over the same columns as the rows, with drag dividers.
 
-        ``headings`` maps each stretching key to its text; fixed columns take
-        their own ``heading``.
+        ``headings`` maps the first four keys to their text; a screen's own
+        text columns and its controls carry their own ``heading``.
         """
+        headings = {**self.headings, **headings}
         header = ctk.CTkFrame(parent, fg_color=fg_color)
         self.apply_grid(header)
         font = ctk.CTkFont(size=HEADER_FONT_SIZE, weight="bold")
@@ -314,7 +396,7 @@ class ItemListLayout:
                          anchor="w", font=font).grid(
                 row=0, column=column.grid_col, padx=5, pady=4, sticky="w")
         labels = {}
-        for key in STRETCH_KEYS:
+        for key in self.keys:
             label = ctk.CTkLabel(header, text=headings[key], width=self.width(key),
                                  anchor="w", font=font)
             label.grid(row=0, column=self.grid_col(key), padx=5, pady=4, sticky="w")
@@ -338,12 +420,12 @@ class ItemListLayout:
 
     # ----------------------------------------------------------------- fitting
     def reserved_px(self) -> int:
-        """What a row spends on everything but the stretching columns."""
+        """What a row spends on everything but the resizable columns."""
         fixed = sum(column.column_px for column in self.lead + self.fixed)
-        return ROW_PAD_PX + FIT_MARGIN_PX + CELL_PAD_PX * len(STRETCH_KEYS) + fixed
+        return ROW_PAD_PX + FIT_MARGIN_PX + CELL_PAD_PX * len(self.keys) + fixed
 
     def fit(self, list_px: int) -> int:
-        """Share a list ``list_px`` wide across the stretching columns.
+        """Share a list ``list_px`` wide across the resizable columns.
 
         Returns the overflow in pixels. A shortfall is logged once each time
         the list crosses below the floors, not on every ``<Configure>``.

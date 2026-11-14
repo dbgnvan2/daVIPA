@@ -4,6 +4,9 @@ Request (2026-11-13): "For the layouts for Today, Upcoming, All items,
 Hierarchical - make them so all items resize as the user changes the height or
 width of the whole screen or any resizable panels."
 
+Superseded in part by `implementation_plan_2026-11-14_all_columns_resize.md`
+(LSR2, 2026-11-14): every text column now resizes, not only the four.
+
 Status: **built 2026-11-13, D1-D7 approved as defaults, then D2/D7 changed
 (below).** Tier: Full (`src/`), one cold pass at least (CLAUDE.md *Review
 sweeps*). The eight tests that need a mapped window (M2b, M10 x2, four

@@ -40,6 +40,7 @@ from .item_list_columns import (
     FACTOR_CHIP_WIDTHS,
     FixedColumn,
     ItemListLayout,
+    TextColumn,
     factors_column,
     timer_column,
 )
@@ -100,10 +101,14 @@ class TodayScreen(ctk.CTkFrame):
         self.show_top_3_only = False  # Track Top 3 mode
         self.search_query = ""  # Track search query
         self.palette = semantic_colors()
-        # LSR-M1/M2: Title, SubSegment, Category and Who stretch with the
-        # list and take a drag divider each; the rest hold fixed widths.
+        # LSR-M1/M2, LSR2: every text column stretches with the list and
+        # takes a drag divider; the checkbox, chips and Timer hold their size.
         self.layout = ItemListLayout(
-            self, self.settings, self.COLUMN_PREFIX, first_col=1, title_default=260)
+            self, self.settings, self.COLUMN_PREFIX, first_col=1, title_default=260,
+            columns=(TextColumn("start", 5, "Start", 60),
+                     TextColumn("due", 6, "Due", 60),
+                     TextColumn("pri", 7, "Pri", SCORE_CELL_WIDTH_PX),
+                     TextColumn("time", 8, "Time", 50)))
         self.resizer = self.layout.resizer
         self._set_list_columns()
 
@@ -209,14 +214,9 @@ class TodayScreen(ctk.CTkFrame):
         self.toolbar_wrap = ToolbarWrap(header_frame, self.search_entry, 1, 5)
 
     def _set_list_columns(self):
-        """The fixed columns either side of the stretching ones (LSR-M1)."""
+        """The controls either side of the resizable columns (LSR2-D2)."""
         btn_col = 10 if self.columns_expanded else 9
-        fixed = [
-            FixedColumn(5, "Start", 60),
-            FixedColumn(6, "Due", 60),
-            FixedColumn(7, "Pri", SCORE_CELL_WIDTH_PX),
-            FixedColumn(8, "Time", 50),
-        ]
+        fixed = []
         if self.columns_expanded:
             fixed.append(factors_column(9))
         fixed.append(timer_column(btn_col))
@@ -594,15 +594,9 @@ class TodayScreen(ctk.CTkFrame):
                 start_date_text = dt.strftime("%m/%d")
             except:
                 pass
-        start_label = ctk.CTkLabel(
-            frame,
-            text=f"S:{start_date_text}",
-            width=60,
-            anchor="w",
-            text_color=row_text,
-            font=list_row_font()
-        )
-        start_label.grid(row=0, column=5, padx=5, pady=5)
+        # LSR2-D5: no "S:" -- the heading says Start.
+        start_label = self.layout.add_text_cell(
+            frame, "start", start_date_text, row_text, list_row_font())
         start_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_start_date_inline(item_id))
 
         # Due Date
@@ -613,15 +607,8 @@ class TodayScreen(ctk.CTkFrame):
                 due_date_text = dt.strftime("%m/%d")
             except:
                 pass
-        due_label = ctk.CTkLabel(
-            frame,
-            text=f"D:{due_date_text}",
-            width=60,
-            anchor="w",
-            text_color=row_text,
-            font=list_row_font()
-        )
-        due_label.grid(row=0, column=6, padx=5, pady=5)
+        due_label = self.layout.add_text_cell(
+            frame, "due", due_date_text, row_text, list_row_font())
         due_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_due_date_inline(item_id))
 
         # Priority score
@@ -630,23 +617,15 @@ class TodayScreen(ctk.CTkFrame):
         # its own keeps the row's text, which the row may have derived
         # from a segment fill.
         cell = level_cell_fill(self.settings, item)
-        score_label_box, score_label = build_level_cell(
-            frame, cell, score_text(item.priority_score), SCORE_CELL_WIDTH_PX, row_text, list_row_font(),
+        score_label_box, score_label = self.layout.add_level_cell(
+            frame, "pri", cell, score_text(item.priority_score), row_text, list_row_font(),
             on_click=lambda _event, item_id=item.id: self.edit_priority_inline(item_id),
         )
-        score_label_box.grid(row=0, column=7, padx=5, pady=5)
 
         # Estimated time (planned_minutes) - ALWAYS shown (not collapsed)
         time_text = f"{item.planned_minutes}m" if item.planned_minutes else "-"
-        time_label = ctk.CTkLabel(
-            frame,
-            text=time_text,
-            width=50,
-            anchor="w",
-            text_color=row_text,
-            font=list_row_font()
-        )
-        time_label.grid(row=0, column=8, padx=5, pady=5)
+        time_label = self.layout.add_text_cell(
+            frame, "time", time_text, row_text, list_row_font())
 
         # Factor chips (I, U, E, V) - only shown when expanded
         factors_frame = ctk.CTkFrame(frame, fg_color="transparent")

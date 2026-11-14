@@ -293,7 +293,15 @@ Upcoming, All Items and Hierarchical share their width out to Title,
 SubSegment, Category and Who, with pinned headers and drag dividers. Holds
 decisions D1 to D9 and the changes made while building (no window minsize;
 the toolbar wraps to a second row). **Approved and built 2026-11-13**; walk
-owed, in `docs/unused-docs/changes/2026-11-13-lsr.md`.
+owed, in `docs/unused-docs/changes/2026-11-13-lsr.md`. Extended by LSR2 below.
+
+### docs/unused-docs/implementation_plan_2026-11-14_all_columns_resize.md
+
+Implementation plan for LSR2-M1 to M8: every text column on the four item
+lists resizes with the window, down to 6 characters, with a divider each;
+controls keep their size; a column shape survives a narrow window (D6).
+Holds decisions D1 to D8. **Approved and built 2026-11-14**; walk owed, in
+the plan's checklist.
 
 ### docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md
 

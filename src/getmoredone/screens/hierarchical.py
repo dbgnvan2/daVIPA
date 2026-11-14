@@ -12,7 +12,7 @@ from ..priority_levels import (
     row_fill,
 )
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
-from .priority_cell import SCORE_CELL_WIDTH_PX, build_level_cell, score_text
+from .priority_cell import SCORE_CELL_WIDTH_PX, score_text
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import (
     confirm_weekly_tactic_completion,
@@ -24,7 +24,7 @@ from .title_format import (
     format_column_text,
     CONTACT_COL_CHARS,
 )
-from .item_list_columns import FixedColumn, ItemListLayout, ToolbarWrap
+from .item_list_columns import ItemListLayout, TextColumn, ToolbarWrap
 
 # Each tree level indents its title this far, inside the title column.
 INDENT_PX = 30
@@ -65,13 +65,13 @@ class HierarchicalScreen(ctk.CTkFrame):
 
         # LSR-M1/M2/M7: a pinned column header with dividers, and one
         # column layout for it and every row at every depth (LSR-M8).
+        # LSR2: Pri, Due and Sub-items resize too; this list has no controls.
         self.layout = ItemListLayout(
-            self, self.settings, self.COLUMN_PREFIX, first_col=0, title_default=320)
-        self.layout.set_columns([], [
-            FixedColumn(4, "Pri", SCORE_CELL_WIDTH_PX),
-            FixedColumn(5, "Due", 110),
-            FixedColumn(6, "Sub-items", 70),
-        ])
+            self, self.settings, self.COLUMN_PREFIX, first_col=0, title_default=320,
+            columns=(TextColumn("pri", 4, "Pri", SCORE_CELL_WIDTH_PX),
+                     TextColumn("due", 5, "Due", 110),
+                     TextColumn("subitems", 6, "Sub-items", 70)))
+        self.layout.set_columns([], [])
         self.column_header = None
 
         # Create scrollable frame for items
@@ -325,41 +325,16 @@ class HierarchicalScreen(ctk.CTkFrame):
         # its own keeps the row's text, which the row may have derived
         # from a segment fill.
         cell = level_cell_fill(self.settings, item)
-        score_label_box, score_label = build_level_cell(
-            frame, cell, score_text(item.priority_score), SCORE_CELL_WIDTH_PX, row_text, list_row_font(),
+        score_label_box, score_label = self.layout.add_level_cell(
+            frame, "pri", cell, score_text(item.priority_score), row_text, list_row_font(),
         )
-        score_label_box.grid(row=0, column=4, padx=5, pady=5)
 
-        # Due date
-        if item.due_date:
-            due_label = ctk.CTkLabel(
-                frame,
-                text=f"Due: {item.due_date}",
-                width=110,
-                text_color=row_text,
-                font=list_row_font()
-            )
-            due_label.grid(row=0, column=5, padx=5, pady=5)
-        else:
-            # Empty space to maintain alignment
-            ctk.CTkLabel(frame, text="", width=110).grid(
-                row=0, column=5, padx=5, pady=5)
-
-        # Child count
+        # Due date, and the child count; an empty cell still holds its column.
+        due_text = f"Due: {item.due_date}" if item.due_date else ""
+        self.layout.add_text_cell(frame, "due", due_text, row_text, list_row_font())
         children = self.db_manager.get_children(item.id)
-        if children:
-            child_count_label = ctk.CTkLabel(
-                frame,
-                text=f"({len(children)} sub)",
-                width=70,
-                text_color=row_text,
-                font=list_row_font()
-            )
-            child_count_label.grid(row=0, column=6, padx=5, pady=5)
-        else:
-            # Empty space to maintain alignment
-            ctk.CTkLabel(frame, text="", width=70).grid(
-                row=0, column=6, padx=5, pady=5)
+        count_text = f"({len(children)} sub)" if children else ""
+        self.layout.add_text_cell(frame, "subitems", count_text, row_text, list_row_font())
 
         return frame
 

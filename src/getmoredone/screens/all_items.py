@@ -34,6 +34,7 @@ from .item_list_columns import (
     FACTOR_CHIP_WIDTHS,
     FixedColumn,
     ItemListLayout,
+    TextColumn,
     factors_column,
     timer_column,
 )
@@ -73,8 +74,15 @@ class AllItemsScreen(ctk.CTkFrame):
         self.create_header()
 
         # LSR-M1/M2/M9: one column layout for the pinned header and the rows.
+        # LSR2: every text column resizes, Status included; its grid index
+        # moves past the factor chips when they are shown.
         self.layout = ItemListLayout(
-            self, self.settings, self.COLUMN_PREFIX, first_col=1, title_default=260)
+            self, self.settings, self.COLUMN_PREFIX, first_col=1, title_default=260,
+            columns=(TextColumn("start", 5, "Start", 60),
+                     TextColumn("due", 6, "Due", 60),
+                     TextColumn("pri", 7, "Priority", ALL_ITEMS_SCORE_CELL_WIDTH_PX),
+                     TextColumn("time", 8, "Est. Time", 60),
+                     TextColumn("status", 9, "Status", 80)))
         self.column_header = None
 
         # Create scrollable frame for items
@@ -189,15 +197,10 @@ class AllItemsScreen(ctk.CTkFrame):
         Tests:   tests/test_list_screen_resize.py::test_lsrm9_all_items_header_matches_rows_expanded
         """
         offset = 1 if self.columns_expanded else 0
-        fixed = [
-            FixedColumn(5, "Start", 60),
-            FixedColumn(6, "Due", 60),
-            FixedColumn(7, "Priority", ALL_ITEMS_SCORE_CELL_WIDTH_PX),
-            FixedColumn(8, "Est. Time", 60),
-        ]
+        fixed = []
         if self.columns_expanded:
             fixed.append(factors_column(9))
-        fixed.append(FixedColumn(9 + offset, "Status", 80))
+        self.layout.move("status", 9 + offset)
         fixed.append(timer_column(10 + offset, "Actions"))
         self.layout.set_columns([FixedColumn(0, "✓", 30)], fixed)
         if self.column_header is not None:
@@ -359,14 +362,8 @@ class AllItemsScreen(ctk.CTkFrame):
                     start_text = dt.strftime("%m/%d")
                 except:
                     pass
-            start_label = ctk.CTkLabel(
-                item_frame,
-                text=start_text,
-                width=60,
-                text_color=row_text,
-                font=list_row_font()
-            )
-            start_label.grid(row=0, column=5, padx=5, pady=5)
+            start_label = self.layout.add_text_cell(
+                item_frame, "start", start_text, row_text, list_row_font())
             start_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_start_date_inline(item_id))
 
             # Due date
@@ -378,14 +375,8 @@ class AllItemsScreen(ctk.CTkFrame):
                     due_text = dt.strftime("%m/%d")
                 except:
                     pass
-            due_label = ctk.CTkLabel(
-                item_frame,
-                text=due_text,
-                width=60,
-                text_color=row_text,
-                font=list_row_font()
-            )
-            due_label.grid(row=0, column=6, padx=5, pady=5)
+            due_label = self.layout.add_text_cell(
+                item_frame, "due", due_text, row_text, list_row_font())
             due_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_due_date_inline(item_id))
 
             # Priority
@@ -394,21 +385,15 @@ class AllItemsScreen(ctk.CTkFrame):
             # its own keeps the row's text, which the row may have derived
             # from a segment fill.
             cell = level_cell_fill(self.settings, item)
-            priority_label_box, priority_label = build_level_cell(
-                item_frame, cell, score_text(item.priority_score), ALL_ITEMS_SCORE_CELL_WIDTH_PX, row_text, list_row_font(),
+            priority_label_box, priority_label = self.layout.add_level_cell(
+                item_frame, "pri", cell, score_text(item.priority_score), row_text, list_row_font(),
                 on_click=lambda _event, item_id=item.id: self.edit_priority_inline(item_id),
             )
-            priority_label_box.grid(row=0, column=7, padx=5, pady=5)
 
             # Estimated time (planned_minutes) - ALWAYS shown (not collapsed)
             time_text = f"{item.planned_minutes}m" if item.planned_minutes else "-"
-            ctk.CTkLabel(
-                item_frame,
-                text=time_text,
-                width=60,
-                text_color=row_text,
-                font=list_row_font()
-            ).grid(row=0, column=8, padx=5, pady=5)
+            self.layout.add_text_cell(
+                item_frame, "time", time_text, row_text, list_row_font())
 
             # Factor chips (I, U, E, V) - only shown when expanded
             col_offset = 0
@@ -447,8 +432,8 @@ class AllItemsScreen(ctk.CTkFrame):
                 col_offset = 1
 
             # Status
-            ctk.CTkLabel(item_frame, text=item.status, width=80, font=list_row_font(), text_color=row_text).grid(
-                row=0, column=9 + col_offset, padx=5, pady=5)
+            self.layout.add_text_cell(
+                item_frame, "status", item.status, row_text, list_row_font())
 
             # Action buttons. One lower than before: the Context column
             # was removed, so Status now sits at 9 + col_offset.

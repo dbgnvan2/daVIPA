@@ -5,7 +5,7 @@ the draggable divider handles, and live text re-clamping. Screens keep their
 own row/header rendering but delegate widths, clamp counts, and drag handling
 here so the behaviour is identical across screens (Today, Scheduler, ...).
 
-Used by `screens/today.py` and `screens/drag_schedule.py`.
+Used by the four item lists (through `item_list_columns.py`), `screens/drag_schedule.py` and `screens/chip_table.py`.
 """
 
 from dataclasses import dataclass
@@ -80,13 +80,12 @@ class ColumnResizer:
         self._drag = None        # (key, x_root_start, width_start)
         # Called after a divider drag ends and the widths are saved.
         self.on_drag_end = None
-        # The widths held before a too-narrow panel pinned everything to the
-        # floor, so the shape can be given back when the panel is wide enough
-        # again. `_widths` is both the rendered width and the weight
-        # `_share` divides by, so flooring it in place would destroy the
-        # proportions the user set rather than suspend them. None whenever
-        # the floor is not in force.
-        self._pre_floor = None   # {key: width} | None
+        # LSR2-D6: the shape a fit shares the width out by. Only a drag (or
+        # the stored widths, on load) sets it; a fit writes `_widths` alone.
+        # When a fit wrote its result back as the next fit's weights, the
+        # columns that reached their floor first lost their share, and a
+        # narrow-then-wide window came back with a different shape.
+        self._weights = dict(self._widths)
 
     # ------------------------------------------------------------------ widths
     def _setting_attr(self) -> str:
@@ -156,7 +155,9 @@ class ColumnResizer:
         promise. That is what lets a drag and a resize coexist: the drag
         writes a pixel width, which becomes the weight the next resize shares
         the panel out by, so the *shape* the user set survives a window of a
-        different size (UPD-F4.6).
+        different size (UPD-F4.6). The weights are `_weights`, kept apart
+        from the drawn `_widths`: a fit never writes them, so columns that
+        reach their floor on the way down keep their share (LSR2-D6).
 
         The return value is the pixels by which the columns overrun
         `available` -- zero whenever they fit. It is a count, not a flag, so
@@ -180,23 +181,13 @@ class ColumnResizer:
                   for k in order}
         floor_total = sum(floors.values())
         if budget < floor_total:
-            # Remember the shape once, on the way in -- not on every
-            # <Configure> of a drag that holds the window below the floor,
-            # which would overwrite it with the floors themselves.
-            if self._pre_floor is None:
-                self._pre_floor = {k: self._widths[k] for k in order}
-            for key in order:
-                self._widths[key] = floors[key]
-            self._apply_all()
+            # The weights are not touched, so the shape comes back when the
+            # panel is wide enough again (UPD-F4.3, LSR2-D6).
+            floored = {k: floors[k] for k in order}
+            if floored != {k: self._widths[k] for k in order}:
+                self._widths.update(floored)
+                self._apply_all()
             return floor_total - budget
-
-        if self._pre_floor is not None:
-            # Wide enough again: share out the shape the panel had before the
-            # floor, not the flat floors it was left holding.
-            for key in order:
-                if key in self._pre_floor:
-                    self._widths[key] = self._pre_floor[key]
-            self._pre_floor = None
 
         assigned = self._share(order, budget, floors)
         if assigned != {k: self._widths[k] for k in order}:
@@ -217,13 +208,13 @@ class ColumnResizer:
         remaining = budget
 
         while free:
-            weight = sum(self._widths[k] for k in free)
+            weight = sum(self._weights[k] for k in free)
             if weight <= 0:
                 # Nothing to go by; equal shares is the only honest answer.
                 weight = len(free)
                 shares = {k: remaining / len(free) for k in free}
             else:
-                shares = {k: remaining * self._widths[k] / weight for k in free}
+                shares = {k: remaining * self._weights[k] / weight for k in free}
 
             pinned = False
             for key in list(free):
@@ -315,6 +306,19 @@ class ColumnResizer:
             norm.append((key, label, full, reserve, width_delta))
         self._rows.append((frame, norm))
 
+    def add_cells(self, frame, cells) -> None:
+        """Add cells to a row already registered, in `register_row`'s shape."""
+        for row_frame, norm in reversed(self._rows):
+            if row_frame is frame:
+                for cell in cells:
+                    key, label = cell[0], cell[1]
+                    full = cell[2] if len(cell) > 2 else None
+                    reserve = cell[3] if len(cell) > 3 else 0
+                    width_delta = cell[4] if len(cell) > 4 else 0
+                    norm.append((key, label, full, reserve, width_delta))
+                return
+        raise ValueError("add_cells: the row was never registered")
+
     def clear_rows(self) -> None:
         self._rows = []
 
@@ -339,15 +343,13 @@ class ColumnResizer:
         new_width = self._clamp(self.specs[k], w0 + (event.x_root - x0))
         if new_width != self._widths[k]:
             self._widths[k] = new_width
-            # A width the user set by hand while the panel is floored is the
-            # newer intent: the restore must not give it back the old one.
-            # The other columns' remembered shape still stands.
-            if self._pre_floor is not None:
-                self._pre_floor.pop(k, None)
             self._apply_live(k)
 
     def _on_stop(self, event, key) -> None:
         self._drag = None
+        # The shape the user set is the one on screen now: it becomes the
+        # weights every later fit shares out by (LSR2-D6).
+        self._weights = dict(self._widths)
         self._persist()
         if self.on_drag_end is not None:
             self.on_drag_end()

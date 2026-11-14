@@ -80,8 +80,9 @@ daVIPA is a desktop task manager focused on prioritization and execution.
 ## 3) Screen-by-screen guide (What + Why)
 
 ### Resizing the item lists (Today, Upcoming, All Items, Hierarchical)
-- What: Each of these four lists has a pinned column header. Title, SubSegment, Category and Who widen and narrow with the window; Start, Due, Pri, Time, the factor chips, Status and the row buttons keep their width. Text that does not fit is cut with `...`, and the full text comes back when the column is wide enough again.
-- Drag the divider at the right edge of a Title, SubSegment, Category or Who heading to change how the width is shared. Each screen remembers its own column shape between sessions, and keeps that shape as the window is resized.
+- What: Each of these four lists has a pinned column header. Every text column widens and narrows with the window: Title, SubSegment, Category, Who, and each list's Start, Due, Pri (Priority), Time (Est. Time), Status and Sub-items. No column gets narrower than 6 characters. The checkbox, the factor chips and the Timer/Actions buttons keep their size. Text that does not fit is cut with `...`, and the full text comes back when the column is wide enough again.
+- Drag the divider at the right edge of any text column's heading to change how the width is shared. Each screen remembers its own column shape between sessions, and keeps that shape as the window is resized, including after the window has been narrowed until every column is at 6 characters.
+- Start and Due show the date alone (`11/14`); the heading says which date it is.
 - On a narrow window the search box gives up width first. Narrower still, the toolbar's right-hand controls (for example **+ New Item**) move to a second toolbar row. Below what those two rows need, the toolbar and the right-hand columns are cut off; there is no minimum window size.
 - In Hierarchical, sub-items are indented inside the Title column, so the columns to the right line up at every level.
 - Why: Use the window's whole width, whatever its size.

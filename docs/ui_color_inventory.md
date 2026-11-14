@@ -31,7 +31,7 @@ rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkg
 - Named colors (match count): **629**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
-- Widget explicit overrides (line count): **519**
+- Widget explicit overrides (line count): **508**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -46,7 +46,7 @@ and theme_files line counts.
 | `theme_api` | 2 |
 | `theme_files` | 1292 |
 | `tuples` | 2 |
-| `widget` | 519 |
+| `widget` | 508 |
 
 Widget override property breakdown:
 
@@ -56,7 +56,7 @@ Widget override property breakdown:
 | `corner_radius` | 58 |
 | `fg_color` | 243 |
 | `hover_color` | 2 |
-| `text_color` | 202 |
+| `text_color` | 191 |
 
 AppSettings persisted color/theme fields:
 
@@ -2662,7 +2662,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/column_resize.py:287` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
+| `src/getmoredone/screens/column_resize.py:278` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
 | `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
 | `src/getmoredone/theme.py:119` | `"chip_bg": "gray30",` |
 
@@ -2940,7 +2940,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/column_resize.py:287` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
+| `src/getmoredone/screens/column_resize.py:278` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
 | `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
 | `themes/apple_grey.json:286` | `"gray70",` |
 | `themes/base_dark_blue.json:117` | `"unselected_hover_color": ["gray70", "gray41"],` |
