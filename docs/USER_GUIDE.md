@@ -465,12 +465,17 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   lunch, the pane's light fill for a free box. Under each column: *Meetings
   3h* and *Free 2½h*. A box with a meeting and a block in it counts as a
   meeting. A date the calendar has never been read for is drawn in a flat
-  border grey and says *not read* instead of a free count, so an unread day
-  never looks empty; a day Day Settings closes (by default Saturday and
-  Sunday) says *no blocks*. The line above the grid says *Calendar not read
-  for N of 7 days*, or the oldest read time, or a failed read.
+  border grey and says *not read* instead of a free count, and its meetings
+  as *—*, so an unread day never looks empty; a day Day Settings closes (by
+  default Saturday and Sunday) says *no blocks*. A column also says how many
+  blocks are outside the day (*2 outside*) and how many all-day events it has
+  (*1 all-day*), since no box shows either. The line above the grid says a
+  failed or partial read first, then *N of 7 days not read*, else the oldest
+  read time.
 
-  The week is read-only: nothing can be dragged onto it or moved in it. Click
+  The week is read-only: nothing can be dragged onto it or moved in it, and
+  AutoLoad, Clear Day, + Buffer and + Break are greyed out until you go back
+  to a day. Click
   a day's heading, boxes or totals to open that date as a day; **‹** and
   **›** move a week back or forward. **↻ Calendar** in the week reads all
   seven dates at once, and a week with any date older than 15 minutes is read
