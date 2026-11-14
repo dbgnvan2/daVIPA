@@ -466,16 +466,44 @@ def test_cipm63_no_column_is_narrower_than_its_text(screen, root):
 
 
 def test_cipm63_a_longer_total_widens_the_columns(screen, manager, root):
-    """A column showing more ("2 outside", "1 all-day") holds its widest line."""
+    """A longer totals line ("Meetings 10½h") widens every column on the next draw."""
+    from tests.test_plan_screen_commitments import _commitment
+
+    _fresh(manager)
     _week(screen, root)
     before = screen.blocks_scroll.grid_columnconfigure(1)["minsize"]
-    _boxless_block(manager, FRIDAY)
-    _boxless_block(manager, FRIDAY)
+    manager.replace_commitments_for_dates(
+        [FRIDAY], [_commitment(480, 1110, day=FRIDAY)], datetime.now().isoformat(timespec="seconds")
+    )
     screen.load_week()
     root.update_idletasks()
 
-    assert screen.blocks_scroll.grid_columnconfigure(1)["minsize"] == _widest_text(screen)
-    assert _widest_text(screen) >= before
+    assert screen._week_totals[FRIDAY].cget("text").startswith("Meetings 10½h")
+    after = screen.blocks_scroll.grid_columnconfigure(1)["minsize"]
+    assert after > before
+    assert after == _widest_text(screen)
+
+
+def test_cipm63_the_divider_gives_way_to_the_week_and_comes_back(screen, root, monkeypatch):
+    """In a window with room for the items setting beside the day but not beside
+    the week, the week takes the difference from the items pane; the day gives it back."""
+    from src.getmoredone.screens.plan import PLAN_PANE_CHROME_PX
+
+    setting = screen.items_width_floor() + 40
+    day_floor = screen.day_width_floor()
+    room = PLAN_PANE_CHROME_PX + setting + day_floor + 10
+    monkeypatch.setattr(screen, "winfo_width", lambda: room)
+    monkeypatch.setattr(screen, "items_col_width", lambda: setting)
+    screen.apply_items_width(setting)
+    assert screen._items_width == setting
+
+    _week(screen, root)
+    week_items = room - PLAN_PANE_CHROME_PX - screen.day_width_floor()
+    assert week_items < setting, "the case this guards is the week needing more than the day"
+    assert screen._items_width == week_items
+
+    screen.set_view_mode("Day")
+    assert screen._items_width == setting
 
 
 def test_cipm63_the_pane_floor_holds_the_week(screen, root):
@@ -685,3 +713,28 @@ def test_cipm65_a_date_with_unplaced_blocks_is_refused(screen, manager, root, mo
     assert screen.status_label.cget("text") == (
         "Open Fri 06 first — 1 block(s) from an earlier version need a box"
     )
+
+
+def test_cipm63_a_narrower_week_gives_width_back(screen, manager, root, monkeypatch):
+    """The clamp asks for the setting each draw, so a wide week does not ratchet
+    the items pane down for the next, narrower one."""
+    from src.getmoredone.screens.plan import PLAN_PANE_CHROME_PX
+    from tests.test_plan_screen_commitments import _commitment
+
+    _fresh(manager)
+    manager.replace_commitments_for_dates(
+        [FRIDAY], [_commitment(480, 1110, day=FRIDAY)], datetime.now().isoformat(timespec="seconds")
+    )
+    setting = screen.items_width_floor() + 400
+    room = PLAN_PANE_CHROME_PX + setting + screen.day_width_floor()
+    monkeypatch.setattr(screen, "winfo_width", lambda: room)
+    monkeypatch.setattr(screen, "items_col_width", lambda: setting)
+    _week(screen, root)
+    wide = screen._items_width
+
+    _fresh(manager)
+    screen.load_week()
+    root.update_idletasks()
+
+    assert screen._items_width > wide, "the narrower week left the items pane where the wide one put it"
+    assert screen._items_width == min(setting, room - PLAN_PANE_CHROME_PX - screen.day_width_floor())
