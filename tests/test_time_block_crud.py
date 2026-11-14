@@ -1170,3 +1170,56 @@ def test_pdm147_an_off_box_time_is_counted_even_when_the_floor_agrees(manager):
     result = manager.repair_slots_from_times(DAY, DayBounds(day_start="08:15"))
 
     assert result.misaligned == 1 and result.moved == []
+
+
+# --- CIP-M6.7: moving a block to another date --------------------------------
+
+def test_cipm67_a_block_moves_to_another_date(manager):
+    block = _at(manager, 30, "mover", 2)
+    _at(manager, 30, "already there", 4, block_date=NEXT_DAY)
+
+    moved = manager.move_block_to_date(block.id, NEXT_DAY, 4, BOUNDS)
+
+    assert _day(manager) == []
+    stored = manager.get_time_block(block.id)
+    assert (stored.block_date, stored.slot_index) == (NEXT_DAY, 4)
+    assert [b.label for b in manager.get_time_blocks(NEXT_DAY)] == ["already there", "mover"]
+    assert (stored.start_time, stored.end_time) == ("10:00", "10:30")
+    assert (moved.block_date, moved.slot_index) == (NEXT_DAY, 4)
+
+
+def test_cipm67_a_move_that_does_not_fit_writes_nothing(manager):
+    block = _at(manager, 30, "mover", 2)
+    before = (_day(manager), _day(manager, NEXT_DAY))
+
+    with pytest.raises(SlotRefusedError) as refusal:
+        manager.move_block_to_date(block.id, NEXT_DAY, 8, BOUNDS)   # 12:00 is lunch
+
+    assert refusal.value.reason == SlotRefusal.CROSSES_LUNCH
+    assert (_day(manager), _day(manager, NEXT_DAY)) == before
+
+
+def test_cipm67_the_fit_is_checked_on_the_target_date(manager):
+    block = _at(manager, 30, "mover", 4)
+    for n in range(MAX_BLOCKS_PER_SLOT):
+        _at(manager, 30, f"other {n}", 4, block_date=NEXT_DAY)
+
+    with pytest.raises(SlotRefusedError):
+        manager.move_block_to_date(block.id, NEXT_DAY, 4, BOUNDS)
+
+    assert manager.get_time_block(block.id).block_date == DAY
+
+
+def test_cipm67_a_move_to_another_date_forgets_its_event(manager):
+    away = _at(manager, 30, "away", 2)
+    stays = _at(manager, 30, "stays", 3)
+    manager.set_block_calendar_event_id(away.id, "gcal-away", "cal")
+    manager.set_block_calendar_event_id(stays.id, "gcal-stays", "cal")
+
+    manager.move_block_to_date(away.id, NEXT_DAY, 4, BOUNDS)
+    manager.move_block_to_date(stays.id, DAY, 5, BOUNDS)
+
+    gone = manager.get_time_block(away.id)
+    assert (gone.calendar_event_id, gone.calendar_event_calendar_id) == (None, None)
+    kept = manager.get_time_block(stays.id)
+    assert (kept.calendar_event_id, kept.slot_index) == ("gcal-stays", 5)

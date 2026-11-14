@@ -265,7 +265,7 @@ def test_cipm61_the_day_buttons_are_refused_in_the_week(screen, manager, root):
     screen.add_padding_block(BlockType.BUFFER)
     screen.autoload_day()
     assert manager.get_time_blocks(THURSDAY) == []
-    assert screen.status_label.cget("text") == "In the week, only an Action Item can be dropped — click a day to plan it"
+    assert screen.status_label.cget("text") == "In the week, drag an Action Item or a Time Block — click a date to open the day"
 
     screen.view_toggle.set("Day")
     screen.set_view_mode("Day")
@@ -334,7 +334,7 @@ def test_cipm61_the_export_is_refused_in_the_week(screen, root):
     assert screen.btn_export_calendar.cget("state") == "disabled"
     screen.export_day_to_calendar()
     assert not getattr(screen, "_export_running", False)
-    assert screen.status_label.cget("text") == "In the week, only an Action Item can be dropped — click a day to plan it"
+    assert screen.status_label.cget("text") == "In the week, drag an Action Item or a Time Block — click a date to open the day"
 
 
 def test_cipm61_leaving_the_week_mid_export_keeps_the_export_disabled(screen, root):
@@ -643,7 +643,7 @@ def test_cipm65_a_drop_on_no_box_writes_nothing(screen, manager, root, monkeypat
     _drop(screen, root, item)
 
     assert all(not [b for b in manager.get_time_blocks(d) if b.item_id == item.id] for d in WEEK)
-    assert screen.status_label.cget("text") == "Drop on a box to plan it — click a day to open it"
+    assert screen.status_label.cget("text") == "Drop on a box to plan it — click a date to open it"
 
 
 def test_cipm65_the_question_is_about_the_boxs_date(screen, manager, root, monkeypatch):
@@ -897,3 +897,210 @@ def test_cipm63_at_150_percent_the_boxes_fill_the_pane_not_overflow_it(screen, r
     monkeypatch.setattr(screen._day_canvas(), "winfo_height", lambda: 1.5 * (100 + rows * 32))
 
     assert screen.week_box_height() == 30
+
+
+# =====================================================================
+# CIP-M6.7 -- dragging a Time Block from one day to another
+# CIP-M6.8 -- only the date heading opens the day
+# =====================================================================
+
+def _item_block(manager, slot, title, day=THURSDAY, minutes=30):
+    item = _item(manager, title)
+    return item, _block(manager, slot, block_date=day, block_type=BlockType.ITEM,
+                        item_id=item.id, label=title, minutes=minutes)
+
+
+def _drop_block(screen, root, block):
+    screen._drag_kind, screen._drag_item, screen._drag_block = "block", None, block
+    screen.on_drag_release(None)
+    root.update_idletasks()
+
+
+def _record_bindings(screen, monkeypatch):
+    """Which widget each week binding went to: {"open": [...], "drag": [(widget, block)]}."""
+    seen = {"open": [], "drag": []}
+    monkeypatch.setattr(screen, "_bind_open", lambda widget, day: seen["open"].append(widget))
+    monkeypatch.setattr(screen, "_bind_week_block_drag",
+                        lambda widget, block: seen["drag"].append((widget, block)))
+    return seen
+
+
+def test_cipm67_a_press_picks_up_the_boxs_first_block(screen, manager, root, monkeypatch):
+    _item, block = _item_block(manager, TEN, "Report")
+    seen = _record_bindings(screen, monkeypatch)
+    _week(screen, root)
+    box, _kind = screen._week_boxes[(THURSDAY, TEN)]
+    title = screen._week_titles[(THURSDAY, TEN)]
+
+    picked = {id(widget): b for widget, b in seen["drag"] if b is not None}
+    assert picked[id(box)].id == block.id
+    assert picked[id(title)].id == block.id
+
+
+def test_cipm67_a_bound_press_starts_a_block_drag(screen, manager, root):
+    _item, block = _item_block(manager, TEN, "Report")
+
+    class Recorder:
+        def __init__(self):
+            self.bound = {}
+
+        def bind(self, sequence, callback):
+            self.bound[sequence] = callback
+
+    widget = Recorder()
+    screen._bind_week_block_drag(widget, block)
+    widget.bound["<ButtonPress-1>"](None)
+
+    assert screen._drag_kind == "block" and screen._drag_block is block
+    assert widget.bound["<ButtonRelease-1>"] == screen.on_drag_release
+    nothing = Recorder()
+    screen._bind_week_block_drag(nothing, None)
+    assert nothing.bound == {}
+
+
+def test_cipm67_lunch_and_meeting_boxes_pick_nothing_up(screen, manager, root, monkeypatch):
+    from src.getmoredone.models import TimeBlock as TB
+    from tests.test_plan_screen_commitments import _commitment
+
+    manager.add_block_at(TB(block_date=THURSDAY, start_time="", end_time="", planned_minutes=30,
+                            label="Lunch", block_type=BlockType.LUNCH), TEN, screen.bounds)
+    # Placed first: a block cannot be put on a meeting. The meeting wins the box.
+    _block(manager, TEN, block_date=FRIDAY, block_type=BlockType.ITEM,
+           item_id=_item(manager, "Under").id, label="Under")
+    manager.replace_commitments_for_dates(
+        [FRIDAY], [_commitment(600, 630, day=FRIDAY)], datetime.now().isoformat(timespec="seconds")
+    )
+    seen = _record_bindings(screen, monkeypatch)
+    _week(screen, root)
+    picked = {id(widget): b for widget, b in seen["drag"]}
+
+    assert picked[id(screen._week_boxes[(THURSDAY, TEN)][0])] is None
+    assert picked[id(screen._week_boxes[(FRIDAY, TEN)][0])] is None
+
+
+def test_cipm67_a_drop_moves_the_block_to_that_date(screen, manager, root, monkeypatch):
+    _fresh(manager)
+    _item, block = _item_block(manager, 2, "Mover")
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, (FRIDAY, TEN))
+
+    _drop_block(screen, root, block)
+
+    stored = manager.get_time_block(block.id)
+    assert (stored.block_date, stored.slot_index) == (FRIDAY, TEN)
+    assert screen._week_mode is True
+    assert (FRIDAY, TEN) in screen._week_titles, "the week was not redrawn"
+    assert screen.status_label.cget("text") == f"Moved Mover to {wv.short_date(FRIDAY)} at {stored.start_time}"
+
+
+def test_cipm67_the_target_dates_rules_refuse(screen, manager, root, monkeypatch):
+    from tests.test_plan_screen_commitments import _commitment
+
+    _fresh(manager)
+    manager.replace_commitments_for_dates(
+        [FRIDAY], [_commitment(600, 630, day=FRIDAY)], datetime.now().isoformat(timespec="seconds")
+    )
+    item, block = _item_block(manager, 2, "Twice")
+    _block(manager, 3, block_date=FRIDAY, block_type=BlockType.ITEM, item_id=item.id, label="Twice")
+    _week(screen, root)
+    queued = []
+    monkeypatch.setattr(screen, "after_idle", queued.append)
+
+    _pointer_on_box(screen, monkeypatch, (FRIDAY, TEN))  # a meeting
+    _drop_block(screen, root, block)
+    assert screen.status_label.cget("text") == "Twice is already in a Time Block on " \
+        f"{wv.short_date(FRIDAY)} at 09:30 — drag that Time Block to move it"
+
+    _other, free_block = _item_block(manager, 4, "Into a meeting")
+    _drop_block(screen, root, free_block)
+    assert screen.status_label.cget("text") == "A calendar event holds that Time Block — try another one"
+
+    assert queued == []
+    assert manager.get_time_block(block.id).block_date == THURSDAY
+    assert manager.get_time_block(free_block.id).block_date == THURSDAY
+
+
+def test_cipm67_the_write_rechecks_the_item_on_that_date(screen, manager, root):
+    item, block = _item_block(manager, 2, "Raced")
+    _block(manager, 3, block_date=FRIDAY, block_type=BlockType.ITEM, item_id=item.id, label="Raced")
+
+    screen.move_block_to_day(block, TEN, FRIDAY)
+
+    assert manager.get_time_block(block.id).block_date == THURSDAY
+    assert screen.status_label.cget("text").startswith("Raced is already in a Time Block on")
+
+
+def test_cipm67_a_non_work_date_asks_first(screen, manager, root, monkeypatch):
+    from src.getmoredone.screens import plan as plan_module
+
+    asked = []
+    monkeypatch.setattr(plan_module.messagebox, "askyesno",
+                        lambda title, text, **kw: asked.append(text) or True)
+    _fresh(manager)
+    _item, block = _item_block(manager, 2, "Weekend")
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, (SATURDAY, TEN))
+
+    _drop_block(screen, root, block)
+
+    assert len(asked) == 1 and asked[0].startswith(f"{SATURDAY} is not a regular work day")
+    assert SATURDAY in screen._work_anyway and THURSDAY not in screen._work_anyway
+    assert manager.get_time_block(block.id).block_date == SATURDAY
+
+
+def test_cipm67_a_move_within_the_date_asks_nothing(screen, manager, root, monkeypatch):
+    from src.getmoredone.screens import plan as plan_module
+
+    asked = []
+    monkeypatch.setattr(plan_module.messagebox, "askyesno",
+                        lambda title, text, **kw: asked.append(text) or True)
+    _fresh(manager)
+    _item, block = _item_block(manager, 2, "Saturday", day=SATURDAY)
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, (SATURDAY, TEN))
+
+    _drop_block(screen, root, block)
+
+    assert asked == []
+    assert manager.get_time_block(block.id).slot_index == TEN
+
+
+def test_cipm67_the_status_names_the_old_date_when_an_event_is_forgotten(screen, manager, root, monkeypatch):
+    _fresh(manager)
+    _item, block = _item_block(manager, 2, "Exported")
+    manager.set_block_calendar_event_id(block.id, "gcal-1", "cal")
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, (FRIDAY, TEN))
+
+    _drop_block(screen, root, manager.get_time_block(block.id))
+
+    assert manager.get_time_block(block.id).calendar_event_id is None
+    assert screen.status_label.cget("text").endswith(
+        f" — export {wv.short_date(THURSDAY)} again to remove it from Google Calendar"
+    )
+
+
+def test_cipm67_a_drop_on_no_box_writes_nothing(screen, manager, root, monkeypatch):
+    _item, block = _item_block(manager, 2, "Missed")
+    _week(screen, root)
+    _run_idle(screen, root, monkeypatch)
+    _pointer_on_box(screen, monkeypatch, None)
+
+    _drop_block(screen, root, block)
+
+    assert manager.get_time_block(block.id).slot_index == 2
+    assert screen.status_label.cget("text") == "Drop on a box to move it — click a date to open it"
+
+
+def test_cipm68_only_the_date_heading_opens_the_day(screen, manager, root, monkeypatch):
+    _item_block(manager, TEN, "Stay")
+    seen = _record_bindings(screen, monkeypatch)
+    _week(screen, root)
+
+    headings = {id(h) for h in screen._week_headers.values()}
+    assert {id(w) for w in seen["open"]} == headings
+    assert len(seen["open"]) == 7

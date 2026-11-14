@@ -238,3 +238,34 @@ def test_cipm66_padding_first_has_no_title(manager):
     summary = _day(manager)
 
     assert 2 not in summary.starts
+
+
+# =====================================================================
+# CIP-M6.7 -- the block a press on a week box picks up
+# =====================================================================
+
+def test_cipm67_a_box_gives_up_its_earliest_block(manager):
+    """B1 -- the block carried into the box, before one starting there."""
+    long = _item_block(manager, 2, "long", minutes=60)  # boxes 2 and 3
+    short = _item_block(manager, 3, "short")
+    summary = _day(manager)
+
+    assert summary.blocks[2].id == long.id
+    assert summary.blocks[3].id == long.id
+    assert short.id not in {b.id for b in summary.blocks.values()}
+
+
+def test_cipm67_padding_is_picked_up_and_lunch_is_not(manager):
+    """B2 -- buffers and breaks move; lunch is set per date, so it does not."""
+    from src.getmoredone.models import BlockType, TimeBlock
+
+    padding = _block(manager, 2)  # a break
+    lunch = manager.add_block_at(
+        TimeBlock(block_date=DAY, start_time="", end_time="", planned_minutes=30,
+                  label="Lunch", block_type=BlockType.LUNCH),
+        5, BOUNDS,
+    )
+    summary = _day(manager)
+
+    assert summary.blocks[2].id == padding.id
+    assert 5 not in summary.blocks and lunch.slot_index == 5
