@@ -473,7 +473,8 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   The week is the selected date and the six after it, as seven columns of the
   same half-hour boxes. The columns share the pane's width and the boxes grow
   with its height, so dragging the divider or resizing the window resizes the
-  week. Purple is a meeting. A Time Block for an Action Item is that item's
+  week. A column is never narrower than its heading and totals: in the week,
+  the divider stops where they would be cut off. Purple is a meeting. A Time Block for an Action Item is that item's
   Category colour (from Vision Planning), and grey is lunch, a Buffer or
   Break, or an item with no Category colour. The pane's light fill is a free
   box. Under each column: *Meetings

@@ -169,7 +169,12 @@ and these mediums, all fixed with a test:
 Fixed though low: the week buttons said "The week is read-only", which is no
 longer true. Recorded, not fixed (low):
 
-- The 40 px floor keeps the boxes but may cut off a column's totals text.
+- ~~The 40 px floor keeps the boxes but may cut off a column's totals text.~~
+  Fixed 2026-11-14: a column's floor is its widest heading or totals text
+  (`fit_week_columns`), and in the week `day_width_floor` holds what the
+  week needs, so the divider stops before the text is cut. Measured on an
+  unmapped screen: totals need 60 px, and the week needs 555 px against the
+  day's 518 px.
 - `WEEK_CHROME_HEIGHT_PX` is an estimate.
 - `_week_day_read` treats an unknown date as read.
 - A colour lookup that raises fails the whole week draw.
