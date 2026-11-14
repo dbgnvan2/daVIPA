@@ -1,8 +1,8 @@
 # Plan: the Scheduler's item columns resize with the window (SCR)
 
 - Date: 2026-11-14
-- Status: **approved 2026-11-14 ("Yes, build it") and built 2026-11-14.**
-  The walk below is not yet done.
+- Status: **approved, built and pushed 2026-11-14.** Walked by the user
+  2026-11-14: "all good on the resizing".
 - Screen: Scheduler (`src/getmoredone/screens/drag_schedule.py`), left
   "Action Items" list
 - Follows: LSR and LSR2, which covered Today, Upcoming, All Items and
@@ -113,12 +113,12 @@ session's shared settings file.
 
 ## Walk checklist (by hand, after the build)
 
-- [ ] Open the Scheduler: the five columns fill the list with no gap at the
+- [x] Open the Scheduler: the five columns fill the list with no gap at the
       right.
-- [ ] Widen and narrow the window: the list and its columns change width in
+- [x] Widen and narrow the window: the list and its columns change width in
       proportion.
-- [ ] Drag the divider between the list and the date boxes: the columns
+- [x] Drag the divider between the list and the date boxes: the columns
       refit to the new list width.
-- [ ] Drag a column divider: when you let go, that column stays where you
+- [x] Drag a column divider: when you let go, that column stays where you
       dropped it and the others refit to fill the list. Near the floor, headings are cut with "..." and stay over their
       columns.

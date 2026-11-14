@@ -308,7 +308,7 @@ the plan's checklist.
 Implementation plan for SCR-M1 to M7: the Scheduler's item columns (Title,
 Segment, SubSegment, Category, Start Date) fill the list and follow its
 width, down to 6 characters; both splitter panes grow with the window.
-**Approved and built 2026-11-14**; walk owed, in the plan's checklist.
+**Approved, built and walked 2026-11-14.**
 
 ### docs/unused-docs/implementation_plan_2026-11-08_plan_calendar_export.md
 
