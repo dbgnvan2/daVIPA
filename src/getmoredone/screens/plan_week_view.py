@@ -82,6 +82,25 @@ def fit_text(text: str, measure, width: int) -> str:
 def week_title_text(title: str, others: int) -> str:
     """What a box says: the title, and "+N" for the others starting with it."""
     return f"{title} +{others}" if others else title
+
+
+def fit_title(title: str, others: int, measure, width: int) -> str:
+    """``week_title_text`` cut to ``width``, keeping "+N" whole.
+
+    The title is cut, not the count, so a long title still says how many
+    others start with it. When no part of the title fits, the count alone.
+    """
+    if not others:
+        return fit_text(title, measure, width)
+    whole = week_title_text(title, others)
+    if measure(whole) <= width:
+        return whole
+    suffix = f" +{others}"
+    head = fit_text(title, measure, width - measure(suffix))
+    if head:
+        return head + suffix
+    count = f"+{others}"
+    return count if measure(count) <= width else ""
 #: What the grid spends on height that is not boxes: the heading row and up
 #: to four lines of totals under each column.
 WEEK_CHROME_HEIGHT_PX = 100
@@ -383,7 +402,8 @@ class PlanWeekViewMixin:
         if background is None:
             return
         item_id, label, others = start
-        full = week_title_text(title_for(item_id, label), others)
+        title = title_for(item_id, label)
+        full = week_title_text(title, others)
         font = ctk.CTkFont(size=WEEK_TITLE_FONT_SIZE)
         text = tk.Label(
             box, text="", font=font, anchor="w", padx=0, pady=0, bd=0,
@@ -392,6 +412,7 @@ class PlanWeekViewMixin:
         text.place(x=WEEK_TITLE_INSET_PX, rely=0.5, anchor="w",
                    relwidth=1, width=-2 * WEEK_TITLE_INSET_PX)
         text.full_title = full
+        text.title_parts = (title, others)
         text.title_font = font
         text.bind("<Configure>", lambda event, w=text: self._fit_week_title(w, event.width))
         self._fit_week_title(text, WEEK_COLUMN_WIDTH_PX - 2 * WEEK_TITLE_INSET_PX)
@@ -400,7 +421,8 @@ class PlanWeekViewMixin:
 
     @staticmethod
     def _fit_week_title(label, width: int) -> str:
-        fitted = fit_text(label.full_title, label.title_font.measure, width)
+        title, others = label.title_parts
+        fitted = fit_title(title, others, label.title_font.measure, width)
         if label.cget("text") != fitted:
             label.configure(text=fitted)
         return fitted
