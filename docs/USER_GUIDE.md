@@ -474,8 +474,8 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   read time.
 
   The week is read-only: nothing can be dragged onto it or moved in it, and
-  AutoLoad, Clear Day, + Buffer and + Break are greyed out until you go back
-  to a day. Click
+  AutoLoad, Clear Day, + Buffer, + Break and ⤴ Google Calendar are greyed
+  out until you go back to a day. Click
   a day's heading, boxes or totals to open that date as a day; **‹** and
   **›** move a week back or forward. **↻ Calendar** in the week reads all
   seven dates at once, and a week with any date older than 15 minutes is read
