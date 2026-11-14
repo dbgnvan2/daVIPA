@@ -38,3 +38,5 @@ Open the Plan, choose **Week**.
 18. [ ] Export a day, then move one of its blocks to another day: the status
     says to export the old day again. Do that: the old event is gone from
     Google Calendar. Export the new day: the block's event is there.
+19. [ ] Make a one-hour block, then click (no drag) its second box in the
+    week: the block does not move and the status line does not change.

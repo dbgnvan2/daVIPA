@@ -95,14 +95,14 @@ mutation-checked against the verbatim line it names.
 |---|---|---|
 | CIP-M6.7a | `move_block_to_date` writes the new date, box and times in one go | `test_cipm67_a_block_moves_to_another_date` |
 | CIP-M6.7b | A move that does not fit on the target date writes nothing | `test_cipm67_a_move_that_does_not_fit_writes_nothing` |
-| CIP-M6.7c | A move to another date clears the event id; one within a date keeps it | `test_cipm67_a_move_to_another_date_forgets_its_event` |
-| CIP-M6.7d | A press on a box picks up its earliest block; lunch picks up nothing | `test_cipm67_a_press_picks_up_the_boxs_first_block` |
+| CIP-M6.7c | A move to another date clears the event id and reports it; one within a date keeps it | `test_cipm67_a_move_to_another_date_forgets_its_event` |
+| CIP-M6.7d | A press on a box picks up its earliest block; lunch picks up nothing | `test_cipm67_a_press_picks_up_the_boxs_first_block`, `test_cipm67_a_bound_press_starts_a_block_drag`, `test_cipm67_lunch_and_meeting_boxes_pick_nothing_up` (screen); `test_cipm67_lunch_does_not_move_to_another_date` (db) |
 | CIP-M6.7e | A drop on another date's free box moves the block there; the week stays | `test_cipm67_a_drop_moves_the_block_to_that_date` |
-| CIP-M6.7f | A meeting box, a full box, and an item already on that date refuse and write nothing | `test_cipm67_the_target_dates_rules_refuse` |
-| CIP-M6.7g | A non-work date asks, and the answer is for that date | `test_cipm67_a_non_work_date_asks_first` |
-| CIP-M6.7h | The status names the date, and the old date when an event was cleared | `test_cipm67_the_status_names_the_dates` |
-| CIP-M6.8a | A click on a box, a title or a total stays in the week | `test_cipm68_a_click_off_the_date_stays_in_the_week` |
-| CIP-M6.8b | A click on the date heading opens that day | `test_cipm68_the_date_heading_opens_the_day` |
+| CIP-M6.7f | A meeting box, a full box, an item already on that date, an unopened date, and an export of either date refuse and write nothing | `test_cipm67_the_target_dates_rules_refuse`, `test_cipm67_the_fit_is_checked_on_the_target_date`, `test_cipm67_the_write_rechecks_the_item_on_that_date`, `test_cipm67_a_day_with_unplaced_blocks_refuses_a_block`, `test_cipm67_a_move_waits_for_an_export_of_either_date` |
+| CIP-M6.7g | A non-work date asks, and the answer is for that date | `test_cipm67_a_non_work_date_asks_first`, `test_cipm67_a_move_within_the_date_asks_nothing` |
+| CIP-M6.7h | The status names the date, and the old date when an event was cleared | `test_cipm67_a_drop_moves_the_block_to_that_date`, `test_cipm67_the_status_names_the_old_date_when_an_event_is_forgotten` |
+| CIP-M6.7i | A press and release with no motion moves nothing (B3) | `test_cipm67_a_click_on_a_box_is_not_a_move` |
+| CIP-M6.8a, b | Only the date heading opens the day; boxes, titles and totals do not | `test_cipm68_only_the_date_heading_opens_the_day` |
 
 Existing tests that change:
 
@@ -133,3 +133,31 @@ Expected size: about 120 lines of `src/` and about 12 tests.
   nothing reaches it. B8 avoids it rather than fixing it.
 - A press on a box that holds two blocks can only pick up the first (B1). The
   day is the place to move the second.
+
+## Review, 2026-11-14
+
+`learning-qa` and a cold correctness pass ran over b98ef33..e2279a8. Fixed,
+each with a mutation-checked test:
+
+- **High:** a click with no motion on any box a block covered moved the
+  block's start there. A week block drop now needs motion (B3).
+- An export running for either date could write an event id onto a block
+  that had just moved (P39). The move is refused while either date is in
+  `_EXPORTS_IN_FLIGHT`, at the drop and again at the write.
+- The "export again" note was read from the block as drawn.
+  `move_block_to_date` now returns the id it cleared, read from the row.
+- `move_block_to_date` refused lunch only on the screen. It now raises
+  `ValueError` for a lunch moving between dates.
+- No test covered "Open … first" for a block drop. One does now.
+- A block deleted since the week was drawn raised a raw id. The screen now
+  says "That Time Block is no longer there" and redraws.
+- A refused write left `_non_work_day` set. It is cleared.
+
+Recorded, not fixed (low):
+
+- A redraw during a drag (calendar read finishing) leaves the drag pointing at
+  widgets that no longer exist; the release still routes by pointer position.
+- No screen test for a full target box or for the unread-calendar suffix; the
+  db test covers the full box.
+- `move_block_to_day` does not catch `sqlite3` errors, the same gap as
+  `move_block_to_slot`.

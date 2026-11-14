@@ -508,7 +508,9 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   Settings closes asks first. Lunch stays on its own day. If the block was
   exported to Google Calendar, its old event stays on the old date until you
   export that date again, and the status line says so; exporting the new date
-  makes a new event. Meetings are moved on the day, and AutoLoad, Clear Day,
+  makes a new event. While either date is being exported the move waits:
+  *Wait for the Google Calendar export of Thu 19 to finish*. A click on a box
+  without dragging moves nothing. Meetings are moved on the day, and AutoLoad, Clear Day,
   + Buffer, + Break and ⤴ Google Calendar are greyed out until you go back to
   a day. Click a column's date heading to open that date as a day; a click on
   a box or a total leaves the week up; **‹** and

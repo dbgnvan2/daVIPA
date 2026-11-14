@@ -20,8 +20,10 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   are the same size relative to the window on a Windows screen at 150%.
   (CIP-M6.3, M6.6)
 - A Time Block can be dragged from one day of the week to another. The target
-  date's checks apply, and lunch stays on its day. A block moved to another
-  date is exported to Google Calendar again as a new event. (CIP-M6.7)
+  date's checks apply, and lunch stays on its day. A click on a box does not
+  move anything. A block moved to another date gets a new Google Calendar
+  event the next time that date is exported; the move waits while either
+  date is being exported. (CIP-M6.7)
 - In the week, only a column's date heading opens that day; a click on a box
   or a total leaves the week up. (CIP-M6.8)
 
