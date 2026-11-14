@@ -107,6 +107,7 @@ def test_scrm6_drag_sets_one_share(scr, monkeypatch):
     resizer = scr.resizer
     scr._fit_items(1200)
     weights = dict(resizer._weights)
+    before_drag = resizer.width("segment")
     resizer._on_start(SimpleNamespace(x_root=500), "segment")
     resizer._on_drag(SimpleNamespace(x_root=560), "segment")
     resizer._on_stop(SimpleNamespace(x_root=560), "segment")
@@ -118,6 +119,8 @@ def test_scrm6_drag_sets_one_share(scr, monkeypatch):
     assert len(pending) == 1, "the drag's end scheduled no refit"
     pending[0]()
     assert sum(_widths(scr).values()) + RESERVED == 1200
+    # The column stays where it was dropped; the others made room for it.
+    assert abs(resizer.width("segment") - (before_drag + 60)) <= 1
 
 
 def test_scr_overflow_is_logged_once(scr, caplog):

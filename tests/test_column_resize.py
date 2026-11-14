@@ -129,3 +129,26 @@ def test_saved_weights_round_trip_outside_the_pixel_limits():
     assert settings.drag_schedule_col_widths == {"a": 1533, "b": 200}
     r.fit_to_width(400)
     assert abs(r.width("a") / r.width("b") - 1533 / 200) < 0.1
+
+
+def test_a_dropped_column_keeps_its_width_after_the_refit():
+    """A drag's column stays where it was dropped; the others absorb it.
+
+    Found by the csdp sweep (2026-11-14): the dropped widths became the
+    weights, so the refit after a drag shrank the dragged column with the
+    rest and it slid back from the cursor -- 60px of drag gave 45.
+    """
+    from types import SimpleNamespace
+    specs = [ColumnSpec(k, grid_col=n, default_width=w, min_width=40, max_width=5000)
+             for n, (k, w) in enumerate((("a", 300), ("b", 200), ("c", 100)), start=1)]
+    r = _resizer(FakeSettings(), specs=specs)
+    r.fill_after_drag = True
+    r.fit_to_width(1000)
+    start = r.width("a")
+    r._on_start(SimpleNamespace(x_root=0), "a")
+    r._on_drag(SimpleNamespace(x_root=200), "a")
+    r._on_stop(SimpleNamespace(x_root=200), "a")
+    r.fit_to_width(1000)
+    assert abs(r.width("a") - (start + 200)) <= 1
+    assert sum(r.width(k) for k in "abc") == 1000
+    assert abs(r.width("b") / r.width("c") - 2) < 0.05

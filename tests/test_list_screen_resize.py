@@ -737,3 +737,25 @@ def test_lsr2_hierarchical_due_has_no_prefix(make):
     cells = [c for _f, cells in _rows(screen.layout) for c in cells if c[0] == "due"]
     assert cells
     assert {full for _k, _l, full, *_ in cells} == {date.today().isoformat()}
+
+
+@pytest.mark.parametrize("name", SCREENS)
+def test_lsr2_a_dropped_column_keeps_its_width(make, name):
+    """After a drag and the refit that follows, the column stays where dropped.
+
+    Found by the csdp sweep (2026-11-14): the refit shrank the dragged
+    column with the rest, so it slid back from the cursor.
+    """
+    _root, screen = make(name)
+    layout = screen.layout
+    resizer = layout.resizer
+    layout.fit(1500)
+    before = resizer.width("title")
+    total = sum(layout.width(k) for k in layout.keys)
+    resizer._on_start(SimpleNamespace(x_root=500), "title")
+    resizer._on_drag(SimpleNamespace(x_root=600), "title")
+    resizer._on_stop(SimpleNamespace(x_root=600), "title")
+    layout.fit(1500)
+    # Rounding leaves up to a pixel per column, which goes to the widest.
+    assert abs(resizer.width("title") - (before + 100)) <= len(layout.keys)
+    assert abs(sum(layout.width(k) for k in layout.keys) - total) <= len(layout.keys)
