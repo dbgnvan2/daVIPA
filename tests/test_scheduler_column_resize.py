@@ -97,8 +97,13 @@ def test_scrm5_both_panes_stretch(scr):
         assert str(scr.splitter.panecget(pane, "stretch")) == "always"
 
 
-def test_scrm6_drag_sets_one_share(scr):
-    """SCR-M6 — a drag changes that column's share only, and is saved."""
+def test_scrm6_drag_sets_one_share(scr, monkeypatch):
+    """SCR-M6 — a drag changes that column's share only, is saved, and refits."""
+    pending = []
+    monkeypatch.setattr(scr, "after", lambda ms, fn: pending.append(fn) or "id")
+    monkeypatch.setattr(scr, "after_cancel", lambda _id: None)
+    monkeypatch.setattr(scr.items_frame, "winfo_width", lambda: 1200)
+    monkeypatch.setattr(scr, "_get_widget_scaling", lambda: 1.0)
     resizer = scr.resizer
     scr._fit_items(1200)
     weights = dict(resizer._weights)
@@ -108,8 +113,22 @@ def test_scrm6_drag_sets_one_share(scr):
     assert resizer._weights["segment"] > weights["segment"]
     saved = AppSettings.load().drag_schedule_col_widths
     assert saved["segment"] == round(resizer._weights["segment"])
-    scr._fit_items(1200)
+    # Found by the csdp sweep: nothing refitted after a drag, so the
+    # columns overran the list until the window next changed size.
+    assert len(pending) == 1, "the drag's end scheduled no refit"
+    pending[0]()
     assert sum(_widths(scr).values()) + RESERVED == 1200
+
+
+def test_scr_overflow_is_logged_once(scr, caplog):
+    """A list narrower than the floors is logged once per crossing (P2)."""
+    caplog.set_level("INFO", logger="src.getmoredone.screens.drag_schedule")
+    for width in (300, 290, 280):
+        assert scr._fit_items(width) > 0
+    scr._fit_items(1200)
+    scr._fit_items(300)
+    hits = [r for r in caplog.records if "narrower than its column floors" in r.getMessage()]
+    assert len(hits) == 2
 
 
 def test_scrm7_refresh_keeps_the_fit(scr, monkeypatch):
@@ -139,3 +158,20 @@ def test_scr_headings_padded_like_their_cells(scr):
     header_box = scr.select_all_checkbox.grid_info()["padx"]
     row_box = [w for w in frame.grid_slaves(row=0, column=0)][0].grid_info()["padx"]
     assert header_box == row_box
+
+
+def test_scr_headings_are_cut_to_their_column(scr):
+    """A heading wider than its column is cut with "...", and comes back whole.
+
+    Found by the csdp sweep: at the 48px floor an uncut bold heading widened
+    its header column and pushed the headings after it off their rows.
+    """
+    labels = scr.resizer._header[1]
+    scr._fit_items(1)
+    # 48px at 8px a character leaves 6 characters.
+    assert labels["subsegment"].cget("text") == "Sub..."
+    assert labels["start_date"].cget("text") == "Sta..."
+    assert labels["title"].cget("text") == "Title"
+    scr._fit_items(2400)
+    assert labels["subsegment"].cget("text") == "SubSegment"
+    assert labels["start_date"].cget("text") == "Start Date"
