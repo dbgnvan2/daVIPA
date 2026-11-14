@@ -87,23 +87,37 @@ class ColumnResizer:
         # When a fit wrote its result back as the next fit's weights, the
         # columns that reached their floor first lost their share, and a
         # narrow-then-wide window came back with a different shape.
-        self._weights = dict(self._widths)
+        self._weights = self._load_stored()
         self._px_per_weight = 1.0
 
     # ------------------------------------------------------------------ widths
     def _setting_attr(self) -> str:
         return f"{self.prefix}_col_widths"
 
-    def _load_widths(self) -> dict:
+    def _load_stored(self) -> dict:
+        """The saved value per column, or its default; unclamped.
+
+        A saved value is a weight (LSR2-D8), and a weight is not bound by the
+        column's pixel limits: clamping it changed the shape on every
+        restart (found by the csdp sweep, 2026-11-14).
+        """
         stored = getattr(self.settings, self._setting_attr(), None) or {}
-        widths = {}
+        values = {}
         for key, spec in self.specs.items():
             raw = stored.get(key)
             if raw is None and key == "title":
                 # Legacy single-title scalar from before this module existed.
                 raw = getattr(self.settings, f"{self.prefix}_title_col_width", None)
-            widths[key] = self._clamp(spec, raw if raw else spec.default_width)
-        return widths
+            try:
+                value = float(raw) if raw else 0.0
+            except (TypeError, ValueError):
+                value = 0.0
+            values[key] = value if value > 0 else float(spec.default_width)
+        return values
+
+    def _load_widths(self) -> dict:
+        return {key: self._clamp(self.specs[key], value)
+                for key, value in self._load_stored().items()}
 
     @staticmethod
     def _clamp(spec: ColumnSpec, width) -> int:

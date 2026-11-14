@@ -140,6 +140,11 @@ They found three medium issues, all fixed:
   that left "Due..." and no date, so the prefix is gone and the cell shows
   `2026-11-14`.
 
+A cold review of those fixes found one more medium issue: saved weights
+were clamped to the column's pixel limits on load, so a shape dragged in a
+narrow window changed after a restart. Saved values now load as weights
+unclamped; only the drawn width is clamped.
+
 Two low findings were dropped as below medium: deep Hierarchical rows
 indenting past a floored Title column, and M4's test not reading the
 weights. The new test `test_lsr2m4b` covers the second.

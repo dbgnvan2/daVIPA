@@ -2662,7 +2662,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/column_resize.py:297` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
+| `src/getmoredone/screens/column_resize.py:311` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
 | `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
 | `src/getmoredone/theme.py:119` | `"chip_bg": "gray30",` |
 
@@ -2940,7 +2940,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/column_resize.py:297` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
+| `src/getmoredone/screens/column_resize.py:311` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
 | `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
 | `themes/apple_grey.json:286` | `"gray70",` |
 | `themes/base_dark_blue.json:117` | `"unselected_hover_color": ["gray70", "gray41"],` |
