@@ -82,6 +82,7 @@ from .plan_blocks import (
 from .plan_commitment_edits import PlanCommitmentEditsMixin
 from .plan_commitments import PlanCommitmentsMixin, commitments_by_slot
 from .plan_settings_dialog import PlanSettingsDialog
+from .plan_week_view import PlanWeekViewMixin
 from .segment_color_utils import resolve_segment_color_for_item
 
 logger = logging.getLogger(__name__)
@@ -297,7 +298,7 @@ def _clock(minutes: int) -> str:
     return f"{hours}h {remainder:02d}m" if hours else f"{remainder}m"
 
 
-class PlanScreen(PlanCommitmentEditsMixin, PlanCommitmentsMixin, ctk.CTkFrame):
+class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMixin, ctk.CTkFrame):
     """Screen for planning time blocks."""
 
     def __init__(self, parent, db_manager: 'DatabaseManager', app: 'GetMoreDoneApp'):
@@ -327,6 +328,10 @@ class PlanScreen(PlanCommitmentEditsMixin, PlanCommitmentsMixin, ctk.CTkFrame):
         self._edit_running = False
         self._edit_result = None
         self._drag_commitment = None
+        # CIP-M6 -- the week view (plan_week_view.py), and each date's read
+        # record while it is up, for the automatic read (W6).
+        self._week_mode = False
+        self._week_fetches: list = []
 
         # DatePickerButton calls its on_date_changed from its own __init__,
         # which lands here before the panes it would reload exist. The flag is
@@ -951,6 +956,8 @@ class PlanScreen(PlanCommitmentEditsMixin, PlanCommitmentsMixin, ctk.CTkFrame):
             frame, text="Day Plan", font=ctk.CTkFont(size=16, weight="bold")
         )
         self.day_heading.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w")
+        # CIP-M6 / W1 -- Day or Week, beside the heading it renames.
+        self.create_view_toggle(frame)
 
         self.day_summary = ctk.CTkLabel(
             frame,
@@ -1208,6 +1215,10 @@ class PlanScreen(PlanCommitmentEditsMixin, PlanCommitmentsMixin, ctk.CTkFrame):
         does its geometry at idle, so no intermediate state is drawn unless
         something asks for it in the middle, and nothing here does.
         """
+        if self._week_mode:
+            # CIP-M6 -- every redraw (a date change, a read, an edit) draws
+            # whichever view is up.
+            return self.load_week()
         try:
             for widget in self.blocks_scroll.winfo_children():
                 widget.destroy()
@@ -2961,7 +2972,11 @@ class PlanScreen(PlanCommitmentEditsMixin, PlanCommitmentsMixin, ctk.CTkFrame):
                 # summary, or the "outside the day" group below the grid.
                 # Reported rather than guessed at: picking a box for them
                 # would put the work somewhere they did not point.
-                self.set_status("Drop an Action Item on a Time Block", "muted")
+                self.set_status(
+                    "The week is read-only — click a day to plan it"
+                    if self._week_mode else "Drop an Action Item on a Time Block",
+                    "muted",
+                )
         elif kind == "block" and block is not None:
             if target is not None:
                 self.after_idle(lambda: self.move_block_to_slot(block.id, target))

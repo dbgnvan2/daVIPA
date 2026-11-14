@@ -27,11 +27,13 @@ from ..calendar_commitments import (
     _boxes_touched,
     age_text,
     committed_slots,
+    dates_between,
     is_off_grid,
     is_stale,
     refresh_commitments,
 )
 from ..models import CalendarCommitment
+from ..plan_week import week_dates
 from ..theme import semantic_colors, status_text_color
 
 logger = logging.getLogger(__name__)
@@ -370,17 +372,19 @@ class PlanCommitmentsMixin:
                     kind="muted",
                 )
             claimed = db_path
-            block_date = self.selected_date
+            # CIP-M6.1 / W6 -- the week reads its seven dates in one call.
+            first, last = self.refresh_range()
             calendar_ids = self.calendar_ids()
             client_factory = self.calendar_client
             if not automatic:
-                self.set_status(f"Reading Google Calendar for {block_date}…", "muted")
+                what = first if first == last else f"{first} to {last}"
+                self.set_status(f"Reading Google Calendar for {what}…", "muted")
 
             def work():
                 # Nothing here touches a widget (see the export's worker).
                 try:
                     self._refresh_result = refresh_commitments(
-                        block_date, block_date,
+                        first, last,
                         client_factory=client_factory,
                         db_path=db_path,
                         calendar_ids=calendar_ids,
@@ -389,7 +393,8 @@ class PlanCommitmentsMixin:
                     from ..calendar_commitments import RefreshOutcome
 
                     self._refresh_result = RefreshOutcome(
-                        dates=[block_date], failure=str(error) or type(error).__name__
+                        dates=dates_between(first, last),
+                        failure=str(error) or type(error).__name__,
                     )
                 finally:
                     release_refresh(db_path)
@@ -442,6 +447,19 @@ class PlanCommitmentsMixin:
         if not getattr(self, "_refresh_automatic", False):
             self.set_status(*refresh_status(result))
 
+    def refresh_range(self) -> Tuple[str, str]:
+        """The dates a read covers: this date, or the week that is up (W6)."""
+        if getattr(self, "_week_mode", False):
+            dates = week_dates(self.selected_date)
+            return dates[0], dates[-1]
+        return self.selected_date, self.selected_date
+
+    def _auto_refresh_key(self) -> tuple:
+        """Once per date, and once per week, per process (D13, W6)."""
+        first, last = self.refresh_range()
+        db_path = str(self.db_manager.db.db_path)
+        return (db_path, first) if first == last else (db_path, first, last)
+
     def maybe_auto_refresh(self) -> None:
         """CIP-M5.5 / D13 -- read a stale date once, in the background.
 
@@ -451,18 +469,29 @@ class PlanCommitmentsMixin:
         """
         if not getattr(self, "_ready", False):
             return
-        stale_minutes = getattr(self.settings, "plan_commitment_stale_minutes", 15)
-        if not is_stale(getattr(self, "_commitment_fetch", None), stale_minutes, datetime.now()):
-            return
-        key = (str(self.db_manager.db.db_path), self.selected_date)
-        if key in _AUTO_REFRESHED or not calendar_ready():
-            return
+        # Every redraw replaces what an earlier one scheduled. A read set up
+        # for the week must not fire after a switch back to a fresh day: the
+        # date is the same, so the date check in ``_auto_refresh_due`` would
+        # not stop it.
         pending = getattr(self, "_auto_refresh_id", None)
         if pending is not None:
             try:
                 self.after_cancel(pending)
             except Exception:  # noqa: BLE001 - already fired
                 pass
+            self._auto_refresh_id = None
+        stale_minutes = getattr(self.settings, "plan_commitment_stale_minutes", 15)
+        if getattr(self, "_week_mode", False):
+            # One read if any of the seven is stale, never seven.
+            fetches = list(getattr(self, "_week_fetches", []) or [None])
+        else:
+            fetches = [getattr(self, "_commitment_fetch", None)]
+        now = datetime.now()
+        if not any(is_stale(fetch, stale_minutes, now) for fetch in fetches):
+            return
+        key = self._auto_refresh_key()
+        if key in _AUTO_REFRESHED or not calendar_ready():
+            return
         try:
             self._auto_refresh_id = self.after(
                 AUTO_REFRESH_DELAY_MS, lambda d=self.selected_date: self._auto_refresh_due(d)
@@ -479,7 +508,7 @@ class PlanCommitmentsMixin:
                 return False
         except Exception:  # noqa: BLE001
             return False
-        key = (str(self.db_manager.db.db_path), block_date)
+        key = self._auto_refresh_key()
         if key in _AUTO_REFRESHED:
             return False
         started = self.refresh_calendar(automatic=True)
