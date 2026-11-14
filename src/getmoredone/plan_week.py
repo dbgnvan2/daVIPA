@@ -69,6 +69,22 @@ def box_item_id(entry: GridSlot) -> Optional[str]:
     return None
 
 
+def box_start(entry: GridSlot) -> Optional[Tuple[str, str, int]]:
+    """CIP-M6.6 -- ``(item id, label, others)`` when the box's item starts here.
+
+    The title goes on the box the colouring block starts in, not on the boxes
+    it carries on into. ``others`` counts the other item blocks starting in
+    the same box, which the box can only say as "+N".
+    """
+    if entry.continued:
+        return None
+    items = [b for b in entry.starting if b.block_type == BlockType.ITEM and b.item_id]
+    if not entry.starting or not items or entry.starting[0] is not items[0]:
+        return None
+    first = items[0]
+    return first.item_id, first.label or "", len(items) - 1
+
+
 @dataclass
 class DaySummary:
     """One week column: its boxes by slot index, and what they add up to."""
@@ -82,6 +98,8 @@ class DaySummary:
     all_day: int = 0
     #: CIP-M6.4 -- the item whose block sets each box's colour, by slot index.
     items: Dict[int, str] = field(default_factory=dict)
+    #: CIP-M6.6 -- the boxes an item's block starts in: (item id, label, others).
+    starts: Dict[int, Tuple[str, str, int]] = field(default_factory=dict)
     #: CIP-M6.5 -- the grid this column was counted from, so a drop on it is
     #: checked against this date's own span and meetings, not rebuilt.
     grid: Optional[DayGrid] = field(default=None, repr=False, compare=False)
@@ -118,6 +136,8 @@ def week_summary(day: str, grid: DayGrid, bounds: DayBounds, *, read: bool,
         all_day=all_day,
         items={entry.slot.index: item for entry in grid.slots
                if (item := box_item_id(entry)) is not None},
+        starts={entry.slot.index: start for entry in grid.slots
+                if (start := box_start(entry)) is not None},
         grid=grid,
     )
 

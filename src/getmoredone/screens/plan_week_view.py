@@ -22,6 +22,8 @@ import logging
 from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 
+import tkinter as tk
+
 import customtkinter as ctk
 
 from ..calendar_commitments import committed_slots
@@ -37,6 +39,7 @@ from ..plan_week import (
     week_dates,
     week_rows,
 )
+from ..color_contrast import normalize_hex_color, pick_text_color
 from ..theme import block_type_colors, semantic_colors, status_text_color
 from ..time_block_layout import SLOT_MINUTES, build_day_grid, format_hhmm
 from .drag_schedule_support import widget_contains_pointer
@@ -51,6 +54,34 @@ WEEK_COLUMN_WIDTH_PX = 40
 WEEK_BOX_PAD_PX = 2  # pady=1 above and below each box
 WEEK_COLUMN_PAD_PX = 2  # padx=1 either side of each column
 WEEK_LABEL_PAD_PX = 4  # the time labels' and arrows' padx
+WEEK_TITLE_FONT_SIZE = 9
+WEEK_TITLE_INSET_PX = 3  # each side of a title inside its box
+ELLIPSIS = "…"
+
+
+def fit_text(text: str, measure, width: int) -> str:
+    """``text`` cut to ``width`` pixels with "…", by ``measure`` (a font's).
+
+    The longest prefix that fits with the ellipsis; just "…" when nothing
+    does, and "" when not even that fits.
+    """
+    if measure(text) <= width:
+        return text
+    if measure(ELLIPSIS) > width:
+        return ""
+    low, high = 0, len(text)
+    while low < high:
+        middle = (low + high + 1) // 2
+        if measure(text[:middle].rstrip() + ELLIPSIS) <= width:
+            low = middle
+        else:
+            high = middle - 1
+    return text[:low].rstrip() + ELLIPSIS
+
+
+def week_title_text(title: str, others: int) -> str:
+    """What a box says: the title, and "+N" for the others starting with it."""
+    return f"{title} +{others}" if others else title
 #: What the grid spends on height that is not boxes: the heading row and up
 #: to four lines of totals under each column.
 WEEK_CHROME_HEIGHT_PX = 100
@@ -219,6 +250,7 @@ class PlanWeekViewMixin:
         self._week_boxes: Dict[Tuple[str, int], Tuple[object, str]] = {}
         self._week_hour_labels: List[object] = []
         self._week_empty_boxes: List[object] = []
+        self._week_titles: Dict[Tuple[str, int], object] = {}
         self._week_totals: Dict[str, object] = {}
         self._week_headers: Dict[str, object] = {}
 
@@ -250,6 +282,7 @@ class PlanWeekViewMixin:
         self._week_row_count = len(rows)
         height = self._week_box_px = self.week_box_height()
         fill_for = self._week_fill_resolver(summaries)
+        title_for = fill_for.title
 
         # After the click: the redraw destroys the button whose click runs.
         back = ctk.CTkButton(
@@ -293,6 +326,9 @@ class PlanWeekViewMixin:
                     corner_radius=2, fg_color=fill,
                 )
                 box.grid(row=offset, column=column, padx=1, pady=1, sticky="ew")
+                start = summary.starts.get(index) if kind == PLANNED else None
+                if start is not None:
+                    self._draw_week_title(box, day, index, fill, start, title_for)
                 if kind:
                     self._bind_open(box, day)
                     self._week_boxes[(day, index)] = (box, kind)
@@ -326,7 +362,48 @@ class PlanWeekViewMixin:
             item = known.get(item_id) if item_id else None
             return color_for(item) if item is not None else None
 
+        def title(item_id, label):
+            """The item's title now; the block's own label if it is gone."""
+            item = known.get(item_id)
+            return item.title if item is not None and item.title else label
+
+        fill.title = title
         return fill
+
+    # ----------------------------------------------------------- M6.6 titles
+    def _draw_week_title(self, box, day: str, index: int, fill: str, start, title_for) -> None:
+        """The item's title on the box its block starts in, cut to the box.
+
+        A plain Tk label placed in the box: placing never asks the box to
+        grow, so a long title cannot widen its column, and its text is re-cut
+        whenever the box changes width. Its colour is derived from the fill
+        for contrast (AGENTS.md: a data colour is a fill only where that is so).
+        """
+        background = normalize_hex_color(fill)
+        if background is None:
+            return
+        item_id, label, others = start
+        full = week_title_text(title_for(item_id, label), others)
+        font = ctk.CTkFont(size=WEEK_TITLE_FONT_SIZE)
+        text = tk.Label(
+            box, text="", font=font, anchor="w", padx=0, pady=0, bd=0,
+            bg=background, fg=pick_text_color(background),
+        )
+        text.place(x=WEEK_TITLE_INSET_PX, rely=0.5, anchor="w",
+                   relwidth=1, width=-2 * WEEK_TITLE_INSET_PX)
+        text.full_title = full
+        text.title_font = font
+        text.bind("<Configure>", lambda event, w=text: self._fit_week_title(w, event.width))
+        self._fit_week_title(text, WEEK_COLUMN_WIDTH_PX - 2 * WEEK_TITLE_INSET_PX)
+        self._bind_open(text, day)
+        self._week_titles[(day, index)] = text
+
+    @staticmethod
+    def _fit_week_title(label, width: int) -> str:
+        fitted = fit_text(label.full_title, label.title_font.measure, width)
+        if label.cget("text") != fitted:
+            label.configure(text=fitted)
+        return fitted
 
     # ----------------------------------------------------------- M6.3 resize
     def fit_week_columns(self) -> int:
