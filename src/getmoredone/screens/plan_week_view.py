@@ -48,8 +48,11 @@ logger = logging.getLogger(__name__)
 
 DAY_VIEW = "Day"
 WEEK_VIEW = "Week"
-#: CIP-M6.3 -- the floors. Above them the boxes follow the pane.
-WEEK_BOX_HEIGHT_PX = 12
+#: CIP-M6.3 -- the floors. Above them the boxes follow the pane. The height
+#: floor is not a constant: it is the title's line plus the drag outline
+#: above and below it plus a margin (``week_box_floor``).
+DRAG_HOVER_BORDER_PX = 2  # the outline a box gets while a drag is over it
+WEEK_TITLE_MARGIN_PX = 1
 WEEK_COLUMN_WIDTH_PX = 40
 WEEK_BOX_PAD_PX = 2  # pady=1 above and below each box
 WEEK_COLUMN_PAD_PX = 2  # padx=1 either side of each column
@@ -77,6 +80,14 @@ def fit_text(text: str, measure, width: int) -> str:
         else:
             high = middle - 1
     return text[:low].rstrip() + ELLIPSIS
+
+
+def week_box_floor(linespace: int) -> int:
+    """The least box height that shows a title of ``linespace`` px whole.
+
+    Its line, clear of the drag outline at top and bottom, with a margin.
+    """
+    return linespace + 2 * DRAG_HOVER_BORDER_PX + WEEK_TITLE_MARGIN_PX
 
 
 def week_title_text(title: str, others: int) -> str:
@@ -404,7 +415,7 @@ class PlanWeekViewMixin:
         item_id, label, others = start
         title = title_for(item_id, label)
         full = week_title_text(title, others)
-        font = ctk.CTkFont(size=WEEK_TITLE_FONT_SIZE)
+        font = self.week_title_font()
         text = tk.Label(
             box, text="", font=font, anchor="w", padx=0, pady=0, bd=0,
             bg=background, fg=pick_text_color(background),
@@ -455,14 +466,26 @@ class PlanWeekViewMixin:
         """What the week's grid needs across, or 0 outside the week."""
         return getattr(self, "_week_width_need", 0) if self._week_mode else 0
 
+    def week_title_font(self):
+        """The one font every week title uses, made on first use."""
+        font = getattr(self, "_week_title_font", None)
+        if font is None:
+            font = self._week_title_font = ctk.CTkFont(size=WEEK_TITLE_FONT_SIZE)
+        return font
+
+    def week_box_min_height(self) -> int:
+        """The floor for this screen's title font (``week_box_floor``)."""
+        return week_box_floor(self.week_title_font().metrics("linespace"))
+
     def week_box_height(self) -> int:
         """Box height for the pane's visible height, never below the floor."""
+        floor = self.week_box_min_height()
         canvas = self._day_canvas()
         rows = getattr(self, "_week_row_count", 0)
         if canvas is None or rows <= 0:
-            return WEEK_BOX_HEIGHT_PX
+            return floor
         room = canvas.winfo_height() - WEEK_CHROME_HEIGHT_PX
-        return max(WEEK_BOX_HEIGHT_PX, room // rows - WEEK_BOX_PAD_PX)
+        return max(floor, room // rows - WEEK_BOX_PAD_PX)
 
     def _bind_week_resize(self) -> None:
         canvas = self._day_canvas()

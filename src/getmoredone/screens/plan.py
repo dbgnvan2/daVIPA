@@ -82,7 +82,7 @@ from .plan_blocks import (
 from .plan_commitment_edits import PlanCommitmentEditsMixin
 from .plan_commitments import PlanCommitmentsMixin, commitments_by_slot
 from .plan_settings_dialog import PlanSettingsDialog
-from .plan_week_view import PlanWeekViewMixin
+from .plan_week_view import DRAG_HOVER_BORDER_PX, PlanWeekViewMixin
 from .segment_color_utils import resolve_segment_color_for_item
 
 logger = logging.getLogger(__name__)
@@ -3384,7 +3384,8 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
             self._drag_hover_border = hovered.cget("border_width")
             self._drag_hover_colour = hovered.cget("border_color")
             hovered.configure(
-                border_width=2, border_color=semantic_colors()["primary_hover"]
+                border_width=DRAG_HOVER_BORDER_PX,
+                border_color=semantic_colors()["primary_hover"],
             )
             self._drag_hover_frame = hovered
 
