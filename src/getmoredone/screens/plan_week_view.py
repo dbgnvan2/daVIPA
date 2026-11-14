@@ -117,7 +117,8 @@ def fit_title(title: str, others: int, measure, width: int) -> str:
     count = f"+{others}"
     return count if measure(count) <= width else ""
 #: What the grid spends on height that is not boxes: the heading row and up
-#: to four lines of totals under each column.
+#: to four lines of totals under each column. CustomTkinter units: those are
+#: CTk labels, which scale with the window.
 WEEK_CHROME_HEIGHT_PX = 100
 #: The header buttons that write to the selected day. Disabled in the week.
 WEEK_LOCKED_BUTTONS = ("btn_clear_day", "btn_autoload", "btn_add_buffer", "btn_add_break")
@@ -504,8 +505,10 @@ class PlanWeekViewMixin:
         rows = getattr(self, "_week_row_count", 0)
         if canvas is None or rows <= 0:
             return floor
-        room = canvas.winfo_height() - WEEK_CHROME_HEIGHT_PX
-        return max(floor, room // rows - WEEK_BOX_PAD_PX)
+        # The canvas is measured in real pixels; a box's height and its pady
+        # are CustomTkinter units, which the box multiplies by the scaling.
+        room = canvas.winfo_height() / self.week_scaling() - WEEK_CHROME_HEIGHT_PX
+        return max(floor, int(room // rows) - WEEK_BOX_PAD_PX)
 
     def _bind_week_resize(self) -> None:
         canvas = self._day_canvas()
