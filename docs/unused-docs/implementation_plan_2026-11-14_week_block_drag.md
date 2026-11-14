@@ -161,3 +161,6 @@ Recorded, not fixed (low):
   db test covers the full box.
 - `move_block_to_day` does not catch `sqlite3` errors, the same gap as
   `move_block_to_slot`.
+- Cold re-pass over 0ee34a1 (logic and ordering): no medium or higher. A
+  click whose pointer slips by one pixel still counts as motion, since
+  `on_drag_motion` has no distance threshold; the day view has the same rule.
