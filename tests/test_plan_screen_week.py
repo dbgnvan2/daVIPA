@@ -815,3 +815,26 @@ def test_cipm66_more_than_one_block_says_how_many(screen, manager, root):
     _week(screen, root)
 
     assert screen._week_titles[(THURSDAY, TEN)].full_title == "First +1"
+
+
+def test_cipm66_the_count_survives_the_cut():
+    measure = len  # one pixel per character
+
+    assert wv.fit_title("Quarterly review", 1, measure, 9) == "Quart… +1"
+    assert wv.fit_title("Call", 1, measure, 9) == "Call +1"
+    assert wv.fit_title("Quarterly review", 1, measure, 3) == "+1"
+    assert wv.fit_title("Quarterly review", 1, measure, 1) == ""
+    assert wv.fit_title("Quarterly review", 0, measure, 9) == "Quarterl…"
+
+
+def test_cipm66_a_long_title_on_screen_keeps_its_count(screen, manager, root):
+    first = _item(manager, LONG_TITLE)
+    second = _item(manager, "Second")
+    _block(manager, TEN, block_type=BlockType.ITEM, item_id=first.id, label=first.title)
+    _block(manager, TEN, block_type=BlockType.ITEM, item_id=second.id, label=second.title)
+    _week(screen, root)
+    label = screen._week_titles[(THURSDAY, TEN)]
+
+    screen._fit_week_title(label, label.title_font.measure("Write the q… +1"))
+
+    assert label.cget("text").endswith("… +1")
