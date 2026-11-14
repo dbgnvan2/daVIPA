@@ -169,6 +169,9 @@ class PlanWeekViewMixin:
         self.blocks_scroll.grid_columnconfigure(0, weight=1)
         for column in range(1, WEEK_DAYS + 2):
             self.blocks_scroll.grid_columnconfigure(column, weight=0, uniform="", minsize=0)
+        # The week's floor is gone; give the items pane its width back.
+        self._week_width_need = 0
+        self.apply_items_width(self.items_col_width())
 
     def step_week(self, weeks: int) -> None:
         """W3 -- ‹ and › move by seven days."""
@@ -193,6 +196,7 @@ class PlanWeekViewMixin:
             self._week_fetches = []
             self._week_summaries = []
             self._week_error = str(error) or type(error).__name__
+            self._week_width_need = 0
             self.set_status(f"The week could not be read: {error}", "error")
         finally:
             self._flush_redraw()
@@ -343,7 +347,9 @@ class PlanWeekViewMixin:
             + WEEK_DAYS * (column + WEEK_COLUMN_PAD_PX)
             + self.week_forward_button.winfo_reqwidth() + WEEK_LABEL_PAD_PX
         )
-        self.apply_items_width(self._items_width)
+        # The setting, not the width drawn: a narrower week must not ratchet
+        # the items pane down (as on_resize).
+        self.apply_items_width(self.items_col_width())
         return column
 
     def week_width_need(self) -> int:
