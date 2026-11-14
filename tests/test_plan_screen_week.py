@@ -887,3 +887,13 @@ def test_cipm63_at_150_percent_the_title_scales_and_fits(screen, manager, root, 
     # Clear of the outline, and no taller than the 1 unit margin plus the
     # rounding of the line up to a whole unit.
     assert 0 < spare <= 2 * scaling
+
+
+def test_cipm63_at_150_percent_the_boxes_fill_the_pane_not_overflow_it(screen, root, monkeypatch):
+    _week(screen, root)
+    rows = screen._week_row_count
+    monkeypatch.setattr(screen, "week_scaling", lambda: 1.5)
+    # The same pane as 100 + 32 per row at scaling 1, in real pixels at 1.5.
+    monkeypatch.setattr(screen._day_canvas(), "winfo_height", lambda: 1.5 * (100 + rows * 32))
+
+    assert screen.week_box_height() == 30
