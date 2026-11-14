@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from src.getmoredone.models import BlockType, TimeBlock
 from src.getmoredone.plan_week import FREE, MEETING, PLANNED, UNREAD, week_dates, week_summary
 from src.getmoredone.screens import plan_commitments as pc
 from tests.test_plan_screen_calendar_export import (
@@ -244,3 +245,56 @@ def test_cipm62_the_week_column_matches_the_day_grid(screen, manager, root):
 
     assert _kinds(screen, THURSDAY) == dict(day.boxes)
     assert {MEETING, PLANNED, FREE} <= set(dict(day.boxes).values())
+
+
+def _boxless_block(manager, day):
+    """A block from an earlier version: no box, so outside the day until placed."""
+    manager.create_time_block(TimeBlock(
+        block_date=day, start_time="", end_time="", planned_minutes=30,
+        label="Old", block_type=BlockType.BREAK,
+    ))
+
+
+def test_cipm61_the_day_buttons_are_refused_in_the_week(screen, manager, root):
+    """Sweep (batch 3) -- they would place by the last day's grid and meetings."""
+    _week(screen, root)
+
+    assert screen.btn_autoload.cget("state") == "disabled"
+    screen.add_padding_block(BlockType.BUFFER)
+    screen.autoload_day()
+    assert manager.get_time_blocks(THURSDAY) == []
+    assert screen.status_label.cget("text") == "The week is read-only — click a day to plan it"
+
+    screen.view_toggle.set("Day")
+    screen.set_view_mode("Day")
+    assert screen.btn_autoload.cget("state") == "normal"
+    screen.add_padding_block(BlockType.BUFFER)
+    assert len(manager.get_time_blocks(THURSDAY)) == 1
+
+
+def test_cipm61_saving_settings_in_the_week_counts_the_week(screen, manager, root):
+    """Sweep (batch 3) -- not the grid of a day that is not on screen."""
+    _boxless_block(manager, WEEK[1])
+    _week(screen, root)
+
+    screen.on_settings_saved(BOUNDS)
+
+    assert screen.status_label.cget("text").startswith("Day settings saved — 1 block this week")
+    assert screen._week_totals[WEEK[1]].cget("text").splitlines()[-1] == "1 outside"
+
+
+def test_cipm61_a_column_click_opens_the_day_after_the_click(screen, root):
+    """Sweep (batch 3) -- the redraw destroys the clicked widget, so it waits for idle."""
+    _week(screen, root)
+
+    class Recorder:
+        def bind(self, sequence, callback):
+            self.callback = callback
+
+    widget = Recorder()
+    screen._bind_open(widget, WEEK[3])
+    widget.callback(None)
+    assert screen._week_mode is True, "the day opened inside the click"
+
+    root.update_idletasks()
+    assert screen._week_mode is False and screen.selected_date == WEEK[3]

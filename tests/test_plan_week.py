@@ -12,6 +12,7 @@ from src.getmoredone.plan_week import (
     MEETING,
     PLANNED,
     UNREAD,
+    DaySummary,
     hours_text,
     read_week,
     week_age_text,
@@ -119,3 +120,47 @@ def test_cipm61_the_week_header_shows_a_failed_read_first():
     failed = {"fetched_at": "2026-11-13T09:00:00", "last_error": "offline"}
     fetches = [{"fetched_at": "2026-11-12T08:00:00"}, failed]
     assert week_age_text(fetches, lambda f: (f.get("last_error", "ok"), "k")) == ("offline", "k")
+
+
+def test_cipm61_a_partial_read_is_said_with_the_unread_count():
+    """Sweep (batch 3) -- a warning on any one date is shown, and unread days are not hidden by it."""
+    warned = {"fetched_at": "2026-11-13T09:00:00", "warning": "not read: Work"}
+    fetches = [{"fetched_at": "2026-11-12T08:00:00"}, warned, None]
+    text, kind = week_age_text(fetches, lambda f: (f.get("warning", "plain"), "warning"))
+    assert (text, kind) == ("not read: Work · 1 of 3 days not read", "warning")
+
+
+def test_cipm61_an_all_day_event_is_counted(manager):
+    """Sweep (batch 3) -- an all-day event holds no box, so the column counts it."""
+    event = {
+        "id": "ad1", "summary": "Out of office", "organizer": {"self": True},
+        "start": {"date": DAY}, "end": {"date": "2026-11-14"},
+    }
+    _read(manager, event)
+    assert _day(manager).all_day == 1
+
+
+def test_cipm61_a_summary_counts_blocks_outside_the_day(manager):
+    from src.getmoredone.models import BlockType, TimeBlock
+
+    manager.create_time_block(TimeBlock(
+        block_date=DAY, start_time="", end_time="", planned_minutes=30,
+        label="Old", block_type=BlockType.BREAK,
+    ))
+    assert _day(manager).outside == 1
+
+
+def test_cipm61_an_unread_days_meetings_are_not_zero():
+    from src.getmoredone.screens.plan_week_view import column_total_text, week_total_text
+
+    unread = DaySummary(day=DAY, boxes=[(0, UNREAD)], read=False)
+    read = DaySummary(day=SATURDAY, boxes=[(0, MEETING)], read=True)
+    assert column_total_text(unread).splitlines()[0] == "Meetings —"
+    assert week_total_text([unread, read]).startswith("Meetings ½h on 1 of 2 days")
+
+
+def test_cipm61_a_column_lists_what_no_box_shows():
+    from src.getmoredone.screens.plan_week_view import column_total_text
+
+    summary = DaySummary(day=DAY, boxes=[(0, FREE)], read=True, outside=2, all_day=1)
+    assert column_total_text(summary).splitlines()[2:] == ["2 outside", "1 all-day"]
