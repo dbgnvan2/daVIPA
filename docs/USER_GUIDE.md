@@ -477,7 +477,9 @@ buttons together instead of leaving them at a fixed size beside panes that grew.
   the divider stops where they would be cut off. Purple is a meeting. A Time Block for an Action Item is that item's
   Category colour (from Vision Planning), and grey is lunch, a Buffer or
   Break, or an item with no Category colour. The pane's light fill is a free
-  box. Under each column: *Meetings
+  box. The box an item's Time Block starts in shows the item's title, cut to
+  fit with "…" and shown in full as the column widens; *+1* means another
+  block starts in the same box. Under each column: *Meetings
   3h* and *Free 2½h*. A box with a meeting and a block in it counts as a
   meeting. A date the calendar has never been read for is drawn in a flat
   border grey and says *not read* instead of a free count, and its meetings

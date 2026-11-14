@@ -188,3 +188,19 @@ longer true. Recorded, not fixed (low):
   pane, and a meeting box keeping its colour.
 - A block whose recorded time disagrees with its box (PD-M14.7) is not
   checked before a week drop.
+
+## CIP-M6.6 — titles on week boxes (2026-11-14, asked after the build)
+
+The user found that week boxes showed no title. These defaults were taken
+without a separate plan, because the change is small:
+
+- The title goes on the box the colouring block starts in. Boxes it carries
+  into stay plain, and so does a box coloured by a block carried in from
+  above.
+- The title is the item's current title, falling back to the block's label.
+  "+N" counts other item blocks starting in the same box.
+- It is a plain Tk label placed inside the box, so a long title cannot widen
+  its column. It is cut with "…" to the label's width and cut again on every
+  `<Configure>`. Its text colour is `pick_text_color` of the fill, which
+  meets the AGENTS.md rule for a data-colour fill.
+- At the 12 px box floor the 9 pt title is tight. A taller pane gives it room.

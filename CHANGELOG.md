@@ -14,6 +14,7 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A Time Block in the week is drawn in its item's Category colour. (CIP-M6.4)
 - An Action Item can be dragged onto a box in the week, and is blocked on that
   box's date with the same checks as the day. (CIP-M6.5)
+- A Time Block in the week shows its item's title, cut to fit. (CIP-M6.6)
 
 ### Added — the week on the Plan (2026-11-13)
 

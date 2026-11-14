@@ -22,3 +22,6 @@ Open the Plan, choose **Week**.
 9. [ ] Drop between boxes or on a heading: nothing written, "Drop on a box to
    plan it".
 10. [ ] Click a day: it still opens as a day, and its new block is there.
+11. [ ] Each Action Item's Time Block shows its title on its first box, cut
+    with "…"; widening the pane shows more of it; the text reads clearly on
+    both a pale and a dark Category colour.

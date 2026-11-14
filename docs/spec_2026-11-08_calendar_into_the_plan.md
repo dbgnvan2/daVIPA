@@ -256,6 +256,7 @@ Plan's. Decisions E1 to E10 in the plan.
 | CIP-M6.3 | The week's seven columns share the pane's width and its boxes follow the pane's height. A column is never narrower than its heading and totals text (and never under 40 px), and the day pane's floor holds the week; a box is never under 12 px high |
 | CIP-M6.4 | A box holding an Action Item's Time Block is filled with that item's Category colour; padding, lunch and an item with no colour keep the planned colour |
 | CIP-M6.5 | An Action Item dropped on a week box is blocked on that box's date, through the day's own checks for that date |
+| CIP-M6.6 | The box an item's Time Block starts in shows the item's title, cut to the box with "…", in a text colour derived from the fill; "+N" counts other blocks starting there |
 | CIP-M7.1 | Docs in the same change: `docs/USER_GUIDE.md`, `docs/google-calendar-setup.md`, `CHANGELOG.md`, `NOTES.md`, `docs/DOCUMENTATION_INDEX.md`, and a handoff note from `.agents/templates/handoff-note.md` |
 
 *M6 built 2026-11-13 (batch 3).* A Day / Week toggle beside the day pane's
