@@ -1413,26 +1413,15 @@ class ProjectBoardsScreen(ctk.CTkFrame):
         if time_line:
             meta_lines.append(time_line)
         self.detail_meta.configure(text="\n".join(meta_lines))
-        category_color = (row.get("category_color_hex") or "").strip() or semantic_colors()["surface_subtle"]
-
         toolbar = ctk.CTkFrame(self.items_frame, fg_color="transparent")
         toolbar.grid(row=0, column=0, sticky="ew", padx=2, pady=(2, 8))
-        self.btn_create_action = ctk.CTkButton(toolbar, text="Create Action Item", command=lambda: self.create_action_item(board.id), **button_style("primary"))
-        self.btn_create_action.pack(
-            side="left", padx=4
-        )
-        self.btn_link_action = ctk.CTkButton(
-            toolbar,
-            text="Link Action Item",
-            command=lambda: self.link_existing_action_item(board.id),
-            fg_color=category_color,
-            hover_color=category_color,
-            text_color=pick_text_color(category_color),
-            border_width=0,
-        )
-        self.btn_link_action.pack(
-            side="left", padx=4
-        )
+        # LRP-M2: six buttons removed from this toolbar (user, 2026-11-16).
+        # Four had another route on screen already -- Edit Project on each
+        # tile's edit icon, Create/Link Note on its note icon, Open Notes on
+        # each note row's own Open button. Create and Link Action Item had
+        # none: an item now reaches a board through the item editor's Project
+        # field. Their methods and LinkProjectActionItemsDialog are kept,
+        # unreachable, and filed in BACKLOG.md (plan D4).
         self.btn_bulk_edit = ctk.CTkButton(
             toolbar,
             text="Bulk Edit",
@@ -1441,22 +1430,6 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             **button_style("secondary"),
         )
         self.btn_bulk_edit.pack(side="left", padx=4)
-        self.btn_edit_project = ctk.CTkButton(toolbar, text="Edit Project", command=lambda: self.edit_project(board.id), **button_style("secondary"))
-        self.btn_edit_project.pack(
-            side="left", padx=4
-        )
-        self.btn_create_note = ctk.CTkButton(toolbar, text="Create Note", command=lambda: self.create_note(board.id), **button_style("secondary"))
-        self.btn_create_note.pack(
-            side="left", padx=4
-        )
-        self.btn_link_note = ctk.CTkButton(toolbar, text="Link Note", command=lambda: self.link_note(board.id), **button_style("secondary"))
-        self.btn_link_note.pack(
-            side="left", padx=4
-        )
-        self.btn_open_notes = ctk.CTkButton(toolbar, text="Open Notes", command=lambda: self.open_note_picker(board.id), **button_style("secondary"))
-        self.btn_open_notes.pack(
-            side="left", padx=4
-        )
         if board.status != ProjectBoardStatus.ACTIVE:
             self.btn_set_active = ctk.CTkButton(toolbar, text="Set Active", command=lambda: self.set_status(board.id, ProjectBoardStatus.ACTIVE), **button_style("secondary"))
             self.btn_set_active.pack(
@@ -1486,7 +1459,8 @@ class ProjectBoardsScreen(ctk.CTkFrame):
         if not all_tasks:
             ctk.CTkLabel(
                 self.items_frame,
-                text="No action items linked yet. Use Create Action Item to add the first task.",
+                text=("No action items linked yet. Open an action item and "
+                      "set its Project to file it here."),
                 text_color=semantic_colors()["muted_text"],
             ).grid(row=3, column=0, sticky="w", padx=6, pady=12)
             return
@@ -2008,7 +1982,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             empty_msg = (
                 f"All {completed_hidden} note(s) completed. Enable 'Show Completed' to view them."
                 if completed_hidden else
-                "No notes linked yet. Use Create Note or Link Note to add one."
+                "No notes linked yet. Use the note icon on the project's tile."
             )
             ctk.CTkLabel(
                 self.notes_links_frame,

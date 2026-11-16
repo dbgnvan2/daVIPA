@@ -114,9 +114,9 @@ class ToolbarWrap:
 
     The search entry gives up width first, down to ``SEARCH_MIN_PX`` (D7).
     Narrower than that, the controls right of the spacer column move to a
-    second row, right-aligned; wide enough again, they go back. Below what
-    two rows need, the toolbar clips: there is no window minsize (decided
-    2026-11-13, options A and C).
+    second row, left-aligned (LRP-M1); wide enough again, they go back. Below
+    what two rows need, the toolbar clips: there is no window minsize
+    (decided 2026-11-13, options A and C).
 
     The controls keep the toolbar as their parent -- the second row grids
     them ``in_`` a child frame -- so ``toolbar.winfo_children()`` and each
@@ -178,11 +178,11 @@ class ToolbarWrap:
     def wrap_row_px(self) -> int:
         """The toolbar width the wrapped second row needs.
 
-        SPC-S2: the wrap frame is gridded ``sticky="e"``, so Tk keeps it at
-        its requested width and pins its right edge to the cell -- a second
-        row wider than the toolbar overflows to the *left*, where a check on
-        the right edge alone cannot see it. This is the number that says
-        whether two rows actually fit, and it is always below
+        LRP-M1: the wrap frame is gridded ``sticky="w"``, so Tk keeps it at
+        its requested width and pins its *left* edge to the cell -- a second
+        row wider than the toolbar overflows to the right. Either edge hides
+        an overflow from a check on the other, so this is the number that
+        says whether two rows actually fit, and it is always below
         ``one_row_px()``: the wrapped group is a subset of the controls one
         row has to hold.
         """
@@ -212,8 +212,11 @@ class ToolbarWrap:
             self.frame = ctk.CTkFrame(self.toolbar, fg_color="transparent")
         # tkinter's own grid: CTk's wrapper would scale grid_info's padding,
         # which is already in pixels, a second time.
+        # LRP-M1: left-justified. The frame keeps its requested width, so
+        # "w" pins its left edge to the toolbar's left and the controls read
+        # left to right from there, as they do on the unwrapped row.
         _tk_grid(self.frame, row=self.wrap_row, column=0,
-                 columnspan=SPACER_COL, sticky="e")
+                 columnspan=SPACER_COL, sticky="w")
         for index, (widget, info) in enumerate(self._moved):
             _tk_grid(widget, in_=self.frame, row=0, column=index,
                      padx=info["padx"], pady=info["pady"], sticky=info["sticky"])
