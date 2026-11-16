@@ -12,6 +12,12 @@ from src.getmoredone.app_settings import AppSettings
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem
 from src.getmoredone.screens.drag_schedule import DragScheduleScreen
+from src.getmoredone.screens.item_list_columns import (
+    STRETCH_MAX_PX,
+    TITLE_MAX_PX,
+    column_default_px,
+    list_floor_px,
+)
 from src.getmoredone.vps_manager import VPSManager
 
 KEYS = ("title", "segment", "subsegment", "category", "start_date")
@@ -61,8 +67,14 @@ def test_scrm2_columns_follow_the_width(scr):
     wide = _widths(scr)
     for key in KEYS:
         assert wide[key] > narrow[key], key
-    assert abs(wide["title"] / wide["segment"] - 220 / 170) < 0.05
-    assert abs(wide["segment"] / wide["start_date"] - 170 / 120) < 0.05
+    # LRP-M6: the proportions are COLUMN_DEFAULT_PX's, the same table every
+    # other listing opens from. Read, not copied: a changed default must not
+    # leave this asserting a ratio the screen no longer has.
+    want = column_default_px
+    assert abs(wide["title"] / wide["segment"]
+               - want("title") / want("segment")) < 0.05
+    assert abs(wide["segment"] / wide["start_date"]
+               - want("segment") / want("start_date")) < 0.05
     for _frame, cells in scr.resizer._rows:
         for key, label, *_ in cells:
             assert int(label.cget("width")) == wide[key]
@@ -146,10 +158,22 @@ def test_scrm7_refresh_keeps_the_fit(scr, monkeypatch):
             assert int(label.cget("width")) == scr.resizer.width(key)
 
 
-def test_scrm1b_no_ceiling_on_a_wide_list(scr):
-    """SCR-M1 — a very wide list is still filled; no column stops at a cap."""
+def test_scrm1b_the_shared_ceiling_applies(scr):
+    """LRP-M5 — the columns stop at the shared maxima, as the others do.
+
+    This asserted the opposite until 2026-11-16: SCR gave the Scheduler a
+    10000 maximum, so it alone kept filling a list of any width while every
+    other listing pinned at STRETCH_MAX_PX. The behaviour changed on purpose
+    (plan D2) -- the divergence was the thing being fixed. The sum of the
+    maxima is 5200, so a list wider than that is no longer filled; the
+    windows this app opens on are well inside it.
+    """
+    scr._fit_items(2800)
+    assert sum(_widths(scr).values()) + RESERVED == 2800, "a real width fills"
     scr._fit_items(6000)
-    assert sum(_widths(scr).values()) + RESERVED == 6000
+    assert _widths(scr)["title"] == TITLE_MAX_PX
+    for key in ("segment", "subsegment", "category", "start_date"):
+        assert _widths(scr)[key] == STRETCH_MAX_PX, key
 
 
 def test_scr_headings_padded_like_their_cells(scr):

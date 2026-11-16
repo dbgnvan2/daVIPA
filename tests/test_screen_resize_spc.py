@@ -32,14 +32,20 @@ from src.getmoredone.screens.item_list_columns import (
     LIST_MIN_CHARS,
     ToolbarWrap,
     _pad_total,
+    column_default_px,
     row_char_px,
 )
+from src.getmoredone.screens.priority_cell import SCORE_CELL_WIDTH_PX
 
 COMPLETED_KEYS = ("title", "who", "completed", "pri")
 PROJECT_KEYS = ("title", "status", "start", "due")
 # The defaults each list opens at, which are also its weights (SPC-D5).
-COMPLETED_DEFAULTS = {"title": 260, "who": 110, "completed": 150, "pri": 60}
-PROJECT_DEFAULTS = {"title": 260, "status": 90, "start": 90, "due": 90}
+# LRP-M6: read from COLUMN_DEFAULT_PX rather than copied, so a changed
+# default cannot leave these asserting proportions no screen has. The
+# priority cell is not shared (UNSHARED_KEYS) and keeps its own width.
+COMPLETED_DEFAULTS = {k: column_default_px(k) for k in COMPLETED_KEYS
+                      if k != "pri"} | {"pri": SCORE_CELL_WIDTH_PX}
+PROJECT_DEFAULTS = {k: column_default_px(k) for k in PROJECT_KEYS}
 
 
 def _floor():

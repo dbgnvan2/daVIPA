@@ -26,6 +26,7 @@ from src.getmoredone.screens.item_list_columns import (
     SEARCH_MIN_PX,
     LIST_MIN_CHARS,
     STRETCH_KEYS,
+    column_default_px,
     row_char_px,
 )
 
@@ -646,7 +647,9 @@ def test_lsr2m7_saved_lsr_widths_carry_over(make, monkeypatch):
     _root, screen = make("all_items")
     layout = screen.layout
     assert {k: layout.width(k) for k in STRETCH_KEYS} == stored
-    assert layout.width("start") == 60
+    # LRP-M6: the shared default, read from the table rather than copied, so
+    # changing a default cannot leave this asserting a width nothing uses.
+    assert layout.width("start") == column_default_px("start")
     layout.fit(1800)
     assert abs(layout.width("title") / layout.width("subsegment") - 4) < 0.1
 
