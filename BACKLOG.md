@@ -375,6 +375,35 @@ behaviour it replaces. `docs/unused-docs/implementation_plan_2026-11-10_plan_wal
 step 4 settles it.
 
 
+## Adjacent issues from the SPC resize batch (2026-11-16)
+
+- **The sidebar's rendered width is not its configured width, and the SPC-S3
+  budget depends on the relationship.** `CTkFrame` does not disable grid
+  propagation, so `ctk.CTkFrame(self, width=SIDEBAR_WIDTH_PX)` in
+  `app.py:create_sidebar` renders at whatever its children require (~180 px
+  today: a default 140 px nav button at `padx=20`), not at 200. The SPC-S3
+  guard treats `DEFAULT_WINDOW_WIDTH_PX - SIDEBAR_WIDTH_PX - 2 *
+  CONTENT_PAD_PX` as a lower bound on the content width, which holds only
+  while every sidebar child requires less than `SIDEBAR_WIDTH_PX`. A longer
+  nav label or a larger wordmark would widen the sidebar, shrink the real
+  content width below the bound, and leave the guard passing while a wrapped
+  toolbar row clips. Medium. Asserting it needs a real `GetMoreDoneApp`, and
+  that constructor calls `DatabaseManager()` with no path -- see below.
+- **`GetMoreDoneApp()` cannot be built in a test without opening the user's
+  real database.** `app.py:__init__` calls `DatabaseManager()` with no
+  argument, which resolves to `~/Library/Application Support/GetMoreDone/` and
+  runs migrations against it; `tests/test_brand_palette.py:258` does exactly
+  this. That breaks the repo's own rule that every `DatabaseManager` in a test
+  takes an explicit `tmp_path` database, and it is why the sidebar item above
+  is unassertable. Medium. A `db_path` argument threaded through `__init__`
+  would fix both.
+- **Completed's wrapped toolbar row grows with the data.** Its stats label
+  (`completed.py:153`) is built empty and filled with `Count: N | Time: …`, so
+  `wrap_row_px()` measures whatever the current filter produced -- the SPC-S3
+  figure of 475 px came from a three-row fixture, and a full year's view is
+  ~50 px wider. 485 px of headroom means it cannot clip, so this is about the
+  guard's number not being a worst case, not about a live defect. Low.
+
 ## Adjacent issues from the SPC resize batch (2026-11-15)
 
 Found by the sweep over SPC (Completed and the Project Board items list

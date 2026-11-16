@@ -225,8 +225,9 @@ themselves in scope for the next pass.
   toolbars, against a budget walked from `DEFAULT_WINDOW_WIDTH_PX`,
   `SIDEBAR_WIDTH_PX` and `CONTENT_PAD_PX` down the frames' own `grid_info`.
   Both sides are requested widths, so neither needs a mapped window. Measured
-  margins: completed 475/960, projects 844/956, scheduler 937/960, today
-  220/940, upcoming 487/960, all_items 270/960, hierarchical 358/960.
+  margins after the cold pass's M2 below: completed 475/960, projects 844/956,
+  scheduler 915/960, today 220/940, upcoming 487/960, all_items 270/960,
+  hierarchical 358/960.
   `SIDEBAR_WIDTH_PX` and `CONTENT_PAD_PX` are promoted out of `app.py`'s
   `create_sidebar` and `create_main_content` for it (rule 8).
 
@@ -267,6 +268,85 @@ themselves in scope for the next pass.
   two controls in one column, so nothing could tell `max` from `sum` -- is
   closed by `test_spcs2_one_row_counts_a_column_once`, a synthetic toolbar
   with two controls in column 0. Mutating `max` to `+` turns it red.
+
+
+## Cold pass over the fix round (2026-11-16)
+
+A cold reviewer over `53b4fea...f5e92db` (src and tests only), given the diff
+and no account of the work. Three mediums, seven lows. It ran nothing.
+
+- **M1 — `SIDEBAR_WIDTH_PX` is the configured width, not the rendered one, and
+  the comment claimed otherwise.** `CTkFrame` never calls
+  `grid_propagate(False)`, so the sidebar's gridded children set its request:
+  the widest is a default-width (140 px) nav button at `padx=20`, i.e. 180 px,
+  and window column 0 carries no weight. The sidebar therefore renders at
+  ~180 px and a screen gets ~20 px *more* than the guard assumes. Confirmed
+  from `app.py:153-215` (no nav button sets `width`) and the absence of any
+  `grid_propagate(False)` in CustomTkinter's `CTkFrame`; not measured, because
+  building a real `GetMoreDoneApp` runs migrations against the user's own
+  database.
+
+  The arithmetic is unchanged -- a lower bound on the content width is the
+  safe direction for this guard -- but the claim is not, so the comment now
+  says "lower bound" and says why. The residual, that a sidebar child needing
+  more than `SIDEBAR_WIDTH_PX` would make the bound optimistic and the guard
+  lenient, is in `BACKLOG.md` with the reason it cannot be asserted yet.
+
+- **M2 — the Scheduler's margin was 23 px, which is inside font-substitution
+  variance.** About 219 px of its 937 px row is label text (`Who:`,
+  `Segment:`, `SubSegment:`, `Project:`), and the themes ask for `SF Display`
+  on macOS and `Roboto` on Linux; `ubuntu-latest` has neither, so Tk
+  substitutes and a face 10% wider would redden the guard on CI. Bought the
+  margin back from the padding instead of from the text: the four filter label
+  pads to `(8, 3)` and the four combo pads to 4. The row needs **915 px**
+  against 960 -- a 45 px margin, which absorbs a 20% widening of the label
+  text, and no combo lost a character beyond the 10 px the first fix took.
+
+- **M3 — the new comment named a guard that does not exist.**
+  `drag_schedule.py` pointed at `test_spcs3_the_wrapped_row_fits_the_default_window`;
+  the real names are `..._the_new_wrapped_rows_...` and `..._the_old_...`. A
+  bare `test_` name with no path is the one citation form
+  `tests/test_traceability_refs.py` deliberately ignores, so nothing caught
+  it. Corrected.
+
+- **L6 — mixed units.** `winfo_reqwidth()` and `grid_info()["padx"]` are
+  scaled pixels; the three constants are logical. On a HiDPI Windows display
+  at 150% the guard would fail on a layout that is fine. `_toolbar_budget`
+  now returns `_apply_widget_scaling(budget)`.
+
+- **L1 — the ancestor walk read a pack-managed frame's padding as zero**,
+  which would make the budget too large. Today every toolbar is a direct grid
+  child of its screen, so the loop runs once; it now asserts that rather than
+  silently contributing zero.
+
+- **L3 — the four-screen table existed twice.** `test_spcm17` kept its own
+  copy of the dict and of the build/teardown that
+  `test_spcs3_the_old_wrapped_rows_fit_the_default_window` had just added.
+  One `OLD_TOOLBARS` and one `_build_old_toolbar_screen` now.
+
+Dissented from, with reasons:
+
+- **L2 — "five of the seven parametrized cases cannot fail."** True, and
+  deliberate: the finding this batch shipped was that *nobody had compared the
+  two numbers at all*, so the guard is written over the class of toolbars
+  rather than the one that was broken (P5). A guard that covers only the
+  screen already known to fail is the one that misses the next one.
+- **L4 — the max-vs-sum guard pins a layout that cannot occur.** Granted that
+  no real toolbar stacks two controls in one grid cell, and the docstring says
+  so. It is kept because the alternative is that nothing distinguishes
+  `max` from `sum`, which was re-sweep finding 2's point; it fails when the
+  formula changes, which is what it is for.
+- **L5 — Completed's wrapped row is data-dependent** (its stats label grows
+  with the count), so its 475/960 is not a worst case. With 485 px of headroom
+  it cannot clip; recorded in `BACKLOG.md` rather than fixed.
+- **L7 — the narrowed Project filter shows one or two fewer characters** of
+  the selected title; the dropdown list is sized by its entries and is
+  unaffected. Walk step 10 asks the user to check it against their own project
+  names.
+
+Not assessed by it: nothing was executed, no window was rendered, the docs
+commit was outside its range, and it did not mutation-check the new
+assertions (I did).
 
 
 ## Adjacent issues found, not fixed
@@ -343,7 +423,8 @@ I did not launch the application. Ten steps, each naming what to look at.
 
 ## Verification status
 
-- `tests/test_screen_resize_spc.py` — 38 passed, 3 skipped locally. The three
+- `tests/test_screen_resize_spc.py` — 37 passed, 3 skipped locally
+  (measured; an earlier draft of this line said 38, which was not). The three
   skipped are `test_spcm15_narrow_window_wraps_and_nothing_clips`, which needs
   a mapped window; **not run locally** (it takes keyboard focus on this
   machine), CI runs it. Its band assertion was changed by re-sweep finding 6
