@@ -179,7 +179,10 @@ class UpcomingScreen(ctk.CTkFrame):
             command=self.create_new_item
         )
         btn_new.grid(row=0, column=9, padx=10, pady=10)
-        self.toolbar_wrap = ToolbarWrap(header, self.search_entry, 1, 5)
+        # LRP-M10: Who resizes with the toolbar; the "Next N days" selector
+        # does not (plan D5).
+        self.toolbar_wrap = ToolbarWrap(header, self.search_entry, 1, 5,
+                                        filters=(self.who_combo,))
 
     def perform_search(self):
         """Perform search and update the view."""

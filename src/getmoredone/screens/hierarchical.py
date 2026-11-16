@@ -138,7 +138,9 @@ class HierarchicalScreen(ctk.CTkFrame):
             command=self.create_new_item
         )
         btn_new.grid(row=0, column=6, padx=10, pady=10)
-        self.toolbar_wrap = ToolbarWrap(header, self.search_entry, 1, 3)
+        # LRP-M10: Status resizes with the toolbar.
+        self.toolbar_wrap = ToolbarWrap(header, self.search_entry, 1, 3,
+                                        filters=(self.status_combo,))
 
     def perform_search(self):
         """Perform search and update the view."""

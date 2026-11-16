@@ -130,6 +130,16 @@ def timer_column(grid_col: int, heading: str = "") -> FixedColumn:
 # LSR-D7: on a narrow window the toolbar's search entry gives up width first,
 # down to this, before any button is clipped.
 SEARCH_MIN_PX = 120
+
+# LRP-M10: a value filter (Who, Status, Segment, SubSegment, Project) is never
+# drawn narrower than this -- "All" plus the dropdown arrow -- and never wider
+# than FILTER_MAX_FACTOR times its own default, so a very wide window leaves
+# the rest of the slack in the spacer column instead of stretching five combo
+# boxes across it. The small numeric selectors ("Next 7 days", "Last 30 days")
+# are not filters for this purpose: their content is one to three characters
+# and growing them buys nothing (plan D5).
+FILTER_MIN_PX = 90
+FILTER_MAX_FACTOR = 2
 # The toolbar's spacer takes almost all of any extra width, so the search
 # entry stays near its own width on a wide window.
 TOOLBAR_SPACER_WEIGHT = 1000
@@ -161,10 +171,22 @@ class ToolbarWrap:
     ``control_row``/``wrap_row`` are the row the controls sit on and the row
     they wrap into, for a toolbar whose other rows are already taken (the
     Project Board's search row and its warning line).
+
+    LRP-M10: ``filters`` are the value filters, which resize with the toolbar
+    the way a list's columns resize with the list -- a share of the slack in
+    proportion to their own default widths, never below ``FILTER_MIN_PX``.
+    Their widths are set here rather than left to ``sticky="ew"`` and a grid
+    weight, because a grid weight cannot give the slack to the filters while
+    taking the shortfall out of the search entry first (LSR-D7), and because
+    it is the same rule the columns follow (docs/list_resize_principles.md).
+
+    LRP-M11: that makes the wrap honest. The row wraps when the controls at
+    their *minimum* widths do not fit, not when their requested widths do
+    not.
     """
 
     def __init__(self, toolbar, entry, search_col, spacer_col: int,
-                 control_row: int = 0, wrap_row: int = 1):
+                 control_row: int = 0, wrap_row: int = 1, filters=()):
         self.toolbar = toolbar
         self.entry = entry
         self.search_col = search_col
@@ -174,6 +196,11 @@ class ToolbarWrap:
         self.frame = None
         self.wrapped = False
         self._moved = []
+        # (widget, its default width), captured before anything resizes it.
+        # Each filter is the only widget in its grid column, which is what
+        # lets ``_filter_room`` subtract their widths out of one_row_px().
+        self.filters = [(widget, int(widget.cget("width")))
+                        for widget in filters]
         if entry is not None:
             toolbar.grid_columnconfigure(search_col, weight=1,
                                          minsize=SEARCH_MIN_PX)
@@ -197,17 +224,36 @@ class ToolbarWrap:
         return [(w, w.grid_info()) for w in self.toolbar.winfo_children()
                 if w is not self.frame and self._on_control_row(w.grid_info())]
 
-    def one_row_px(self) -> int:
-        """The toolbar width one row needs, the search entry at its minimum."""
+    def _row_px(self, filter_px) -> int:
+        """One row's width, each value filter counted as ``filter_px(default)``.
+
+        Every other control counts at its requested width. The sum is taken
+        per column with ``max``, so a label sharing a filter's column still
+        counts at its own width.
+        """
+        defaults = dict(self.filters)
         columns = {}
         for widget, info in self._one_row_placements():
             col = int(info["column"])
             if self.entry is not None and col == self.search_col:
                 continue
-            need = widget.winfo_reqwidth() + _pad_total(info["padx"])
-            columns[col] = max(columns.get(col, 0), need)
+            width = (filter_px(defaults[widget]) if widget in defaults
+                     else widget.winfo_reqwidth())
+            columns[col] = max(columns.get(col, 0),
+                               width + _pad_total(info["padx"]))
         minimum = SEARCH_MIN_PX if self.entry is not None else 0
         return sum(columns.values()) + minimum
+
+    def one_row_px(self) -> int:
+        """The toolbar width one row needs, the search entry at its minimum.
+
+        The value filters count at their *default* widths, not the widths
+        they are drawn at now. A number that moved as ``fit_filters`` resized
+        them would make ``fit`` non-monotone: measured 2026-11-16, the same
+        All Items toolbar read 997 px, then 916, then 922, and once it had
+        wrapped it never came back.
+        """
+        return self._row_px(lambda default: default)
 
     def wrap_row_px(self) -> int:
         """The toolbar width the wrapped second row needs.
@@ -230,9 +276,55 @@ class ToolbarWrap:
              if int(info["column"]) > self.spacer_col),
             key=lambda pair: int(pair[1]["column"]))
 
+    def _filter_room(self, width: int) -> int:
+        """The width the filters have between them at a toolbar of ``width``.
+
+        Everything else on the row -- labels, buttons, every pad, and the
+        search entry at its minimum -- is taken out first.
+        """
+        return max(0, int(width) - self._row_px(lambda _default: 0))
+
+    def min_one_row_px(self) -> int:
+        """The toolbar width one row needs with every filter at its minimum.
+
+        This is the wrap threshold (LRP-M11): below it the row cannot hold
+        its controls even with every filter shrunk, so it wraps.
+        ``one_row_px()`` is the same number with the filters at their
+        defaults, which is the width at or above which they are drawn full
+        size.
+        """
+        return self._row_px(lambda _default: FILTER_MIN_PX)
+
+    def fit_filters(self, width: int) -> None:
+        """Give each value filter its share of a toolbar ``width`` (LRP-M10).
+
+        The share is proportional to the filter's own default width, so the
+        filters keep their relative sizes -- Project stays wider than Who --
+        and is clamped to [FILTER_MIN_PX, FILTER_MAX_FACTOR * default].
+        """
+        if not self.filters:
+            return
+        room = self._filter_room(width)
+        total = sum(default for _w, default in self.filters) or 1
+        for widget, default in self.filters:
+            share = int(room * default / total)
+            want = min(share, FILTER_MAX_FACTOR * default)
+            widget.configure(width=max(FILTER_MIN_PX, want))
+
     def fit(self, width: int) -> None:
-        """Lay the toolbar out for ``width`` px: one row if it fits, else two."""
-        want = int(width) < self.one_row_px()
+        """Lay the toolbar out for ``width`` px: one row if it fits, else two.
+
+        LRP-M11: the threshold is ``min_one_row_px()`` -- the row wraps when
+        the controls at their *minimum* widths do not fit, not when their
+        default widths do not. A filter therefore gives up width before the
+        buttons leave the row, after the search entry (LSR-D7) and before it.
+
+        While wrapped, the filters stay at their minimum: the room is
+        measured against one row, which is the width they would have to fit
+        in to come back.
+        """
+        self.fit_filters(width)
+        want = int(width) < self.min_one_row_px()
         if want == self.wrapped:
             return
         if want:

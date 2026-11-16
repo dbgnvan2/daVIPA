@@ -173,7 +173,11 @@ class AllItemsScreen(ctk.CTkFrame):
             command=self.create_new_item
         )
         btn_new.grid(row=0, column=9, padx=10, pady=10)
-        self.toolbar_wrap = ToolbarWrap(header, self.search_entry, 1, 7)
+        # LRP-M10: both value filters resize with the toolbar. They sit left
+        # of the spacer, so they resize without ever wrapping.
+        self.toolbar_wrap = ToolbarWrap(
+            header, self.search_entry, 1, 7,
+            filters=(self.status_combo, self.who_combo))
 
     def perform_search(self):
         """Perform search and update the view."""

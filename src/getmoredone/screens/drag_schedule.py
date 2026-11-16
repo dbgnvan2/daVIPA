@@ -258,7 +258,13 @@ class DragScheduleScreen(ctk.CTkFrame):
         self.project_filter_combo.grid(row=0, column=12, padx=4, pady=10)
         # SPC-M14: no search entry on this toolbar; Refresh's column takes the
         # slack and the four filters wrap to a second row.
-        self.toolbar_wrap = ToolbarWrap(header, None, None, 4)
+        # LRP-M10: and they resize with it, in proportion to the widths above,
+        # so Project stays the widest. The "Next N days" selector does not
+        # (plan D5).
+        self.toolbar_wrap = ToolbarWrap(
+            header, None, None, 4,
+            filters=(self.who_combo, self.segment_filter_combo,
+                     self.subsegment_filter_combo, self.project_filter_combo))
 
     def create_body(self):
         body = ctk.CTkFrame(self)

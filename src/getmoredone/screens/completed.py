@@ -159,7 +159,10 @@ class CompletedScreen(ctk.CTkFrame):
         self.stats_label.grid(row=0, column=7, padx=(20, 10), pady=10)
         # SPC-M14: no search entry here, so the "days" label's column takes
         # the slack and everything right of it wraps to a second row.
-        self.toolbar_wrap = ToolbarWrap(header, None, None, 3)
+        # LRP-M10: Who resizes with the toolbar; the "Last N days" selector
+        # does not (plan D5).
+        self.toolbar_wrap = ToolbarWrap(header, None, None, 3,
+                                        filters=(self.who_combo,))
 
     def _build_column_header(self):
         """The pinned column headings, over the same columns as the rows."""
