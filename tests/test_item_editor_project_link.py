@@ -819,20 +819,31 @@ def test_sweep8_a_failed_project_create_reports_instead_of_dying_silently(tmp_pa
             manager, "create_project_board",
             lambda _board: (_ for _ in ()).throw(RuntimeError("disk on fire")))
 
-        shown = []
+        # MOD-M2 moved the report from a platform dialog to the picker's own
+        # notice line, so the stub grows the channel (case b: the behaviour
+        # changed on purpose). messagebox is still watched, asserted empty:
+        # the dialog must not come back.
+        boxes = []
         import tkinter.messagebox as messagebox
         monkeypatch.setattr(messagebox, "showerror",
-                            lambda *a, **k: shown.append(a))
+                            lambda *a, **k: boxes.append(a))
 
+        shown = []
         chosen = []
         stub = SimpleNamespace(
             db_manager=manager,
             wait_window=lambda _dialog: None,
             _finish=lambda board_id: chosen.append(board_id),
+            set_status=lambda text, kind="muted": shown.append((kind, text)),
         )
         SetProjectDialog.create_new_project(stub)
 
         assert shown, "the failure was swallowed"
+        assert shown[-1][0] == "error", shown
+        assert "disk on fire" in shown[-1][1], (
+            "the notice did not say what went wrong"
+        )
+        assert boxes == [], f"a platform dialog came back: {boxes}"
         assert chosen == [], "a project that was never saved was selected anyway"
     finally:
         vps.close()

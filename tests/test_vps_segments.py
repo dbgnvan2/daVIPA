@@ -128,18 +128,20 @@ def test_rn_the_editor_refuses_a_case_only_duplicate_and_keeps_the_edit(vps, mon
     is told why, and the dialog is still open with their typing in it.
     """
     import customtkinter as ctk
-    from src.getmoredone.screens import vps_segment_editor
 
     existing = vps.get_all_segments(active_only=False)[0]["name"]
     segment_id = vps.create_segment("Utterly Distinct", "d", "#0a1b2c", 95)
     segment = dict(vps.get_segment(segment_id))
 
-    errors = []
-    monkeypatch.setattr(
-        vps_segment_editor.messagebox,
-        "showerror",
-        lambda title, message: errors.append((title, message)),
-    )
+    # MOD-M2: the refusal goes on the dialog's own notice line, not a
+    # platform dialog over it (case b: the behaviour changed on purpose).
+    # messagebox is still watched at module scope, asserted empty, so the
+    # dialog cannot come back without this test seeing it.
+    boxes = []
+    import tkinter.messagebox as messagebox
+    for name in ("showerror", "showinfo", "showwarning"):
+        monkeypatch.setattr(messagebox, name,
+                            lambda *a, **k: boxes.append(a))
 
     root = ctk.CTk()
     root.withdraw()
@@ -150,9 +152,11 @@ def test_rn_the_editor_refuses_a_case_only_duplicate_and_keeps_the_edit(vps, mon
 
         dialog.save_segment()
 
-        assert errors, "the editor saved or failed silently — the user was told nothing"
-        assert "already exists" in errors[-1][1], (
-            f"the refusal reason did not reach the user: {errors[-1]}")
+        told = dialog.notice_label().cget("text")
+        assert told, "the editor saved or failed silently — the user was told nothing"
+        assert "already exists" in told, (
+            f"the refusal reason did not reach the user: {told!r}")
+        assert boxes == [], f"a platform dialog came back: {boxes}"
 
         names = [seg["name"] for seg in vps.get_all_segments(active_only=False)]
         assert sum(1 for n in names if n.lower() == existing.lower()) == 1, (

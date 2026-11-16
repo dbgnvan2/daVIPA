@@ -377,3 +377,27 @@ def test_modm2_an_inline_list_is_capped():
     assert inline_list(few) == ", ".join(few)
     assert "and 1 more" in inline_list(few + ["extra"])
     assert inline_list(few + ["extra"]).count(",") == INLINE_LIST_CAP - 1
+
+
+def test_modm2_report_on_finds_the_nearest_line(screen):
+    """``report_on`` serves callers that cannot carry the mixin at all."""
+    from src.getmoredone.screens.status_notice import report_on
+
+    owner = screen()
+    assert report_on(owner, "from a module function", "warning") is True
+    assert owner.status_label.cget("text") == "from a module function"
+
+
+def test_modm2_report_on_says_when_nothing_took_it():
+    """A plain widget with no line above it: the caller is told, not fooled."""
+    from src.getmoredone.screens.status_notice import report_on
+
+    root = ctk.CTk()
+    root.withdraw()
+    try:
+        assert report_on(ctk.CTkFrame(root), "nowhere", "error") is False
+    finally:
+        try:
+            root.destroy()
+        except Exception:
+            pass

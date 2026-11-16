@@ -1811,17 +1811,33 @@ def test_updm54_the_bottom_row_is_one_add_and_the_selection_still_works():
     import src.getmoredone.screens.weekly_items as wi
 
     root, screen = _week_screen(right_rows=[_weekly_row(1)])
-    warned = []
+    # MOD-M2 moved the no-selection warning from a platform dialog to this
+    # screen's notice line (case b: the behaviour changed on purpose).
+    # messagebox is still watched, asserted untouched, so the dialog cannot
+    # come back without this test seeing it.
+    boxes = []
     original = wi.messagebox.showwarning
-    wi.messagebox.showwarning = lambda title, msg: warned.append(title)
+    wi.messagebox.showwarning = lambda *a, **k: boxes.append(a)
     try:
         actions_bar = [c for c in screen.right_frame.winfo_children()
                        if c.grid_info() and int(c.grid_info()["row"]) == 1][0]
         assert _button_texts(actions_bar) == ["Add Weekly Tactic"]
 
+        # Asserted on the notice's *kind*, not its words: this screen's
+        # notice line already carries a muted load summary that happens to
+        # contain "weekly tactic", and a substring check against it passed
+        # with the refusal deleted (caught by mutation).
+        from src.getmoredone.theme import status_text_color
+
         screen.selected_weekly_item = None
         screen.open_selected_weekly_item()
-        assert warned == ["No Weekly Item Selected"]
+        told = screen.notice_label()
+        assert told.cget("text_color") == status_text_color("warning"), (
+            "no selection opened an editor on nothing, or said nothing: "
+            f"{told.cget('text')!r}"
+        )
+        assert "select" in told.cget("text").lower(), told.cget("text")
+        assert boxes == [], f"a platform dialog came back: {boxes}"
 
         screen.on_select_weekly_item(0)
         assert screen.selected_weekly_item["id"] == "wt-1"

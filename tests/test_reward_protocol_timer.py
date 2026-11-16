@@ -1373,7 +1373,7 @@ def test_rp45_a_failed_completion_does_not_leave_the_window_claiming_success(roo
     errors = []
     try:
         timer.fire_celebration = lambda kind: None
-        timer._show_error_dialog = lambda message: errors.append(message)
+        timer._report_error = lambda message: errors.append(message)
         timer.db_manager.create_work_log = lambda log: (_ for _ in ()).throw(
             RuntimeError("database is locked"))
 
@@ -1709,7 +1709,7 @@ def test_cancel_timer_cannot_leak_a_pending_completion(root, manager, quiet):
     item, board = _linked(manager)
     timer = _timer(root, manager, item)
     timer.fire_celebration = lambda kind: None
-    timer._show_error_dialog = lambda message: None
+    timer._report_error = lambda message: None
     timer.start_timer()
     timer.work_seconds_elapsed = 25 * 60
 
@@ -1840,7 +1840,7 @@ def test_save_and_close_after_a_failed_done_does_not_count_a_completion(root, ma
     timer = _timer(root, manager, item)
     try:
         timer.fire_celebration = lambda kind: None
-        timer._show_error_dialog = lambda message: None
+        timer._report_error = lambda message: None
         timer.start_timer()
         timer.work_seconds_elapsed = 25 * 60
 

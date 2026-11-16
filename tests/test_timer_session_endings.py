@@ -376,9 +376,15 @@ def test_t55_every_messagebox_over_the_timer_suspends_its_topmost():
     tkinter.messagebox builds its own Toplevel and grabs it, so it belongs to
     the same class as the four dialogs — but it lives in a different file and
     the AST guard above, whose docstring says "no sibling modal left
-    unhardened", could not see it. Three of these four sites are the except
+    unhardened", could not see it. Three of those four sites were the except
     handler of a timer ending, which is the worst place to put an invisible
     modal: something has already gone wrong and the user is told nothing.
+
+    MOD-M2 removed all four: a timer ending reports on the window's own notice
+    line now, which is inside the window and cannot sit behind it. So the
+    expected count is zero (case b: the behaviour changed on purpose), and
+    this is the tripwire for either file gaining a messagebox again -- a new
+    one fails the count, and an unsuspended one fails the comparison below.
 
     Anchored to whole call expressions via the AST, not grepped: the words
     appear in the comments explaining them.
@@ -457,9 +463,12 @@ def test_t55_every_messagebox_over_the_timer_suspends_its_topmost():
                 if target is not None and target in suspended:
                     guarded.add((name, inner.lineno))
 
-    assert len(all_sites) == 4, (
-        f"the set of messagebox calls changed: {sorted(all_sites)}. A new one "
-        "must be wrapped in parent_topmost_suspended and counted here."
+    assert len(all_sites) == 0, (
+        f"the set of messagebox calls changed: {sorted(all_sites)}. MOD-M2 "
+        "left none in these two files: a notice goes on the window's own "
+        "notice line (StatusNoticeMixin.set_status), and a question that "
+        "genuinely needs a modal must be wrapped in parent_topmost_suspended "
+        "and counted here."
     )
     assert all_sites - guarded == set(), (
         "these messagebox calls open behind an always-on-top window holding a "

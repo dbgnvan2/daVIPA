@@ -39,6 +39,12 @@ def _dialog_stub(manager, board_id, checked=()):
         refreshed=0,
     )
     stub.refresh_results = lambda: setattr(stub, "refreshed", stub.refreshed + 1)
+    # MOD-M2: these methods report on the dialog's notice line now, not in a
+    # platform dialog. Behaviour changed intentionally; the contract the tests
+    # below exist for -- that the refusal reaches the user rather than
+    # escaping a Tk callback -- is unchanged.
+    stub.notices = []
+    stub.set_status = lambda text, kind="muted": stub.notices.append((kind, text))
     for name in ("_link", "_link_selected_items", "_confirm_relink"):
         method = getattr(LinkProjectActionItemsDialog, name)
         setattr(stub, name, (lambda m: lambda *a, **kw: m(stub, *a, **kw))(method))
@@ -627,17 +633,16 @@ def test_f5_a_failed_bulk_link_moves_nothing(tmp_path, monkeypatch, answers):
             return real(board_id, item_id)
 
         monkeypatch.setattr(manager, "link_item_to_project_exclusive", explode_on_the_third)
-        errors = []
-        monkeypatch.setattr(pb.messagebox, "showerror",
-                            lambda title, message, **kw: errors.append(message))
-
         stub = _dialog_stub(manager, new.id, checked=[i.id for i in items])
         stub._link_selected_items()
 
         for item in items:
             assert manager.get_project_board_ids_for_item(item.id) == [old.id], (
                 "the batch was half-applied — some items moved, some did not")
-        assert errors, "the failure reached nobody"
+        assert stub.notices, "the failure reached nobody"
+        kind, message = stub.notices[0]
+        assert kind == "error"
+        assert "None of the 3 selected items were moved" in message, message
         assert stub.checked_items == {i.id for i in items}, "the selection was consumed"
     finally:
         vps.close()
@@ -1538,12 +1543,13 @@ def test_f2_dragging_a_tactic_onto_a_project_is_refused(tmp_path, monkeypatch, a
         tactic = make_week_item(vps, ape_id)
         daily = make_daily_item(vps, "An ordinary task")
 
+        # MOD-M2: DRP-M2 already fell back to the notice line when the
+        # platform refused the dialog, and the attempt is gone -- so the line
+        # is where the word about the tactic arrives.
         told = []
-        monkeypatch.setattr(ds.messagebox, "showinfo",
-                            lambda title, msg, **kw: told.append(msg))
-
         stub = SimpleNamespace(db_manager=manager, drag_items=[tactic, daily])
         stub.refresh = lambda: None
+        stub.set_status = lambda text, kind="muted": told.append(text)
         ds.DragScheduleScreen._drop_onto_project(stub, board.id)
 
         assert told, "the tactic was silently left behind with no word"
@@ -1602,13 +1608,14 @@ def test_p10_a_refused_link_reports_instead_of_escaping_a_tk_callback(tmp_path, 
             raise ValueError("simulated refusal")
 
         monkeypatch.setattr(manager, "link_item_to_project_exclusive", explode)
-        errors = []
-        monkeypatch.setattr(pb.messagebox, "showerror",
-                            lambda title, msg, **kw: errors.append(msg))
 
-        _dialog_stub(manager, board.id)._link(item.id)
+        stub = _dialog_stub(manager, board.id)
+        stub._link(item.id)
 
-        assert errors and "simulated refusal" in errors[0], errors
+        assert stub.notices, "the refusal reached nobody"
+        kind, message = stub.notices[0]
+        assert kind == "error"
+        assert "simulated refusal" in message, message
     finally:
         vps.close()
 

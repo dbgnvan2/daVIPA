@@ -807,9 +807,14 @@ def test_b52_a_failing_timer_ending_does_not_hang_the_run(tmp_path, messageboxes
     """B5.2 — the case that actually cost two minutes of a review pass.
 
     Every timer ending wraps its body in ``except Exception`` and calls
-    ``_show_error_dialog``. Before this, a test that raised inside one opened a
+    ``_report_error``. Before this, a test that raised inside one opened a
     real modal and the run stopped there. The assertion is simply that this
     function returns.
+
+    MOD-M2 moved that handler off the platform dialog and onto the window's
+    own notice line, so the channel asserted here changed with it (case b:
+    the behaviour changed on purpose). The dialog cannot come back without
+    this test seeing it -- ``messageboxes`` stays, asserted empty.
     """
     import customtkinter as ctk
 
@@ -828,10 +833,13 @@ def test_b52_a_failing_timer_ending_does_not_hang_the_run(tmp_path, messageboxes
 
         # The shape of a real failure inside an ending: something the handler
         # cannot help with, on the path that reports it.
-        timer._show_error_dialog("Failed to complete action: boom")
+        timer._report_error("Failed to complete action: boom")
 
-        assert any(f == "showerror" for f, _t, _m in messageboxes), (
-            "the ending's error path did not go through messagebox at all"
+        assert timer.notice_label().cget("text") == (
+            "Failed to complete action: boom"
+        ), "the ending's error path put nothing on the notice line"
+        assert messageboxes == [], (
+            f"the ending's error path opened a platform dialog: {messageboxes}"
         )
         timer.destroy()
     finally:

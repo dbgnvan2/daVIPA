@@ -17,9 +17,13 @@ import inspect  # noqa: F401  (kept: other tests in this file still use it)
 
 import pytest
 
+import ast
+import pathlib
+
 from tests.source_asserts import (
     assigns_self_attribute,
     calls_any_attribute,
+    calls_attribute,
     references_name,
 )
 
@@ -28,11 +32,29 @@ from src.getmoredone.screens.vps_editors import TLVisionEditorDialog
 from src.getmoredone.screens.vps_planning import VPSPlanningScreen
 
 
-def test_bc3_messagebox_is_imported_in_vps_editors():
-    """The New Vision crash was a missing messagebox, so this is the guard."""
-    assert hasattr(vps_editors, "messagebox"), (
-        "vps_editors has no messagebox — save_vision's error paths will raise")
-    assert callable(getattr(vps_editors.messagebox, "showerror", None))
+def test_bc3_vps_editors_reaches_for_no_platform_dialog():
+    """MOD-M2 -- the replacement for the missing-messagebox guard.
+
+    The New Vision crash was a ``messagebox`` name that was not imported, and
+    the guard was that the name exists. These editors no longer name it at
+    all: every refusal goes on the dialog's own notice line, so the guard that
+    matters now is the opposite one -- the module must not reach for the
+    platform again, by import or by call (case b: the behaviour changed on
+    purpose, and a guard for an import nothing uses guards nothing).
+    """
+    assert not hasattr(vps_editors, "messagebox"), (
+        "vps_editors imports messagebox again; MOD-M2 reports on the notice "
+        "line instead (StatusNoticeMixin.set_status)")
+    source = pathlib.Path(vps_editors.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    reached = [
+        node.lineno for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr.startswith(("show", "ask"))
+        and ast.unparse(node.func).startswith("messagebox.")
+    ]
+    assert reached == [], f"platform dialogs are back at lines {reached}"
 
 
 def test_bc3_save_vision_does_not_use_ctkmessagebox():
@@ -51,10 +73,13 @@ def test_bc3_save_vision_still_reports_errors_to_the_user():
     """Removing the crash must not have removed the error message with it.
 
     The original check printed a warning and passed when no messagebox call was
-    found, so a silent save_vision would have gone unnoticed.
+    found, so a silent save_vision would have gone unnoticed. MOD-M2 moved the
+    channel to the dialog's notice line, so the call asserted here moved with
+    it (case b) -- the thing being guarded, that a failed save says something,
+    is unchanged.
     """
-    assert calls_any_attribute(
-        TLVisionEditorDialog.save_vision, "messagebox", ("showerror", "showinfo")
+    assert calls_attribute(
+        TLVisionEditorDialog.save_vision, "self", "set_status"
     ), ("save_vision no longer tells the user anything when it fails")
 
 

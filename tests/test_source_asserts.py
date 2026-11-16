@@ -178,8 +178,11 @@ def test_the_helpers_parse_a_real_method_from_the_app():
     """
     from src.getmoredone.screens.vps_editors import TLVisionEditorDialog
 
-    assert calls_any_attribute(
-        TLVisionEditorDialog.save_vision, "messagebox", ("showerror", "showinfo")
+    # The sample was ``messagebox.showerror`` until MOD-M2 took the platform
+    # dialog out of this method. Its notice line is the call that is there
+    # now; what is being tested is the helper, not the method.
+    assert calls_attribute(
+        TLVisionEditorDialog.save_vision, "self", "set_status"
     ), "the helper cannot see a call it should see in real app source"
 
 

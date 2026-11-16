@@ -547,24 +547,33 @@ def test_wt_m6b5_the_notifier_only_interrupts_when_it_should():
 
 
 def test_wt_m6b5_a_failure_is_not_dressed_as_good_news(monkeypatch):
-    """A failed re-file must not arrive as an info box titled "created"."""
+    """A failed re-file must not arrive as the kind that clears itself.
+
+    MOD-M2 moved this notice from a messagebox to the screen's notice line, so
+    the thing that must not be dressed as good news is now the *kind* rather
+    than the title and icon (case b: the behaviour changed on purpose). It
+    matters more than it did: an ``info`` kind takes itself down after
+    ``notice_dismiss_ms`` (MOD-M3), so a failure sent as ``info`` would be a
+    failure the user can miss entirely.
+    """
     from src.getmoredone.screens import week_collision_notice as notice
     from src.getmoredone.weekly_tactic import CascadeReport
 
     shown = []
-    monkeypatch.setattr(notice.messagebox, "showinfo",
-                        lambda title, msg, **k: shown.append(("info", title)))
-    monkeypatch.setattr(notice.messagebox, "showwarning",
-                        lambda title, msg, **k: shown.append(("warning", title)))
+    monkeypatch.setattr(notice, "report_on",
+                        lambda parent, text, kind: shown.append((kind, text))
+                        or True)
 
     rollover = CascadeReport()
     rollover.record("annual_plans", "ap-1", "2027", stub=True)
     notice.notify_cascade(SimpleNamespace(last_cascade_report=rollover))
-    assert shown[-1] == ("info", "Plan records created")
+    assert shown[-1][0] == "info", "what the cascade built is not a failure"
 
     notice.notify_cascade(SimpleNamespace(
         last_cascade_report=CascadeReport(status="ape_missing")))
-    assert shown[-1][0] == "warning", "a failure must not use the success icon"
+    assert shown[-1][0] == "warning", (
+        "a failure sent as info clears itself after a few seconds"
+    )
 
 
 def test_wt_m6b5_every_report_producing_surface_reads_it():
@@ -728,13 +737,20 @@ def test_wt_m6b5_a_batch_of_no_ops_reports_nothing(tmp_path):
 
 
 def test_wt_m6b6_a_notice_lowers_an_always_on_top_parent(monkeypatch):
-    """Every notice here ends in a messagebox, often parented to the timer.
+    """The one modal left in this module still lowers its topmost parent.
 
     The TimerWindow sets -topmost at construction and never drops it, so a
     modal opening behind it still holds grab_set(): it takes every click while
     showing nothing, and the window underneath looks frozen. That is the bug
-    the timer's own dialogs were fixed for, and these six call sites were left
-    out of that sweep (P5).
+    the timer's own dialogs were fixed for, and these call sites were left out
+    of that sweep (P5).
+
+    MOD-M2 took the two *telling* notices off the platform dialog, so they can
+    no longer open behind anything. It left the one that *asks* -- completing
+    a Weekly Tactic with open children -- which is still a modal over a
+    possibly-topmost parent, and is what this now measures (case b: the
+    behaviour changed on purpose, and the risk moved with the last modal
+    rather than going away). MOD-M5 is the asking sites, in phase 2.
 
     conftest silences -topmost for the run, so the flag is set and read through
     the Tcl interpreter — past the patch in both directions, or this would be
@@ -760,16 +776,20 @@ def test_wt_m6b6_a_notice_lowers_an_always_on_top_parent(monkeypatch):
         assert topmost_now(root), "precondition: the parent is always-on-top"
 
         seen = []
-        monkeypatch.setattr(notice.messagebox, "showwarning",
-                            lambda *a, **k: seen.append(topmost_now(root)))
+        monkeypatch.setattr(notice.messagebox, "askyesno",
+                            lambda *a, **k: seen.append(topmost_now(root))
+                            or True)
 
-        db = SimpleNamespace(last_week_collision={
-            "title": "A tactic", "week_start": "2026-02-23"})
-        assert notice.notify_week_collision(db, root) is True
+        # A Weekly Tactic with one open child: the only shape that asks.
+        db = SimpleNamespace(
+            get_action_item=lambda _id: SimpleNamespace(item_type="week"),
+            get_children=lambda _id: [SimpleNamespace(status="pending")],
+        )
+        assert notice.confirm_weekly_tactic_completion(db, "t-1", root) is True
 
         assert seen == [False], (
-            "the notice opened while its parent was still always-on-top, so it "
-            "sits behind the window it belongs to and holds the grab there"
+            "the question opened while its parent was still always-on-top, so "
+            "it sits behind the window it belongs to and holds the grab there"
         )
         assert topmost_now(root), "the parent never got its always-on-top back"
     finally:
