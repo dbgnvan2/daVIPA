@@ -21,7 +21,7 @@ from .week_collision_notice import (
     describe_week_collision,
     notify_weekly_tactic_changes,
 )
-from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
+from ..theme import button_style, combo_box_style, semantic_colors
 from .drag_schedule_support import (
     color_for_day_stats,
     date_background_for,
@@ -34,6 +34,7 @@ from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage
 from .title_format import split_action_item_title, format_column_text
 from .column_resize import CHAR_PX, ColumnResizer
 from .item_list_columns import TextColumn, ToolbarWrap, custom_specs
+from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
@@ -56,7 +57,7 @@ ITEM_FIT_DELAY_MS = 120
 ITEM_ROW_RESERVED_PX = (30 + 12) + 12 + 4 * 8 + 4 + 6
 
 
-class DragScheduleScreen(ctk.CTkFrame):
+class DragScheduleScreen(StatusNoticeMixin, ctk.CTkFrame):
     """Screen with drag-and-drop scheduling onto date boxes."""
 
     # BP5/S2-4 — a lineage-filtered "No Project" view cannot filter in SQL, so
@@ -143,12 +144,9 @@ class DragScheduleScreen(ctk.CTkFrame):
         # DRP-M3: where a drop reports when the platform will not show a
         # dialog from inside a drag release (PD-M12). Not modal, so it cannot
         # fail the way the dialog did.
-        self.status_label = ctk.CTkLabel(self, text="", anchor="w")
-        self.status_label.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 6))
+        self.create_status_line(row=2, column=0, sticky="ew",
+                                padx=12, pady=(0, 6))
         self.refresh()
-
-    def set_status(self, text: str, kind: str = "muted"):
-        self.status_label.configure(text=text, text_color=status_text_color(kind))
 
     def _sync_ui_sizing_from_settings(self):
         """Sync Drag Schedule sizing options from persisted settings."""

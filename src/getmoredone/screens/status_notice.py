@@ -1,0 +1,187 @@
+"""The shared notice line: how a screen tells the user something.
+
+Purpose: MOD-M1 -- one contract for reporting to the user, so no screen has to
+         reach for a platform dialog to say "saved" or "that failed".
+Spec:    docs/unused-docs/implementation_plan_2026-11-16_modeless_notices.md#mod-m1
+Tests:   tests/test_modeless_notices.py
+
+This is not a new idea. ``PlanScreen`` and ``DragScheduleScreen`` have carried
+``set_status(text, kind)`` since DRP-M3, and the reason is recorded at
+``plan.py:2446``: on macOS the platform dialog raises a bare ``TclError`` from
+the idle callback a drag release schedules, and a hand-rolled grabbed toplevel
+in its place hung the application outright, because its window could not become
+visible while its own grab was up. Both were reported from the running screen
+on 2026-11-07, three hours apart. A label already on the screen cannot fail
+either way, which is why it is the one place a notice is allowed to live.
+
+What this module adds is that the other screens may have it too.
+"""
+
+import logging
+
+import customtkinter as ctk
+
+from ..theme import status_text_color
+
+logger = logging.getLogger(__name__)
+
+
+#: Kinds that clear themselves (MOD-M3). Everything else persists, so an
+#: unknown kind stays on screen rather than vanishing: a notice nobody sees is
+#: the failure this whole change exists to fix. ``status_text_color`` accepts
+#: legacy colour words beside the semantic names, so both spellings are here.
+TRANSIENT_KINDS = frozenset({"info", "blue", "success", "green"})
+
+
+class StatusNoticeMixin:
+    """Give a screen the notice line, and the ``set_status`` contract.
+
+    Purpose: MOD-M1 -- the contract ``PlanScreen`` and ``DragScheduleScreen``
+             already satisfy, in one place so 23 other screens can satisfy it
+             without each inventing it.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-16_modeless_notices.md#mod-m1
+    Tests:   tests/test_modeless_notices.py::test_modm1_every_reporting_screen_sets_text_and_semantic_colour
+
+    Mixed in ahead of ``ctk.CTkFrame``. A screen that already builds its own
+    ``status_label`` keeps it; one that does not calls
+    :meth:`create_status_line`.
+    """
+
+    #: Set by :meth:`create_status_line`, or by the screen itself.
+    status_label = None
+
+    def create_status_line(self, parent=None, **grid_kwargs):
+        """Build the notice label and return it.
+
+        ``grid_kwargs`` goes straight to ``grid``, so the caller places it;
+        a screen knows where its own bottom row is and this does not.
+        """
+        self.status_label = ctk.CTkLabel(parent if parent is not None else self,
+                                         text="", anchor="w")
+        if grid_kwargs:
+            self.status_label.grid(**grid_kwargs)
+        return self.status_label
+
+    def set_status(self, text: str, kind: str = "muted"):
+        """Show ``text`` on the notice line, coloured for ``kind``.
+
+        Purpose: MOD-M1/M3/M4 -- report to the user without a platform dialog,
+                 persist anything they must act on, and never raise from the
+                 callback the notice was written in.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-16_modeless_notices.md#mod-m1
+        Tests:   tests/test_modeless_notices.py::test_modm1_every_reporting_screen_sets_text_and_semantic_colour
+                 tests/test_modeless_notices.py::test_modm3_an_error_survives_a_refresh
+                 tests/test_modeless_notices.py::test_modm4_a_notice_from_an_idle_callback_does_not_raise
+
+        An ``info`` or ``success`` notice clears itself after
+        ``AppSettings.notice_dismiss_ms``; an ``error``, ``warning`` or
+        ``muted`` one stays until the screen says otherwise (MOD-M3).
+        """
+        label = getattr(self, "status_label", None)
+        if label is None:
+            # Not silently dropped (P2): a screen reporting before it has a
+            # notice line is a wiring mistake, and the message is the evidence.
+            logger.warning("%s has no status line yet; notice dropped: %r",
+                           type(self).__name__, text)
+            return
+
+        self._cancel_pending_dismiss()
+        try:
+            label.configure(text=text, text_color=status_text_color(kind))
+        except Exception:
+            # MOD-M4: the caller may be an idle callback from a drag release,
+            # and a notice that raises there takes the gesture with it --
+            # which is PD-M12's traceback. Report and carry on.
+            logger.exception("notice could not be drawn: %r", text)
+            return
+
+        if text and kind in TRANSIENT_KINDS:
+            self._schedule_dismiss()
+
+    def notify_owner(self, text: str, kind: str = "muted"):
+        """Report on the nearest ancestor's notice line instead of this one.
+
+        Purpose: MOD-M2 -- a dialog that reports and then closes cannot report
+                 on itself; its line goes with it.
+        Spec:    docs/unused-docs/implementation_plan_2026-11-16_modeless_notices.md#mod-m2
+        Tests:   tests/test_modeless_notices.py::test_modm2_a_dialog_that_closes_reports_on_its_opener
+                 tests/test_modeless_notices.py::test_modm2_an_orphan_notice_is_logged
+
+        ~30 of the swept call sites are `showinfo("Success", ...)` followed by
+        ``self.destroy()``. Written to this object's own label the message
+        would be destroyed in the same frame it was drawn, so the user would
+        be told nothing at all -- quieter than the dialog it replaced, and
+        the one way this change could make the app worse.
+
+        Walks ``master`` rather than taking the opener as an argument: a
+        dialog is constructed with its parent as ``master`` already, so there
+        is no new wiring for 19 dialog classes to get wrong.
+        """
+        node = getattr(self, "master", None)
+        seen = 0
+        while node is not None and seen < 20:
+            seen += 1
+            label = getattr(node, "status_label", None)
+            if label is not None and callable(getattr(node, "set_status", None)):
+                try:
+                    if label.winfo_exists():
+                        node.set_status(text, kind)
+                        return
+                except Exception:
+                    logger.debug("ancestor notice line was not usable")
+            node = getattr(node, "master", None)
+        # Not silently dropped (P2). Falling back to this object's own line is
+        # wrong here -- the caller is about to destroy it -- so say so, with
+        # the message, and let the walk checklist find the screen that needs
+        # a notice line of its own.
+        logger.warning("no notice line above %s; %s notice dropped: %r",
+                       type(self).__name__, kind, text)
+
+    def clear_status(self):
+        """Take the notice down now."""
+        self._cancel_pending_dismiss()
+        label = getattr(self, "status_label", None)
+        if label is None:
+            return
+        try:
+            label.configure(text="")
+        except Exception:
+            logger.exception("notice could not be cleared")
+
+    def dismiss_delay_ms(self) -> int:
+        """How long a transient notice stays, from settings (P4)."""
+        from ..app_settings import AppSettings
+
+        settings = getattr(self, "settings", None)
+        default = AppSettings.notice_dismiss_ms
+        value = getattr(settings, "notice_dismiss_ms", default)
+        try:
+            value = int(value)
+        except (TypeError, ValueError):
+            logger.warning("notice_dismiss_ms is not a number: %r; using %d",
+                           value, default)
+            return default
+        # A zero or negative delay would take the notice down in the same
+        # frame it went up, which reads as the notice never having appeared.
+        return value if value > 0 else default
+
+    def _schedule_dismiss(self):
+        try:
+            self._status_dismiss_after = self.after(self.dismiss_delay_ms(),
+                                                    self.clear_status)
+        except Exception:
+            # No event loop to schedule on. The notice stays up, which is the
+            # safe direction: visible too long beats never seen.
+            logger.debug("no loop to schedule the notice dismissal on")
+            self._status_dismiss_after = None
+
+    def _cancel_pending_dismiss(self):
+        pending = getattr(self, "_status_dismiss_after", None)
+        if not pending:
+            return
+        self._status_dismiss_after = None
+        try:
+            self.after_cancel(pending)
+        except Exception:
+            # Already fired or the widget is going away; nothing to cancel.
+            logger.debug("nothing to cancel for the notice dismissal")

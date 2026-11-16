@@ -38,7 +38,8 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 import customtkinter as ctk
 
 from ..models import ActionItem, BlockType, TimeBlock
-from ..theme import button_style, semantic_colors, status_text_color
+from ..theme import button_style, semantic_colors
+from .status_notice import StatusNoticeMixin
 from ..time_block_layout import (
     DAY_EXTEND_EARLIER,
     DAY_EXTEND_LATER,
@@ -308,7 +309,8 @@ def _clock(minutes: int) -> str:
     return f"{hours}h {remainder:02d}m" if hours else f"{remainder}m"
 
 
-class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMixin, ctk.CTkFrame):
+class PlanScreen(StatusNoticeMixin, PlanWeekViewMixin, PlanCommitmentEditsMixin,
+                 PlanCommitmentsMixin, ctk.CTkFrame):
     """Screen for planning time blocks."""
 
     def __init__(self, parent, db_manager: 'DatabaseManager', app: 'GetMoreDoneApp'):
@@ -698,8 +700,7 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         # through would have gone silent on a default-sized window, for the
         # feature whose strings are the longest it produces. Its own row
         # cannot be squeezed by a seventh button.
-        self.status_label = ctk.CTkLabel(self, text="", anchor="w")
-        self.status_label.grid(
+        self.create_status_line(
             row=2, column=0, columnspan=3, sticky="ew", padx=20, pady=(2, 8)
         )
 
@@ -1514,9 +1515,6 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
             parts.append(f"{overlapping} {noun} a meeting")
 
         self.day_summary.configure(text="  ·  ".join(parts))
-
-    def set_status(self, text: str, kind: str = "muted"):
-        self.status_label.configure(text=text, text_color=status_text_color(kind))
 
     # ================= creating blocks ======================================
 

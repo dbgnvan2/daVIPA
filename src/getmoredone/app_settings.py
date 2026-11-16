@@ -144,6 +144,11 @@ class AppSettings:
     drag_schedule_date_text_color: str = "#FFFFFF"
     # Drag Schedule date/future box height in pixels
     drag_schedule_box_height_px: int = 86
+    # MOD-M3: how long an `info` or `success` notice stays on a screen's
+    # status line. An `error` or `warning` one is not timed -- it stays until
+    # the screen replaces it. Read through
+    # StatusNoticeMixin.dismiss_delay_ms, never inline.
+    notice_dismiss_ms: int = 6000
     # Two consumers, and no screen writes it -- but `save` does: a field the
     # settings file does not hold is stamped with this default on the first
     # save, so a loaded value is almost always a file value. That is why
