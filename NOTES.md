@@ -34,6 +34,12 @@ are the same commit (`c8125af`), and `claude/plan-day-faults-03c116`
   toast cannot ask anything, so each call site has to be sorted into telling
   and asking.
 
+**The six branch refs are deleted** (2026-11-16, on the user's instruction),
+local and remote, each tip having first been confirmed byte-identical to a
+pushed `archive/*` tag. `main` is now the only branch in the repo and the only
+one on `origin`; the three tags are the sole reference to that work, and
+`git show archive/<name>` is how to read it.
+
 Not verified on screen, and nothing about `main`'s behaviour changed here —
 this entry, `BACKLOG.md` MOD-A1 and three tags are the whole of it.
 
@@ -57,8 +63,8 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   did not: `claude/plan-day-range-pdm13` (28 ahead) with `dayrange-backup` at
   the same tip and `claude/plan-day-faults-03c116` as its ancestor, and
   `claude/setup-getmoredone-env-BjJcS` (one commit from 2026-08-25 removing
-  `grab_set()` and adding a toast widget). **All four are settled as of
-  2026-11-16** — see "The four leftover branches are decided" below. The
+  `grab_set()` and adding a toast widget). **All four are settled, and their
+  refs deleted, as of 2026-11-16** — see "The four leftover branches are decided" below. The
   pointer above to `CLAUDE.md` was correct when written and is not now: the
   rewrite of 2026-11-10 (`docs/unused-docs/changes/2026-11-10-claude-md-narrative.md`)
   dropped the must-not-merge line, and what carries it instead is the
@@ -203,7 +209,8 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   `2fac9b3`. `refs/heads/claude/plan-day-range-pdm13` is **superseded and
   stays unmerged** at `c8125af`: it holds the earlier design of the plan day,
   the one whose shared-setting write caused both reported faults. It must not
-  be merged. Whether to delete it was undecided, and is decided below.
+  be merged. Whether to delete it was undecided; it is decided below, and the
+  ref itself is gone, preserved as `archive/plan-day-range-pdm13`.
 - **Eleven of the twenty red tests are closed.** Ten by the PDT batch — the
   nine plan-day failures and `test_every_referenced_test_name_exists` — which
   were stale test vehicles, not missing code: `outside` was implemented on
