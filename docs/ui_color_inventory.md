@@ -28,10 +28,10 @@ rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkg
 ## 1) Summary Counts By Type
 
 - Hex colors (match count): **1065**
-- Named colors (match count): **629**
+- Named colors (match count): **631**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
-- Widget explicit overrides (line count): **509**
+- Widget explicit overrides (line count): **508**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -42,11 +42,11 @@ and theme_files line counts.
 |---|---:|
 | `app_settings` | 38 |
 | `hex` | 163 |
-| `named` | 39 |
+| `named` | 40 |
 | `theme_api` | 2 |
 | `theme_files` | 1292 |
 | `tuples` | 2 |
-| `widget` | 509 |
+| `widget` | 508 |
 
 Widget override property breakdown:
 
@@ -56,7 +56,7 @@ Widget override property breakdown:
 | `corner_radius` | 59 |
 | `fg_color` | 245 |
 | `hover_color` | 1 |
-| `text_color` | 189 |
+| `text_color` | 188 |
 
 AppSettings persisted color/theme fields:
 
@@ -74,31 +74,31 @@ src/getmoredone/app_settings.py:139:    # a dark one, for the reason ``theme.pri
 src/getmoredone/app_settings.py:140:    list_date_band_color: str = ""
 src/getmoredone/app_settings.py:143:    # Drag Schedule date box text color (hex)
 src/getmoredone/app_settings.py:144:    drag_schedule_date_text_color: str = "#FFFFFF"
-src/getmoredone/app_settings.py:358:                settings.appearance_mode = cls._normalize_appearance_mode(
-src/getmoredone/app_settings.py:359:                    settings.appearance_mode)
-src/getmoredone/app_settings.py:360:                settings.theme_name = cls._normalize_theme_name(
-src/getmoredone/app_settings.py:361:                    settings.theme_name)
-src/getmoredone/app_settings.py:374:                settings.list_date_band_color = cls._normalize_list_date_band_color(
-src/getmoredone/app_settings.py:375:                    getattr(settings, "list_date_band_color", "")
-src/getmoredone/app_settings.py:497:        self.appearance_mode = self._normalize_appearance_mode(
-src/getmoredone/app_settings.py:498:            self.appearance_mode)
-src/getmoredone/app_settings.py:499:        self.theme_name = self._normalize_theme_name(self.theme_name)
-src/getmoredone/app_settings.py:512:        self.list_date_band_color = self._normalize_list_date_band_color(
-src/getmoredone/app_settings.py:513:            self.list_date_band_color
-src/getmoredone/app_settings.py:709:        _normalize_theme_name defers its import for the same reason.
-src/getmoredone/app_settings.py:779:    def _normalize_appearance_mode(value: Optional[str]) -> str:
-src/getmoredone/app_settings.py:785:    def _normalize_theme_name(value: Optional[str]) -> str:
-src/getmoredone/app_settings.py:786:        """Coerce a persisted theme name, using theme.py's list and no other.
-src/getmoredone/app_settings.py:788:        This held a SECOND hardcoded copy of the theme names. Adding a theme to
-src/getmoredone/app_settings.py:791:        load, because the new name was not in the copy. Picking a new theme
-src/getmoredone/app_settings.py:794:        Imported inside the function: theme.py pulls in customtkinter, and
-src/getmoredone/app_settings.py:798:        from .theme import normalize_theme_name
-src/getmoredone/app_settings.py:800:        return normalize_theme_name(value)
-src/getmoredone/app_settings.py:811:    def _normalize_list_date_band_color(value: object) -> str:
-src/getmoredone/app_settings.py:812:        """DBC-M1.1 -- a stored band colour, or ``""`` for the theme's own.
-src/getmoredone/app_settings.py:816:        nothing unusable reaches ``theme.date_band_colors``, which carried the
-src/getmoredone/app_settings.py:821:        normalized = normalize_hex_color(value)
-src/getmoredone/app_settings.py:825:                "the theme's own band colour. Set it again in Settings > "
+src/getmoredone/app_settings.py:363:                settings.appearance_mode = cls._normalize_appearance_mode(
+src/getmoredone/app_settings.py:364:                    settings.appearance_mode)
+src/getmoredone/app_settings.py:365:                settings.theme_name = cls._normalize_theme_name(
+src/getmoredone/app_settings.py:366:                    settings.theme_name)
+src/getmoredone/app_settings.py:379:                settings.list_date_band_color = cls._normalize_list_date_band_color(
+src/getmoredone/app_settings.py:380:                    getattr(settings, "list_date_band_color", "")
+src/getmoredone/app_settings.py:502:        self.appearance_mode = self._normalize_appearance_mode(
+src/getmoredone/app_settings.py:503:            self.appearance_mode)
+src/getmoredone/app_settings.py:504:        self.theme_name = self._normalize_theme_name(self.theme_name)
+src/getmoredone/app_settings.py:517:        self.list_date_band_color = self._normalize_list_date_band_color(
+src/getmoredone/app_settings.py:518:            self.list_date_band_color
+src/getmoredone/app_settings.py:714:        _normalize_theme_name defers its import for the same reason.
+src/getmoredone/app_settings.py:784:    def _normalize_appearance_mode(value: Optional[str]) -> str:
+src/getmoredone/app_settings.py:790:    def _normalize_theme_name(value: Optional[str]) -> str:
+src/getmoredone/app_settings.py:791:        """Coerce a persisted theme name, using theme.py's list and no other.
+src/getmoredone/app_settings.py:793:        This held a SECOND hardcoded copy of the theme names. Adding a theme to
+src/getmoredone/app_settings.py:796:        load, because the new name was not in the copy. Picking a new theme
+src/getmoredone/app_settings.py:799:        Imported inside the function: theme.py pulls in customtkinter, and
+src/getmoredone/app_settings.py:803:        from .theme import normalize_theme_name
+src/getmoredone/app_settings.py:805:        return normalize_theme_name(value)
+src/getmoredone/app_settings.py:816:    def _normalize_list_date_band_color(value: object) -> str:
+src/getmoredone/app_settings.py:817:        """DBC-M1.1 -- a stored band colour, or ``""`` for the theme's own.
+src/getmoredone/app_settings.py:821:        nothing unusable reaches ``theme.date_band_colors``, which carried the
+src/getmoredone/app_settings.py:826:        normalized = normalize_hex_color(value)
+src/getmoredone/app_settings.py:830:                "the theme's own band colour. Set it again in Settings > "
 ```
 
 Hex top values (20 of 233 distinct):
@@ -156,13 +156,13 @@ Named top values (all 39 distinct):
 | `gray16` | 8 |
 | `gray50` | 8 |
 | `gray52` | 8 |
+| `green` | 8 |
 | `gray13` | 7 |
 | `gray65` | 7 |
 | `gray85` | 7 |
-| `green` | 7 |
+| `blue` | 5 |
 | `orange` | 5 |
 | `red` | 5 |
-| `blue` | 4 |
 | `white` | 4 |
 | `gray30` | 3 |
 | `grey` | 2 |
@@ -640,8 +640,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 |---|---|
 | `src/getmoredone/screens/segment_color_utils.py:10` | `DEFAULT_SEGMENT_COLOR = "#334155"` |
 | `src/getmoredone/screens/settings_vsp_segments.py:13` | `DEFAULT_INDICATOR_COLOR = "#334155"` |
-| `src/getmoredone/screens/vision_segments.py:13` | `DEFAULT_SWATCH_COLOR = "#334155"` |
-| `src/getmoredone/screens/vision_segments.py:397` | `color_row, color = self._color_input(f, (row or {}).get("color_hex", "#334155"))` |
+| `src/getmoredone/screens/vision_segments.py:14` | `DEFAULT_SWATCH_COLOR = "#334155"` |
+| `src/getmoredone/screens/vision_segments.py:401` | `color_row, color = self._color_input(f, (row or {}).get("color_hex", "#334155"))` |
 | `src/getmoredone/vps_manager.py:1433` | `color_map[name] = row["color_hex"] or "#334155"` |
 | `src/getmoredone/vps_manager.py:1443` | `color = (row["color_hex"] or "").strip() or "#334155"` |
 | `src/getmoredone/vps_manager_taxonomy.py:1010` | `COALESCE(sd.color_hex, '#334155') AS color_hex,` |
@@ -864,7 +864,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/vps_segment_editor.py:16` | `DEFAULT_SEGMENT_COLOR = "#4A90E2"` |
+| `src/getmoredone/screens/vps_segment_editor.py:17` | `DEFAULT_SEGMENT_COLOR = "#4A90E2"` |
 
 ### `#4ade80`
 
@@ -1013,8 +1013,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/settings_vsp_segments.py:250` | `color_hex = subsegment.get("color_hex") or "#64748B"` |
-| `src/getmoredone/screens/settings_vsp_segments.py:280` | `initial = subsegment.get("color_hex") or "#64748B"` |
+| `src/getmoredone/screens/settings_vsp_segments.py:258` | `color_hex = subsegment.get("color_hex") or "#64748B"` |
+| `src/getmoredone/screens/settings_vsp_segments.py:288` | `initial = subsegment.get("color_hex") or "#64748B"` |
 | `src/getmoredone/vps_manager.py:160` | `DEFAULT_SUBSEGMENT_BASE = "#64748B"` |
 | `src/getmoredone/vps_manager.py:1511` | `return "#64748B"` |
 | `src/getmoredone/vps_manager_taxonomy.py:396` | `sub_color = (sub_row["color_hex"] if sub_row else "") or "#64748B"` |
@@ -1380,7 +1380,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/vision_segments.py:536` | `color_row, color = self._color_input(f, (row or {}).get("color_hex", "#94A3B8"))` |
+| `src/getmoredone/screens/vision_segments.py:542` | `color_row, color = self._color_input(f, (row or {}).get("color_hex", "#94A3B8"))` |
 
 ### `#97208c`
 
@@ -1552,8 +1552,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/color_contrast.py:50` | ```exception. A three-digit ``#ABC`` is expanded, because that is a form people``` |
-| `src/getmoredone/screens/vps_segment_editor.py:216` | ```Accepts ``#abc`` and a missing ``#``, which the old check refused --``` |
-| `src/getmoredone/screens/vps_segment_editor.py:242` | ```# text. ``validate_color`` accepts ``#abc`` and a missing ``#``, and``` |
+| `src/getmoredone/screens/vps_segment_editor.py:221` | ```Accepts ``#abc`` and a missing ``#``, which the old check refused --``` |
+| `src/getmoredone/screens/vps_segment_editor.py:245` | ```# text. ``validate_color`` accepts ``#abc`` and a missing ``#``, and``` |
 | `src/getmoredone/vps_manager.py:206` | ``` ``normalize_hex_color`` expands ``#abc`` and supplies a missing ``#``. ``` |
 | `src/getmoredone/vps_manager_taxonomy.py:356` | ```# typed; once that gate reads ``#abc`` and ``abcdef``, both became``` |
 | `src/getmoredone/vps_manager_taxonomy.py:449` | ```gate reads ``#abc``, storing the text as given would write a``` |
@@ -2348,11 +2348,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/brand.py:48` | `ON_DARK = "#FFFFFF"` |
 | `src/getmoredone/color_contrast.py:157` | `light: str = "#FFFFFF",` |
 | `src/getmoredone/color_contrast.py:165` | `def pick_text_color(bg_hex: str, light: str = "#FFFFFF", dark: str = "#000000") -> str:` |
-| `src/getmoredone/screens/drag_schedule.py:1157` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
-| `src/getmoredone/screens/drag_schedule.py:1177` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
-| `src/getmoredone/screens/drag_schedule.py:1307` | `text_color=date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
-| `src/getmoredone/screens/drag_schedule.py:1409` | `return normalized_date_text_color(getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
-| `src/getmoredone/screens/drag_schedule.py:1412` | `return date_text_color_for(bg_color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
+| `src/getmoredone/screens/drag_schedule.py:1155` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
+| `src/getmoredone/screens/drag_schedule.py:1175` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
+| `src/getmoredone/screens/drag_schedule.py:1305` | `text_color=date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
+| `src/getmoredone/screens/drag_schedule.py:1407` | `return normalized_date_text_color(getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
+| `src/getmoredone/screens/drag_schedule.py:1410` | `return date_text_color_for(bg_color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
 | `src/getmoredone/screens/drag_schedule_support.py:63` | `color = str(configured_value or "#FFFFFF").strip()` |
 | `src/getmoredone/screens/drag_schedule_support.py:67` | `return "#FFFFFF"` |
 | `src/getmoredone/screens/settings.py:746` | `value=getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")` |
@@ -2411,7 +2411,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/timer_window.py:892` | `status_color = "green" if self.timer_state == self.RUNNING else "blue"` |
+| `src/getmoredone/screens/status_notice.py:33` | `TRANSIENT_KINDS = frozenset({"info", "blue", "success", "green"})` |
+| `src/getmoredone/screens/timer_window.py:899` | `status_color = "green" if self.timer_state == self.RUNNING else "blue"` |
 | `src/getmoredone/theme.py:19` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:268` | `"blue": palette["primary"],` |
 | `tools/generate_ctk_themes.py:48` | `"blue": ["#3B8ED0", "#1F6AA5"],` |
@@ -2420,7 +2421,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/vps_editors.py:1289` | `separator = ctk.CTkFrame(main_frame, height=2, fg_color="gray")` |
+| `src/getmoredone/screens/vps_editors.py:1301` | `separator = ctk.CTkFrame(main_frame, height=2, fg_color="gray")` |
 | `src/getmoredone/theme.py:270` | `"gray": palette["muted_text"],` |
 | `themes/apple_grey.json:176` | `"gray",` |
 | `themes/apple_grey.json:177` | `"gray"` |
@@ -2688,7 +2689,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/screens/column_resize.py:360` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
-| `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
+| `src/getmoredone/screens/item_editor.py:196` | `fg_color=("gray70", "gray30"))` |
 | `src/getmoredone/theme.py:122` | `"chip_bg": "gray30",` |
 
 ### `gray36`
@@ -2966,7 +2967,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/screens/column_resize.py:360` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
-| `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
+| `src/getmoredone/screens/item_editor.py:196` | `fg_color=("gray70", "gray30"))` |
 | `themes/apple_grey.json:286` | `"gray70",` |
 | `themes/base_dark_blue.json:117` | `"unselected_hover_color": ["gray70", "gray41"],` |
 | `themes/black_white.json:286` | `"gray70",` |
@@ -3173,10 +3174,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/timer_window.py:847` | `self._update_status_label("Working...", "green")` |
-| `src/getmoredone/screens/timer_window.py:892` | `status_color = "green" if self.timer_state == self.RUNNING else "blue"` |
-| `src/getmoredone/screens/timer_window.py:1059` | `self._update_status_label("Recording...", "green")` |
-| `src/getmoredone/screens/timer_window.py:1097` | `self._update_status_label("Working...", "green")` |
+| `src/getmoredone/screens/status_notice.py:33` | `TRANSIENT_KINDS = frozenset({"info", "blue", "success", "green"})` |
+| `src/getmoredone/screens/timer_window.py:854` | `self._update_status_label("Working...", "green")` |
+| `src/getmoredone/screens/timer_window.py:899` | `status_color = "green" if self.timer_state == self.RUNNING else "blue"` |
+| `src/getmoredone/screens/timer_window.py:1066` | `self._update_status_label("Recording...", "green")` |
+| `src/getmoredone/screens/timer_window.py:1104` | `self._update_status_label("Working...", "green")` |
 | `src/getmoredone/theme.py:19` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:260` | `"green": palette["success_strong"],` |
 | `tools/generate_ctk_themes.py:44` | `"green": ["#2CC985", "#2FA572"],` |
@@ -3192,8 +3194,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/timer_window.py:862` | `self._update_status_label("Paused", "orange")` |
-| `src/getmoredone/screens/timer_window.py:1025` | `self._update_status_label("Resting — Resume starts another block", "orange")` |
+| `src/getmoredone/screens/timer_window.py:869` | `self._update_status_label("Paused", "orange")` |
+| `src/getmoredone/screens/timer_window.py:1032` | `self._update_status_label("Resting — Resume starts another block", "orange")` |
 | `src/getmoredone/theme.py:19` | `THEME_NAMES = ("davipa", "green", "orange", "pink", "grey", "blue", "purple",` |
 | `src/getmoredone/theme.py:265` | `"orange": palette["warning"],` |
 | `tools/generate_ctk_themes.py:45` | `"orange": ["#C2410C", "#9A3412"],` |
@@ -3203,9 +3205,9 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | File:Line | Snippet |
 |---|---|
 | `src/getmoredone/color_contrast.py:51` | ```type and every browser accepts; a named colour such as ``"red"`` is not,``` |
-| `src/getmoredone/screens/timer_window.py:919` | `self._update_status_label("Stopped", "red")` |
-| `src/getmoredone/screens/timer_window.py:971` | `self._update_status_label("⏰ BREAK OVER! ⏰", "red")` |
-| `src/getmoredone/screens/timer_window.py:1074` | `self._update_status_label("Not saved — try Done again", "red")` |
+| `src/getmoredone/screens/timer_window.py:926` | `self._update_status_label("Stopped", "red")` |
+| `src/getmoredone/screens/timer_window.py:978` | `self._update_status_label("⏰ BREAK OVER! ⏰", "red")` |
+| `src/getmoredone/screens/timer_window.py:1081` | `self._update_status_label("Not saved — try Done again", "red")` |
 | `src/getmoredone/theme.py:263` | `"red": palette["danger"],` |
 
 ### `white`
@@ -3221,7 +3223,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/timer_window.py:954` | `self._update_status_label("⏰ BREAK TIME! ⏰", "yellow")` |
+| `src/getmoredone/screens/timer_window.py:961` | `self._update_status_label("⏰ BREAK TIME! ⏰", "yellow")` |
 | `src/getmoredone/theme.py:266` | `"yellow": palette["warning"],` |
 
 ### Theme API Occurrences
@@ -3235,8 +3237,8 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
-| `src/getmoredone/screens/vps_segment_editor.py:35` | `self.selected_color = (` |
+| `src/getmoredone/screens/item_editor.py:196` | `fg_color=("gray70", "gray30"))` |
+| `src/getmoredone/screens/vps_segment_editor.py:36` | `self.selected_color = (` |
 
 ## 3) Replace Plan
 
