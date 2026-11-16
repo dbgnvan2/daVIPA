@@ -512,9 +512,10 @@ def test_spcm15_narrow_window_wraps_and_nothing_clips(
     for widget, _info in wrap._moved:
         left = widget.winfo_rootx()
         right = left + widget.winfo_width()
-        # Both edges: the wrap frame is gridded sticky="e", so an over-wide
-        # second row overflows to the LEFT, which a right-edge check alone
-        # reads as a pass (SPC-S2).
+        # Both edges. The frame is gridded sticky="w" since LRP-M1, so an
+        # over-wide second row now overflows RIGHT; it was "e" when SPC-S2
+        # was written and the overflow went left, out of sight of a
+        # right-edge check. Checking both survives either direction.
         assert right <= toolbar_right + 1, (name, widget, right, toolbar_right)
         assert left >= toolbar_left - 1, (name, widget, left, toolbar_left)
 
@@ -547,9 +548,10 @@ def test_spcs2_two_rows_need_less_width_than_one(name, completed_screen,
     """SPC-S2 — the wrapped row fits in a width where one row does not.
 
     The band `wrap_row_px() <= W < one_row_px()` is the whole point of the
-    wrap, and it has to be non-empty: the wrap frame is gridded `sticky="e"`,
-    so a second row wider than the toolbar overflows the LEFT edge, out of
-    sight, instead of reporting anything. Needs no mapped window -- both
+    wrap, and it has to be non-empty: the frame keeps its requested width, so
+    a second row wider than the toolbar overflows one edge out of sight
+    instead of reporting anything -- the left edge when this was written
+    (`sticky="e"`), the right since LRP-M1. Needs no mapped window -- both
     numbers are requested widths, which a withdrawn window has.
     """
     screen = {"completed": completed_screen, "projects": projects_screen,
@@ -658,9 +660,11 @@ def test_spcs3_the_new_wrapped_rows_fit_the_default_window(
     ``wrap_row_px`` says how wide two rows need to be, and nothing compared it
     with the width a header actually gets at ``DEFAULT_GEOMETRY``. The
     Scheduler's four filters needed 991 px against 960, so on every launch the
-    wrapped row ran off the toolbar's left edge -- the wrap frame is
-    ``sticky="e"``, so the overflow goes left -- and clipped the ``Who:``
-    filter. A right-edge assertion reads that as a pass.
+    wrapped row ran off the toolbar's left edge -- the frame was then
+    ``sticky="e"``, so the overflow went left -- and clipped the ``Who:``
+    filter. A right-edge assertion reads that as a pass. Since LRP-M1 the
+    frame is ``sticky="w"`` and an overflow would go right instead; this
+    budget is what keeps it from happening at all.
 
     Both sides are requested widths, so this needs no window on screen.
     """
