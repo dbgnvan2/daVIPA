@@ -74,31 +74,31 @@ src/getmoredone/app_settings.py:139:    # a dark one, for the reason ``theme.pri
 src/getmoredone/app_settings.py:140:    list_date_band_color: str = ""
 src/getmoredone/app_settings.py:143:    # Drag Schedule date box text color (hex)
 src/getmoredone/app_settings.py:144:    drag_schedule_date_text_color: str = "#FFFFFF"
-src/getmoredone/app_settings.py:352:                settings.appearance_mode = cls._normalize_appearance_mode(
-src/getmoredone/app_settings.py:353:                    settings.appearance_mode)
-src/getmoredone/app_settings.py:354:                settings.theme_name = cls._normalize_theme_name(
-src/getmoredone/app_settings.py:355:                    settings.theme_name)
-src/getmoredone/app_settings.py:368:                settings.list_date_band_color = cls._normalize_list_date_band_color(
-src/getmoredone/app_settings.py:369:                    getattr(settings, "list_date_band_color", "")
-src/getmoredone/app_settings.py:491:        self.appearance_mode = self._normalize_appearance_mode(
-src/getmoredone/app_settings.py:492:            self.appearance_mode)
-src/getmoredone/app_settings.py:493:        self.theme_name = self._normalize_theme_name(self.theme_name)
-src/getmoredone/app_settings.py:506:        self.list_date_band_color = self._normalize_list_date_band_color(
-src/getmoredone/app_settings.py:507:            self.list_date_band_color
-src/getmoredone/app_settings.py:703:        _normalize_theme_name defers its import for the same reason.
-src/getmoredone/app_settings.py:773:    def _normalize_appearance_mode(value: Optional[str]) -> str:
-src/getmoredone/app_settings.py:779:    def _normalize_theme_name(value: Optional[str]) -> str:
-src/getmoredone/app_settings.py:780:        """Coerce a persisted theme name, using theme.py's list and no other.
-src/getmoredone/app_settings.py:782:        This held a SECOND hardcoded copy of the theme names. Adding a theme to
-src/getmoredone/app_settings.py:785:        load, because the new name was not in the copy. Picking a new theme
-src/getmoredone/app_settings.py:788:        Imported inside the function: theme.py pulls in customtkinter, and
-src/getmoredone/app_settings.py:792:        from .theme import normalize_theme_name
-src/getmoredone/app_settings.py:794:        return normalize_theme_name(value)
-src/getmoredone/app_settings.py:805:    def _normalize_list_date_band_color(value: object) -> str:
-src/getmoredone/app_settings.py:806:        """DBC-M1.1 -- a stored band colour, or ``""`` for the theme's own.
-src/getmoredone/app_settings.py:810:        nothing unusable reaches ``theme.date_band_colors``, which carried the
-src/getmoredone/app_settings.py:815:        normalized = normalize_hex_color(value)
-src/getmoredone/app_settings.py:819:                "the theme's own band colour. Set it again in Settings > "
+src/getmoredone/app_settings.py:358:                settings.appearance_mode = cls._normalize_appearance_mode(
+src/getmoredone/app_settings.py:359:                    settings.appearance_mode)
+src/getmoredone/app_settings.py:360:                settings.theme_name = cls._normalize_theme_name(
+src/getmoredone/app_settings.py:361:                    settings.theme_name)
+src/getmoredone/app_settings.py:374:                settings.list_date_band_color = cls._normalize_list_date_band_color(
+src/getmoredone/app_settings.py:375:                    getattr(settings, "list_date_band_color", "")
+src/getmoredone/app_settings.py:497:        self.appearance_mode = self._normalize_appearance_mode(
+src/getmoredone/app_settings.py:498:            self.appearance_mode)
+src/getmoredone/app_settings.py:499:        self.theme_name = self._normalize_theme_name(self.theme_name)
+src/getmoredone/app_settings.py:512:        self.list_date_band_color = self._normalize_list_date_band_color(
+src/getmoredone/app_settings.py:513:            self.list_date_band_color
+src/getmoredone/app_settings.py:709:        _normalize_theme_name defers its import for the same reason.
+src/getmoredone/app_settings.py:779:    def _normalize_appearance_mode(value: Optional[str]) -> str:
+src/getmoredone/app_settings.py:785:    def _normalize_theme_name(value: Optional[str]) -> str:
+src/getmoredone/app_settings.py:786:        """Coerce a persisted theme name, using theme.py's list and no other.
+src/getmoredone/app_settings.py:788:        This held a SECOND hardcoded copy of the theme names. Adding a theme to
+src/getmoredone/app_settings.py:791:        load, because the new name was not in the copy. Picking a new theme
+src/getmoredone/app_settings.py:794:        Imported inside the function: theme.py pulls in customtkinter, and
+src/getmoredone/app_settings.py:798:        from .theme import normalize_theme_name
+src/getmoredone/app_settings.py:800:        return normalize_theme_name(value)
+src/getmoredone/app_settings.py:811:    def _normalize_list_date_band_color(value: object) -> str:
+src/getmoredone/app_settings.py:812:        """DBC-M1.1 -- a stored band colour, or ``""`` for the theme's own.
+src/getmoredone/app_settings.py:816:        nothing unusable reaches ``theme.date_band_colors``, which carried the
+src/getmoredone/app_settings.py:821:        normalized = normalize_hex_color(value)
+src/getmoredone/app_settings.py:825:                "the theme's own band colour. Set it again in Settings > "
 ```
 
 Hex top values (20 of 233 distinct):
@@ -2687,7 +2687,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/column_resize.py:337` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
+| `src/getmoredone/screens/column_resize.py:360` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
 | `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
 | `src/getmoredone/theme.py:122` | `"chip_bg": "gray30",` |
 
@@ -2965,7 +2965,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/column_resize.py:337` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
+| `src/getmoredone/screens/column_resize.py:360` | `fg_color=fg_color if fg_color is not None else ("gray70", "gray30"),` |
 | `src/getmoredone/screens/item_editor.py:190` | `fg_color=("gray70", "gray30"))` |
 | `themes/apple_grey.json:286` | `"gray70",` |
 | `themes/base_dark_blue.json:117` | `"unselected_hover_color": ["gray70", "gray41"],` |

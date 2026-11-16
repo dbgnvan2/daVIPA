@@ -224,6 +224,33 @@ the same range. All ten acted on:
 
 Six new guards for findings 1 to 8, each mutation-checked.
 
+## What the re-sweep of the fixes found, and what was done
+
+The three fix commits are the least-reviewed code in the batch, so
+`learning-qa` ran again over `2acd905...HEAD` alone (5 findings, 0 high: one
+strong medium, two medium, two low). It also reported the pin-and-re-share
+loop (finding 4 above) sound on its own terms — termination, the integer
+arithmetic, `pending.remove` under duplicate defaults, and the wrap boundary
+at exactly `min_one_row_px()`.
+
+| # | finding | done |
+|---|---|---|
+| 1 | the "is this scalar unset?" sentinel compared against the live class default, which `AppSettings.save` stamps into the settings file on the first save — so it is a file value being compared against a number that moves (P4/P6) | `column_resize.LEGACY_TITLE_DEFAULTS`: a per-prefix tuple of every value the scalar has shipped as a default, with a guard that the live attribute is in it |
+| 2 | three prose claims left asserting something untrue — "nothing in `src/` writes it" (`save` does), a px constant for a user-editable setting, and PB-M5's cross-screen invariant, which LRP's shared table retired (P6) | all three corrected; PB-M5's docstring now states only the half that is left, and says why the other half went |
+| 3 | both `fit` methods latched a **boolean**, so the shallowest overrun was logged and every deeper one suppressed — one INFO line naming the least severe instance (P2) | the latch keeps the magnitude; a deeper overrun reports, a width that fits resets it. Fixed in `ToolbarWrap` and `ItemListLayout` together (P5) |
+| 4 | `test_lrpm6_a_default_scalar_does_not_override_the_table` took its "fresh install" premise off the session-shared `settings.json` that `ColumnResizer._persist` writes into (P8) | builds the resizer against an `AppSettings` the test owns, as its sibling already did |
+| 5 | the rule reaches the `today` prefix too and no guard followed it there | the new guard is parametrized over every prefix in the table |
+
+Two consequences worth naming. Finding 3's fix changed behaviour an existing
+test asserted: `test_spcm3_completed_floor_is_six_characters` required the
+shortfall to be "logged once", which is the defect itself — rewritten to the
+new contract as case (b). And the re-sweep's adjacent, pre-existing finding —
+`ToolbarWrap` fits on raw `<Configure>` pixels while `ItemListLayout` divides
+by the widget scaling — is filed as `BACKLOG.md` LRP-A3, not fixed.
+
+Three new guards for findings 1, 3, 4 and 5; eight mutations across them and
+the two reverted lines, each reddening its named guard.
+
 ## Verification
 
 Targeted runs only: `tests/test_column_resize.py`,

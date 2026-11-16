@@ -52,6 +52,18 @@ text is cut to does not, so a larger list font cuts the Scheduler's titles
 earlier than it cuts the other lists'. One argument; not fixed in LRP because
 it is not part of what the user asked for.
 
+### LRP-A3 — the toolbar fits on raw event pixels, the list on scaled ones (low)
+
+`ToolbarWrap._on_configure` (`screens/item_list_columns.py`) calls `fit`
+synchronously on every `<Configure>` with the raw `event.width`, while
+`ItemListLayout._on_configure` debounces through `after(FIT_DELAY_MS)` and
+divides by `_get_widget_scaling()`. At a widget scaling other than 1.0 the
+toolbar's budget is in device pixels while the widths `fit_filters` writes are
+scaled again by CustomTkinter on draw, so the wrap threshold and the filter
+sizes are measured in different units from the columns'. Nothing is known to
+misdraw at scaling 1.0, which is every machine this has been walked on. Found
+by the LRP sweep's re-sweep, 2026-11-16; adjacent, not fixed (global rule 10).
+
 ## Adjacent issue — the band thresholds outlived the bands (PBG, filed 2026-11-12)
 
 ### PBG-A9 — the badge's pill is nearly the value of the row behind it (low)

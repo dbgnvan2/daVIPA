@@ -69,9 +69,18 @@ floors, divider drags, persistence) and `screens/item_list_columns.py`
    every filter at its minimum. So the search entry gives up width first
    (down to `SEARCH_MIN_PX`), then the filters, then the row wraps. There is
    no window `minsize`, so `fit` returns the pixels a wrapped row overruns
-   the toolbar by and logs the crossing once, the way `ItemListLayout.fit`
-   reports a list narrower than its column floors. The budget is held by a
-   test as well, because that overflow is past the right edge, off screen.
+   the toolbar by and logs it, the way `ItemListLayout.fit` reports a list
+   narrower than its column floors. The budget is held by a test as well,
+   because that overflow is past the right edge, off screen.
+
+   **The log keeps the worst overrun, not the first.** Both `fit` methods
+   hold a high-water mark and report a shortfall each time it grows past the
+   worst one since the last fit that fitted. They held a boolean until
+   2026-11-16, and because `fit` runs on every `<Configure>`, that meant the
+   shallowest crossing was logged and every deeper one the user reached by
+   keeping hold of the window edge was suppressed — one INFO line naming the
+   least severe instance was the whole record of an arbitrarily large
+   off-screen overflow (P2).
 
    `one_row_px()` counts the filters at their **default** widths, never at
    the widths they are drawn at. A threshold measured from the drawn widths
@@ -96,12 +105,22 @@ floors, divider drags, persistence) and `screens/item_list_columns.py`
   all.
 - A legacy `<prefix>_title_col_width` scalar in `AppSettings` wins over a spec
   default where someone stored one — it is the only record of a Title width
-  dragged before `<prefix>_col_widths` existed. The settings class's own
-  default for it does not win, because it is not a width anyone chose: taking
-  it was how the Scheduler went on opening at 220 while every other listing's
-  Title was 260. Do not raise that default to match the table instead; the
-  Plan screen reads the same scalar live for its own title column (PB-M5), so
-  that moves a different screen.
+  dragged before `<prefix>_col_widths` existed. A value equal to one of that
+  prefix's shipped defaults does not win, because it is not a width anyone
+  chose: taking it was how the Scheduler went on opening at 220 while every
+  other listing's Title was 260. Do not raise that default to match the table
+  instead; the Plan screen reads the same scalar live for its own title column
+  (PB-M5), so that moves a different screen.
+- **The shipped defaults are a tuple, not the live class attribute.**
+  `column_resize.LEGACY_TITLE_DEFAULTS` lists every value each prefix's scalar
+  has shipped as a default, and changing the attribute means adding the old
+  value there. `AppSettings.save` stamps a field the settings file does not
+  hold, so the first save on any install writes that build's default into the
+  file and the loaded value is a file value from then on; a sentinel that
+  compared against a number which moves would turn a cohort of never-dragged
+  installs into phantom dragged widths, with nothing left to say the drag
+  never happened. `AppSettings._day_shape_was_confirmed` documents the same
+  erasure for the day values.
 
 Decisions and the measurements behind them:
 `docs/unused-docs/implementation_plan_2026-11-16_list_resize_principles.md`.
