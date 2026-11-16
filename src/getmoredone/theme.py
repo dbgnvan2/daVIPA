@@ -224,6 +224,17 @@ def list_row_font() -> ctk.CTkFont:
     return ctk.CTkFont(size=LIST_ROW_FONT_SIZE)
 
 
+def list_row_font_bold() -> ctk.CTkFont:
+    """The row font in bold, for a row's own heading line.
+
+    Same size as ``list_row_font``, so a cell drawn in it is budgeted by the
+    same ``row_char_px()`` the resizer cuts every other cell with. A size of
+    its own would ignore the user's list font setting while the cut tracked
+    it (SPC-S1).
+    """
+    return ctk.CTkFont(size=LIST_ROW_FONT_SIZE, weight="bold")
+
+
 def combo_box_style() -> Dict[str, object]:
     """Theme-aware combobox styling for filters and settings controls."""
     palette = semantic_colors()

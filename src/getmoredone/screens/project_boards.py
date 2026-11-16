@@ -32,6 +32,7 @@ from ..theme import (
     button_style,
     combo_box_style,
     list_row_font,
+    list_row_font_bold,
     semantic_colors,
     status_text_color,
 )
@@ -44,8 +45,16 @@ if TYPE_CHECKING:
 IMPORTANCE_OPTIONS = [f"{k} ({v})" for k, v in PriorityFactors.IMPORTANCE.items()]
 
 #: SPC-D2 -- the linked Action Items list's own columns, and the width its
-#: three action buttons take (Edit 70, Complete 82, Unlink 70, padx 3 each).
-ITEM_ACTIONS_WIDTH_PX = 240
+#: three action buttons take. Derived from the widths the buttons are built
+#: with, as FACTOR_CHIP_WIDTHS is: a reserve restated beside the widget goes
+#: wrong silently, because it is only a grid minsize (P4).
+ITEM_EDIT_WIDTH_PX = 70
+ITEM_COMPLETE_WIDTH_PX = 82
+ITEM_UNLINK_WIDTH_PX = 70
+ITEM_ACTION_PAD_PX = 3
+ITEM_ACTIONS_WIDTH_PX = (
+    ITEM_EDIT_WIDTH_PX + ITEM_COMPLETE_WIDTH_PX + ITEM_UNLINK_WIDTH_PX
+    + 2 * ITEM_ACTION_PAD_PX * 3)
 ITEM_ACTIONS_COL = 5
 ITEM_CHECKBOX_WIDTH_PX = 24
 
@@ -1555,7 +1564,11 @@ class ProjectBoardsScreen(ctk.CTkFrame):
                 row_frame,
                 text=self.items_layout.cell_text("title", item.title),
                 width=self.items_layout.cell_width("title"),
-                font=ctk.CTkFont(size=15, weight="bold"),
+                # SPC-S1: the row font in bold, not a size of its own. The
+                # resizer cuts this cell at row_char_px(), which follows the
+                # user's list font setting; a hardcoded 15 ignored it, so a
+                # larger setting grew the budget and not the text.
+                font=list_row_font_bold(),
                 anchor="w",
                 justify="left",
             )
@@ -1586,15 +1599,15 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             actions = ctk.CTkFrame(row_frame, fg_color="transparent")
             actions.grid(row=0, column=ITEM_ACTIONS_COL, rowspan=2,
                          sticky="e", padx=8, pady=8)
-            ctk.CTkButton(actions, text="Edit", width=70, command=lambda item_id=item.id: self.edit_item(item_id), **button_style("secondary")).pack(
-                side="left", padx=3
+            ctk.CTkButton(actions, text="Edit", width=ITEM_EDIT_WIDTH_PX, command=lambda item_id=item.id: self.edit_item(item_id), **button_style("secondary")).pack(
+                side="left", padx=ITEM_ACTION_PAD_PX
             )
             if item.status == "open":
-                ctk.CTkButton(actions, text="Complete", width=82, command=lambda item_id=item.id: self.complete_item(item_id), **button_style("secondary")).pack(
-                    side="left", padx=3
+                ctk.CTkButton(actions, text="Complete", width=ITEM_COMPLETE_WIDTH_PX, command=lambda item_id=item.id: self.complete_item(item_id), **button_style("secondary")).pack(
+                    side="left", padx=ITEM_ACTION_PAD_PX
                 )
-            ctk.CTkButton(actions, text="Unlink", width=70, command=lambda item_id=item.id: self.unlink_item(item_id), **button_style("secondary")).pack(
-                side="left", padx=3
+            ctk.CTkButton(actions, text="Unlink", width=ITEM_UNLINK_WIDTH_PX, command=lambda item_id=item.id: self.unlink_item(item_id), **button_style("secondary")).pack(
+                side="left", padx=ITEM_ACTION_PAD_PX
             )
 
     def _build_items_column_header(self):

@@ -1,4 +1,4 @@
-"""The column layout shared by the four item lists.
+"""The column layout shared by six item lists, and the toolbar wrap of four.
 
 Purpose: LSR-M1/M2/M3/M6, LSR2-M1..M8 -- Today, Upcoming, All Items and
          Hierarchical give every text column (Title, SubSegment, Category,
@@ -6,9 +6,16 @@ Purpose: LSR-M1/M2/M3/M6, LSR2-M1..M8 -- Today, Upcoming, All Items and
          ``ColumnResizer`` each, hold their controls (checkbox, Timer, factor
          chips) at one width in the header and every row, and refit the text
          columns whenever the list area changes width.
+         SPC-M1..M17 -- Completed (Title, Who, Completed, Pri) and the Project
+         Board's linked Action Items (Title, Status, Start, Due) do the same
+         through ``ItemListLayout.custom``, which takes a column set of its
+         own; and ``ToolbarWrap`` serves the Scheduler, Projects and Completed
+         headers as well as those four, including headers with no search entry
+         and with controls on rows of their own.
 Spec:    docs/unused-docs/implementation_plan_2026-11-13_resizable_list_layouts.md,
-         docs/unused-docs/implementation_plan_2026-11-14_all_columns_resize.md
-Tests:   tests/test_list_screen_resize.py
+         docs/unused-docs/implementation_plan_2026-11-14_all_columns_resize.md,
+         docs/unused-docs/implementation_plan_2026-11-15_schedule_projects_completed_resize.md
+Tests:   tests/test_list_screen_resize.py, tests/test_screen_resize_spc.py
 
 The rows stay each screen's own (plan D8); this module owns only widths.
 """
@@ -168,6 +175,27 @@ class ToolbarWrap:
         minimum = SEARCH_MIN_PX if self.entry is not None else 0
         return sum(columns.values()) + minimum
 
+    def wrap_row_px(self) -> int:
+        """The toolbar width the wrapped second row needs.
+
+        SPC-S2: the wrap frame is gridded ``sticky="e"``, so Tk keeps it at
+        its requested width and pins its right edge to the cell -- a second
+        row wider than the toolbar overflows to the *left*, where a check on
+        the right edge alone cannot see it. This is the number that says
+        whether two rows actually fit, and it is always below
+        ``one_row_px()``: the wrapped group is a subset of the controls one
+        row has to hold.
+        """
+        return sum(widget.winfo_reqwidth() + _pad_total(info["padx"])
+                   for widget, info in self._wrap_candidates())
+
+    def _wrap_candidates(self) -> list:
+        """(widget, grid options) for the controls right of the spacer column."""
+        return sorted(
+            ((w, info) for w, info in self._one_row_placements()
+             if int(info["column"]) > self.spacer_col),
+            key=lambda pair: int(pair[1]["column"]))
+
     def fit(self, width: int) -> None:
         """Lay the toolbar out for ``width`` px: one row if it fits, else two."""
         want = int(width) < self.one_row_px()
@@ -179,11 +207,7 @@ class ToolbarWrap:
             self._unwrap()
 
     def _wrap(self) -> None:
-        self._moved = sorted(
-            ((w, w.grid_info()) for w in self.toolbar.winfo_children()
-             if w is not self.frame and self._on_control_row(w.grid_info())
-             and int(w.grid_info()["column"]) > self.spacer_col),
-            key=lambda pair: int(pair[1]["column"]))
+        self._moved = self._wrap_candidates()
         if self.frame is None:
             self.frame = ctk.CTkFrame(self.toolbar, fg_color="transparent")
         # tkinter's own grid: CTk's wrapper would scale grid_info's padding,

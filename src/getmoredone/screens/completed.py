@@ -30,6 +30,13 @@ from .title_format import split_action_item_title
 REOPEN_WIDTH_PX = 70
 REOPEN_PAD_PX = 4
 
+#: The "WT" badge inside the Title cell, and the gap after it. The title's
+#: own width is the column less both, so the two must agree with the widget
+#: rather than be restated beside it (P4).
+BADGE_WIDTH_PX = 28
+BADGE_GAP_PX = 6
+BADGE_TITLE_DELTA_PX = BADGE_WIDTH_PX + BADGE_GAP_PX
+
 if TYPE_CHECKING:
     from ..db_manager import DatabaseManager
     from ..app import GetMoreDoneApp
@@ -277,14 +284,14 @@ class CompletedScreen(ctk.CTkFrame):
                 ctk.CTkLabel(
                     title_cell,
                     text="WT",
-                    width=28,
+                    width=BADGE_WIDTH_PX,
                     corner_radius=6,
                     fg_color=palette["success_strong"],
                     text_color=palette["on_strong"],
                     font=ctk.CTkFont(size=11, weight="bold"),
-                ).grid(row=0, column=0, padx=(0, 6), sticky="w")
-            # The badge (28) and its gap (6) come out of the title's width.
-            title_delta = 34 if has_badge else 0
+                ).grid(row=0, column=0, padx=(0, BADGE_GAP_PX), sticky="w")
+            # The badge and its gap come out of the title's width.
+            title_delta = BADGE_TITLE_DELTA_PX if has_badge else 0
             title_label = ctk.CTkLabel(
                 title_cell,
                 text=self.layout.cell_text("title", parsed.title, title_delta),
@@ -362,7 +369,7 @@ class CompletedScreen(ctk.CTkFrame):
             btn_uncomplete = ctk.CTkButton(
                 item_frame,
                 text="Reopen",
-                width=70,
+                width=REOPEN_WIDTH_PX,
                 **button_style("secondary"),
                 command=lambda i=item.id: self.uncomplete_item(i)
             )
