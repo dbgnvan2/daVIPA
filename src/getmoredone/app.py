@@ -26,11 +26,21 @@ from .vps_manager import VPSManager
 DEFAULT_GEOMETRY = "1200x700"
 DEFAULT_WINDOW_WIDTH_PX = int(DEFAULT_GEOMETRY.split("x")[0])
 
-#: The sidebar's width, and the padding around the content frame. Promoted out
-#: of ``create_sidebar``/``create_main_content`` (rule 8) because the width a
-#: screen's header actually gets at the default window is
-#: ``DEFAULT_WINDOW_WIDTH_PX - SIDEBAR_WIDTH_PX - 2 * CONTENT_PAD_PX`` less its
-#: own padding, and SPC-S3 asserts a toolbar's wrapped row fits inside it.
+#: The sidebar's configured width, and the padding around the content frame.
+#: Promoted out of ``create_sidebar``/``create_main_content`` (rule 8) so
+#: SPC-S3 can assert that a toolbar's wrapped second row fits the window the
+#: app opens at.
+#:
+#: ``DEFAULT_WINDOW_WIDTH_PX - SIDEBAR_WIDTH_PX - 2 * CONTENT_PAD_PX`` is a
+#: *lower bound* on the content width, not the exact figure. ``CTkFrame`` does
+#: not call ``grid_propagate(False)``, so the sidebar's gridded children set
+#: its request: the widest is a default-width (140 px) nav button at
+#: ``padx=20``, i.e. 180 px, and column 0 carries no weight, so the sidebar
+#: renders narrower than this constant and the content frame gets more than
+#: the bound. The bound is the safe direction for the SPC-S3 guard. It stops
+#: being safe if a sidebar child ever requires more than SIDEBAR_WIDTH_PX --
+#: see the BACKLOG entry, which cannot be asserted today because building a
+#: real ``GetMoreDoneApp`` opens the user's own database.
 SIDEBAR_WIDTH_PX = 200
 CONTENT_PAD_PX = 10
 

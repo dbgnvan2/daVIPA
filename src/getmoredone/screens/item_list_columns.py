@@ -1,4 +1,4 @@
-"""The column layout shared by six item lists, and the toolbar wrap of four.
+"""The column layout shared by six item lists, and the toolbar wrap of seven.
 
 Purpose: LSR-M1/M2/M3/M6, LSR2-M1..M8 -- Today, Upcoming, All Items and
          Hierarchical give every text column (Title, SubSegment, Category,
