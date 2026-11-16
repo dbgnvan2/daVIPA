@@ -555,6 +555,29 @@ def test_spcs2_two_rows_need_less_width_than_one(name, completed_screen,
         w.winfo_reqwidth() + _pad_total(i["padx"]) for w, i in wrap._moved)
 
 
+def test_spcs2_the_wrapped_group_survives_a_cycle(completed_screen):
+    """SPC-S2 — the same controls, in the same order, wrapped or not.
+
+    ``_wrap`` selects its group through ``_one_row_placements()`` now, which
+    returns the captured infos once wrapped and live ``grid_info`` before: the
+    two branches must agree, or ``wrap_row_px()`` measures one group while
+    ``_wrap`` moves another.
+    """
+    wrap = completed_screen().toolbar_wrap
+
+    def shape():
+        return [(id(w), int(i["column"])) for w, i in wrap._wrap_candidates()]
+
+    before, px_before = shape(), wrap.wrap_row_px()
+    assert before, "no control sits right of the spacer column"
+    wrap.fit(wrap.one_row_px() - 50)
+    assert wrap.wrapped is True
+    assert shape() == before and wrap.wrap_row_px() == px_before
+    wrap.fit(wrap.one_row_px() + 50)
+    assert wrap.wrapped is False
+    assert shape() == before and wrap.wrap_row_px() == px_before
+
+
 def test_spcs1_the_project_title_tracks_the_row_font(projects_screen,
                                                      monkeypatch):
     """SPC-S1 — the bold Action Items title is the row font's size, not 15.
