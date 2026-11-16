@@ -31,7 +31,7 @@ rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkg
 - Named colors (match count): **629**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
-- Widget explicit overrides (line count): **512**
+- Widget explicit overrides (line count): **509**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -46,7 +46,7 @@ and theme_files line counts.
 | `theme_api` | 2 |
 | `theme_files` | 1292 |
 | `tuples` | 2 |
-| `widget` | 512 |
+| `widget` | 509 |
 
 Widget override property breakdown:
 
@@ -54,9 +54,9 @@ Widget override property breakdown:
 |---|---:|
 | `border_color` | 21 |
 | `corner_radius` | 59 |
-| `fg_color` | 246 |
-| `hover_color` | 2 |
-| `text_color` | 190 |
+| `fg_color` | 245 |
+| `hover_color` | 1 |
+| `text_color` | 189 |
 
 AppSettings persisted color/theme fields:
 
@@ -74,31 +74,31 @@ src/getmoredone/app_settings.py:139:    # a dark one, for the reason ``theme.pri
 src/getmoredone/app_settings.py:140:    list_date_band_color: str = ""
 src/getmoredone/app_settings.py:143:    # Drag Schedule date box text color (hex)
 src/getmoredone/app_settings.py:144:    drag_schedule_date_text_color: str = "#FFFFFF"
-src/getmoredone/app_settings.py:345:                settings.appearance_mode = cls._normalize_appearance_mode(
-src/getmoredone/app_settings.py:346:                    settings.appearance_mode)
-src/getmoredone/app_settings.py:347:                settings.theme_name = cls._normalize_theme_name(
-src/getmoredone/app_settings.py:348:                    settings.theme_name)
-src/getmoredone/app_settings.py:361:                settings.list_date_band_color = cls._normalize_list_date_band_color(
-src/getmoredone/app_settings.py:362:                    getattr(settings, "list_date_band_color", "")
-src/getmoredone/app_settings.py:484:        self.appearance_mode = self._normalize_appearance_mode(
-src/getmoredone/app_settings.py:485:            self.appearance_mode)
-src/getmoredone/app_settings.py:486:        self.theme_name = self._normalize_theme_name(self.theme_name)
-src/getmoredone/app_settings.py:499:        self.list_date_band_color = self._normalize_list_date_band_color(
-src/getmoredone/app_settings.py:500:            self.list_date_band_color
-src/getmoredone/app_settings.py:696:        _normalize_theme_name defers its import for the same reason.
-src/getmoredone/app_settings.py:766:    def _normalize_appearance_mode(value: Optional[str]) -> str:
-src/getmoredone/app_settings.py:772:    def _normalize_theme_name(value: Optional[str]) -> str:
-src/getmoredone/app_settings.py:773:        """Coerce a persisted theme name, using theme.py's list and no other.
-src/getmoredone/app_settings.py:775:        This held a SECOND hardcoded copy of the theme names. Adding a theme to
-src/getmoredone/app_settings.py:778:        load, because the new name was not in the copy. Picking a new theme
-src/getmoredone/app_settings.py:781:        Imported inside the function: theme.py pulls in customtkinter, and
-src/getmoredone/app_settings.py:785:        from .theme import normalize_theme_name
-src/getmoredone/app_settings.py:787:        return normalize_theme_name(value)
-src/getmoredone/app_settings.py:798:    def _normalize_list_date_band_color(value: object) -> str:
-src/getmoredone/app_settings.py:799:        """DBC-M1.1 -- a stored band colour, or ``""`` for the theme's own.
-src/getmoredone/app_settings.py:803:        nothing unusable reaches ``theme.date_band_colors``, which carried the
-src/getmoredone/app_settings.py:808:        normalized = normalize_hex_color(value)
-src/getmoredone/app_settings.py:812:                "the theme's own band colour. Set it again in Settings > "
+src/getmoredone/app_settings.py:350:                settings.appearance_mode = cls._normalize_appearance_mode(
+src/getmoredone/app_settings.py:351:                    settings.appearance_mode)
+src/getmoredone/app_settings.py:352:                settings.theme_name = cls._normalize_theme_name(
+src/getmoredone/app_settings.py:353:                    settings.theme_name)
+src/getmoredone/app_settings.py:366:                settings.list_date_band_color = cls._normalize_list_date_band_color(
+src/getmoredone/app_settings.py:367:                    getattr(settings, "list_date_band_color", "")
+src/getmoredone/app_settings.py:489:        self.appearance_mode = self._normalize_appearance_mode(
+src/getmoredone/app_settings.py:490:            self.appearance_mode)
+src/getmoredone/app_settings.py:491:        self.theme_name = self._normalize_theme_name(self.theme_name)
+src/getmoredone/app_settings.py:504:        self.list_date_band_color = self._normalize_list_date_band_color(
+src/getmoredone/app_settings.py:505:            self.list_date_band_color
+src/getmoredone/app_settings.py:701:        _normalize_theme_name defers its import for the same reason.
+src/getmoredone/app_settings.py:771:    def _normalize_appearance_mode(value: Optional[str]) -> str:
+src/getmoredone/app_settings.py:777:    def _normalize_theme_name(value: Optional[str]) -> str:
+src/getmoredone/app_settings.py:778:        """Coerce a persisted theme name, using theme.py's list and no other.
+src/getmoredone/app_settings.py:780:        This held a SECOND hardcoded copy of the theme names. Adding a theme to
+src/getmoredone/app_settings.py:783:        load, because the new name was not in the copy. Picking a new theme
+src/getmoredone/app_settings.py:786:        Imported inside the function: theme.py pulls in customtkinter, and
+src/getmoredone/app_settings.py:790:        from .theme import normalize_theme_name
+src/getmoredone/app_settings.py:792:        return normalize_theme_name(value)
+src/getmoredone/app_settings.py:803:    def _normalize_list_date_band_color(value: object) -> str:
+src/getmoredone/app_settings.py:804:        """DBC-M1.1 -- a stored band colour, or ``""`` for the theme's own.
+src/getmoredone/app_settings.py:808:        nothing unusable reaches ``theme.date_band_colors``, which carried the
+src/getmoredone/app_settings.py:813:        normalized = normalize_hex_color(value)
+src/getmoredone/app_settings.py:817:                "the theme's own band colour. Set it again in Settings > "
 ```
 
 Hex top values (20 of 233 distinct):
@@ -2348,11 +2348,11 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/brand.py:48` | `ON_DARK = "#FFFFFF"` |
 | `src/getmoredone/color_contrast.py:157` | `light: str = "#FFFFFF",` |
 | `src/getmoredone/color_contrast.py:165` | `def pick_text_color(bg_hex: str, light: str = "#FFFFFF", dark: str = "#000000") -> str:` |
-| `src/getmoredone/screens/drag_schedule.py:1150` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
-| `src/getmoredone/screens/drag_schedule.py:1170` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
-| `src/getmoredone/screens/drag_schedule.py:1300` | `text_color=date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
-| `src/getmoredone/screens/drag_schedule.py:1402` | `return normalized_date_text_color(getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
-| `src/getmoredone/screens/drag_schedule.py:1405` | `return date_text_color_for(bg_color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
+| `src/getmoredone/screens/drag_schedule.py:1157` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
+| `src/getmoredone/screens/drag_schedule.py:1177` | `date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
+| `src/getmoredone/screens/drag_schedule.py:1307` | `text_color=date_text_color_for(color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")),` |
+| `src/getmoredone/screens/drag_schedule.py:1409` | `return normalized_date_text_color(getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
+| `src/getmoredone/screens/drag_schedule.py:1412` | `return date_text_color_for(bg_color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
 | `src/getmoredone/screens/drag_schedule_support.py:63` | `color = str(configured_value or "#FFFFFF").strip()` |
 | `src/getmoredone/screens/drag_schedule_support.py:67` | `return "#FFFFFF"` |
 | `src/getmoredone/screens/settings.py:746` | `value=getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")` |
