@@ -47,6 +47,16 @@ Main project documentation including:
 - Recent improvements (VPS, Timer, Contacts, etc.)
 - **NEW: Testing section** with test commands and coverage
 
+### docs/list_resize_principles.md
+
+The contract every listing of action items keeps when its columns resize:
+one default width per column kind, a default as a weight, one floor (six
+characters at the row font) and one maximum per kind, controls at a fixed
+width, a debounced refit, and a toolbar that wraps left-justified rather than
+clipping. Read before adding a listing or changing how one sizes its columns;
+`tests/test_list_resize_principles.py` asserts it over all seven. Holds
+LRP-M1 to M11. **Approved and built 2026-11-16.**
+
 ### docs/USER_GUIDE.md
 
 Current end-user documentation including:
