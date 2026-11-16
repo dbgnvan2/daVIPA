@@ -462,6 +462,9 @@ def test_spcm14_header_wraps_and_unwraps(name, completed_screen, projects_screen
     wrap = screen.toolbar_wrap
     one_row = wrap.one_row_px()
     assert one_row > 0
+    # LRP-M11: a value filter gives up width before the row wraps, so the
+    # threshold is one row with the filters at their minimum.
+    threshold = wrap.min_one_row_px()
 
     wrap.fit(one_row + 50)
     assert wrap.wrapped is False
@@ -469,7 +472,7 @@ def test_spcm14_header_wraps_and_unwraps(name, completed_screen, projects_screen
     # warning line) is not the wrap's to put back.
     gridded = {w for w in wrap.toolbar.winfo_children() if w.grid_info()}
 
-    wrap.fit(one_row - 50)
+    wrap.fit(threshold - 50)
     assert wrap.wrapped is True, f"{name} did not wrap"
     assert wrap._moved, f"{name} wrapped nothing"
     assert int(wrap.frame.grid_info()["row"]) == wrap.wrap_row
@@ -564,10 +567,12 @@ def test_spcs2_two_rows_need_less_width_than_one(name, completed_screen,
               "scheduler": scheduler_screen}[name]()
     wrap = screen.toolbar_wrap
     assert wrap.wrap_row_px() > 0
-    assert wrap.wrap_row_px() < wrap.one_row_px(), (
-        name, wrap.wrap_row_px(), wrap.one_row_px())
+    # LRP-M11: the wrap threshold is one row with the value filters at their
+    # minimum, so that -- not one_row_px() -- is the top of the band.
+    assert wrap.wrap_row_px() < wrap.min_one_row_px() <= wrap.one_row_px(), (
+        name, wrap.wrap_row_px(), wrap.min_one_row_px(), wrap.one_row_px())
     # The band is where the wrap is used, so it must actually wrap there.
-    wrap.fit(wrap.one_row_px() - 1)
+    wrap.fit(wrap.min_one_row_px() - 1)
     assert wrap.wrapped is True, name
     # And the group it moved is the one the measurement was taken over.
     assert wrap.wrap_row_px() == sum(
@@ -697,20 +702,31 @@ def test_spcs2_the_wrapped_group_survives_a_cycle(completed_screen):
     returns the captured infos once wrapped and live ``grid_info`` before: the
     two branches must agree, or ``wrap_row_px()`` measures one group while
     ``_wrap`` moves another.
+
+    LRP-M10 put a resizable control in that group -- Completed's Who filter
+    is right of the spacer -- so the group's pixel total is no longer
+    constant across a narrow fit. What must not move is the rest of it: the
+    measurement is taken over the same widgets at every width.
     """
     wrap = completed_screen().toolbar_wrap
 
     def shape():
         return [(id(w), int(i["column"])) for w, i in wrap._wrap_candidates()]
 
-    before, px_before = shape(), wrap.wrap_row_px()
+    def filter_px():
+        group = {id(w) for w, _i in wrap._wrap_candidates()}
+        return sum(widget.winfo_reqwidth() for widget, _d in wrap.filters
+                   if id(widget) in group)
+
+    before, fixed = shape(), wrap.wrap_row_px() - filter_px()
     assert before, "no control sits right of the spacer column"
-    wrap.fit(wrap.one_row_px() - 50)
+    assert fixed > 0, "the group is nothing but filters; pick another screen"
+    wrap.fit(wrap.min_one_row_px() - 50)
     assert wrap.wrapped is True
-    assert shape() == before and wrap.wrap_row_px() == px_before
+    assert shape() == before and wrap.wrap_row_px() - filter_px() == fixed
     wrap.fit(wrap.one_row_px() + 50)
     assert wrap.wrapped is False
-    assert shape() == before and wrap.wrap_row_px() == px_before
+    assert shape() == before and wrap.wrap_row_px() - filter_px() == fixed
 
 
 def test_spcs1_the_project_title_tracks_the_row_font(projects_screen,
@@ -764,7 +780,7 @@ def test_spcm17_existing_toolbars_unchanged(name, tmp_path):
             need = widget.winfo_reqwidth() + _pad_total(info["padx"])
             columns[col] = max(columns.get(col, 0), need)
         assert wrap.one_row_px() == sum(columns.values()) + SEARCH_MIN_PX
-        wrap.fit(wrap.one_row_px() - 50)
+        wrap.fit(wrap.min_one_row_px() - 50)
         assert wrap.wrapped is True
         moved = {w for w, _info in wrap._moved}
         assert screen.search_entry not in moved

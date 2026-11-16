@@ -404,7 +404,11 @@ def test_lsrm10_toolbar_wraps_its_right_hand_group(make, name):
     toolbar = screen.search_entry.master
     wrap = screen.toolbar_wrap
     before = _placements(toolbar, wrap)
-    wrap.fit(wrap.one_row_px() - 1)
+    # LRP-M11: the threshold is one row with the value filters at their
+    # minimum, not at the width they happen to be drawn at. Below 2026-11-16
+    # the two were the same number; now a filter gives up width before the
+    # row wraps, so one_row_px() - 1 no longer forces a wrap.
+    wrap.fit(wrap.min_one_row_px() - 1)
     moved = [w for w, (master, _r, _c) in _placements(toolbar, wrap).items()
              if master != str(toolbar)]
     assert len(moved) == WRAPPED[name]

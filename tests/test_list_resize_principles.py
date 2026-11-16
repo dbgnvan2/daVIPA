@@ -25,6 +25,8 @@ from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem, ProjectBoard
 from src.getmoredone.screens.item_list_columns import (
     COLUMN_DEFAULT_PX,
+    FILTER_MAX_FACTOR,
+    FILTER_MIN_PX,
     STRETCH_MAX_PX,
     TITLE_MAX_PX,
     UNSHARED_KEYS,
@@ -44,6 +46,20 @@ REMOVED_BUTTONS = (
 
 LISTINGS = ("today", "upcoming", "all_items", "hierarchical", "completed",
             "project_items", "drag_schedule")
+
+# LRP-M10: how many value filters each listing's toolbar hands to ToolbarWrap.
+# Every listing is named, the two with none included, so a filter added to a
+# toolbar and not wired here is a failure rather than a silent omission.
+FILTER_COUNT = {
+    "today": 0,
+    "upcoming": 1,        # Who
+    "all_items": 2,       # Status, Who
+    "hierarchical": 1,    # Status
+    "completed": 1,       # Who
+    "project_items": 0,
+    "drag_schedule": 4,   # Who, Segment, SubSegment, Project
+}
+FILTERED = tuple(name for name, count in FILTER_COUNT.items() if count)
 
 
 def _app():
@@ -245,7 +261,7 @@ def test_lrpm1_the_wrapped_row_is_left_justified(completed_screen):
     """
     screen = completed_screen()
     wrap = screen.toolbar_wrap
-    wrap.fit(wrap.one_row_px() - 1)
+    wrap.fit(wrap.min_one_row_px() - 1)
     assert wrap.wrapped
     assert wrap.frame.grid_info()["sticky"] == "w"
 
@@ -255,7 +271,7 @@ def test_lrpm1_the_wrapped_controls_read_left_to_right(completed_screen):
     screen = completed_screen()
     wrap = screen.toolbar_wrap
     one_row_order = [int(info["column"]) for _w, info in wrap._wrap_candidates()]
-    wrap.fit(wrap.one_row_px() - 1)
+    wrap.fit(wrap.min_one_row_px() - 1)
     wrapped = [(w, int(w.grid_info()["column"])) for w, _i in wrap._moved]
     assert [col for _w, col in wrapped] == list(range(len(wrapped)))
     assert one_row_order == sorted(one_row_order)
@@ -379,3 +395,122 @@ def test_lrpm9_every_column_moves_in_proportion_to_title(listing, name):
         assert delta > 0, key
         want = weights[key] / weights["title"]
         assert abs(delta / title_delta - want) < 0.05, (key, delta, title_delta)
+
+
+# -------------------------------------------------------------------- LRP-M10
+@pytest.mark.parametrize("name", LISTINGS)
+def test_lrpm10_every_value_filter_is_wired(listing, name):
+    """LRP-M10 — each toolbar hands its value filters to the wrap, and only those.
+
+    Read off the wrap rather than the screen: a combo the screen holds but
+    does not pass through resizes like a label, which is the bug this guards.
+    """
+    screen, _resizer = listing(name)
+    wrap = screen.toolbar_wrap
+    assert len(wrap.filters) == FILTER_COUNT[name]
+    for widget, default in wrap.filters:
+        assert isinstance(widget, ctk.CTkComboBox), widget
+        assert default >= FILTER_MIN_PX, (widget, default)
+        assert int(widget.grid_info()["row"]) == wrap.control_row
+
+
+@pytest.mark.parametrize("name", FILTERED)
+def test_lrpm10_a_filter_never_goes_below_the_minimum(listing, name):
+    """LRP-M10 — squeezed, every filter sits at FILTER_MIN_PX, none under it."""
+    screen, _resizer = listing(name)
+    wrap = screen.toolbar_wrap
+    wrap.fit(wrap.min_one_row_px() - 400)
+    assert [widget.cget("width") for widget, _d in wrap.filters] == \
+        [FILTER_MIN_PX] * FILTER_COUNT[name]
+
+
+@pytest.mark.parametrize("name", FILTERED)
+def test_lrpm10_a_filter_stops_at_its_maximum(listing, name):
+    """LRP-M10 — given far more room than it can use, a filter pins at its cap.
+
+    Without a cap one wide window turns a Who combo into a banner; with one,
+    the slack past it goes to the spacer, as it did before the filters flexed.
+    """
+    screen, _resizer = listing(name)
+    wrap = screen.toolbar_wrap
+    wrap.fit(wrap.one_row_px() + 4000)
+    for widget, default in wrap.filters:
+        assert widget.cget("width") == FILTER_MAX_FACTOR * default, widget
+
+
+@pytest.mark.parametrize("name", ("all_items", "drag_schedule"))
+def test_lrpm10_a_filter_takes_its_share_in_proportion_to_its_default(listing,
+                                                                     name):
+    """LRP-M10 — the columns' rule, applied to the filters.
+
+    Over a width change each filter's change holds a fixed ratio to the first
+    filter's, and that ratio is the ratio of their default widths -- so a
+    Project filter stays wider than a Who filter at every width. Measured in
+    a band above the minimum and below the maximum, where nothing is pinned.
+    """
+    screen, _resizer = listing(name)
+    wrap = screen.toolbar_wrap
+    fixed = wrap.min_one_row_px() - FILTER_MIN_PX * len(wrap.filters)
+    total = sum(default for _widget, default in wrap.filters)
+
+    wrap.fit(fixed + total)
+    narrow = [widget.cget("width") for widget, _d in wrap.filters]
+    wrap.fit(fixed + 3 * total // 2)
+    wide = [widget.cget("width") for widget, _d in wrap.filters]
+
+    anchor_default = wrap.filters[0][1]
+    anchor = wide[0] - narrow[0]
+    assert anchor > 0, (narrow, wide)
+    for (widget, default), before, after in zip(wrap.filters, narrow, wide):
+        assert after > before, widget
+        want = default / anchor_default
+        assert abs((after - before) / anchor - want) < 0.05, (
+            widget, default, before, after)
+
+
+# -------------------------------------------------------------------- LRP-M11
+@pytest.mark.parametrize("name", FILTERED)
+def test_lrpm11_the_row_wraps_only_below_the_minimum_fit(listing, name):
+    """LRP-M11 — a filter gives up width before the buttons leave the row.
+
+    The threshold is one row with every filter at its minimum. Between that
+    and one row at their defaults the toolbar stays on one row and the
+    filters absorb the shortfall; one pixel under it, the row wraps.
+    """
+    screen, _resizer = listing(name)
+    wrap = screen.toolbar_wrap
+    assert wrap.min_one_row_px() < wrap.one_row_px()
+
+    wrap.fit(wrap.one_row_px())
+    assert not wrap.wrapped
+    full = [widget.cget("width") for widget, _d in wrap.filters]
+    assert full == [default for _w, default in wrap.filters]
+
+    wrap.fit(wrap.min_one_row_px())
+    assert not wrap.wrapped, "wrapped where the minimums still fit"
+    assert all(now <= was for now, was in zip(
+        [widget.cget("width") for widget, _d in wrap.filters], full))
+    assert [widget.cget("width") for widget, _d in wrap.filters] != full, \
+        "nothing gave up width on the way down to the threshold"
+
+    wrap.fit(wrap.min_one_row_px() - 1)
+    assert wrap.wrapped
+
+
+@pytest.mark.parametrize("name", FILTERED)
+def test_lrpm11_the_threshold_does_not_move_as_the_filters_resize(listing, name):
+    """LRP-M11 — the wrap threshold is the same number at every width.
+
+    It was not, when ``one_row_px()`` counted the filters at the width they
+    happened to be drawn at: fitting a toolbar resized the filters, which
+    moved the threshold, which changed the next fit's answer. All Items read
+    997 px, then 916, then 922 on 2026-11-16, and a toolbar that had wrapped
+    never unwrapped.
+    """
+    screen, _resizer = listing(name)
+    wrap = screen.toolbar_wrap
+    threshold, full = wrap.min_one_row_px(), wrap.one_row_px()
+    for width in (full + 2000, threshold - 300, threshold, full):
+        wrap.fit(width)
+        assert wrap.min_one_row_px() == threshold, width
+        assert wrap.one_row_px() == full, width
