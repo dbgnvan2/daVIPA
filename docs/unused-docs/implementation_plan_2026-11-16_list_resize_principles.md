@@ -1,6 +1,6 @@
 # LRP — list resize principles, resizable filters, left-justified wrap, Project Board buttons
 
-Date: 2026-11-16. Status: **drafted, not approved.**
+Date: 2026-11-16. Status: **approved and built 2026-11-16.**
 
 Five requests, in the user's words:
 
@@ -176,6 +176,17 @@ keep their width; growing them buys nothing.
   internally. If it does not redraw at a stretched width, LRP-M10 needs an
   explicit `configure(width=...)` on each fit instead. Verify with a real
   widget before building the rest of Phase 3.
+  *Resolved as built:* `sticky="ew"` was not used. `fit_filters` sets each
+  filter's width explicitly, because a grid weight cannot give the slack to
+  the filters while taking the shortfall out of the search entry first
+  (LSR-D7), and the explicit share is the same rule the columns follow.
+  `TOOLBAR_SPACER_WEIGHT` is therefore unchanged, contrary to LRP-M10's
+  wording above.
+- **Found while building, not in this plan:** a threshold measured from the
+  filters' drawn widths made `fit` non-monotone — fitting resized the
+  filters, which moved the threshold. `one_row_px()` counts them at their
+  defaults and `min_one_row_px()` at their minimum, and
+  `test_lrpm11_the_threshold_does_not_move_as_the_filters_resize` holds it.
 - **LRP-M1 moves the clipping to the right edge.** Better than the left, where
   the SPC bug hid, but still clipping: there is no window `minsize` (SPC D11).
 - **Phase 2 touches all nine screen modules.** One build batch at a time in

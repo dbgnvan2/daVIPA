@@ -47,11 +47,28 @@ floors, divider drags, persistence) and `screens/item_list_columns.py`
    `FIT_DELAY_MS` so a window drag refits once at the end rather than on every
    event, and never mid-drag of a divider.
 
-8. **The toolbar wraps rather than clips.** Controls right of the spacer
-   column move to a second row, left-justified, when one row does not fit.
-   There is no window `minsize`; the budget is held by a test instead, because
-   a wrapped row wider than the toolbar overflows an edge where nothing sees
+8. **A value filter resizes; a control does not.** Who, Status, Segment,
+   SubSegment and Project take a share of the toolbar's slack in proportion
+   to their own default widths — the same rule as the columns — down to
+   `FILTER_MIN_PX` (90) and up to twice the default. The numeric selectors
+   (`Next 7 days`, `Last 30 days`) keep their width: they hold one to three
+   characters. A toolbar names its filters when it builds its `ToolbarWrap`;
+   a combo it does not name resizes like a label, which is to say not at all.
+
+9. **The toolbar wraps rather than clips, and it wraps last.** Controls right
+   of the spacer column move to a second row, left-justified, when one row
+   does not fit — and "does not fit" means `min_one_row_px()`, one row with
+   every filter at its minimum. So the search entry gives up width first
+   (down to `SEARCH_MIN_PX`), then the filters, then the row wraps. There is
+   no window `minsize`; the budget is held by a test instead, because a
+   wrapped row wider than the toolbar overflows an edge where nothing sees
    it.
+
+   `one_row_px()` counts the filters at their **default** widths, never at
+   the widths they are drawn at. A threshold measured from the drawn widths
+   moves every time a fit resizes them, which makes the next fit's answer
+   depend on the last one: All Items read 997 px, then 916, then 922 for one
+   toolbar on 2026-11-16, and once it had wrapped it never unwrapped.
 
 ## Adding a listing
 
@@ -61,6 +78,11 @@ floors, divider drags, persistence) and `screens/item_list_columns.py`
   outcome: add the kind to the table, or give the column a width and a reason.
 - Call `layout.bind(<the list area>)` so it refits, and `layout.build_header`
   so it gets dividers.
+- Pass the screen's value filters to `ToolbarWrap(..., filters=(...))`, and
+  add the listing to `FILTER_COUNT` in
+  `tests/test_list_resize_principles.py`, which names all seven — including
+  the two that have none — so a filter left unwired fails rather than passing
+  unnoticed.
 - A legacy `<prefix>_title_col_width` scalar in `AppSettings` wins over a spec
   default, so it must equal the table's Title. The Scheduler opened at 220
   rather than 260 for exactly this reason until 2026-11-16.
