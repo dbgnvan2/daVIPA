@@ -12,7 +12,9 @@ from tkinter import filedialog, colorchooser, messagebox
 from ..app_settings import AppSettings
 from .. import week_calendar
 from ..obsidian_utils import validate_obsidian_setup
-from ..theme import APPEARANCE_MODES, THEME_NAMES, button_style, combo_box_style, status_text_color
+from ..color_contrast import normalize_hex_color
+from ..theme import (APPEARANCE_MODES, THEME_NAMES, button_style,
+                     combo_box_style, semantic_colors, status_text_color)
 from .settings_integrations import SettingsIntegrationsMixin
 from .settings_priority_colors import SettingsPriorityColorsMixin
 from .settings_vsp_segments import SettingsVSPSegmentsMixin
@@ -466,6 +468,41 @@ class SettingsScreen(
         )
         self.completion_confetti_threshold_entry.grid(row=5, column=1, sticky="w", padx=10, pady=5)
 
+        # DBC-M4 -- here rather than on its own tab: it is a
+        # listing-appearance setting, next to Row Text Size.
+        ctk.CTkLabel(section, text="Day/Date band colour:").grid(
+            row=6, column=0, sticky="w", padx=10, pady=5)
+        self.list_date_band_color_var = ctk.StringVar(
+            value=getattr(self.settings, "list_date_band_color", "") or ""
+        )
+        self.list_date_band_color_entry = ctk.CTkEntry(
+            section,
+            textvariable=self.list_date_band_color_var,
+            width=140,
+        )
+        self.list_date_band_color_entry.grid(row=6, column=1, sticky="w", padx=10, pady=5)
+        self.list_date_band_color_pick_btn = ctk.CTkButton(
+            section,
+            text="Pick Colour",
+            width=110,
+            command=self.pick_list_date_band_color,
+            **button_style("secondary"),
+        )
+        self.list_date_band_color_pick_btn.grid(row=6, column=2, sticky="w", padx=10, pady=5)
+        self.list_date_band_swatch = ctk.CTkFrame(
+            section,
+            width=48,
+            height=22,
+            corner_radius=6,
+            fg_color=self._date_band_swatch_color(),
+        )
+        self.list_date_band_swatch.grid(row=6, column=3, sticky="w", padx=10, pady=5)
+        self.list_date_band_swatch.grid_propagate(False)
+        # Registered after the swatch exists, since the callback repaints it.
+        self.list_date_band_color_var.trace_add(
+            "write", lambda *_: self._refresh_date_band_swatch()
+        )
+
         self.theme_apply_btn = ctk.CTkButton(
             section,
             text="Apply / Save",
@@ -475,18 +512,51 @@ class SettingsScreen(
         self.theme_apply_btn.grid(row=1, column=3, rowspan=5, sticky="w", padx=10, pady=5)
 
         self.appearance_status_label = self._status_label(section, text="", level="success")
-        self.appearance_status_label.grid(row=6, column=0, columnspan=4, sticky="w", padx=10, pady=(8, 4))
+        self.appearance_status_label.grid(row=7, column=0, columnspan=4, sticky="w", padx=10, pady=(8, 4))
 
         info_text = (
             "Appearance mode controls system/dark/light rendering.\n"
             "Color theme switches between bundled CustomTkinter palettes.\n"
             "Row Text Size controls font size in item listing rows.\n"
+            "Day/Date band colour sets the background of the band that labels a date "
+            "in the Upcoming list; clear it to go back to the theme's own colour. "
+            "The band's date text is chosen for contrast against whatever you pick, "
+            "and a value that is not #RRGGBB is refused — nothing in this section is "
+            "saved until it is corrected or cleared.\n"
             "Completion Badge can be an uploaded image shown on Today completed items.\n"
             "Set Confetti Every N Completions to 0 to disable confetti."
         )
         self._info_label(section, text=info_text, justify="left", wraplength=600).grid(
-            row=7, column=0, columnspan=4, sticky="w", padx=10, pady=5
+            row=8, column=0, columnspan=4, sticky="w", padx=10, pady=5
         )
+
+    def _date_band_swatch_color(self) -> str:
+        """The field's colour, or -- for a blank field -- the theme's own,
+        because that is what the band will draw.
+        """
+        return (
+            normalize_hex_color(self.list_date_band_color_var.get())
+            or semantic_colors()["surface_subtle"]
+        )
+
+    def _refresh_date_band_swatch(self):
+        """Repaint the swatch from the field as it is typed."""
+        swatch = getattr(self, "list_date_band_swatch", None)
+        if swatch is not None:
+            swatch.configure(fg_color=self._date_band_swatch_color())
+
+    def pick_list_date_band_color(self):
+        """Choose the Day/Date band colour with the system colour chooser."""
+        # Normalised, not raw: Tk raises on a colour it cannot parse, and
+        # the exception would escape the command, leaving a dead button.
+        current = normalize_hex_color(self.list_date_band_color_var.get()) or None
+        picked = colorchooser.askcolor(
+            color=current,
+            title="Pick the Day/Date band colour",
+        )
+        if picked and picked[1]:
+            self.list_date_band_color_var.set(picked[1].upper())
+            self._refresh_date_band_swatch()
 
     def on_theme_preference_changed(self, _choice=None):
         """Apply and persist theme choices immediately."""
@@ -505,6 +575,25 @@ class SettingsScreen(
             self.completion_confetti_threshold_var.get(),
             default=getattr(self.settings, "completion_confetti_threshold", 0),
         )
+
+        # DBC-M4 -- checked before anything is written, and refused with the
+        # value in the message rather than rewritten to a default: a user who
+        # typed a colour they meant has no way to know it was discarded.
+        band_raw = self.list_date_band_color_var.get().strip()
+        if not band_raw:
+            self.settings.list_date_band_color = ""
+        else:
+            band_colour = normalize_hex_color(band_raw)
+            if band_colour is None:
+                self._set_status(
+                    self.appearance_status_label,
+                    f"Day/Date band colour: “{band_raw}” is not a colour. "
+                    f"Use #RRGGBB, or clear the field for the theme's own colour.",
+                    "error",
+                )
+                return
+            self.settings.list_date_band_color = band_colour
+
         # Before the theme is applied, not after: a refused write leaves the
         # file saying something else, and applying app-wide would show a theme
         # that is gone on the next launch.
@@ -512,6 +601,12 @@ class SettingsScreen(
             return
 
         self._hand_settings_to_app()
+        # Show the field what was stored ("aabbcc" -> "#AABBCC"). Before
+        # ``app.apply_theme_preferences``, not after: that call rebuilds this
+        # screen, so later lines touch destroyed widgets (adjacent issue,
+        # noted in the plan, for the status label below).
+        self.list_date_band_color_var.set(self.settings.list_date_band_color)
+        self._refresh_date_band_swatch()
         self.app.apply_theme_preferences()
         self._set_status(self.appearance_status_label, "✓ Saved appearance and completion badge settings", "success")
 

@@ -131,6 +131,12 @@ class AppSettings:
     # List view settings
     # Default state for list views (Today, Upcoming, All Items)
     default_columns_expanded: bool = False
+    # DBC-M1 -- the background of the band that labels a Day/Date in a
+    # listing, which is the Upcoming screen's date group header. "" is the
+    # theme's own ``surface_subtle``, so an existing install looks unchanged
+    # and clearing the field puts that colour back. One value, not a light and
+    # a dark one, for the reason ``theme.priority_level_fill_colors`` gives.
+    list_date_band_color: str = ""
     # First day of business year in MM-DD format
     business_year_start_mmdd: str = "01-01"
     # Drag Schedule date box text color (hex)

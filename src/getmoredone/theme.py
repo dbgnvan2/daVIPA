@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, NamedTuple, Optional, Tuple
 
 import customtkinter as ctk
 
 from .paths import resolve_theme_path
-from .color_contrast import normalize_hex_color
+from .color_contrast import normalize_hex_color, pick_text_color
+
+logger = logging.getLogger(__name__)
 
 APPEARANCE_MODES = ("system", "dark", "light")
 # "davipa" is the brand theme, built from brand.py and the colour system
@@ -327,6 +330,50 @@ def priority_level_fill_colors() -> Dict[str, str]:
         LEVEL_ANY_HIGH: "#FEF3C7",
         LEVEL_NO_HIGH_OR_CRITICAL: "",
     }
+
+
+class DateBandColors(NamedTuple):
+    """``text_color`` is ``None`` for a theme fill, which pairs itself with
+    the theme's own label colour; a picked fill carries a derived one.
+    """
+
+    fill: str
+    text_color: Optional[str]
+
+
+#: One warning per bad value, not one per date group in the list.
+_warned_date_band_colors: set = set()
+
+
+def date_band_colors(settings) -> DateBandColors:
+    """DBC-M2 -- the fill and label colour for a Day/Date band.
+
+    Purpose: the band takes ``settings.list_date_band_color`` when that is a
+             colour, and the theme's ``surface_subtle`` when it is blank or
+             unusable -- unusable never reaches Tk, which raises on a colour
+             it cannot parse and would take down the whole refresh.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-15_date_band_colour.md#dbc-m2
+    Tests:   tests/test_date_band_colour.py
+    """
+    theme_fill = semantic_colors()["surface_subtle"]
+    raw = getattr(settings, "list_date_band_color", "")
+
+    if isinstance(raw, str) and not raw.strip():
+        return DateBandColors(theme_fill, None)
+
+    normalized = normalize_hex_color(raw)
+    if normalized is None:
+        key = repr(raw)
+        if key not in _warned_date_band_colors:
+            _warned_date_band_colors.add(key)
+            logger.warning(
+                "Ignoring unusable Day/Date band colour %r; using the theme's "
+                "own band colour. Set it again in Settings > Appearance.",
+                raw,
+            )
+        return DateBandColors(theme_fill, None)
+
+    return DateBandColors(normalized, pick_text_color(normalized))
 
 
 def block_type_colors() -> Dict[str, str]:

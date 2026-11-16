@@ -23,7 +23,8 @@ from .week_collision_notice import (
     confirm_weekly_tactic_completion,
     notify_weekly_tactic_changes,
 )
-from ..theme import apply_segment_accent, semantic_colors, button_style, combo_box_style, list_row_font
+from ..theme import (apply_segment_accent, semantic_colors, button_style,
+                     combo_box_style, date_band_colors, list_row_font)
 from .inline_editors import InlineDateDialog, InlinePriorityDialog
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
 from .title_format import (
@@ -302,8 +303,11 @@ class UpcomingScreen(ctk.CTkFrame):
             date_label = self.format_date_header(
                 start_date, len(items_for_date), total_planned)
 
+            # DBC-M3 -- fill and label together: a coloured band has no
+            # theme pairing, so a dark pick needs a derived label colour.
+            band = date_band_colors(self.settings)
             header_frame = ctk.CTkFrame(
-                self.scroll_frame, fg_color=self.palette["surface_subtle"])
+                self.scroll_frame, fg_color=band.fill)
             header_frame.grid(row=row, column=0,
                               sticky="ew", pady=(10, 0), padx=5)
             header_frame.grid_columnconfigure(0, weight=1)
@@ -311,7 +315,8 @@ class UpcomingScreen(ctk.CTkFrame):
             ctk.CTkLabel(
                 header_frame,
                 text=date_label,
-                font=ctk.CTkFont(size=14, weight="bold")
+                font=ctk.CTkFont(size=14, weight="bold"),
+                text_color=band.text_color
             ).grid(row=0, column=0, sticky="w", padx=10, pady=5)
 
             row += 1
