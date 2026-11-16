@@ -84,7 +84,7 @@ daVIPA is a desktop task manager focused on prioritization and execution.
 - Drag the divider at the right edge of any text column's heading to change how the width is shared. Each screen remembers its own column shape between sessions, and keeps that shape as the window is resized, including after the window has been narrowed until every column is at 6 characters.
 - Start and Due show the date alone (`11/14`; in Hierarchical, `2026-11-14`); the heading says which date it is. Completed's date column and a project's Start and Due read the same way.
 - When you let go of a divider, the column you dragged keeps the width you dropped it at, and the other columns grow or shrink to fill the list. A click on a divider with no drag changes nothing.
-- On a narrow window the search box gives up width first, where the screen has one. Narrower still, the toolbar's right-hand controls (for example **+ New Item**) move to a second toolbar row. The Scheduler, Projects and Completed toolbars do this too, so their filters no longer run off the right-hand edge. Below what those two rows need, the toolbar and the right-hand columns are cut off; there is no minimum window size.
+- On a narrow window the search box gives up width first, where the screen has one. Narrower still, the toolbar's right-hand controls (for example **+ New Item**) move to a second toolbar row. The Scheduler, Projects and Completed toolbars do this too, so their filters no longer run off the right-hand edge; each one's second row is sized to fit the window the app opens at. Below what those two rows need, the toolbar and the right-hand columns are cut off; there is no minimum window size.
 - In Hierarchical, sub-items are indented inside the Title column, so the columns to the right line up at every level.
 - Why: Use the window's whole width, whatever its size.
 
@@ -230,7 +230,7 @@ Note actions:
 - **Trash can** — What: Delete the project note. Why: Remove obsolete project records when appropriate.
 
 Filters:
-- **Toolbar wrap** — What: The Note Size slider, Compact Height and the hint line sit at the toolbar's right-hand edge, and on a narrow window they move to a second toolbar row; the search row and the multi-link warning stay on their own rows. Why: Reach every control at any window size.
+- **Toolbar wrap** — What: The Note Size slider, Compact Height and the hint line sit at the toolbar's right-hand edge, and on a narrow window they move to a second toolbar row; the search row and the multi-link warning stay on their own rows. Narrower still than the second row needs, they clip again; there is no minimum window size. Why: Reach every control at any window size.
 - **Show Pending / Show Complete** — What: Toggles those note states onto the board. Why: Review inactive work without mixing it into the default active board.
 - **Link Action Item button color** — What: In the detail panel, the button uses the Category color. Why: Keep the project-to-action workflow visually tied to planning lineage.
 
@@ -913,7 +913,7 @@ happen on that save, all deliberate:
 - Why: Review progress and time spent.
 
 Header controls:
-- **Toolbar wrap** — What: The Who filter, Expand/Collapse and the stats label sit at the toolbar's right-hand edge, and on a narrow window they move to a second toolbar row instead of running off it. Why: Reach every filter at any window size.
+- **Toolbar wrap** — What: The Who filter, Expand/Collapse and the stats label sit at the toolbar's right-hand edge, and on a narrow window they move to a second toolbar row instead of running off it. Narrower still than the second row needs, they clip again; there is no minimum window size. Why: Reach every filter at any window size.
 - **Last N days** — What: Sets the lookback window. Why: Focus on a recent period.
 - **Who** — What: Filter by Who. Why: Review work for a client or context.
 - **Expand/Collapse** — What: Toggles priority factor chips. Why: Show or hide detail.

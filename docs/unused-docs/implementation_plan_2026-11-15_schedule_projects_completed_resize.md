@@ -1,7 +1,7 @@
 # Plan: Schedule, Projects and Completed resize with the window (SPC)
 
 - Date: 2026-11-15
-- Status: **approved and built 2026-11-15**; walk owed (below).
+- Status: **approved and built 2026-11-15, re-swept 2026-11-16**; walk owed (below).
 - Screens: Scheduler (`screens/drag_schedule.py`), Project Board
   (`screens/project_boards.py`), Completed (`screens/completed.py`)
 - Follows: LSR and LSR2 (Today, Upcoming, All Items, Hierarchical) and SCR
@@ -166,8 +166,11 @@ pass. Fixed in this batch:
   font setting. A larger setting grew the budget and not the text. Now
   `theme.list_row_font_bold()`. The cold pass also predicted the label would
   push its column wider; measured and it does not — `winfo_reqwidth()` equals
-  the configured width. The residual is that bold overshoots the 8 px/char
-  model by about 12%, which is the same approximation all six lists use.
+  the configured width. The residual is that bold is a little wider per
+  character than plain at the same size, so the 8 px/char model the cut uses
+  is an approximation here as it is for all six lists. The direction and size
+  of that error were not measured, and the earlier claim of a 12% overshoot
+  is withdrawn.
 - **SPC-S2 — `test_spcm15` could not fail for two of its three screens.** The
   wrap frame is gridded `sticky="e"`, so a second row wider than the toolbar
   overflows the *left* edge, which a right-edge check reads as a pass. At the
@@ -194,6 +197,78 @@ pass. Fixed in this batch:
 
 Not fixed, recorded below and in `BACKLOG.md`.
 
+## Re-sweep findings and what was done (2026-11-16)
+
+`learning-qa` over the fix range `f83719a...53b4fea`. Six findings, one
+medium-high. All of them are fixed or dismissed here, and the fixes are
+themselves in scope for the next pass.
+
+- **Medium-high, SPC-S3 — the batch never compared the two numbers it
+  produced.** `wrap_row_px()` says how wide a wrapped second row has to be;
+  nothing compared it with the width a header actually gets when the app opens
+  at `DEFAULT_GEOMETRY`. The Scheduler's four filters needed **991 px** and the
+  header gets **960 px** (1200 window - 200 sidebar - 2x10 content pad - 2x10
+  header pad), so on every launch the wrapped row ran off the toolbar's *left*
+  edge -- the wrap frame is `sticky="e"` -- and clipped the `Who:` filter. The
+  one test that could have seen it runs at `one_row_px() - 40`, which for the
+  Scheduler is 1353 px, above the band users start in. So the Schedule screen
+  did not deliver this batch's own goal at the default window.
+
+  Fixed by cutting the filter row to fit: the three filter label pads from
+  `(14, 5)` to `(10, 4)` and `Who:` from `(20, 5)` to `(12, 4)`, and the
+  Segment, SubSegment and Project combos from 160/160/180 to 150/150/170. The
+  second row now needs **937 px** against the 960 it gets. D11 stands -- no
+  window minsize was added.
+
+  `test_spcs3_the_new_wrapped_rows_fit_the_default_window` and
+  `..._the_old_wrapped_rows_fit_the_default_window` assert this for all seven
+  toolbars, against a budget walked from `DEFAULT_WINDOW_WIDTH_PX`,
+  `SIDEBAR_WIDTH_PX` and `CONTENT_PAD_PX` down the frames' own `grid_info`.
+  Both sides are requested widths, so neither needs a mapped window. Measured
+  margins: completed 475/960, projects 844/956, scheduler 937/960, today
+  220/940, upcoming 487/960, all_items 270/960, hierarchical 358/960.
+  `SIDEBAR_WIDTH_PX` and `CONTENT_PAD_PX` are promoted out of `app.py`'s
+  `create_sidebar` and `create_main_content` for it (rule 8).
+
+- **Finding 6 — `test_spcm15` compared a window number with a toolbar
+  number.** Its band pre-check asserted `root.geometry`'s width against
+  `wrap_row_px()`; the toolbar is narrower than the window by the sidebar and
+  by every frame's padding. The check now runs after `root.update()` against
+  `wrap.toolbar.winfo_width()`.
+
+- **Finding 5, P4 — the pads were still restated.** The width sweep derived
+  the widths and left the pads: `REOPEN_PAD_PX = 4` beside `padx=2`,
+  `FixedColumn(..., 12)` beside `padx=6`, `FixedColumn(..., 16)` beside
+  `padx=8`. Each is now one constant used in the widget call and doubled for
+  the column's reserve: `REOPEN_PAD_PX = 2`, `ITEM_CHECKBOX_PAD_PX = 6`,
+  `ITEM_ACTIONS_OUTER_PAD_PX = 8`. Re-evaluated from the AST:
+  `ITEM_ACTIONS_WIDTH_PX` is still 240 and `BADGE_TITLE_DELTA_PX` still 34, so
+  no reserve moved.
+
+- **Finding 4, rule 13 — the clip-again sentence was on one screen of three.**
+  The Scheduler's user-guide entry said "Narrower still than the second row
+  needs, they clip again"; `sticky="e"` applies to all three, so Projects and
+  Completed now say it too, and the shared resize paragraph records that each
+  second row is sized to fit the window the app opens at.
+
+- **Finding 3, P6 — a residual stated as a measurement.** The SPC-S1 note
+  claimed bold "overshoots the 8 px/char model by about 12%". That number was
+  not measured in this batch and the re-sweep read the sign the other way, so
+  the claim is withdrawn above rather than replaced with a second unmeasured
+  one.
+
+- **Finding 2 — dismissed, with a guard instead.** It asked for literal px
+  pins in `test_spcm17`. Declined: font metrics differ per machine and CI runs
+  Linux, so a literal px pin is environment-dependent, and this repo's own
+  precedent is to compare against `DEFAULT_WINDOW_WIDTH_PX` rather than
+  against literal pixels (`tests/test_plan_screen_pf_header.py:219`,
+  `tests/test_plan_screen_calendar_export.py:809`). The real gap it pointed at
+  -- that `one_row_px()` takes a column's **max** and no real toolbar stacks
+  two controls in one column, so nothing could tell `max` from `sum` -- is
+  closed by `test_spcs2_one_row_counts_a_column_once`, a synthetic toolbar
+  with two controls in column 0. Mutating `max` to `+` turns it red.
+
+
 ## Adjacent issues found, not fixed
 
 - `completed.py` has no `columns_expanded` persistence (it always opens
@@ -218,7 +293,7 @@ Not fixed, recorded below and in `BACKLOG.md`.
 
 ## Walk checklist (by hand, after the build)
 
-I did not launch the application. Nine steps, each naming what to look at.
+I did not launch the application. Ten steps, each naming what to look at.
 
 **Completed**
 
@@ -258,13 +333,26 @@ I did not launch the application. Nine steps, each naming what to look at.
 9. Narrow the window. Who, Segment, SubSegment and Project move to a second
    toolbar row instead of the Project filter clipping off the right edge. The
    item columns behave as they did after SCR — unchanged by this batch.
+10. **Open the Scheduler at the window the app opens at** (quit first, so the
+    geometry is the default 1200x700, and do not resize). The four filters sit
+    on a second toolbar row with the `Who:` label fully visible at its left
+    end — this is the case SPC-S3 fixed, where the row needed 991 px in a
+    header 960 px wide and ran off the left edge. The three combos are 10 px
+    narrower than before; check the longest project and segment names you have
+    are still readable in them, and say so if they are not.
 
 ## Verification status
 
-- `tests/test_screen_resize_spc.py` — 24 passed, 3 skipped locally. The three
+- `tests/test_screen_resize_spc.py` — 38 passed, 3 skipped locally. The three
   skipped are `test_spcm15_narrow_window_wraps_and_nothing_clips`, which needs
   a mapped window; **not run locally** (it takes keyboard focus on this
-  machine), CI runs it.
+  machine), CI runs it. Its band assertion was changed by re-sweep finding 6
+  and so is **unverified** here — it is inside the test that cannot run on
+  this machine.
+- The SPC-S3 overflow itself is **unverified on a real window**: the arithmetic
+  is confirmed from `app.py` and each header's `grid_info`, and both sides of
+  the guard are requested widths, but nobody has seen the Scheduler at
+  1200x700. Walk step 10 is that check.
 - Every new guard mutation-checked: the line it names deleted or inverted, the
   test confirmed red, the file restored verbatim (sha256 compared).
 - Regression: `test_list_screen_resize.py`, `test_scheduler_column_resize.py`,
