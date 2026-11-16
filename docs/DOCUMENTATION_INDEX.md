@@ -326,6 +326,16 @@ different defaults), decisions D1 to D5, and the two risks as they resolved.
 **Approved and built 2026-11-16**; walk owed, in
 `docs/unused-docs/changes/2026-11-16-lrp.md`.
 
+### docs/unused-docs/implementation_plan_2026-11-16_modeless_notices.md
+
+Implementation plan for MOD-M1 to M7, from `BACKLOG.md` MOD-A1: the 89
+`messagebox.show*` calls that tell the user something move to the per-screen
+status line DRP-M3/PD-M13 established, the 24 that ask a question keep
+`messagebox` and are hardened instead, and the 49 `grab_set()` calls are
+classified per window. Holds the measurement, the decision to adopt `main`'s
+status line rather than the archived toast, and the two-phase boundary.
+**Proposed 2026-11-16, not approved.**
+
 ### docs/unused-docs/implementation_plan_2026-11-15_date_band_colour.md
 
 Implementation plan for DBC-M1 to M4: a Settings value for the background of
