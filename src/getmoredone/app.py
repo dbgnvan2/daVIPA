@@ -26,6 +26,14 @@ from .vps_manager import VPSManager
 DEFAULT_GEOMETRY = "1200x700"
 DEFAULT_WINDOW_WIDTH_PX = int(DEFAULT_GEOMETRY.split("x")[0])
 
+#: The sidebar's width, and the padding around the content frame. Promoted out
+#: of ``create_sidebar``/``create_main_content`` (rule 8) because the width a
+#: screen's header actually gets at the default window is
+#: ``DEFAULT_WINDOW_WIDTH_PX - SIDEBAR_WIDTH_PX - 2 * CONTENT_PAD_PX`` less its
+#: own padding, and SPC-S3 asserts a toolbar's wrapped row fits inside it.
+SIDEBAR_WIDTH_PX = 200
+CONTENT_PAD_PX = 10
+
 
 class GetMoreDoneApp(ctk.CTk):
     """Main application window."""
@@ -102,7 +110,8 @@ class GetMoreDoneApp(ctk.CTk):
 
         # Create main content area
         self.content_frame = ctk.CTkFrame(self, corner_radius=0)
-        self.content_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+        self.content_frame.grid(row=0, column=1, sticky="nsew",
+                                padx=CONTENT_PAD_PX, pady=CONTENT_PAD_PX)
         self.content_frame.grid_columnconfigure(0, weight=1)
         self.content_frame.grid_rowconfigure(0, weight=1)
 
@@ -144,7 +153,8 @@ class GetMoreDoneApp(ctk.CTk):
 
     def create_sidebar(self):
         """Create navigation sidebar."""
-        self.sidebar = ctk.CTkFrame(self, width=200, corner_radius=0)
+        self.sidebar = ctk.CTkFrame(self, width=SIDEBAR_WIDTH_PX,
+                                    corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.grid_rowconfigure(19, weight=1)
 

@@ -56,7 +56,11 @@ ITEM_ACTIONS_WIDTH_PX = (
     ITEM_EDIT_WIDTH_PX + ITEM_COMPLETE_WIDTH_PX + ITEM_UNLINK_WIDTH_PX
     + 2 * ITEM_ACTION_PAD_PX * 3)
 ITEM_ACTIONS_COL = 5
+#: One side's pad on the actions frame and on the row checkbox. Each column
+#: reserves both sides, so the reserve is derived from these (P4).
+ITEM_ACTIONS_OUTER_PAD_PX = 8
 ITEM_CHECKBOX_WIDTH_PX = 24
+ITEM_CHECKBOX_PAD_PX = 6
 
 
 class ProjectBoardEditorDialog(ctk.CTkToplevel):
@@ -1555,7 +1559,8 @@ class ProjectBoardsScreen(ctk.CTkFrame):
                 checkbox_width=ITEM_CHECKBOX_WIDTH_PX,
                 checkbox_height=ITEM_CHECKBOX_WIDTH_PX,
                 command=lambda item_id=item.id: self._on_item_checkbox_changed(item_id),
-            ).grid(row=0, column=0, rowspan=2, sticky="nw", padx=6, pady=8)
+            ).grid(row=0, column=0, rowspan=2, sticky="nw",
+                   padx=ITEM_CHECKBOX_PAD_PX, pady=8)
 
             # SPC-D2: Title, Status, Start and Due are columns now, so the
             # one-line meta string is gone; "Next:" stays under the title,
@@ -1598,7 +1603,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
 
             actions = ctk.CTkFrame(row_frame, fg_color="transparent")
             actions.grid(row=0, column=ITEM_ACTIONS_COL, rowspan=2,
-                         sticky="e", padx=8, pady=8)
+                         sticky="e", padx=ITEM_ACTIONS_OUTER_PAD_PX, pady=8)
             ctk.CTkButton(actions, text="Edit", width=ITEM_EDIT_WIDTH_PX, command=lambda item_id=item.id: self.edit_item(item_id), **button_style("secondary")).pack(
                 side="left", padx=ITEM_ACTION_PAD_PX
             )
@@ -1618,8 +1623,10 @@ class ProjectBoardsScreen(ctk.CTkFrame):
         """
         palette = semantic_colors()
         self.items_layout.set_columns(
-            [FixedColumn(0, "", ITEM_CHECKBOX_WIDTH_PX, 12)],
-            [FixedColumn(ITEM_ACTIONS_COL, "", ITEM_ACTIONS_WIDTH_PX, 16)])
+            [FixedColumn(0, "", ITEM_CHECKBOX_WIDTH_PX,
+                         2 * ITEM_CHECKBOX_PAD_PX)],
+            [FixedColumn(ITEM_ACTIONS_COL, "", ITEM_ACTIONS_WIDTH_PX,
+                         2 * ITEM_ACTIONS_OUTER_PAD_PX)])
         header = self.items_layout.build_header(
             self.items_frame, {}, fg_color=palette["surface_subtle"],
             border_color=palette["border"])

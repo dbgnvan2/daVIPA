@@ -28,7 +28,9 @@ from .title_format import split_action_item_title
 
 #: The Reopen button's width, and the padding it is gridded with.
 REOPEN_WIDTH_PX = 70
-REOPEN_PAD_PX = 4
+#: One side's pad on the Reopen button. The column reserves both sides, so
+#: the reserve is derived from this rather than restating it (P4).
+REOPEN_PAD_PX = 2
 
 #: The "WT" badge inside the Title cell, and the gap after it. The title's
 #: own width is the column less both, so the two must agree with the widget
@@ -166,7 +168,7 @@ class CompletedScreen(ctk.CTkFrame):
         if self.columns_expanded:
             fixed.append(factors_column(5))
         fixed.append(FixedColumn(6 if self.columns_expanded else 5, "",
-                                 REOPEN_WIDTH_PX, REOPEN_PAD_PX))
+                                 REOPEN_WIDTH_PX, 2 * REOPEN_PAD_PX))
         self.layout.set_columns([FixedColumn(0, "", 30)], fixed)
         if self.column_header is not None:
             self.column_header.destroy()
@@ -373,7 +375,8 @@ class CompletedScreen(ctk.CTkFrame):
                 **button_style("secondary"),
                 command=lambda i=item.id: self.uncomplete_item(i)
             )
-            btn_uncomplete.grid(row=0, column=5+col_offset, padx=2, pady=5)
+            btn_uncomplete.grid(row=0, column=5+col_offset,
+                                padx=REOPEN_PAD_PX, pady=5)
 
     def edit_item(self, item_id: str):
         """Edit item details."""

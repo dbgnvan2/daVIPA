@@ -194,8 +194,12 @@ class DragScheduleScreen(ctk.CTkFrame):
         # narrow for one. Stuck left so Refresh itself does not drift.
         self.refresh_btn.grid(row=0, column=4, padx=(10, 5), pady=10, sticky="w")
 
+        # SPC-S3: this group is the wrapped second row, and it has to fit the
+        # width the header gets at the default window. The pads and the three
+        # combo widths below were cut to bring it under that budget; the guard
+        # test_spcs3_the_wrapped_row_fits_the_default_window holds them there.
         ctk.CTkLabel(header, text="Who:").grid(
-            row=0, column=5, padx=(20, 5), pady=10)
+            row=0, column=5, padx=(12, 4), pady=10)
 
         who_values = ["All"] + self.db_manager.get_distinct_who_values()
         self.who_var = ctk.StringVar(value="All")
@@ -210,39 +214,39 @@ class DragScheduleScreen(ctk.CTkFrame):
         self.who_combo.grid(row=0, column=6, padx=5, pady=10)
 
         ctk.CTkLabel(header, text="Segment:").grid(
-            row=0, column=7, padx=(14, 5), pady=10
+            row=0, column=7, padx=(10, 4), pady=10
         )
         self.segment_filter_combo = ctk.CTkComboBox(
             header,
             values=["All"],
             variable=self.segment_filter_var,
-            width=160,
+            width=150,
             **combo_box_style(),
             command=lambda _v: self.on_segment_filter_changed(),
         )
         self.segment_filter_combo.grid(row=0, column=8, padx=5, pady=10)
 
         ctk.CTkLabel(header, text="SubSegment:").grid(
-            row=0, column=9, padx=(14, 5), pady=10
+            row=0, column=9, padx=(10, 4), pady=10
         )
         self.subsegment_filter_combo = ctk.CTkComboBox(
             header,
             values=["All"],
             variable=self.subsegment_filter_var,
-            width=160,
+            width=150,
             **combo_box_style(),
             command=lambda _v: self.on_subsegment_filter_changed(),
         )
         self.subsegment_filter_combo.grid(row=0, column=10, padx=5, pady=10)
 
         ctk.CTkLabel(header, text="Project:").grid(
-            row=0, column=11, padx=(14, 5), pady=10
+            row=0, column=11, padx=(10, 4), pady=10
         )
         self.project_filter_combo = ctk.CTkComboBox(
             header,
             values=["All"],
             variable=self.project_filter_var,
-            width=180,
+            width=170,
             **combo_box_style(),
             command=lambda _v: self.on_project_filter_changed(),
         )
