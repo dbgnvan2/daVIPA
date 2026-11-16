@@ -3,6 +3,7 @@
 Spec: docs/unused-docs/implementation_plan_2026-11-15_date_band_colour.md
 """
 
+import json
 import logging
 import pathlib
 import subprocess
@@ -25,6 +26,21 @@ from src.getmoredone.theme import (
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
+def _redirect_settings(monkeypatch, settings_file):
+    """Point ``AppSettings`` at this test's own settings file.
+
+    conftest's session-scoped ``_isolate_user_settings`` replaces
+    ``AppSettings.get_settings_path`` outright, so patching
+    ``default_settings_path`` changes nothing: the suite's one shared settings
+    file is read instead, and a ``save()`` here is then read by the next test.
+    Patch the attribute conftest patches, and monkeypatch restores its redirect
+    afterwards.
+    """
+    monkeypatch.setattr(
+        AppSettings, "get_settings_path", classmethod(lambda cls: settings_file)
+    )
+
+
 # =========================================================================
 # DBC-M1 — the setting
 # =========================================================================
@@ -32,10 +48,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 def test_dbcm1_the_field_round_trips_and_defaults_to_the_theme(tmp_path, monkeypatch):
     """DBC-M1 — the field ships blank and survives a save/load."""
     settings_file = tmp_path / "settings.json"
-    monkeypatch.setattr(
-        "src.getmoredone.app_settings.default_settings_path",
-        lambda: settings_file,
-    )
+    _redirect_settings(monkeypatch, settings_file)
 
     assert AppSettings().list_date_band_color == ""
 
@@ -44,6 +57,24 @@ def test_dbcm1_the_field_round_trips_and_defaults_to_the_theme(tmp_path, monkeyp
 
     settings.list_date_band_color = "#D9E8FF"
     assert settings.save()
+    assert AppSettings.load().list_date_band_color == "#D9E8FF"
+
+
+def test_dbcm11_load_heals_a_stored_value_tk_would_reject(tmp_path, monkeypatch):
+    """DBC-M1.1 -- a hand-edited colour must not wedge Settings > Appearance.
+
+    Without normalising on load, a stored "lightblue" drew the band correctly
+    and then refused every save in that section, on every launch, naming a
+    field the user had not touched.
+    """
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(json.dumps({"list_date_band_color": "lightblue"}))
+    _redirect_settings(monkeypatch, settings_file)
+
+    assert AppSettings.load().list_date_band_color == ""
+
+    # A good value is kept, upper-cased, so the healing is not a blanket wipe.
+    settings_file.write_text(json.dumps({"list_date_band_color": "#d9e8ff"}))
     assert AppSettings.load().list_date_band_color == "#D9E8FF"
 
 
@@ -125,6 +156,13 @@ def test_dbcm3_the_upcoming_band_is_drawn_from_the_helper():
     assert picked["FILL"] == "#D9E8FF"
     assert picked["TEXT"] == "#000000"
 
+    # The composition the helper exists for: a stored value Tk would reject
+    # reaches a real screen build and the band draws the theme fill, rather
+    # than raising a TclError out of the refresh. This is the case that would
+    # catch a later edit passing the stored string straight to fg_color.
+    bad = _render_band("rebeccapurple")
+    assert bad["FILL"] == bad["THEME"]
+
 
 # =========================================================================
 # DBC-M4 — the Settings row
@@ -159,6 +197,8 @@ class _StubAppearanceSection:
     """
 
     apply_theme_preferences = SettingsScreen.apply_theme_preferences
+    _validated_band_colour = SettingsScreen._validated_band_colour
+    _restore_appearance_choices = SettingsScreen._restore_appearance_choices
     _parse_positive_or_zero_int = SettingsScreen._parse_positive_or_zero_int
     _date_band_swatch_color = SettingsScreen._date_band_swatch_color
     _refresh_date_band_swatch = SettingsScreen._refresh_date_band_swatch
@@ -206,7 +246,10 @@ def test_dbcm4_a_colour_is_saved():
 
     assert screen.settings.list_date_band_color == "#D9E8FF"
     assert screen.writes == 1
-    assert screen.status[1] == "success"
+    # Deliberately not asserting the success status: in the real app the line
+    # that sets it runs after app.apply_theme_preferences(), which destroys
+    # this screen, so the user never sees it. Asserting it here would make
+    # that pre-existing defect look covered.
     # The field is shown what was stored, not what was typed.
     assert screen.list_date_band_color_var.get() == "#D9E8FF"
     assert screen.list_date_band_swatch.fg_color == "#D9E8FF"
@@ -216,6 +259,37 @@ def test_dbcm4_a_colour_is_saved():
     cleared.apply_theme_preferences()
     assert cleared.settings.list_date_band_color == ""
     assert cleared.list_date_band_swatch.fg_color == semantic_colors()["surface_subtle"]
+
+
+def test_dbcm42_a_refusal_leaves_the_whole_section_untouched():
+    """DBC-M4.2 -- the refusal is reachable from the three Appearance combos.
+
+    They apply and persist on selection, so a typo in the band field used to
+    mean: the theme is not applied and not written, five fields are left
+    mutated on the screen's shared settings object for the next Save on any
+    other section to persist, and each combo goes on displaying a choice that
+    was never written.
+    """
+    screen = _StubAppearanceSection("rebeccapurple")
+    screen.settings.appearance_mode = "dark"
+    screen.settings.theme_name = "apple_grey"
+    screen.settings.list_row_font_size = 14
+
+    # What a user picking a new theme with a bad colour in the field does.
+    screen.appearance_mode_var.set("light")
+    screen.theme_name_var.set("davipa")
+    screen.list_row_font_size_var.set("18")
+    screen.apply_theme_preferences()
+
+    assert screen.writes == 0
+    # Nothing was mutated, so no later save on this screen can publish it.
+    assert screen.settings.appearance_mode == "dark"
+    assert screen.settings.theme_name == "apple_grey"
+    assert screen.settings.list_row_font_size == 14
+    # And no combo claims a choice the file does not hold.
+    assert screen.appearance_mode_var.get() == "dark"
+    assert screen.theme_name_var.get() == "apple_grey"
+    assert screen.list_row_font_size_var.get() == "14"
 
 
 def test_dbcm41_a_bad_colour_is_refused_and_not_written():

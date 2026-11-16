@@ -135,6 +135,13 @@ def test_the_theme_is_not_applied_over_a_refused_write(settings_path, monkeypatc
         stub, lbl, text, level
     )
     stub._write_settings = lambda lbl: SettingsScreen._write_settings(stub, lbl)
+    # DBC-M4.2 -- the handler validates the band colour before it mutates
+    # anything. Behaviour changed intentionally; blank passes validation, so
+    # this test still reaches the refused write it was written for.
+    stub._validated_band_colour = lambda: SettingsScreen._validated_band_colour(stub)
+    stub._restore_appearance_choices = (
+        lambda: SettingsScreen._restore_appearance_choices(stub)
+    )
 
     SettingsScreen.apply_theme_preferences(stub)
 
