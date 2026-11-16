@@ -6,6 +6,13 @@ each raises its own exception. The screen caught the first and not the second,
 so the newer refusal would have escaped a Tk ``command`` into a stderr a
 double-clicked app has nowhere to send: the user would press Delete, see
 nothing happen, and have no idea why (P5).
+
+MOD-M2 moved both refusals off ``messagebox.showerror`` and onto the screen's
+notice line. The contract these tests exist for is unchanged -- the refusal,
+its count and the names of the blockers reach the user -- so they assert the
+same things through ``set_status``. The one deliberate change is the cap: a
+dialog body listed ten names down the window, and a notice line has room for
+``status_notice.INLINE_LIST_CAP``.
 """
 
 from types import SimpleNamespace
@@ -18,26 +25,30 @@ from src.getmoredone.vps_manager import (
     ActionItemsAttachedError,
     ProjectBoardsAttachedError,
 )
+from src.getmoredone.screens.status_notice import INLINE_LIST_CAP
 from tests.weekly_tactic_fixtures import make_vps, seed_ape
 
 
 def _screen_stub(vps, raising):
     """Enough of the screen to drive the delete handler without a display."""
-    return SimpleNamespace(
+    notices = []
+    stub = SimpleNamespace(
         vps_manager=SimpleNamespace(
             delete_annual_records_for_vision_element=raising),
         refresh_lists=lambda: None,
         _parse_year=lambda: 2026,
+        notices=notices,
     )
+    stub.set_status = lambda text, kind="muted": notices.append((kind, text))
+    return stub
 
 
 @pytest.fixture
 def dialogs(monkeypatch):
-    seen = {"errors": [], "asked": []}
+    """Only the question is a dialog now; the refusals are notices (MOD-M2)."""
+    seen = {"asked": []}
     monkeypatch.setattr(avs.messagebox, "askyesno",
                         lambda *a, **k: seen["asked"].append(a) or True)
-    monkeypatch.setattr(avs.messagebox, "showerror",
-                        lambda title, message, **k: seen["errors"].append((title, message)))
     return seen
 
 
@@ -50,11 +61,12 @@ def test_action_items_attached_is_reported_not_raised(dialogs):
     def raising(year, ve_id):
         raise ActionItemsAttachedError(["Draft the outline", "Publish it"])
 
-    _delete(_screen_stub(None, raising))
+    stub = _screen_stub(None, raising)
+    _delete(stub)
 
-    assert dialogs["errors"], "the refusal reached nobody"
-    title, message = dialogs["errors"][0]
-    assert "Action Items Attached" == title
+    assert stub.notices, "the refusal reached nobody"
+    kind, message = stub.notices[0]
+    assert kind == "error"
     assert "Draft the outline" in message and "Publish it" in message
     assert "2 action item(s)" in message
 
@@ -63,23 +75,28 @@ def test_a_long_list_of_items_is_capped(dialogs):
     def raising(year, ve_id):
         raise ActionItemsAttachedError([f"Item {i}" for i in range(25)])
 
-    _delete(_screen_stub(None, raising))
+    stub = _screen_stub(None, raising)
+    _delete(stub)
 
-    _title, message = dialogs["errors"][0]
+    _kind, message = stub.notices[0]
     assert "25 action item(s)" in message
-    assert "and 15 more" in message, message
-    assert message.count("  • ") == 11        # ten named plus the "more" line
+    assert f"and {25 - INLINE_LIST_CAP} more" in message, message
+    # Named inline, so the line stays a line: the cap, not ten bullets.
+    assert message.count(",") == INLINE_LIST_CAP - 1, message
+    assert "Item 0" in message and f"Item {INLINE_LIST_CAP}" not in message
 
 
 def test_the_projects_refusal_still_works(dialogs):
     def raising(year, ve_id):
         raise ProjectBoardsAttachedError(["Website Rebuild"])
 
-    _delete(_screen_stub(None, raising))
+    stub = _screen_stub(None, raising)
+    _delete(stub)
 
-    title, message = dialogs["errors"][0]
-    assert "Projects Attached" == title
+    kind, message = stub.notices[0]
+    assert kind == "error"
     assert "Website Rebuild" in message
+    assert "project(s) still attached" in message
 
 
 def test_a_clean_delete_refreshes_and_says_nothing(dialogs):
@@ -90,7 +107,7 @@ def test_a_clean_delete_refreshes_and_says_nothing(dialogs):
     _delete(stub)
 
     assert refreshed == [True]
-    assert dialogs["errors"] == []
+    assert stub.notices == []
 
 
 def test_the_refusal_is_raised_for_a_real_attached_item(tmp_path):

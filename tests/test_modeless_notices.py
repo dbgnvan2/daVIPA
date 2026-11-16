@@ -362,3 +362,18 @@ def test_modm2_an_orphan_notice_is_logged(caplog):
             root.destroy()
         except Exception:
             pass
+
+
+def test_modm2_an_inline_list_is_capped():
+    """A refusal that used a dialog body now fits a line.
+
+    Tests:   src/getmoredone/screens/status_notice.py::inline_list
+    """
+    from src.getmoredone.screens.status_notice import INLINE_LIST_CAP, inline_list
+
+    assert inline_list([]) == ""
+    assert inline_list(["one"]) == "one"
+    few = [f"n{i}" for i in range(INLINE_LIST_CAP)]
+    assert inline_list(few) == ", ".join(few)
+    assert "and 1 more" in inline_list(few + ["extra"])
+    assert inline_list(few + ["extra"]).count(",") == INLINE_LIST_CAP - 1
