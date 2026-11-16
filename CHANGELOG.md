@@ -14,7 +14,9 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the theme's own colour, so an existing install looks unchanged. The band's
   date text is derived from the fill for contrast at 4.5:1, so a dark pick
   stays readable; a value that is not `#RRGGBB` is refused rather than
-  replaced with a default. (DBC-M1 to M4)
+  replaced with a default, and one hand-edited into `settings.json` is
+  dropped on load with a line in `app.log` rather than left to refuse every
+  later save in that section. (DBC-M1 to M4)
 
 ### Changed — the Plan week (2026-11-14)
 

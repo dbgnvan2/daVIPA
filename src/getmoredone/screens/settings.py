@@ -600,11 +600,9 @@ class SettingsScreen(
     def apply_theme_preferences(self):
         """Save selected appearance and theme, then apply app-wide."""
         # DBC-M4.2 -- first, before a single field is mutated. This handler is
-        # also the ``command`` of the three Appearance combo boxes, so a
-        # refusal below is reachable by picking a theme while the band entry
-        # holds a typo. Validating last left five fields already written to
-        # ``self.settings``, which the next Save on this screen would persist,
-        # and left each combo displaying a choice that was never written.
+        # also the three Appearance combos' ``command``, so validating last
+        # left five fields written to the shared settings object for the next
+        # Save on any other section to persist.
         band_colour = self._validated_band_colour()
         if band_colour is None:
             self._restore_appearance_choices()

@@ -96,9 +96,9 @@ src/getmoredone/app_settings.py:782:        from .theme import normalize_theme_n
 src/getmoredone/app_settings.py:784:        return normalize_theme_name(value)
 src/getmoredone/app_settings.py:795:    def _normalize_list_date_band_color(value: object) -> str:
 src/getmoredone/app_settings.py:796:        """DBC-M1.1 -- a stored band colour, or ``""`` for the theme's own.
-src/getmoredone/app_settings.py:810:        unusable can now reach ``theme.date_band_colors``, which carried the
-src/getmoredone/app_settings.py:815:        normalized = normalize_hex_color(value)
-src/getmoredone/app_settings.py:819:                "the theme's own band colour. Set it again in Settings > "
+src/getmoredone/app_settings.py:800:        nothing unusable reaches ``theme.date_band_colors``, which carried the
+src/getmoredone/app_settings.py:805:        normalized = normalize_hex_color(value)
+src/getmoredone/app_settings.py:809:                "the theme's own band colour. Set it again in Settings > "
 ```
 
 Hex top values (20 of 233 distinct):
@@ -1545,7 +1545,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/settings.py:632` | `# Show the field what was stored ("aabbcc" -> "#AABBCC"). Before` |
+| `src/getmoredone/screens/settings.py:630` | `# Show the field what was stored ("aabbcc" -> "#AABBCC"). Before` |
 
 ### `#abc`
 
@@ -2355,10 +2355,10 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/drag_schedule.py:1391` | `return date_text_color_for(bg_color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
 | `src/getmoredone/screens/drag_schedule_support.py:63` | `color = str(configured_value or "#FFFFFF").strip()` |
 | `src/getmoredone/screens/drag_schedule_support.py:67` | `return "#FFFFFF"` |
-| `src/getmoredone/screens/settings.py:748` | `value=getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")` |
-| `src/getmoredone/screens/settings.py:836` | `color_value = self.drag_schedule_text_color_var.get().strip() or "#FFFFFF"` |
-| `src/getmoredone/screens/settings.py:840` | `color_value = "#FFFFFF"` |
-| `src/getmoredone/screens/settings.py:864` | `initial = self.drag_schedule_text_color_var.get().strip() or "#FFFFFF"` |
+| `src/getmoredone/screens/settings.py:746` | `value=getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")` |
+| `src/getmoredone/screens/settings.py:834` | `color_value = self.drag_schedule_text_color_var.get().strip() or "#FFFFFF"` |
+| `src/getmoredone/screens/settings.py:838` | `color_value = "#FFFFFF"` |
+| `src/getmoredone/screens/settings.py:862` | `initial = self.drag_schedule_text_color_var.get().strip() or "#FFFFFF"` |
 | `src/getmoredone/screens/settings_priority_colors.py:199` | ``` ``#FFFFFF``, and a user who typed a colour they meant has no way to ``` |
 | `themes/apple_grey.json:18` | `"#FFFFFF",` |
 | `themes/apple_grey.json:22` | `"#FFFFFF",` |

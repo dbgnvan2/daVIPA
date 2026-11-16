@@ -795,20 +795,10 @@ class AppSettings:
     def _normalize_list_date_band_color(value: object) -> str:
         """DBC-M1.1 -- a stored band colour, or ``""`` for the theme's own.
 
-        Here with the other six appearance normalizers for the reason they are
-        here: a value a hand-edit left behind must not be able to wedge the
-        UI. Without it a stored ``"lightblue"`` drew the band correctly but
-        refused every save in Settings > Appearance, on every launch, naming a
-        field the user had not touched.
-
-        The drop is logged, for the reason ``_normalize_commitment_settings``
-        gives: a hand edit that did not take has to be findable. Without the
-        line it is silent everywhere -- the entry shows blank, which is what
-        "never set" looks like, and the file keeps the rejected value until
-        some later Appearance save overwrites it. This is also the only
-        remaining report of the condition in the running app: nothing
-        unusable can now reach ``theme.date_band_colors``, which carried the
-        warning before.
+        A stored ``"lightblue"`` drew the band and then refused every save in
+        Settings > Appearance, on every launch. Logged, because after this
+        nothing unusable reaches ``theme.date_band_colors``, which carried the
+        only warning: docs/unused-docs/changes/2026-11-15-date-band-colour.md.
         """
         if isinstance(value, str) and not value.strip():
             return ""
