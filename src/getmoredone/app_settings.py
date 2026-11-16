@@ -315,9 +315,9 @@ class AppSettings:
     def _forget_assignments(self) -> None:
         """Treat this object as freshly loaded: nothing changed yet.
 
-        ``load`` normalizes six fields after construction, which is this build
+        ``load`` normalizes seven fields after construction, which is this build
         reading the file rather than a user choosing anything. Left recorded,
-        every object would claim those six and a stale snapshot would go on
+        every object would claim those seven and a stale snapshot would go on
         reverting an appearance mode or a font size another screen had changed.
         """
         self.__dict__.get("_assigned", set()).clear()
@@ -474,7 +474,7 @@ class AppSettings:
         """
         settings_path = self.get_settings_path()
         # Snapshotted before the normalizers below, which assign to this object
-        # and would otherwise claim six fields on every save -- including on a
+        # and would otherwise claim seven fields on every save -- including on a
         # stale object that never touched them.
         assigned = self._assigned_names()
         self.last_save_error = None
@@ -800,8 +800,28 @@ class AppSettings:
         UI. Without it a stored ``"lightblue"`` drew the band correctly but
         refused every save in Settings > Appearance, on every launch, naming a
         field the user had not touched.
+
+        The drop is logged, for the reason ``_normalize_commitment_settings``
+        gives: a hand edit that did not take has to be findable. Without the
+        line it is silent everywhere -- the entry shows blank, which is what
+        "never set" looks like, and the file keeps the rejected value until
+        some later Appearance save overwrites it. This is also the only
+        remaining report of the condition in the running app: nothing
+        unusable can now reach ``theme.date_band_colors``, which carried the
+        warning before.
         """
-        return normalize_hex_color(value) or ""
+        if isinstance(value, str) and not value.strip():
+            return ""
+        normalized = normalize_hex_color(value)
+        if normalized is None:
+            logger.warning(
+                "Ignoring stored Day/Date band colour %r: not #RRGGBB. Using "
+                "the theme's own band colour. Set it again in Settings > "
+                "Appearance.",
+                value,
+            )
+            return ""
+        return normalized
 
     @staticmethod
     def _normalize_business_year_start_mmdd(value: Optional[str]) -> str:

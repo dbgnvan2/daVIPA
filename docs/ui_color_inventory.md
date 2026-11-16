@@ -40,7 +40,7 @@ and theme_files line counts.
 
 | Scan | Lines |
 |---|---:|
-| `app_settings` | 36 |
+| `app_settings` | 38 |
 | `hex` | 163 |
 | `named` | 39 |
 | `theme_api` | 2 |
@@ -96,7 +96,9 @@ src/getmoredone/app_settings.py:782:        from .theme import normalize_theme_n
 src/getmoredone/app_settings.py:784:        return normalize_theme_name(value)
 src/getmoredone/app_settings.py:795:    def _normalize_list_date_band_color(value: object) -> str:
 src/getmoredone/app_settings.py:796:        """DBC-M1.1 -- a stored band colour, or ``""`` for the theme's own.
-src/getmoredone/app_settings.py:804:        return normalize_hex_color(value) or ""
+src/getmoredone/app_settings.py:810:        unusable can now reach ``theme.date_band_colors``, which carried the
+src/getmoredone/app_settings.py:815:        normalized = normalize_hex_color(value)
+src/getmoredone/app_settings.py:819:                "the theme's own band colour. Set it again in Settings > "
 ```
 
 Hex top values (20 of 233 distinct):
