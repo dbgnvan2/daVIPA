@@ -1525,8 +1525,16 @@ def test_scvm41_a_malformed_segment_colour_does_not_become_a_fill():
 #: ``ast.unparse`` renders them. Text and not a shape, so a swapped attribute
 #: or a dropped fallback fails -- ``None`` is a colour Tk rejects.
 def _level_cell_call(statement):
-    """The ``build_level_cell(...)`` call ``statement`` assigns, or ``None``."""
-    if isinstance(statement, ast.Assign) and isinstance(statement.value, ast.Call):
+    """The ``build_level_cell(...)`` call in ``statement``, or ``None``.
+
+    SPC (2026-11-15): a bare call statement counts too, not only one whose
+    result is bound. Completed discards the pair ``add_level_cell`` returns --
+    the layout grids the box itself -- and requiring an ``Assign`` made this
+    scanner blind to that call, which is the one failure mode it has.
+    """
+    if isinstance(statement, (ast.Assign, ast.Expr)) and isinstance(
+        statement.value, ast.Call
+    ):
         call = statement.value
         func = call.func
         if isinstance(func, ast.Name) and func.id == "build_level_cell":
