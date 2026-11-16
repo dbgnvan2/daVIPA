@@ -8,6 +8,7 @@ from typing import Optional, TYPE_CHECKING
 
 from ..app_settings import AppSettings
 from ..models import ActionItem
+from .status_notice import StatusNoticeMixin
 from .week_collision_notice import notify_weekly_tactic_changes
 from ..theme import button_style, status_text_color
 from ..utils.after_tracker import TrackedAfterMixin
@@ -281,8 +282,13 @@ class CompletionNoteDialog(ctk.CTkToplevel):
         self.destroy()
 
 
-class NextActionWindow(TrackedAfterMixin, ctk.CTkToplevel):
+class NextActionWindow(StatusNoticeMixin, TrackedAfterMixin, ctk.CTkToplevel):
     """Floating window for viewing/editing action item notes independently."""
+
+    # MOD-M1: its own attribute rather than ``status_label``, to match the
+    # TimerWindow it floats beside and to leave that name free for window
+    # state if this window ever shows any.
+    NOTICE_LABEL_ATTR = "notice_status_label"
 
     def __init__(self, parent, db_manager: DatabaseManager, item: ActionItem, parent_window=None):
         super().__init__(parent)
@@ -383,6 +389,13 @@ class NextActionWindow(TrackedAfterMixin, ctk.CTkToplevel):
         self.notes_text.insert("1.0", description)
         self.notes_text.focus()
 
+        # MOD-M2: the notice line. This window and the timer behind it are
+        # both -topmost, which is what made a dialog here open underneath the
+        # window it was attached to; a label inside cannot.
+        self.create_status_line(
+            parent=main_frame, row=3, column=0, sticky="ew",
+            padx=12, pady=(0, 8))
+
     def save_notes(self):
         """Save the edited notes back to the action item."""
         try:
@@ -410,16 +423,7 @@ class NextActionWindow(TrackedAfterMixin, ctk.CTkToplevel):
             print(f"[ERROR] Failed to save notes: {e}")
             import traceback
             traceback.print_exc()
-            import tkinter.messagebox as messagebox
-            # Both windows: this one is -topmost from its own setup_window and
-            # is what the box is parented to, and the timer behind it is
-            # -topmost too. Suspending only the timer left the box under the
-            # window it was attached to — the one site in this batch where the
-            # suspended window and the parented window were different objects.
-            with parent_topmost_suspended(self.parent_window), \
-                    parent_topmost_suspended(self):
-                messagebox.showerror("Error", f"Failed to save notes: {e}",
-                                     parent=self)
+            self.set_status(f"The notes were not saved: {e}", "error")
 
     def refresh_notes(self):
         """Refresh notes textbox from the current item data."""

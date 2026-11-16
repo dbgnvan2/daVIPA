@@ -15,12 +15,13 @@ import customtkinter as ctk
 
 from ..models import ProjectBoardStatus
 from ..theme import button_style, semantic_colors, status_text_color
+from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..db_manager import DatabaseManager
 
 
-class SetProjectDialog(ctk.CTkToplevel):
+class SetProjectDialog(StatusNoticeMixin, ctk.CTkToplevel):
     """Pick the Project an Action Item is filed under."""
 
     #: Statuses offered for a *new* choice. A completed project is never
@@ -86,6 +87,12 @@ class SetProjectDialog(ctk.CTkToplevel):
         self.scroll_frame = ctk.CTkScrollableFrame(self)
         self.scroll_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         self.scroll_frame.grid_columnconfigure(0, weight=1)
+
+        # MOD-M2: the notice line, above the buttons. This dialog creates a
+        # project inline, and a creation that fails is reported here rather
+        # than on a second platform dialog over this one.
+        self.create_status_line().pack(
+            fill="x", padx=15, pady=(0, 4), anchor="w")
 
         btn_frame = ctk.CTkFrame(self)
         btn_frame.pack(fill="x", padx=10, pady=(0, 10))
@@ -233,12 +240,7 @@ class SetProjectDialog(ctk.CTkToplevel):
         try:
             self.db_manager.create_project_board(result)
         except Exception as exc:  # noqa: BLE001 - surfaced to the user below
-            from tkinter import messagebox
-            messagebox.showerror(
-                "Could Not Create Project",
-                f"The project was not saved:\n\n{exc}",
-                parent=self,
-            )
+            self.set_status(f"The project was not saved: {exc}", "error")
             return
         self._finish(result.id)
 

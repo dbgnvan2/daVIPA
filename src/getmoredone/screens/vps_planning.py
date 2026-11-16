@@ -6,13 +6,14 @@ import customtkinter as ctk
 from typing import Optional, TYPE_CHECKING, Dict, Any, List
 
 from ..theme import button_style, status_text_color, vps_level_colors
+from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..vps_manager import VPSManager
     from ..app import GetMoreDoneApp
 
 
-class VPSPlanningScreen(ctk.CTkFrame):
+class VPSPlanningScreen(StatusNoticeMixin, ctk.CTkFrame):
     """Screen showing VSP planning hierarchy in collapsible tree view."""
 
     LEVEL_COLORS = vps_level_colors()
@@ -40,6 +41,12 @@ class VPSPlanningScreen(ctk.CTkFrame):
         self.scroll_frame.grid(
             row=1, column=0, sticky="nsew", padx=10, pady=10)
         self.scroll_frame.grid_columnconfigure(0, weight=1)
+
+        # MOD-M2: the notice line. The refusals this screen makes -- no
+        # segment to hang a vision on, a quarterly initiative with no annual
+        # link, a record with children -- are reported here.
+        self.create_status_line(
+            row=2, column=0, sticky="ew", padx=12, pady=(0, 8))
 
         # Load segments and tree
         self.refresh()
@@ -902,11 +909,9 @@ class VPSPlanningScreen(ctk.CTkFrame):
 
         if not segments:
             # No segments available
-            from tkinter import messagebox
-            messagebox.showinfo(
-                "No Segments",
-                "Please create a life segment first before adding visions."
-            )
+            self.set_status(
+                "Create a life segment first, then add a vision to it.",
+                "warning")
             return
 
         # If only one segment, use it automatically
@@ -1106,11 +1111,9 @@ class VPSPlanningScreen(ctk.CTkFrame):
         if initiative:
             annual_initiative_id = initiative.get('annual_initiative_id')
             if not annual_initiative_id:
-                from tkinter import messagebox
-                messagebox.showerror(
-                    "Missing Annual Initiative Link",
-                    "This quarterly initiative is not linked to an annual initiative."
-                )
+                self.set_status(
+                    "This quarterly initiative is not linked to an annual "
+                    "initiative, so it cannot be edited.", "error")
                 return
             dialog = QuarterInitiativeEditorDialog(
                 self, self.vps_manager, annual_initiative_id,
@@ -1203,12 +1206,10 @@ class VPSPlanningScreen(ctk.CTkFrame):
         )
 
     def _show_error_has_children(self, entity_type: str):
-        """Show error message when deletion fails due to child records."""
-        from tkinter import messagebox
-        messagebox.showerror(
-            "Cannot Delete",
-            f"Cannot delete this {entity_type} because it has child records.\n\nPlease delete all child records first."
-        )
+        """Report that deletion is refused because of child records."""
+        self.set_status(
+            f"This {entity_type} has child records. Delete those first.",
+            "error")
 
     def delete_tl_vision(self, vision_id: str):
         """Delete a TL Vision."""

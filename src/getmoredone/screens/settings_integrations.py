@@ -9,10 +9,9 @@ from pathlib import Path
 from tkinter import messagebox
 
 from ..theme import button_style, status_text_color
-from .status_notice import StatusNoticeMixin
 
 
-class SettingsIntegrationsMixin(StatusNoticeMixin):
+class SettingsIntegrationsMixin:
     def create_email_import_section(self, parent=None):
         """Create Email Import settings section (Gmail label → Action Items)."""
         if parent is None:
@@ -291,7 +290,8 @@ class SettingsIntegrationsMixin(StatusNoticeMixin):
         try:
             content = help_path.read_text(encoding="utf-8")
         except Exception as e:
-            self.set_status(f"Could not load the help file: {e}", "error")
+            self._set_status(self.gmail_status_label,
+                             f"Could not load the help file: {e}", "error")
             return
 
         dialog = ctk.CTkToplevel(self)

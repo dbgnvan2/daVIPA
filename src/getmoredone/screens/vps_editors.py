@@ -5,11 +5,11 @@ VSP entity editor dialogs for creating and editing strategic planning items.
 import customtkinter as ctk
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
-from tkinter import messagebox
 
 from ..color_contrast import pick_text_color
 from ..theme import status_text_color
 from ..widgets.date_picker import DatePickerButton
+from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..vps_manager import VPSManager
@@ -44,7 +44,7 @@ def _finish_dialog_show(dialog: ctk.CTkToplevel) -> None:
     dialog.update_idletasks()
 
 
-class TLVisionEditorDialog(ctk.CTkToplevel):
+class TLVisionEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
     """Dialog for creating/editing TL Visions (Top Level Visions)."""
 
     def __init__(self, parent, vps_manager: 'VPSManager', segment_id: str, vision_id: Optional[str] = None):
@@ -156,6 +156,11 @@ class TLVisionEditorDialog(ctk.CTkToplevel):
                           sticky="ew", padx=10, pady=10)
         button_frame.grid_columnconfigure(0, weight=1)
         button_frame.grid_columnconfigure(1, weight=1)
+        # MOD-M1: under the buttons, so a refusal appears without moving the
+        # field it is about.
+        self.create_status_line(main_frame, row=row + 1, column=0,
+                                columnspan=2, sticky="ew", padx=10,
+                                pady=(0, 8))
 
         btn_save = ctk.CTkButton(
             button_frame, text="Save", command=self.save_vision)
@@ -200,10 +205,7 @@ class TLVisionEditorDialog(ctk.CTkToplevel):
             try:
                 start_year = int(start_year_str)
             except ValueError:
-                messagebox.showerror(
-                    "Validation Error",
-                    "Start year must be a valid integer"
-                )
+                self.set_status("Start year must be a whole number.", "error")
                 return
 
         if not end_year_str:
@@ -212,17 +214,12 @@ class TLVisionEditorDialog(ctk.CTkToplevel):
             try:
                 end_year = int(end_year_str)
             except ValueError:
-                messagebox.showerror(
-                    "Validation Error",
-                    "End year must be a valid integer"
-                )
+                self.set_status("End year must be a whole number.", "error")
                 return
 
         if end_year <= start_year:
-            messagebox.showerror(
-                "Validation Error",
-                "End year must be greater than start year"
-            )
+            self.set_status(
+                "End year must be later than the start year.", "error")
             return
 
         title = self.title_entry.get().strip()
@@ -263,13 +260,10 @@ class TLVisionEditorDialog(ctk.CTkToplevel):
             self.destroy()
 
         except Exception as e:
-            messagebox.showerror(
-                "Error",
-                f"Failed to save vision: {str(e)}"
-            )
+            self.set_status(f"Could not save the vision: {e}", "error")
 
 
-class QuarterInitiativeEditorDialog(ctk.CTkToplevel):
+class QuarterInitiativeEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
     """Dialog for creating/editing Quarter Initiatives."""
 
     def __init__(self, parent, vps_manager: 'VPSManager', annual_initiative_id: str,
@@ -375,6 +369,11 @@ class QuarterInitiativeEditorDialog(ctk.CTkToplevel):
                           sticky="ew", padx=10, pady=10)
         button_frame.grid_columnconfigure(0, weight=1)
         button_frame.grid_columnconfigure(1, weight=1)
+        # MOD-M1: under the buttons, so a refusal appears without moving the
+        # field it is about.
+        self.create_status_line(main_frame, row=row + 1, column=0,
+                                columnspan=2, sticky="ew", padx=10,
+                                pady=(0, 8))
         button_frame.grid_columnconfigure(2, weight=1)
 
         btn_save = ctk.CTkButton(
@@ -460,8 +459,8 @@ class QuarterInitiativeEditorDialog(ctk.CTkToplevel):
                 annual_initiative = self.vps_manager.get_annual_initiative(
                     self.annual_initiative_id)
                 if not annual_initiative:
-                    messagebox.showerror(
-                        "Error", "Annual Initiative not found.")
+                    self.set_status(
+                        "That Annual Initiative no longer exists.", "error")
                     return
                 self.vps_manager.create_quarter_initiative(
                     annual_initiative_id=self.annual_initiative_id,
@@ -586,6 +585,11 @@ class AnnualVisionEditorDialog(ctk.CTkToplevel):
                           sticky="ew", padx=10, pady=10)
         button_frame.grid_columnconfigure(0, weight=1)
         button_frame.grid_columnconfigure(1, weight=1)
+        # MOD-M1: under the buttons, so a refusal appears without moving the
+        # field it is about.
+        self.create_status_line(main_frame, row=row + 1, column=0,
+                                columnspan=2, sticky="ew", padx=10,
+                                pady=(0, 8))
 
         btn_save = ctk.CTkButton(
             button_frame, text="Save", command=self.save_vision)
@@ -667,7 +671,7 @@ class AnnualVisionEditorDialog(ctk.CTkToplevel):
             print(f"Error saving annual vision: {e}")
 
 
-class AnnualPlanEditorDialog(ctk.CTkToplevel):
+class AnnualPlanEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
     """Dialog for creating/editing Annual Plans."""
 
     def __init__(self, parent, vps_manager: 'VPSManager', annual_vision_id: str,
@@ -769,6 +773,11 @@ class AnnualPlanEditorDialog(ctk.CTkToplevel):
                           sticky="ew", padx=10, pady=10)
         button_frame.grid_columnconfigure(0, weight=1)
         button_frame.grid_columnconfigure(1, weight=1)
+        # MOD-M1: under the buttons, so a refusal appears without moving the
+        # field it is about.
+        self.create_status_line(main_frame, row=row + 1, column=0,
+                                columnspan=2, sticky="ew", padx=10,
+                                pady=(0, 8))
 
         btn_save = ctk.CTkButton(
             button_frame, text="Save", command=self.save_plan)
@@ -802,18 +811,12 @@ class AnnualPlanEditorDialog(ctk.CTkToplevel):
             try:
                 year = int(year_str)
             except ValueError:
-                messagebox.showerror(
-                    "Validation Error",
-                    "Year must be a valid integer"
-                )
+                self.set_status("Year must be a whole number.", "error")
                 return
 
         theme = self.theme_entry.get().strip()
         if not theme:
-            messagebox.showerror(
-                "Validation Error",
-                "Theme is required"
-            )
+            self.set_status("A theme is required.", "error")
             return
 
         objective = self.objective_text.get("1.0", "end-1c").strip()
@@ -845,13 +848,10 @@ class AnnualPlanEditorDialog(ctk.CTkToplevel):
             self.destroy()
 
         except Exception as e:
-            messagebox.showerror(
-                "Error",
-                f"Error saving annual plan: {e}"
-            )
+            self.set_status(f"Could not save the annual plan: {e}", "error")
 
 
-class AnnualInitiativeEditorDialog(ctk.CTkToplevel):
+class AnnualInitiativeEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
     """Dialog for creating/editing Annual Initiatives."""
 
     def __init__(self, parent, vps_manager: 'VPSManager', annual_plan_id: str,
@@ -941,6 +941,11 @@ class AnnualInitiativeEditorDialog(ctk.CTkToplevel):
                           sticky="ew", padx=10, pady=10)
         button_frame.grid_columnconfigure(0, weight=1)
         button_frame.grid_columnconfigure(1, weight=1)
+        # MOD-M1: under the buttons, so a refusal appears without moving the
+        # field it is about.
+        self.create_status_line(main_frame, row=row + 1, column=0,
+                                columnspan=2, sticky="ew", padx=10,
+                                pady=(0, 8))
 
         btn_save = ctk.CTkButton(
             button_frame, text="Save", command=self.save_initiative)
@@ -971,12 +976,12 @@ class AnnualInitiativeEditorDialog(ctk.CTkToplevel):
         try:
             year = int(self.year_entry.get().strip())
         except ValueError:
-            messagebox.showerror("Validation Error", "Year must be a valid integer")
+            self.set_status("Year must be a whole number.", "error")
             return
 
         title = self.title_entry.get().strip()
         if not title:
-            messagebox.showerror("Validation Error", "Title is required")
+            self.set_status("A title is required.", "error")
             return
 
         outcome_statement = self.outcome_text.get("1.0", "end-1c").strip()
@@ -1005,7 +1010,8 @@ class AnnualInitiativeEditorDialog(ctk.CTkToplevel):
 
             self.destroy()
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save annual initiative: {e}")
+            self.set_status(
+                f"Could not save the annual initiative: {e}", "error")
 
 
 class MonthTacticEditorDialog(ctk.CTkToplevel):
@@ -1102,6 +1108,11 @@ class MonthTacticEditorDialog(ctk.CTkToplevel):
                           sticky="ew", padx=10, pady=10)
         button_frame.grid_columnconfigure(0, weight=1)
         button_frame.grid_columnconfigure(1, weight=1)
+        # MOD-M1: under the buttons, so a refusal appears without moving the
+        # field it is about.
+        self.create_status_line(main_frame, row=row + 1, column=0,
+                                columnspan=2, sticky="ew", padx=10,
+                                pady=(0, 8))
 
         btn_save = ctk.CTkButton(
             button_frame, text="Save", command=self.save_tactic)
@@ -1199,7 +1210,7 @@ class MonthTacticEditorDialog(ctk.CTkToplevel):
             print(f"Error saving month tactic: {e}")
 
 
-class WeekActionEditorDialog(ctk.CTkToplevel):
+class WeekActionEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
     """Dialog for creating/editing Week Actions."""
 
     def __init__(self, parent, vps_manager: 'VPSManager', month_tactic_id: str,
@@ -1323,6 +1334,11 @@ class WeekActionEditorDialog(ctk.CTkToplevel):
                           sticky="ew", padx=10, pady=10)
         button_frame.grid_columnconfigure(0, weight=1)
         button_frame.grid_columnconfigure(1, weight=1)
+        # MOD-M1: under the buttons, so a refusal appears without moving the
+        # field it is about.
+        self.create_status_line(main_frame, row=row + 1, column=0,
+                                columnspan=2, sticky="ew", padx=10,
+                                pady=(0, 8))
         button_frame.grid_columnconfigure(2, weight=1)
 
         btn_save = ctk.CTkButton(
@@ -1371,8 +1387,8 @@ class WeekActionEditorDialog(ctk.CTkToplevel):
         title = self.title_entry.get().strip()
 
         if not (week_start and week_end and title):
-            messagebox.showerror(
-                "Validation Error", "Week start, week end, and title are required.")
+            self.set_status(
+                "Week start, week end and title are all required.", "error")
             return None
 
         description = self.description_text.get("1.0", "end-1c").strip()
@@ -1423,7 +1439,7 @@ class WeekActionEditorDialog(ctk.CTkToplevel):
             return saved_id
 
         except Exception as e:
-            messagebox.showerror("Error", f"Error saving week action: {e}")
+            self.set_status(f"Could not save the week action: {e}", "error")
             return None
 
     def save_action(self):
@@ -1460,16 +1476,14 @@ class WeekActionEditorDialog(ctk.CTkToplevel):
             raw = txt_actions.get("1.0", "end-1c")
             titles = [line.strip() for line in raw.splitlines() if line.strip()][:5]
             if not titles:
-                messagebox.showerror(
-                    "Validation Error", "Please enter at least one action title.")
+                self.set_status(
+                    "Enter at least one action title.", "error")
                 return
 
             created = self.vps_manager.create_action_items_for_week_action(
                 action_id, titles)
-            messagebox.showinfo(
-                "Next Actions Created",
-                f"Created {len(created)} action item(s)."
-            )
+            self.set_status(
+                f"Created {len(created)} action item(s).", "success")
             dialog.destroy()
 
         ctk.CTkButton(btn_frame, text="Create", command=on_create).grid(

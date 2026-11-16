@@ -23,8 +23,9 @@ from ..theme import button_style, semantic_colors, status_text_color
 from ..utils.audio_playback import play_audio_file_async, play_system_beep
 from ..utils.music_library import select_track
 from ..utils.icon_loader import load_music_note_icon
+from .status_notice import StatusNoticeMixin
 from .timer_window_dialogs import (
-    CompletionNoteDialog, NextActionWindow, parent_topmost_suspended,
+    CompletionNoteDialog, NextActionWindow,
     raise_over_a_stuck_timer)
 from ..utils.after_tracker import TrackedAfterMixin
 from .timer_window_reward import TimerRewardMixin
@@ -102,7 +103,8 @@ def follow_up_title(title: str, made_on: Optional[date] = None) -> str:
 _LIVE_TIMERS: "weakref.WeakValueDictionary[str, object]" = weakref.WeakValueDictionary()
 
 
-class TimerWindow(TimerRewardMixin, TrackedAfterMixin, ctk.CTkToplevel):
+class TimerWindow(StatusNoticeMixin, TimerRewardMixin, TrackedAfterMixin,
+                  ctk.CTkToplevel):
     """Floating timer window for action items.
 
     The reward protocol (RP-4) lives in TimerRewardMixin; this class owns the
@@ -110,6 +112,12 @@ class TimerWindow(TimerRewardMixin, TrackedAfterMixin, ctk.CTkToplevel):
 
     Spec: docs/spec_2026-08-23_dopamine_reward_protocol.md#4-ux-flow-hook-points-into-screenstimer_windowpy
     """
+
+    # MOD-M1: this window's ``status_label`` is the timer's own state ("Ready
+    # to start", "Paused"), so a notice written there would erase what the
+    # window is for. The notice line is its own label at the foot of the
+    # window.
+    NOTICE_LABEL_ATTR = "notice_status_label"
 
     # RP-4.3 / spec decision D2. Break end no longer stops the timer, so there
     # is a fifth state: the break is over and the user has not yet said whether
@@ -681,6 +689,13 @@ class TimerWindow(TimerRewardMixin, TrackedAfterMixin, ctk.CTkToplevel):
         description = self.item.description or ""
         self.next_steps_text.insert("1.0", description)
 
+        # MOD-M2: the notice line, at the foot of the window. The timer's four
+        # endings report their failures here; a modal over an always-on-top
+        # window was the whole of the T5.5 bug.
+        self.create_status_line(
+            parent=main_frame, row=6, column=0, sticky="ew",
+            padx=12, pady=(0, 8))
+
     def save_notes(self):
         """Save the edited notes back to the action item."""
         try:
@@ -708,25 +723,20 @@ class TimerWindow(TimerRewardMixin, TrackedAfterMixin, ctk.CTkToplevel):
             print(f"[ERROR] Failed to save notes: {e}")
             import traceback
             traceback.print_exc()
-            import tkinter.messagebox as messagebox
-            with parent_topmost_suspended(self):
-                messagebox.showerror("Error", f"Failed to save notes: {e}",
-                                     parent=self)
+            self.set_status(f"The notes were not saved: {e}", "error")
 
-    def _show_error_dialog(self, message: str):
-        """Best-effort error dialog for UI flows that may race window teardown."""
-        try:
-            import tkinter.messagebox as messagebox
+    def _report_error(self, message: str):
+        """Report an ending's failure on the notice line (MOD-M2).
 
-            # The timer is always-on-top, so without this the error opens
-            # BEHIND it holding a grab — every button dead and nothing on
-            # screen to say why. This is the handler for all four endings, so
-            # it is the worst possible place for that (P5: the same class as
-            # the four dialogs, and it was left out of the first sweep).
-            with parent_topmost_suspended(self):
-                messagebox.showerror("Error", message, parent=self)
-        except tk.TclError as exc:
-            print(f"[ERROR] Could not show error dialog: {exc}")
+        This is the handler for all four timer endings. It used to open a
+        platform dialog, and because this window is always-on-top that dialog
+        opened BEHIND it holding a grab -- every button dead and nothing on
+        screen to say why (T5.5). A label inside the window cannot do that.
+
+        ``set_status`` swallows its own Tk failures (MOD-M4), so this stays
+        safe to call from a handler racing window teardown.
+        """
+        self.set_status(message, "error")
 
     def _cancel_pending_timer(self):
         """Cancel any queued timer callback if it still exists."""
@@ -775,11 +785,8 @@ class TimerWindow(TimerRewardMixin, TrackedAfterMixin, ctk.CTkToplevel):
             print(f"[ERROR] Failed to open Next Action Window: {e}")
             import traceback
             traceback.print_exc()
-            import tkinter.messagebox as messagebox
-            with parent_topmost_suspended(self):
-                messagebox.showerror(
-                    "Error", f"Failed to open Next Action Window: {e}",
-                    parent=self)
+            self.set_status(
+                f"The Next Action window did not open: {e}", "error")
 
     def format_time(self, seconds: int) -> str:
         """Format seconds as MM:SS."""
@@ -1207,7 +1214,7 @@ class TimerWindow(TimerRewardMixin, TrackedAfterMixin, ctk.CTkToplevel):
             traceback.print_exc()
             # Before the modal, because the label outlives it.
             self.completion_failed()
-            self._show_error_dialog(f"Failed to complete action: {e}")
+            self._report_error(f"Failed to complete action: {e}")
 
     def save_and_close_action(self):
         """Record the session and go back to the action item, leaving it open.
@@ -1254,7 +1261,7 @@ class TimerWindow(TimerRewardMixin, TrackedAfterMixin, ctk.CTkToplevel):
             print(f"[ERROR] Save & Close failed: {e}")
             import traceback
             traceback.print_exc()
-            self._show_error_dialog(f"Failed to save the session: {e}")
+            self._report_error(f"Failed to save the session: {e}")
 
     def cancel_action(self):
         """Close the timer and leave the Action Item exactly as it was.
@@ -1295,7 +1302,7 @@ class TimerWindow(TimerRewardMixin, TrackedAfterMixin, ctk.CTkToplevel):
             print(f"[ERROR] Cancel Timer failed: {e}")
             import traceback
             traceback.print_exc()
-            self._show_error_dialog(f"Failed to close the timer: {e}")
+            self._report_error(f"Failed to close the timer: {e}")
 
     def _discard_pending_completion(self):
         """Forget a Done that never landed. This ending is not a completion.
@@ -1566,7 +1573,11 @@ class TimerWindow(TimerRewardMixin, TrackedAfterMixin, ctk.CTkToplevel):
             # one thing here that cannot be recreated (P13).
             db_manager.inherit_derived_item_context(item.id, new_item.id)
 
-            notify_weekly_tactic_changes(db_manager)
+            # MOD-M2: with the parent, so the notice has a line to land on.
+            # It used to be a dialog parented to the root, which needed none;
+            # report_on checks winfo_exists and drops it if the window has
+            # gone, which the dialog below can do.
+            notify_weekly_tactic_changes(db_manager, self)
 
             # The Next Steps dialog used to run here, asking for a note and two
             # dates before the follow-up existed. It was the modal the user
@@ -1614,7 +1625,7 @@ class TimerWindow(TimerRewardMixin, TrackedAfterMixin, ctk.CTkToplevel):
             print(f"[ERROR] Continue action failed: {e}")
             import traceback
             traceback.print_exc()
-            self._show_error_dialog(f"Failed to continue action: {e}")
+            self._report_error(f"Failed to continue action: {e}")
 
     def save_work_log(self, note: Optional[str] = None):
         """Save work log entry to database, with the reward-protocol audit trail.

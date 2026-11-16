@@ -37,6 +37,7 @@ from ..theme import (
     status_text_color,
 )
 from ..utils.duration import format_minutes
+from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
@@ -63,7 +64,7 @@ ITEM_CHECKBOX_WIDTH_PX = 24
 ITEM_CHECKBOX_PAD_PX = 6
 
 
-class ProjectBoardEditorDialog(ctk.CTkToplevel):
+class ProjectBoardEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
     """Add/edit dialog for a project board."""
 
     def __init__(
@@ -196,6 +197,9 @@ class ProjectBoardEditorDialog(ctk.CTkToplevel):
 
         actions = ctk.CTkFrame(root, fg_color="transparent")
         actions.grid(row=6, column=0, columnspan=2, sticky="ew", padx=8, pady=(8, 4))
+        # MOD-M1: under the actions, so a refusal leaves the form where it is.
+        self.create_status_line(root, row=7, column=0, columnspan=2,
+                                sticky="ew", padx=8, pady=(0, 6))
         ctk.CTkButton(actions, text="Cancel", width=90, command=self.cancel, **button_style("secondary")).pack(
             side="right", padx=4
         )
@@ -230,18 +234,15 @@ class ProjectBoardEditorDialog(ctk.CTkToplevel):
 
     def save(self):
         if not self.title_var.get().strip():
-            messagebox.showerror("Missing Title", "Project title is required.", parent=self)
+            self.set_status("A project title is required.", "error")
             return
 
         selected_label = self.ape_var.get().strip()
         ape_id = self.ape_label_to_id.get(selected_label)
 
         if not ape_id:
-            messagebox.showerror(
-                "Annual Plan Element Required",
-                "Please select a valid Annual Plan Element before saving.",
-                parent=self,
-            )
+            self.set_status(
+                "Select a valid Annual Plan Element before saving.", "error")
             return
 
         board = self.board or ProjectBoard(
@@ -270,7 +271,7 @@ class ProjectBoardEditorDialog(ctk.CTkToplevel):
         self.destroy()
 
 
-class LinkProjectActionItemsDialog(ctk.CTkToplevel):
+class LinkProjectActionItemsDialog(StatusNoticeMixin, ctk.CTkToplevel):
     """Attach existing action items to a selected project item."""
 
     def __init__(self, parent, db_manager: "DatabaseManager", board_id: str, on_linked):
@@ -320,6 +321,9 @@ class LinkProjectActionItemsDialog(ctk.CTkToplevel):
         # Filter buttons (AND logic)
         filters = ctk.CTkFrame(root)
         filters.grid(row=1, column=0, sticky="ew", padx=0, pady=(0, 8))
+        # MOD-M1: under the results list.
+        self.create_status_line(root, row=3, column=0, sticky="ew",
+                                padx=0, pady=(8, 0))
         filters.grid_columnconfigure(5, weight=1)
 
         ctk.CTkLabel(filters, text="Filter (AND):", text_color=semantic_colors()["muted_text"]).grid(
@@ -462,7 +466,7 @@ class LinkProjectActionItemsDialog(ctk.CTkToplevel):
         try:
             self.db_manager.link_item_to_project_exclusive(self.board_id, item_id)
         except Exception as exc:
-            messagebox.showerror("Link Failed", str(exc), parent=self)
+            self.set_status(f"Could not link that item: {exc}", "error")
             self.refresh_results()
             return
         if item_id in self.checked_items:
@@ -542,11 +546,9 @@ class LinkProjectActionItemsDialog(ctk.CTkToplevel):
                 for item_id in selected:
                     self.db_manager.link_item_to_project_exclusive(self.board_id, item_id)
         except Exception as exc:
-            messagebox.showerror(
-                "Link Failed",
-                f"None of the {len(selected)} selected items were moved: {exc}",
-                parent=self,
-            )
+            self.set_status(
+                f"None of the {len(selected)} selected items were moved: "
+                f"{exc}", "error")
             self.refresh_results()
             return
 
@@ -558,7 +560,7 @@ class LinkProjectActionItemsDialog(ctk.CTkToplevel):
         self.refresh_results()
 
 
-class BulkEditItemsDialog(ctk.CTkToplevel):
+class BulkEditItemsDialog(StatusNoticeMixin, ctk.CTkToplevel):
     """Bulk edit dialog for setting Start Date and Priority across multiple items."""
 
     def __init__(self, parent, db_manager: "DatabaseManager", item_ids: list[str]):
@@ -635,6 +637,9 @@ class BulkEditItemsDialog(ctk.CTkToplevel):
         # Buttons
         actions = ctk.CTkFrame(root, fg_color="transparent")
         actions.grid(row=4, column=0, columnspan=2, sticky="ew", padx=0, pady=0)
+        # MOD-M1: under the actions, beside the fields it validates.
+        self.create_status_line(root, row=5, column=0, columnspan=2,
+                                sticky="ew", padx=0, pady=(8, 0))
         ctk.CTkButton(actions, text="Cancel", width=90, command=self.cancel, **button_style("secondary")).pack(
             side="right", padx=4
         )
@@ -654,27 +659,19 @@ class BulkEditItemsDialog(ctk.CTkToplevel):
                 input_date = date_class.fromisoformat(start_date)
                 today = date_class.today()
                 if input_date < today:
-                    messagebox.showerror(
-                        "Invalid Date",
-                        f"Start date must be today ({today.isoformat()}) or later.",
-                        parent=self,
-                    )
+                    self.set_status(
+                        f"Start date must be today ({today.isoformat()}) or "
+                        "later.", "error")
                     return
             except ValueError:
-                messagebox.showerror(
-                    "Invalid Date Format",
-                    "Please use YYYY-MM-DD format (e.g., 2026-06-15).",
-                    parent=self,
-                )
+                self.set_status(
+                    "Use YYYY-MM-DD format, for example 2026-06-15.", "error")
                 return
 
         # Require at least one field to be changed
         if not start_date and priority is None:
-            messagebox.showwarning(
-                "No Changes",
-                "Please specify at least one field to update, or click Cancel.",
-                parent=self,
-            )
+            self.set_status(
+                "Specify at least one field to update, or Cancel.", "warning")
             return
 
         self.result = {
@@ -797,7 +794,7 @@ def project_time_line(row: dict) -> Optional[str]:
             f" | {format_minutes(row.get('total_minutes'))}")
 
 
-class ProjectBoardsScreen(ctk.CTkFrame):
+class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
     """Single project board containing many project items linked to APEs."""
 
     CARD_WIDTH = 235
@@ -871,6 +868,9 @@ class ProjectBoardsScreen(ctk.CTkFrame):
         self.grid_rowconfigure(1, weight=1)
 
         self._build()
+        # MOD-M1: below both panels, so a refusal does not resize them.
+        self.create_status_line(row=2, column=0, sticky="ew",
+                                padx=12, pady=(0, 8))
         self.refresh()
 
     def _build(self):
@@ -1343,7 +1343,8 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             width=self.ACTION_BUTTON_WIDTH,
             height=self.ACTION_BUTTON_HEIGHT,
             font=ctk.CTkFont(size=self.ACTION_ICON_FONT_SIZE, weight="bold"),
-            command=lambda b=row["id"]: self.set_status(b, ProjectBoardStatus.PENDING),
+            command=lambda b=row["id"]: self.set_board_status(
+                b, ProjectBoardStatus.PENDING),
             **button_style("secondary"),
         ).grid(row=0, column=3, padx=2, pady=2, sticky="ew")
         ctk.CTkButton(
@@ -1352,7 +1353,8 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             width=self.ACTION_BUTTON_WIDTH,
             height=self.ACTION_BUTTON_HEIGHT,
             font=ctk.CTkFont(size=self.ACTION_ICON_FONT_SIZE + 2, weight="bold"),
-            command=lambda b=row["id"]: self.set_status(b, ProjectBoardStatus.COMPLETED),
+            command=lambda b=row["id"]: self.set_board_status(
+                b, ProjectBoardStatus.COMPLETED),
             **button_style("secondary"),
         ).grid(row=0, column=4, padx=2, pady=2, sticky="ew")
         ctk.CTkButton(
@@ -1431,7 +1433,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
         )
         self.btn_bulk_edit.pack(side="left", padx=4)
         if board.status != ProjectBoardStatus.ACTIVE:
-            self.btn_set_active = ctk.CTkButton(toolbar, text="Set Active", command=lambda: self.set_status(board.id, ProjectBoardStatus.ACTIVE), **button_style("secondary"))
+            self.btn_set_active = ctk.CTkButton(toolbar, text="Set Active", command=lambda: self.set_board_status(board.id, ProjectBoardStatus.ACTIVE), **button_style("secondary"))
             self.btn_set_active.pack(
                 side="left", padx=4
             )
@@ -1638,7 +1640,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             self.selected_board_id = None
         self.refresh()
 
-    def set_status(self, board_id: str, status: str):
+    def set_board_status(self, board_id: str, status: str):
         self.db_manager.set_project_board_status(board_id, status)
         if status != ProjectBoardStatus.ACTIVE and self.selected_board_id == board_id:
             self.selected_board_id = None
@@ -1747,7 +1749,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             self.refresh()
             self.edit_item(item_id)
         except Exception as e:
-            messagebox.showerror("Error Creating Item", f"Failed to create action item: {str(e)}", parent=self)
+            self.set_status(f"Could not create the action item: {e}", "error")
 
     def complete_item(self, item_id: str):
         # WTP-M6.1 - the same question the editor asks. A declined
@@ -1810,7 +1812,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             self.item_checkbox_vars.clear()
             self.refresh()
         except Exception as e:
-            messagebox.showerror("Bulk Edit Error", f"Failed to update items: {str(e)}", parent=self)
+            self.set_status(f"Could not update the items: {e}", "error")
 
     def link_existing_action_item(self, board_id: str):
         dialog = LinkProjectActionItemsDialog(self, self.db_manager, board_id, self.refresh)
@@ -1872,11 +1874,12 @@ class ProjectBoardsScreen(ctk.CTkFrame):
 
         links = self.db_manager.get_project_board_links(board_id)
         if not links:
-            messagebox.showinfo("No Notes", "This project has no linked Obsidian notes yet.", parent=self)
+            self.set_status("This project has no linked Obsidian notes yet.", "info")
             return
         settings = AppSettings.load()
         if not settings.obsidian_vault_path:
-            messagebox.showerror("Obsidian Not Set Up", "Configure an Obsidian vault in Settings first.", parent=self)
+            self.set_status(
+                "Configure an Obsidian vault in Settings first.", "error")
             return
         if len(links) == 1:
             open_in_obsidian(links[0].url, settings.obsidian_vault_path)
@@ -2088,7 +2091,8 @@ class ProjectBoardsScreen(ctk.CTkFrame):
         if settings.obsidian_vault_path:
             open_in_obsidian(path, settings.obsidian_vault_path)
         else:
-            messagebox.showerror("Error", "Obsidian vault path not configured in settings.")
+            self.set_status(
+                "No Obsidian vault path is configured in Settings.", "error")
 
     def _bind_click_recursive(self, widget, callback):
         widget.bind("<Button-1>", callback)

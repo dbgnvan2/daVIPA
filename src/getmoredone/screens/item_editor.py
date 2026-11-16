@@ -48,6 +48,7 @@ from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage
 # Still used by _canonical_weekly_tactic_title, which is about Weekly Tactic
 # titles, not the removed Context field.
 from .title_format import split_action_item_title
+from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..db_manager import DatabaseManager
@@ -67,7 +68,8 @@ def _get_weekly_debug_logger() -> logging.Logger:
     return logger
 
 
-class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFormMixin,
+class ItemEditorDialog(StatusNoticeMixin, TrackedAfterMixin,
+                       ItemEditorContactsMixin, ItemEditorFormMixin,
                        ItemEditorNotesMixin, ctk.CTkToplevel):
     """Dialog for creating/editing action items."""
 
@@ -143,6 +145,10 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
 
         # Create form
         self.create_form()
+        # MOD-M1: under the form, across the whole editor, so neither column
+        # is resized by a refusal.
+        self.create_status_line(row=1, column=0, sticky="ew",
+                                padx=10, pady=(0, 8))
         self._apply_record_type_ui()
 
         # Load item data if editing, or apply defaults if new
@@ -1749,11 +1755,9 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
         next_action_text = self.next_action_text.get("1.0", "end-1c").strip()
 
         if not next_action_text:
-            import tkinter.messagebox as messagebox
-            messagebox.showwarning(
-                "No Next Actions",
-                "Please add tasks to the Next Action field (one per line) before creating tasks."
-            )
+            self.set_status(
+                "Add tasks to the Next Action field, one per line, before "
+                "creating tasks.", "warning")
             return
 
         # Split into lines and filter out empty lines
@@ -1761,11 +1765,9 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
                  for line in next_action_text.split('\n') if line.strip()]
 
         if not lines:
-            import tkinter.messagebox as messagebox
-            messagebox.showwarning(
-                "No Next Actions",
-                "Please add tasks to the Next Action field (one per line) before creating tasks."
-            )
+            self.set_status(
+                "Add tasks to the Next Action field, one per line, before "
+                "creating tasks.", "warning")
             return
 
         # Get the current item
@@ -1804,12 +1806,9 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
                 child_item, apply_defaults=False)
             created_count += 1
 
-        # Show success message
-        import tkinter.messagebox as messagebox
-        messagebox.showinfo(
-            "Tasks Created",
-            f"Created {created_count} child task(s) from Next Action list."
-        )
+        self.set_status(
+            f"Created {created_count} child task(s) from the Next Action "
+            "list.", "success")
 
         # Refresh the display if there's a callback
         if self.on_close_callback:
@@ -1839,7 +1838,7 @@ class ItemEditorDialog(TrackedAfterMixin, ItemEditorContactsMixin, ItemEditorFor
     def set_weekly_tactic(self):
         """Open dialog to set/change the weekly tactic association."""
         if not self.vps_manager:
-            messagebox.showinfo("Weekly Tactic", "VSP data is not available.")
+            self.set_status("VSP data is not available.", "info")
             return
 
         current_title = self.item.title if self.item else (self.title_entry.get().strip() or "Action Item")

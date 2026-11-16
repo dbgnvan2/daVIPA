@@ -125,7 +125,7 @@ class TimerRewardMixin(TimerCelebrationMixin):
             print(f"[ERROR] Editing the deliverable failed: {e}")
             import traceback
             traceback.print_exc()
-            self._show_error_dialog(f"Failed to change the deliverable: {e}")
+            self._report_error(f"Failed to change the deliverable: {e}")
 
     def _edit_deliverable(self):
         """The body of edit_deliverable, so the guard above stays readable."""

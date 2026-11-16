@@ -116,6 +116,14 @@ class SettingsVSPSegmentsMixin:
         self.subsegments_scroll_frame.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=10, pady=(0, 10))
         self.subsegments_scroll_frame.grid_columnconfigure(0, weight=1)
 
+        # MOD-M1: this section's notice line. Settings reports per section
+        # rather than once per screen, so a refusal appears beside the
+        # controls it is about.
+        self.vps_segments_status_label = self._status_label(
+            section, text="", level="error")
+        self.vps_segments_status_label.grid(
+            row=3, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 8))
+
         # Load lists
         self.refresh_segments_list()
         self.refresh_subsegments_list()
@@ -286,7 +294,8 @@ class SettingsVSPSegmentsMixin:
             self.app.vps_manager.update_vision_subsegment_color(subsegment["id"], new_color)
             self.refresh_subsegments_list()
         except Exception as exc:
-            messagebox.showerror("Color Update Failed", str(exc))
+            self._set_status(self.vps_segments_status_label,
+                             f"Could not update the colour: {exc}", "error")
 
     def create_new_segment(self):
         """Open dialog to create a new segment."""
@@ -300,7 +309,8 @@ class SettingsVSPSegmentsMixin:
         """Create a subsegment under an existing Settings life segment."""
         segments = self.app.vps_manager.get_all_segments(active_only=False)
         if not segments:
-            messagebox.showwarning("No Segments", "Create a life segment first.")
+            self._set_status(self.vps_segments_status_label,
+                             "Create a life segment first.", "warning")
             return
 
         dialog = ctk.CTkToplevel(self)
@@ -473,18 +483,17 @@ class SettingsVSPSegmentsMixin:
                     try:
                         # Since we can't delete with children, we need to tell user
                         # to remove records manually
-                        messagebox.showwarning(
-                            "Manual Deletion Required",
-                            f"To delete segment '{segment['name']}':\n\n"
-                            f"1. Go to VSP Planning screen\n"
-                            f"2. Delete all {total} records in this segment\n"
-                            f"   (Start with Week Actions, work up to TL Visions)\n"
-                            f"3. Return here to delete the empty segment\n\n"
-                            f"This manual process prevents accidental data loss."
-                        )
+                        self._set_status(
+                            self.vps_segments_status_label,
+                            f"Delete the {total} records in "
+                            f"'{segment['name']}' on the VSP Planning screen "
+                            "first, starting with Week Actions, then delete "
+                            "the empty segment here.",
+                            "warning")
                     except Exception as e:
-                        messagebox.showerror(
-                            "Error", f"Deletion failed: {str(e)}")
+                        self._set_status(
+                            self.vps_segments_status_label,
+                            f"Deletion failed: {e}", "error")
                 else:
                     status_label.configure(
                         text="❌ Incorrect confirmation text. Type exactly: yes proceed"
@@ -524,9 +533,8 @@ class SettingsVSPSegmentsMixin:
             )
 
             if response:
-                messagebox.showinfo(
-                    "Success",
-                    f"Segment '{segment['name']}' has been deleted."
-                )
+                self._set_status(
+                    self.vps_segments_status_label,
+                    f"Deleted '{segment['name']}'.", "success")
                 self.refresh_segments_list()
                 self.refresh_subsegments_list()

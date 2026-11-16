@@ -5,10 +5,11 @@ VSP Segment Editor Dialog for creating and editing life segments.
 import customtkinter as ctk
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
-from tkinter import messagebox, colorchooser
+from tkinter import colorchooser
 
 from ..color_contrast import normalize_hex_color
 from ..theme import button_style
+from .status_notice import StatusNoticeMixin
 
 #: The colour a new segment starts from, and the swatch's fallback when a
 #: stored colour cannot be read (SCV-M6.2). Named once rather than written out
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from ..vps_manager import VPSManager
 
 
-class VPSSegmentEditorDialog(ctk.CTkToplevel):
+class VPSSegmentEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
     """Dialog for creating/editing VSP life segments with color picker."""
 
     def __init__(self, parent, vps_manager: 'VPSManager', segment: Optional[dict] = None):
@@ -146,6 +147,10 @@ class VPSSegmentEditorDialog(ctk.CTkToplevel):
         # Buttons
         button_frame = ctk.CTkFrame(main_frame)
         button_frame.grid(row=row, column=0, columnspan=2, pady=20)
+        # MOD-M1: under the buttons, beside the fields it validates.
+        self.create_status_line(main_frame, row=row + 1, column=0,
+                                columnspan=2, sticky="ew", padx=10,
+                                pady=(0, 8))
 
         ctk.CTkButton(
             button_frame,
@@ -224,7 +229,7 @@ class VPSSegmentEditorDialog(ctk.CTkToplevel):
         # Get values
         name = self.name_entry.get().strip()
         if not name:
-            messagebox.showerror("Validation Error", "Name is required")
+            self.set_status("A name is required.", "error")
             return
 
         description = self.description_text.get("1.0", "end-1c").strip()
@@ -232,11 +237,9 @@ class VPSSegmentEditorDialog(ctk.CTkToplevel):
         # Get color from entry field (user might have typed it)
         typed_color = self.color_entry.get()
         if not self.validate_color(typed_color):
-            messagebox.showerror(
-                "Validation Error",
-                "Invalid color code. Must be in format #RRGGBB "
-                f"(e.g., {DEFAULT_SEGMENT_COLOR})"
-            )
+            self.set_status(
+                "That colour code must be #RRGGBB, for example "
+                f"{DEFAULT_SEGMENT_COLOR}.", "error")
             return
         # SCV-M1.3: the normalised form is what is stored, never the typed
         # text. ``validate_color`` accepts ``#abc`` and a missing ``#``, and
@@ -247,8 +250,7 @@ class VPSSegmentEditorDialog(ctk.CTkToplevel):
         try:
             order_index = int(self.order_entry.get().strip())
         except ValueError:
-            messagebox.showerror("Validation Error",
-                                 "Display Order must be a number")
+            self.set_status("Display Order must be a number.", "error")
             return
 
         is_active = self.active_var.get()
@@ -278,4 +280,4 @@ class VPSSegmentEditorDialog(ctk.CTkToplevel):
             self.destroy()
 
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save segment: {str(e)}")
+            self.set_status(f"Could not save the segment: {e}", "error")
