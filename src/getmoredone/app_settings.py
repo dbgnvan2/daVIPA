@@ -144,13 +144,19 @@ class AppSettings:
     drag_schedule_date_text_color: str = "#FFFFFF"
     # Drag Schedule date/future box height in pixels
     drag_schedule_box_height_px: int = 86
-    # Two consumers, and nothing in src/ writes it. PlanScreen.box_title_width
-    # reads it live for a day box's title column and for the two pane floors
-    # (PB-M5), and ColumnResizer treats a *stored* value as the Scheduler's
-    # legacy Title width. It stays 220 for the Plan screen's sake: raising it
-    # to reach the Scheduler moved that screen's layout instead (LRP, found by
-    # the sweep), and the Scheduler now takes COLUMN_DEFAULT_PX["title"]
-    # whenever this is only the default.
+    # Two consumers, and no screen writes it -- but `save` does: a field the
+    # settings file does not hold is stamped with this default on the first
+    # save, so a loaded value is almost always a file value. That is why
+    # column_resize.LEGACY_TITLE_DEFAULTS, not this attribute, decides whether
+    # a stored scalar was chosen by anyone; change this number and that tuple
+    # has to keep the old one.
+    #
+    # PlanScreen.box_title_width reads it live for a day box's title column
+    # and for the two pane floors (PB-M5), and ColumnResizer treats a stored
+    # value as the Scheduler's legacy Title width. It stays 220 for the Plan
+    # screen's sake: raising it to reach the Scheduler moved that screen's
+    # layout instead (LRP, found by the sweep), and the Scheduler now takes
+    # COLUMN_DEFAULT_PX["title"] whenever this is only the default.
     drag_schedule_title_col_width: int = 220
     # Plan screen: width (px) of the items column. Fixed, not a share of
     # the window -- it holds titles, and the day beside it is what the

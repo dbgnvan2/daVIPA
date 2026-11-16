@@ -25,6 +25,24 @@ CHAR_PX = 8
 # measures its text with.
 MIN_COLUMN_CHARS = 5
 
+# Every value a prefix's legacy ``<prefix>_title_col_width`` scalar has shipped
+# as an AppSettings class default, oldest first. `_stored_legacy_title` reads a
+# stored value equal to any of them as unset.
+#
+# It cannot ask the live class attribute instead. `AppSettings.save` stamps a
+# field the settings file does not hold (`_merge_over_file`: `name not in
+# on_disk`), so the first save on any install writes that build's default into
+# the file, and from then on the loaded value *is* a file value. Comparing it
+# against a number that moves would turn a cohort of never-dragged installs
+# into phantom dragged widths the next time either default changes, with
+# nothing left to say the drag never happened -- the same erasure
+# `AppSettings._day_shape_was_confirmed` documents. A tuple keeps the history
+# (P4: the defaults are config, not a constant read out of live code).
+LEGACY_TITLE_DEFAULTS = {
+    "drag_schedule": (220,),
+    "today": (260,),
+}
+
 
 def min_column_width(char_px: int = CHAR_PX) -> int:
     """The five-character floor in pixels at the given character width."""
@@ -125,19 +143,24 @@ class ColumnResizer:
 
         The scalar predates this module and is the only record of a Title
         width dragged before ``<prefix>_col_widths`` existed, so it still
-        wins over a spec default. What does not win is the settings class's
-        own default for it: that is not a width anyone chose, and taking it
-        was how the Scheduler went on opening at 220 after COLUMN_DEFAULT_PX
-        made every listing's Title 260 (LRP; found by the sweep, 2026-11-16).
-        A stored value that happens to equal the default is indistinguishable
-        from an unset one and is read as unset.
+        wins over a spec default. What does not win is a value equal to one of
+        this prefix's shipped defaults in ``LEGACY_TITLE_DEFAULTS``: that is
+        not a width anyone chose, and taking it was how the Scheduler went on
+        opening at 220 after COLUMN_DEFAULT_PX made every listing's Title 260
+        (LRP; found by the sweep, 2026-11-16).
+
+        A real drag that landed exactly on a shipped default is read as unset
+        and the column opens at the table's width. That is the cheap mistake:
+        it costs one drag, where the other way round costs every
+        never-dragged install the shape the shared table is for. See
+        ``LEGACY_TITLE_DEFAULTS`` for why the live class attribute cannot be
+        the sentinel.
         """
         attr = f"{self.prefix}_title_col_width"
         value = getattr(self.settings, attr, None)
         if value is None:
             return None
-        unset = object()
-        if value == getattr(type(self.settings), attr, unset):
+        if value in LEGACY_TITLE_DEFAULTS.get(self.prefix, ()):
             return None
         return value
 

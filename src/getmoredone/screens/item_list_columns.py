@@ -195,7 +195,7 @@ class ToolbarWrap:
         self.wrap_row = wrap_row
         self.frame = None
         self.wrapped = False
-        self._short = False
+        self._short = 0
         self._moved = []
         # (widget, its default width), captured before anything resizes it.
         # The default is the weight ``fit_filters`` shares by and the width
@@ -364,10 +364,17 @@ class ToolbarWrap:
         in to come back.
 
         Returns the pixels by which the wrapped row overruns ``width``, and
-        logs a shortfall once each time the toolbar crosses into one, as
-        ``ItemListLayout.fit`` does for the columns (P2). There is no window
-        minsize, and ``sticky="w"`` puts the overflow past the right edge
-        where nothing on screen reports it.
+        logs a shortfall each time it grows past the worst one logged since
+        the toolbar last fitted, as ``ItemListLayout.fit`` does for the
+        columns (P2). There is no window minsize, and ``sticky="w"`` puts the
+        overflow past the right edge where nothing on screen reports it.
+
+        The watermark is the number, not a flag. ``fit`` runs on every
+        ``<Configure>``, so a latched boolean logged the first few pixels of
+        overrun and then suppressed the 400px case the user reaches by
+        keeping hold of the window edge -- one INFO line naming the least
+        severe instance was the entire record (found by the sweep's re-sweep,
+        2026-11-16).
         """
         self.fit_filters(width)
         want = int(width) < self.min_one_row_px()
@@ -377,11 +384,11 @@ class ToolbarWrap:
             else:
                 self._unwrap()
         short = max(0, self.wrap_row_px() - int(width)) if self.wrapped else 0
-        if short and not self._short:
+        if short > self._short:
             logger.info("toolbar wrapped row needs %d px inside %d px: %d px "
                         "is drawn past the right edge",
                         self.wrap_row_px(), int(width), short)
-        self._short = bool(short)
+        self._short = short
         return short
 
     def _wrap(self) -> None:
@@ -518,7 +525,7 @@ class ItemListLayout:
         self.lead: list = []
         self._measured = None
         self._after_id = None
-        self._short = False
+        self._short = 0
         self.fit_count = 0
         # A fit skipped during a drag runs once the divider is let go.
         self.resizer.on_drag_end = self._on_configure
@@ -699,18 +706,20 @@ class ItemListLayout:
     def fit(self, list_px: int) -> int:
         """Share a list ``list_px`` wide across the resizable columns.
 
-        Returns the overflow in pixels. A shortfall is logged once each time
-        the list crosses below the floors, not on every ``<Configure>``.
-        Ignored while a divider is being dragged.
+        Returns the overflow in pixels. A shortfall is logged each time it
+        grows past the worst one logged since the list last fitted, not on
+        every ``<Configure>`` and not only the first few pixels of it -- see
+        ``ToolbarWrap.fit`` for why the watermark is the number rather than a
+        flag. Ignored while a divider is being dragged.
         """
         if self.resizer.dragging:
             return 0
         self.fit_count += 1
         overflow = self.resizer.fit_to_width(int(list_px) - self.reserved_px())
-        if overflow and not self._short:
+        if overflow > self._short:
             logger.info("%s list is %d px narrower than its column floors",
                         self.resizer.prefix, overflow)
-        self._short = bool(overflow)
+        self._short = overflow
         return overflow
 
     def bind(self, widget) -> None:

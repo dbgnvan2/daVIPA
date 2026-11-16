@@ -456,8 +456,10 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         screen it hid.
 
         Floored at ``items_width_floor()`` since PD-M1 made a row the day
-        chip's four columns, one of which is the 220px Drag Schedule title
-        width. At the shipped 260 the row asked for 306px inside a 256px pane
+        chip's four columns, one of which is ``box_title_width()`` -- the
+        ``drag_schedule_title_col_width`` setting, which the user can edit, so
+        the floor is whatever that value makes it and not a constant stated
+        here. At the shipped 260 the row asked for 306px inside a 256px pane
         and the ``30m`` label was laid out past the right edge: measured, not
         inferred -- it was invisible in the app while the first version of
         ``::test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it``
@@ -498,10 +500,21 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
     def box_title_width(self) -> int:
         """Width (px) of a day box's title column, from the Drag Schedule setting.
 
-        Purpose: PB-M5 -- one title width across the two screens that show a
-                 task as a row, so the columns line up between them.
+        Purpose: PB-M5 -- a day box's title column is the width this setting
+                 asks for.
         Spec:    docs/unused-docs/implementation_plan_2026-11-06_plan_box_appearance.md#pb-m5
         Tests:   tests/test_plan_screen.py::test_pbm54_the_title_column_follows_the_drag_schedule_width
+
+        PB-M5 was written as "one title width across the two screens that
+        show a task as a row, so the columns line up between them", and that
+        half of it is retired: LRP gave every listing of action items a shared
+        default table, so a fresh install has the Scheduler's Title at
+        ``COLUMN_DEFAULT_PX["title"]`` (260) and this box at the setting
+        (220). The two screens stopped lining up by construction, and nothing
+        tries to make them -- raising the setting to 260 to close the gap is
+        what LRP's sweep rejected, because the setting is this screen's two
+        pane floors as well. The test above compares this screen against the
+        setting, which is the whole of the claim that is left.
         """
         return self._positive_setting(
             "drag_schedule_title_col_width", SLOT_TITLE_WIDTH_PX
