@@ -124,6 +124,10 @@ def test_the_theme_is_not_applied_over_a_refused_write(settings_path, monkeypatc
         list_row_font_size_var=SimpleNamespace(get=lambda: "14"),
         completion_badge_path_var=SimpleNamespace(get=lambda: ""),
         completion_confetti_threshold_var=SimpleNamespace(get=lambda: "0"),
+        # DBC-M4 -- the handler reads one more variable since 2026-11-15.
+        # Blank, so this test still exercises the refused-write path and
+        # nothing else: a bad colour would be refused before the write.
+        list_date_band_color_var=SimpleNamespace(get=lambda: ""),
         _parse_positive_or_zero_int=lambda value, default=0: default,
         appearance_status_label=label,
     )
