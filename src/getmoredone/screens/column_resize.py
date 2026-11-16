@@ -112,14 +112,34 @@ class ColumnResizer:
         for key, spec in self.specs.items():
             raw = stored.get(key)
             if raw is None and key == "title":
-                # Legacy single-title scalar from before this module existed.
-                raw = getattr(self.settings, f"{self.prefix}_title_col_width", None)
+                raw = self._stored_legacy_title()
             try:
                 value = float(raw) if raw else 0.0
             except (TypeError, ValueError):
                 value = 0.0
             values[key] = value if value > 0 else float(spec.default_width)
         return values
+
+    def _stored_legacy_title(self):
+        """The legacy ``<prefix>_title_col_width``, where someone stored one.
+
+        The scalar predates this module and is the only record of a Title
+        width dragged before ``<prefix>_col_widths`` existed, so it still
+        wins over a spec default. What does not win is the settings class's
+        own default for it: that is not a width anyone chose, and taking it
+        was how the Scheduler went on opening at 220 after COLUMN_DEFAULT_PX
+        made every listing's Title 260 (LRP; found by the sweep, 2026-11-16).
+        A stored value that happens to equal the default is indistinguishable
+        from an unset one and is read as unset.
+        """
+        attr = f"{self.prefix}_title_col_width"
+        value = getattr(self.settings, attr, None)
+        if value is None:
+            return None
+        unset = object()
+        if value == getattr(type(self.settings), attr, unset):
+            return None
+        return value
 
     def _load_widths(self) -> dict:
         return {key: self._clamp(self.specs[key], value)

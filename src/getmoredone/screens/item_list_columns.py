@@ -195,6 +195,7 @@ class ToolbarWrap:
         self.wrap_row = wrap_row
         self.frame = None
         self.wrapped = False
+        self._short = False
         self._moved = []
         # (widget, its default width), captured before anything resizes it.
         # The default is the weight ``fit_filters`` shares by and the width
@@ -265,8 +266,19 @@ class ToolbarWrap:
         says whether two rows actually fit, and it is always below
         ``one_row_px()``: the wrapped group is a subset of the controls one
         row has to hold.
+
+        A value filter in that group counts at ``FILTER_MIN_PX``, which is
+        the width it is actually at whenever the row is wrapped: a wrapped
+        toolbar is narrower than ``min_one_row_px()``, so ``fit_filters`` has
+        less room than the minimums and pins every filter at one. Counting it
+        live left this number moving as the filters resized -- the same
+        feedback loop ``one_row_px`` was changed to break (found by the
+        sweep, 2026-11-16, over a measurement that reads the Scheduler's
+        whole wrapped group).
         """
-        return sum(widget.winfo_reqwidth() + _pad_total(info["padx"])
+        defaults = dict(self.filters)
+        return sum((FILTER_MIN_PX if widget in defaults
+                    else widget.winfo_reqwidth()) + _pad_total(info["padx"])
                    for widget, info in self._wrap_candidates())
 
     def _wrap_candidates(self) -> list:
@@ -299,19 +311,47 @@ class ToolbarWrap:
         """Give each value filter its share of a toolbar ``width`` (LRP-M10).
 
         The share is proportional to the filter's own default width, so the
-        filters keep their relative sizes -- Project stays wider than Who --
-        and is clamped to [FILTER_MIN_PX, FILTER_MAX_FACTOR * default].
+        filters keep their relative sizes -- Project stays wider than Who.
+        A share below ``FILTER_MIN_PX`` or above ``FILTER_MAX_FACTOR`` times
+        the default pins there, and what is left is shared again among the
+        rest, as ``ColumnResizer._share`` does it. Clamping each share where
+        it stood instead drew a total wider than the room: 190 px into 180 on
+        All Items, over a 23 px band, where the row has not wrapped, the
+        search entry is already at its minimum and Tk takes the difference
+        out of a column of its own choosing (found by the sweep, 2026-11-16).
+
+        Only a width that actually changed is written: ``fit`` runs on every
+        ``<Configure>`` of a window drag, and a CTkComboBox redraws itself
+        when it is configured.
         """
         if not self.filters:
             return
         room = self._filter_room(width)
-        total = sum(default for _w, default in self.filters) or 1
-        for widget, default in self.filters:
-            share = int(room * default / total)
-            want = min(share, FILTER_MAX_FACTOR * default)
-            widget.configure(width=max(FILTER_MIN_PX, want))
+        pending = list(self.filters)
+        drawn = {}
+        while pending:
+            total = sum(default for _widget, default in pending) or 1
+            pinned = []
+            for widget, default in pending:
+                share = int(room * default / total)
+                if share < FILTER_MIN_PX:
+                    pinned.append((widget, default, FILTER_MIN_PX))
+                elif share > FILTER_MAX_FACTOR * default:
+                    pinned.append((widget, default, FILTER_MAX_FACTOR * default))
+            if not pinned:
+                for widget, default in pending:
+                    drawn[widget] = int(room * default / total)
+                break
+            for widget, default, px in pinned:
+                drawn[widget] = px
+                room -= px
+                pending.remove((widget, default))
+            room = max(0, room)
+        for widget, px in drawn.items():
+            if int(widget.cget("width")) != px:
+                widget.configure(width=px)
 
-    def fit(self, width: int) -> None:
+    def fit(self, width: int) -> int:
         """Lay the toolbar out for ``width`` px: one row if it fits, else two.
 
         LRP-M11: the threshold is ``min_one_row_px()`` -- the row wraps when
@@ -322,15 +362,27 @@ class ToolbarWrap:
         While wrapped, the filters stay at their minimum: the room is
         measured against one row, which is the width they would have to fit
         in to come back.
+
+        Returns the pixels by which the wrapped row overruns ``width``, and
+        logs a shortfall once each time the toolbar crosses into one, as
+        ``ItemListLayout.fit`` does for the columns (P2). There is no window
+        minsize, and ``sticky="w"`` puts the overflow past the right edge
+        where nothing on screen reports it.
         """
         self.fit_filters(width)
         want = int(width) < self.min_one_row_px()
-        if want == self.wrapped:
-            return
-        if want:
-            self._wrap()
-        else:
-            self._unwrap()
+        if want != self.wrapped:
+            if want:
+                self._wrap()
+            else:
+                self._unwrap()
+        short = max(0, self.wrap_row_px() - int(width)) if self.wrapped else 0
+        if short and not self._short:
+            logger.info("toolbar wrapped row needs %d px inside %d px: %d px "
+                        "is drawn past the right edge",
+                        self.wrap_row_px(), int(width), short)
+        self._short = bool(short)
+        return short
 
     def _wrap(self) -> None:
         self._moved = self._wrap_candidates()
