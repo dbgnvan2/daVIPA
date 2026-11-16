@@ -23,6 +23,33 @@ One batch at a time in this checkout (`CLAUDE.md`). What is here is open work:
 adjacent issues from recent batches, screen reports, the carried-forward
 features, and the long-standing bugs, requests and user stories at the end.
 
+## Recovered from a deleted branch (filed 2026-11-16)
+
+### MOD-A1 — dialogs that take focus, and 26 files of blocking messageboxes (medium)
+
+`grab_set()` is called in 24 `src/` files and `tkinter.messagebox` in 26, so a
+dialog takes keyboard and mouse focus from wherever the user is working and an
+error or a confirmation arrives as a blocking OS dialog. Only the paths where
+this actually broke have been dealt with: PD-M12/PD-M13 took `messagebox` off
+the Plan screen's drop path, where macOS raises `TclError` from it, and
+deleted `widgets/confirm_dialog.py`. There has been no general sweep.
+
+A sweep was written once and never adopted —
+`git show archive/no-focus-stealing-dialogs` (`f1675f5`, 2026-08-25): 27
+`grab_set()` calls removed across 12 files, a stacking auto-dismissing
+`widgets/toast.py` added, and 50+ `messagebox` calls replaced with
+`show_toast()`. It forks from 2026-03-06 and cannot be merged — 11 conflicts,
+two of them files `main` has since deleted — and `main` has since grown from
+12 and 14 call sites to 24 and 26. So the commit is a reference for the shape
+of the fix, not something to merge.
+
+It is a user-visible behaviour change across ~26 files, so it needs its own
+spec, plan and on-screen walk rather than a sweep bolted onto another batch.
+The open question first: a toast cannot ask anything, so every `messagebox`
+call site has to be sorted into "tells the user something" (a toast) and "asks
+the user something" (a dialog that must still be modal, and must not raise
+from a drag release).
+
 ## Orphaned by the Project Board button removal (LRP, filed 2026-11-16)
 
 ### LRP-A1 — three pieces of code with no caller (medium)

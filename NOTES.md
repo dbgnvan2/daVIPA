@@ -1,3 +1,42 @@
+## The four leftover branches are decided (2026-11-16)
+
+**One line: nothing was merged, because nothing on them is missing from
+`main` except one feature that cannot be merged.** All three distinct heads
+are preserved as annotated tags whose messages carry the evidence, so the
+branch refs hold nothing the repo would lose.
+
+Four refs, three heads: `claude/plan-day-range-pdm13` and `dayrange-backup`
+are the same commit (`c8125af`), and `claude/plan-day-faults-03c116`
+(`2b2393f`) is its ancestor — 19 of its 28 commits.
+
+- **`archive/plan-day-range-pdm13`** / **`archive/plan-day-faults-03c116`** —
+  the earlier plan-day design, superseded. `main` built the same ground later
+  and differently as PD-M14, "the day's hours are a template", with a
+  `DaySpan` type in place of the branch's `drawn_day_slots` /
+  `slot_is_on_the_date`; PD-M14 *withdrew* PD-M5 criteria the branch rests on.
+  PD-M13.1 to .4 are `done` in `docs/spec_coverage.md` and the 55
+  pdm13/pdm14/pdm15 tests pass; Clear Day (PD-M8) and the midnight refusal are
+  both present. 23 test names exist only on the branch, and the behaviours
+  they assert are `main`'s under other names — `a_later_drop_leaves_day_end_alone`
+  is `test_pdm141_a_drop_on_later_writes_no_settings`, and so on. A trial merge
+  conflicts in 18 files. **This confirms the 2026-11-09 entry below from the
+  code rather than from the record**, and closes the open action in
+  `docs/unused-docs/changes/2026-11-08-one-batch-at-a-time.md` ("Decide the two
+  branches… Do not leave them").
+- **`archive/no-focus-stealing-dialogs`** — `f1675f5`, the one commit
+  `claude/setup-getmoredone-env-BjJcS` held that `main` lacks, and the only
+  real work in the four. It is **not** superseded: no general sweep of
+  `grab_set()` or `messagebox` has happened. It is also not mergeable — it
+  forks from 2026-03-06, conflicts in 11 files, and two of those `main` has
+  since deleted, so a merge would resurrect `reschedule_dialog.py` and
+  `vision_planning.py`. Filed as `BACKLOG.md` **MOD-A1** to be rebuilt against
+  today's `main` with its own spec and walk, with the open question named: a
+  toast cannot ask anything, so each call site has to be sorted into telling
+  and asking.
+
+Not verified on screen, and nothing about `main`'s behaviour changed here —
+this entry, `BACKLOG.md` MOD-A1 and three tags are the whole of it.
+
 ## Where `main` stands (2026-11-09)
 
 `main` is **green**: CI run 42721197588 at `f01c23f`, `2660 passed, 10
@@ -14,12 +53,16 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   which was `MAW-N1` — and the two clean worktrees under `.claude/worktrees/`
   were removed. Tips are recorded in
   `docs/unused-docs/backlog_archive_2026-11-09.md` in case a ref is wanted
-  back. What is left is `main` plus three branches that hold commits `main`
-  does not: `claude/plan-day-range-pdm13` (28 ahead; `CLAUDE.md` says it must
-  not be merged) with `dayrange-backup` at the same tip and
-  `claude/plan-day-faults-03c116` as its ancestor, and
+  back. What that left was `main` plus three branches holding commits `main`
+  did not: `claude/plan-day-range-pdm13` (28 ahead) with `dayrange-backup` at
+  the same tip and `claude/plan-day-faults-03c116` as its ancestor, and
   `claude/setup-getmoredone-env-BjJcS` (one commit from 2026-08-25 removing
-  `grab_set()` and adding a toast widget, 659 behind, still not on `main`).
+  `grab_set()` and adding a toast widget). **All four are settled as of
+  2026-11-16** — see "The four leftover branches are decided" below. The
+  pointer above to `CLAUDE.md` was correct when written and is not now: the
+  rewrite of 2026-11-10 (`docs/unused-docs/changes/2026-11-10-claude-md-narrative.md`)
+  dropped the must-not-merge line, and what carries it instead is the
+  `archive/plan-day-range-pdm13` tag message.
 
 - **`BACKLOG.md` is trimmed to what is active** (2026-11-09, on the user's
   instruction). 245 items became 74: 27 recorded their own closure, 116 were
@@ -160,7 +203,7 @@ One batch at a time from here, per `CLAUDE.md`. What that leaves:
   `2fac9b3`. `refs/heads/claude/plan-day-range-pdm13` is **superseded and
   stays unmerged** at `c8125af`: it holds the earlier design of the plan day,
   the one whose shared-setting write caused both reported faults. It must not
-  be merged. Whether to delete it is undecided.
+  be merged. Whether to delete it was undecided, and is decided below.
 - **Eleven of the twenty red tests are closed.** Ten by the PDT batch — the
   nine plan-day failures and `test_every_referenced_test_name_exists` — which
   were stale test vehicles, not missing code: `outside` was implemented on
