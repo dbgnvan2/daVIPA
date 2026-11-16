@@ -562,8 +562,53 @@ class SettingsScreen(
         """Apply and persist theme choices immediately."""
         self.apply_theme_preferences()
 
+    def _validated_band_colour(self):
+        """The band colour to store, or ``None`` after reporting a refusal.
+
+        A cleared field is ``""`` (the theme's own colour), not a refusal. A
+        value that is not a colour is refused with the value in the message
+        rather than rewritten to a default: a user who typed a colour they
+        meant has no way to know it was discarded.
+        """
+        raw = self.list_date_band_color_var.get().strip()
+        if not raw:
+            return ""
+        colour = normalize_hex_color(raw)
+        if colour is None:
+            self._set_status(
+                self.appearance_status_label,
+                f"Day/Date band colour: “{raw}” is not a colour. "
+                f"Use #RRGGBB, or clear the field for the theme's own colour.",
+                "error",
+            )
+            return None
+        return colour
+
+    def _restore_appearance_choices(self):
+        """Put the three Appearance combos back to what the file holds.
+
+        DBC-M4.2 -- a combo box goes on displaying a selection after the save
+        it triggered was refused, which reads as applied. The entries are left
+        alone: unsaved text in an entry is visibly the user's own typing.
+        """
+        self.appearance_mode_var.set(getattr(self.settings, "appearance_mode", "dark"))
+        self.theme_name_var.set(getattr(self.settings, "theme_name", "apple_grey"))
+        self.list_row_font_size_var.set(
+            str(getattr(self.settings, "list_row_font_size", 14))
+        )
+
     def apply_theme_preferences(self):
         """Save selected appearance and theme, then apply app-wide."""
+        # DBC-M4.2 -- first, before a single field is mutated. This handler is
+        # also the ``command`` of the three Appearance combo boxes, so a
+        # refusal below is reachable by picking a theme while the band entry
+        # holds a typo. Validating last left five fields already written to
+        # ``self.settings``, which the next Save on this screen would persist,
+        # and left each combo displaying a choice that was never written.
+        band_colour = self._validated_band_colour()
+        if band_colour is None:
+            self._restore_appearance_choices()
+            return
         self.settings.appearance_mode = self.appearance_mode_var.get().strip().lower()
         self.settings.theme_name = self.theme_name_var.get().strip().lower()
         try:
@@ -575,24 +620,7 @@ class SettingsScreen(
             self.completion_confetti_threshold_var.get(),
             default=getattr(self.settings, "completion_confetti_threshold", 0),
         )
-
-        # DBC-M4 -- checked before anything is written, and refused with the
-        # value in the message rather than rewritten to a default: a user who
-        # typed a colour they meant has no way to know it was discarded.
-        band_raw = self.list_date_band_color_var.get().strip()
-        if not band_raw:
-            self.settings.list_date_band_color = ""
-        else:
-            band_colour = normalize_hex_color(band_raw)
-            if band_colour is None:
-                self._set_status(
-                    self.appearance_status_label,
-                    f"Day/Date band colour: “{band_raw}” is not a colour. "
-                    f"Use #RRGGBB, or clear the field for the theme's own colour.",
-                    "error",
-                )
-                return
-            self.settings.list_date_band_color = band_colour
+        self.settings.list_date_band_color = band_colour
 
         # Before the theme is applied, not after: a refused write leaves the
         # file saying something else, and applying app-wide would show a theme

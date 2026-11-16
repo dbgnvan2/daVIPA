@@ -40,7 +40,7 @@ and theme_files line counts.
 
 | Scan | Lines |
 |---|---:|
-| `app_settings` | 28 |
+| `app_settings` | 36 |
 | `hex` | 163 |
 | `named` | 39 |
 | `theme_api` | 2 |
@@ -61,34 +61,42 @@ Widget override property breakdown:
 AppSettings persisted color/theme fields:
 
 ```text
-src/getmoredone/app_settings.py:65:    appearance_mode: str = "dark"  # system | dark | light
-src/getmoredone/app_settings.py:66:    theme_name: str = "apple_grey"
-src/getmoredone/app_settings.py:79:    # tests/test_priority_level_colors.py::test_plcm21_every_level_has_a_settings_field
-src/getmoredone/app_settings.py:88:    # The defaults are duplicated from theme.priority_level_fill_colors(),
-src/getmoredone/app_settings.py:92:    priority_level_color_any_critical: str = "#DCFCE7"
-src/getmoredone/app_settings.py:93:    priority_level_color_any_high: str = "#FEF3C7"
-src/getmoredone/app_settings.py:94:    priority_level_color_no_high_or_critical: str = ""
-src/getmoredone/app_settings.py:136:    # theme's own ``surface_subtle``, so an existing install looks unchanged
-src/getmoredone/app_settings.py:138:    # a dark one, for the reason ``theme.priority_level_fill_colors`` gives.
-src/getmoredone/app_settings.py:139:    list_date_band_color: str = ""
-src/getmoredone/app_settings.py:142:    # Drag Schedule date box text color (hex)
-src/getmoredone/app_settings.py:143:    drag_schedule_date_text_color: str = "#FFFFFF"
-src/getmoredone/app_settings.py:341:                settings.appearance_mode = cls._normalize_appearance_mode(
-src/getmoredone/app_settings.py:342:                    settings.appearance_mode)
-src/getmoredone/app_settings.py:343:                settings.theme_name = cls._normalize_theme_name(
-src/getmoredone/app_settings.py:344:                    settings.theme_name)
-src/getmoredone/app_settings.py:477:        self.appearance_mode = self._normalize_appearance_mode(
-src/getmoredone/app_settings.py:478:            self.appearance_mode)
-src/getmoredone/app_settings.py:479:        self.theme_name = self._normalize_theme_name(self.theme_name)
-src/getmoredone/app_settings.py:686:        _normalize_theme_name defers its import for the same reason.
-src/getmoredone/app_settings.py:756:    def _normalize_appearance_mode(value: Optional[str]) -> str:
-src/getmoredone/app_settings.py:762:    def _normalize_theme_name(value: Optional[str]) -> str:
-src/getmoredone/app_settings.py:763:        """Coerce a persisted theme name, using theme.py's list and no other.
-src/getmoredone/app_settings.py:765:        This held a SECOND hardcoded copy of the theme names. Adding a theme to
-src/getmoredone/app_settings.py:768:        load, because the new name was not in the copy. Picking a new theme
-src/getmoredone/app_settings.py:771:        Imported inside the function: theme.py pulls in customtkinter, and
-src/getmoredone/app_settings.py:775:        from .theme import normalize_theme_name
-src/getmoredone/app_settings.py:777:        return normalize_theme_name(value)
+src/getmoredone/app_settings.py:14:from .color_contrast import normalize_hex_color
+src/getmoredone/app_settings.py:66:    appearance_mode: str = "dark"  # system | dark | light
+src/getmoredone/app_settings.py:67:    theme_name: str = "apple_grey"
+src/getmoredone/app_settings.py:80:    # tests/test_priority_level_colors.py::test_plcm21_every_level_has_a_settings_field
+src/getmoredone/app_settings.py:89:    # The defaults are duplicated from theme.priority_level_fill_colors(),
+src/getmoredone/app_settings.py:93:    priority_level_color_any_critical: str = "#DCFCE7"
+src/getmoredone/app_settings.py:94:    priority_level_color_any_high: str = "#FEF3C7"
+src/getmoredone/app_settings.py:95:    priority_level_color_no_high_or_critical: str = ""
+src/getmoredone/app_settings.py:137:    # theme's own ``surface_subtle``, so an existing install looks unchanged
+src/getmoredone/app_settings.py:139:    # a dark one, for the reason ``theme.priority_level_fill_colors`` gives.
+src/getmoredone/app_settings.py:140:    list_date_band_color: str = ""
+src/getmoredone/app_settings.py:143:    # Drag Schedule date box text color (hex)
+src/getmoredone/app_settings.py:144:    drag_schedule_date_text_color: str = "#FFFFFF"
+src/getmoredone/app_settings.py:342:                settings.appearance_mode = cls._normalize_appearance_mode(
+src/getmoredone/app_settings.py:343:                    settings.appearance_mode)
+src/getmoredone/app_settings.py:344:                settings.theme_name = cls._normalize_theme_name(
+src/getmoredone/app_settings.py:345:                    settings.theme_name)
+src/getmoredone/app_settings.py:358:                settings.list_date_band_color = cls._normalize_list_date_band_color(
+src/getmoredone/app_settings.py:359:                    getattr(settings, "list_date_band_color", "")
+src/getmoredone/app_settings.py:481:        self.appearance_mode = self._normalize_appearance_mode(
+src/getmoredone/app_settings.py:482:            self.appearance_mode)
+src/getmoredone/app_settings.py:483:        self.theme_name = self._normalize_theme_name(self.theme_name)
+src/getmoredone/app_settings.py:496:        self.list_date_band_color = self._normalize_list_date_band_color(
+src/getmoredone/app_settings.py:497:            self.list_date_band_color
+src/getmoredone/app_settings.py:693:        _normalize_theme_name defers its import for the same reason.
+src/getmoredone/app_settings.py:763:    def _normalize_appearance_mode(value: Optional[str]) -> str:
+src/getmoredone/app_settings.py:769:    def _normalize_theme_name(value: Optional[str]) -> str:
+src/getmoredone/app_settings.py:770:        """Coerce a persisted theme name, using theme.py's list and no other.
+src/getmoredone/app_settings.py:772:        This held a SECOND hardcoded copy of the theme names. Adding a theme to
+src/getmoredone/app_settings.py:775:        load, because the new name was not in the copy. Picking a new theme
+src/getmoredone/app_settings.py:778:        Imported inside the function: theme.py pulls in customtkinter, and
+src/getmoredone/app_settings.py:782:        from .theme import normalize_theme_name
+src/getmoredone/app_settings.py:784:        return normalize_theme_name(value)
+src/getmoredone/app_settings.py:795:    def _normalize_list_date_band_color(value: object) -> str:
+src/getmoredone/app_settings.py:796:        """DBC-M1.1 -- a stored band colour, or ``""`` for the theme's own.
+src/getmoredone/app_settings.py:804:        return normalize_hex_color(value) or ""
 ```
 
 Hex top values (20 of 233 distinct):
@@ -1535,7 +1543,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/settings.py:604` | `# Show the field what was stored ("aabbcc" -> "#AABBCC"). Before` |
+| `src/getmoredone/screens/settings.py:632` | `# Show the field what was stored ("aabbcc" -> "#AABBCC"). Before` |
 
 ### `#abc`
 
@@ -1851,7 +1859,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/app_settings.py:92` | `priority_level_color_any_critical: str = "#DCFCE7"` |
+| `src/getmoredone/app_settings.py:93` | `priority_level_color_any_critical: str = "#DCFCE7"` |
 | `src/getmoredone/screens/priority_cell.py:3` | ```Purpose: PCC-A3 -- a level colour is pale (Any Critical ``#DCFCE7``), and on a``` |
 | `src/getmoredone/theme.py:140` | `"on_strong": "#ECFDF5" if mode == "light" else "#DCFCE7",` |
 | `src/getmoredone/theme.py:329` | `LEVEL_ANY_CRITICAL: "#DCFCE7",` |
@@ -2176,7 +2184,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/app_settings.py:93` | `priority_level_color_any_high: str = "#FEF3C7"` |
+| `src/getmoredone/app_settings.py:94` | `priority_level_color_any_high: str = "#FEF3C7"` |
 | `src/getmoredone/theme.py:330` | `LEVEL_ANY_HIGH: "#FEF3C7",` |
 
 ### `#ff5a8a`
@@ -2334,7 +2342,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/app_settings.py:143` | `drag_schedule_date_text_color: str = "#FFFFFF"` |
+| `src/getmoredone/app_settings.py:144` | `drag_schedule_date_text_color: str = "#FFFFFF"` |
 | `src/getmoredone/brand.py:48` | `ON_DARK = "#FFFFFF"` |
 | `src/getmoredone/color_contrast.py:157` | `light: str = "#FFFFFF",` |
 | `src/getmoredone/color_contrast.py:165` | `def pick_text_color(bg_hex: str, light: str = "#FFFFFF", dark: str = "#000000") -> str:` |
@@ -2345,10 +2353,10 @@ Each row is from grep output and includes `file:line` and a short snippet.
 | `src/getmoredone/screens/drag_schedule.py:1391` | `return date_text_color_for(bg_color, getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF"))` |
 | `src/getmoredone/screens/drag_schedule_support.py:63` | `color = str(configured_value or "#FFFFFF").strip()` |
 | `src/getmoredone/screens/drag_schedule_support.py:67` | `return "#FFFFFF"` |
-| `src/getmoredone/screens/settings.py:720` | `value=getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")` |
-| `src/getmoredone/screens/settings.py:808` | `color_value = self.drag_schedule_text_color_var.get().strip() or "#FFFFFF"` |
-| `src/getmoredone/screens/settings.py:812` | `color_value = "#FFFFFF"` |
-| `src/getmoredone/screens/settings.py:836` | `initial = self.drag_schedule_text_color_var.get().strip() or "#FFFFFF"` |
+| `src/getmoredone/screens/settings.py:748` | `value=getattr(self.settings, "drag_schedule_date_text_color", "#FFFFFF")` |
+| `src/getmoredone/screens/settings.py:836` | `color_value = self.drag_schedule_text_color_var.get().strip() or "#FFFFFF"` |
+| `src/getmoredone/screens/settings.py:840` | `color_value = "#FFFFFF"` |
+| `src/getmoredone/screens/settings.py:864` | `initial = self.drag_schedule_text_color_var.get().strip() or "#FFFFFF"` |
 | `src/getmoredone/screens/settings_priority_colors.py:199` | ``` ``#FFFFFF``, and a user who typed a colour they meant has no way to ``` |
 | `themes/apple_grey.json:18` | `"#FFFFFF",` |
 | `themes/apple_grey.json:22` | `"#FFFFFF",` |

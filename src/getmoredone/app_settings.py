@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, asdict, fields, field
 
+from .color_contrast import normalize_hex_color
 from .paths import default_settings_path
 
 logger = logging.getLogger(__name__)
@@ -354,6 +355,9 @@ class AppSettings:
                 settings.first_week_of_year_rule = cls._normalize_first_week_of_year_rule(
                     getattr(settings, "first_week_of_year_rule", "iso")
                 )
+                settings.list_date_band_color = cls._normalize_list_date_band_color(
+                    getattr(settings, "list_date_band_color", "")
+                )
                 settings._normalize_commitment_settings()
                 substituted = settings._normalize_plan_day_settings()
                 # Decided from the file, not from the fact that it parsed. A
@@ -488,6 +492,9 @@ class AppSettings:
         )
         self.first_week_of_year_rule = self._normalize_first_week_of_year_rule(
             self.first_week_of_year_rule
+        )
+        self.list_date_band_color = self._normalize_list_date_band_color(
+            self.list_date_band_color
         )
         self._normalize_plan_day_settings()
 
@@ -783,6 +790,18 @@ class AppSettings:
         except (TypeError, ValueError):
             size = 14
         return max(10, min(24, size))
+
+    @staticmethod
+    def _normalize_list_date_band_color(value: object) -> str:
+        """DBC-M1.1 -- a stored band colour, or ``""`` for the theme's own.
+
+        Here with the other six appearance normalizers for the reason they are
+        here: a value a hand-edit left behind must not be able to wedge the
+        UI. Without it a stored ``"lightblue"`` drew the band correctly but
+        refused every save in Settings > Appearance, on every launch, naming a
+        field the user had not touched.
+        """
+        return normalize_hex_color(value) or ""
 
     @staticmethod
     def _normalize_business_year_start_mmdd(value: Optional[str]) -> str:
