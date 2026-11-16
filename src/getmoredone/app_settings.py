@@ -144,7 +144,12 @@ class AppSettings:
     drag_schedule_date_text_color: str = "#FFFFFF"
     # Drag Schedule date/future box height in pixels
     drag_schedule_box_height_px: int = 86
-    drag_schedule_title_col_width: int = 220
+    # LRP-M6: the legacy Title fallback, which ``ColumnResizer._load_stored``
+    # prefers over a spec default, so while this said 220 the Scheduler opened
+    # at 220 whatever COLUMN_DEFAULT_PX said. It must equal that table's
+    # "title"; app_settings cannot import from screens, so
+    # tests/test_list_resize_principles.py asserts the two agree.
+    drag_schedule_title_col_width: int = 260
     # Plan screen: width (px) of the items column. Fixed, not a share of
     # the window -- it holds titles, and the day beside it is what the
     # width is for. Editable in Settings > Date Increment Settings,

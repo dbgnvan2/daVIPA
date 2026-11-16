@@ -77,12 +77,12 @@ class AllItemsScreen(ctk.CTkFrame):
         # LSR2: every text column resizes, Status included; its grid index
         # moves past the factor chips when they are shown.
         self.layout = ItemListLayout(
-            self, self.settings, self.COLUMN_PREFIX, first_col=1, title_default=260,
-            columns=(TextColumn("start", 5, "Start", 60),
-                     TextColumn("due", 6, "Due", 60),
+            self, self.settings, self.COLUMN_PREFIX, first_col=1,
+            columns=(TextColumn("start", 5, "Start"),
+                     TextColumn("due", 6, "Due"),
                      TextColumn("pri", 7, "Priority", ALL_ITEMS_SCORE_CELL_WIDTH_PX),
-                     TextColumn("time", 8, "Est. Time", 60),
-                     TextColumn("status", 9, "Status", 80)))
+                     TextColumn("time", 8, "Est. Time"),
+                     TextColumn("status", 9, "Status")))
         self.column_header = None
 
         # Create scrollable frame for items

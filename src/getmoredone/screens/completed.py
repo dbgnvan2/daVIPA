@@ -77,9 +77,9 @@ class CompletedScreen(ctk.CTkFrame):
         # layout for it and the rows. Completed's own four columns (SPC-D1).
         self.layout = ItemListLayout.custom(
             self, self.settings, self.COLUMN_PREFIX,
-            columns=(TextColumn("title", 1, "Title", 260),
-                     TextColumn("who", 2, "Who", 110),
-                     TextColumn("completed", 3, "Completed", 150),
+            columns=(TextColumn("title", 1, "Title"),
+                     TextColumn("who", 2, "Who"),
+                     TextColumn("completed", 3, "Completed"),
                      TextColumn("pri", 4, "Pri", SCORE_CELL_WIDTH_PX)))
         self.column_header = None
 

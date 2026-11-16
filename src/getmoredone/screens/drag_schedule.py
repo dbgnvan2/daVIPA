@@ -32,19 +32,19 @@ from .drag_schedule_support import (
 )
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .title_format import split_action_item_title, format_column_text
-from .column_resize import CHAR_PX, ColumnResizer, ColumnSpec
-from .item_list_columns import ToolbarWrap
+from .column_resize import CHAR_PX, ColumnResizer
+from .item_list_columns import TextColumn, ToolbarWrap, custom_specs
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
 
 logger = logging.getLogger(__name__)
 
-# SCR-D4: no item column goes below 6 characters at the row font (size 14,
-# 8px a character), as on the other item lists.
-ITEM_COLUMN_FLOOR_PX = 6 * CHAR_PX
-# No ceiling worth stating: the columns fill the list however wide it is.
-ITEM_COLUMN_MAX_PX = 10000
+# LRP-M4/M5: the floor and the maxima are the shared ones now, reached
+# through ``custom_specs``. This list used to carry its own: a floor fixed at
+# ``6 * CHAR_PX``, which ignored the row-font setting the other lists follow,
+# and a 10000 maximum that let its columns keep growing on a wide window
+# where every other listing pins at ``STRETCH_MAX_PX``.
 # Pixels per character of a heading (bold, CTk's default size 13): 7 at
 # size 13 by the 14px-is-8px estimate, plus one for bold, so 8.
 HEADER_CHAR_PX = round(CHAR_PX * 13 / 14) + 1
@@ -118,14 +118,15 @@ class DragScheduleScreen(ctk.CTkFrame):
             prefix="drag_schedule",
             text_pad=" ",
             # SCR-D3: the defaults are the weights a first open shares the
-            # list out by; the columns then fill it (SCR-D2).
-            specs=[
-                ColumnSpec(key, grid_col=col, default_width=width,
-                           min_width=ITEM_COLUMN_FLOOR_PX, max_width=ITEM_COLUMN_MAX_PX)
-                for col, (key, width) in enumerate((
-                    ("title", 220), ("segment", 170), ("subsegment", 170),
-                    ("category", 170), ("start_date", 120)), start=1)
-            ],
+            # list out by; the columns then fill it (SCR-D2). LRP-M6: they
+            # come from COLUMN_DEFAULT_PX, so this list opens in the same
+            # proportions as the other six. It was 220/170/170/170/120.
+            specs=custom_specs([
+                TextColumn(key, col, "")
+                for col, key in enumerate(
+                    ("title", "segment", "subsegment", "category",
+                     "start_date"), start=1)
+            ]),
         )
         self._items_fit_after = None
         self._items_short = False

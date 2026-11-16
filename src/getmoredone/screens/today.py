@@ -104,11 +104,11 @@ class TodayScreen(ctk.CTkFrame):
         # LSR-M1/M2, LSR2: every text column stretches with the list and
         # takes a drag divider; the checkbox, chips and Timer hold their size.
         self.layout = ItemListLayout(
-            self, self.settings, self.COLUMN_PREFIX, first_col=1, title_default=260,
-            columns=(TextColumn("start", 5, "Start", 60),
-                     TextColumn("due", 6, "Due", 60),
+            self, self.settings, self.COLUMN_PREFIX, first_col=1,
+            columns=(TextColumn("start", 5, "Start"),
+                     TextColumn("due", 6, "Due"),
                      TextColumn("pri", 7, "Pri", SCORE_CELL_WIDTH_PX),
-                     TextColumn("time", 8, "Time", 50)))
+                     TextColumn("time", 8, "Time")))
         self.resizer = self.layout.resizer
         self._set_list_columns()
 

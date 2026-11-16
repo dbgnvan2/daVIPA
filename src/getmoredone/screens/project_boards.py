@@ -862,10 +862,10 @@ class ProjectBoardsScreen(ctk.CTkFrame):
         # resize with the panel (SPC-D2/D3).
         self.items_layout = ItemListLayout.custom(
             self, self.settings, self.COLUMN_PREFIX,
-            columns=(TextColumn("title", 1, "Title", 260),
-                     TextColumn("status", 2, "Status", 90),
-                     TextColumn("start", 3, "Start", 90),
-                     TextColumn("due", 4, "Due", 90)))
+            columns=(TextColumn("title", 1, "Title"),
+                     TextColumn("status", 2, "Status"),
+                     TextColumn("start", 3, "Start"),
+                     TextColumn("due", 4, "Due")))
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)

@@ -23,6 +23,7 @@ The rows stay each screen's own (plan D8); this module owns only widths.
 import logging
 import tkinter
 from dataclasses import dataclass
+from typing import Optional
 
 import customtkinter as ctk
 
@@ -39,11 +40,44 @@ STRETCH_KEYS = ("title", "subsegment", "category", "who")
 LIST_MIN_CHARS = 6
 
 TITLE_MAX_PX = 2000
-# The widths these columns had before LSR: 15, 15 and 10 characters at
-# CHAR_PX, so an unresized list opens as it did.
-LINEAGE_DEFAULT_PX = 15 * CHAR_PX
-WHO_DEFAULT_PX = 10 * CHAR_PX
 STRETCH_MAX_PX = 800
+
+# LRP-M6 (plan D1): one default width per column kind, shared by every
+# listing of action items. A default is also the column's weight until the
+# user drags it (LSR2-D8), so this table is the shape a list opens at and the
+# reason the seven listings now resize alike. Measured before it: Title was
+# 220, 260 or 320, a lineage column 120 or 170, Who 80 or 110, a date column
+# 60, 90, 110 or 150.
+#
+# "start_date" is the Scheduler's key for the same column as "start". A key
+# is also its persistence sub-key, so renaming it would discard a width the
+# user had dragged; both spellings carry the one value instead.
+COLUMN_DEFAULT_PX = {
+    "title": 260,
+    "segment": 150,
+    "subsegment": 150,
+    "category": 150,
+    "who": 110,
+    "start": 110,
+    "start_date": 110,
+    "due": 110,
+    "completed": 110,
+    "status": 90,
+    "time": 60,
+    "subitems": 70,
+}
+# The priority cell is a control with fixed content, 60 px on most lists and
+# 80 on All Items on purpose, so it is not shared.
+UNSHARED_KEYS = ("pri",)
+
+
+def column_default_px(key: str) -> int:
+    """The shared default for a column kind; raises on an unknown key.
+
+    Raising is the point. A listing that invents a column name gets an error
+    where it is built rather than a width nobody chose.
+    """
+    return COLUMN_DEFAULT_PX[key]
 
 # Every cell is gridded padx=5, every row padx=5 inside the scroll frame.
 CELL_PAD_PX = 10
@@ -258,14 +292,24 @@ def header_char_px() -> int:
 class TextColumn:
     """A screen's own text column after Who: it resizes like the first four.
 
-    ``default_px`` is its width before LSR2, so an unresized list opens as it
-    did, and is its weight until the user drags it (LSR2-D8).
+    ``default_px`` is the column's opening width, and its weight until the
+    user drags it (LSR2-D8). Left as ``None`` -- which is what every listing
+    does for a shared column kind -- it comes from ``COLUMN_DEFAULT_PX``
+    (LRP-M6). A number here overrides the table, and the only columns that
+    pass one are the priority cells (``UNSHARED_KEYS``).
     """
 
     key: str
     grid_col: int
     heading: str
-    default_px: int
+    default_px: Optional[int] = None
+
+    @property
+    def width_px(self) -> int:
+        """Its own default if it has one, else the shared one for its kind."""
+        if self.default_px is not None:
+            return self.default_px
+        return column_default_px(self.key)
 
 
 def list_floor_px() -> int:
@@ -273,21 +317,25 @@ def list_floor_px() -> int:
     return LIST_MIN_CHARS * row_char_px()
 
 
-def stretch_specs(first_col: int, title_default: int, columns=()) -> list:
-    """Every resizable column: the four from ``first_col``, then ``columns``."""
+def stretch_specs(first_col: int, columns=()) -> list:
+    """Every resizable column: the four from ``first_col``, then ``columns``.
+
+    Every width comes from ``COLUMN_DEFAULT_PX`` unless a ``TextColumn``
+    carries one of its own (LRP-M6).
+    """
     floor = list_floor_px()
     specs = [
-        ColumnSpec("title", first_col, title_default,
+        ColumnSpec("title", first_col, column_default_px("title"),
                    min_width=floor, max_width=TITLE_MAX_PX),
-        ColumnSpec("subsegment", first_col + 1, LINEAGE_DEFAULT_PX,
+        ColumnSpec("subsegment", first_col + 1, column_default_px("subsegment"),
                    min_width=floor, max_width=STRETCH_MAX_PX),
-        ColumnSpec("category", first_col + 2, LINEAGE_DEFAULT_PX,
+        ColumnSpec("category", first_col + 2, column_default_px("category"),
                    min_width=floor, max_width=STRETCH_MAX_PX),
-        ColumnSpec("who", first_col + 3, WHO_DEFAULT_PX,
+        ColumnSpec("who", first_col + 3, column_default_px("who"),
                    min_width=floor, max_width=STRETCH_MAX_PX),
     ]
     for column in columns:
-        specs.append(ColumnSpec(column.key, column.grid_col, column.default_px,
+        specs.append(ColumnSpec(column.key, column.grid_col, column.width_px,
                                 min_width=floor, max_width=STRETCH_MAX_PX))
     return specs
 
@@ -301,7 +349,7 @@ def custom_specs(columns, title_key: str = "title") -> list:
     """
     floor = list_floor_px()
     return [ColumnSpec(
-        column.key, column.grid_col, column.default_px, min_width=floor,
+        column.key, column.grid_col, column.width_px, min_width=floor,
         max_width=TITLE_MAX_PX if column.key == title_key else STRETCH_MAX_PX)
         for column in columns]
 
@@ -310,7 +358,7 @@ class ItemListLayout:
     """One list screen's column widths, header and resize binding."""
 
     def __init__(self, owner, settings, prefix: str, first_col: int = 1,
-                 title_default: int = 260, columns=(), specs=None):
+                 columns=(), specs=None):
         self.owner = owner
         self.headings = {column.key: column.heading for column in columns}
         self.resizer = ColumnResizer(
@@ -318,7 +366,7 @@ class ItemListLayout:
             settings=settings,
             prefix=prefix,
             specs=(specs if specs is not None
-                   else stretch_specs(first_col, title_default, columns)),
+                   else stretch_specs(first_col, columns)),
             char_px=row_char_px(),
             set_cell_width=True,
         )

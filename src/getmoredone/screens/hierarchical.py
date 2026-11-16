@@ -67,10 +67,10 @@ class HierarchicalScreen(ctk.CTkFrame):
         # column layout for it and every row at every depth (LSR-M8).
         # LSR2: Pri, Due and Sub-items resize too; this list has no controls.
         self.layout = ItemListLayout(
-            self, self.settings, self.COLUMN_PREFIX, first_col=0, title_default=320,
+            self, self.settings, self.COLUMN_PREFIX, first_col=0,
             columns=(TextColumn("pri", 4, "Pri", SCORE_CELL_WIDTH_PX),
-                     TextColumn("due", 5, "Due", 110),
-                     TextColumn("subitems", 6, "Sub-items", 70)))
+                     TextColumn("due", 5, "Due"),
+                     TextColumn("subitems", 6, "Sub-items")))
         self.layout.set_columns([], [])
         self.column_header = None
 
