@@ -7,6 +7,41 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — one set of resize principles for every list (2026-11-16)
+
+- **Every listing of action items now starts from the same column widths**
+  and shares a change in width the same way, so Today, Upcoming, All Items,
+  Hierarchical, Completed, a project's Action Items and the Scheduler look
+  and feel like one list. Title 260, Segment / SubSegment / Category 150,
+  Who 110, any date 110, Status 90, Est. Time 60. Seven of the ten column
+  kinds had carried two or three different defaults; the Scheduler also had
+  its own floor (fixed, ignoring the row-font setting) and its own maximum
+  (10000 px, where the others pinned at 800). A column shape you have
+  dragged is stored as a weight and still wins over these, so only an
+  install that has never dragged a divider opens at new widths.
+  (LRP-M4 to M9; `docs/list_resize_principles.md`)
+- **The filter boxes resize with their toolbar** — Who, Status, Segment,
+  SubSegment and Project on Upcoming, All Items, Hierarchical, Completed and
+  the Scheduler. Each takes a share of the toolbar's change in proportion to
+  its own width, down to 90 px and up to twice its starting width; the
+  `Next N days` / `Last N days` selectors keep their size. A toolbar now
+  wraps to a second row only once every filter is at its minimum, so the
+  search box gives up width first, then the filters, then the row wraps.
+  (LRP-M10, LRP-M11)
+- **A wrapped toolbar row is left-justified**, reading left to right under
+  the first row instead of being pushed to the right-hand edge. (LRP-M1)
+
+### Removed — six buttons off the Project Board's right panel (2026-11-16)
+
+- Create Action Item, Link Action Item, Edit Project, Create Note, Link Note
+  and Open Notes are gone from the toolbar above a project's Action Items;
+  Bulk Edit and Set Active stay. Four had another route on screen already
+  (the tile's pencil and 📄 icons, and each note row's own Open). Create and
+  Link Action Item did not: an item reaches a project through the **Project**
+  field in the item editor, and the Link Action Items dialog — search, filter
+  buttons, Link Selected — is no longer reachable from anywhere. Its code is
+  kept in place, unreachable, and filed in `BACKLOG.md`. (LRP-M2, LRP-M3)
+
 ### Added — the Day/Date band colour (2026-11-15)
 
 - Settings → Appearance takes a **Day/Date band colour**, which sets the

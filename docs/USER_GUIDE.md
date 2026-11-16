@@ -81,10 +81,11 @@ daVIPA is a desktop task manager focused on prioritization and execution.
 
 ### Resizing the item lists (Today, Upcoming, All Items, Hierarchical, Completed, the Scheduler's list, and a project's Action Items)
 - What: Each of these lists shares its width out to its own text columns. Today, Upcoming, All Items, Hierarchical and Completed have a pinned column header; the Scheduler's list has one too. A project's Action Items list has a heading row that scrolls with the list, because the detail panel is one scroll area. Every text column widens and narrows with the window: Title, SubSegment, Category, Who, and each list's Start, Due, Pri (Priority), Time (Est. Time), Status and Sub-items. Completed's columns are Title, Who, Completed and Pri; a project's Action Items columns are Title, Status, Start and Due. No column gets narrower than 6 characters. The checkbox, the factor chips and the Timer/Actions buttons keep their size. Text that does not fit is cut with `...`, headings included, and the full text comes back when the column is wide enough again.
+- **Every list starts from the same widths.** A column of a given kind opens at one width on every screen — Title 260, Segment / SubSegment / Category 150, Who 110, any date column 110, Status 90, Est. Time 60, Hierarchical's Sub-items 70 — and grows and shrinks by the same share of the list's change wherever it appears, so two lists at different widths look like the same list. No column goes past 800px (Title: 2000). If you have ever dragged a divider on a screen, your own shape is remembered and wins over these. The rules and the reasons are in `docs/list_resize_principles.md`.
 - Drag the divider at the right edge of any text column's heading to change how the width is shared. Each screen remembers its own column shape between sessions, and keeps that shape as the window is resized, including after the window has been narrowed until every column is at 6 characters.
 - Start and Due show the date alone (`11/14`; in Hierarchical, `2026-11-14`); the heading says which date it is. Completed's date column and a project's Start and Due read the same way.
 - When you let go of a divider, the column you dragged keeps the width you dropped it at, and the other columns grow or shrink to fill the list. A click on a divider with no drag changes nothing.
-- On a narrow window the search box gives up width first, where the screen has one. Narrower still, the toolbar's right-hand controls (for example **+ New Item**) move to a second toolbar row. The Scheduler, Projects and Completed toolbars do this too, so their filters no longer run off the right-hand edge; each one's second row is sized to fit the window the app opens at. Below what those two rows need, the toolbar and the right-hand columns are cut off; there is no minimum window size.
+- On a narrow window the search box gives up width first, where the screen has one. Then the **filter boxes** — Who, Status, Segment, SubSegment, Project — narrow with the toolbar, each by a share of the change in proportion to its own width, down to 90px; on a wide window they grow the same way, up to twice their starting width. The `Next N days` / `Last N days` selectors keep their size, since they hold two or three characters. Only when every filter is at 90px and the row still does not fit do the toolbar's right-hand controls (for example **+ New Item**) move to a second toolbar row, **left-justified** under the first. The Scheduler, Projects and Completed toolbars do this too, so their filters no longer run off the right-hand edge; each one's second row is sized to fit the window the app opens at. Below what those two rows need, the toolbar and the right-hand columns are cut off; there is no minimum window size.
 - In Hierarchical, sub-items are indented inside the Title column, so the columns to the right line up at every level.
 - Why: Use the window's whole width, whatever its size.
 
@@ -173,7 +174,7 @@ Header controls:
 Main area:
 - **Action Items list (left)** — What: Open items with no dates plus upcoming items in the selected window. Why: A short list of items worth scheduling.
   - Columns: `(checkbox)`, `Title`, `Segment`, `SubSegment`, `Category`, `Start`
-  - **Columns fill the list** — What: Title, Segment, SubSegment, Category and Start Date always fill the list's width, starting in the proportions 220 : 170 : 170 : 170 : 120. When the window grows or shrinks, or you move the divider between the list and the date boxes, every column changes width in proportion, down to 6 characters. The list and the date boxes share a change in window width, so the divider between them keeps its place. Why: Use the whole width of the list at any window size.
+  - **Columns fill the list** — What: Title, Segment, SubSegment, Category and Start Date always fill the list's width, starting in the proportions 260 : 150 : 150 : 150 : 110. When the window grows or shrinks, or you move the divider between the list and the date boxes, every column changes width in proportion, down to 6 characters. The list and the date boxes share a change in window width, so the divider between them keeps its place. Why: Use the whole width of the list at any window size.
   - **Resizable columns** — What: Every data column has a draggable divider at its right edge. When you let go, the column you dragged keeps the width you dropped it at, and the other columns grow or shrink to fill the list. Cell text expands to fill the new width (so a wide Title shows the full title instead of "…"). The shape is remembered between sessions. Same reusable resizer as the Today view.
   - **Row checkbox** — What: A checkbox in the first column of each item row. Why: Select several items to move them together (see "Drag a group" below). Optional — leave them all unchecked to drag items one at a time.
 - **Date Boxes (right)** — What: Drop targets for dates. Why: Reschedule by drag-and-drop.
@@ -232,7 +233,6 @@ Note actions:
 Filters:
 - **Toolbar wrap** — What: The Note Size slider, Compact Height and the hint line sit at the toolbar's right-hand edge, and on a narrow window they move to a second toolbar row; the search row and the multi-link warning stay on their own rows. Narrower still than the second row needs, they clip again; there is no minimum window size. Why: Reach every control at any window size.
 - **Show Pending / Show Complete** — What: Toggles those note states onto the board. Why: Review inactive work without mixing it into the default active board.
-- **Link Action Item button color** — What: In the detail panel, the button uses the Category color. Why: Keep the project-to-action workflow visually tied to planning lineage.
 
 #### Project detail panel (right side)
 
@@ -265,7 +265,7 @@ Project Notes section:
 - **Count label** — Reads "N note(s) shown" or "N shown • M completed hidden" when the shared filter hides completed notes.
 
 Action Items section:
-- **Columns** — What: Each row is columnar — `(checkbox)`, `Title`, `Status`, `Start`, `Due`, then **Edit** / **Complete** / **Unlink** — under a heading row that scrolls with the list. The four text columns always fill the list's width, starting in the proportions 260 : 90 : 90 : 90, and resize as described under *Resizing the item lists* above: a draggable divider at each column's right edge, a floor of 6 characters, and the shape remembered between sessions. Each item's next step still shows on a second line inside the Title column, cut to that column's width. Why: Read the status and the dates in line with the other rows instead of in one run-on line.
+- **Columns** — What: Each row is columnar — `(checkbox)`, `Title`, `Status`, `Start`, `Due`, then **Edit** / **Complete** / **Unlink** — under a heading row that scrolls with the list. The four text columns always fill the list's width, starting in the proportions 260 : 90 : 110 : 110, and resize as described under *Resizing the item lists* above: a draggable divider at each column's right edge, a floor of 6 characters, and the shape remembered between sessions. Each item's next step still shows on a second line inside the Title column, cut to that column's width. Why: Read the status and the dates in line with the other rows instead of in one run-on line.
 - **Select All checkbox** — What: Checks every visible action item row in one click. Why: Avoid clicking each row when planning a bulk change. Respects the shared Show Completed filter — only visible items are selected.
 - **Per-item checkbox** — What: Selects a single action item. Why: Build an arbitrary selection for bulk edits.
 - **Bulk Edit button** — What: Enabled when ≥1 item is selected; opens a small dialog. Why: Apply Start Date and/or Priority to several items at once.
@@ -275,16 +275,28 @@ Action Items section:
 - **Edit / Complete / Unlink** — Per-row controls work as before.
 
 #### Toolbar buttons (right panel)
-- **Create Action Item** — Add a new task to this project.
-- **Link Action Item** — What: Opens the Link Action Items dialog to attach existing tasks to this project. Why: Pull already-created items onto a project so they pick up its planning lineage.
-  - **Search** — Filter by title, description, next step, or who.
-  - **Filter buttons (AND logic)** — `Completed`, `Not Completed`, `Linked`, `Not Linked`. What: Toggle any combination; active filters highlight and all selected filters must match (e.g. `Not Completed` + `Not Linked` shows only open tasks not yet on any project). Why: Narrow a long task list to exactly the items you want to link.
-  - **Per-row checkbox + Link Selected** — What: Check several rows and click **Link Selected** to attach them all at once; the per-row **Link** button still links one item. Why: Bulk-link a batch without clicking each row.
-  - Linking an item also stamps the project's APE onto it, so it becomes filterable by Segment/SubSegment in the Scheduler.
+
+As of 2026-11-16 this toolbar holds **Bulk Edit** and, while the selected
+project is not already Active, **Set Active**. Six buttons were taken off it — Create
+Action Item, Link Action Item, Edit Project, Create Note, Link Note and Open
+Notes — so the panel is the lists, not a second row of controls. Where each
+one's work is done now:
+
+- **Edit Project** → the **pencil** icon on the project's own tile.
+- **Create Note** / **Link Note** → the **📄** icon on the tile, which asks
+  which of the two you want.
+- **Open Notes** → each note row in the Project Notes list has its own
+  **Open**.
+- **Create Action Item** → create the item on Today, Upcoming or All Items and
+  set its **Project** in the item editor. There is no longer a route from this
+  screen.
+- **Link Action Item** → open the item and set its **Project** in the item
+  editor. The Link Action Items dialog, with its search, its AND-logic filter
+  buttons and its Link Selected, is no longer reachable from anywhere; linking
+  one item at a time through the editor replaces it. Linking still stamps the
+  project's APE onto the item, so it stays filterable by Segment/SubSegment in
+  the Scheduler.
 - **Bulk Edit** — See above; enabled when items are selected.
-- **Edit Project** — Open the project editor dialog.
-- **Create Note** / **Link Note** — Create a new Obsidian note (lands in your Project Notes Folder) or link an existing one.
-- **Open Notes** — Browse the project's linked notes in a separate dialog (kept for explicit "show me the notes I have" use).
 
 ### Plan (Time Blocks)
 - What: Build a day by dragging the items that start on that date onto a grid of
@@ -921,7 +933,7 @@ Header controls:
 
 Columns: `(✓)`, `Title`, `Who`, `Completed`, `Pri`, the priority factor chips when expanded, and `Reopen`.
 
-- **Columns fill the list** — What: Title, Who, Completed and Pri always fill the list's width, starting in the proportions 260 : 110 : 150 : 60, with a pinned heading row and a draggable divider at each column's right edge. They resize as described under *Resizing the item lists* above, down to 6 characters, and the shape is remembered between sessions. The ✓ mark, the factor chips and **Reopen** keep their size. The date column shows the date alone — the heading says it is the completed date. Why: Use the window's whole width, and read long titles without losing the other columns.
+- **Columns fill the list** — What: Title, Who, Completed and Pri always fill the list's width, starting in the proportions 260 : 110 : 110 : 60, with a pinned heading row and a draggable divider at each column's right edge. They resize as described under *Resizing the item lists* above, down to 6 characters, and the shape is remembered between sessions. The ✓ mark, the factor chips and **Reopen** keep their size. The date column shows the date alone — the heading says it is the completed date. Why: Use the window's whole width, and read long titles without losing the other columns.
 
 Row controls:
 - **Edit** — What: Opens the Item Editor. Why: Review or adjust completed items.

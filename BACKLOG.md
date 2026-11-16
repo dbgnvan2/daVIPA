@@ -23,6 +23,35 @@ One batch at a time in this checkout (`CLAUDE.md`). What is here is open work:
 adjacent issues from recent batches, screen reports, the carried-forward
 features, and the long-standing bugs, requests and user stories at the end.
 
+## Orphaned by the Project Board button removal (LRP, filed 2026-11-16)
+
+### LRP-A1 — three pieces of code with no caller (medium)
+
+Removing Create Action Item and Link Action Item from the right panel
+(LRP-M2) left `ProjectBoardsScreen.link_existing_action_item` and
+`ProjectBoardsScreen.open_note_picker` with no caller anywhere in `src/` or
+`tests/`, and `LinkProjectActionItemsDialog`
+(`screens/project_boards.py:273`) reachable in `src/` only from the first of
+them. The dialog carries the exclusive multi-link filing logic and
+`tests/test_project_multi_link.py`, which still passes because it builds the
+dialog directly.
+
+Kept in place deliberately (plan D4): deleting it is a separate decision from
+"remove these buttons", and re-exposing it elsewhere is the other way that
+decision can go. What must not happen is for it to sit unreachable and
+unrecorded. Decide one of: delete all three with their tests, or give the
+dialog a route (the item editor's Project field is the single-item
+replacement; there is no multi-link route at all now).
+
+### LRP-A2 — the Scheduler's text clamp ignores the row font (low)
+
+`screens/drag_schedule.py` builds its `ColumnResizer` with the default
+`char_px`, while the five item lists pass `row_char_px()`. Since LRP-M4 its
+column *floors* follow the row-font setting, but the character budget its
+text is cut to does not, so a larger list font cuts the Scheduler's titles
+earlier than it cuts the other lists'. One argument; not fixed in LRP because
+it is not part of what the user asked for.
+
 ## Adjacent issue — the band thresholds outlived the bands (PBG, filed 2026-11-12)
 
 ### PBG-A9 — the badge's pill is nearly the value of the row behind it (low)
