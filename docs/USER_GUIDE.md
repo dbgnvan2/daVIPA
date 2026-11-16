@@ -79,12 +79,12 @@ daVIPA is a desktop task manager focused on prioritization and execution.
 
 ## 3) Screen-by-screen guide (What + Why)
 
-### Resizing the item lists (Today, Upcoming, All Items, Hierarchical)
-- What: Each of these four lists has a pinned column header. Every text column widens and narrows with the window: Title, SubSegment, Category, Who, and each list's Start, Due, Pri (Priority), Time (Est. Time), Status and Sub-items. No column gets narrower than 6 characters. The checkbox, the factor chips and the Timer/Actions buttons keep their size. Text that does not fit is cut with `...`, headings included, and the full text comes back when the column is wide enough again.
+### Resizing the item lists (Today, Upcoming, All Items, Hierarchical, Completed, the Scheduler's list, and a project's Action Items)
+- What: Each of these lists shares its width out to its own text columns. Today, Upcoming, All Items, Hierarchical and Completed have a pinned column header; the Scheduler's list has one too. A project's Action Items list has a heading row that scrolls with the list, because the detail panel is one scroll area. Every text column widens and narrows with the window: Title, SubSegment, Category, Who, and each list's Start, Due, Pri (Priority), Time (Est. Time), Status and Sub-items. Completed's columns are Title, Who, Completed and Pri; a project's Action Items columns are Title, Status, Start and Due. No column gets narrower than 6 characters. The checkbox, the factor chips and the Timer/Actions buttons keep their size. Text that does not fit is cut with `...`, headings included, and the full text comes back when the column is wide enough again.
 - Drag the divider at the right edge of any text column's heading to change how the width is shared. Each screen remembers its own column shape between sessions, and keeps that shape as the window is resized, including after the window has been narrowed until every column is at 6 characters.
-- Start and Due show the date alone (`11/14`; in Hierarchical, `2026-11-14`); the heading says which date it is.
+- Start and Due show the date alone (`11/14`; in Hierarchical, `2026-11-14`); the heading says which date it is. Completed's date column and a project's Start and Due read the same way.
 - When you let go of a divider, the column you dragged keeps the width you dropped it at, and the other columns grow or shrink to fill the list. A click on a divider with no drag changes nothing.
-- On a narrow window the search box gives up width first. Narrower still, the toolbar's right-hand controls (for example **+ New Item**) move to a second toolbar row. Below what those two rows need, the toolbar and the right-hand columns are cut off; there is no minimum window size.
+- On a narrow window the search box gives up width first, where the screen has one. Narrower still, the toolbar's right-hand controls (for example **+ New Item**) move to a second toolbar row. The Scheduler, Projects and Completed toolbars do this too, so their filters no longer run off the right-hand edge. Below what those two rows need, the toolbar and the right-hand columns are cut off; there is no minimum window size.
 - In Hierarchical, sub-items are indented inside the Title column, so the columns to the right line up at every level.
 - Why: Use the window's whole width, whatever its size.
 
@@ -168,6 +168,7 @@ Header controls:
 - **Who** — What: Filters the left list by Who. Why: Focus on one client or context.
 - **Segment / SubSegment** — What: Filters the Scheduler by APE lineage. Why: Focus scheduling on one planning area.
 - **Refresh** — What: Reloads the full visible range using the current `Next N days` and `Who` filters and clears any clicked date filter. Why: Reset back to the full scheduling set.
+- **Toolbar wrap** — What: On a narrow window the Who, Segment, SubSegment and Project filters move to a second toolbar row instead of clipping off the right-hand edge. Why: Reach every filter at any window size.
 
 Main area:
 - **Action Items list (left)** — What: Open items with no dates plus upcoming items in the selected window. Why: A short list of items worth scheduling.
@@ -229,6 +230,7 @@ Note actions:
 - **Trash can** — What: Delete the project note. Why: Remove obsolete project records when appropriate.
 
 Filters:
+- **Toolbar wrap** — What: On a narrow window the board's right-hand controls — the Note Size slider, Compact Height and the hint line — move to a second toolbar row; the search row and the multi-link warning stay on their own rows. Why: Reach every control at any window size.
 - **Show Pending / Show Complete** — What: Toggles those note states onto the board. Why: Review inactive work without mixing it into the default active board.
 - **Link Action Item button color** — What: In the detail panel, the button uses the Category color. Why: Keep the project-to-action workflow visually tied to planning lineage.
 
@@ -263,6 +265,7 @@ Project Notes section:
 - **Count label** — Reads "N note(s) shown" or "N shown • M completed hidden" when the shared filter hides completed notes.
 
 Action Items section:
+- **Columns** — What: Each row is columnar — `(checkbox)`, `Title`, `Status`, `Start`, `Due`, then **Edit** / **Complete** / **Unlink** — under a heading row that scrolls with the list. The four text columns always fill the list's width, starting in the proportions 260 : 90 : 90 : 90, and resize as described under *Resizing the item lists* above: a draggable divider at each column's right edge, a floor of 6 characters, and the shape remembered between sessions. Each item's next step still shows on a second line inside the Title column, cut to that column's width. Why: Read the status and the dates in line with the other rows instead of in one run-on line.
 - **Select All checkbox** — What: Checks every visible action item row in one click. Why: Avoid clicking each row when planning a bulk change. Respects the shared Show Completed filter — only visible items are selected.
 - **Per-item checkbox** — What: Selects a single action item. Why: Build an arbitrary selection for bulk edits.
 - **Bulk Edit button** — What: Enabled when ≥1 item is selected; opens a small dialog. Why: Apply Start Date and/or Priority to several items at once.
@@ -910,10 +913,15 @@ happen on that save, all deliberate:
 - Why: Review progress and time spent.
 
 Header controls:
+- **Toolbar wrap** — What: On a narrow window the Who filter, Expand/Collapse and the stats label move to a second toolbar row instead of running off the edge. Why: Reach every filter at any window size.
 - **Last N days** — What: Sets the lookback window. Why: Focus on a recent period.
 - **Who** — What: Filter by Who. Why: Review work for a client or context.
 - **Expand/Collapse** — What: Toggles priority factor chips. Why: Show or hide detail.
 - **Stats label** — What: Shows count and total planned minutes. Why: Quick summary.
+
+Columns: `(✓)`, `Title`, `Who`, `Completed`, `Pri`, the priority factor chips when expanded, and `Reopen`.
+
+- **Columns fill the list** — What: Title, Who, Completed and Pri always fill the list's width, starting in the proportions 260 : 110 : 150 : 60, with a pinned heading row and a draggable divider at each column's right edge. They resize as described under *Resizing the item lists* above, down to 6 characters, and the shape is remembered between sessions. The ✓ mark, the factor chips and **Reopen** keep their size. The date column shows the date alone — the heading says it is the completed date. Why: Use the window's whole width, and read long titles without losing the other columns.
 
 Row controls:
 - **Edit** — What: Opens the Item Editor. Why: Review or adjust completed items.

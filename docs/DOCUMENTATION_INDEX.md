@@ -310,6 +310,15 @@ Upcoming screen's date group header. Holds the decision to derive the band's
 label colour from the fill, and the known consequence for the column-heading
 row. **Approved and built 2026-11-15.**
 
+### docs/unused-docs/implementation_plan_2026-11-15_schedule_projects_completed_resize.md
+
+Implementation plan for SPC-M1 to M17: Completed's four columns and the
+Project Board's Action Items list (converted from a one-line meta string to
+real columns) fill their list and follow its width, down to 6 characters, with
+a divider each; the Schedule, Projects and Completed toolbars wrap their
+right-hand group to a second row instead of clipping. Holds decisions D1 to
+D11 and the walk checklist. **Approved and built 2026-11-15**; walk owed.
+
 ### docs/unused-docs/implementation_plan_2026-11-14_scheduler_columns_resize.md
 
 Implementation plan for SCR-M1 to M7: the Scheduler's item columns (Title,
