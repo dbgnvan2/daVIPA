@@ -13,15 +13,22 @@ from ..priority_levels import (
     level_cell_fill,
     row_fill,
 )
+from .item_list_columns import (
+    FixedColumn,
+    ItemListLayout,
+    TextColumn,
+    ToolbarWrap,
+    factors_column,
+)
 from .priority_cell import SCORE_CELL_WIDTH_PX, build_level_cell, score_text
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import notify_weekly_tactic_changes
 from ..theme import apply_segment_accent, semantic_colors, button_style, combo_box_style, list_row_font
-from .title_format import (
-    split_action_item_title,
-    format_column_text,
-    CONTACT_COL_CHARS,
-)
+from .title_format import split_action_item_title
+
+#: The Reopen button's width, and the padding it is gridded with.
+REOPEN_WIDTH_PX = 70
+REOPEN_PAD_PX = 4
 
 if TYPE_CHECKING:
     from ..db_manager import DatabaseManager
@@ -30,6 +37,9 @@ if TYPE_CHECKING:
 
 class CompletedScreen(ctk.CTkFrame):
     """Screen showing completed items."""
+
+    #: Where this screen's column shape is saved (``<prefix>_col_widths``).
+    COLUMN_PREFIX = "completed"
 
     def __init__(self, parent, db_manager: 'DatabaseManager', app: 'GetMoreDoneApp'):
         super().__init__(parent)
@@ -48,16 +58,28 @@ class CompletedScreen(ctk.CTkFrame):
         self.palette = semantic_colors()
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        # Row 0 = toolbar, row 1 = pinned column header, row 2 = the list.
+        self.grid_rowconfigure(2, weight=1)
 
         # Create header
         self.create_header()
 
+        # SPC-M1/M7: a pinned column header with dividers, and one column
+        # layout for it and the rows. Completed's own four columns (SPC-D1).
+        self.layout = ItemListLayout.custom(
+            self, self.settings, self.COLUMN_PREFIX,
+            columns=(TextColumn("title", 1, "Title", 260),
+                     TextColumn("who", 2, "Who", 110),
+                     TextColumn("completed", 3, "Completed", 150),
+                     TextColumn("pri", 4, "Pri", SCORE_CELL_WIDTH_PX)))
+        self.column_header = None
+
         # Create scrollable frame for items
         self.scroll_frame = ctk.CTkScrollableFrame(self, label_text="")
         self.scroll_frame.grid(
-            row=1, column=0, sticky="nsew", padx=10, pady=10)
+            row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.scroll_frame.grid_columnconfigure(0, weight=1)
+        self.layout.bind(self.scroll_frame)
 
         # Load items
         self.refresh()
@@ -66,7 +88,6 @@ class CompletedScreen(ctk.CTkFrame):
         """Create header with controls."""
         header = ctk.CTkFrame(self)
         header.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
-        header.grid_columnconfigure(3, weight=1)
 
         # Title
         title = ctk.CTkLabel(
@@ -127,6 +148,29 @@ class CompletedScreen(ctk.CTkFrame):
             text_color=self.palette["body_text"]
         )
         self.stats_label.grid(row=0, column=7, padx=(20, 10), pady=10)
+        # SPC-M14: no search entry here, so the "days" label's column takes
+        # the slack and everything right of it wraps to a second row.
+        self.toolbar_wrap = ToolbarWrap(header, None, None, 3)
+
+    def _build_column_header(self):
+        """The pinned column headings, over the same columns as the rows."""
+        # SPC-D8: only the controls keep a fixed width.
+        fixed = []
+        if self.columns_expanded:
+            fixed.append(factors_column(5))
+        fixed.append(FixedColumn(6 if self.columns_expanded else 5, "",
+                                 REOPEN_WIDTH_PX, REOPEN_PAD_PX))
+        self.layout.set_columns([FixedColumn(0, "", 30)], fixed)
+        if self.column_header is not None:
+            self.column_header.destroy()
+        hdr = self.layout.build_header(
+            self, {},
+            fg_color=self.palette["surface_subtle"],
+            border_color=self.palette["border"],
+        )
+        hdr.grid(row=1, column=0, sticky="ew",
+                 padx=self.layout.header_padx(self.scroll_frame, 10), pady=(10, 4))
+        self.column_header = hdr
 
     def toggle_columns(self):
         """Toggle between expanded and collapsed column view."""
@@ -145,6 +189,8 @@ class CompletedScreen(ctk.CTkFrame):
         # Clear current items
         for widget in self.scroll_frame.winfo_children():
             widget.destroy()
+        self.layout.clear_rows()
+        self._build_column_header()
 
         # Refresh VSP segment color cache
         self.segment_colors_by_id = self.app.vps_manager.get_segment_colors_by_id()
@@ -215,7 +261,7 @@ class CompletedScreen(ctk.CTkFrame):
             item_frame = ctk.CTkFrame(self.scroll_frame, fg_color=bg_color)
             apply_segment_accent(item_frame, segment_color)
             item_frame.grid(row=idx, column=0, sticky="ew", pady=2, padx=5)
-            item_frame.grid_columnconfigure(1, weight=1)
+            self.layout.apply_grid(item_frame)
             parsed = split_action_item_title(item.title)
 
             # Checkmark
@@ -223,9 +269,11 @@ class CompletedScreen(ctk.CTkFrame):
                 row=0, column=0, padx=5, pady=5)
 
             title_cell = ctk.CTkFrame(item_frame, fg_color="transparent")
-            title_cell.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+            title_cell.grid(row=0, column=self.layout.grid_col("title"),
+                            sticky="ew", padx=5, pady=5)
             title_cell.grid_columnconfigure(1, weight=1)
-            if item.item_type == "week":
+            has_badge = item.item_type == "week"
+            if has_badge:
                 ctk.CTkLabel(
                     title_cell,
                     text="WT",
@@ -235,36 +283,32 @@ class CompletedScreen(ctk.CTkFrame):
                     text_color=palette["on_strong"],
                     font=ctk.CTkFont(size=11, weight="bold"),
                 ).grid(row=0, column=0, padx=(0, 6), sticky="w")
+            # The badge (28) and its gap (6) come out of the title's width.
+            title_delta = 34 if has_badge else 0
             title_label = ctk.CTkLabel(
                 title_cell,
-                text=parsed.title,
+                text=self.layout.cell_text("title", parsed.title, title_delta),
+                width=self.layout.cell_width("title", title_delta),
                 font=list_row_font(),
                 anchor="w",
                 text_color=row_text,
             )
             title_label.grid(row=0, column=1, sticky="ew")
             title_label.bind("<Button-1>", lambda _event, item_id=item.id: self.edit_item(item_id))
+            # Every cell follows its column live (SPC-M2).
+            self.layout.register_row(
+                item_frame, [("title", title_label, parsed.title, title_delta)])
 
             # Who
-            ctk.CTkLabel(
-                item_frame,
-                text=format_column_text(item.who, CONTACT_COL_CHARS),
-                width=110,
-                anchor="w",
-                text_color=row_text,
-                font=list_row_font(),
-            ).grid(row=0, column=2, padx=5, pady=5, sticky="w")
+            self.layout.add_text_cell(
+                item_frame, "who", item.who or "-", row_text, list_row_font())
 
-            # Completed date
-            if item.completed_at:
-                completed_label = ctk.CTkLabel(
-                    item_frame,
-                    text=f"Completed: {item.completed_at[:10]}",
-                    width=150,
-                    text_color=row_text,
-                    font=list_row_font()
-                )
-                completed_label.grid(row=0, column=3, padx=5, pady=5)
+            # Completed date. SPC-D2: no "Completed:" prefix -- the heading
+            # says it, as on the other lists' date columns (LSR2-D5).
+            self.layout.add_text_cell(
+                item_frame, "completed",
+                item.completed_at[:10] if item.completed_at else "-",
+                row_text, list_row_font())
 
             # Priority score
             # PCC-M3 -- the Priority cell's background is the priority colour
@@ -272,10 +316,9 @@ class CompletedScreen(ctk.CTkFrame):
             # its own keeps the row's text, which the row may have derived
             # from a segment fill.
             cell = level_cell_fill(self.settings, item)
-            score_label_box, score_label = build_level_cell(
-                item_frame, cell, score_text(item.priority_score), SCORE_CELL_WIDTH_PX, row_text, list_row_font(),
-            )
-            score_label_box.grid(row=0, column=4, padx=5, pady=5)
+            self.layout.add_level_cell(
+                item_frame, "pri", cell, score_text(item.priority_score),
+                row_text, list_row_font())
 
             # Factor chips (I, U, E, V) - only shown when expanded
             col_offset = 0
@@ -323,7 +366,7 @@ class CompletedScreen(ctk.CTkFrame):
                 **button_style("secondary"),
                 command=lambda i=item.id: self.uncomplete_item(i)
             )
-            btn_uncomplete.grid(row=0, column=6+col_offset, padx=2, pady=5)
+            btn_uncomplete.grid(row=0, column=5+col_offset, padx=2, pady=5)
 
     def edit_item(self, item_id: str):
         """Edit item details."""

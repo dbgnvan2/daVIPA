@@ -114,43 +114,59 @@ class ToolbarWrap:
     The controls keep the toolbar as their parent -- the second row grids
     them ``in_`` a child frame -- so ``toolbar.winfo_children()`` and each
     control's place in the one-row layout are unchanged.
+
+    SPC-D9: ``entry`` is None on a toolbar with no search entry (Completed,
+    the Scheduler), and the search minimum then counts as nothing.
+    ``control_row``/``wrap_row`` are the row the controls sit on and the row
+    they wrap into, for a toolbar whose other rows are already taken (the
+    Project Board's search row and its warning line).
     """
 
-    def __init__(self, toolbar, entry, search_col: int, spacer_col: int):
+    def __init__(self, toolbar, entry, search_col, spacer_col: int,
+                 control_row: int = 0, wrap_row: int = 1):
         self.toolbar = toolbar
         self.entry = entry
         self.search_col = search_col
         self.spacer_col = spacer_col
+        self.control_row = control_row
+        self.wrap_row = wrap_row
         self.frame = None
         self.wrapped = False
         self._moved = []
-        toolbar.grid_columnconfigure(search_col, weight=1, minsize=SEARCH_MIN_PX)
+        if entry is not None:
+            toolbar.grid_columnconfigure(search_col, weight=1,
+                                         minsize=SEARCH_MIN_PX)
+            entry.grid_configure(sticky="ew")
         toolbar.grid_columnconfigure(spacer_col, weight=TOOLBAR_SPACER_WEIGHT)
-        entry.grid_configure(sticky="ew")
         # CTkFrame.bind would bind its inner canvas, whose events never
         # name the toolbar; bind the toolbar's own Tk frame.
         tkinter.Misc.bind(toolbar, "<Configure>", self._on_configure, "+")
+
+    def _on_control_row(self, info) -> bool:
+        return bool(info) and int(info["row"]) == self.control_row
 
     def _one_row_placements(self) -> list:
         """(widget, grid options) for every control, as in the one-row layout."""
         if self.wrapped:
             moved = {widget for widget, _info in self._moved}
             rest = [(w, w.grid_info()) for w in self.toolbar.winfo_children()
-                    if w is not self.frame and w not in moved and w.grid_info()]
+                    if w is not self.frame and w not in moved
+                    and self._on_control_row(w.grid_info())]
             return rest + list(self._moved)
         return [(w, w.grid_info()) for w in self.toolbar.winfo_children()
-                if w is not self.frame and w.grid_info()]
+                if w is not self.frame and self._on_control_row(w.grid_info())]
 
     def one_row_px(self) -> int:
         """The toolbar width one row needs, the search entry at its minimum."""
         columns = {}
         for widget, info in self._one_row_placements():
             col = int(info["column"])
-            if col == self.search_col:
+            if self.entry is not None and col == self.search_col:
                 continue
             need = widget.winfo_reqwidth() + _pad_total(info["padx"])
             columns[col] = max(columns.get(col, 0), need)
-        return sum(columns.values()) + SEARCH_MIN_PX
+        minimum = SEARCH_MIN_PX if self.entry is not None else 0
+        return sum(columns.values()) + minimum
 
     def fit(self, width: int) -> None:
         """Lay the toolbar out for ``width`` px: one row if it fits, else two."""
@@ -165,14 +181,15 @@ class ToolbarWrap:
     def _wrap(self) -> None:
         self._moved = sorted(
             ((w, w.grid_info()) for w in self.toolbar.winfo_children()
-             if w is not self.frame and w.grid_info()
+             if w is not self.frame and self._on_control_row(w.grid_info())
              and int(w.grid_info()["column"]) > self.spacer_col),
             key=lambda pair: int(pair[1]["column"]))
         if self.frame is None:
             self.frame = ctk.CTkFrame(self.toolbar, fg_color="transparent")
         # tkinter's own grid: CTk's wrapper would scale grid_info's padding,
         # which is already in pixels, a second time.
-        _tk_grid(self.frame, row=1, column=0, columnspan=SPACER_COL, sticky="e")
+        _tk_grid(self.frame, row=self.wrap_row, column=0,
+                 columnspan=SPACER_COL, sticky="e")
         for index, (widget, info) in enumerate(self._moved):
             _tk_grid(widget, in_=self.frame, row=0, column=index,
                      padx=info["padx"], pady=info["pady"], sticky=info["sticky"])
@@ -248,18 +265,33 @@ def stretch_specs(first_col: int, title_default: int, columns=()) -> list:
     return specs
 
 
+def custom_specs(columns, title_key: str = "title") -> list:
+    """Specs for a list whose columns are not the shared four (SPC-D3).
+
+    Completed (Title, Who, Completed, Pri) and the Project Board's Action
+    Items (Title, Status, Start, Due) have neither SubSegment nor Category,
+    so ``stretch_specs`` cannot describe them. Same floor and same maxima.
+    """
+    floor = list_floor_px()
+    return [ColumnSpec(
+        column.key, column.grid_col, column.default_px, min_width=floor,
+        max_width=TITLE_MAX_PX if column.key == title_key else STRETCH_MAX_PX)
+        for column in columns]
+
+
 class ItemListLayout:
     """One list screen's column widths, header and resize binding."""
 
-    def __init__(self, owner, settings, prefix: str, first_col: int,
-                 title_default: int = 260, columns=()):
+    def __init__(self, owner, settings, prefix: str, first_col: int = 1,
+                 title_default: int = 260, columns=(), specs=None):
         self.owner = owner
         self.headings = {column.key: column.heading for column in columns}
         self.resizer = ColumnResizer(
             owner=owner,
             settings=settings,
             prefix=prefix,
-            specs=stretch_specs(first_col, title_default, columns),
+            specs=(specs if specs is not None
+                   else stretch_specs(first_col, title_default, columns)),
             char_px=row_char_px(),
             set_cell_width=True,
         )
@@ -272,6 +304,18 @@ class ItemListLayout:
         # A fit skipped during a drag runs once the divider is let go.
         self.resizer.on_drag_end = self._on_configure
         self.resizer.fill_after_drag = True
+
+    @classmethod
+    def custom(cls, owner, settings, prefix: str, columns,
+               title_key: str = "title"):
+        """A list whose columns are its own, not the shared four (SPC-D3).
+
+        Every column is a ``TextColumn``, Title included, and the floor, the
+        debounce, the dividers, heading cutting, the refit after a drag and
+        the persistence are the ones the four item lists use.
+        """
+        return cls(owner, settings, prefix, columns=columns,
+                   specs=custom_specs(columns, title_key))
 
     # ----------------------------------------------------------------- columns
     @property

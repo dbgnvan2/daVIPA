@@ -10,9 +10,16 @@ from typing import TYPE_CHECKING, Optional
 import customtkinter as ctk
 from PIL import Image
 
+from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
 from ..models import ActionItem, PriorityFactors, ProjectBoard, ProjectBoardStatus
 from ..paths import project_root
+from .item_list_columns import (
+    FixedColumn,
+    ItemListLayout,
+    TextColumn,
+    ToolbarWrap,
+)
 from .project_link_notice import (
     confirm_exclusive_relink,
     describe_outstanding_multi_links,
@@ -21,7 +28,13 @@ from .week_collision_notice import (
     confirm_weekly_tactic_completion,
     notify_weekly_tactic_changes,
 )
-from ..theme import button_style, combo_box_style, semantic_colors, status_text_color
+from ..theme import (
+    button_style,
+    combo_box_style,
+    list_row_font,
+    semantic_colors,
+    status_text_color,
+)
 from ..utils.duration import format_minutes
 
 if TYPE_CHECKING:
@@ -29,6 +42,12 @@ if TYPE_CHECKING:
     from ..db_manager import DatabaseManager
 
 IMPORTANCE_OPTIONS = [f"{k} ({v})" for k, v in PriorityFactors.IMPORTANCE.items()]
+
+#: SPC-D2 -- the linked Action Items list's own columns, and the width its
+#: three action buttons take (Edit 70, Complete 82, Unlink 70, padx 3 each).
+ITEM_ACTIONS_WIDTH_PX = 240
+ITEM_ACTIONS_COL = 5
+ITEM_CHECKBOX_WIDTH_PX = 24
 
 
 class ProjectBoardEditorDialog(ctk.CTkToplevel):
@@ -771,6 +790,8 @@ class ProjectBoardsScreen(ctk.CTkFrame):
     CARD_WIDTH = 235
     CARD_HEIGHT = 280
     SPLITTER_WIDTH = 8
+    #: Where the items list's column shape is saved.
+    COLUMN_PREFIX = "project_items"
     MIN_PANEL_WIDTH = 300
     ACTION_BUTTON_WIDTH = 38
     ACTION_BUTTON_HEIGHT = 34
@@ -823,6 +844,16 @@ class ProjectBoardsScreen(ctk.CTkFrame):
         else:
             self.edit_icon_image = None
 
+        self.settings = AppSettings.load()
+        # SPC-M8: the linked Action Items list is columnar, and its columns
+        # resize with the panel (SPC-D2/D3).
+        self.items_layout = ItemListLayout.custom(
+            self, self.settings, self.COLUMN_PREFIX,
+            columns=(TextColumn("title", 1, "Title", 260),
+                     TextColumn("status", 2, "Status", 90),
+                     TextColumn("start", 3, "Start", 90),
+                     TextColumn("due", 4, "Due", 90)))
+
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
@@ -832,7 +863,6 @@ class ProjectBoardsScreen(ctk.CTkFrame):
     def _build(self):
         header = ctk.CTkFrame(self)
         header.grid(row=0, column=0, sticky="ew", padx=12, pady=12)
-        header.grid_columnconfigure(9, weight=1)
 
         ctk.CTkLabel(header, text="Project Board", font=ctk.CTkFont(size=22, weight="bold")).grid(
             row=0, column=0, padx=8, pady=8, sticky="w"
@@ -851,12 +881,15 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             variable=self.show_pending_var,
             command=self.refresh,
         ).grid(row=0, column=3, padx=8, pady=8)
+        # SPC-D10: the slack sits in this column, so the size controls right
+        # of it hug the right edge and wrap to row 1 on a narrow window.
+        # Stuck left so the checkbox itself does not drift.
         ctk.CTkCheckBox(
             header,
             text="Show Complete",
             variable=self.show_completed_var,
             command=self.refresh,
-        ).grid(row=0, column=4, padx=8, pady=8)
+        ).grid(row=0, column=4, padx=8, pady=8, sticky="w")
         ctk.CTkLabel(header, text="Note Size").grid(row=0, column=5, padx=(14, 4), pady=8)
         ctk.CTkSlider(
             header,
@@ -891,7 +924,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             justify="left",
             text_color=status_text_color("warning"),
         )
-        self.multi_link_label.grid(row=2, column=0, columnspan=10, padx=8,
+        self.multi_link_label.grid(row=3, column=0, columnspan=10, padx=8,
                                    pady=(0, 8), sticky="w")
 
         # Search row
@@ -900,7 +933,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             placeholder_text="Search title, next step, notes...",
             width=240,
         )
-        self.search_entry.grid(row=1, column=0, columnspan=2, padx=8, pady=(0, 8), sticky="w")
+        self.search_entry.grid(row=2, column=0, columnspan=2, padx=8, pady=(0, 8), sticky="w")
         self.search_entry.bind("<Return>", lambda e: self.perform_search())
 
         self.btn_search = ctk.CTkButton(
@@ -910,7 +943,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             command=self.perform_search,
             **button_style("secondary"),
         )
-        self.btn_search.grid(row=1, column=2, padx=6, pady=(0, 8), sticky="w")
+        self.btn_search.grid(row=2, column=2, padx=6, pady=(0, 8), sticky="w")
 
         self.btn_clear_search = ctk.CTkButton(
             header,
@@ -919,7 +952,12 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             command=self.clear_search,
             **button_style("secondary"),
         )
-        self.btn_clear_search.grid(row=1, column=3, padx=6, pady=(0, 8), sticky="w")
+        self.btn_clear_search.grid(row=2, column=3, padx=6, pady=(0, 8), sticky="w")
+
+        # SPC-M14/M16: no search entry on the control row, so Show Complete's
+        # column takes the slack; row 1 is the wrap row, and the search row
+        # (2) and the warning line (3) stay where they are.
+        self.toolbar_wrap = ToolbarWrap(header, None, None, 4, wrap_row=1)
 
         body = ctk.CTkFrame(self)
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
@@ -981,6 +1019,7 @@ class ProjectBoardsScreen(ctk.CTkFrame):
         self.items_frame = ctk.CTkScrollableFrame(right_panel)
         self.items_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.items_frame.grid_columnconfigure(0, weight=1)
+        self.items_layout.bind(self.items_frame)
         body.bind("<Configure>", self._on_body_resize)
 
     def perform_search(self):
@@ -1319,6 +1358,8 @@ class ProjectBoardsScreen(ctk.CTkFrame):
     def _render_detail(self):
         for child in self.items_frame.winfo_children():
             child.destroy()
+        self.items_layout.clear_rows()
+        self.items_layout.resizer.clear_header()
 
         # Clear selections when rendering new detail view
         self.selected_item_ids.clear()
@@ -1484,13 +1525,15 @@ class ProjectBoardsScreen(ctk.CTkFrame):
                 self.items_frame,
                 text=f"All {completed_count} item(s) completed. Enable 'Show Completed' to view them.",
                 text_color=semantic_colors()["muted_text"],
-            ).grid(row=4, column=0, sticky="w", padx=6, pady=12)
+            ).grid(row=5, column=0, sticky="w", padx=6, pady=12)
             return
 
-        for idx, item in enumerate(tasks, start=4):
+        self._build_items_column_header()
+
+        for idx, item in enumerate(tasks, start=5):
             row_frame = ctk.CTkFrame(self.items_frame)
-            row_frame.grid(row=idx, column=0, sticky="ew", padx=2, pady=4)
-            row_frame.grid_columnconfigure(1, weight=1)
+            row_frame.grid(row=idx, column=0, sticky="ew", padx=5, pady=4)
+            self.items_layout.apply_grid(row_frame)
 
             checkbox_var = ctk.BooleanVar(value=False)
             self.item_checkbox_vars[item.id] = checkbox_var
@@ -1499,30 +1542,50 @@ class ProjectBoardsScreen(ctk.CTkFrame):
                 row_frame,
                 text="",
                 variable=checkbox_var,
-                width=24,
-                checkbox_width=24,
-                checkbox_height=24,
+                width=ITEM_CHECKBOX_WIDTH_PX,
+                checkbox_width=ITEM_CHECKBOX_WIDTH_PX,
+                checkbox_height=ITEM_CHECKBOX_WIDTH_PX,
                 command=lambda item_id=item.id: self._on_item_checkbox_changed(item_id),
             ).grid(row=0, column=0, rowspan=2, sticky="nw", padx=6, pady=8)
 
-            left = ctk.CTkFrame(row_frame, fg_color="transparent")
-            left.grid(row=0, column=1, sticky="ew", padx=8, pady=8)
-            left.grid_columnconfigure(0, weight=1)
-            ctk.CTkLabel(
-                left,
-                text=item.title,
+            # SPC-D2: Title, Status, Start and Due are columns now, so the
+            # one-line meta string is gone; "Next:" stays under the title,
+            # inside the Title column and cut to it (SPC-M11).
+            title_label = ctk.CTkLabel(
+                row_frame,
+                text=self.items_layout.cell_text("title", item.title),
+                width=self.items_layout.cell_width("title"),
                 font=ctk.CTkFont(size=15, weight="bold"),
                 anchor="w",
                 justify="left",
-            ).grid(row=0, column=0, sticky="w")
-            meta = (
-                f"Status: {item.status} | Start: {item.start_date or '-'} | Due: {item.due_date or '-'}\n"
-                f"Next: {item.next_action or '-'}"
             )
-            ctk.CTkLabel(left, text=meta, justify="left", anchor="w").grid(row=1, column=0, sticky="w", pady=(2, 0))
+            title_label.grid(row=0, column=self.items_layout.grid_col("title"),
+                             padx=5, pady=(8, 0), sticky="w")
+            self.items_layout.register_row(
+                row_frame, [("title", title_label, item.title, 0)])
+
+            next_text = f"Next: {item.next_action or '-'}"
+            next_label = ctk.CTkLabel(
+                row_frame,
+                text=self.items_layout.cell_text("title", next_text),
+                width=self.items_layout.cell_width("title"),
+                font=list_row_font(),
+                anchor="w",
+                justify="left",
+            )
+            next_label.grid(row=1, column=self.items_layout.grid_col("title"),
+                            padx=5, pady=(2, 8), sticky="w")
+            self.items_layout.add_cell(row_frame, "title", next_label, next_text)
+
+            for key, value in (("status", item.status),
+                               ("start", item.start_date or "-"),
+                               ("due", item.due_date or "-")):
+                self.items_layout.add_text_cell(
+                    row_frame, key, value, None, list_row_font())
 
             actions = ctk.CTkFrame(row_frame, fg_color="transparent")
-            actions.grid(row=0, column=2, sticky="e", padx=8, pady=8)
+            actions.grid(row=0, column=ITEM_ACTIONS_COL, rowspan=2,
+                         sticky="e", padx=8, pady=8)
             ctk.CTkButton(actions, text="Edit", width=70, command=lambda item_id=item.id: self.edit_item(item_id), **button_style("secondary")).pack(
                 side="left", padx=3
             )
@@ -1533,6 +1596,21 @@ class ProjectBoardsScreen(ctk.CTkFrame):
             ctk.CTkButton(actions, text="Unlink", width=70, command=lambda item_id=item.id: self.unlink_item(item_id), **button_style("secondary")).pack(
                 side="left", padx=3
             )
+
+    def _build_items_column_header(self):
+        """The Action Items column headings, with a divider per column.
+
+        SPC-D7: it scrolls with the list rather than being pinned -- the
+        detail panel is one scroll area holding the notes section too.
+        """
+        palette = semantic_colors()
+        self.items_layout.set_columns(
+            [FixedColumn(0, "", ITEM_CHECKBOX_WIDTH_PX, 12)],
+            [FixedColumn(ITEM_ACTIONS_COL, "", ITEM_ACTIONS_WIDTH_PX, 16)])
+        header = self.items_layout.build_header(
+            self.items_frame, {}, fg_color=palette["surface_subtle"],
+            border_color=palette["border"])
+        header.grid(row=4, column=0, sticky="ew", padx=5, pady=(0, 4))
 
     def add_project(self):
         dialog = ProjectBoardEditorDialog(self, self.db_manager)

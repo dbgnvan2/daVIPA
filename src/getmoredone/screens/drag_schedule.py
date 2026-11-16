@@ -33,6 +33,7 @@ from .drag_schedule_support import (
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .title_format import split_action_item_title, format_column_text
 from .column_resize import CHAR_PX, ColumnResizer, ColumnSpec
+from .item_list_columns import ToolbarWrap
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
@@ -157,7 +158,6 @@ class DragScheduleScreen(ctk.CTkFrame):
     def create_header(self):
         header = ctk.CTkFrame(self)
         header.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
-        header.grid_columnconfigure(13, weight=1)
 
         title = ctk.CTkLabel(
             header,
@@ -189,7 +189,10 @@ class DragScheduleScreen(ctk.CTkFrame):
             command=self.refresh_all_dates,
             **button_style("secondary"),
         )
-        self.refresh_btn.grid(row=0, column=4, padx=(10, 5), pady=10)
+        # SPC-D10: the slack sits in this column, so the filters right of it
+        # hug the right edge and wrap to a second row when the window is too
+        # narrow for one. Stuck left so Refresh itself does not drift.
+        self.refresh_btn.grid(row=0, column=4, padx=(10, 5), pady=10, sticky="w")
 
         ctk.CTkLabel(header, text="Who:").grid(
             row=0, column=5, padx=(20, 5), pady=10)
@@ -244,6 +247,9 @@ class DragScheduleScreen(ctk.CTkFrame):
             command=lambda _v: self.on_project_filter_changed(),
         )
         self.project_filter_combo.grid(row=0, column=12, padx=5, pady=10)
+        # SPC-M14: no search entry on this toolbar; Refresh's column takes the
+        # slack and the four filters wrap to a second row.
+        self.toolbar_wrap = ToolbarWrap(header, None, None, 4)
 
     def create_body(self):
         body = ctk.CTkFrame(self)

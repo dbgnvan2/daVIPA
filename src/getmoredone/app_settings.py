@@ -164,6 +164,9 @@ class AppSettings:
     upcoming_col_widths: dict = field(default_factory=dict)
     all_items_col_widths: dict = field(default_factory=dict)
     hierarchical_col_widths: dict = field(default_factory=dict)
+    # SPC-D6 — Completed, and the Project Board's linked Action Items list.
+    completed_col_widths: dict = field(default_factory=dict)
+    project_items_col_widths: dict = field(default_factory=dict)
 
     # UPD-D4 — where a two-panel VSP tab's vertical divider was left. The same
     # class of state as a column width, and stored the same way: one field per
