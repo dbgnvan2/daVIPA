@@ -168,7 +168,7 @@ Header controls:
 - **Who** — What: Filters the left list by Who. Why: Focus on one client or context.
 - **Segment / SubSegment** — What: Filters the Scheduler by APE lineage. Why: Focus scheduling on one planning area.
 - **Refresh** — What: Reloads the full visible range using the current `Next N days` and `Who` filters and clears any clicked date filter. Why: Reset back to the full scheduling set.
-- **Toolbar wrap** — What: On a narrow window the Who, Segment, SubSegment and Project filters move to a second toolbar row instead of clipping off the right-hand edge. Why: Reach every filter at any window size.
+- **Toolbar wrap** — What: The Who, Segment, SubSegment and Project filters sit at the toolbar's right-hand edge, and on a narrow window they move to a second toolbar row instead of clipping off that edge. Narrower still than the second row needs, they clip again; there is no minimum window size. Why: Reach every filter at any window size.
 
 Main area:
 - **Action Items list (left)** — What: Open items with no dates plus upcoming items in the selected window. Why: A short list of items worth scheduling.
@@ -230,7 +230,7 @@ Note actions:
 - **Trash can** — What: Delete the project note. Why: Remove obsolete project records when appropriate.
 
 Filters:
-- **Toolbar wrap** — What: On a narrow window the board's right-hand controls — the Note Size slider, Compact Height and the hint line — move to a second toolbar row; the search row and the multi-link warning stay on their own rows. Why: Reach every control at any window size.
+- **Toolbar wrap** — What: The Note Size slider, Compact Height and the hint line sit at the toolbar's right-hand edge, and on a narrow window they move to a second toolbar row; the search row and the multi-link warning stay on their own rows. Why: Reach every control at any window size.
 - **Show Pending / Show Complete** — What: Toggles those note states onto the board. Why: Review inactive work without mixing it into the default active board.
 - **Link Action Item button color** — What: In the detail panel, the button uses the Category color. Why: Keep the project-to-action workflow visually tied to planning lineage.
 
@@ -913,7 +913,7 @@ happen on that save, all deliberate:
 - Why: Review progress and time spent.
 
 Header controls:
-- **Toolbar wrap** — What: On a narrow window the Who filter, Expand/Collapse and the stats label move to a second toolbar row instead of running off the edge. Why: Reach every filter at any window size.
+- **Toolbar wrap** — What: The Who filter, Expand/Collapse and the stats label sit at the toolbar's right-hand edge, and on a narrow window they move to a second toolbar row instead of running off it. Why: Reach every filter at any window size.
 - **Last N days** — What: Sets the lookback window. Why: Focus on a recent period.
 - **Who** — What: Filter by Who. Why: Review work for a client or context.
 - **Expand/Collapse** — What: Toggles priority factor chips. Why: Show or hide detail.

@@ -375,6 +375,42 @@ behaviour it replaces. `docs/unused-docs/implementation_plan_2026-11-10_plan_wal
 step 4 settles it.
 
 
+## Adjacent issues from the SPC resize batch (2026-11-15)
+
+Found by the sweep over SPC (Completed and the Project Board items list
+resize, three toolbars wrap), neither introduced by it nor fixed in it.
+
+### 2026-11-15 - Type: Bug
+
+**Title:** A non-dict `<prefix>_col_widths` in settings.json stops a screen opening
+**Description:** `ColumnResizer._load_stored` calls `.get` on whatever is
+stored, and `AppSettings.load` filters by field name with no type check. A
+hand-edited or corrupted settings file holding a list, string or int under any
+of the six `*_col_widths` keys raises `AttributeError` during screen
+construction, so the screen does not open at all. Probed directly; reachable
+only via a corrupted or hand-edited file.
+**Priority:** Medium
+**Effort:** Small
+**Notes:** Fix the class, not one prefix (P5): coerce to a dict in
+`_load_stored`, or type-check the dict fields in `AppSettings.load`. SPC adds
+two more keys of the same shape, so the blast radius grew by two.
+
+### 2026-11-15 - Type: Bug
+
+**Title:** Completed's stats label can clip until the next window resize
+**Description:** `stats_label` is the only variable-width control on any of
+these toolbars, and `refresh()` rewrites it (`Count: 3` to
+`Count: 412 | Time: 93h 20m`) without re-running `toolbar_wrap.fit`. The
+header's allocated width does not change, so no `<Configure>` fires: the
+toolbar stays on one row and the label clips until the user resizes the
+window.
+**Priority:** Low
+**Effort:** Small
+**Notes:** Call `self.toolbar_wrap.fit(self.header.winfo_width())` after the
+stats text is set, or make `ToolbarWrap` re-measure on a `<Configure>` of its
+own children. Not a regression — Completed had no wrap before SPC.
+
+
 ## Adjacent issues from the plan day-controls batch (2026-11-06)
 
 Found while building PD-M2 and PD-M3, not introduced by either, and not fixed

@@ -152,6 +152,48 @@ asserts it exactly).
 Tier: **Full** — `src/`, three screens' user-visible layout. Budget: prose at
 or under 0.3 lines per line of changed code, tests at or under 2x.
 
+## Sweep findings and what was done (2026-11-15)
+
+Two passes: `learning-qa` (failures that hide, P1-P45) and a cold correctness
+pass. Fixed in this batch:
+
+- **High — the colour inventory was stale**, so `tests/test_color_inventory_sync.py`
+  was red at the first three commits: this change adds two `build_header(...)`
+  calls and removes two `text_color=row_text` labels. `tools/color_audit.py`
+  re-run and the regenerated `docs/ui_color_inventory.md` committed with it.
+- **SPC-S1 — the Action Items title was a hardcoded bold 15** while the
+  resizer cuts that cell at `row_char_px()`, which follows the user's list
+  font setting. A larger setting grew the budget and not the text. Now
+  `theme.list_row_font_bold()`. The cold pass also predicted the label would
+  push its column wider; measured and it does not — `winfo_reqwidth()` equals
+  the configured width. The residual is that bold overshoots the 8 px/char
+  model by about 12%, which is the same approximation all six lists use.
+- **SPC-S2 — `test_spcm15` could not fail for two of its three screens.** The
+  wrap frame is gridded `sticky="e"`, so a second row wider than the toolbar
+  overflows the *left* edge, which a right-edge check reads as a pass. At the
+  fixed 760 px it was testing the Scheduler (second row needs 991 px) and
+  Projects (844 px) below their own two-row minimum. Now sized from
+  `one_row_px() - 40`, inside the band where two rows are the point, and both
+  edges are asserted. New `ToolbarWrap.wrap_row_px()` is that measurement, and
+  `_wrap` now shares its candidate selection so the two cannot drift.
+  `test_spcs2_two_rows_need_less_width_than_one` guards the band without a
+  mapped window.
+- **P4 — reserved widths restated beside their widgets.** `REOPEN_WIDTH_PX`
+  existed but the button still said `width=70`; `ITEM_ACTIONS_WIDTH_PX = 240`
+  carried its arithmetic in a comment; `title_delta = 34` duplicated the
+  badge's width and gap. All three now derive from the widget's own constants,
+  as `FACTOR_CHIP_WIDTHS` does. `ITEM_ACTIONS_WIDTH_PX` still evaluates to
+  240, so nothing moved.
+- **P29 — a floor assertion.** `test_spcm17` asserted
+  `one_row_px() > SEARCH_MIN_PX`, which cannot see the threshold moving that
+  it exists to catch. Pinned to the exact sum of the row-0 column needs plus
+  `SEARCH_MIN_PX`, computed in the test from `grid_info`.
+- **Rule 13 — `item_list_columns.py`'s own docstring** still said "the four
+  item lists" and pointed at only the LSR tests. It now names six lists, the
+  four toolbars, this plan and this batch's test file.
+
+Not fixed, recorded below and in `BACKLOG.md`.
+
 ## Adjacent issues found, not fixed
 
 - `completed.py` has no `columns_expanded` persistence (it always opens
@@ -161,6 +203,18 @@ or under 0.3 lines per line of changed code, tests at or under 2x.
   `cards_frame.winfo_width()` on every `<Configure>` with an 80 ms debounce
   (`_schedule_card_render`), which rebuilds every card. It works; it is just
   more work per resize than a fit would be.
+- Completed's `stats_label` is the only variable-width control on any of these
+  toolbars, and `refresh()` rewrites it (`Count: 3` to `Count: 412 | Time: 93h
+  20m`) without re-running `toolbar_wrap.fit`. The header's allocated width
+  does not change, so no `<Configure>` fires and the label can clip until the
+  next window resize. Not a regression — Completed had no wrap before this
+  batch.
+- `ColumnResizer._load_stored` calls `.get` on whatever is stored under
+  `<prefix>_col_widths`, and `AppSettings.load` filters by field name with no
+  type check. A hand-edited or corrupted `settings.json` holding a list,
+  string or int there raises `AttributeError` during screen construction, so
+  the screen does not open. Pre-existing and class-wide across all six
+  prefixes; this batch adds two more of the same shape.
 
 ## Walk checklist (by hand, after the build)
 
@@ -225,8 +279,10 @@ I did not launch the application. Nine steps, each naming what to look at.
 - `tests/test_priority_level_colors.py` — `_level_cell_call` matched only a
   cell call whose result is bound (`ast.Assign`). Completed discards the pair
   `add_level_cell` returns, because the layout grids the box itself, so the
-  scanner went blind to that call and `test_pccm3_the_cell_options_come_from_
-  the_helper` passed on an empty list. Widened to `ast.Expr` as well: being
-  blind to a call is the only failure mode that scanner has, so accepting
-  more call shapes can only strengthen it. Test rule (c) — the guard was
-  over-specified on source shape, not on behaviour.
+  scanner found no cell for `completed.refresh` and
+  `test_pccm3_the_cell_options_come_from_the_helper` **failed**
+  (`assert [] == [('cell', 'row_text')]`) — it did not pass on an empty list.
+  Widened to `ast.Expr` as well. Test rule **(b)**: the call's shape changed
+  intentionally, and the `Assign` requirement was incidental to the claim the
+  guard makes. It still fails on a dropped call, so the widening does not
+  weaken it.
