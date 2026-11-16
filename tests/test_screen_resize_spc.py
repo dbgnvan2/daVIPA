@@ -18,6 +18,11 @@ from unittest.mock import MagicMock
 import customtkinter as ctk
 import pytest
 
+from src.getmoredone.app import (
+    CONTENT_PAD_PX,
+    DEFAULT_WINDOW_WIDTH_PX,
+    SIDEBAR_WIDTH_PX,
+)
 from src.getmoredone.app_settings import AppSettings
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem, ProjectBoard
@@ -25,6 +30,7 @@ from src.getmoredone import theme
 from src.getmoredone.screens.item_list_columns import (
     FIT_DELAY_MS,
     LIST_MIN_CHARS,
+    ToolbarWrap,
     _pad_total,
     row_char_px,
 )
@@ -490,12 +496,17 @@ def test_spcm15_narrow_window_wraps_and_nothing_clips(
     # Scheduler (991) and Projects (844) below their own second row, where
     # the group overflowed the left edge and this test could not fail.
     width = wrap.one_row_px() - 40
-    assert width > wrap.wrap_row_px(), (name, width, wrap.wrap_row_px())
     root = screen.winfo_toplevel()
     root.geometry(f"{width}x600")
     root.update()
     screen.update_idletasks()
     assert wrap.wrapped is True, f"{name} did not wrap at {width}px"
+    # The band, checked on the toolbar and not on the window: the geometry
+    # above is a window number, and the toolbar is narrower by the sidebar
+    # and by every frame's padding, so comparing the two measures different
+    # things (SPC-S3).
+    assert wrap.toolbar.winfo_width() > wrap.wrap_row_px(), (
+        name, wrap.toolbar.winfo_width(), wrap.wrap_row_px())
     toolbar_left = wrap.toolbar.winfo_rootx()
     toolbar_right = toolbar_left + wrap.toolbar.winfo_width()
     for widget, _info in wrap._moved:
@@ -553,6 +564,102 @@ def test_spcs2_two_rows_need_less_width_than_one(name, completed_screen,
     # And the group it moved is the one the measurement was taken over.
     assert wrap.wrap_row_px() == sum(
         w.winfo_reqwidth() + _pad_total(i["padx"]) for w, i in wrap._moved)
+
+
+def test_spcs2_one_row_counts_a_column_once(completed_screen):
+    """SPC-S2 -- one row is the sum of column maxima, not of every widget.
+
+    Two controls stacked in one column need that column once. Summing the
+    widgets instead inflates one row and wraps a toolbar that would have
+    fitted. Every real toolbar puts one control per column, so none of them
+    can tell the two apart; this one can.
+    """
+    screen = completed_screen()
+    toolbar = ctk.CTkFrame(screen)
+    wide = ctk.CTkButton(toolbar, text="A", width=100)
+    wide.grid(row=0, column=0, padx=5)
+    narrow = ctk.CTkButton(toolbar, text="B", width=60)
+    narrow.grid(row=0, column=0, padx=5)
+    alone = ctk.CTkFrame(toolbar, width=40)
+    alone.grid(row=0, column=1, padx=0)
+    toolbar.update_idletasks()
+
+    wrap = ToolbarWrap(toolbar, None, None, 0)
+    stacked = [w.winfo_reqwidth() + 10 for w in (wide, narrow)]
+    assert min(stacked) < max(stacked), stacked
+    assert wrap.one_row_px() == max(stacked) + alone.winfo_reqwidth()
+    assert wrap.one_row_px() < sum(stacked) + alone.winfo_reqwidth()
+
+
+OLD_TOOLBARS = {
+    "today": ("today", "TodayScreen"),
+    "upcoming": ("upcoming", "UpcomingScreen"),
+    "all_items": ("all_items", "AllItemsScreen"),
+    "hierarchical": ("hierarchical", "HierarchicalScreen"),
+}
+
+
+def _toolbar_budget(wrap, screen):
+    """The width this toolbar gets when the app opens at DEFAULT_GEOMETRY.
+
+    The content frame is the window less the sidebar and its own padding; the
+    toolbar is that less the padding of every frame between it and the screen.
+    """
+    budget = DEFAULT_WINDOW_WIDTH_PX - SIDEBAR_WIDTH_PX - 2 * CONTENT_PAD_PX
+    widget = wrap.toolbar
+    while widget is not None and widget is not screen:
+        budget -= _pad_total((widget.grid_info() or {}).get("padx", 0))
+        widget = widget.master
+    return budget
+
+
+def _assert_wrapped_row_fits(name, screen):
+    wrap = screen.toolbar_wrap
+    budget = _toolbar_budget(wrap, screen)
+    assert budget > 0, (name, budget)
+    assert wrap.wrap_row_px() <= budget, (
+        f"{name}: the wrapped second row needs {wrap.wrap_row_px()} px and "
+        f"the header gets {budget} px at the default window")
+
+
+@pytest.mark.parametrize("name", ["completed", "projects", "scheduler"])
+def test_spcs3_the_new_wrapped_rows_fit_the_default_window(
+        name, completed_screen, projects_screen, scheduler_screen):
+    """SPC-S3 -- the wrapped second row fits the window the app opens at.
+
+    ``wrap_row_px`` says how wide two rows need to be, and nothing compared it
+    with the width a header actually gets at ``DEFAULT_GEOMETRY``. The
+    Scheduler's four filters needed 991 px against 960, so on every launch the
+    wrapped row ran off the toolbar's left edge -- the wrap frame is
+    ``sticky="e"``, so the overflow goes left -- and clipped the ``Who:``
+    filter. A right-edge assertion reads that as a pass.
+
+    Both sides are requested widths, so this needs no window on screen.
+    """
+    screen = {"completed": completed_screen, "projects": projects_screen,
+              "scheduler": scheduler_screen}[name]()
+    _assert_wrapped_row_fits(name, screen)
+
+
+@pytest.mark.parametrize("name", list(OLD_TOOLBARS))
+def test_spcs3_the_old_wrapped_rows_fit_the_default_window(name, tmp_path):
+    """SPC-S3 -- and so do the four toolbars that already wrapped."""
+    import importlib
+
+    module, attr = OLD_TOOLBARS[name]
+    cls = getattr(importlib.import_module(
+        f"src.getmoredone.screens.{module}"), attr)
+    root = _root()
+    db = DatabaseManager(str(tmp_path / f"{name}.db"))
+    db.create_action_item(ActionItem(who="Self", title="A task"))
+    try:
+        screen = cls(root, db, _app())
+        screen.pack(fill="both", expand=True)
+        screen.update_idletasks()
+        _assert_wrapped_row_fits(name, screen)
+    finally:
+        db.close()
+        root.destroy()
 
 
 def test_spcs2_the_wrapped_group_survives_a_cycle(completed_screen):
