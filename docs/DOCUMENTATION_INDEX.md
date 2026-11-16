@@ -302,6 +302,14 @@ lists resizes with the window, down to 6 characters, with a divider each;
 controls keep their size; a column shape survives a narrow window (D6).
 Holds decisions D1 to D8. **Approved, built and walked 2026-11-14.**
 
+### docs/unused-docs/implementation_plan_2026-11-15_date_band_colour.md
+
+Implementation plan for DBC-M1 to M4: a Settings value for the background of
+the band that labels a Day/Date in a listing of action items, which is the
+Upcoming screen's date group header. Holds the decision to derive the band's
+label colour from the fill, and the known consequence for the column-heading
+row. **Approved and built 2026-11-15.**
+
 ### docs/unused-docs/implementation_plan_2026-11-14_scheduler_columns_resize.md
 
 Implementation plan for SCR-M1 to M7: the Scheduler's item columns (Title,

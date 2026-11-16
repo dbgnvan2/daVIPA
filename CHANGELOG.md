@@ -7,6 +7,15 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — the Day/Date band colour (2026-11-15)
+
+- Settings → Appearance takes a **Day/Date band colour**, which sets the
+  background of the band that labels a date in the Upcoming list. Blank keeps
+  the theme's own colour, so an existing install looks unchanged. The band's
+  date text is derived from the fill for contrast at 4.5:1, so a dark pick
+  stays readable; a value that is not `#RRGGBB` is refused rather than
+  replaced with a default. (DBC-M1 to M4)
+
 ### Changed — the Plan week (2026-11-14)
 
 - The week's columns now fill the pane and its boxes grow with it, so the week
