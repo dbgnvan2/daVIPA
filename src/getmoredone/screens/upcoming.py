@@ -26,6 +26,7 @@ from .week_collision_notice import (
 from ..theme import (apply_segment_accent, semantic_colors, button_style,
                      combo_box_style, date_band_colors, list_row_font)
 from .inline_editors import InlineDateDialog, InlinePriorityDialog
+from .status_notice import StatusNoticeMixin
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
 from .title_format import (
     split_action_item_title,
@@ -47,7 +48,7 @@ if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
 
 
-class UpcomingScreen(ctk.CTkFrame):
+class UpcomingScreen(StatusNoticeMixin, ctk.CTkFrame):
     """Screen showing upcoming items grouped by due date."""
 
     COLUMN_PREFIX = "upcoming"
@@ -92,6 +93,12 @@ class UpcomingScreen(ctk.CTkFrame):
             row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.scroll_frame.grid_columnconfigure(0, weight=1)
         self.layout.bind(self.scroll_frame)
+        # MOD-M1: the notice line. This screen reports no errors of its own,
+        # but every save here runs through notify_weekly_tactic_changes, and a
+        # refused week or a cascade's new records are reported on the line of
+        # the screen that saved -- which means the screen must have one.
+        self.create_status_line(
+            row=4, column=0, sticky="ew", padx=12, pady=(0, 8))
 
         # Load items
         self.refresh()

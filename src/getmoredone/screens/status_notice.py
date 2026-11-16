@@ -58,6 +58,35 @@ def inline_list(names, cap: int = INLINE_LIST_CAP) -> str:
     return shown
 
 
+def report_on(widget, text: str, kind: str = "muted") -> bool:
+    """Report on the first notice line at or above ``widget``.
+
+    Purpose: MOD-M2 -- the week-collision notices are module functions given
+             a ``parent`` widget, not screens, so they cannot carry the mixin.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-16_modeless_notices.md#mod-m2
+    Tests:   tests/test_modeless_notices.py::test_modm2_report_on_finds_the_nearest_line
+
+    Returns whether a line took it, so a caller that must fall back can tell.
+    """
+    node = widget
+    seen = 0
+    while node is not None and seen < 20:
+        seen += 1
+        getter = getattr(node, "notice_label", None)
+        label = getter() if callable(getter) else getattr(node, "status_label",
+                                                          None)
+        setter = getattr(node, "set_status", None)
+        if label is not None and callable(setter):
+            try:
+                if label.winfo_exists():
+                    setter(text, kind)
+                    return True
+            except Exception:
+                logger.debug("a notice line on the way up was not usable")
+        node = getattr(node, "master", None)
+    return False
+
+
 class StatusNoticeMixin:
     """Give a screen the notice line, and the ``set_status`` contract.
 
@@ -153,21 +182,8 @@ class StatusNoticeMixin:
         dialog is constructed with its parent as ``master`` already, so there
         is no new wiring for 19 dialog classes to get wrong.
         """
-        node = getattr(self, "master", None)
-        seen = 0
-        while node is not None and seen < 20:
-            seen += 1
-            getter = getattr(node, "notice_label", None)
-            label = getter() if callable(getter) else getattr(
-                node, "status_label", None)
-            if label is not None and callable(getattr(node, "set_status", None)):
-                try:
-                    if label.winfo_exists():
-                        node.set_status(text, kind)
-                        return
-                except Exception:
-                    logger.debug("ancestor notice line was not usable")
-            node = getattr(node, "master", None)
+        if report_on(getattr(self, "master", None), text, kind):
+            return
         # Not silently dropped (P2). Falling back to this object's own line is
         # wrong here -- the caller is about to destroy it -- so say so, with
         # the message, and let the walk checklist find the screen that needs

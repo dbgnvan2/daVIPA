@@ -24,6 +24,7 @@ from .priority_cell import SCORE_CELL_WIDTH_PX, build_level_cell, score_text
 from .segment_color_utils import resolve_segment_color_for_item
 from .week_collision_notice import notify_weekly_tactic_changes
 from ..theme import apply_segment_accent, semantic_colors, button_style, combo_box_style, list_row_font
+from .status_notice import StatusNoticeMixin
 from .title_format import split_action_item_title
 
 #: The Reopen button's width, and the padding it is gridded with.
@@ -44,7 +45,7 @@ if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
 
 
-class CompletedScreen(ctk.CTkFrame):
+class CompletedScreen(StatusNoticeMixin, ctk.CTkFrame):
     """Screen showing completed items."""
 
     #: Where this screen's column shape is saved (``<prefix>_col_widths``).
@@ -89,6 +90,13 @@ class CompletedScreen(ctk.CTkFrame):
             row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.scroll_frame.grid_columnconfigure(0, weight=1)
         self.layout.bind(self.scroll_frame)
+
+        # MOD-M1: the notice line. This screen reports no errors of its own,
+        # but every save here runs through notify_weekly_tactic_changes, and a
+        # refused week or a cascade's new records are reported on the line of
+        # the screen that saved -- which means the screen must have one.
+        self.create_status_line(
+            row=4, column=0, sticky="ew", padx=12, pady=(0, 8))
 
         # Load items
         self.refresh()

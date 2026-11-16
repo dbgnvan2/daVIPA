@@ -15,24 +15,33 @@ target week is already taken, and record the detail on
 silence as no return value at all (P25) — so this is the reader.
 """
 
+import logging
 from contextlib import contextmanager
 from tkinter import messagebox
 from typing import Any, Optional
 
 from ..models import Status
+from .status_notice import report_on
+
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
 def _parent_not_on_top(parent: Any):
     """Lower an always-on-top parent for the life of the notice below it.
 
-    Purpose: every notice here ends in ``messagebox``, and the parent is often
-             the TimerWindow, which sets ``-topmost`` at construction and never
-             drops it. A modal that opens *behind* its parent still holds
-             ``grab_set()``, so it takes every click while showing nothing —
-             the window underneath looks frozen. That is the bug the timer's
-             own dialogs were fixed for; these six call sites were left out
-             (P5: the fix stopped at the file boundary).
+    Purpose: the question below still ends in ``messagebox``, and the parent
+             is often the TimerWindow, which sets ``-topmost`` at construction
+             and never drops it. A modal that opens *behind* its parent still
+             holds ``grab_set()``, so it takes every click while showing
+             nothing — the window underneath looks frozen. That is the bug the
+             timer's own dialogs were fixed for; these call sites were left
+             out (P5: the fix stopped at the file boundary).
+
+             MOD-M2 left one caller: the two *telling* notices now go to the
+             screen's own notice line, which is inside the window and cannot
+             sit behind it. Only ``confirm_weekly_tactic_completion`` asks,
+             and an asking site is still a modal (MOD-M5, phase 2).
     Tests:   tests/test_weekly_tactic_surfaces.py::test_wt_m6b6_a_notice_lowers_an_always_on_top_parent
 
     Imported inside the function on purpose: ``timer_window_dialogs`` imports
@@ -114,13 +123,18 @@ def notify_cascade(db_manager: Any, parent: Any = None) -> bool:
     message = describe_cascade(report)
     if not message:
         return False
-    with _parent_not_on_top(parent):
-        if getattr(report, "failed", False):
-            # A failure under a success title with an info icon reads as good news.
-            messagebox.showwarning("Item not re-filed", message, parent=parent)
-        else:
-            messagebox.showinfo("Plan records created", message, parent=parent)
-    return True
+    # MOD-M2: on the notice line of the screen that saved, not a dialog over
+    # it. A failure is a ``warning`` so it stays until the screen replaces it;
+    # what the cascade built is ``info`` and clears itself (MOD-M3).
+    kind = "warning" if getattr(report, "failed", False) else "info"
+    shown = report_on(parent, message, kind)
+    if not shown:
+        # Not silently dropped (P2). No notice line above this parent means a
+        # screen the MOD-M1 sweep did not reach, and the message is the
+        # evidence of which one.
+        logger.warning("no notice line above %r; cascade notice dropped: %r",
+                       parent, message)
+    return shown
 
 
 def notify_weekly_tactic_changes(db_manager: Any, parent: Any = None) -> bool:
@@ -140,9 +154,13 @@ def notify_week_collision(db_manager: Any, parent: Any = None) -> bool:
     message = describe_week_collision(getattr(db_manager, "last_week_collision", None))
     if not message:
         return False
-    with _parent_not_on_top(parent):
-        messagebox.showwarning("Week Already Taken", message, parent=parent)
-    return True
+    # MOD-M2: a refused week is something the user must act on, so it is a
+    # ``warning`` and stays on the line until the screen replaces it.
+    shown = report_on(parent, message, "warning")
+    if not shown:
+        logger.warning("no notice line above %r; collision notice dropped: %r",
+                       parent, message)
+    return shown
 
 
 def confirm_weekly_tactic_completion(

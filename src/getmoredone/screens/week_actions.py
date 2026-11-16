@@ -41,14 +41,13 @@ from .segment_color_utils import (
 from .split_panel import MIN_PANEL_WIDTH, SPLITTER_WIDTH, SplitPanel
 from .today import TodayScreen
 from .week_collision_notice import notify_weekly_tactic_changes
-from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
     from ..vps_manager import VPSManager
 
 
-class WeekTacticActionsPanel(StatusNoticeMixin, TodayScreen):
+class WeekTacticActionsPanel(TodayScreen):
     """Today's list, filtered by Weekly Tactic instead of by today's date.
 
     Purpose: AWA-M5 — the Action Items panel the request asked to "work like
@@ -120,7 +119,9 @@ class WeekTacticActionsPanel(StatusNoticeMixin, TodayScreen):
 
         # The panel inherits Today's rows: 0 the toolbar, 1 the column
         # header, 2 the scrolling list -- the only row with weight -- so row
-        # 3 is the bottom of the panel.
+        # 3 is the bottom of the panel, with Today's notice line under it at
+        # row 4 (MOD-M1). The notice line is inherited too: the mixin is on
+        # TodayScreen now, and naming it again here is an MRO conflict.
         bottom = ctk.CTkFrame(parent, fg_color="transparent")
         bottom.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 12))
         self.bottom_actions = bottom

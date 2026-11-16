@@ -23,6 +23,7 @@ from .week_collision_notice import (
     notify_weekly_tactic_changes,
 )
 from ..theme import apply_segment_accent, semantic_colors, button_style, combo_box_style, list_row_font
+from .status_notice import StatusNoticeMixin
 from .inline_editors import InlineDateDialog, InlinePriorityDialog
 from .title_format import (
     split_action_item_title,
@@ -44,7 +45,7 @@ if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
 
 
-class AllItemsScreen(ctk.CTkFrame):
+class AllItemsScreen(StatusNoticeMixin, ctk.CTkFrame):
     """Screen showing all items in a table format."""
 
     COLUMN_PREFIX = "all_items"
@@ -91,6 +92,13 @@ class AllItemsScreen(ctk.CTkFrame):
             row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.scroll_frame.grid_columnconfigure(0, weight=1)
         self.layout.bind(self.scroll_frame)
+
+        # MOD-M1: the notice line. This screen reports no errors of its own,
+        # but every save here runs through notify_weekly_tactic_changes, and a
+        # refused week or a cascade's new records are reported on the line of
+        # the screen that saved -- which means the screen must have one.
+        self.create_status_line(
+            row=4, column=0, sticky="ew", padx=12, pady=(0, 8))
 
         # Load items
         self.refresh()

@@ -27,6 +27,7 @@ from .week_collision_notice import (
     notify_weekly_tactic_changes,
 )
 from ..theme import apply_segment_accent, celebration_colors, semantic_colors, button_style, list_row_font
+from .status_notice import StatusNoticeMixin
 from .inline_editors import InlineDateDialog, InlinePriorityDialog
 from .item_lineage import lineage_for_item, LINEAGE_COL_CHARS
 from ..utils.icon_loader import IconLoader
@@ -49,7 +50,7 @@ if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
 
 
-class TodayScreen(ctk.CTkFrame):
+class TodayScreen(StatusNoticeMixin, ctk.CTkFrame):
     """Screen showing today's items (start <= today), including completed items."""
 
     # Width of column 0 (drag grip + checkbox on open rows, badge on completed
@@ -129,6 +130,13 @@ class TodayScreen(ctk.CTkFrame):
             row=2, column=0, sticky="nsew", padx=20, pady=(0, 20))
         self.scroll_frame.grid_columnconfigure(0, weight=1)
         self.layout.bind(self.scroll_frame)
+
+        # MOD-M1: the notice line. This screen reports no errors of its own,
+        # but every save here runs through notify_weekly_tactic_changes, and a
+        # refused week or a cascade's new records are reported on the line of
+        # the screen that saved -- which means the screen must have one.
+        self.create_status_line(
+            row=4, column=0, sticky="ew", padx=12, pady=(0, 8))
 
         # Build the pinned header, then load items
         self._build_column_header()
