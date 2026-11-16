@@ -8,13 +8,14 @@ from ..theme import apply_segment_accent, button_style, semantic_colors, status_
 from ..color_contrast import pick_text_color
 from ..vps_manager import VisionElementHasDependentsError
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
+from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..vps_manager import VPSManager
     from ..app import GetMoreDoneApp
 
 
-class VisionElementsScreen(ctk.CTkFrame):
+class VisionElementsScreen(StatusNoticeMixin, ctk.CTkFrame):
     """Create and browse Vision Elements."""
 
     def __init__(self, parent, vps_manager: "VPSManager", app: "GetMoreDoneApp"):
@@ -31,6 +32,10 @@ class VisionElementsScreen(ctk.CTkFrame):
         self.key_var = ctk.StringVar(value="")
 
         self.create_ui()
+        # MOD-M1: below the list, so a refusal does not move the controls the
+        # user is working in.
+        self.create_status_line(row=2, column=0, sticky="ew",
+                                padx=12, pady=(0, 10))
         self.reload_dropdowns()
         self.refresh_list()
 
@@ -147,16 +152,17 @@ class VisionElementsScreen(ctk.CTkFrame):
         category = self.category_var.get().strip()
 
         if not segment or not subsegment or not category:
-            messagebox.showerror("Missing Values", "Segment, SubSegment, and Category are required.")
+            self.set_status(
+                "Segment, SubSegment and Category are all required.", "error")
             return
 
         try:
             self.vps_manager.create_or_get_vision_element(segment, subsegment, category)
             self.update_key_preview()
             self.refresh_all()
-            messagebox.showinfo("Created", "Vision Element created/updated successfully.")
+            self.set_status("Vision Element saved.", "success")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to create Vision Element:\n{e}")
+            self.set_status(f"Could not save the Vision Element: {e}", "error")
 
     def refresh_list(self):
         for widget in self.list_frame.winfo_children():
@@ -375,17 +381,15 @@ class VisionElementsScreen(ctk.CTkFrame):
             deleted = self.vps_manager.delete_vision_element(row["id"])
         except VisionElementHasDependentsError as exc:
             details = "\n".join(f"  • {line}" for line in exc.summary_lines)
-            messagebox.showerror(
-                "Child Items Attached",
-                "You must delete or reassign all child items from a Vision Element "
-                f"before you can delete a Vision Element.\n\nStill attached:\n{details}",
-            )
+            self.set_status(
+                f"Child items are still attached ({details}). Delete or "
+                "reassign them first.", "error")
             return
 
         if deleted:
             self.refresh_all()
         else:
-            messagebox.showerror("Delete Failed", "Vision element could not be deleted.")
+            self.set_status("That Vision Element could not be deleted.", "error")
 
     def edit_level_vision(self, row: dict, level: str):
         labels = {
@@ -397,7 +401,8 @@ class VisionElementsScreen(ctk.CTkFrame):
             return
         level_title, level_name, level_id, current_text = labels[level]
         if not level_id:
-            messagebox.showerror("Missing Record", f"Unable to edit {level_title} vision text.")
+            self.set_status(
+                f"That {level_title} vision text cannot be edited.", "error")
             return
 
         dialog = ctk.CTkToplevel(self)

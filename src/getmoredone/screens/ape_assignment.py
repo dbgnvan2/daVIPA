@@ -15,6 +15,7 @@ from .pick_record_dialog import describe_lineage, open_pick_record_dialog
 from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .split_panel import SPLITTER_WIDTH, SplitPanel
+from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
 logger = get_weekly_tactic_logger()
 
 
-class APEAssignmentScreen(ctk.CTkFrame):
+class APEAssignmentScreen(StatusNoticeMixin, ctk.CTkFrame):
     """Assign Annual Plan Elements to a selected quarter."""
 
     # UPD-D3/D4 — this screen's own corner of AppSettings. The divider's
@@ -226,10 +227,10 @@ class APEAssignmentScreen(ctk.CTkFrame):
             year = int(self.year_var.get().strip())
             quarter = int(self.quarter_var.get().strip())
         except ValueError:
-            messagebox.showerror("Invalid Period", "Enter a valid year and quarter.")
+            self.set_status("Enter a valid year and quarter.", "error")
             return None
         if quarter not in (1, 2, 3, 4):
-            messagebox.showerror("Invalid Quarter", "Quarter must be 1, 2, 3, or 4.")
+            self.set_status("Quarter must be 1, 2, 3, or 4.", "error")
             return None
         return year, quarter
 

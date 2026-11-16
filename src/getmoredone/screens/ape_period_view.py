@@ -15,6 +15,7 @@ from .pick_record_dialog import describe_lineage, open_pick_record_dialog
 from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .split_panel import SPLITTER_WIDTH, SplitPanel
+from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
 logger = get_weekly_tactic_logger()
 
 
-class APEPeriodViewScreen(ctk.CTkFrame):
+class APEPeriodViewScreen(StatusNoticeMixin, ctk.CTkFrame):
     """Assign quarter-selected APEs to a selected month."""
 
     # UPD-D3/D4 — this screen's own corner of AppSettings. The divider's ratio
@@ -285,22 +286,21 @@ class APEPeriodViewScreen(ctk.CTkFrame):
             quarter = int(self.quarter_var.get().strip())
             month = int(self.month_var.get().strip())
         except ValueError:
-            messagebox.showerror("Invalid Period", "Enter a valid year, quarter, and month.")
+            self.set_status("Enter a valid year, quarter and month.", "error")
             return None
         if quarter not in (1, 2, 3, 4):
-            messagebox.showerror("Invalid Quarter", "Quarter must be 1, 2, 3, or 4.")
+            self.set_status("Quarter must be 1, 2, 3, or 4.", "error")
             return None
         if month < 1 or month > 12:
-            messagebox.showerror("Invalid Month", "Month must be between 1 and 12.")
+            self.set_status("Month must be between 1 and 12.", "error")
             return None
         # APC-M3 — the pickers cannot produce this pair, but a stale variable
         # or a hand-typed year still reaches here, and the manager refuses the
         # write anyway (APC-M2.1). Saying so beats a Save that does nothing.
         if quarter_of_month(month) != quarter:
-            messagebox.showerror(
-                "Quarter and Month Disagree",
-                f"Month M{month} is in Q{quarter_of_month(month)}, not Q{quarter}.",
-            )
+            self.set_status(
+                f"Month M{month} is in Q{quarter_of_month(month)}, "
+                f"not Q{quarter}.", "error")
             return None
         return year, quarter, month
 

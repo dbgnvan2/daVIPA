@@ -15,6 +15,7 @@ from .pick_record_dialog import describe_lineage, open_pick_record_dialog
 from .row_drag import RowDragSource
 from .segment_color_utils import load_latest_lineage_color_maps, resolve_lineage_colors
 from .split_panel import SPLITTER_WIDTH, SplitPanel
+from .status_notice import StatusNoticeMixin, inline_list
 
 logger = get_weekly_tactic_logger()
 
@@ -35,7 +36,7 @@ STATUS_WRAPLENGTH = 400
 LEFT_TITLE = "Vision Elements (tick to filter the annual elements on the right)"
 
 
-class AnnualVisionSegmentsScreen(ctk.CTkFrame):
+class AnnualVisionSegmentsScreen(StatusNoticeMixin, ctk.CTkFrame):
     """Drag vision elements into annual list to create annual plan records."""
 
     # UPD-D3/D4 — this screen's own corner of AppSettings. The divider's ratio
@@ -223,7 +224,7 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         try:
             return int(self.year_var.get().strip())
         except ValueError:
-            messagebox.showerror("Invalid Year", "Enter a valid year, e.g. 2026.")
+            self.set_status("Enter a valid year, for example 2026.", "error")
             return None
 
     def refresh_lists(self):
@@ -517,7 +518,9 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         """Edit a right-side annual item by updating its source Vision Element."""
         vision_element_id = row.get("vision_element_id")
         if not vision_element_id:
-            messagebox.showerror("Missing Source", "This annual record is missing its source Vision Element.")
+            self.set_status(
+                "That annual record is missing its source Vision Element.",
+                "error")
             return
 
         dialog = ctk.CTkToplevel(self)
@@ -603,7 +606,9 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
 
         vision_element_id = row.get("vision_element_id")
         if not vision_element_id:
-            messagebox.showerror("Missing Source", "This annual record is missing its source Vision Element.")
+            self.set_status(
+                "That annual record is missing its source Vision Element.",
+                "error")
             return
 
         key = row.get("key_field") or "this annual record"
@@ -617,12 +622,11 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
         try:
             deleted = self.vps_manager.delete_annual_records_for_vision_element(year, vision_element_id)
         except ProjectBoardsAttachedError as exc:
-            project_list = "\n".join(f"  • {title}" for title in exc.board_titles)
-            messagebox.showerror(
-                "Projects Attached",
-                "You must delete or reassign all Projects from an APE before you "
-                f"can delete an APE.\n\n{len(exc.board_titles)} project(s) attached:\n"
-                f"{project_list}",
+            self.set_status(
+                f"{len(exc.board_titles)} project(s) still attached "
+                f"({inline_list(exc.board_titles)}). Delete or reassign them "
+                "first.",
+                "error",
             )
             return
         except ActionItemsAttachedError as exc:
@@ -632,18 +636,14 @@ class AnnualVisionSegmentsScreen(ctk.CTkFrame):
             # into a stderr a double-clicked app has nowhere to send (P5 — the
             # sibling exception was not handled).
             # Tests: tests/test_vps_ape_deletion_ui.py
-            shown = "\n".join(f"  • {title}" for title in exc.titles[:10])
-            if len(exc.titles) > 10:
-                shown += f"\n  • ... and {len(exc.titles) - 10} more"
-            messagebox.showerror(
-                "Action Items Attached",
-                "You must move or delete all Action Items on an APE before you "
-                f"can delete it.\n\n{len(exc.titles)} action item(s) attached:\n"
-                f"{shown}",
+            self.set_status(
+                f"{len(exc.titles)} action item(s) still on it "
+                f"({inline_list(exc.titles)}). Move or delete them first.",
+                "error",
             )
             return
 
         if deleted:
             self.refresh_lists()
         else:
-            messagebox.showerror("Delete Failed", "Annual record could not be deleted.")
+            self.set_status("That annual record could not be deleted.", "error")

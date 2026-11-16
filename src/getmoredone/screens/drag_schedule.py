@@ -1585,13 +1585,10 @@ class DragScheduleScreen(StatusNoticeMixin, ctk.CTkFrame):
                         "belong to their Annual Plan Element rather than to a "
                         "project. They were left where they are."
                         % len(tactics))
-            try:
-                messagebox.showinfo("Weekly Tactic", text, parent=self)
-            except tk.TclError:
-                # DRP-M2: a notice, not a question -- the rest of the drag
-                # still goes through, and the log keeps what was said.
-                logger.warning("Weekly Tactic notice could not be shown: %s", text)
-                self.set_status(text, "warning")
+            # MOD-M2: DRP-M2 already fell back to the notice line when the
+            # platform refused the dialog. The fallback was the right channel,
+            # so the attempt is gone and the line is all that is left.
+            self.set_status(text, "warning")
         if not item_ids:
             self.refresh()
             return
@@ -1621,11 +1618,7 @@ class DragScheduleScreen(StatusNoticeMixin, ctk.CTkFrame):
                         self.db_manager.link_item_to_project_exclusive(board_id, item_id)
         except Exception as exc:
             text = f"None of the {len(item_ids)} dragged items were moved: {exc}"
-            try:
-                messagebox.showerror("Move Failed", text, parent=self)
-            except tk.TclError:
-                logger.warning("Move Failed notice could not be shown: %s", text)
-                self.set_status(text, "error")
+            self.set_status(text, "error")
         self.refresh()
 
     def update_drag_position(self):

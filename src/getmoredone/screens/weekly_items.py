@@ -27,6 +27,7 @@ from .segment_color_utils import (
     resolve_chip_colors,
 )
 from .split_panel import SPLITTER_WIDTH, SplitPanel
+from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
 logger = get_weekly_tactic_logger()
 
 
-class WeeklyItemsScreen(ctk.CTkFrame):
+class WeeklyItemsScreen(StatusNoticeMixin, ctk.CTkFrame):
     """Assign month-selected Annual Plan Elements into weekly tactics."""
 
     # UPD-M5 — the divider position and each panel's column widths are this
@@ -757,7 +758,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
 
     def open_selected_weekly_item(self):
         if not self.selected_weekly_item:
-            messagebox.showwarning("No Weekly Item Selected", "Select a weekly tactic on the right first.")
+            self.set_status("Select a weekly tactic on the right first.", "warning")
             return
         from .item_editor import ItemEditorDialog
         ItemEditorDialog(self, self.app.db_manager, item_id=self.selected_weekly_item["id"], vps_manager=self.vps_manager, on_close_callback=self.on_weekly_editor_closed)
@@ -803,7 +804,7 @@ class WeeklyItemsScreen(ctk.CTkFrame):
         if self.vps_manager.delete_weekly_action_item(row["id"]):
             self.refresh()
         else:
-            messagebox.showerror("Delete Failed", "Weekly tactic could not be deleted.")
+            self.set_status("That weekly tactic could not be deleted.", "error")
 
     def on_weekly_editor_closed(self):
         self.refresh()

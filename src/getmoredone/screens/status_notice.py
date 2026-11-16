@@ -33,6 +33,31 @@ logger = logging.getLogger(__name__)
 TRANSIENT_KINDS = frozenset({"info", "blue", "success", "green"})
 
 
+#: How many names an inline notice lists before it summarises the rest. A
+#: status line has one line's room, where the dialog this replaced had a
+#: scrollable body, so the cap is lower than the 10 that body used.
+INLINE_LIST_CAP = 3
+
+
+def inline_list(names, cap: int = INLINE_LIST_CAP) -> str:
+    """Join names for a one-line notice, summarising past ``cap``.
+
+    Purpose: MOD-M2 -- the refusals that used to list their blockers down a
+             dialog body have one line now, and a bulleted list with embedded
+             newlines does not read on one.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-16_modeless_notices.md#mod-m2
+    Tests:   tests/test_modeless_notices.py::test_modm2_an_inline_list_is_capped
+
+    Both APE deletion refusals compose one, so it lives here rather than in
+    either of them (P5).
+    """
+    names = list(names)
+    shown = ", ".join(str(n) for n in names[:cap])
+    if len(names) > cap:
+        shown += f" and {len(names) - cap} more"
+    return shown
+
+
 class StatusNoticeMixin:
     """Give a screen the notice line, and the ``set_status`` contract.
 
@@ -47,8 +72,18 @@ class StatusNoticeMixin:
     :meth:`create_status_line`.
     """
 
+    #: Which attribute holds the notice label. Overridden where a screen
+    #: already uses ``status_label`` for something else -- ``TimerWindow``
+    #: shows the timer's own state there ("Ready to start"), and a notice
+    #: written over it would erase what the window is for.
+    NOTICE_LABEL_ATTR = "status_label"
+
     #: Set by :meth:`create_status_line`, or by the screen itself.
     status_label = None
+
+    def notice_label(self):
+        """The label notices are drawn on, or None before it is built."""
+        return getattr(self, self.NOTICE_LABEL_ATTR, None)
 
     def create_status_line(self, parent=None, **grid_kwargs):
         """Build the notice label and return it.
@@ -56,11 +91,12 @@ class StatusNoticeMixin:
         ``grid_kwargs`` goes straight to ``grid``, so the caller places it;
         a screen knows where its own bottom row is and this does not.
         """
-        self.status_label = ctk.CTkLabel(parent if parent is not None else self,
-                                         text="", anchor="w")
+        label = ctk.CTkLabel(parent if parent is not None else self,
+                             text="", anchor="w")
+        setattr(self, self.NOTICE_LABEL_ATTR, label)
         if grid_kwargs:
-            self.status_label.grid(**grid_kwargs)
-        return self.status_label
+            label.grid(**grid_kwargs)
+        return label
 
     def set_status(self, text: str, kind: str = "muted"):
         """Show ``text`` on the notice line, coloured for ``kind``.
@@ -77,7 +113,7 @@ class StatusNoticeMixin:
         ``AppSettings.notice_dismiss_ms``; an ``error``, ``warning`` or
         ``muted`` one stays until the screen says otherwise (MOD-M3).
         """
-        label = getattr(self, "status_label", None)
+        label = self.notice_label()
         if label is None:
             # Not silently dropped (P2): a screen reporting before it has a
             # notice line is a wiring mistake, and the message is the evidence.
@@ -121,7 +157,9 @@ class StatusNoticeMixin:
         seen = 0
         while node is not None and seen < 20:
             seen += 1
-            label = getattr(node, "status_label", None)
+            getter = getattr(node, "notice_label", None)
+            label = getter() if callable(getter) else getattr(
+                node, "status_label", None)
             if label is not None and callable(getattr(node, "set_status", None)):
                 try:
                     if label.winfo_exists():
@@ -140,7 +178,7 @@ class StatusNoticeMixin:
     def clear_status(self):
         """Take the notice down now."""
         self._cancel_pending_dismiss()
-        label = getattr(self, "status_label", None)
+        label = self.notice_label()
         if label is None:
             return
         try:

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Optional
 
 from ..theme import button_style, status_text_color
 from ..color_contrast import normalize_hex_color, pick_text_color
+from .status_notice import StatusNoticeMixin
 
 #: The fallback when a stored colour cannot be read (SCV-M6.3, SCV-M7.1).
 #: Slate, the same neutral the segment dialog already defaults to, so an
@@ -41,7 +42,7 @@ if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
 
 
-class VisionSegmentsScreen(ctk.CTkFrame):
+class VisionSegmentsScreen(StatusNoticeMixin, ctk.CTkFrame):
     TAB_BUTTON_HEIGHT = 32
     ACTION_BUTTON_WIDTH = 120
     VIEW_BUTTON_WIDTH = 160
@@ -65,6 +66,9 @@ class VisionSegmentsScreen(ctk.CTkFrame):
         self._create_view_switcher()
         self._create_lists()
         self._create_bottom_actions()
+        # MOD-M1: under the action row, inside the container that holds it.
+        self.create_status_line(self.container, row=4, column=0, sticky="ew",
+                                padx=8, pady=(0, 6))
         self.refresh_all()
         self._set_active_view(self.active_view)
 
@@ -432,7 +436,9 @@ class VisionSegmentsScreen(ctk.CTkFrame):
             return
         ok = self.vps_manager.delete_vision_segment_admin(row["id"])
         if not ok:
-            messagebox.showerror("Delete Failed", "Segment has dependent records. Remove children first.")
+            self.set_status(
+                "That segment has dependent records. Remove its children first.",
+                "error")
         self.refresh_all()
 
     def new_subsegment(self):
@@ -441,7 +447,7 @@ class VisionSegmentsScreen(ctk.CTkFrame):
     def edit_subsegment(self, row: Optional[dict]):
         segments = self.vps_manager.get_vision_segments_admin()
         if not segments:
-            messagebox.showwarning("No Segments", "Create a segment first.")
+            self.set_status("Create a segment first.", "warning")
             return
         d = ctk.CTkToplevel(self)
         d.title("SubSegment")
@@ -508,7 +514,7 @@ class VisionSegmentsScreen(ctk.CTkFrame):
     def edit_category(self, row: Optional[dict]):
         segments = self.vps_manager.get_vision_segments_admin()
         if not segments:
-            messagebox.showwarning("No Segments", "Create a segment first.")
+            self.set_status("Create a segment first.", "warning")
             return
         d = ctk.CTkToplevel(self)
         d.title("Category")

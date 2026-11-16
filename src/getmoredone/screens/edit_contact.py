@@ -8,12 +8,13 @@ from typing import TYPE_CHECKING, Optional
 
 from ..models import Contact
 from ..theme import button_style
+from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..db_manager import DatabaseManager
 
 
-class EditContactDialog(ctk.CTkToplevel):
+class EditContactDialog(StatusNoticeMixin, ctk.CTkToplevel):
     """Dialog for creating or editing a contact."""
 
     def __init__(self, parent, db_manager: 'DatabaseManager', contact_id: Optional[int] = None):
@@ -28,7 +29,7 @@ class EditContactDialog(ctk.CTkToplevel):
             self.title("Edit Contact")
             self.contact = self.db_manager.get_contact(contact_id)
             if not self.contact:
-                messagebox.showerror("Error", "Contact not found")
+                self.notify_owner("That contact no longer exists.", "error")
                 self.destroy()
                 return
         else:
@@ -116,6 +117,10 @@ class EditContactDialog(ctk.CTkToplevel):
         # Buttons frame
         btn_frame = ctk.CTkFrame(self)
         btn_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 20))
+        # MOD-M2: validation reports here, where the field being complained
+        # about is still on screen and still editable.
+        self.create_status_line(row=2, column=0, sticky="ew",
+                                padx=20, pady=(0, 12))
         btn_frame.grid_columnconfigure(1, weight=1)
 
         # Delete button (only for existing contacts)
@@ -153,14 +158,15 @@ class EditContactDialog(ctk.CTkToplevel):
         # Validate
         name = self.name_var.get().strip()
         if not name:
-            messagebox.showerror("Validation Error", "Name is required")
+            self.set_status("A name is required.", "error")
             return
 
         # Check for duplicate name (if creating new or changing name)
         if not self.contact_id or (self.contact and name != self.contact.name):
             existing = self.db_manager.get_contact_by_name(name)
             if existing:
-                messagebox.showerror("Validation Error", f"A contact with the name '{name}' already exists")
+                self.set_status(
+                    f"A contact called '{name}' already exists.", "error")
                 return
 
         # Get values
@@ -178,7 +184,7 @@ class EditContactDialog(ctk.CTkToplevel):
                 self.contact.phone = phone
                 self.contact.notes = notes
                 self.db_manager.update_contact(self.contact)
-                messagebox.showinfo("Success", "Contact updated successfully")
+                self.notify_owner(f"Updated {name}.", "success")
             else:
                 # Create new contact
                 new_contact = Contact(
@@ -189,12 +195,12 @@ class EditContactDialog(ctk.CTkToplevel):
                     notes=notes
                 )
                 self.db_manager.create_contact(new_contact)
-                messagebox.showinfo("Success", "Contact created successfully")
+                self.notify_owner(f"Added {name}.", "success")
 
             self.destroy()
 
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save contact: {str(e)}")
+            self.set_status(f"Could not save the contact: {e}", "error")
 
     def delete_contact(self):
         """Delete the contact."""
@@ -213,7 +219,7 @@ class EditContactDialog(ctk.CTkToplevel):
 
         try:
             self.db_manager.delete_contact(self.contact_id)
-            messagebox.showinfo("Success", "Contact deleted successfully")
+            self.notify_owner(f"Deleted {self.contact.name}.", "success")
             self.destroy()
         except Exception as e:
             # If deletion fails (likely due to foreign key constraint), offer to deactivate instead
@@ -226,10 +232,12 @@ class EditContactDialog(ctk.CTkToplevel):
             if deactivate:
                 try:
                     self.db_manager.deactivate_contact(self.contact_id)
-                    messagebox.showinfo("Success", "Contact deactivated successfully")
+                    self.notify_owner(
+                        f"Deactivated {self.contact.name}.", "success")
                     self.destroy()
                 except Exception as e2:
-                    messagebox.showerror("Error", f"Failed to deactivate contact: {str(e2)}")
+                    self.set_status(
+                        f"Could not deactivate the contact: {e2}", "error")
 
     def cancel(self):
         """Cancel and close dialog."""

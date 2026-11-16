@@ -41,13 +41,14 @@ from .segment_color_utils import (
 from .split_panel import MIN_PANEL_WIDTH, SPLITTER_WIDTH, SplitPanel
 from .today import TodayScreen
 from .week_collision_notice import notify_weekly_tactic_changes
+from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..app import GetMoreDoneApp
     from ..vps_manager import VPSManager
 
 
-class WeekTacticActionsPanel(TodayScreen):
+class WeekTacticActionsPanel(StatusNoticeMixin, TodayScreen):
     """Today's list, filtered by Weekly Tactic instead of by today's date.
 
     Purpose: AWA-M5 — the Action Items panel the request asked to "work like
@@ -178,10 +179,9 @@ class WeekTacticActionsPanel(TodayScreen):
         Tests: tests/test_ape_week_actions.py::test_awam54_add_action_item_links_by_weekly_tactic_id
         """
         if not self.selected_tactic:
-            messagebox.showwarning(
-                "No Weekly Tactic Selected",
-                "Select a Weekly Tactic on the left first.",
-            )
+            # The panel has no line of its own; the screen around it does.
+            self.notify_owner(
+                "Select a Weekly Tactic on the left first.", "warning")
             return
 
         title = (self._prompt_for_title() or "").strip()
