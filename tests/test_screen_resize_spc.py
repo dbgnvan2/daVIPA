@@ -599,6 +599,26 @@ OLD_TOOLBARS = {
 }
 
 
+def _build_old_toolbar_screen(name, tmp_path):
+    """One of the four screens that already wrapped, on its own root.
+
+    Returns (root, db, screen); the caller closes the db and destroys the
+    root. Shared so the four-screen table exists once (P4).
+    """
+    import importlib
+
+    module, attr = OLD_TOOLBARS[name]
+    cls = getattr(importlib.import_module(
+        f"src.getmoredone.screens.{module}"), attr)
+    root = _root()
+    db = DatabaseManager(str(tmp_path / f"{name}.db"))
+    db.create_action_item(ActionItem(who="Self", title="A task"))
+    screen = cls(root, db, _app())
+    screen.pack(fill="both", expand=True)
+    screen.update_idletasks()
+    return root, db, screen
+
+
 def _toolbar_budget(wrap, screen):
     """The width this toolbar gets when the app opens at DEFAULT_GEOMETRY.
 
@@ -608,9 +628,17 @@ def _toolbar_budget(wrap, screen):
     budget = DEFAULT_WINDOW_WIDTH_PX - SIDEBAR_WIDTH_PX - 2 * CONTENT_PAD_PX
     widget = wrap.toolbar
     while widget is not None and widget is not screen:
-        budget -= _pad_total((widget.grid_info() or {}).get("padx", 0))
+        info = widget.grid_info() or {}
+        assert info, (
+            f"{widget} between the toolbar and the screen is not grid-managed;"
+            " its padding would be read as zero and the budget would come out"
+            " too large")
+        budget -= _pad_total(info.get("padx", 0))
         widget = widget.master
-    return budget
+    # Both sides in the same units: winfo_reqwidth and grid_info's padx are
+    # scaled pixels, and the three constants are logical ones. They differ on
+    # a HiDPI Windows display, where the window geometry is scaled too.
+    return wrap.toolbar._apply_widget_scaling(budget)
 
 
 def _assert_wrapped_row_fits(name, screen):
@@ -644,18 +672,8 @@ def test_spcs3_the_new_wrapped_rows_fit_the_default_window(
 @pytest.mark.parametrize("name", list(OLD_TOOLBARS))
 def test_spcs3_the_old_wrapped_rows_fit_the_default_window(name, tmp_path):
     """SPC-S3 -- and so do the four toolbars that already wrapped."""
-    import importlib
-
-    module, attr = OLD_TOOLBARS[name]
-    cls = getattr(importlib.import_module(
-        f"src.getmoredone.screens.{module}"), attr)
-    root = _root()
-    db = DatabaseManager(str(tmp_path / f"{name}.db"))
-    db.create_action_item(ActionItem(who="Self", title="A task"))
+    root, db, screen = _build_old_toolbar_screen(name, tmp_path)
     try:
-        screen = cls(root, db, _app())
-        screen.pack(fill="both", expand=True)
-        screen.update_idletasks()
         _assert_wrapped_row_fits(name, screen)
     finally:
         db.close()
@@ -717,24 +735,8 @@ def test_spcm17_existing_toolbars_unchanged(name, tmp_path):
     """
     from src.getmoredone.screens.item_list_columns import SEARCH_MIN_PX
 
-    modules = {
-        "today": ("today", "TodayScreen"),
-        "upcoming": ("upcoming", "UpcomingScreen"),
-        "all_items": ("all_items", "AllItemsScreen"),
-        "hierarchical": ("hierarchical", "HierarchicalScreen"),
-    }
-    import importlib
-
-    module, attr = modules[name]
-    cls = getattr(importlib.import_module(
-        f"src.getmoredone.screens.{module}"), attr)
-    root = _root()
-    db = DatabaseManager(str(tmp_path / f"{name}.db"))
-    db.create_action_item(ActionItem(who="Self", title="A task"))
+    root, db, screen = _build_old_toolbar_screen(name, tmp_path)
     try:
-        screen = cls(root, db, _app())
-        screen.pack(fill="both", expand=True)
-        screen.update_idletasks()
         wrap = screen.toolbar_wrap
         assert wrap.entry is screen.search_entry
         assert wrap.control_row == 0 and wrap.wrap_row == 1
