@@ -44,8 +44,12 @@ REMOVED_BUTTONS = (
     "Open Notes",
 )
 
+# Every listing of action items. "week_actions" is the APE Week Actions
+# panel, a TodayScreen subclass with its own COLUMN_PREFIX: it takes Today's
+# layout and therefore these defaults, so it is in scope and was missed by
+# the first version of this file (found by the sweep, 2026-11-16).
 LISTINGS = ("today", "upcoming", "all_items", "hierarchical", "completed",
-            "project_items", "drag_schedule")
+            "project_items", "drag_schedule", "week_actions")
 
 # LRP-M10: how many value filters each listing's toolbar hands to ToolbarWrap.
 # Every listing is named, the two with none included, so a filter added to a
@@ -59,6 +63,15 @@ FILTER_COUNT = {
     "project_items": 0,
     "drag_schedule": 4,   # Who, Segment, SubSegment, Project
 }
+# The listings whose toolbar goes through ToolbarWrap. The APE Week Actions
+# panel has none of its own -- that screen's controls sit outside the panel --
+# so the filter guards do not reach it, while every column guard does.
+# test_lrpm10_the_week_actions_panel_has_no_toolbar holds the exclusion.
+TOOLBARS = tuple(name for name in LISTINGS if name != "week_actions")
+# Combo boxes that sit on a toolbar's control row and are deliberately not
+# value filters (plan D5): the numeric day selectors, whose content is one to
+# three characters, and the Scheduler's sort order.
+NON_FILTER_COMBOS = ("days_combo", "project_sort_combo")
 FILTERED = tuple(name for name, count in FILTER_COUNT.items() if count)
 
 
@@ -114,6 +127,9 @@ def _listing_class(name):
     if name == "completed":
         from src.getmoredone.screens.completed import CompletedScreen
         return CompletedScreen
+    if name == "week_actions":
+        from src.getmoredone.screens.week_actions import WeekTacticActionsPanel
+        return WeekTacticActionsPanel
     raise AssertionError(f"no screen class for listing {name!r}")
 
 
@@ -356,17 +372,39 @@ def test_lrpm4_the_floor_follows_the_row_font(listing, monkeypatch):
     assert resizer.specs["title"].min_width == list_floor_px()
 
 
-def test_lrpm6_the_legacy_title_fallback_matches_the_table():
-    """LRP-M6 — the legacy scalars agree with COLUMN_DEFAULT_PX.
+def test_lrpm6_a_default_scalar_does_not_override_the_table(listing):
+    """LRP-M6 — the Scheduler opens at the shared Title width on a fresh install.
 
-    ``ColumnResizer._load_stored`` prefers ``<prefix>_title_col_width`` over a
-    spec's default, so a scalar that disagrees silently overrides the table --
-    which is exactly what 220 here did to the Scheduler until 2026-11-16.
-    app_settings cannot import from screens, so this is the link.
+    ``ColumnResizer`` prefers a stored ``<prefix>_title_col_width`` over a
+    spec default, and ``AppSettings.drag_schedule_title_col_width`` is 220
+    for the Plan screen's sake (PB-M5 reads it live). Taking that default as
+    a stored width was how the Scheduler went on opening at 220 while every
+    other listing's Title was 260 -- the divergence LRP-M6 exists to close,
+    left open by the first version of this batch and found by the sweep.
+
+    Built for real on default settings, which is what a fresh install has.
     """
-    want = column_default_px("title")
-    assert AppSettings.drag_schedule_title_col_width == want
-    assert AppSettings.today_title_col_width == want
+    _screen, resizer = listing("drag_schedule")
+    assert AppSettings.drag_schedule_title_col_width != column_default_px("title")
+    assert resizer.width("title") == column_default_px("title")
+
+
+def test_lrpm6_a_stored_scalar_still_wins(listing, tmp_path):
+    """LRP-M6 — a Title width dragged before the per-column dict is kept.
+
+    The scalar is the only record of one, so ignoring the class default must
+    not turn into ignoring the setting. Asserted on the real resizer the
+    Scheduler built, re-loaded against a settings object holding a value
+    nobody could mistake for a default.
+    """
+    from src.getmoredone.screens.column_resize import ColumnResizer
+
+    screen, resizer = listing("drag_schedule")
+    settings = AppSettings()
+    settings.drag_schedule_title_col_width = 442
+    reloaded = ColumnResizer(owner=None, settings=settings, prefix="drag_schedule",
+                             specs=list(resizer.specs.values()))
+    assert reloaded.width("title") == 442
 
 
 # --------------------------------------------------------------------- LRP-M9
@@ -398,15 +436,26 @@ def test_lrpm9_every_column_moves_in_proportion_to_title(listing, name):
 
 
 # -------------------------------------------------------------------- LRP-M10
-@pytest.mark.parametrize("name", LISTINGS)
+@pytest.mark.parametrize("name", TOOLBARS)
 def test_lrpm10_every_value_filter_is_wired(listing, name):
-    """LRP-M10 — each toolbar hands its value filters to the wrap, and only those.
+    """LRP-M10 — every combo on the toolbar's control row is wired, bar the two.
 
-    Read off the wrap rather than the screen: a combo the screen holds but
-    does not pass through resizes like a label, which is the bug this guards.
+    Discovered from the toolbar, not read off a table: a guard that only
+    compares a count against FILTER_COUNT passes a combo nobody wired as
+    long as nobody edits the table, and the principles document tells the
+    next author to edit the table (found by the sweep, 2026-11-16). The
+    count is asserted too, as a second and independent statement of the
+    same fact.
     """
     screen, _resizer = listing(name)
     wrap = screen.toolbar_wrap
+    excluded = {id(getattr(screen, attr)) for attr in NON_FILTER_COMBOS
+                if isinstance(getattr(screen, attr, None), ctk.CTkComboBox)}
+    on_the_row = {id(child) for child in wrap.toolbar.winfo_children()
+                  if isinstance(child, ctk.CTkComboBox)
+                  and child.grid_info()
+                  and int(child.grid_info()["row"]) == wrap.control_row}
+    assert {id(widget) for widget, _d in wrap.filters} == on_the_row - excluded
     assert len(wrap.filters) == FILTER_COUNT[name]
     for widget, default in wrap.filters:
         assert isinstance(widget, ctk.CTkComboBox), widget
@@ -514,3 +563,60 @@ def test_lrpm11_the_threshold_does_not_move_as_the_filters_resize(listing, name)
         wrap.fit(width)
         assert wrap.min_one_row_px() == threshold, width
         assert wrap.one_row_px() == full, width
+
+
+@pytest.mark.parametrize("name", FILTERED)
+def test_lrpm10_the_filters_never_draw_wider_than_their_room(listing, name):
+    """LRP-M10 — the share is re-shared after a pin, so the total fits.
+
+    Clamping each filter's share up to FILTER_MIN_PX where it stood drew a
+    total wider than the room the toolbar had: 190 px into 180 on All Items,
+    over a band about 23 px wide, with the row not yet wrapped and the search
+    entry already at its minimum, so Tk took the difference out of a column
+    of its own choosing and nothing said so (found by the sweep, 2026-11-16).
+    Checked across the whole band down to the wrap threshold.
+    """
+    screen, _resizer = listing(name)
+    wrap = screen.toolbar_wrap
+    threshold = wrap.min_one_row_px()
+    for width in range(threshold, wrap.one_row_px() + 1, 7):
+        wrap.fit(width)
+        room = wrap._filter_room(width)
+        drawn = sum(widget.cget("width") for widget, _d in wrap.filters)
+        assert drawn <= room, (name, width, drawn, room)
+
+
+def test_lrpm11_fit_reports_a_second_row_that_does_not_fit(completed_screen,
+                                                           caplog):
+    """LRP-M11 — a wrapped row wider than the toolbar is counted and logged.
+
+    ``sticky="w"`` puts the overflow past the right edge, off screen, and
+    there is no window minsize, so the only report is the number ``fit``
+    returns and the one line it logs — the same contract
+    ``ItemListLayout.fit`` keeps for the columns (P2). Logged once on the
+    crossing, not on every <Configure>.
+    """
+    wrap = completed_screen().toolbar_wrap
+    assert wrap.fit(wrap.one_row_px()) == 0
+
+    too_narrow = wrap.wrap_row_px() - 60
+    with caplog.at_level("INFO"):
+        short = wrap.fit(too_narrow)
+        again = wrap.fit(too_narrow)
+    assert short == wrap.wrap_row_px() - too_narrow
+    assert again == short
+    lines = [r for r in caplog.records if "past the right edge" in r.message]
+    assert len(lines) == 1, [r.message for r in lines]
+    assert wrap.fit(wrap.one_row_px()) == 0
+
+
+def test_lrpm10_the_week_actions_panel_has_no_toolbar(listing):
+    """LRP-M10 — the one listing the filter guards leave out, and why.
+
+    The APE Week Actions panel is a TodayScreen subclass, so every column
+    guard covers it; it builds no toolbar of its own, so there is no filter
+    set to wire. Asserted rather than assumed: if it ever grows one, the
+    exclusion in TOOLBARS stops being true and this fails.
+    """
+    screen, _resizer = listing("week_actions")
+    assert not hasattr(screen, "toolbar_wrap")

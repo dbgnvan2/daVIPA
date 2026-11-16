@@ -704,29 +704,23 @@ def test_spcs2_the_wrapped_group_survives_a_cycle(completed_screen):
     ``_wrap`` moves another.
 
     LRP-M10 put a resizable control in that group -- Completed's Who filter
-    is right of the spacer -- so the group's pixel total is no longer
-    constant across a narrow fit. What must not move is the rest of it: the
-    measurement is taken over the same widgets at every width.
+    is right of the spacer -- and ``wrap_row_px`` prices a filter at
+    ``FILTER_MIN_PX``, the width a wrapped filter is always at, so the total
+    is a constant again and this test holds it as one.
     """
     wrap = completed_screen().toolbar_wrap
 
     def shape():
         return [(id(w), int(i["column"])) for w, i in wrap._wrap_candidates()]
 
-    def filter_px():
-        group = {id(w) for w, _i in wrap._wrap_candidates()}
-        return sum(widget.winfo_reqwidth() for widget, _d in wrap.filters
-                   if id(widget) in group)
-
-    before, fixed = shape(), wrap.wrap_row_px() - filter_px()
+    before, px_before = shape(), wrap.wrap_row_px()
     assert before, "no control sits right of the spacer column"
-    assert fixed > 0, "the group is nothing but filters; pick another screen"
     wrap.fit(wrap.min_one_row_px() - 50)
     assert wrap.wrapped is True
-    assert shape() == before and wrap.wrap_row_px() - filter_px() == fixed
+    assert shape() == before and wrap.wrap_row_px() == px_before
     wrap.fit(wrap.one_row_px() + 50)
     assert wrap.wrapped is False
-    assert shape() == before and wrap.wrap_row_px() - filter_px() == fixed
+    assert shape() == before and wrap.wrap_row_px() == px_before
 
 
 def test_spcs1_the_project_title_tracks_the_row_font(projects_screen,

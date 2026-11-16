@@ -158,12 +158,14 @@ def test_project_board_ui_elements_presence(mock_app, mock_db):
     assert hasattr(screen, "btn_add_project"), "Missing '+ New Project' button"
     assert hasattr(screen, "btn_refresh"), "Missing 'Refresh' button"
     
-    # Detail toolbar buttons
-    assert hasattr(screen, "btn_create_action"), "Missing 'Create Action Item' button"
-    assert hasattr(screen, "btn_link_action"), "Missing 'Link Action Item' button"
-    assert hasattr(screen, "btn_edit_project"), "Missing 'Edit Project' button"
-    assert hasattr(screen, "btn_create_note"), "Missing 'Create Note' button"
-    assert hasattr(screen, "btn_link_note"), "Missing 'Link Note' button"
-    assert hasattr(screen, "btn_open_notes"), "Missing 'Open Notes' button"
+    # Detail toolbar buttons. Six were removed on 2026-11-16 (LRP-M2, at the
+    # user's request) and this file is the screen contract, so the contract is
+    # that they are gone -- asserted here as well as in
+    # tests/test_list_resize_principles.py, which also checks the toolbar they
+    # left and the empty-state texts that named them.
+    assert hasattr(screen, "btn_bulk_edit"), "Missing 'Bulk Edit' button"
+    for gone in ("btn_create_action", "btn_link_action", "btn_edit_project",
+                 "btn_create_note", "btn_link_note", "btn_open_notes"):
+        assert not hasattr(screen, gone), f"{gone} is back on the right panel"
     
     root.destroy()
