@@ -21,9 +21,11 @@ import pytest
 from src.getmoredone.app_settings import AppSettings
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import ActionItem, ProjectBoard
+from src.getmoredone import theme
 from src.getmoredone.screens.item_list_columns import (
     FIT_DELAY_MS,
     LIST_MIN_CHARS,
+    _pad_total,
     row_char_px,
 )
 
@@ -481,16 +483,29 @@ def test_spcm15_narrow_window_wraps_and_nothing_clips(
     """
     screen = {"completed": completed_screen, "projects": projects_screen,
               "scheduler": scheduler_screen}[name](mapped=True)
+    wrap = screen.toolbar_wrap
+    # Inside the band where two rows are the point: narrow enough to wrap,
+    # wide enough to hold the wrapped row. Below wrap_row_px() it clips, and
+    # nothing stops the window going there (D11) -- a fixed 760 put the
+    # Scheduler (991) and Projects (844) below their own second row, where
+    # the group overflowed the left edge and this test could not fail.
+    width = wrap.one_row_px() - 40
+    assert width > wrap.wrap_row_px(), (name, width, wrap.wrap_row_px())
     root = screen.winfo_toplevel()
-    root.geometry("760x600")
+    root.geometry(f"{width}x600")
     root.update()
     screen.update_idletasks()
-    wrap = screen.toolbar_wrap
-    assert wrap.wrapped is True, f"{name} did not wrap at 760px"
-    toolbar_right = wrap.toolbar.winfo_rootx() + wrap.toolbar.winfo_width()
+    assert wrap.wrapped is True, f"{name} did not wrap at {width}px"
+    toolbar_left = wrap.toolbar.winfo_rootx()
+    toolbar_right = toolbar_left + wrap.toolbar.winfo_width()
     for widget, _info in wrap._moved:
-        right = widget.winfo_rootx() + widget.winfo_width()
+        left = widget.winfo_rootx()
+        right = left + widget.winfo_width()
+        # Both edges: the wrap frame is gridded sticky="e", so an over-wide
+        # second row overflows to the LEFT, which a right-edge check alone
+        # reads as a pass (SPC-S2).
         assert right <= toolbar_right + 1, (name, widget, right, toolbar_right)
+        assert left >= toolbar_left - 1, (name, widget, left, toolbar_left)
 
 
 def test_spcm16_only_the_control_row_wraps(projects_screen):
@@ -512,6 +527,54 @@ def test_spcm16_only_the_control_row_wraps(projects_screen):
         assert widget not in moved, widget
         assert int(widget.grid_info()["row"]) == row, widget
         assert str(widget.grid_info()["in"]) == str(wrap.toolbar)
+
+
+@pytest.mark.parametrize("name", ["completed", "projects", "scheduler"])
+def test_spcs2_two_rows_need_less_width_than_one(name, completed_screen,
+                                                 projects_screen,
+                                                 scheduler_screen):
+    """SPC-S2 — the wrapped row fits in a width where one row does not.
+
+    The band `wrap_row_px() <= W < one_row_px()` is the whole point of the
+    wrap, and it has to be non-empty: the wrap frame is gridded `sticky="e"`,
+    so a second row wider than the toolbar overflows the LEFT edge, out of
+    sight, instead of reporting anything. Needs no mapped window -- both
+    numbers are requested widths, which a withdrawn window has.
+    """
+    screen = {"completed": completed_screen, "projects": projects_screen,
+              "scheduler": scheduler_screen}[name]()
+    wrap = screen.toolbar_wrap
+    assert wrap.wrap_row_px() > 0
+    assert wrap.wrap_row_px() < wrap.one_row_px(), (
+        name, wrap.wrap_row_px(), wrap.one_row_px())
+    # The band is where the wrap is used, so it must actually wrap there.
+    wrap.fit(wrap.one_row_px() - 1)
+    assert wrap.wrapped is True, name
+    # And the group it moved is the one the measurement was taken over.
+    assert wrap.wrap_row_px() == sum(
+        w.winfo_reqwidth() + _pad_total(i["padx"]) for w, i in wrap._moved)
+
+
+def test_spcs1_the_project_title_tracks_the_row_font(projects_screen,
+                                                     monkeypatch):
+    """SPC-S1 — the bold Action Items title is the row font's size, not 15.
+
+    The resizer cuts that cell at ``row_char_px()``, which follows the user's
+    list font setting; a hardcoded 15 meant a larger setting grew the
+    character budget while the drawn text stayed put.
+    """
+    from src.getmoredone.screens import item_list_columns
+
+    monkeypatch.setattr(theme, "LIST_ROW_FONT_SIZE", 20)
+    assert item_list_columns.row_char_px() == 11, "the budget did not follow"
+    screen = projects_screen()
+    titles = [label for key, label, _d in _cells(screen.items_layout)
+              if key == "title" and "Next:" not in label.cget("text")]
+    assert titles, "no title cell registered"
+    for label in titles:
+        font = label.cget("font")
+        assert int(font.cget("size")) == 20, font.cget("size")
+        assert font.cget("weight") == "bold", font.cget("weight")
 
 
 @pytest.mark.parametrize("name", ["today", "upcoming", "all_items", "hierarchical"])
@@ -545,8 +608,20 @@ def test_spcm17_existing_toolbars_unchanged(name, tmp_path):
         wrap = screen.toolbar_wrap
         assert wrap.entry is screen.search_entry
         assert wrap.control_row == 0 and wrap.wrap_row == 1
-        # The entry's column is excluded and its minimum added instead.
-        assert wrap.one_row_px() > SEARCH_MIN_PX
+        # The entry's column is excluded and its minimum added instead --
+        # pinned exactly, not as a floor: a floor cannot see the threshold
+        # move that this test exists to catch (repo test rules).
+        columns = {}
+        for widget in wrap.toolbar.winfo_children():
+            info = widget.grid_info()
+            if not info or widget is wrap.frame or int(info["row"]) != 0:
+                continue
+            col = int(info["column"])
+            if col == wrap.search_col:
+                continue
+            need = widget.winfo_reqwidth() + _pad_total(info["padx"])
+            columns[col] = max(columns.get(col, 0), need)
+        assert wrap.one_row_px() == sum(columns.values()) + SEARCH_MIN_PX
         wrap.fit(wrap.one_row_px() - 50)
         assert wrap.wrapped is True
         moved = {w for w, _info in wrap._moved}
