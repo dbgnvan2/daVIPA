@@ -197,8 +197,8 @@ class ToolbarWrap:
         self.wrapped = False
         self._moved = []
         # (widget, its default width), captured before anything resizes it.
-        # Each filter is the only widget in its grid column, which is what
-        # lets ``_filter_room`` subtract their widths out of one_row_px().
+        # The default is the weight ``fit_filters`` shares by and the width
+        # ``one_row_px`` measures with, so it has to be read before a fit.
         self.filters = [(widget, int(widget.cget("width")))
                         for widget in filters]
         if entry is not None:

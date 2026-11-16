@@ -456,8 +456,10 @@ class PlanScreen(PlanWeekViewMixin, PlanCommitmentEditsMixin, PlanCommitmentsMix
         screen it hid.
 
         Floored at ``items_width_floor()`` since PD-M1 made a row the day
-        chip's four columns, one of which is the 220px Drag Schedule title
-        width. At the shipped 260 the row asked for 306px inside a 256px pane
+        chip's four columns, one of which is the Drag Schedule title width --
+        220px when this was written, 260 since LRP-M6 made the Scheduler's
+        Title column the shared default, which raised this floor from 444px
+        to 484px. At the shipped 260 the row asked for 306px inside a 256px pane
         and the ``30m`` label was laid out past the right edge: measured, not
         inferred -- it was invisible in the app while the first version of
         ``::test_pdm13_every_line_of_the_rebuilt_row_is_drawn_inside_it``

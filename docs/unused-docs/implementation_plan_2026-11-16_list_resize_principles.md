@@ -182,6 +182,17 @@ keep their width; growing them buys nothing.
   (LSR-D7), and the explicit share is the same rule the columns follow.
   `TOOLBAR_SPACER_WEIGHT` is therefore unchanged, contrary to LRP-M10's
   wording above.
+- **Reached further than the Scheduler, not in this plan:**
+  `AppSettings.drag_schedule_title_col_width` had to move 220 -> 260 for
+  LRP-M6 to take effect at all (`ColumnResizer._load_stored` prefers it over
+  a spec default). The Plan screen reads the same scalar for a day box's
+  title column (PB-M5, so the two screens' columns line up), so that screen's
+  title column widens too and `items_width_floor()` / `day_width_floor()`
+  rise from 444 px to 484 px. Accepted rather than decoupled: leaving the
+  Plan screen at 220 while the Scheduler drew 260 would break the one thing
+  the shared scalar exists for. `tests/test_plan_screen.py` is green (243
+  passed), the `items_col_width` docstring and the USER_GUIDE's 444 are
+  corrected, and the consequence is in the CHANGELOG.
 - **Found while building, not in this plan:** a threshold measured from the
   filters' drawn widths made `fit` non-monotone — fitting resized the
   filters, which moved the threshold. `one_row_px()` counts them at their

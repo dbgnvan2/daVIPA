@@ -30,6 +30,12 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (LRP-M10, LRP-M11)
 - **A wrapped toolbar row is left-justified**, reading left to right under
   the first row instead of being pushed to the right-hand edge. (LRP-M1)
+- **The Plan screen's title column follows the Scheduler's**, as it has
+  since PB-M5, so giving the Scheduler the shared Title default also widens
+  a day box's title column from 220 to 260 px and raises the items pane's
+  floor from 444 to 484 px. Only on an install that has not set *Drag
+  Schedule title column width*; the two screens would otherwise stop lining
+  up, which is what that setting is shared for.
 
 ### Removed — six buttons off the Project Board's right panel (2026-11-16)
 
