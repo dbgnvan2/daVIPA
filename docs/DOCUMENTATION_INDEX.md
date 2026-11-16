@@ -56,7 +56,7 @@ width, a debounced refit, a value filter that takes its share of the
 toolbar's slack the way a column takes the list's, and a toolbar that wraps
 left-justified rather than clipping — and only once every filter is at its
 minimum. Read before adding a listing or changing how one sizes its columns;
-`tests/test_list_resize_principles.py` asserts it over all seven. Holds
+`tests/test_list_resize_principles.py` asserts it over all eight. Holds
 LRP-M1 to M11. **Approved and built 2026-11-16.**
 
 ### docs/USER_GUIDE.md
@@ -317,7 +317,8 @@ Holds decisions D1 to D8. **Approved, built and walked 2026-11-14.**
 ### docs/unused-docs/implementation_plan_2026-11-16_list_resize_principles.md
 
 Implementation plan for LRP-M1 to M11: one set of resize principles across
-all seven listings of action items — one default width per column kind, one
+every listing of action items — eight, once the sweep found the APE Week
+Actions panel — one default width per column kind, one
 floor, one maximum — plus resizable value filters, a left-justified wrapped
 toolbar row, and six buttons off the Project Board's right panel. Holds the
 measured divergence table (seven of ten column kinds carried two or three

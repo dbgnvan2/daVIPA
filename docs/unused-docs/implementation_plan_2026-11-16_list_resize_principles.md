@@ -182,17 +182,18 @@ keep their width; growing them buys nothing.
   (LSR-D7), and the explicit share is the same rule the columns follow.
   `TOOLBAR_SPACER_WEIGHT` is therefore unchanged, contrary to LRP-M10's
   wording above.
-- **Reached further than the Scheduler, not in this plan:**
-  `AppSettings.drag_schedule_title_col_width` had to move 220 -> 260 for
-  LRP-M6 to take effect at all (`ColumnResizer._load_stored` prefers it over
-  a spec default). The Plan screen reads the same scalar for a day box's
-  title column (PB-M5, so the two screens' columns line up), so that screen's
-  title column widens too and `items_width_floor()` / `day_width_floor()`
-  rise from 444 px to 484 px. Accepted rather than decoupled: leaving the
-  Plan screen at 220 while the Scheduler drew 260 would break the one thing
-  the shared scalar exists for. `tests/test_plan_screen.py` is green (243
-  passed), the `items_col_width` docstring and the USER_GUIDE's 444 are
-  corrected, and the consequence is in the CHANGELOG.
+- **The legacy Title scalar was the wrong lever.**
+  `AppSettings.drag_schedule_title_col_width` was first raised 220 -> 260 so
+  LRP-M6 would reach the Scheduler at all (`ColumnResizer._load_stored`
+  prefers it over a spec default). Two problems, both found in the sweep:
+  the Plan screen reads that same scalar live for a day box's title column
+  and for both pane floors (PB-M5), so raising it moved a screen outside
+  this batch (444 px -> 484 px, measured); and on an install whose settings
+  file already holds 220, `AppSettings.load` keeps 220, so the Scheduler went
+  on opening at 220 anyway. Settled instead inside `ColumnResizer`: a stored
+  scalar still wins, the settings class's *default* for it does not, and the
+  scalar stays 220 for the Plan screen. `tests/test_plan_screen.py` green
+  (243 passed) before and after.
 - **Found while building, not in this plan:** a threshold measured from the
   filters' drawn widths made `fit` non-monotone — fitting resized the
   filters, which moved the threshold. `one_row_px()` counts them at their
@@ -202,6 +203,26 @@ keep their width; growing them buys nothing.
   the SPC bug hid, but still clipping: there is no window `minsize` (SPC D11).
 - **Phase 2 touches all nine screen modules.** One build batch at a time in
   this checkout; the three phases are sequential commits, not parallel work.
+
+## What the sweep found, and what was done
+
+`learning-qa` over `c4a8672...HEAD` (10 findings, 3 high) and a read pass over
+the same range. All ten acted on:
+
+| # | finding | done |
+|---|---|---|
+| 1 | `tests/test_ui_presence.py` still asserted the six removed buttons exist — the suite was **red** on this branch and no run in this batch had touched that file | the screen contract now asserts they are gone; confirmed red before the fix |
+| 2 | the 220 -> 260 scalar never reaches an install whose settings file holds 220 | settled in `ColumnResizer`: a class default is not a stored width |
+| 3 | that scalar's other live consumer is the Plan screen (PB-M5) | scalar reverted to 220; Plan screen untouched |
+| 4 | `fit_filters` clamped each share where it stood, drawing 190 px into 180 | pin and re-share, as `ColumnResizer._share` does |
+| 5 | `wrap_row_px()` still priced filters live, so the SPC-S3 budget number moved as they resized | prices a filter at `FILTER_MIN_PX`, which is where a wrapped one always is |
+| 6 | `ToolbarWrap.fit` reported neither an overflowing second row nor a clamped filter (P2) | returns the shortfall and logs the crossing once |
+| 7 | `week_actions.WeekTacticActionsPanel` is an eighth listing, outside the enumeration | in `LISTINGS`; a guard holds its exclusion from the toolbar rules |
+| 8 | the wiring guard compared a count to a hand-written table | discovers every combo on the control row; the count stays as a second statement |
+| 9 | five `configure` calls per `<Configure>` | only a width that changed is written |
+| 10 | a stale Create Note / Link Note route in `docs/USER_GUIDE.md` | corrected |
+
+Six new guards for findings 1 to 8, each mutation-checked.
 
 ## Verification
 
