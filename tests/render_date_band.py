@@ -11,8 +11,15 @@ roots in one interpreter hang the run. The root is withdrawn and never mapped,
 so it takes no focus and does not add to the ``mapped_windows`` count
 ``test_ci_contract.py`` holds. Not named ``test_*``: it is a helper.
 
-Usage: python tests/render_date_band.py [<band colour>]
+Usage: python tests/render_date_band.py [<band colour>] [post-load]
 Prints ``THEME``, then ``FILL``/``TEXT`` per band; exit 0 unless it fails.
+
+``post-load`` hands the colour to the built screen instead of storing it in
+``settings.json``. ``AppSettings.load`` normalizes an unusable stored value to
+``""`` before any screen sees it, so a stored one cannot reach
+``theme.date_band_colors`` at all -- and an assertion fed that way proves the
+load healing, not the helper. This flag is how the helper's own fallback is
+reached through a real screen build.
 """
 
 import json
@@ -35,14 +42,18 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 WORKSPACE = pathlib.Path(tempfile.mkdtemp(prefix="render-date-band-"))
 os.environ["GETMOREDONE_DATA_DIR"] = str(WORKSPACE)
 
+RAW = sys.argv[1] if len(sys.argv) > 1 else ""
+POST_LOAD = "post-load" in sys.argv[2:]
+
 # Before the application is imported: the screen reads this in __init__.
 (WORKSPACE / "settings.json").write_text(
-    json.dumps({"list_date_band_color": sys.argv[1] if len(sys.argv) > 1 else ""})
+    json.dumps({"list_date_band_color": "" if POST_LOAD else RAW})
 )
 
 import customtkinter as ctk
 
 from src.getmoredone.models import ActionItem
+from src.getmoredone.screens import upcoming as upcoming_module
 from src.getmoredone.screens.upcoming import UpcomingScreen
 from src.getmoredone.theme import semantic_colors
 from src.getmoredone.vps_manager import VPSManager
@@ -65,6 +76,15 @@ def main() -> int:
     screen = UpcomingScreen(window, manager, app)
     screen.pack(fill="both", expand=True)
     window.update()
+
+    if POST_LOAD:
+        # ``refresh`` reloads settings, so the value has to come back from
+        # ``load`` to survive the rebuild it does.
+        injected = upcoming_module.AppSettings.load()
+        injected.list_date_band_color = RAW
+        upcoming_module.AppSettings.load = classmethod(lambda cls: injected)
+        screen.refresh()
+        window.update()
 
     print(f"THEME {semantic_colors()['surface_subtle']}")
 

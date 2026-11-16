@@ -60,7 +60,9 @@ def test_dbcm1_the_field_round_trips_and_defaults_to_the_theme(tmp_path, monkeyp
     assert AppSettings.load().list_date_band_color == "#D9E8FF"
 
 
-def test_dbcm11_load_heals_a_stored_value_tk_would_reject(tmp_path, monkeypatch):
+def test_dbcm11_load_heals_a_stored_value_tk_would_reject(
+    tmp_path, monkeypatch, caplog
+):
     """DBC-M1.1 -- a hand-edited colour must not wedge Settings > Appearance.
 
     Without normalising on load, a stored "lightblue" drew the band correctly
@@ -71,11 +73,24 @@ def test_dbcm11_load_heals_a_stored_value_tk_would_reject(tmp_path, monkeypatch)
     settings_file.write_text(json.dumps({"list_date_band_color": "lightblue"}))
     _redirect_settings(monkeypatch, settings_file)
 
-    assert AppSettings.load().list_date_band_color == ""
+    with caplog.at_level(logging.WARNING, logger="src.getmoredone.app_settings"):
+        assert AppSettings.load().list_date_band_color == ""
 
-    # A good value is kept, upper-cased, so the healing is not a blanket wipe.
-    settings_file.write_text(json.dumps({"list_date_band_color": "#d9e8ff"}))
-    assert AppSettings.load().list_date_band_color == "#D9E8FF"
+    # Logged, because nothing else reports it: the entry then shows blank,
+    # which is what "never set" looks like, and no unusable value can still
+    # reach theme.date_band_colors to warn there.
+    assert sum("lightblue" in r.getMessage() for r in caplog.records) == 1
+
+    # A good value is kept, upper-cased, so the healing is not a blanket wipe,
+    # and a blank one is not reported as a bad colour.
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="src.getmoredone.app_settings"):
+        settings_file.write_text(json.dumps({"list_date_band_color": "#d9e8ff"}))
+        assert AppSettings.load().list_date_band_color == "#D9E8FF"
+        settings_file.write_text(json.dumps({"list_date_band_color": "  "}))
+        assert AppSettings.load().list_date_band_color == ""
+    assert [r.getMessage() for r in caplog.records
+            if "Day/Date band colour" in r.getMessage()] == []
 
 
 # =========================================================================
@@ -132,11 +147,18 @@ def test_dbcm22_an_unusable_colour_falls_back_to_the_theme(caplog):
 # DBC-M3 — the band itself
 # =========================================================================
 
-def _render_band(colour: str):
-    """Build Upcoming in a subprocess and return its band's reported colours."""
+def _render_band(colour: str, post_load: bool = False):
+    """Build Upcoming in a subprocess and return its band's reported colours.
+
+    ``post_load`` hands the colour to the built screen rather than storing it,
+    which is the only way an unusable value reaches ``date_band_colors``:
+    ``AppSettings.load`` normalizes a stored one to ``""`` first.
+    """
+    argv = [sys.executable, str(REPO_ROOT / "tests" / "render_date_band.py"), colour]
+    if post_load:
+        argv.append("post-load")
     result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "tests" / "render_date_band.py"), colour],
-        capture_output=True, text=True, timeout=180, cwd=REPO_ROOT,
+        argv, capture_output=True, text=True, timeout=180, cwd=REPO_ROOT,
     )
     assert result.returncode == 0, result.stderr
     lines = dict(
@@ -156,11 +178,12 @@ def test_dbcm3_the_upcoming_band_is_drawn_from_the_helper():
     assert picked["FILL"] == "#D9E8FF"
     assert picked["TEXT"] == "#000000"
 
-    # The composition the helper exists for: a stored value Tk would reject
-    # reaches a real screen build and the band draws the theme fill, rather
-    # than raising a TclError out of the refresh. This is the case that would
-    # catch a later edit passing the stored string straight to fg_color.
-    bad = _render_band("rebeccapurple")
+    # The composition the helper exists for: a value Tk would reject reaches a
+    # real screen build, and the band draws the theme fill rather than raising
+    # a TclError out of the refresh. Injected after load, because load heals a
+    # stored one -- fed that way this would pass on a screen that handed the
+    # raw string to fg_color, which is the edit it exists to catch.
+    bad = _render_band("rebeccapurple", post_load=True)
     assert bad["FILL"] == bad["THEME"]
 
 
