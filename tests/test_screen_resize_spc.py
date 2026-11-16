@@ -218,19 +218,38 @@ def test_spcm2_completed_follows_the_width(completed_screen):
         assert int(label.cget("width")) == max(1, wide[key] - delta), key
 
 
+def _logged_shortfalls(caplog):
+    """Every column shortfall `ItemListLayout.fit` has logged, in px, in order."""
+    return [int(r.getMessage().split(" is ")[1].split(" px")[0])
+            for r in caplog.records
+            if "narrower than its column floors" in r.getMessage()]
+
+
 def test_spcm3_completed_floor_is_six_characters(completed_screen, caplog):
-    """SPC-M3 — no column below 6 characters; the shortfall is logged once."""
+    """SPC-M3 — no column below 6 characters; a deepening shortfall is logged.
+
+    "Logged once" was this test's contract until LRP, and it was hiding the
+    overrun that matters: the latch was a boolean, so the first shallow
+    crossing was reported and every deeper one after it was suppressed. ``fit``
+    now keeps the worst shortfall it has logged, so each deeper one reports and
+    a width that fits resets the watermark. Case (b) — the behaviour changed
+    intentionally (found by the sweep's re-sweep, 2026-11-16).
+    """
     layout = completed_screen().layout
     caplog.set_level("INFO", logger="src.getmoredone.screens.item_list_columns")
     for width in (1200, 600, 300, 1):
         layout.fit(width)
         assert min(_widths(layout, COMPLETED_KEYS).values()) >= _floor(), width
     assert set(_widths(layout, COMPLETED_KEYS).values()) == {_floor()}
+
+    deepening = _logged_shortfalls(caplog)
+    assert len(deepening) >= 2, deepening
+    assert deepening == sorted(set(deepening)), deepening
+
+    caplog.clear()
     layout.fit(1200)
     layout.fit(1)
-    hits = [r for r in caplog.records
-            if "narrower than its column floors" in r.getMessage()]
-    assert len(hits) == 2, [r.getMessage() for r in hits]
+    assert _logged_shortfalls(caplog) == [max(deepening)]
 
 
 def test_spcm4_completed_configure_and_refresh_refit(completed_screen, monkeypatch):

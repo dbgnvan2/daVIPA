@@ -33,6 +33,7 @@ from src.getmoredone.screens.item_list_columns import (
     column_default_px,
     list_floor_px,
 )
+from src.getmoredone.screens.column_resize import LEGACY_TITLE_DEFAULTS
 
 # The buttons the user asked to be taken off the Project Board's right panel.
 REMOVED_BUTTONS = (
@@ -382,11 +383,53 @@ def test_lrpm6_a_default_scalar_does_not_override_the_table(listing):
     other listing's Title was 260 -- the divergence LRP-M6 exists to close,
     left open by the first version of this batch and found by the sweep.
 
-    Built for real on default settings, which is what a fresh install has.
+    Built against an ``AppSettings`` this test owns, not the one the screen
+    loaded. ``conftest._isolate_user_settings`` is session-scoped, so every
+    test in the run shares one ``settings.json`` and
+    ``ColumnResizer._persist`` writes into it: taking the screen's own
+    settings would make this guard's premise -- default settings, which is
+    what a fresh install has -- a question of which files pytest collected
+    first (P8; found by the sweep's re-sweep, 2026-11-16).
     """
+    from src.getmoredone.screens.column_resize import ColumnResizer
+
     _screen, resizer = listing("drag_schedule")
-    assert AppSettings.drag_schedule_title_col_width != column_default_px("title")
-    assert resizer.width("title") == column_default_px("title")
+    settings = AppSettings()
+    assert settings.drag_schedule_title_col_width != column_default_px("title")
+    fresh = ColumnResizer(owner=None, settings=settings, prefix="drag_schedule",
+                          specs=list(resizer.specs.values()))
+    assert fresh.width("title") == column_default_px("title")
+
+
+@pytest.mark.parametrize("prefix", sorted(LEGACY_TITLE_DEFAULTS))
+def test_lrpm6_every_shipped_default_is_read_as_unset(listing, prefix):
+    """LRP-M6 — no value the scalar ever shipped as a default counts as a drag.
+
+    ``AppSettings.save`` stamps a field the settings file does not hold, so
+    the first save on any install writes that build's default into the file
+    and the loaded value is a file value from then on. The live class
+    attribute therefore cannot be the sentinel: change it and a cohort of
+    never-dragged installs silently becomes phantom dragged widths. The
+    history lives in ``LEGACY_TITLE_DEFAULTS``, and the second assertion is
+    what keeps it in step with the class (found by the sweep's re-sweep,
+    2026-11-16).
+
+    Parametrized over every prefix in the table, so the rule is held for
+    ``today`` as well as the Scheduler -- it is keyed on the prefix and
+    reaches both.
+    """
+    from src.getmoredone.screens.column_resize import ColumnResizer
+
+    attr = f"{prefix}_title_col_width"
+    assert getattr(AppSettings, attr) in LEGACY_TITLE_DEFAULTS[prefix]
+    _screen, resizer = listing("drag_schedule")
+    specs = list(resizer.specs.values())
+    for shipped in LEGACY_TITLE_DEFAULTS[prefix]:
+        settings = AppSettings()
+        setattr(settings, attr, shipped)
+        fresh = ColumnResizer(owner=None, settings=settings, prefix=prefix,
+                              specs=specs)
+        assert fresh.width("title") == column_default_px("title")
 
 
 def test_lrpm6_a_stored_scalar_still_wins(listing, tmp_path):
@@ -608,6 +651,37 @@ def test_lrpm11_fit_reports_a_second_row_that_does_not_fit(completed_screen,
     lines = [r for r in caplog.records if "past the right edge" in r.message]
     assert len(lines) == 1, [r.message for r in lines]
     assert wrap.fit(wrap.one_row_px()) == 0
+
+
+def test_lrpm11_a_worse_shortfall_is_logged_and_a_smaller_one_is_not(
+    completed_screen, caplog
+):
+    """LRP-M11 — the log keeps the worst overrun, not the first few pixels of it.
+
+    ``fit`` runs on every <Configure>, so a latched boolean logged the
+    shallowest crossing and then went quiet through every width the user
+    reaches by keeping hold of the window edge: one INFO line naming the
+    least severe instance was the whole record of an arbitrarily large
+    off-screen overflow (found by the sweep's re-sweep, 2026-11-16). The
+    watermark is the number, so a deeper overrun reports and a shallower one
+    stays quiet.
+    """
+    wrap = completed_screen().toolbar_wrap
+    assert wrap.fit(wrap.one_row_px()) == 0
+    shallow = wrap.wrap_row_px() - 10
+    deep = wrap.wrap_row_px() - 300
+
+    with caplog.at_level("INFO"):
+        first = wrap.fit(shallow)
+        worse = wrap.fit(deep)
+        smaller = wrap.fit(shallow)
+    assert first == 10
+    assert worse == 300
+    assert smaller == 10
+    logged = [r.message for r in caplog.records
+              if "past the right edge" in r.message]
+    assert len(logged) == 2, logged
+    assert "300 px is drawn past the right edge" in logged[1]
 
 
 def test_lrpm10_the_week_actions_panel_has_no_toolbar(listing):
