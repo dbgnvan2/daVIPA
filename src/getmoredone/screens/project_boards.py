@@ -12,7 +12,8 @@ from PIL import Image
 
 from ..app_settings import AppSettings
 from ..color_contrast import pick_text_color
-from ..models import ActionItem, PriorityFactors, ProjectBoard, ProjectBoardStatus
+from ..models import (
+    ActionItem, PriorityFactors, ProjectBoard, ProjectBoardStatus, Status)
 from ..paths import project_root
 from .item_list_columns import (
     FixedColumn,
@@ -62,6 +63,12 @@ ITEM_ACTIONS_COL = 5
 ITEM_ACTIONS_OUTER_PAD_PX = 8
 ITEM_CHECKBOX_WIDTH_PX = 24
 ITEM_CHECKBOX_PAD_PX = 6
+#: LRP-A4 -- the Project Notes disclosure button. Wide enough for the triangle
+#: and nothing else, so the section title sits beside it rather than indented.
+NOTES_TOGGLE_WIDTH_PX = 28
+#: LRP-C1 -- the status filter checkboxes on the Action Items header line.
+STATUS_FILTER_BOX_PX = 20
+STATUS_FILTER_PAD_PX = 10
 
 
 class ProjectBoardEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
@@ -176,11 +183,10 @@ class ProjectBoardEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
         ctk.CTkComboBox(
             top_row,
             width=140,
-            values=[
-                ProjectBoardStatus.ACTIVE,
-                ProjectBoardStatus.PENDING,
-                ProjectBoardStatus.COMPLETED,
-            ],
+            # SVU-M1: all four project statuses, read from
+            # ProjectBoardStatus.ALL rather than typed out here -- this
+            # dropdown offered three and was missing Canceled.
+            values=list(ProjectBoardStatus.ALL),
             variable=self.status_var,
             **combo_box_style(),
         ).grid(row=0, column=3, sticky="w", padx=8, pady=8)
@@ -836,12 +842,17 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
         self._custom_card_width: int = self.CARD_WIDTH
         self.selected_item_ids: set[str] = set()
         self.item_checkbox_vars: dict[str, ctk.BooleanVar] = {}
-        # M4.A.1 — Shared 'Show Completed' toggle filters BOTH the Project
-        # Notes list and the Action Items list. Default OFF per user direction
-        # ("Clicking on a Project will display all the OPEN Project Notes and
-        # Action Items").
-        # Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M4.A.1
-        self.show_completed_items_var = ctk.BooleanVar(value=False)
+        # LRP-C1 — one checkbox per Action Item status, shared with the Project
+        # Notes list the way M4.A.1's single 'Show Completed' box was. Open is
+        # the only one ticked at first, so clicking a project still opens on
+        # the work that is live; the other two are the user's to ask for.
+        self.item_status_filter_vars: dict[str, ctk.BooleanVar] = {
+            status: ctk.BooleanVar(value=status in Status.DEFAULT_VISIBLE)
+            for status in Status.ALL
+        }
+        # LRP-A4 — the Project Notes section starts collapsed, and stays how
+        # the user last left it for as long as the screen lives.
+        self.notes_expanded = False
 
         # Load Edit Icon
         icon_path = project_root() / "assets" / "icons" / "pencil_vertical.png"
@@ -1409,8 +1420,10 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
         meta_lines = [
             f"{row.get('ape_year') or ''} | {row.get('segment_name') or ''} | {row.get('subsegment_name') or ''} | "
             f"{row.get('category_name') or ''} | Status: {row.get('status')}",
-            f"Next Step: {row.get('next_step') or '-'}",
         ]
+        # LRP-A1: the "Next Step:" meta line is gone from the detail header
+        # (user, 2026-11-16). The field itself is untouched -- it is still
+        # edited on the project editor and still shown on each tile.
         time_line = project_time_line(row)
         if time_line:
             meta_lines.append(time_line)
@@ -1438,22 +1451,12 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
                 side="left", padx=4
             )
 
-        # M4.A.1 — Shared "Show Completed" toggle above BOTH the Project Notes
-        # section and the Action Items section. Toggling refreshes both lists
-        # via _render_detail.
-        # Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M4.A.1, M4.A.2
-        shared_filter = ctk.CTkFrame(self.items_frame, fg_color="transparent")
-        shared_filter.grid(row=1, column=0, sticky="ew", padx=2, pady=(0, 4))
-        shared_filter.grid_columnconfigure(0, weight=1)
-        ctk.CTkCheckBox(
-            shared_filter,
-            text="Show Completed",
-            variable=self.show_completed_items_var,
-            command=self._render_detail,
-        ).grid(row=0, column=1, sticky="e", padx=8, pady=4)
-
+        # LRP-C1 (user, 2026-11-16): the standalone right-justified "Show
+        # Completed" row that M4.A.1 put here is gone. Its job is done by the
+        # three status boxes on the Action Items header line below, which the
+        # Project Notes section reads too (load_notes).
         self.notes_links_frame = ctk.CTkFrame(self.items_frame)
-        self.notes_links_frame.grid(row=2, column=0, sticky="ew", padx=2, pady=(0, 8))
+        self.notes_links_frame.grid(row=1, column=0, sticky="ew", padx=2, pady=(0, 8))
         self.notes_links_frame.grid_columnconfigure(0, weight=1)
         self.load_notes()
 
@@ -1467,52 +1470,46 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
             ).grid(row=3, column=0, sticky="w", padx=6, pady=12)
             return
 
-        # M4.A.2 — Filter respects the SHARED Show Completed toggle. The toggle
-        # itself was rendered above (row 1) and refreshes _render_detail, which
-        # re-runs both the notes section and this items section.
-        show_completed = self.show_completed_items_var.get()
-        tasks = [t for t in all_tasks if show_completed or t.status != "completed"]
-        completed_count = sum(1 for t in all_tasks if t.status == "completed")
+        # LRP-C1 — an item is shown when its own status is ticked. Unticking
+        # every box shows nothing, which is the honest reading of the controls
+        # rather than a hidden "show everything" fallback.
+        tasks = [t for t in all_tasks if self._item_status_shown(t.status)]
+        hidden_count = len(all_tasks) - len(tasks)
+        if hidden_count:
+            count_text = f"{len(tasks)} shown • {hidden_count} hidden"
+        else:
+            count_text = f"{len(tasks)} item{'s' if len(tasks) != 1 else ''}"
 
-        # Action Items header — bold section title + Select All + count.
-        # The Show Completed checkbox is intentionally NOT here anymore (M4):
-        # it lives in the shared filter row above both sections.
+        # LRP-A2/A3 (user, 2026-11-16): the header is ONE line, left-justified
+        # throughout -- "Action Items", then the count immediately after it,
+        # then the status filters (LRP-C1). Select All is no longer a labelled
+        # row of its own: it is the unlabelled checkbox in the column header,
+        # directly above each row's own checkbox (_build_items_column_header).
         items_header = ctk.CTkFrame(self.items_frame, fg_color="transparent")
         items_header.grid(row=3, column=0, sticky="ew", padx=2, pady=(8, 4))
-        items_header.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
             items_header,
             text="Action Items",
             font=ctk.CTkFont(size=16, weight="bold"),
-        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=6, pady=(0, 2))
+        ).grid(row=0, column=0, sticky="w", padx=(6, 10), pady=(0, 2))
 
-        self.check_all_var = ctk.BooleanVar(value=False)
-        ctk.CTkCheckBox(
-            items_header,
-            text="Select All",
-            variable=self.check_all_var,
-            command=self._on_check_all_changed,
-            width=24,
-            checkbox_width=24,
-            checkbox_height=24,
-        ).grid(row=1, column=0, sticky="w", padx=6, pady=4)
-
-        if completed_count and not show_completed:
-            count_text = f"{len(tasks)} shown • {completed_count} completed hidden"
-        else:
-            count_text = f"{len(tasks)} item{'s' if len(tasks) != 1 else ''}"
         ctk.CTkLabel(
             items_header,
             text=count_text,
             text_color=semantic_colors()["muted_text"],
             font=ctk.CTkFont(size=12),
-        ).grid(row=1, column=1, sticky="e", padx=8, pady=4)
+        ).grid(row=0, column=1, sticky="w", padx=(0, 16), pady=(0, 2))
+
+        self._build_item_status_filters(items_header, row=0, first_column=2)
+
+        self.check_all_var = ctk.BooleanVar(value=False)
 
         if not tasks:
             ctk.CTkLabel(
                 self.items_frame,
-                text=f"All {completed_count} item(s) completed. Enable 'Show Completed' to view them.",
+                text=(f"{hidden_count} item(s) hidden by the status filters. "
+                      "Tick a status above to view them."),
                 text_color=semantic_colors()["muted_text"],
             ).grid(row=5, column=0, sticky="w", padx=6, pady=12)
             return
@@ -1583,13 +1580,55 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
             ctk.CTkButton(actions, text="Edit", width=ITEM_EDIT_WIDTH_PX, command=lambda item_id=item.id: self.edit_item(item_id), **button_style("secondary")).pack(
                 side="left", padx=ITEM_ACTION_PAD_PX
             )
-            if item.status == "open":
+            if item.status == Status.OPEN:
                 ctk.CTkButton(actions, text="Complete", width=ITEM_COMPLETE_WIDTH_PX, command=lambda item_id=item.id: self.complete_item(item_id), **button_style("secondary")).pack(
                     side="left", padx=ITEM_ACTION_PAD_PX
                 )
             ctk.CTkButton(actions, text="Unlink", width=ITEM_UNLINK_WIDTH_PX, command=lambda item_id=item.id: self.unlink_item(item_id), **button_style("secondary")).pack(
                 side="left", padx=ITEM_ACTION_PAD_PX
             )
+
+    def _item_status_shown(self, status: str) -> bool:
+        """Whether a row carrying ``status`` passes the header's filters.
+
+        Purpose: LRP-C1 -- the three checkboxes are the whole filter, so a
+                 row is shown when its own status is ticked. A status the boxes
+                 do not cover (a value left by an older build, say) is shown
+                 rather than silently dropped: P2 -- surface, never drop.
+        Spec:    docs/spec_2026-11-16_status_vocabulary.md
+        Tests:   tests/test_project_board_status_filters.py::test_lrpc1_open_is_the_only_default
+                 tests/test_project_board_status_filters.py::test_lrpc1_unknown_status_is_shown
+        """
+        var = self.item_status_filter_vars.get(status)
+        return True if var is None else var.get()
+
+    def _build_item_status_filters(self, parent, row: int, first_column: int):
+        """The three status checkboxes, left-justified on the header line.
+
+        Purpose: LRP-C1 -- Open, Completed, Canceled, in that order, each
+                 toggling its own status in both lists. These are the action
+                 item statuses, which SVU-M1 left alone; the four-word
+                 vocabulary belongs to the *project*, not to its items.
+        Spec:    docs/spec_2026-11-16_status_vocabulary.md
+        Tests:   tests/test_project_board_status_filters.py::test_lrpc1_three_boxes_on_the_header_line
+        """
+        for offset, status in enumerate(Status.ALL):
+            ctk.CTkCheckBox(
+                parent,
+                text=status.capitalize(),
+                variable=self.item_status_filter_vars[status],
+                command=self._render_detail,
+                width=STATUS_FILTER_BOX_PX,
+                checkbox_width=STATUS_FILTER_BOX_PX,
+                checkbox_height=STATUS_FILTER_BOX_PX,
+                font=ctk.CTkFont(size=12),
+            ).grid(row=row, column=first_column + offset, sticky="w",
+                   padx=(0, STATUS_FILTER_PAD_PX), pady=(0, 2))
+
+    def _toggle_notes_section(self):
+        """Open or close the Project Notes list (LRP-A4)."""
+        self.notes_expanded = not self.notes_expanded
+        self.load_notes()
 
     def _build_items_column_header(self):
         """The Action Items column headings, with a divider per column.
@@ -1607,6 +1646,23 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
             self.items_frame, {}, fg_color=palette["surface_subtle"],
             border_color=palette["border"])
         header.grid(row=4, column=0, sticky="ew", padx=5, pady=(0, 4))
+
+        # LRP-A3 — Select All lives here, in the checkbox column of the column
+        # header, so it sits directly above the per-row checkboxes it controls.
+        # build_header grids an empty heading label into every fixed column;
+        # the one over column 0 is replaced rather than stacked on, so the two
+        # widgets cannot fight over the cell's width.
+        for placeholder in header.grid_slaves(row=0, column=0):
+            placeholder.destroy()
+        ctk.CTkCheckBox(
+            header,
+            text="",
+            variable=self.check_all_var,
+            command=self._on_check_all_changed,
+            width=ITEM_CHECKBOX_WIDTH_PX,
+            checkbox_width=ITEM_CHECKBOX_WIDTH_PX,
+            checkbox_height=ITEM_CHECKBOX_WIDTH_PX,
+        ).grid(row=0, column=0, padx=ITEM_CHECKBOX_PAD_PX, pady=4, sticky="w")
 
     def add_project(self):
         dialog = ProjectBoardEditorDialog(self, self.db_manager)
@@ -1728,7 +1784,7 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
                 next_action=board.next_step,
                 annual_plan_element_id=board.annual_plan_element_id,
                 start_date=date.today().isoformat(),
-                status="open",
+                status=Status.OPEN,
                 category="Project Board",
                 importance=board.importance,
                 urgency=5,  # Default to medium
@@ -1937,10 +1993,10 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
         for child in self.notes_links_frame.winfo_children():
             child.destroy()
 
-        # Filter respects the shared Show Completed toggle (added in M4).
-        # Default attr is True so this method is safe to call before M4 wiring.
-        show_completed = getattr(self, "show_completed_items_var", None)
-        include_completed = show_completed.get() if show_completed else True
+        # LRP-C1 — the notes list reads the same status boxes as the items
+        # list. A note is open or completed only, so the Canceled box does not
+        # reach it.
+        include_completed = self._item_status_shown(Status.COMPLETED)
 
         all_links = self.db_manager.get_project_board_links(
             self.selected_board_id, include_completed=True
@@ -1952,16 +2008,28 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
         completed_hidden = sum(1 for link in all_links if link.status == "completed") \
             if not include_completed else 0
 
-        # M3.A.1 — Bold "Project Notes" section header
+        # M3.A.1 — Bold "Project Notes" section header.
+        # LRP-A4 (user, 2026-11-16): the section starts collapsed. This header
+        # line -- disclosure triangle, title, count -- is always rendered, so
+        # the panel still says how many notes are filed against the project
+        # without spending the height on listing them.
         header_row = ctk.CTkFrame(self.notes_links_frame, fg_color="transparent")
         header_row.pack(fill="x", pady=(0, 2))
-        header_row.grid_columnconfigure(0, weight=1)
+        header_row.grid_columnconfigure(2, weight=1)
+        self.notes_toggle_button = ctk.CTkButton(
+            header_row,
+            text=("▾" if self.notes_expanded else "▸"),
+            width=NOTES_TOGGLE_WIDTH_PX,
+            command=self._toggle_notes_section,
+            **button_style("secondary"),
+        )
+        self.notes_toggle_button.grid(row=0, column=0, sticky="w", padx=(6, 6))
         ctk.CTkLabel(
             header_row,
             text="Project Notes",
             font=ctk.CTkFont(size=16, weight="bold"),
             anchor="w",
-        ).grid(row=0, column=0, sticky="w", padx=6, pady=(0, 0))
+        ).grid(row=0, column=1, sticky="w", padx=0, pady=(0, 0))
 
         # M3.A.4 — Count label
         if completed_hidden:
@@ -1979,7 +2047,11 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
             font=ctk.CTkFont(size=12),
             anchor="e",
         )
-        self.notes_count_label.grid(row=0, column=1, sticky="e", padx=8)
+        self.notes_count_label.grid(row=0, column=2, sticky="e", padx=8)
+
+        # LRP-A4 — the header above is the whole section while it is collapsed.
+        if not self.notes_expanded:
+            return
 
         if not shown_links:
             empty_msg = (

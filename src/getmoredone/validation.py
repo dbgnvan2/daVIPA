@@ -5,7 +5,7 @@ Validation logic for GetMoreDone application.
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from .models import ActionItem, PriorityFactors
+from .models import ActionItem, PriorityFactors, Status
 
 
 class ValidationError(Exception):
@@ -91,11 +91,14 @@ class Validator:
         if item.planned_minutes is not None and item.planned_minutes < 0:
             errors.append(ValidationError("planned_minutes", "Planned minutes cannot be negative"))
 
-        # Validate status
-        valid_statuses = ["open", "completed", "canceled"]
-        if item.status not in valid_statuses:
+        # Validate status. SVU-M1: read from Status.ALL rather than a second
+        # list typed out here, so a change to the vocabulary cannot leave the
+        # validator behind (global rule 8 -- config, not magic constants).
+        if item.status not in Status.ALL:
             errors.append(
-                ValidationError("status", f"Status must be one of: {valid_statuses}")
+                ValidationError(
+                    "status",
+                    f"Status must be one of: {list(Status.ALL)}")
             )
 
         return errors

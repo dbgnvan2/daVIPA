@@ -31,7 +31,7 @@ rg --sort path --no-config -n -H -i '#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|"(darkg
 - Named colors (match count): **631**
 - Tuple colors / appearance tuples (match count): **2**
 - CustomTkinter theme API usage (`set_default_color_theme`/`set_appearance_mode`) line count: **2**
-- Widget explicit overrides (line count): **508**
+- Widget explicit overrides (line count): **507**
 
 Lines returned per scan. `scan_all` refuses an empty scan, so
 this table is not the blindness check -- it is here to localise
@@ -46,7 +46,7 @@ and theme_files line counts.
 | `theme_api` | 2 |
 | `theme_files` | 1292 |
 | `tuples` | 2 |
-| `widget` | 508 |
+| `widget` | 507 |
 
 Widget override property breakdown:
 
@@ -54,7 +54,7 @@ Widget override property breakdown:
 |---|---:|
 | `border_color` | 21 |
 | `corner_radius` | 59 |
-| `fg_color` | 245 |
+| `fg_color` | 244 |
 | `hover_color` | 1 |
 | `text_color` | 188 |
 
@@ -1627,7 +1627,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/project_boards.py:1318` | `text_color="#B91C1C",` |
+| `src/getmoredone/screens/project_boards.py:1329` | `text_color="#B91C1C",` |
 | `src/getmoredone/theme.py:134` | `"danger": "#B91C1C",` |
 | `src/getmoredone/theme.py:153` | `# #B91C1C measured 4.15:1 on that surface, under the 4.5:1 a glyph` |
 
@@ -1959,7 +1959,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/project_boards.py:1317` | `hover_color="#EAB308",` |
+| `src/getmoredone/screens/project_boards.py:1328` | `hover_color="#EAB308",` |
 
 ### `#ecfdf5`
 
@@ -2128,7 +2128,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/project_boards.py:1316` | `fg_color="#FACC15",` |
+| `src/getmoredone/screens/project_boards.py:1327` | `fg_color="#FACC15",` |
 
 ### `#fbbf24`
 

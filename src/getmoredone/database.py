@@ -4,6 +4,7 @@ Handles SQLite schema creation and connection management.
 """
 
 import logging
+import re
 import sqlite3
 from pathlib import Path
 from typing import Optional
@@ -414,7 +415,7 @@ class Database:
                 -- than stored, so the two can never disagree.
                 savor_count            INTEGER NOT NULL DEFAULT 0,
                 status                 TEXT NOT NULL DEFAULT 'active'
-                                        CHECK(status IN ('active', 'pending', 'completed')),
+                                        CHECK(status IN ('active', 'pending', 'canceled', 'completed')),
                 completed_at           TEXT,
                 created_at             TEXT NOT NULL,
                 updated_at             TEXT NOT NULL
@@ -857,6 +858,90 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_blocks_date_slot
             ON time_blocks(block_date, slot_index, position)
         """)
+
+        self._widen_board_status_check(conn)
+
+    @staticmethod
+    def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
+        """Whether ``table`` is in this database already.
+
+        Purpose: SVU-M2 -- ``_run_migrations`` is called from the middle of
+                 ``initialize_schema``, before the project tables below it are
+                 created, so on a brand-new database ``project_boards`` does
+                 not exist yet. It needs no rewriting then: the CREATE TABLE
+                 statement above already carries the widened constraint.
+        """
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (table,),
+        ).fetchone()
+        return row is not None
+
+    def _widen_board_status_check(self, conn: sqlite3.Connection):
+        """Let ``project_boards.status`` hold 'canceled'.
+
+        Purpose: SVU-M2 -- a project board may now be canceled (SVU-M1), which
+                 the old CHECK constraint did not allow. Action items are not
+                 touched: their vocabulary is unchanged.
+        Spec:    docs/spec_2026-11-16_status_vocabulary.md
+        Tests:   tests/test_status_vocabulary.py::test_svum2_board_check_accepts_canceled
+                 tests/test_status_vocabulary.py::test_svum2_rebuild_keeps_existing_boards
+                 tests/test_status_vocabulary.py::test_svum2_migration_is_idempotent
+        """
+        if not self._table_exists(conn, "project_boards"):
+            return
+
+        # The CHECK constraint cannot be altered in place, so the table is
+        # rebuilt -- but only when it is actually carrying the old one, so a
+        # launch on an already-migrated database does no write at all.
+        sql = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' "
+            "AND name = 'project_boards'"
+        ).fetchone()
+        if not sql or "'canceled'" in (sql[0] or ""):
+            return
+
+        # P4: the replacement table is the existing one with its status CHECK
+        # widened, not a second copy of the CREATE TABLE above. A database old
+        # enough to need this may carry columns a later migration added, and
+        # re-declaring the table by hand would silently drop them.
+        create_sql, substitutions = re.subn(
+            r"CHECK\s*\(\s*status\s+IN\s*\([^)]*\)\s*\)",
+            "CHECK(status IN ('active', 'pending', 'canceled', 'completed'))",
+            sql[0],
+            count=1,
+        )
+        if substitutions != 1:
+            logger.warning(
+                "SVU-M2: project_boards has no status CHECK to widen; "
+                "leaving the table as it is."
+            )
+            return
+        create_sql = create_sql.replace("project_boards", "project_boards_svu", 1)
+
+        columns = [row[1] for row in
+                   conn.execute("PRAGMA table_info(project_boards)").fetchall()]
+        column_list = ", ".join(columns)
+
+        # P5/P9: foreign keys are ON for this connection (PRAGMA at connect),
+        # and project_board_items and project_board_links both reference this
+        # table ON DELETE CASCADE -- dropping it with enforcement on would
+        # cascade the children away. The pragma is a no-op inside a
+        # transaction, so the copy runs outside one and is restored in a
+        # finally, leaving enforcement on even if the rebuild raises.
+        conn.commit()
+        conn.execute("PRAGMA foreign_keys = OFF")
+        try:
+            conn.execute(create_sql)
+            conn.execute(
+                f"INSERT INTO project_boards_svu ({column_list}) "
+                f"SELECT {column_list} FROM project_boards"
+            )
+            conn.execute("DROP TABLE project_boards")
+            conn.execute("ALTER TABLE project_boards_svu RENAME TO project_boards")
+            conn.commit()
+        finally:
+            conn.execute("PRAGMA foreign_keys = ON")
 
     def __enter__(self):
         """Context manager entry."""

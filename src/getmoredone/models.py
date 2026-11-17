@@ -189,7 +189,7 @@ class ProjectBoardLink:
     url: str
     label: Optional[str] = None
     link_type: str = "url"
-    status: str = "open"  # M1.A.1 — Open/Completed lifecycle (mirrors action items)
+    status: str = "open"
     id: str = field(default_factory=lambda: str(uuid4()))
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -533,6 +533,13 @@ class SchedulingOptions:
 
 
 # Status constants
+#
+# The two vocabularies are deliberately NOT the same, and SVU-M1 (user,
+# 2026-11-16) is the decision that they stay apart. An action item is open,
+# completed or canceled -- a task is not "pending", it is simply not started.
+# A *project* is the thing that can be parked, so it is active, pending,
+# canceled or completed. A board gained `canceled` in this change; an item
+# gained nothing.
 class Status:
     """Valid status values for action items."""
 
@@ -540,13 +547,23 @@ class Status:
     COMPLETED = "completed"
     CANCELED = "canceled"
 
+    #: Every status, in the order the UI offers them.
+    ALL = (OPEN, COMPLETED, CANCELED)
+
+    #: What a list shows unless the user asks for more.
+    DEFAULT_VISIBLE = (OPEN,)
+
 
 class ProjectBoardStatus:
     """Valid status values for project boards."""
 
     ACTIVE = "active"
     PENDING = "pending"
+    CANCELED = "canceled"
     COMPLETED = "completed"
+
+    #: SVU-M1 -- `canceled` is new here; the other three were already stored.
+    ALL = (ACTIVE, PENDING, CANCELED, COMPLETED)
 
 
 @dataclass
