@@ -17,6 +17,35 @@ daVIPA is a desktop task manager focused on prioritization and execution.
 
 ## 2) Core concepts
 
+### The status line (where the app tells you things)
+- What: Every screen, and every editor dialog, has a one-line message area —
+  usually just under the buttons or at the foot of the list. Anything the app
+  needs to tell you appears there: a save confirmed, a refusal and its reason,
+  an export's count, a failure and what it was.
+- Why: It used to be an operating-system dialog that took keyboard and mouse
+  focus from whatever you were doing and had to be dismissed before you could
+  carry on. Two of those dialogs also misbehaved on macOS when raised from a
+  drag release — one raised an error, the other froze the window — so a message
+  that is part of the screen is both less interruptive and more reliable.
+- Colour is the kind: **red** an error, **amber** a warning or a refusal,
+  **green** or **blue** something that worked, **grey** a plain statement of
+  what happened.
+- How long it stays: a **green or blue** message clears itself after about six
+  seconds, because you have already seen the thing it confirms. A **red or
+  amber** one **stays** until the screen has something else to say, because it
+  is usually telling you that something you wanted did not happen.
+- A green message that **asks you to do something**, or that counts what it
+  left behind, also stays. There are four: "export that day again to remove it
+  from Google Calendar", Clear Day's "removed 4 of 6 blocks", the calendar
+  export summary, and the notice saying a year rollover created planning rows
+  that are blank and need your words. Nothing else in the app will ask you
+  about any of them a second time, so they do not time out.
+- A dialog that reports and then closes writes its message to the screen
+  *behind* it, so the message does not vanish with the dialog.
+- Questions are still dialogs. Anything that needs your answer before it can
+  continue — a confirmation before a delete, "complete this anyway?" — still
+  opens in front of what it belongs to and still waits.
+
 ### List Views
 - What: In this project, `List Views` refers specifically to the `Today`, `Upcoming`, `All Items`, and `Hierarchical` screens.
 - Why: These four screens share list-style browsing, filtering, and row presentation patterns, so they are treated as one UI family in planning and implementation discussions.

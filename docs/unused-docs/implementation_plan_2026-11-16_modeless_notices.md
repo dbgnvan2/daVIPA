@@ -1,6 +1,13 @@
 # Implementation plan — modeless notices (MOD-M1 to M7)
 
-**Status: proposed, not approved. No code written.** From `BACKLOG.md` MOD-A1.
+**Status: approved 2026-11-16. Phase 1 (MOD-M1 to M4) built; phase 2 (MOD-M5,
+MOD-M6) not started; MOD-M7's walk owed.** From `BACKLOG.md` MOD-A1. The
+phase 1 record, including the three pieces of scope this plan did not have,
+the nine findings of the pre-push review round, and the walk checklist, is
+`docs/unused-docs/changes/2026-11-16-modeless-notices-phase1.md`. Two things
+this plan got wrong are corrected there: MOD-M3's auto-clear was not safe to
+apply blanket to the 21 `set_status` calls `plan.py` and `drag_schedule.py`
+already had, and the colour inventory did need regenerating.
 Reference for the idea only: `git show archive/no-focus-stealing-dialogs`
 (`f1675f5`, 2026-08-25).
 

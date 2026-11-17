@@ -25,7 +25,23 @@ features, and the long-standing bugs, requests and user stories at the end.
 
 ## Recovered from a deleted branch (filed 2026-11-16)
 
-### MOD-A1 — dialogs that take focus, and 26 files of blocking messageboxes (medium)
+### MOD-A1 — dialogs that take focus, and the 49 `grab_set` calls (medium)
+
+**Phase 1 of this is built and pushed (MOD-M1 to M4, 2026-11-16): the telling
+half is done.** Every `messagebox.show*` in `src/` outside the two allowlisted
+in `app.py` now reports on a per-screen notice line
+(`screens/status_notice.py`). What is left here is **phase 2 — MOD-M5 and
+MOD-M6** in
+`docs/unused-docs/implementation_plan_2026-11-16_modeless_notices.md`: the 24
+sites that *ask* a question, which keep `messagebox` and need hardening so one
+cannot raise from a drag release, and the 49 `grab_set()` calls, which need
+classifying per window. The item leaves when phase 2 lands. Also owed: the
+ten-step on-screen walk MOD-M7 asks for, in
+`docs/unused-docs/changes/2026-11-16-modeless-notices-phase1.md`.
+
+The measurement below is as it stood before phase 1, and is kept because
+phase 2's scope is read off it.
+
 
 `grab_set()` is called in 24 `src/` files and `tkinter.messagebox` in 26, so a
 dialog takes keyboard and mouse focus from wherever the user is working and an
@@ -49,6 +65,57 @@ The open question first: a toast cannot ask anything, so every `messagebox`
 call site has to be sorted into "tells the user something" (a toast) and "asks
 the user something" (a dialog that must still be modal, and must not raise
 from a drag release).
+
+## Found by the MOD phase 1 sweep (filed 2026-11-16)
+
+### MOD-A2 — a mapped-window guard is red on `main` (medium)
+
+`tests/test_tk_offscreen.py::test_every_test_that_needs_a_mapped_window_asks_for_one`
+fails. `tests/test_scheduler_column_resize.py` calls
+`event_generate("<Configure>")` and no test in that file requests the
+`mapped_windows` fixture, which that guard reads as "the suite will hang".
+It arrived with `e35fc1d` (the LRP batch) and is already on `main`, so it is
+not the MOD batch's doing and was not folded into it.
+
+It is a real decision, not a two-line edit, which is why it is filed rather
+than fixed in passing. Either:
+
+- request the `mapped_windows` fixture in `test_scrm4_configure_refits`, which
+  puts a real window on screen and changes the mapped-window count asserted by
+  `tests/test_ci_contract.py` (currently 29, and stated in `CLAUDE.md`'s
+  Commands block); or
+- call the bound `<Configure>` handler directly and lose the proof that the
+  binding exists at all, which is what that test is for.
+
+The guard itself is a blunt source check — it fires on the presence of
+`event_generate` in a file with no `mapped_windows` anywhere in it, not on the
+one call. Whether that is the right shape is the third thing to decide.
+
+### MOD-A3 — is the notice line on the VPS dialogs actually visible? (medium)
+
+Raised by the pre-push review of MOD phase 1 and **not settled**: the only
+finding of the nine that could not be answered by reading the code.
+
+The notice line on `vps_editors.py`'s four editor dialogs, `WeekActionEditor`,
+and `vps_segment_editor.py` is added as a new last grid row (`row=row + 1`) in
+Toplevels with a declared geometry — `600x500`, `600x450`, `700x900` — whose
+content already nearly fills the height. If a row falls below the window edge,
+`set_status` succeeds, `winfo_exists()` returns True, every one of the 43
+guards passes, and the user sees nothing: the exact "believes it reported and
+did not" state the whole MOD change exists to remove.
+
+No assertion on `cget("text")` can detect it. Settling it needs a mapped
+window, so it is step 11 of the walk in
+`docs/unused-docs/changes/2026-11-16-modeless-notices-phase1.md`. The check
+that would make it a test, and which fits the repo's existing mapped-window
+set: after `update_idletasks()`, assert `label.winfo_ismapped()` and that
+`label.winfo_rooty() + label.winfo_reqheight()` is inside the window's own
+`winfo_rooty() + winfo_height()`, for each notice-bearing dialog. That changes
+the mapped-window count asserted by `tests/test_ci_contract.py`, which is why
+it is a decision rather than an addition.
+
+If the walk shows a clipped row, the fix is the dialog's geometry, not the
+notice line's placement.
 
 ## Orphaned by the Project Board button removal (LRP, filed 2026-11-16)
 

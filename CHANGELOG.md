@@ -7,6 +7,41 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — the app tells you things on the screen, not in a dialog (2026-11-16)
+
+- **Every message the app shows you now appears on the screen's own status
+  line** instead of an operating-system dialog that took focus and had to be
+  dismissed. All 89 of those dialogs are gone; the two left are for failures
+  that happen before there is a window to write on. Colour is the kind — red an
+  error, amber a refusal, green or blue something that worked, grey a plain
+  statement. A green or blue message clears itself after about six seconds; a
+  red or amber one stays until the screen has something else to say, because it
+  is usually telling you that what you wanted did not happen. A dialog that
+  reports and then closes writes to the screen behind it, so the message does
+  not go with it. **Questions are unchanged** — anything that needs your answer
+  still opens in front of what it belongs to and still waits. Today, Upcoming,
+  All Items, Hierarchical and Completed gained a status line of their own: a
+  refused week used to arrive as a dialog on those screens and now has
+  somewhere to land. How long a self-clearing message stays is
+  `notice_dismiss_ms` in your settings file. (MOD-M1 to M4)
+- **The Contacts screen and the APE Week Actions panel were reporting to
+  nobody.** Found by the pre-push review: adding, editing, deleting or
+  deactivating a contact from the Contacts tab said nothing at all, and so did
+  the refusal when you pressed Add Action Item on the Week Actions panel with
+  no tactic selected. Both have a status line now.
+- **A message that tells you to do something no longer clears itself.** Three
+  were wrong to time out: the one asking you to export a day again so a stale
+  Google Calendar event goes away, the Clear Day summary that says how many
+  blocks it left in place, and the calendar export summary. The year-rollover
+  notice — the one that says new planning rows were created blank and need
+  your words — also stays now, because nothing else in the app will ever ask
+  again. Plain confirmations still clear after six seconds.
+- **The Weekly Items, APE Assignment, APE by Month and Annual Vision screens
+  share one line between their own summaries and their messages**, and a
+  summary written after an error used to keep the error's red. It takes the
+  right colour now, and a failed Remove on the two APE screens is red or amber
+  rather than whatever came before it.
+
 ### Changed — one set of resize principles for every list (2026-11-16)
 
 - **Every listing of action items now starts from the same column widths**

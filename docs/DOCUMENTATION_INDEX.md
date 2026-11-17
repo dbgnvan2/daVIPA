@@ -334,7 +334,20 @@ status line DRP-M3/PD-M13 established, the 24 that ask a question keep
 `messagebox` and are hardened instead, and the 49 `grab_set()` calls are
 classified per window. Holds the measurement, the decision to adopt `main`'s
 status line rather than the archived toast, and the two-phase boundary.
-**Proposed 2026-11-16, not approved.**
+**Approved 2026-11-16. Phase 1 (MOD-M1 to M4) built; phase 2 (MOD-M5, M6) not
+started.**
+
+### docs/unused-docs/changes/2026-11-16-modeless-notices-phase1.md
+
+Handoff note for MOD phase 1: what the shared notice line is, why a label
+rather than the archived floating toast, the three pieces of scope the plan did
+not have (five list screens given a line for the week-collision path,
+`project_boards.set_status` renamed to `set_board_status`,
+`TimerWindow._show_error_dialog` renamed to `_report_error`), the two
+`notify_weekly_tactic_changes` call sites that now have nowhere to draw, the
+nine findings of the pre-push review round and what each fix was, and the
+fourteen-step on-screen walk MOD-M7 owes. **Walk owed**, and step 11 is the one
+review finding no test can settle (BACKLOG MOD-A3).
 
 ### docs/unused-docs/implementation_plan_2026-11-15_date_band_colour.md
 
