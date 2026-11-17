@@ -187,6 +187,21 @@ def test_a_test_can_ask_for_a_mapped_window(mapped_windows):
         root.destroy()
 
 
+#: Every test that generates a real Tk event and then pumps the event loop, or
+#: asks outright for a window that is not withdrawn. Exact, not a floor, for
+#: the reason ``test_the_documented_mapped_window_count_is_the_real_one`` gives
+#: about the count of 29: a floor hides the narrowing it exists to catch. These
+#: five all request ``mapped_windows``; the other 24 tests that request it do
+#: so to read real geometry, which this guard has never demanded.
+DRIVES_REAL_EVENTS = {
+    "test_plan_screen.py::test_a_real_press_and_release_on_an_item_row_creates_a_block",
+    "test_plan_screen.py::test_a_real_release_outside_the_day_creates_nothing",
+    "test_plan_screen.py::test_a_real_right_click_on_a_block_opens_the_menu",
+    "test_plan_screen.py::test_tgm111_a_real_drag_moves_a_block_between_slots",
+    "test_today_pin_drag.py::test_real_grip_events_pin_on_upward_drag",
+}
+
+
 def test_every_test_that_needs_a_mapped_window_asks_for_one():
     """A test that drives real Tk events must request ``mapped_windows``.
 
@@ -220,25 +235,46 @@ def test_every_test_that_needs_a_mapped_window_asks_for_one():
     )
 
     tests_dir = Path(__file__).resolve().parent
-    # conftest.py as well as the test's own module: this repo's shared fixtures
-    # live there, so a window one of them maps is reachable from a test that
-    # names nothing but the fixture.
-    shared = module_functions(ast.parse(
-        (tests_dir.parent / "conftest.py").read_text(encoding="utf-8")))
+    # Every conftest pytest would apply here, not one named file: shared
+    # fixtures live in the root one today, and a window mapped by a fixture
+    # whose body is outside the lookup reads as needing nothing. Asserted
+    # rather than assumed, because this arm contributes nothing to the live
+    # tree and so could break green (cold pass, 2026-11-16).
+    conftests = [candidate for candidate in
+                 (tests_dir.parent / "conftest.py", tests_dir / "conftest.py")
+                 if candidate.exists()]
+    assert conftests, (
+        "no conftest.py beside tests/ or in it, so the shared-fixture arm of "
+        "this guard read nothing; a window mapped by a shared fixture would "
+        "be invisible to it"
+    )
+    shared = {}
+    for candidate in conftests:
+        shared.update(module_functions(
+            ast.parse(candidate.read_text(encoding="utf-8"))))
 
-    offenders = []
+    detected, offenders = set(), []
     for path in sorted(tests_dir.glob("test_*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         lookup = {**shared, **module_functions(tree)}
-        for node in test_functions(tree):
-            if not needs_a_mapped_window(node, lookup):
+        for node, enclosing in test_functions(tree):
+            if not needs_a_mapped_window(node, lookup, enclosing):
                 continue
-            if "mapped_windows" not in fixture_names(node):
+            detected.add(f"{path.name}::{node.name}")
+            if "mapped_windows" not in fixture_names(node, enclosing):
                 offenders.append(f"{path.name}::{node.name}")
     assert not offenders, (
         "these tests generate a real Tk event and then pump the event loop, "
         "or ask for a window that is not withdrawn, without requesting the "
         f"mapped_windows fixture, so the suite will hang: {offenders}"
+    )
+    assert detected == DRIVES_REAL_EVENTS, (
+        f"the detector sees {sorted(detected)}. A guard that reports no "
+        "offenders because it stopped detecting anything is a green run, so "
+        "the set is named here the way the mapped-window count is: a real "
+        "event test ADDED to the suite belongs in DRIVES_REAL_EVENTS, and one "
+        "that disappears from this set without being deleted is the detector "
+        "breaking, not the suite improving"
     )
 
 def test_the_mapped_window_detector_asks_for_the_pair_not_the_token():
@@ -249,18 +285,23 @@ def test_the_mapped_window_detector_asks_for_the_pair_not_the_token():
              and a false clearance wherever the word appeared in a comment or
              in another guard's own source. Replacing it with a detector moves
              that risk into the detector, so the detector gets the assertions:
-             an exact set over a synthetic module, one arm per way the old
-             check could be fooled.
+             an exact set over a synthetic module, one arm per way it could be
+             fooled. The last two arms are the cold pass's own findings — a
+             name collision between two classes cleared a hazardous test
+             silently, and a `usefixtures` mark on a class was invisible.
     Spec:    BACKLOG.md MOD-A2
     Tests:   this test
 
     An exact set, not a membership check per arm: an arm that stops being
-    detected has to turn the set red, and so does a new false positive.
+    detected has to turn the set red, and so does a new false positive. Keyed
+    by qualified name, because the collision arm needs two tests that share a
+    bare one.
     """
     import ast
     import textwrap
 
     from tests.display_capabilities import (
+        fixture_names,
         module_functions,
         needs_a_mapped_window,
         test_functions,
@@ -310,22 +351,63 @@ def test_the_mapped_window_detector_asks_for_the_pair_not_the_token():
 
             def test_a_method_calling_its_own_helper(self, widget):
                 self.helper(widget)
+
+        class TestCollidingNameHazardous:
+            def test_a_name_two_classes_share(self, root):
+                root.event_generate("<Button-1>")
+                root.update()
+
+        class TestCollidingNameHarmless:
+            def test_a_name_two_classes_share(self):
+                assert True
+
+        @pytest.mark.usefixtures("a_mapped_fixture")
+        class TestMarkedOnTheClass:
+            def test_the_mark_is_the_request(self):
+                assert True
+
+        @pytest.mark.usefixtures("mapped_windows")
+        class TestAskingOnTheClass:
+            def test_covered_by_the_class_mark(self, root):
+                root.event_generate("<Button-1>")
+                root.update()
     ''')
 
     tree = ast.parse(source)
     lookup = module_functions(tree)
-    tripped = {node.name for node in test_functions(tree)
-               if needs_a_mapped_window(node, lookup)}
+
+    def label(node, enclosing):
+        return ".".join([cls.name for cls in enclosing] + [node.name])
+
+    tripped = {label(node, enclosing)
+               for node, enclosing in test_functions(tree)
+               if needs_a_mapped_window(node, lookup, enclosing)}
 
     assert tripped == {
         "test_pair_in_the_body",
         "test_the_pair_through_helpers",
         "test_a_window_asked_for_on_purpose",
-        "test_a_method_calling_its_own_helper",
+        "TestReachedThroughSelf.test_a_method_calling_its_own_helper",
+        "TestCollidingNameHazardous.test_a_name_two_classes_share",
+        "TestMarkedOnTheClass.test_the_mark_is_the_request",
+        "TestAskingOnTheClass.test_covered_by_the_class_mark",
     }, (
         "the detector read the synthetic module as "
         f"{sorted(tripped)}; a test it stops seeing hangs the suite, and one "
         "it wrongly sees is a window on the user's screen for nothing"
+    )
+
+    # The other half of the class-mark finding: the request has to be read off
+    # the class too, or the guard calls the test above an offender and sends
+    # the author to add a parameter the mark already supplies.
+    asked = {label(node, enclosing): fixture_names(node, enclosing)
+             for node, enclosing in test_functions(tree)}
+    assert "mapped_windows" in asked[
+        "TestAskingOnTheClass.test_covered_by_the_class_mark"], (
+        "a usefixtures mark on the class was not read as a fixture request, "
+        "so a test that does ask for a mapped window reads as one that does "
+        "not -- an offender the guard invents, and a real window the "
+        "documented count of 29 would not mention"
     )
 
 

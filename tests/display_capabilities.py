@@ -69,12 +69,36 @@ def _ask_the_display(attribute: str) -> bool:
             window.destroy()
 
 
-def fixture_names(func) -> set:
+def usefixtures_names(node) -> set:
+    """The fixture names a ``usefixtures`` mark on this node asks for.
+
+    Separate from ``fixture_names`` because a ``ClassDef`` carries the same
+    mark and has no parameters to read, and pytest applies a class's mark
+    to every method on it.
+    """
+    import ast
+
+    names = set()
+    for decorator in node.decorator_list:
+        if not isinstance(decorator, ast.Call):
+            continue
+        if (isinstance(decorator.func, ast.Attribute)
+                and decorator.func.attr == "usefixtures"):
+            names |= {a.value for a in decorator.args
+                      if isinstance(a, ast.Constant) and isinstance(a.value, str)}
+    return names
+
+
+def fixture_names(func, enclosing=()) -> set:
     """Every fixture a test function requests, from its AST node.
 
     Positional, keyword-only and positional-only alike, plus
-    ``@pytest.mark.usefixtures("...")`` -- which is how a fixture wanted purely
-    for its side effect is usually written.
+    ``@pytest.mark.usefixtures("...")`` -- which is how a fixture wanted
+    purely for its side effect is usually written -- on the function and on any
+    ``ClassDef`` in ``enclosing``. pytest applies a class's mark to every
+    method on it, and a method has no way to see that mark from its own node; a
+    request the reader cannot see is a window on the screen that no count
+    mentions (cold pass, 2026-11-16).
 
     Shared, because two guards ask this question and they disagreed: the
     read-back detector in ``tests/test_display_capabilities.py`` counted the
@@ -87,13 +111,8 @@ def fixture_names(func) -> set:
 
     args = func.args
     names = {a.arg for a in args.posonlyargs + args.args + args.kwonlyargs}
-    for decorator in func.decorator_list:
-        if not isinstance(decorator, ast.Call):
-            continue
-        if (isinstance(decorator.func, ast.Attribute)
-                and decorator.func.attr == "usefixtures"):
-            names |= {a.value for a in decorator.args
-                      if isinstance(a, ast.Constant) and isinstance(a.value, str)}
+    for node in (func, *enclosing):
+        names |= usefixtures_names(node)
     return names
 
 
@@ -168,7 +187,7 @@ def _markers(func) -> set:
     return found
 
 
-def _reachable(func, lookup) -> set:
+def _reachable(func, lookup, enclosing=()) -> set:
     """``_markers`` for this function and everything it reaches in ``lookup``.
 
     A test rarely generates the event itself: it calls a ``_click`` or
@@ -176,7 +195,16 @@ def _reachable(func, lookup) -> set:
     followed -- bare calls by name, and requested fixtures by parameter name,
     which is the same thing at the AST level.
     """
-    seen, todo, markers = set(), [func.name], set()
+    # From ``func`` itself, not from ``lookup[func.name]``: two classes in one
+    # module can give a method the same name, and seeding the walk by name
+    # looked the subject of the question up and got the OTHER body -- so a test
+    # that generates an event and pumps read as needing nothing at all. A
+    # silent pass, which is the one direction this guard must not fail in.
+    # Demonstrated 2026-11-16; the comment on ``module_functions`` used to
+    # claim it could not happen.
+    markers = _markers(func)
+    seen = set()
+    todo = list(bare_calls(func) | fixture_names(func, enclosing))
     while todo:
         name = todo.pop()
         if name in seen or name not in lookup:
@@ -215,9 +243,16 @@ def module_functions(tree) -> dict:
     """name -> node for every function in a module, nested ones included.
 
     Keyed by bare name, which is what a call site gives us. Module level wins
-    a collision with a method of the same name: resolving a helper to the
-    wrong body of the same name can only widen what the caller sees, and a
-    widened answer here is a guard failure naming a test, never a silent pass.
+    a collision with a method of the same name.
+
+    For a function reached as a CALLEE that is harmless: resolving a helper to
+    the wrong body of the same name can only widen what the caller sees, and a
+    widened answer is a guard failure naming a test rather than a silent pass.
+    It was **not** harmless for the function being asked about, which
+    ``_reachable`` used to look up by name -- a collision there replaced the
+    subject of the question and cleared it silently. That is why ``_reachable``
+    now starts from the node it was handed. This docstring asserted the
+    opposite until 2026-11-16.
     """
     import ast
 
@@ -229,15 +264,32 @@ def module_functions(tree) -> dict:
 
 
 def test_functions(tree) -> list:
-    """Every ``test_*`` function in a module, methods on a class included."""
+    """``(node, enclosing_classes)`` for every ``test_*`` function in a module.
+
+    Methods on a class included, with the classes they are nested in, outermost
+    first -- a ``usefixtures`` mark on the class is a fixture request the method
+    node cannot see on its own.
+    """
     import ast
 
-    return [node for node in ast.walk(tree)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name.startswith("test_")]
+    found = []
+
+    def walk(node, classes):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.ClassDef):
+                walk(child, (*classes, child))
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if child.name.startswith("test_"):
+                    found.append((child, classes))
+                walk(child, classes)
+            else:
+                walk(child, classes)
+
+    walk(tree, ())
+    return found
 
 
-def needs_a_mapped_window(func, lookup) -> bool:
+def needs_a_mapped_window(func, lookup, enclosing=()) -> bool:
     """Would this test deadlock, or show a window, on a withdrawn root?
 
     Two ways, and they are different hazards sharing one fixture:
@@ -262,6 +314,6 @@ def needs_a_mapped_window(func, lookup) -> bool:
     repo's shared fixtures live; a helper reached through an import would be
     missed, and the hang would be found by waiting for a timeout.
     """
-    markers = _reachable(func, lookup)
+    markers = _reachable(func, lookup, enclosing)
     return ((_EVENT_CALL in markers and _PUMP_CALL in markers)
             or _ON_PURPOSE in markers)
