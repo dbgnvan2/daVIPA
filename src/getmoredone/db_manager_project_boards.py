@@ -74,13 +74,17 @@ class DBManagerProjectBoardsMixin:
             return False
 
         completed_at = datetime.now().isoformat() if status == ProjectBoardStatus.COMPLETED else None
-        self.db.conn.execute("""
+        cursor = self.db.conn.execute("""
             UPDATE project_boards
             SET status = ?, completed_at = ?, updated_at = ?
             WHERE id = ?
         """, (status, completed_at, datetime.now().isoformat(), board_id))
         self.db.conn.commit()
-        return True
+        # P6/P42: the return value is the screen's evidence that the write
+        # landed, so it reports the row count rather than the fact that a
+        # statement ran. A board deleted on another screen leaves a card whose
+        # button still carries its id; that used to report success.
+        return cursor.rowcount == 1
 
     def get_project_boards(
         self,

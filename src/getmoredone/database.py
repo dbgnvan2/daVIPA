@@ -898,11 +898,18 @@ class Database:
 
         # The rebuild needs `PRAGMA foreign_keys = OFF`, which SQLite ignores
         # while a transaction is open -- so it rests on a commit it does not
-        # own. Inside `DatabaseManager.transaction()` commits are deferred and
-        # that commit is a no-op, which would leave enforcement ON and let
-        # `DROP TABLE project_boards` cascade its items and notes away. No
-        # caller does that today (both `initialize_schema` callers run at
-        # construction), so this refuses rather than rely on that holding.
+        # own, and inside `DatabaseManager.transaction()` it must not make one.
+        # Committing there would make the caller's partial work durable, which
+        # is the all-or-nothing guarantee `_DeferredCommitConnection` exists to
+        # give; going ahead without committing would leave enforcement ON and
+        # let `DROP TABLE project_boards` cascade its items and notes away.
+        # Neither is acceptable, so the rebuild declines the connection.
+        #
+        # No caller reaches it today: all three `initialize_schema` callers
+        # (`db_manager.py`, `vps_manager.py`, `selftest.py`) run at
+        # construction, on a connection nobody has deferred. The third is
+        # worth knowing about -- `selftest.check_database()` runs this rebuild
+        # against the user's real default database.
         if getattr(conn, "commits_deferred", False):
             logger.warning(
                 "SVU-M2: project_boards status CHECK not widened -- commits "
@@ -935,8 +942,12 @@ class Database:
             re.IGNORECASE,
         )
         if match is None:
-            if re.search(r"CHECK\s*\([^)]*\bstatus\b", create_source,
-                         re.IGNORECASE):
+            # Anchored on the column, not merely on the word appearing
+            # somewhere in a CHECK: `CHECK(length(status) > 0)` is not a
+            # status vocabulary constraint, and warning about it would be the
+            # every-launch log line the branch below exists to avoid.
+            if re.search(r"CHECK\s*\(\s*[\"'`\[]?status[\"'`\]]?\s",
+                         create_source, re.IGNORECASE):
                 # There is a status CHECK, and this could not rewrite it.
                 logger.warning(
                     "SVU-M2: project_boards has no status CHECK to widen; "
@@ -964,7 +975,9 @@ class Database:
 
         columns = [row[1] for row in
                    conn.execute("PRAGMA table_info(project_boards)").fetchall()]
-        column_list = ", ".join(columns)
+        # Quoted: `action_items` already carries a column named `group`, so a
+        # reserved word arriving on this table would otherwise break the copy.
+        column_list = ", ".join(f'"{name}"' for name in columns)
 
         # P5/P9: foreign keys are ON for this connection (PRAGMA at connect),
         # and project_board_items and project_board_links both reference this
@@ -973,10 +986,13 @@ class Database:
         # transaction, so the copy runs outside one and is restored in a
         # finally, leaving enforcement on even if the rebuild raises.
         #
-        # `force_commit` where the connection has one: this commit is the
-        # rebuild's own, and it is the whole precondition for the pragma.
-        commit = getattr(conn, "force_commit", conn.commit)
-        commit()
+        # Plain `commit`, deliberately, not `force_commit`: the refusal above
+        # is what makes this safe, and should it ever be removed, a gated
+        # commit leaves the transaction open and the pragma read-back below
+        # declines the rebuild. `force_commit` would instead commit the
+        # caller's partial work and then destroy the children. The weaker call
+        # is the safer one here.
+        conn.commit()
         conn.execute("PRAGMA foreign_keys = OFF")
         if conn.execute("PRAGMA foreign_keys").fetchone()[0] != 0:
             # P6: the pragma is applied silently or not at all, so the
@@ -1016,7 +1032,7 @@ class Database:
             )
             conn.execute("DROP TABLE project_boards")
             conn.execute("ALTER TABLE project_boards_svu RENAME TO project_boards")
-            commit()
+            conn.commit()
         finally:
             # The INSERT opens a transaction, and `PRAGMA foreign_keys` is
             # silently ignored while one is open -- so without this rollback a

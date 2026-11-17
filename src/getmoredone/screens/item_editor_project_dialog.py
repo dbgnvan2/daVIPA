@@ -124,9 +124,14 @@ class SetProjectDialog(StatusNoticeMixin, ctk.CTkToplevel):
         A completed project is not offered as a new choice, but if the item is
         already filed under one it stays in the list — dropping it would hide
         the item's own current value.
+
+        SVU-M3: that promise needs ``show_canceled`` too. Without it a canceled
+        board never comes back from the query, so the escape hatch below has
+        nothing to match and the item's own project vanished from its picker.
+        ``SELECTABLE_STATUSES`` still keeps canceled out of what is *offered*.
         """
         rows = self.db_manager.get_project_boards(
-            show_pending=True, show_completed=True
+            show_pending=True, show_completed=True, show_canceled=True
         )
         return [
             row for row in rows

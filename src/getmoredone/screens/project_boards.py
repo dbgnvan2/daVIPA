@@ -258,7 +258,15 @@ class ProjectBoardEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
         board.title = self.title_var.get().strip()
         board.annual_plan_element_id = ape_id
         board.importance = self._extract_factor_value(self.priority_var.get())
-        board.status = self.status_var.get().strip() or ProjectBoardStatus.ACTIVE
+        # SVU-M3: the combobox is free-text, and `create_project_board` /
+        # `update_project_board` do not gate what they are handed. An unknown
+        # status either raises IntegrityError into Tk's callback handler or, on
+        # a database the migration leaves CHECK-less, stores and drops the
+        # board out of every status filter -- the same unreachability SVU-M3
+        # fixed, by another door. Ungated writers: SVU-A4.
+        typed = self.status_var.get().strip()
+        board.status = (typed if typed in ProjectBoardStatus.ALL
+                        else ProjectBoardStatus.ACTIVE)
         board.next_step = self.next_step_var.get().strip() or None
         board.notes = self.notes_box.get("1.0", "end").strip() or None
         # WT-D9: stored exactly as typed. No validation, no reordering.
@@ -1709,14 +1717,15 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
         self.refresh()
 
     def set_board_status(self, board_id: str, status: str):
-        # SVU-M3: the manager refuses a status outside the vocabulary and says
-        # so by returning False. Refreshing over a discarded False redrew the
-        # unchanged board and looked exactly like success.
+        # SVU-M3: the manager refuses a status outside the vocabulary, and
+        # reports a write that did not land, by returning False. Refreshing
+        # over a discarded False redrew the unchanged board and looked exactly
+        # like success. Reported on this screen's own notice line: MOD-M2
+        # leaves only two platform dialogs in the app, both for a failure with
+        # no screen to put a notice on, and this is not one of them.
         if not self.db_manager.set_project_board_status(board_id, status):
-            messagebox.showerror(
-                "Project Status",
-                f"'{status}' is not a project status, so nothing was changed.",
-                parent=self)
+            self.set_status(
+                f"Could not set that project to '{status}'.", "error")
             return
         if status != ProjectBoardStatus.ACTIVE and self.selected_board_id == board_id:
             self.selected_board_id = None
