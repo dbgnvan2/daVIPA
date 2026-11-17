@@ -77,7 +77,7 @@ daVIPA is a desktop task manager focused on prioritization and execution.
 - Why: Powers time blocks, timer defaults, and planned vs actual stats.
 
 ### Status
-- What: Items can be `open`, `completed`, or `canceled`.
+- What: Items can be `open`, `completed`, or `canceled`. (A *project* has its own, wider set: active, pending, canceled, completed.)
 - Why: Status controls what shows up on Today/Upcoming views and what counts toward stats.
 
 ### Contacts and Who
@@ -280,22 +280,23 @@ Not to be confused with the reward protocol's own counter, which counts
 *completed deliverables* (Done presses) to decide how often you get a celebration
 and carries no time at all. See "The reward protocol" below.
 
-When you click a project on the board, the right side shows two stacked sections — Project Notes on top, Action Items below — with a shared filter above both.
-
-- **Shared "Show Completed" checkbox** — What: A single toggle above both lists, default OFF. Why: First view shows only open Project Notes and open Action Items; flip it on to reveal completed work in both lists at once.
+When you click a project on the board, the right side shows two stacked sections — Project Notes on top, Action Items below. The three status checkboxes on the Action Items line filter both.
 
 Project Notes section:
 - **What it is** — Each row is an Obsidian note linked to this project. Project Notes have a Status (Open / Completed) but no priority and no dates.
+- **Starts collapsed** — What: Only the header line shows — the ▸ triangle, "Project Notes", and the count. Click the triangle to list the notes, click it again to fold them away. Why: The panel opens on the action items, which is what most visits are for, without hiding that notes exist.
 - **Per-row buttons**:
   - **Open** — What: Opens the note in your Obsidian vault. Why: Read or edit the note.
   - **Complete** / **Reopen** — What: Flips the note's status. Why: Track whether a reference doc still needs attention.
   - **Unlink** — What: Removes the link from this project (does not delete the .md file). Why: Disassociate a note that no longer belongs.
 - **Ordering** — Notes are shown most-recently-linked first.
-- **Count label** — Reads "N note(s) shown" or "N shown • M completed hidden" when the shared filter hides completed notes.
+- **Count label** — Reads "N note(s) shown" or "N shown • M completed hidden" when the Completed checkbox is unticked. It stays on the header line while the section is collapsed.
 
 Action Items section:
 - **Columns** — What: Each row is columnar — `(checkbox)`, `Title`, `Status`, `Start`, `Due`, then **Edit** / **Complete** / **Unlink** — under a heading row that scrolls with the list. The four text columns always fill the list's width, starting in the proportions 260 : 90 : 110 : 110, and resize as described under *Resizing the item lists* above: a draggable divider at each column's right edge, a floor of 6 characters, and the shape remembered between sessions. Each item's next step still shows on a second line inside the Title column, cut to that column's width. Why: Read the status and the dates in line with the other rows instead of in one run-on line.
-- **Select All checkbox** — What: Checks every visible action item row in one click. Why: Avoid clicking each row when planning a bulk change. Respects the shared Show Completed filter — only visible items are selected.
+- **Heading line** — What: "Action Items", then the count, then the three status checkboxes, all left-justified on one line. The count reads "N items", or "N shown • M hidden" when the status filters are holding items back.
+- **Status checkboxes** — What: **Open**, **Completed**, **Canceled** — the three statuses an action item can have. Open is ticked when you open a project and the other two are not, so the first view is the live work. A row shows when its own status is ticked, so unticking all three shows nothing. The **Completed** box also governs whether completed Project Notes appear. Why: Reach any slice of the project's work from the heading line, without a separate filter row.
+- **Select All checkbox** — What: The unlabelled checkbox in the column heading, directly above the per-row checkboxes. Checks every visible action item row in one click. Why: Avoid clicking each row when planning a bulk change. Respects the status filters — only visible items are selected.
 - **Per-item checkbox** — What: Selects a single action item. Why: Build an arbitrary selection for bulk edits.
 - **Bulk Edit button** — What: Enabled when ≥1 item is selected; opens a small dialog. Why: Apply Start Date and/or Priority to several items at once.
   - **Start Date** — Future dates only (today or later). When set, Due Date is auto-set to Start Date + 1 day for every selected item.
@@ -311,7 +312,10 @@ Action Item, Link Action Item, Edit Project, Create Note, Link Note and Open
 Notes — so the panel is the lists, not a second row of controls. Where each
 one's work is done now:
 
-- **Edit Project** → the **pencil** icon on the project's own tile.
+- **Edit Project** → the **pencil** icon on the project's own tile. Its
+  **Status** dropdown offers all four project statuses — Active, Pending,
+  Canceled, Completed. These are the *project's* statuses, not its items':
+  a project can be parked, a task cannot.
 - **Create Note** / **Link Note** → the **📄** icon on the tile, which asks
   which of the two you want.
 - **Open Notes** → each note row in the Project Notes list has its own

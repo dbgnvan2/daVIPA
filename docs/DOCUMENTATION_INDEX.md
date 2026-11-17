@@ -1343,6 +1343,16 @@ are task briefs for batches that are finished. They moved to
 reads them. The `Spec:` docstrings in `src/getmoredone/branding.py` and
 `tests/test_branding.py` were repointed at the new path in the same change.
 
+### docs/spec_2026-11-16_status_vocabulary.md
+
+The project board status vocabulary - Active, Pending, Canceled, Completed,
+with `canceled` new (`SVU-M1`, `SVU-M2`) - and the Projects screen's right-hand
+panel rebuilt in the same batch (`LRP-A1` - `LRP-C1`). Built 2026-11-16: 31 of
+31 criteria `done`, each with its test named in the spec's table. Records the
+decision that the action item vocabulary (`open` / `completed` / `canceled`)
+stays separate and unchanged, and that `project_boards` is rebuilt on open to
+widen its status `CHECK`. Three known gaps are in the spec's section 5.
+
 ## Maintenance
 
 Documentation is updated:

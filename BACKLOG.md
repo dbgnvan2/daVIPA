@@ -23,6 +23,24 @@ One batch at a time in this checkout (`CLAUDE.md`). What is here is open work:
 adjacent issues from recent batches, screen reports, the carried-forward
 features, and the long-standing bugs, requests and user stories at the end.
 
+## Follow-ups from the status vocabulary batch (filed 2026-11-16)
+
+### SVU-A1 — nothing sets an action item to `canceled` (medium)
+
+`Status` has carried `canceled` all along, the validator accepts it and the
+Projects panel now has a box that filters for it
+(`docs/spec_2026-11-16_status_vocabulary.md`). But the only writer of a
+terminal item status is `complete_action_item`, so the `Canceled` box has
+nothing to find unless the item editor's Status field is used by hand. Needs a
+per-row or bulk-edit action, plus its reverse.
+
+### SVU-A2 — a project cannot be canceled from the board list (low)
+
+`ProjectBoardStatus.CANCELED` is now in the editor's dropdown and allowed by
+the `project_boards` `CHECK`, but the board toolbar's one-click buttons are
+still `Set Active` / `Set Pending` / `Complete`. Named here rather than added
+silently to a batch that was about the vocabulary (global rule 10).
+
 ## Recovered from a deleted branch (filed 2026-11-16)
 
 ### MOD-A1 — dialogs that take focus, and the 49 `grab_set` calls (medium)

@@ -1,3 +1,38 @@
+## A project can be canceled, and the Projects panel rebuilt (2026-11-16)
+
+**One line: a project board's statuses are Active, Pending, Canceled,
+Completed — `canceled` is new — and the Projects screen's right-hand panel was
+rebuilt.**
+
+Spec and per-criterion status:
+[`docs/spec_2026-11-16_status_vocabulary.md`](docs/spec_2026-11-16_status_vocabulary.md).
+
+**Action items were not touched.** An item is still `open` / `completed` /
+`canceled`. The two vocabularies are deliberately different: a project can be
+parked, a task cannot. An earlier draft of this batch renamed the item status
+`open` to `active` across the app; that was wrong and was reverted before
+anything was committed.
+
+What did change in the data layer is one constraint: `project_boards.status`
+had `CHECK(status IN ('active', 'pending', 'completed'))`, so `'canceled'`
+could not be stored. SQLite cannot alter a `CHECK` in place, so
+`Database._widen_board_status_check` rebuilds the table — copying its own
+`CREATE TABLE` text with the constraint widened, and running with foreign keys
+off so the `ON DELETE CASCADE` on the two child tables cannot fire. It is
+idempotent and does nothing on a fresh database. No row's status value is
+rewritten.
+
+On the panel: the `Next Step:` meta line is gone, the item count moved onto the
+`Action Items` line, `Select All` lost its label and moved into the column
+heading above the row checkboxes, the Project Notes section starts collapsed,
+and the single `Show Completed` box became three status boxes — Open,
+Completed, Canceled, with Open ticked.
+
+Two follow-ups are filed as `SVU-A1` and `SVU-A2` in `BACKLOG.md`: nothing in
+the UI cancels an action item, and nothing cancels a project from the board
+list, so the new `Canceled` box and the new dropdown value are both ahead of
+the controls that would use them.
+
 ## The four leftover branches are decided (2026-11-16)
 
 **One line: nothing was merged, because nothing on them is missing from
