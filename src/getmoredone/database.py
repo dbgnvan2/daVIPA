@@ -889,7 +889,24 @@ class Database:
                  tests/test_status_vocabulary.py::test_svum2_migration_is_idempotent
                  tests/test_status_vocabulary.py::test_svum2_a_failed_rebuild_leaves_foreign_keys_on
         """
+        # The early return also guards the `DROP TABLE IF EXISTS
+        # project_boards_svu` below: a leftover scratch table is only ever
+        # dropped on a launch where the real table is present, so it can never
+        # be the last copy of the data.
         if not self._table_exists(conn, "project_boards"):
+            return
+
+        # The rebuild needs `PRAGMA foreign_keys = OFF`, which SQLite ignores
+        # while a transaction is open -- so it rests on a commit it does not
+        # own. Inside `DatabaseManager.transaction()` commits are deferred and
+        # that commit is a no-op, which would leave enforcement ON and let
+        # `DROP TABLE project_boards` cascade its items and notes away. No
+        # caller does that today (both `initialize_schema` callers run at
+        # construction), so this refuses rather than rely on that holding.
+        if getattr(conn, "commits_deferred", False):
+            logger.warning(
+                "SVU-M2: project_boards status CHECK not widened -- commits "
+                "are deferred, so foreign keys cannot be turned off safely.")
             return
 
         # The CHECK constraint cannot be altered in place, so the table is
@@ -900,34 +917,49 @@ class Database:
             "AND name = 'project_boards'"
         ).fetchone()
         create_source = (sql[0] if sql else "") or ""
-        if not create_source or "'canceled'" in create_source:
-            return
-        if "CHECK" not in create_source.upper():
-            # An older database added `status` with
-            # `ALTER TABLE ... ADD COLUMN`, which carries no CHECK at all.
-            # Nothing to widen and 'canceled' is already storable, so this is
-            # a normal state, not the unparseable-constraint case warned about
-            # below -- it must not log on every launch for the rest of time.
-            logger.debug(
-                "SVU-M2: project_boards has no status CHECK; nothing to widen.")
+        if not create_source:
             return
 
         # P4: the replacement table is the existing one with its status CHECK
         # widened, not a second copy of the CREATE TABLE above. A database old
         # enough to need this may carry columns a later migration added, and
         # re-declaring the table by hand would silently drop them.
-        create_sql, substitutions = re.subn(
-            r"CHECK\s*\(\s*status\s+IN\s*\([^)]*\)\s*\)",
-            "CHECK(status IN ('active', 'pending', 'canceled', 'completed'))",
+        #
+        # The constraint is located first and the "already migrated?" question
+        # answered from the matched text, not from the whole CREATE TABLE: a
+        # comment anywhere in the schema that happened to mention 'canceled'
+        # would otherwise make an un-migrated database skip the rebuild.
+        match = re.search(
+            r"CHECK\s*\(\s*[\"'`\[]?status[\"'`\]]?\s+IN\s*\([^)]*\)\s*\)",
             create_source,
-            count=1,
+            re.IGNORECASE,
         )
-        if substitutions != 1:
-            logger.warning(
-                "SVU-M2: project_boards has no status CHECK to widen; "
-                "leaving the table as it is."
-            )
+        if match is None:
+            if re.search(r"CHECK\s*\([^)]*\bstatus\b", create_source,
+                         re.IGNORECASE):
+                # There is a status CHECK, and this could not rewrite it.
+                logger.warning(
+                    "SVU-M2: project_boards has no status CHECK to widen; "
+                    "leaving the table as it is."
+                )
+            else:
+                # An older database added `status` with
+                # `ALTER TABLE ... ADD COLUMN`, which carries no CHECK at all.
+                # Nothing to widen and 'canceled' is already storable, so this
+                # is a normal state and must not log on every launch for the
+                # rest of that database's life.
+                logger.debug(
+                    "SVU-M2: project_boards has no status CHECK; "
+                    "nothing to widen.")
             return
+        if "'canceled'" in match.group(0):
+            return
+
+        create_sql = (
+            create_source[:match.start()]
+            + "CHECK(status IN ('active', 'pending', 'canceled', 'completed'))"
+            + create_source[match.end():]
+        )
         create_sql = create_sql.replace("project_boards", "project_boards_svu", 1)
 
         columns = [row[1] for row in
@@ -940,9 +972,43 @@ class Database:
         # cascade the children away. The pragma is a no-op inside a
         # transaction, so the copy runs outside one and is restored in a
         # finally, leaving enforcement on even if the rebuild raises.
-        conn.commit()
+        #
+        # `force_commit` where the connection has one: this commit is the
+        # rebuild's own, and it is the whole precondition for the pragma.
+        commit = getattr(conn, "force_commit", conn.commit)
+        commit()
         conn.execute("PRAGMA foreign_keys = OFF")
+        if conn.execute("PRAGMA foreign_keys").fetchone()[0] != 0:
+            # P6: the pragma is applied silently or not at all, so the
+            # precondition is read back rather than assumed. Stopping here
+            # costs a database that cannot store 'canceled'; carrying on with
+            # enforcement still ON would cost every item and note on every
+            # board, at the DROP below.
+            #
+            # This branch carries no test, deliberately: the reachable way in
+            # is a connection that swallows the commit above, and the only one
+            # of those (`_DeferredCommitConnection`) is refused earlier. Any
+            # other would still roll back in the `finally`, which undoes the
+            # damage the check exists to prevent -- so a guard for it could
+            # only ever pass. It is kept as a precondition check, not as
+            # covered behaviour.
+            conn.execute("PRAGMA foreign_keys = ON")
+            logger.warning(
+                "SVU-M2: project_boards status CHECK not widened -- foreign "
+                "keys could not be turned off.")
+            return
         try:
+            # P1: `CREATE TABLE` is DDL in autocommit, durable the moment it
+            # runs, and the rollback below cannot undo it. A rebuild that
+            # failed after it -- a write lock held by the packaged app on the
+            # INSERT, say -- would leave project_boards_svu on disk, and
+            # sqlite_master stores a CREATE with `IF NOT EXISTS` stripped, so
+            # every later launch would raise "table project_boards_svu already
+            # exists" out of `DatabaseManager.__init__` and that database
+            # could never be opened again. Dropping a leftover first makes the
+            # rebuild re-entrant, which turns one transient lock back into a
+            # transient failure.
+            conn.execute("DROP TABLE IF EXISTS project_boards_svu")
             conn.execute(create_sql)
             conn.execute(
                 f"INSERT INTO project_boards_svu ({column_list}) "
@@ -950,7 +1016,7 @@ class Database:
             )
             conn.execute("DROP TABLE project_boards")
             conn.execute("ALTER TABLE project_boards_svu RENAME TO project_boards")
-            conn.commit()
+            commit()
         finally:
             # The INSERT opens a transaction, and `PRAGMA foreign_keys` is
             # silently ignored while one is open -- so without this rollback a

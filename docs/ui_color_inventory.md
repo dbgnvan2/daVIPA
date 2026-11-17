@@ -1627,7 +1627,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/project_boards.py:1329` | `text_color="#B91C1C",` |
+| `src/getmoredone/screens/project_boards.py:1341` | `text_color="#B91C1C",` |
 | `src/getmoredone/theme.py:134` | `"danger": "#B91C1C",` |
 | `src/getmoredone/theme.py:153` | `# #B91C1C measured 4.15:1 on that surface, under the 4.5:1 a glyph` |
 
@@ -1959,7 +1959,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/project_boards.py:1328` | `hover_color="#EAB308",` |
+| `src/getmoredone/screens/project_boards.py:1340` | `hover_color="#EAB308",` |
 
 ### `#ecfdf5`
 
@@ -2128,7 +2128,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/project_boards.py:1327` | `fg_color="#FACC15",` |
+| `src/getmoredone/screens/project_boards.py:1339` | `fg_color="#FACC15",` |
 
 ### `#fbbf24`
 

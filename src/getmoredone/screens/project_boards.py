@@ -828,6 +828,7 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
         self.search_query = ""  # Track search query
         self.show_pending_var = ctk.BooleanVar(value=False)
         self.show_completed_var = ctk.BooleanVar(value=False)
+        self.show_canceled_var = ctk.BooleanVar(value=False)
         self.note_width_var = ctk.DoubleVar(value=float(self.CARD_WIDTH))
         self.compact_height_var = ctk.BooleanVar(value=False)
         self._render_after_id = None
@@ -905,16 +906,26 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
             variable=self.show_pending_var,
             command=self.refresh,
         ).grid(row=0, column=3, padx=8, pady=8)
-        # SPC-D10: the slack sits in this column, so the size controls right
-        # of it hug the right edge and wrap to row 1 on a narrow window.
-        # Stuck left so the checkbox itself does not drift.
         ctk.CTkCheckBox(
             header,
             text="Show Complete",
             variable=self.show_completed_var,
             command=self.refresh,
         ).grid(row=0, column=4, padx=8, pady=8, sticky="w")
-        ctk.CTkLabel(header, text="Note Size").grid(row=0, column=5, padx=(14, 4), pady=8)
+        # SVU-M3: the way back for a canceled project. The editor can set the
+        # status, so without this box the project left the screen for good.
+        # It belongs left of the spacer with the other two board filters:
+        # right of it, it joins the size controls in the wrapped second row
+        # and pushes that row past the header's width (SPC-D10).
+        ctk.CTkCheckBox(
+            header,
+            text="Show Canceled",
+            variable=self.show_canceled_var,
+            command=self.refresh,
+        ).grid(row=0, column=5, padx=8, pady=8, sticky="w")
+        # SPC-D10: column 6 is empty and holds the slack, so the size controls
+        # right of it hug the right edge and wrap to row 1 on a narrow window.
+        ctk.CTkLabel(header, text="Note Size").grid(row=0, column=7, padx=(14, 4), pady=8)
         ctk.CTkSlider(
             header,
             from_=150,
@@ -923,21 +934,21 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
             variable=self.note_width_var,
             command=self._on_note_size_slider,
             width=180,
-        ).grid(row=0, column=6, padx=4, pady=8)
+        ).grid(row=0, column=8, padx=4, pady=8)
         self.note_size_value_label = ctk.CTkLabel(header, text=f"{self.CARD_WIDTH}px")
-        self.note_size_value_label.grid(row=0, column=7, padx=(0, 8), pady=8, sticky="w")
+        self.note_size_value_label.grid(row=0, column=9, padx=(0, 8), pady=8, sticky="w")
         ctk.CTkCheckBox(
             header,
             text="Compact Height",
             variable=self.compact_height_var,
             command=self._render_cards,
-        ).grid(row=0, column=8, padx=8, pady=8)
+        ).grid(row=0, column=10, padx=8, pady=8)
 
         ctk.CTkLabel(
             header,
             text="Project items on the board at left, linked action items at right.",
             text_color=semantic_colors()["muted_text"],
-        ).grid(row=0, column=9, padx=8, pady=8, sticky="e")
+        ).grid(row=0, column=11, padx=8, pady=8, sticky="e")
 
         # BP2 — rows that predate exclusive filing. Reported where the user can
         # act on them, not only in a start-up log line nobody reads (P25).
@@ -948,7 +959,7 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
             justify="left",
             text_color=status_text_color("warning"),
         )
-        self.multi_link_label.grid(row=3, column=0, columnspan=10, padx=8,
+        self.multi_link_label.grid(row=3, column=0, columnspan=12, padx=8,
                                    pady=(0, 8), sticky="w")
 
         # Search row
@@ -981,7 +992,7 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
         # SPC-M14/M16: no search entry on the control row, so Show Complete's
         # column takes the slack; row 1 is the wrap row, and the search row
         # (2) and the warning line (3) stay where they are.
-        self.toolbar_wrap = ToolbarWrap(header, None, None, 4, wrap_row=1)
+        self.toolbar_wrap = ToolbarWrap(header, None, None, 6, wrap_row=1)
 
         body = ctk.CTkFrame(self)
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
@@ -1083,6 +1094,7 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
             self.db_manager.get_project_boards(
                 show_pending=self.show_pending_var.get(),
                 show_completed=self.show_completed_var.get(),
+                show_canceled=self.show_canceled_var.get(),
             )
         )
         # If we have a selected ID, verify it still exists in the DB at all
@@ -1697,7 +1709,15 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
         self.refresh()
 
     def set_board_status(self, board_id: str, status: str):
-        self.db_manager.set_project_board_status(board_id, status)
+        # SVU-M3: the manager refuses a status outside the vocabulary and says
+        # so by returning False. Refreshing over a discarded False redrew the
+        # unchanged board and looked exactly like success.
+        if not self.db_manager.set_project_board_status(board_id, status):
+            messagebox.showerror(
+                "Project Status",
+                f"'{status}' is not a project status, so nothing was changed.",
+                parent=self)
+            return
         if status != ProjectBoardStatus.ACTIVE and self.selected_board_id == board_id:
             self.selected_board_id = None
         self.refresh()
@@ -2055,7 +2075,8 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
 
         if not shown_links:
             empty_msg = (
-                f"All {completed_hidden} note(s) completed. Enable 'Show Completed' to view them."
+                f"All {completed_hidden} note(s) completed. Tick "
+                f"'Completed' on the Action Items line to view them."
                 if completed_hidden else
                 "No notes linked yet. Use the note icon on the project's tile."
             )

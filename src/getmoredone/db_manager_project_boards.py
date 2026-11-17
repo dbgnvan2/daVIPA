@@ -61,12 +61,16 @@ class DBManagerProjectBoardsMixin:
         self.db.conn.commit()
 
     def set_project_board_status(self, board_id: str, status: str) -> bool:
-        """Update project board status."""
-        if status not in {
-            ProjectBoardStatus.ACTIVE,
-            ProjectBoardStatus.PENDING,
-            ProjectBoardStatus.COMPLETED,
-        }:
+        """Update project board status.
+
+        Purpose: SVU-M3 -- reads ``ProjectBoardStatus.ALL`` rather than naming
+                 the statuses here, which is how this gate came to reject
+                 `canceled` after the vocabulary gained it (global rule 8).
+        Spec:    docs/spec_2026-11-16_status_vocabulary.md
+        Tests:   tests/test_status_vocabulary.py::test_svum3_every_board_status_can_be_set
+                 tests/test_status_vocabulary.py::test_svum3_an_unknown_board_status_is_refused
+        """
+        if status not in ProjectBoardStatus.ALL:
             return False
 
         completed_at = datetime.now().isoformat() if status == ProjectBoardStatus.COMPLETED else None
@@ -82,6 +86,7 @@ class DBManagerProjectBoardsMixin:
         self,
         show_pending: bool = False,
         show_completed: bool = False,
+        show_canceled: bool = False,
     ) -> List[Dict[str, Any]]:
         """Project boards with APE metadata, linked-item counts and time totals.
 
@@ -106,6 +111,13 @@ class DBManagerProjectBoardsMixin:
             statuses.append(ProjectBoardStatus.PENDING)
         if show_completed:
             statuses.append(ProjectBoardStatus.COMPLETED)
+        # SVU-M3: `canceled` needs a way back into the list of its own. Without
+        # one, a project canceled in the editor left the Projects screen and
+        # there was no setting that brought it back -- the row was still there,
+        # but nothing could reach it.
+        if show_canceled:
+            statuses.append(ProjectBoardStatus.CANCELED)
+
             
         placeholders = ",".join("?" for _ in statuses)
         query = f"""
