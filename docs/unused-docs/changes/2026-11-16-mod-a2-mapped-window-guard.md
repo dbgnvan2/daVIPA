@@ -87,6 +87,80 @@ and `CLAUDE.md`, `conftest.py` and `tests/test_ci_contract.py` are untouched.
   detector; the module docstring now states the fixture's second purpose
 - `BACKLOG.md` — MOD-A2 removed
 
+## The cold pass, and what it changed
+
+A `learning-qa` pass over the two commits above, run cold — a fresh reviewer
+with none of the context that wrote them. Four findings, one of them
+demonstrated rather than argued, and all four fixed here. The pass is the
+reason this note has a second half: the first version of the detector shipped
+with a hole of exactly the kind it was written to close.
+
+**1 (high, P2) — the walk started from a name, not from a node.** `_reachable`
+seeded itself with `todo = [func.name]` and then looked that name up in the
+lookup. `module_functions` keys by bare name, so two classes in one module that
+give a method the same name make the lookup hold only one of them — and the
+walk then answered the question about the *other* body. Reproduced before
+fixing: two classes, one method name, the hazardous one generating an event and
+pumping, and `needs_a_mapped_window` returned `False` for both. Renaming one
+method returned `True`. A silent pass, which is the single direction this guard
+must not fail in.
+
+Worse than the bug: the docstring on `module_functions` asserted that a
+collision "can only widen what the caller sees ... never a silent pass". True
+of a *callee*, false of the subject of the question, where the lookup replaces
+it. So the code had a hole and the comment told the next reader not to look for
+it. Both are fixed — `_reachable` now takes its markers from the node it was
+handed, and the docstring says what was wrong with it and when.
+
+Latent today: 0 name collisions across the suite's test functions. But 149 test
+classes hold 186 methods, so two classes in one file sharing a method name is
+an ordinary thing to write, and nothing failed when someone did.
+
+**2 (medium, P3/P5) — a `usefixtures` mark on a class was invisible.** pytest
+applies a class's mark to every method on it; `fixture_names` read only the
+function's own parameters and own decorators. Both directions broke, and one
+silently: a class marked with a window-mapping fixture read as needing nothing,
+while a hazardous method in a class marked `usefixtures("mapped_windows")` read
+as an offender and would have sent the author to add a parameter the mark
+already supplies.
+
+`fixture_names` now takes the enclosing classes, `test_functions` returns them
+with each test, and `usefixtures_names` is split out because a `ClassDef`
+carries the same mark and has no parameters to read.
+
+**This one reached a sibling.** `_mapped_window_test_count` in
+`tests/test_ci_contract.py` reads the same `fixture_names`, so fixing only the
+guard would have left the count of 29 unable to see a request the guard can —
+the exact divergence `tests/display_capabilities.py` exists to prevent, and
+that `test_the_fixture_request_is_read_the_same_way_by_both_guards` was written
+to catch. The counter and that test's synthetic source were changed in the same
+commit. The count is still 29: no class in the suite uses the mark.
+
+**3 (medium, P3/P6) — the shared-fixture arm read one hard-coded file.** The
+guard parsed `conftest.py` beside `tests/` and nothing else, while pytest
+resolves a conftest chain. The arm also contributes nothing to the live tree —
+no function in the root `conftest.py` carries a marker, and all five tripped
+tests trip on their own bodies — so it could have broken without a single test
+noticing. It now looks for both conftests pytest would apply and asserts it
+found at least one.
+
+**4 (medium, P2/P9) — the guard reported offenders and nothing else.** A
+detector that stops detecting produces zero offenders and a green run. The
+first round's mutation proved the guard can still see an offender among tests it
+*already* detects; nothing proved it would notice if it stopped detecting them.
+`DRIVES_REAL_EVENTS` now names the five, exact and not a floor, the way the
+count of 29 is named — and mutation F4 below is that scenario made to happen.
+
+### Adjacent issues found, not fixed
+
+- `tests/test_unified_panel_design.py:2782`
+  `test_updm71_no_test_here_needs_a_mapped_window` reads
+  `[arg.arg for arg in node.args.args]` directly rather than through
+  `fixture_names`, so it misses the keyword-only and both mark spellings. It is
+  a file-local assertion of zero, pre-existing, and untouched by this change —
+  the third place this one question is asked. Filed as `BACKLOG.md` MOD-A7
+  rather than swept in.
+
 ## Verification
 
 - Command: `GETMOREDONE_NO_MAPPED_WINDOWS=1 nice -n 19 taskpolicy -b ./venv/bin/python -m pytest tests/test_tk_offscreen.py tests/test_ci_contract.py tests/test_display_capabilities.py tests/test_scheduler_column_resize.py -q --timeout=300`
@@ -100,10 +174,27 @@ and `CLAUDE.md`, `conftest.py` and `tests/test_ci_contract.py` are untouched.
      fails. The pair is what is being asked for.
   3. `_reachable` stops extending through `bare_calls` and `fixture_names` →
      the detector's guard fails. Helper resolution is not decoration.
-- Not run: the full suite. Not run: the two `<Configure>` tests in
-  `tests/test_screen_resize_spc.py` and `tests/test_unified_panel_design.py`,
-  which the old guard cleared by accident and the new one clears on purpose;
-  neither file was changed.
+- After the cold pass's fixes — PASS: `tests/test_tk_offscreen.py`,
+  `tests/test_display_capabilities.py`, `tests/test_ci_contract.py`, 133 passed
+  and 6 skipped, so the count of 29 still reconciles with the widened reader.
+- Second mutation gate, all five RED, each file restored byte-identical:
+  1. `_reachable` seeded by name again → the detector's guard fails on the
+     collision arm.
+  2. `fixture_names` ignoring the enclosing classes → the detector's guard
+     fails on the class-mark arms.
+  3. the same mutation against
+     `test_the_fixture_request_is_read_the_same_way_by_both_guards` → fails, so
+     the counter's reader is covered too.
+  4. the conftest candidates pointed at a file that does not exist → the new
+     assertion fires, rather than the arm reading nothing in silence.
+  5. `_PUMP_CALL` changed to match nothing → `offenders` stays empty and the
+     `DRIVES_REAL_EVENTS` set is what turns it red. Finding 4's scenario,
+     made to happen.
+- Measured, not reasoned: the two withdrawn `<Configure>` tests in
+  `tests/test_screen_resize_spc.py` complete in 3.79s rather than hanging,
+  which is the premise the whole fix rests on.
+- Not run: the full suite. Not run: `tests/test_unified_panel_design.py`, whose
+  `_click` the new guard clears on purpose; the file was not changed.
 
 ## Risks / Known gaps
 
@@ -117,6 +208,22 @@ and `CLAUDE.md`, `conftest.py` and `tests/test_ci_contract.py` are untouched.
   false clearance is a hung suite with no name attached.
 - The detector reads source. It cannot see a test that hangs for a reason other
   than these two.
+- **A helper reached as `harness.click(...)` or `Cls.helper(...)` is not
+  followed.** `bare_calls` follows plain names and `self.x(...)`. Checked by
+  widening the walk to follow any `obj.attr(...)` whose attr is a module
+  function and re-running over all of `tests/`: 0 additional tests trip, so
+  this is latent.
+- **`update()` is the only blocking call modelled.** `wait_visibility`,
+  `wait_window` and `mainloop` also block on a window that is never mapped.
+  Not live — `wait_window` appears in `tests/` only as a name being
+  monkeypatched out.
+- **`_ON_PURPOSE` reads as a knob and is not one.** `_markers` tests the
+  hardcoded `keyword.arg == "withdraw"` against the constant `False`, so
+  editing the string changes nothing, and `withdraw=0` or `withdraw=flag` do
+  not match.
+- **The synthetic module has no arm for a fixture that requests another
+  fixture.** The chain is followed by `_reachable`; the depth-2 case is not
+  asserted.
 
 ## Next agent actions
 

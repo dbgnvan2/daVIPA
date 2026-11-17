@@ -94,6 +94,30 @@ it is a decision rather than an addition.
 If the walk shows a clipped row, the fix is the dialog's geometry, not the
 notice line's placement.
 
+## Found by the MOD-A2 cold pass (filed 2026-11-16)
+
+### MOD-A7 — the third spelling of "does this test ask for a mapped window?" (low)
+
+`tests/test_unified_panel_design.py:2782`
+`test_updm71_no_test_here_needs_a_mapped_window` reads
+`[arg.arg for arg in node.args.args]` directly instead of going through
+`display_capabilities.fixture_names`, so it misses a keyword-only parameter and
+both `usefixtures` spellings — the mark on the function and the mark on the
+class.
+
+Adjacent, not introduced by the MOD-A2 change and deliberately not swept into
+it (global rule 10). It is a file-local assertion of zero, so the blast radius
+is one file: a test added there that asked for the fixture in any of those
+three ways would read as asking for nothing, and would put a window on the
+screen on every local run without that guard noticing. The suite-wide count in
+`tests/test_ci_contract.py` would still catch it, which is why this is low.
+
+The fix is to call `fixture_names(node, enclosing)` over
+`display_capabilities.test_functions(tree)`, which is what the two guards in
+`tests/test_tk_offscreen.py` and `tests/test_ci_contract.py` now do. The
+module exists so that one question has one answer; this is the last place that
+asks it its own way.
+
 ## Found by the MOD fix-round re-sweep (filed 2026-11-16)
 
 The second sweep of the batch, over the fix commits only. Six findings: three
