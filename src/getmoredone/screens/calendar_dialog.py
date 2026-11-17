@@ -231,6 +231,9 @@ class CalendarEventDialog(ctk.CTkToplevel):
 
     def create_event(self):
         """Create the calendar event and link it to the action item."""
+        # Bound before the `try` so the close decision below is reachable from
+        # every arm, including the handlers.
+        created = False
         try:
             # Validate inputs
             event_title = self.title_entry.get().strip()
@@ -339,7 +342,7 @@ class CalendarEventDialog(ctk.CTkToplevel):
                 webbrowser.open(calendar_url)
 
                 self.result = calendar_url
-                self.destroy()
+                created = True
             else:
                 self.error_label.configure(text="Event created but no link returned")
 
@@ -349,3 +352,13 @@ class CalendarEventDialog(ctk.CTkToplevel):
             self.error_label.configure(text=f"Calendar error: {str(e)}")
         except Exception as e:
             self.error_label.configure(text=f"Unexpected error: {str(e)}")
+
+        # MOD: the close is outside the `try`, because all three handlers above
+        # report on a label belonging to this dialog. By the time it runs the
+        # event exists in Google, the ItemLink is written and the item is marked
+        # a meeting, so a TclError out of teardown used to be caught by the last
+        # handler and painted as "Unexpected error: ..." onto a widget on its
+        # way out -- completed work reported as a failure, invisibly, and a
+        # retry books the meeting twice (P6).
+        if created:
+            self.destroy()

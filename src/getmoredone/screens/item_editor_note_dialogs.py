@@ -200,13 +200,19 @@ class CreateNoteDialog(ctk.CTkToplevel):
             # Open in Obsidian
             open_in_obsidian(file_path, settings.obsidian_vault_path)
 
-            # Close dialog and refresh parent
-            self.destroy()
-            if hasattr(self.parent_window, 'load_notes'):
-                self.parent_window.load_notes()
-
         except Exception as e:
             self.error_label.configure(text=f"Error: {str(e)}")
+            return
+
+        # MOD: outside the `try`, because the handler above reports on a label
+        # belonging to this dialog. By here the note file exists and the link
+        # is in the database, so a TclError out of teardown -- or anything the
+        # parent's refresh raises -- used to be painted onto a widget on its
+        # way out: a completed write reported as "Error: ..." that nobody can
+        # read, and a user who retries gets a second link (P6).
+        self.destroy()
+        if hasattr(self.parent_window, 'load_notes'):
+            self.parent_window.load_notes()
 
     def center_on_parent(self):
         """Center the dialog on the parent window."""
@@ -485,13 +491,15 @@ class LinkNoteDialog(ctk.CTkToplevel):
                 )
                 self.db_manager.add_project_board_link(link)
 
-            # Close dialog and refresh parent
-            self.destroy()
-            if hasattr(self.parent_window, 'load_notes'):
-                self.parent_window.load_notes()
-
         except Exception as e:
             self.error_label.configure(text=f"Error: {str(e)}")
+            return
+
+        # MOD: outside the `try`, for the reason given in create_note -- the
+        # link row is written by here, and the handler draws on this dialog.
+        self.destroy()
+        if hasattr(self.parent_window, 'load_notes'):
+            self.parent_window.load_notes()
 
     def browse_file(self):
         """Browse for a markdown file (fallback option)."""
