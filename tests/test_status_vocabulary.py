@@ -8,13 +8,14 @@ SVU-M1  a project board is active/pending/canceled/completed; an action item
 SVU-M2  an existing database's board CHECK constraint is widened on open
 """
 
+import logging
 import sqlite3
 
 import pytest
 
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import (
-    ActionItem, ProjectBoardStatus, Status)
+    ActionItem, ProjectBoard, ProjectBoardStatus, Status)
 from src.getmoredone.validation import Validator
 
 
@@ -272,10 +273,17 @@ def test_svum2_a_check_less_table_is_left_alone_without_warning(tmp_path, caplog
         """)
         conn.commit()
 
-    with caplog.at_level("WARNING"):
+    with caplog.at_level(logging.DEBUG, logger="src.getmoredone.database"):
         manager = DatabaseManager(db_path)
     try:
-        assert "SVU-M2" not in caplog.text, caplog.text
+        # Both halves, because the negative one alone passes with the whole
+        # method stubbed out -- it pins no branch at all.
+        assert any("no status CHECK" in record.message
+                   for record in caplog.records
+                   if record.levelno == logging.DEBUG), caplog.text
+        assert not [record for record in caplog.records
+                    if record.levelno >= logging.WARNING
+                    and "SVU-M2" in record.message], caplog.text
         manager.db.conn.execute(
             "INSERT INTO project_boards (id, title, status, created_at, "
             "updated_at) VALUES ('b3', 'Z', 'canceled', 'd', 'd')")
@@ -316,3 +324,189 @@ def test_svum2_a_fresh_database_already_allows_canceled(tmp_path):
         assert "'canceled'" in sql, sql
     finally:
         manager.close()
+
+
+def test_svum2_a_leftover_scratch_table_does_not_block_the_next_launch(tmp_path):
+    """The rebuild is re-entrant, so one transient failure is not permanent.
+
+    `CREATE TABLE` is DDL in autocommit and the rollback cannot undo it, so a
+    rebuild that raised after it leaves `project_boards_svu` on disk. SQLite
+    stores a CREATE with `IF NOT EXISTS` stripped, so without the pre-CREATE
+    drop the next launch raises "table project_boards_svu already exists" out
+    of `DatabaseManager.__init__` -- a database that can never be opened again.
+    """
+    db_path = _legacy_db(tmp_path / "legacy_debris.db")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(f"CREATE TABLE project_boards_svu ({BOARD_COLUMNS}, "
+                     f"status TEXT, completed_at TEXT, created_at TEXT, "
+                     f"updated_at TEXT)")
+        conn.commit()
+
+    manager = DatabaseManager(db_path)
+    try:
+        schema = manager.db.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'project_boards'"
+        ).fetchone()[0]
+        assert "'canceled'" in schema, schema
+        assert manager.db.conn.execute(
+            "SELECT COUNT(*) AS n FROM project_boards").fetchone()["n"] == 1
+    finally:
+        manager.close()
+
+
+def test_svum2_a_deferred_commit_connection_is_refused(tmp_path, caplog):
+    """The rebuild rests on a commit it does not own.
+
+    `PRAGMA foreign_keys = OFF` is ignored while a transaction is open, and
+    inside `DatabaseManager.transaction()` the commit that closes one is a
+    no-op. Rebuilding anyway would leave enforcement ON and let `DROP TABLE
+    project_boards` cascade every item and note away.
+    """
+    db_path = _legacy_db(tmp_path / "legacy_deferred.db")
+    manager = DatabaseManager(db_path)
+    try:
+        conn = manager.db.conn
+        # Put the old constraint back so there is work to refuse.
+        conn.execute("DROP TABLE project_boards")
+        conn.execute(f"""
+            CREATE TABLE project_boards (
+                {BOARD_COLUMNS},
+                {LEGACY_BOARD_CHECK},
+                completed_at TEXT,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+
+        conn.defer_commits()
+        try:
+            with caplog.at_level(logging.WARNING):
+                manager.db._widen_board_status_check(conn)
+        finally:
+            conn.resume_commits()
+
+        schema = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'project_boards'"
+        ).fetchone()[0]
+        assert "'canceled'" not in schema, schema
+        assert "commits are deferred" in caplog.text, caplog.text
+    finally:
+        manager.close()
+
+
+def test_svum2_a_comment_mentioning_canceled_does_not_skip_the_rebuild(tmp_path):
+    """The decision comes from the matched CHECK, not the whole schema text."""
+    db_path = str(tmp_path / "commented.db")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(f"""
+            CREATE TABLE project_boards (
+                {BOARD_COLUMNS},
+                -- a project is never 'canceled' here yet
+                {LEGACY_BOARD_CHECK},
+                completed_at TEXT,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+
+    manager = DatabaseManager(db_path)
+    try:
+        schema = manager.db.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'project_boards'"
+        ).fetchone()[0]
+        assert "'canceled'" in schema.split("CHECK", 1)[1], schema
+        manager.db.conn.execute(
+            "INSERT INTO project_boards (id, title, status, created_at, "
+            "updated_at) VALUES ('b4', 'C', 'canceled', 'd', 'd')")
+        manager.db.conn.commit()
+        assert manager.db.conn.execute(
+            "SELECT status FROM project_boards WHERE id = 'b4'"
+        ).fetchone()["status"] == ProjectBoardStatus.CANCELED
+    finally:
+        manager.close()
+
+
+def test_svum2_a_lowercase_check_is_widened_too(tmp_path):
+    """SQL keywords are case-insensitive, so the pattern must be."""
+    db_path = str(tmp_path / "lowercase.db")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(f"""
+            CREATE TABLE project_boards (
+                {BOARD_COLUMNS},
+                status TEXT NOT NULL DEFAULT 'active'
+                    check(status in ('active', 'pending', 'completed')),
+                completed_at TEXT,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+
+    manager = DatabaseManager(db_path)
+    try:
+        schema = manager.db.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'project_boards'"
+        ).fetchone()[0]
+        assert "'canceled'" in schema, schema
+        manager.db.conn.execute(
+            "INSERT INTO project_boards (id, title, status, created_at, "
+            "updated_at) VALUES ('b5', 'D', 'canceled', 'd', 'd')")
+        manager.db.conn.commit()
+        assert manager.db.conn.execute(
+            "SELECT status FROM project_boards WHERE id = 'b5'"
+        ).fetchone()["status"] == ProjectBoardStatus.CANCELED
+    finally:
+        manager.close()
+
+
+# --------------------------------------------------------------------- SVU-M3
+
+def _board(manager, title="P"):
+    board = ProjectBoard(title=title)
+    manager.create_project_board(board)
+    return board.id
+
+
+def test_svum3_every_board_status_can_be_set(tmp_path):
+    """The gate read a hand-written set, so it rejected `canceled` silently."""
+    manager = DatabaseManager(str(tmp_path / "setstatus.db"))
+    try:
+        board_id = _board(manager)
+        for status in ProjectBoardStatus.ALL:
+            assert manager.set_project_board_status(board_id, status) is True, status
+            assert manager.get_project_board(board_id).status == status
+    finally:
+        manager.close()
+
+
+def test_svum3_an_unknown_board_status_is_refused(tmp_path):
+    manager = DatabaseManager(str(tmp_path / "badstatus.db"))
+    try:
+        board_id = _board(manager)
+        assert manager.set_project_board_status(board_id, "open") is False
+        assert manager.get_project_board(board_id).status == (
+            ProjectBoardStatus.ACTIVE)
+    finally:
+        manager.close()
+
+
+def test_svum3_a_canceled_board_is_hidden_but_reachable(tmp_path):
+    """Canceling a project must not put it beyond the UI's reach.
+
+    `get_project_boards` could only ever return active, pending and completed,
+    so a project canceled in the editor left the Projects screen and no
+    setting brought it back.
+    """
+    manager = DatabaseManager(str(tmp_path / "canceled_board.db"))
+    try:
+        board_id = _board(manager, "Dropped")
+        manager.set_project_board_status(board_id, ProjectBoardStatus.CANCELED)
+
+        default = [row["id"] for row in manager.get_project_boards()]
+        assert board_id not in default
+
+        shown = [row["id"] for row in
+                 manager.get_project_boards(show_canceled=True)]
+        assert board_id in shown
+    finally:
+        manager.close()
+

@@ -340,3 +340,54 @@ def test_svum1_project_editor_offers_all_four_statuses(db_manager):
     finally:
         dialog.destroy()
         root.destroy()
+
+
+# --------------------------------------------------------------------- SVU-M3
+
+def test_svum3_a_refused_board_status_is_reported_not_swallowed(
+        screen, monkeypatch):
+    """`set_project_board_status` says no by returning False.
+
+    The screen used to discard it and refresh, which redrew the unchanged
+    board and was indistinguishable from success.
+    """
+    screen_obj, board_id, _ids, _root = screen
+    shown = []
+    monkeypatch.setattr(
+        "src.getmoredone.screens.project_boards.messagebox.showerror",
+        lambda *args, **kwargs: shown.append(args))
+    refreshed = []
+    monkeypatch.setattr(screen_obj, "refresh", lambda: refreshed.append(1))
+
+    screen_obj.set_board_status(board_id, "open")
+
+    assert shown, "a refused status change must be reported"
+    assert not refreshed, "nothing changed, so there is nothing to redraw"
+
+
+def test_svum3_the_toolbar_offers_show_canceled(screen):
+    """The way back for a canceled project."""
+    screen_obj, _board_id, _ids, _root = screen
+    labels = {box.cget("text")
+              for box in _descendants(screen_obj, ctk.CTkCheckBox)}
+    assert "Show Canceled" in labels, sorted(labels)
+    assert screen_obj.show_canceled_var.get() is False
+
+
+def test_lrpc1_the_empty_notes_message_names_a_control_that_exists(
+        screen, db_manager):
+    """LRP-C1 replaced the `Show Completed` box the old message named."""
+    screen_obj, board_id, _ids, root = screen
+    db_manager.add_project_board_link(ProjectBoardLink(
+        project_board_id=board_id, url="note://done", label="Done",
+        link_type="note", status=Status.COMPLETED))
+    screen_obj.notes_expanded = True
+    screen_obj.refresh()
+    root.update_idletasks()
+
+    texts = [label.cget("text")
+             for label in _descendants(screen_obj, ctk.CTkLabel)]
+    empty = [text for text in texts if "note(s) completed" in text]
+    assert empty, texts
+    assert "Show Completed" not in empty[0]
+    assert "'Completed' on the Action Items line" in empty[0]
