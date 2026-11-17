@@ -11,6 +11,11 @@ off-screen instead does not work on macOS, which clamps a window back onto the
 display. The few tests that read real geometry ask for the ``mapped_windows``
 fixture, because ``winfo_width()`` on a withdrawn window returns 1.
 
+A second, smaller set asks for it for a different reason: a generated event
+followed by ``update()`` waits on a queue a withdrawn window never drains, so
+those tests hang rather than fail. The two reasons share one fixture, which is
+why the guard below demands it for the second and never objects to the first.
+
 This is the guard on the guard (P24): a fixture that quietly stopped working
 would look exactly like a passing suite.
 """
@@ -189,21 +194,138 @@ def test_every_test_that_needs_a_mapped_window_asks_for_one():
     window — it does not fail, it hangs, and a hung suite gives no clue which
     test caused it. This is a source check rather than a behavioural one
     because the alternative is discovering it by waiting for a timeout.
+
+    Purpose: per test, and for the pair rather than for the token. The
+             file-level text version of this check was wrong in both
+             directions at once (MOD-A2): it failed
+             ``test_scheduler_column_resize.py`` for an
+             ``event_generate("<Configure>")`` with no pump after it, which
+             cannot hang, and it cleared ``test_screen_resize_spc.py`` and
+             ``test_unified_panel_design.py``, which do the same thing, because
+             the word ``mapped_windows`` appeared elsewhere in those files —
+             in one of them only inside another guard's own source. Demanding
+             the fixture for a test that does not need it is not a harmless
+             over-reach: it puts a real window on the user's screen and adds
+             one to the set the documented local workflow skips.
+    Tests:   test_the_mapped_window_detector_asks_for_the_pair_not_the_token
     """
-    import re
+    import ast
     from pathlib import Path
 
+    from tests.display_capabilities import (
+        fixture_names,
+        module_functions,
+        needs_a_mapped_window,
+        test_functions,
+    )
+
     tests_dir = Path(__file__).resolve().parent
+    # conftest.py as well as the test's own module: this repo's shared fixtures
+    # live there, so a window one of them maps is reachable from a test that
+    # names nothing but the fixture.
+    shared = module_functions(ast.parse(
+        (tests_dir.parent / "conftest.py").read_text(encoding="utf-8")))
+
     offenders = []
     for path in sorted(tests_dir.glob("test_*.py")):
-        text = path.read_text(encoding="utf-8")
-        if "event_generate" not in text and "withdraw=False" not in text:
-            continue
-        if "mapped_windows" not in text:
-            offenders.append(path.name)
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        lookup = {**shared, **module_functions(tree)}
+        for node in test_functions(tree):
+            if not needs_a_mapped_window(node, lookup):
+                continue
+            if "mapped_windows" not in fixture_names(node):
+                offenders.append(f"{path.name}::{node.name}")
     assert not offenders, (
-        "these files drive real Tk events but no test in them requests the "
+        "these tests generate a real Tk event and then pump the event loop, "
+        "or ask for a window that is not withdrawn, without requesting the "
         f"mapped_windows fixture, so the suite will hang: {offenders}"
+    )
+
+def test_the_mapped_window_detector_asks_for_the_pair_not_the_token():
+    """The guard above is only as good as what it counts as the hazard.
+
+    Purpose: its predecessor was a substring search, and it was wrong in both
+             directions — a false demand on a `<Configure>` that cannot hang,
+             and a false clearance wherever the word appeared in a comment or
+             in another guard's own source. Replacing it with a detector moves
+             that risk into the detector, so the detector gets the assertions:
+             an exact set over a synthetic module, one arm per way the old
+             check could be fooled.
+    Spec:    BACKLOG.md MOD-A2
+    Tests:   this test
+
+    An exact set, not a membership check per arm: an arm that stops being
+    detected has to turn the set red, and so does a new false positive.
+    """
+    import ast
+    import textwrap
+
+    from tests.display_capabilities import (
+        module_functions,
+        needs_a_mapped_window,
+        test_functions,
+    )
+
+    source = textwrap.dedent('''
+        def _click(widget):
+            widget.event_generate("<Button-1>")
+
+        def _pump(root):
+            root.update()
+
+        def a_mapped_fixture():
+            make_screen(withdraw=False)
+
+        def test_pair_in_the_body(root):
+            root.event_generate("<Button-1>")
+            root.update()
+
+        def test_an_event_with_no_pump(frame):
+            frame.event_generate("<Configure>")
+            assert frame.fitted == 1
+
+        def test_the_pair_through_helpers(root):
+            _click(root)
+            _pump(root)
+
+        def test_a_dict_update_is_not_a_pump(frame):
+            frame.event_generate("<Configure>")
+            seen = {}
+            seen.update({"a": 1})
+
+        def test_update_idletasks_is_not_a_pump(frame):
+            frame.event_generate("<Configure>")
+            frame.update_idletasks()
+
+        def test_a_pump_with_no_event(root):
+            root.update()
+
+        def test_a_window_asked_for_on_purpose(a_mapped_fixture):
+            assert True
+
+        class TestReachedThroughSelf:
+            def helper(self, widget):
+                widget.event_generate("<Button-1>")
+                widget.update()
+
+            def test_a_method_calling_its_own_helper(self, widget):
+                self.helper(widget)
+    ''')
+
+    tree = ast.parse(source)
+    lookup = module_functions(tree)
+    tripped = {node.name for node in test_functions(tree)
+               if needs_a_mapped_window(node, lookup)}
+
+    assert tripped == {
+        "test_pair_in_the_body",
+        "test_the_pair_through_helpers",
+        "test_a_window_asked_for_on_purpose",
+        "test_a_method_calling_its_own_helper",
+    }, (
+        "the detector read the synthetic module as "
+        f"{sorted(tripped)}; a test it stops seeing hangs the suite, and one "
+        "it wrongly sees is a window on the user's screen for nothing"
     )
 
 

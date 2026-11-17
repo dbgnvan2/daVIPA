@@ -120,3 +120,148 @@ def require(attribute: str) -> None:
             "reading it back measures the display rather than the code "
             "(CI's Xvfb has no window manager for -topmost, and reports "
             "-alpha only once a window is mapped)")
+
+
+#: The attribute call that posts a real Tk event into the queue.
+_EVENT_CALL = "event_generate"
+
+#: The pump that waits for that queue to drain. ``update_idletasks`` is a
+#: different attribute and is deliberately not here: it runs idle tasks only,
+#: does not wait on the event queue, and so does not deadlock on a withdrawn
+#: window -- which is why the ``<Configure>`` tests that use it are safe.
+_PUMP_CALL = "update"
+
+#: Passing this to a helper is a test saying outright that it wants a window on
+#: the screen, whether or not it then drives events through it.
+_ON_PURPOSE = "withdraw=False"
+
+
+def _markers(func) -> set:
+    """What one function body does that bears on needing a mapped window.
+
+    Returns a subset of ``{_EVENT_CALL, _PUMP_CALL, _ON_PURPOSE}``.
+
+    ``update`` counts only when called with no arguments at all. ``d.update(
+    {...})`` on a plain dict is the same attribute name and has nothing to do
+    with Tk; the no-argument form is what a window pump looks like and what a
+    dict update essentially never does. A false positive here is a guard
+    failure naming a specific test, not a silent pass, so the narrowing errs in
+    the direction that stays visible.
+    """
+    import ast
+
+    found = set()
+    for node in ast.walk(func):
+        if not isinstance(node, ast.Call):
+            continue
+        if isinstance(node.func, ast.Attribute):
+            if node.func.attr == _EVENT_CALL:
+                found.add(_EVENT_CALL)
+            elif (node.func.attr == _PUMP_CALL
+                    and not node.args and not node.keywords):
+                found.add(_PUMP_CALL)
+        for keyword in node.keywords:
+            if (keyword.arg == "withdraw"
+                    and isinstance(keyword.value, ast.Constant)
+                    and keyword.value.value is False):
+                found.add(_ON_PURPOSE)
+    return found
+
+
+def _reachable(func, lookup) -> set:
+    """``_markers`` for this function and everything it reaches in ``lookup``.
+
+    A test rarely generates the event itself: it calls a ``_click`` or
+    ``_press_target`` helper, or takes a fixture that maps the window. Both are
+    followed -- bare calls by name, and requested fixtures by parameter name,
+    which is the same thing at the AST level.
+    """
+    seen, todo, markers = set(), [func.name], set()
+    while todo:
+        name = todo.pop()
+        if name in seen or name not in lookup:
+            continue
+        seen.add(name)
+        node = lookup[name]
+        markers |= _markers(node)
+        todo.extend(bare_calls(node))
+        todo.extend(fixture_names(node))
+    return markers
+
+
+def bare_calls(func) -> set:
+    """The helper call sites in this body, by the name they resolve against.
+
+    Plain ``helper(...)`` calls, and ``self.helper(...)`` -- some of this
+    repo's tests are methods on a class, and a helper reached through ``self``
+    is the same call site written differently.
+    """
+    import ast
+
+    names = set()
+    for node in ast.walk(func):
+        if not isinstance(node, ast.Call):
+            continue
+        if isinstance(node.func, ast.Name):
+            names.add(node.func.id)
+        elif (isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "self"):
+            names.add(node.func.attr)
+    return names
+
+
+def module_functions(tree) -> dict:
+    """name -> node for every function in a module, nested ones included.
+
+    Keyed by bare name, which is what a call site gives us. Module level wins
+    a collision with a method of the same name: resolving a helper to the
+    wrong body of the same name can only widen what the caller sees, and a
+    widened answer here is a guard failure naming a test, never a silent pass.
+    """
+    import ast
+
+    nested = {node.name: node for node in ast.walk(tree)
+              if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    top = {node.name: node for node in tree.body
+           if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    return {**nested, **top}
+
+
+def test_functions(tree) -> list:
+    """Every ``test_*`` function in a module, methods on a class included."""
+    import ast
+
+    return [node for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name.startswith("test_")]
+
+
+def needs_a_mapped_window(func, lookup) -> bool:
+    """Would this test deadlock, or show a window, on a withdrawn root?
+
+    Two ways, and they are different hazards sharing one fixture:
+
+    - ``event_generate`` **and** a bare ``update()`` somewhere it reaches. The
+      pump waits for an event queue that a withdrawn window never drains, so
+      the test hangs rather than fails, and a hung suite names no test.
+    - ``withdraw=False``, which is a test asking for a real window outright.
+
+    ``event_generate`` on its own is not either of them. Tk delivers a
+    generated event straight to the binding, so a test that generates one and
+    then asserts on what the handler did -- without pumping -- runs fine
+    withdrawn. The file-level predecessor of this check did not make that
+    distinction and so failed ``test_scheduler_column_resize.py`` for a
+    ``<Configure>`` that cannot hang, while clearing
+    ``test_screen_resize_spc.py`` and ``test_unified_panel_design.py``, which
+    do the same thing, because the token appeared somewhere else in those
+    files (MOD-A2, 2026-11-16).
+
+    Not covered: a helper imported from another test module. ``lookup`` is
+    built from the test's own module and ``conftest.py``, which is where this
+    repo's shared fixtures live; a helper reached through an import would be
+    missed, and the hang would be found by waiting for a timeout.
+    """
+    markers = _reachable(func, lookup)
+    return ((_EVENT_CALL in markers and _PUMP_CALL in markers)
+            or _ON_PURPOSE in markers)
