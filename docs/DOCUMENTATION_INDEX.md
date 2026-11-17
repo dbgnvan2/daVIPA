@@ -1347,8 +1347,8 @@ reads them. The `Spec:` docstrings in `src/getmoredone/branding.py` and
 
 The project board status vocabulary - Active, Pending, Canceled, Completed,
 with `canceled` new (`SVU-M1`, `SVU-M2`) - and the Projects screen's right-hand
-panel rebuilt in the same batch (`LRP-A1` - `LRP-C1`). Built 2026-11-16: 49 of
-49 criteria `done`, each with its test named in the spec's table. Records the
+panel rebuilt in the same batch (`LRP-A1` - `LRP-C1`). Built 2026-11-16: 52 of
+52 criteria `done`, each with its test named in the spec's table. Records the
 decision that the action item vocabulary (`open` / `completed` / `canceled`)
 stays separate and unchanged, and that `project_boards` is rebuilt on open to
 widen its status `CHECK`. `SVU-M3` is the sweep's finding that canceling a

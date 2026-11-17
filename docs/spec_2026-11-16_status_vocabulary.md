@@ -96,9 +96,14 @@ Two more came out of the sweep over this batch:
 The "already migrated?" question is answered from the matched `CHECK`, not the
 whole schema text, so a comment that mentions `'canceled'` cannot make an
 un-migrated database skip the rebuild. The pattern is case-insensitive and
-tolerates a quoted column name. The fallback warning is anchored on the
-`status` column, so a `CHECK(length(status) > 0)` is not mistaken for a
-vocabulary constraint and warned about on every launch. The copy quotes its
+tolerates a quoted column name. The fallback warning is anchored on
+`status` being *compared* -- preceded by nothing word-like and followed by
+`IN`, `=`, `<>` or `!=`. A `CHECK(length(status) > 0)` is therefore not
+mistaken for a vocabulary constraint and warned about on every launch, while
+`CHECK (title <> '' AND status IN (...))` and `CHECK(status = 'active' OR
+...)` -- both real constraints the splice cannot widen, so `canceled` will not
+store -- are reported rather than passed over in silence. An earlier anchor
+required `status` to come first inside the `CHECK` and lost both. The copy quotes its
 column names, since `action_items` already carries one called `group`.
 
 No row's `status` value is rewritten, in any table.
@@ -131,10 +136,25 @@ board -- which the query could not return -- never reached it. It passes
 is offered. The two `drag_schedule.py` callers correctly leave it out: a
 canceled project should not be schedulable.
 
-The Status combobox is free-text and `create_project_board` /
-`update_project_board` do not gate what they are handed, so the editor clamps
-a typed value to `ProjectBoardStatus.ALL`. The ungated writers themselves are
-`SVU-A4`.
+The Status combobox is free-text (`combo_box_style()` sets colours, not
+`state`) and `create_project_board` / `update_project_board` do not gate what
+they are handed, so the editor checks the typed value against
+`ProjectBoardStatus.ALL`. It **refuses** an unknown one, naming the four
+words, the way the invalid Annual Plan Element check three lines above it
+does. A clamp to `active` shipped first and was worse than the
+`IntegrityError` it replaced: it moved a completed project into the active
+group *and* ran on into the `completed_at` reset below, discarding the
+project's completion date, with nothing said. The only silent normalisation in
+this repo, `models.BlockType.normalize`, is scoped by its docstring to
+*reading stored rows*. Case is folded before the test, because `Completed` is
+what the board's own buttons and `docs/USER_GUIDE.md` show the user while the
+dropdown's values are lowercase. The ungated writers themselves are `SVU-A4`.
+
+`set_board_status` makes the same distinction the manager cannot: it checks the
+vocabulary itself, so a `False` from the manager now means only *no row
+matched*. That is a board another screen deleted, and the screen refreshes it
+away -- a ghost card left in place fails identically on every further click,
+under a notice describing a project the user can still see.
 
 The three board filters sit **left** of the toolbar's spacer column. Right of
 it the new box joins the size controls in the wrapped second row and pushes it
@@ -215,14 +235,17 @@ Code: `screens/project_boards.py`.
 | SVU-M3 | Every status in the vocabulary can be set | `test_svum3_every_board_status_can_be_set` |
 | SVU-M3 | An unknown board status is still refused | `test_svum3_an_unknown_board_status_is_refused` |
 | SVU-M3 | A canceled board is out of the default list and reachable | `test_svum3_a_canceled_board_is_hidden_but_reachable` |
-| SVU-M3 | A refused status change is reported, not redrawn | `test_svum3_a_refused_board_status_is_reported_not_swallowed` |
+| SVU-M3 | An unknown status is refused, with no redraw | `test_svum3_an_unknown_status_is_refused_without_a_redraw` |
+| SVU-M3 | A board deleted elsewhere is refreshed away | `test_svum3_a_board_deleted_elsewhere_is_refreshed_away` |
 | SVU-M3 | The toolbar offers Show Canceled | `test_svum3_the_toolbar_offers_show_canceled` |
-| SVU-M3 | A refused change is reported on the notice line, not a dialog | `test_svum3_a_refused_board_status_is_reported_not_swallowed` |
+| SVU-M3 | A refused change is reported on the notice line, not a dialog | `test_svum3_an_unknown_status_is_refused_without_a_redraw` |
 | SVU-M3 | A stale board id is not reported as applied | `test_svum3_a_stale_board_id_is_not_reported_as_applied` |
-| SVU-M3 | A typed status cannot reach the writer | `test_svum3_a_typed_status_cannot_reach_the_writer` |
+| SVU-M3 | A typed status is refused, and `completed_at` survives | `test_svum3_a_typed_status_is_refused_not_corrected` |
+| SVU-M3 | A capitalised status is accepted, not refused | `test_svum3_a_capitalised_status_is_accepted` |
 | SVU-M3 | The picker keeps the item's own canceled project | `tests/test_item_editor_project_link.py::test_svum3_current_project_is_listed_even_when_canceled` |
 | SVU-M3 | The row left of the spacer fits the default window | `tests/test_screen_resize_spc.py::test_spcs3_the_unwrapping_row_fits_the_default_window` |
 | SVU-M2 | A `CHECK(length(status) > 0)` does not warn every launch | `test_svum2_a_length_check_does_not_warn_every_launch` |
+| SVU-M2 | A vocabulary `CHECK` the splice cannot widen warns | `test_svum2_an_unwidenable_vocabulary_check_warns` |
 
 ## 5. Known gaps
 
@@ -237,8 +260,9 @@ Code: `screens/project_boards.py`.
   ever shipped. Filed as `SVU-A3`, whose fix is the
   `weekly_tactic_migration_report` shape this file already uses twice.
 - **`create_project_board` and `update_project_board` do not validate
-  `status`.** The editor clamps before calling them, so nothing reaches them
-  unvalidated today, but the gate is in the caller rather than the writer.
+  `status`.** Both callers that can produce an arbitrary value -- the editor
+  dialog and `set_board_status` -- refuse it first, so nothing reaches them
+  unvalidated today, but the gate is in the callers rather than the writer.
   Filed as `SVU-A4`.
 - **The pragma read-back before the destructive half has no test**, by
   construction: its one reachable trigger is refused earlier, and any other

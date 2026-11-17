@@ -22,13 +22,24 @@ exact allowlist of two platform dialogs — and that the same vanishing-project
 bug survived in the item editor's project picker, which could not keep its
 `PL1` promise for a canceled board. Both fixed.
 
-Fifteen new guards across the two fix rounds, each mutation-proved. Two
+Twenty new guards across the three fix rounds, each mutation-proved. Two
 guards written during this work turned out not to pin what they claimed: one
 passed with the method stubbed out, the other locked in place the dialog
 MOD-M2 forbids. Both rewritten. A third, for the pragma read-back, was deleted
-rather than kept, because no mutation of that branch is observable. Spec and criteria:
+rather than kept, because no mutation of that branch is observable.
+
+A cold pass over the second round's fixes found one of them worse than the bug
+it replaced. Clamping a typed project status to `active` stopped the
+`IntegrityError`, but it also fell through to the `completed_at` reset below
+and discarded a completed project's completion date, saying nothing. The
+editor refuses an unknown status now, and folds case first so `Completed` --
+the spelling the board's own buttons use -- is accepted. The same pass found
+`set_board_status` giving one message to two different failures, so a card for
+a board deleted on another screen stayed on the board; and the warning anchor
+from the second round excluding two real constraint shapes along with the one
+it meant to exclude. Spec and criteria:
 [`docs/spec_2026-11-16_status_vocabulary.md`](docs/spec_2026-11-16_status_vocabulary.md),
-49 of 49.
+52 of 52.
 
 ## A project can be canceled, and the Projects panel rebuilt (2026-11-16)
 

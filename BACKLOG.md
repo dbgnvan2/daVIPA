@@ -61,8 +61,9 @@ in-code as "a large data change is never silent (P2)": a
 `set_project_board_status` validates against `ProjectBoardStatus.ALL`, but the
 two writers the project editor uses take whatever they are handed, and the
 editor's Status combobox is free-text (`combo_box_style()` sets colours, not
-`state`). The editor clamps to the vocabulary before calling them, so nothing
-unvalidated reaches them today — but the gate is in the caller, which is what
+`state`). Both callers that can produce an arbitrary value — the editor
+dialog and the screen's `set_board_status` — refuse one first, so nothing
+unvalidated reaches them today, but the gate is in the callers, which is what
 let `set_project_board_status` fall behind the vocabulary in the first place
 (global rule 8). Validate in the writers, and consider `state="readonly"` on
 the combobox.

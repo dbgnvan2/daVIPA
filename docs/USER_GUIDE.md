@@ -261,7 +261,8 @@ Note actions:
 
 Filters:
 - **Toolbar wrap** — What: The Note Size slider, Compact Height and the hint line sit at the toolbar's right-hand edge, and on a narrow window they move to a second toolbar row; the search row and the multi-link warning stay on their own rows. Narrower still than the second row needs, they clip again; there is no minimum window size. Why: Reach every control at any window size.
-- **Show Pending / Show Complete / Show Canceled** — What: Toggles those project states onto the board. Why: Review inactive work without mixing it into the default active board. A project set to Canceled in its editor leaves the board, and Show Canceled is how you find it again.
+- **Show Pending / Show Complete / Show Canceled** — What: Toggles those project states onto the board. Why: Review inactive work without mixing it into the default active board. A project set to Canceled in its editor leaves the board, and Show Canceled is how you find it again. An action item already filed under that project still lists it in the item's own project picker, so the item's filing never disappears.
+- **Refusals appear on the screen's notice line**, under the board, rather than in a pop-up dialog. A Status the editor does not recognise is refused and names the four valid values; it is not quietly changed to Active.
 
 #### Project detail panel (right side)
 

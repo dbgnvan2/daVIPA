@@ -3,7 +3,7 @@
 **Date:** 2026-11-17 **Batch:** `f136044`..`0a10162`
 **Spec:** [`docs/spec_2026-11-16_status_vocabulary.md`](../../spec_2026-11-16_status_vocabulary.md)
 
-The batch's 49 criteria are green under pytest, including widget-level checks
+The batch's 52 criteria are green under pytest, including widget-level checks
 that build the real panel. What pytest does **not** do is launch the app
 against the real database, and this session does not drive the machine. So the
 list below is for a human at the keyboard.
@@ -42,7 +42,12 @@ holds the database lock.
     project field: the project is still listed, with the tick on it. (It was
     not, until the second review pass.)
 11. In the project editor, type a nonsense status into the Status box and
-    save: the project comes back Active rather than raising.
+    save: the save is refused, the notice under the form names the four valid
+    words, and the project keeps the status it had. On a **completed** project
+    this is the one that matters -- an earlier build quietly made it Active
+    and discarded its completion date.
+11a. Type `Completed` with a capital C and save: it is accepted, because that
+    is the spelling the board's own buttons use.
 
 ## The right-hand panel
 
