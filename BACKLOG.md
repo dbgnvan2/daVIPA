@@ -56,6 +56,54 @@ rather than fixed. The fix is the shape this file already uses twice —
 in-code as "a large data change is never silent (P2)": a
 `board_status_migration_report` attribute set on every exit path.
 
+A cold pass on 2026-11-17 found the warn-vs-debug split inside that first exit
+also decoupled from the `CHECK` body: `compared` and `\bCHECK\b` are searched
+over the whole `CREATE` text and nothing ties the two hits to one constraint.
+Three shapes, each reproduced against a real `DatabaseManager` launch —
+`CHECK(upper(status) IN (...))` is silent where it must warn (`canceled` does
+not store), while a `--` comment reading `status = 'active'` and a generated
+column `AS (status = 'completed')` each warn on every launch where they must
+not. None is a shape this app produces; the whole branch is unreachable for
+any database a released version created, because `project_boards` has carried
+`CHECK(status IN (...))` since `77fd093`. The report attribute above makes the
+split moot, so it is one fix, not two.
+
+### SVU-A5 — `completed_at` is re-stamped, and discarded, with no notice (medium)
+
+`db_manager_project_boards.py:76` sets `completed_at = now()` when the status
+becomes `completed` and `None` otherwise, unconditionally. Pre-dates the
+status vocabulary batch (`e906e21`, 2026-03-20) and found by the cold pass
+over its last fix round (global rule 10: flagged, not swept into that diff).
+
+Two consequences, both reproduced by driving the real screen:
+
+- The ✓ button is drawn on **every** card, completed ones included, and
+  `project_boards.py` puts completed boards in `board_rows` whenever Show
+  Completed is ticked. One click on an already-completed card replaces its
+  completion date with today's and says nothing.
+- Any move off `completed` — the pending icon, or the editor — discards the
+  date outright. It cannot be recovered; clicking ✓ again stamps today.
+
+The editor's own path disagrees with the manager's: `project_boards.py:288`
+guards with `and not board.completed_at`, so it preserves an existing stamp
+where the manager overwrites it. Decide which is right (preserving is the more
+defensible: the field records when the work finished, not when the button was
+last pressed), make both paths agree, and surface the change (P2) if a date is
+ever deliberately cleared. The editor's `elif` that nulls it is the same line
+either way.
+
+### SVU-A6 — `update_project_board` does not check the row count (low)
+
+The same P6/P42 hardening the vocabulary batch applied to
+`set_project_board_status` — report `cursor.rowcount == 1` rather than the
+fact that a statement ran — is missing from `update_project_board`
+(`db_manager_project_boards.py:39-53`), which is the project editor's writer.
+It returns nothing, so an edit against a board deleted meanwhile is lost in
+silence. Near-unreachable in-app: the editor is `grab_set()` modal and
+`delete_project_board` has one caller on the same screen, so it needs a second
+process. Same class, same file, left out of that batch deliberately (global
+rule 10); fix with its siblings (global rule 5).
+
 ### SVU-A4 — `create_project_board` / `update_project_board` do not gate status (low)
 
 `set_project_board_status` validates against `ProjectBoardStatus.ALL`, but the

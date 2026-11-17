@@ -240,7 +240,7 @@ Code: `screens/project_boards.py`.
 | SVU-M3 | The toolbar offers Show Canceled | `test_svum3_the_toolbar_offers_show_canceled` |
 | SVU-M3 | A refused change is reported on the notice line, not a dialog | `test_svum3_an_unknown_status_is_refused_without_a_redraw` |
 | SVU-M3 | A stale board id is not reported as applied | `test_svum3_a_stale_board_id_is_not_reported_as_applied` |
-| SVU-M3 | A typed status is refused, and `completed_at` survives | `test_svum3_a_typed_status_is_refused_not_corrected` |
+| SVU-M3 | A typed status is refused, and the board it was typed into is left alone | `test_svum3_a_typed_status_is_refused_not_corrected` |
 | SVU-M3 | A capitalised status is accepted, not refused | `test_svum3_a_capitalised_status_is_accepted` |
 | SVU-M3 | The picker keeps the item's own canceled project | `tests/test_item_editor_project_link.py::test_svum3_current_project_is_listed_even_when_canceled` |
 | SVU-M3 | The row left of the spacer fits the default window | `tests/test_screen_resize_spc.py::test_spcs3_the_unwrapping_row_fits_the_default_window` |

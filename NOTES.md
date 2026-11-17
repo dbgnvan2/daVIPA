@@ -37,7 +37,21 @@ the spelling the board's own buttons use -- is accepted. The same pass found
 `set_board_status` giving one message to two different failures, so a card for
 a board deleted on another screen stayed on the board; and the warning anchor
 from the second round excluding two real constraint shapes along with the one
-it meant to exclude. Spec and criteria:
+it meant to exclude.
+
+A second cold pass, over those three fixes, found the guard for the first of
+them carrying two assertions that could not fail: they read the row back from
+the database, and `save()` writes nothing -- it mutates the board and hands it
+to `edit_project`. The spec's criterion named that test for "`completed_at`
+survives", so half of it had no evidence behind it. Asserted on the board
+object now, and the criterion says what is actually guarded. The same pass
+turned up two pre-existing defects in `set_project_board_status` and
+`update_project_board`, filed as `SVU-A5` and `SVU-A6` rather than swept into
+this batch (global rule 10). `SVU-A5` is worth reading: the ✓ button on an
+already-completed card replaces its completion date with today's, and the
+editor and the manager disagree about whether an existing stamp is preserved.
+
+Spec and criteria:
 [`docs/spec_2026-11-16_status_vocabulary.md`](docs/spec_2026-11-16_status_vocabulary.md),
 52 of 52.
 
