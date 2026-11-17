@@ -39,7 +39,7 @@ Code: `models.py`, `validation.py`, `screens/project_boards.py`.
 when its `CHECK` does not yet allow `'canceled'` — SQLite cannot alter a
 `CHECK` in place.
 
-Four decisions in that rebuild:
+Five decisions in that rebuild:
 
 - It widens the table's **own** `CREATE TABLE` text from `sqlite_master` by
   regex, not a second hand-written schema — a database old enough to need this
@@ -50,6 +50,15 @@ Four decisions in that rebuild:
 - It is idempotent, and on a fresh database it does nothing —
   `_run_migrations` runs before the table is created, and its `CREATE TABLE`
   statement already carries the widened constraint.
+- Its `finally` rolls back before restoring `PRAGMA foreign_keys = ON`.
+  The `INSERT` opens a transaction, and the pragma is silently ignored while
+  one is open, so without the rollback a rebuild that raised part-way would
+  leave enforcement off for the life of the connection and the next board
+  delete would orphan its items and notes instead of cascading them.
+- A table whose `status` column was added by `ALTER TABLE ... ADD COLUMN`
+  carries no `CHECK` at all. That is a normal state with nothing to widen, so
+  it returns at debug level; the warning is kept for a `CHECK` that genuinely
+  could not be parsed.
 - It is called from `_run_migrations`, which runs **before**
   `initialize_schema`'s `CREATE INDEX IF NOT EXISTS` statements. That ordering
   is what puts `idx_project_boards_status` and `idx_project_boards_ape` back
@@ -100,6 +109,8 @@ Code: `screens/project_boards.py`.
 | SVU-M2 | The rebuild keeps every board row | `test_svum2_rebuild_keeps_existing_boards` |
 | SVU-M2 | The rebuild leaves item/note status values alone | `test_svum2_rebuild_leaves_item_status_alone` |
 | SVU-M2 | The rebuild does not cascade the notes away | `test_svum2_rebuild_keeps_the_notes_linked_to_a_board` |
+| SVU-M2 | A failed rebuild still leaves foreign keys on | `test_svum2_a_failed_rebuild_leaves_foreign_keys_on` |
+| SVU-M2 | A CHECK-less table is left alone, and does not warn every launch | `test_svum2_a_check_less_table_is_left_alone_without_warning` |
 | SVU-M2 | The rebuild leaves the board indexes in place | `test_svum2_rebuild_leaves_the_board_indexes_in_place` |
 | SVU-M2 | Foreign keys are on again afterwards | `test_svum2_foreign_keys_are_on_again_after_the_rebuild` |
 | SVU-M2 | A second open changes nothing | `test_svum2_migration_is_idempotent` |
