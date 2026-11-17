@@ -337,6 +337,16 @@ status line rather than the archived toast, and the two-phase boundary.
 **Approved 2026-11-16. Phase 1 (MOD-M1 to M4) built; phase 2 (MOD-M5, M6) not
 started.**
 
+### docs/unused-docs/changes/2026-11-16-mod-a2-mapped-window-guard.md
+
+Handoff note for MOD-A2: the mapped-window guard was a file-level substring
+search and was wrong in both directions — red on a `<Configure>` that cannot
+hang, and clearing two files that do the same thing, one of them on a match
+inside another guard's own source. It is now a per-test AST detector in
+`tests/display_capabilities.py`. Holds the measurement that chose the shape (5
+tests need a mapped window for the event hazard, all 5 already asked) and so
+why the documented count stays 29. **Closed 2026-11-16.**
+
 ### docs/unused-docs/changes/2026-11-16-modeless-notices-phase1.md
 
 Handoff note for MOD phase 1: what the shared notice line is, why a label

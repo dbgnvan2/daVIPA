@@ -68,29 +68,6 @@ from a drag release).
 
 ## Found by the MOD phase 1 sweep (filed 2026-11-16)
 
-### MOD-A2 — a mapped-window guard is red on `main` (medium)
-
-`tests/test_tk_offscreen.py::test_every_test_that_needs_a_mapped_window_asks_for_one`
-fails. `tests/test_scheduler_column_resize.py` calls
-`event_generate("<Configure>")` and no test in that file requests the
-`mapped_windows` fixture, which that guard reads as "the suite will hang".
-It arrived with `e35fc1d` (the LRP batch) and is already on `main`, so it is
-not the MOD batch's doing and was not folded into it.
-
-It is a real decision, not a two-line edit, which is why it is filed rather
-than fixed in passing. Either:
-
-- request the `mapped_windows` fixture in `test_scrm4_configure_refits`, which
-  puts a real window on screen and changes the mapped-window count asserted by
-  `tests/test_ci_contract.py` (currently 29, and stated in `CLAUDE.md`'s
-  Commands block); or
-- call the bound `<Configure>` handler directly and lose the proof that the
-  binding exists at all, which is what that test is for.
-
-The guard itself is a blunt source check — it fires on the presence of
-`event_generate` in a file with no `mapped_windows` anywhere in it, not on the
-one call. Whether that is the right shape is the third thing to decide.
-
 ### MOD-A3 — is the notice line on the VPS dialogs actually visible? (medium)
 
 Raised by the pre-push review of MOD phase 1 and **not settled**: the only
