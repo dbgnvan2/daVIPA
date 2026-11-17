@@ -85,9 +85,15 @@ and `CLAUDE.md`, `conftest.py` and `tests/test_ci_contract.py` are untouched.
   `_reachable`, `bare_calls`, `module_functions`, `test_functions`
 - `tests/test_tk_offscreen.py` — the guard rewritten; a new guard on the
   detector; the module docstring now states the fixture's second purpose
-- `BACKLOG.md` — MOD-A2 removed
+- `tests/test_ci_contract.py` — `_mapped_window_test_count` and the
+  both-guards test brought onto the widened reader
+- `tests/test_display_capabilities.py` — the third reader of the fixture
+  request, brought onto the same call
+- `BACKLOG.md` — MOD-A2 removed, MOD-A7 filed
+- `docs/spec_coverage.md`, `docs/DOCUMENTATION_INDEX.md` — the row and the
+  entry for this note
 
-## The cold pass, and what it changed
+## The first cold pass, and what it changed
 
 A `learning-qa` pass over the two commits above, run cold — a fresh reviewer
 with none of the context that wrote them. Four findings, one of them
@@ -157,9 +163,68 @@ count of 29 is named — and mutation F4 below is that scenario made to happen.
   `test_updm71_no_test_here_needs_a_mapped_window` reads
   `[arg.arg for arg in node.args.args]` directly rather than through
   `fixture_names`, so it misses the keyword-only and both mark spellings. It is
-  a file-local assertion of zero, pre-existing, and untouched by this change —
-  the third place this one question is asked. Filed as `BACKLOG.md` MOD-A7
-  rather than swept in.
+  a file-local assertion of zero, pre-existing, and untouched by this change.
+  With the third reader found by the second pass below, it is the fourth place
+  this one question is asked and the only one that does not go through the
+  shared helper at all. Filed as `BACKLOG.md` MOD-A7 rather than swept in.
+
+## The second cold pass, and what it changed
+
+The four fixes above are themselves the least-reviewed code in this change, so
+they got their own cold pass. Three more findings, **every one of them a silent
+pass** -- the direction a hung suite fails in, naming nothing. Each was
+reproduced before being accepted and each is fixed here.
+
+**1 (medium) -- the amended docstring was still wrong, and the hazard it denied
+was real.** The fix for the first pass's finding 1 left `module_functions`
+claiming that a collision on a *callee* "can only widen what the caller sees".
+It is the opposite: the lookup kept one node per name, so the body that lost
+the collision was discarded, markers and all. Reproduced -- a harmless
+module-level `_click` shadowing a hazardous `TestA._click` gave `False` for a
+test that calls it. `module_functions` now returns a **tuple of every body** of
+that name and `_reachable` unions over them, so a collision widens instead of
+narrowing; `merge_functions` does the same when the conftest lookup and the
+module lookup are combined, where `{**a, **b}` had been dropping `a`'s bodies.
+
+This is the second round in which a comment in this module asserted a hazard
+away that took ten lines to reproduce. Both claims are recorded in the
+docstring with their dates, because the comment is what stops the next reader
+looking.
+
+**2 (medium, P5) -- there was a *third* reader of the fixture request, not
+two.** `tests/test_display_capabilities.py:184` calls `fixture_names(node)` on
+its own, and the first pass's widening left it on the narrow call. It would
+have reported a test guarded by a class mark as unguarded -- precisely the
+divergence `tests/display_capabilities.py` exists to prevent, one function
+below the docstring that said there were two. It now passes the enclosing
+chain, like the other two.
+
+Three written claims rested on "two", and all three were corrected in the same
+change: the `fixture_names` docstring, the `docs/spec_coverage.md` row, and
+`BACKLOG.md` MOD-A7's "the third spelling".
+
+**3 (medium) -- a module-level `pytestmark` was invisible.** `usefixtures_names`
+read `decorator_list`, which a `Module` node does not have, so
+`pytestmark = pytest.mark.usefixtures(...)` contributed nothing. **Ten test files
+here already mark a whole file that way**, so this is the house spelling, not a
+corner. Reproduced: a module given a window-mapping fixture by a module mark
+read as needing no window. `usefixtures_names` now reads the assignment, a
+list or tuple of marks included, and `test_functions` puts the module at the
+head of the enclosing chain.
+
+**4 (low) -- a claim in this note was overstated**, and is corrected below:
+mutation 5's redness is not isolated to `DRIVES_REAL_EVENTS`.
+
+**5 (medium, P24) -- found by the gate, not by a reviewer.** Two of the three
+fixes above had no assertion anywhere, and a third was pinned only by accident
+of `ast.walk` order. The mutation gate is what surfaced that, which is the
+argument for running it on a fix batch rather than treating it as ceremony;
+the first attempt's verdicts and what was wrong with each are under
+Verification.
+
+No third review pass. This repo's rule is that a further pass is earned only by
+a high-severity finding, and this one produced mediums; the fixes get the
+mutation gate instead.
 
 ## Verification
 
@@ -187,9 +252,62 @@ count of 29 is named — and mutation F4 below is that scenario made to happen.
      the counter's reader is covered too.
   4. the conftest candidates pointed at a file that does not exist → the new
      assertion fires, rather than the arm reading nothing in silence.
-  5. `_PUMP_CALL` changed to match nothing → `offenders` stays empty and the
-     `DRIVES_REAL_EVENTS` set is what turns it red. Finding 4's scenario,
-     made to happen.
+  5. `_PUMP_CALL` changed to match nothing → red. Finding 4's scenario, made
+     to happen, with one claim corrected: `offenders` does stay empty, but the
+     detector's own guard reddens on the same mutation, so the
+     `DRIVES_REAL_EVENTS` set is *a* thing that catches it and not the only
+     one. What the set uniquely covers is a narrowing the synthetic module has
+     no arm for.
+- Third mutation gate, on the second pass's fixes. **Its first attempt is the
+  reason this batch grew three arms**: it came back three GREEN and one RED,
+  and all four verdicts were wrong in a way worth writing down, because a
+  mutation gate that reports a fix as covered when it is not is the same
+  failure as the guard it is gating.
+  - `M1` kept the LAST body of a colliding name. `ast.walk` happens to yield a
+    class's method after a module-level function of the same name, so the
+    hazardous body survived the mutation and nothing failed. The verbatim
+    original is "one body per name, **module level winning**"; written that
+    way it is red.
+  - `M2` and `M4` were GREEN because nothing asserted on the fixes at all.
+    `merge_functions` had no arm, and the one existing mark arm in the
+    read-back detector's cases spells the mark as a decorator **on the
+    function**, which `decorator_list` carries either way — so putting that
+    reader back on the narrow call could not fail. Three arms added, named
+    below.
+  - `M3` was RED on `AttributeError: 'Module' object has no attribute
+    'decorator_list'`. The mutation made the module branch unreachable and the
+    `else` then ran against a `Module`. A crash is not the guard detecting
+    anything, and counting it as RED is a false pass for the gate itself; the
+    gate now requires the failure to name an assertion, and the mutation
+    leaves the branch running with a name nothing assigns.
+- Third mutation gate, second attempt — baseline green first (13 passed), then
+  **all four RED**, each on a named assertion, each file restored
+  byte-identical:
+  1. `module_functions` back to one body per name with module level winning →
+     the detector's guard fails, having lost
+     `TestCollidingNameHazardous.test_through_a_shadowed_helper`.
+  2. `merge_functions` dropping the earlier lookup's bodies → the new
+     collision assertions fail, in both orders.
+  3. the module mark's name changed to one nothing assigns → the module-mark
+     arm fails. Behavioural, not a crash.
+  4. the third reader back on the narrow call → the two new read-back arms
+     fail.
+- Arms and assertions added for the three unguarded fixes, one per finding:
+  a class-mark and a module-mark read-back case in
+  `tests/test_display_capabilities.py`, and assertions on `merge_functions`
+  and `module_functions` themselves in `tests/test_tk_offscreen.py` — on the
+  functions that resolve a collision, rather than on an arm that happens to
+  exercise one, because which body wins an `ast.walk` collision is incidental.
+- Two failures in the guard run of the three files are **the concurrent
+  session, demonstrated not inferred**:
+  `tests/test_display_capabilities.py::test_cghm43_the_display_dependent_count_is_exact`
+  scans every `tests/test_*.py` from disk at test time, and two of the four
+  files it counts were being rewritten mid-run; computed again on the settled
+  tree it gives `len(asks) == 4` with `asks <= reads`, which is what it
+  asserts. `test_meta_marker_covers_exactly_the_repo_assertion_files` timed out
+  at 300s in a whole-suite collect subprocess, the same contention that timed
+  out three of them earlier the same day, with both runs' pids observed
+  overlapping.
 - Measured, not reasoned: the two withdrawn `<Configure>` tests in
   `tests/test_screen_resize_spc.py` complete in 3.79s rather than hanging,
   which is the premise the whole fix rests on.
@@ -221,6 +339,15 @@ count of 29 is named — and mutation F4 below is that scenario made to happen.
   hardcoded `keyword.arg == "withdraw"` against the constant `False`, so
   editing the string changes nothing, and `withdraw=0` or `withdraw=flag` do
   not match.
+- **An arm that depends on which body wins a collision is not a guard.** The
+  shadowed-helper arm reddens only while `ast.walk` yields the hazardous body
+  last. The assertions on `merge_functions` and `module_functions` do not
+  depend on the order; the arm is kept because it is the shape a real test
+  takes, not because it pins the fix.
+- **`usefixtures(*NAMES)` contributes no names.** The argument is a `Starred`
+  node whose value cannot be resolved from the syntax, so a request written
+  that way is unread — a silent pass. Surfaced rather than handled: nothing in
+  this repo writes it, and resolving it means evaluating the module.
 - **The synthetic module has no arm for a fixture that requests another
   fixture.** The chain is followed by `_reachable`; the depth-2 case is not
   asserted.

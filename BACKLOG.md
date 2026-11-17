@@ -96,7 +96,7 @@ notice line's placement.
 
 ## Found by the MOD-A2 cold pass (filed 2026-11-16)
 
-### MOD-A7 — the third spelling of "does this test ask for a mapped window?" (low)
+### MOD-A7 — the one reader that still asks its own way (low)
 
 `tests/test_unified_panel_design.py:2782`
 `test_updm71_no_test_here_needs_a_mapped_window` reads
@@ -113,10 +113,12 @@ screen on every local run without that guard noticing. The suite-wide count in
 `tests/test_ci_contract.py` would still catch it, which is why this is low.
 
 The fix is to call `fixture_names(node, enclosing)` over
-`display_capabilities.test_functions(tree)`, which is what the two guards in
-`tests/test_tk_offscreen.py` and `tests/test_ci_contract.py` now do. The
-module exists so that one question has one answer; this is the last place that
-asks it its own way.
+`display_capabilities.test_functions(tree)`, which is what the three readers
+in `tests/test_tk_offscreen.py`, `tests/test_ci_contract.py` and
+`tests/test_display_capabilities.py` now do. The module exists so that one
+question has one answer, and this is the fourth place that asks it — the only
+one left that does not go through the shared helper at all, which is also what
+makes it the visible one.
 
 ## Found by the MOD fix-round re-sweep (filed 2026-11-16)
 
