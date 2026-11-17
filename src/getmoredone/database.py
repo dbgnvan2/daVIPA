@@ -887,6 +887,7 @@ class Database:
         Tests:   tests/test_status_vocabulary.py::test_svum2_board_check_accepts_canceled
                  tests/test_status_vocabulary.py::test_svum2_rebuild_keeps_existing_boards
                  tests/test_status_vocabulary.py::test_svum2_migration_is_idempotent
+                 tests/test_status_vocabulary.py::test_svum2_a_failed_rebuild_leaves_foreign_keys_on
         """
         if not self._table_exists(conn, "project_boards"):
             return
@@ -898,7 +899,17 @@ class Database:
             "SELECT sql FROM sqlite_master WHERE type = 'table' "
             "AND name = 'project_boards'"
         ).fetchone()
-        if not sql or "'canceled'" in (sql[0] or ""):
+        create_source = (sql[0] if sql else "") or ""
+        if not create_source or "'canceled'" in create_source:
+            return
+        if "CHECK" not in create_source.upper():
+            # An older database added `status` with
+            # `ALTER TABLE ... ADD COLUMN`, which carries no CHECK at all.
+            # Nothing to widen and 'canceled' is already storable, so this is
+            # a normal state, not the unparseable-constraint case warned about
+            # below -- it must not log on every launch for the rest of time.
+            logger.debug(
+                "SVU-M2: project_boards has no status CHECK; nothing to widen.")
             return
 
         # P4: the replacement table is the existing one with its status CHECK
@@ -908,7 +919,7 @@ class Database:
         create_sql, substitutions = re.subn(
             r"CHECK\s*\(\s*status\s+IN\s*\([^)]*\)\s*\)",
             "CHECK(status IN ('active', 'pending', 'canceled', 'completed'))",
-            sql[0],
+            create_source,
             count=1,
         )
         if substitutions != 1:
@@ -941,6 +952,13 @@ class Database:
             conn.execute("ALTER TABLE project_boards_svu RENAME TO project_boards")
             conn.commit()
         finally:
+            # The INSERT opens a transaction, and `PRAGMA foreign_keys` is
+            # silently ignored while one is open -- so without this rollback a
+            # failure part-way through would leave enforcement OFF for the
+            # life of the connection, and the next board delete would orphan
+            # its items and notes instead of cascading them.
+            if conn.in_transaction:
+                conn.rollback()
             conn.execute("PRAGMA foreign_keys = ON")
 
     def __enter__(self):

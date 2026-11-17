@@ -189,7 +189,7 @@ class ProjectBoardLink:
     url: str
     label: Optional[str] = None
     link_type: str = "url"
-    status: str = "open"
+    status: str = "open"  # M1.A.1 — Open/Completed lifecycle (mirrors action items)
     id: str = field(default_factory=lambda: str(uuid4()))
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
