@@ -390,7 +390,7 @@ def test_svum3_a_board_deleted_elsewhere_is_refreshed_away(
     assert refreshed, "the ghost card has to go, or the next click repeats this"
 
 
-def _editor_stub(db_manager, board, typed):
+def _editor_stub(board, typed):
     """The editor's save path with everything but Status held constant."""
     return SimpleNamespace(
         board=board,
@@ -425,8 +425,7 @@ def test_svum3_a_typed_status_is_refused_not_corrected(db_manager):
     board = ProjectBoard(title="Typed", status=ProjectBoardStatus.COMPLETED)
     board.completed_at = "2026-11-17T09:00:00"
     db_manager.create_project_board(board)
-    stub = _editor_stub(db_manager, db_manager.get_project_board(board.id),
-                        "actve")
+    stub = _editor_stub(db_manager.get_project_board(board.id), "actve")
     stub.set_status = lambda text, kind=None: stub.notices.append((text, kind))
 
     ProjectBoardEditorDialog.save(stub)
@@ -435,10 +434,14 @@ def test_svum3_a_typed_status_is_refused_not_corrected(db_manager):
     assert stub.notices == [
         ("Status must be one of: active, pending, canceled, completed.",
          "error")]
-    stored = db_manager.get_project_board(board.id)
-    assert stored.status == ProjectBoardStatus.COMPLETED
-    assert stored.completed_at == "2026-11-17T09:00:00", (
-        "the clamp used to fall through to active and wipe this")
+    # Asserted on the board object, not on the row. `save()` writes
+    # nothing -- it mutates the board and hands it back through
+    # `self.result`, which `edit_project` then stores -- so reading the row
+    # back here would pass however `save()` behaved. The board is where a
+    # refusal has to leave the old values standing.
+    assert stub.board.status == ProjectBoardStatus.COMPLETED
+    assert stub.board.completed_at == "2026-11-17T09:00:00", (
+        "the clamp fell through to active, and the reset below wiped this")
 
 
 def test_svum3_a_capitalised_status_is_accepted(db_manager):
@@ -450,7 +453,7 @@ def test_svum3_a_capitalised_status_is_accepted(db_manager):
     """
     board = ProjectBoard(title="Typed")
     db_manager.create_project_board(board)
-    stub = _editor_stub(db_manager, db_manager.get_project_board(board.id),
+    stub = _editor_stub(db_manager.get_project_board(board.id),
                         " Completed ")
     stub.set_status = lambda text, kind=None: stub.notices.append((text, kind))
 

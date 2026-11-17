@@ -486,8 +486,11 @@ def test_svum3_a_stale_board_id_is_not_reported_as_applied(tmp_path):
     succeeds, so the row count is what separates applied from accepted.
     """
     manager = DatabaseManager(str(tmp_path / "stale.db"))
-    assert manager.set_project_board_status(
-        "no-such-board", ProjectBoardStatus.COMPLETED) is False
+    try:
+        assert manager.set_project_board_status(
+            "no-such-board", ProjectBoardStatus.COMPLETED) is False
+    finally:
+        manager.close()
 
 
 def test_svum3_an_unknown_board_status_is_refused(tmp_path):
