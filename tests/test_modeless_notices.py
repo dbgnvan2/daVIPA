@@ -594,6 +594,13 @@ def test_modm3_destroy_cancels_a_pending_dismissal(screen):
     assert made._status_dismiss_after is None, (
         "the timer still points at a widget that has gone"
     )
+    # Without this the guard is satisfied by a ``destroy`` that cancels the
+    # dismissal and never calls ``super().destroy()`` -- which would leave
+    # every screen and dialog in the app alive on navigation, a worse fault
+    # than the one above and invisible to the assertion before it.
+    assert not made.winfo_exists(), (
+        "destroy cancelled the timer but did not destroy the widget"
+    )
 
 
 def test_modm2_report_on_does_not_claim_a_write_that_did_not_land(screen):
@@ -631,38 +638,86 @@ def test_modm2_report_on_does_not_claim_a_write_that_did_not_land(screen):
     )
 
 
-SHARED_LABEL_SCREENS = [
-    "weekly_items.py",
-    "ape_assignment.py",
-    "ape_period_view.py",
-    "annual_vision_segments.py",
-]
+def _notice_attr(node: ast.ClassDef, bodies: dict) -> str:
+    """The label attribute this class's own notice contract writes through.
+
+    ``NOTICE_LABEL_ATTR`` defaults to ``status_label`` but ``TimerWindow``
+    overrides it, and that override is the whole reason this cannot be a file
+    list: TimerWindow writes ``self.status_label`` five times and is correct
+    to, because its notice line is ``notice_status_label`` and the label those
+    writes touch is the break banner.
+    """
+    seen = set()
+    pending = [node]
+    while pending:
+        current = pending.pop(0)
+        if current.name in seen:
+            continue
+        seen.add(current.name)
+        for stmt in current.body:
+            if not isinstance(stmt, ast.Assign):
+                continue
+            for target in stmt.targets:
+                if (isinstance(target, ast.Name)
+                        and target.id == "NOTICE_LABEL_ATTR"
+                        and isinstance(stmt.value, ast.Constant)
+                        and isinstance(stmt.value.value, str)):
+                    return stmt.value.value
+        for base in current.bases:
+            name = base.id if isinstance(base, ast.Name) else None
+            if name and name in bodies:
+                pending.append(bodies[name])
+    return "status_label"
 
 
-@pytest.mark.parametrize("name", SHARED_LABEL_SCREENS)
-def test_modm1_a_shared_notice_line_has_exactly_one_writer(name):
-    """No ``self.status_label.configure`` left on a screen that also reports.
+def test_modm1_a_shared_notice_line_has_exactly_one_writer():
+    """No raw write to the label a class reports through.
 
-    These four were given the mixin over a ``status_label`` that already
+    Four screens were given the mixin over a ``status_label`` that already
     carried their own standing content. ``set_status`` sets ``text_color`` and
     a raw ``configure(text=...)`` does not reset it, so a neutral count
     summary written after an error notice rendered in the error colour and
-    stayed that way. Exact count, not a floor: a floor hides the narrowing it
-    was written to catch.
+    stayed that way.
+
+    Stated over the whole tree rather than over a list of the four, because
+    the list was the thing being maintained: the review that produced this
+    guard found the same defect class in files no list named. The invariant is
+    per class and per attribute -- a class that calls ``self.set_status`` must
+    not also write raw to whatever ``NOTICE_LABEL_ATTR`` resolves to for it --
+    so a screen that keeps a second, unrelated label is not caught by it, and
+    a fifth screen that repeats the defect is.
     """
-    path = SRC / "getmoredone" / "screens" / name
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    raw = [node.lineno for node in ast.walk(tree)
-           if isinstance(node, ast.Call)
-           and isinstance(node.func, ast.Attribute)
-           and node.func.attr == "configure"
-           and isinstance(node.func.value, ast.Attribute)
-           and node.func.value.attr == "status_label"
-           and isinstance(node.func.value.value, ast.Name)
-           and node.func.value.value.id == "self"]
-    assert len(raw) == 0, (
-        f"{name} writes its own notice line directly at lines {raw}; route it "
-        "through set_status so the colour and any pending dismissal are reset"
+    bodies = {}
+    for path in sorted(SRC.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.ClassDef):
+                bodies[node.name] = node
+
+    reporters = _classes_calling("set_status")
+    assert reporters, "nothing calls self.set_status; this guard stopped looking"
+
+    offenders = {}
+    for path in sorted(SRC.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef) or node.name not in reporters:
+                continue
+            attr = _notice_attr(node, bodies)
+            raw = [sub.lineno for sub in ast.walk(node)
+                   if isinstance(sub, ast.Call)
+                   and isinstance(sub.func, ast.Attribute)
+                   and sub.func.attr == "configure"
+                   and isinstance(sub.func.value, ast.Attribute)
+                   and sub.func.value.attr == attr
+                   and isinstance(sub.func.value.value, ast.Name)
+                   and sub.func.value.value.id == "self"]
+            if raw:
+                offenders[f"{rel}:{node.name}.{attr}"] = raw
+    assert offenders == {}, (
+        "these classes write the notice line they report through directly; "
+        "route it through set_status so the colour and any pending dismissal "
+        f"are reset: {offenders}"
     )
 
 
@@ -679,38 +734,55 @@ def test_modm1_a_muted_write_takes_the_previous_colour_back_off(screen):
         "muted"), "a neutral summary kept the last notice's colour"
 
 
-DESTROY_AND_REPORT_FILES = [
-    "vps_editors.py",
-    "vps_segment_editor.py",
-    "edit_contact.py",
-]
-
-
-@pytest.mark.parametrize("name", DESTROY_AND_REPORT_FILES)
-def test_modm2_a_dialog_does_not_close_inside_the_try_that_reports_for_it(name):
+def test_modm2_a_dialog_does_not_close_inside_the_try_that_reports_for_it():
     """``self.destroy()`` must not sit in a ``try`` whose handler reports here.
 
     ``messagebox.showerror`` did not need the dialog to still exist; a label on
     the dialog does. With ``destroy()`` inside the ``try``, a TclError out of
     teardown after a save had already succeeded reported "Could not save ..."
     onto a widget on its way out: a false failure, and an invisible one.
+
+    Over the whole tree, and over both spellings of reporting. The first form
+    of this guard named three files and matched ``self.set_status`` only, and
+    the review that followed found three more instances it could not see --
+    in ``calendar_dialog`` and ``item_editor_note_dialogs``, which report by
+    configuring a label directly, and where the swallowed work is a calendar
+    event already booked in Google and a note already written and linked. A
+    guard whose scope is a list is a guard that has to be remembered.
     """
-    path = SRC / "getmoredone" / "screens" / name
-    tree = ast.parse(path.read_text(encoding="utf-8"))
+    def self_calls(nodes, attr):
+        return [n.lineno for body in nodes for n in ast.walk(body)
+                if isinstance(n, ast.Call)
+                and isinstance(n.func, ast.Attribute)
+                and n.func.attr == attr
+                and isinstance(n.func.value, ast.Name)
+                and n.func.value.id == "self"]
 
-    def calls(nodes, attr):
-        return any(isinstance(n, ast.Call)
-                   and isinstance(n.func, ast.Attribute)
-                   and n.func.attr == attr
-                   and isinstance(n.func.value, ast.Name)
-                   and n.func.value.id == "self"
-                   for body in nodes for n in ast.walk(body))
+    def reports_on_self(handler):
+        """self.set_status(...), or self.<label>.configure(...)."""
+        direct = self_calls([handler], "set_status")
+        onto_label = [n.lineno for n in ast.walk(handler)
+                      if isinstance(n, ast.Call)
+                      and isinstance(n.func, ast.Attribute)
+                      and n.func.attr == "configure"
+                      and isinstance(n.func.value, ast.Attribute)
+                      and isinstance(n.func.value.value, ast.Name)
+                      and n.func.value.value.id == "self"]
+        return direct + onto_label
 
-    offenders = [node.lineno for node in ast.walk(tree)
-                 if isinstance(node, ast.Try)
-                 and calls(node.body, "destroy")
-                 and any(calls(h.body, "set_status") for h in node.handlers)]
-    assert offenders == [], (
-        f"{name} closes the dialog inside a try whose except reports on it, "
-        f"at lines {offenders}; move destroy() after the except"
+    offenders = {}
+    for path in sorted(SRC.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Try):
+                continue
+            if not self_calls(node.body, "destroy"):
+                continue
+            reporting = [ln for h in node.handlers for ln in reports_on_self(h)]
+            if reporting:
+                offenders[f"{rel}:{node.lineno}"] = reporting
+    assert offenders == {}, (
+        "these close the dialog inside a try whose except reports on it; "
+        f"move destroy() after the except: {offenders}"
     )
