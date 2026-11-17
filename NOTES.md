@@ -1,3 +1,26 @@
+## The sweep over that batch: three fixes (2026-11-17)
+
+**One line: canceling a project put it beyond the UI's reach, and a failed
+migration could brick the database.**
+
+- A rebuild that failed after its `CREATE` left `project_boards_svu` behind,
+  and every later launch then died on it — a database that could never be
+  opened again. The rebuild is now re-entrant.
+- It also rested on a commit that is a no-op inside
+  `DatabaseManager.transaction()`, which would have let `DROP TABLE
+  project_boards` cascade every item and note away. It refuses that connection
+  and reads the pragma back.
+- `set_project_board_status` silently refused `canceled` and
+  `get_project_boards` could never return it, so a project canceled in the
+  editor vanished for good. There is now a **Show Canceled** box beside Show
+  Pending and Show Complete, and a refusal is reported instead of redrawn as
+  success.
+
+Eleven new guards, each mutation-proved. One of the previous batch's own
+guards turned out to pass with the method stubbed out and was rewritten. Spec
+and criteria: [`docs/spec_2026-11-16_status_vocabulary.md`](docs/spec_2026-11-16_status_vocabulary.md),
+44 of 44.
+
 ## A project can be canceled, and the Projects panel rebuilt (2026-11-16)
 
 **One line: a project board's statuses are Active, Pending, Canceled,

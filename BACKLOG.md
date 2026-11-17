@@ -41,6 +41,17 @@ the `project_boards` `CHECK`, but the board toolbar's one-click buttons are
 still `Set Active` / `Set Pending` / `Complete`. Named here rather than added
 silently to a batch that was about the vocabulary (global rule 10).
 
+### SVU-A3 — a status CHECK the migration cannot parse (low)
+
+`_widen_board_status_check` rewrites `project_boards`'s own `CHECK` by regex.
+Where that pattern does not match, it logs and leaves the table alone — and
+that database then rejects `canceled`, so the failure surfaces later as an
+unhandled `IntegrityError` from the project editor rather than at startup.
+Only a hand-edited database reaches it (`git log -S` shows no such shape has
+ever shipped), which is why it is filed rather than fixed. The fix is either
+to publish the outcome the way `weekly_tactic_migration_report` does, or to
+probe the constraint with a rolled-back insert instead of reading schema text.
+
 ## Recovered from a deleted branch (filed 2026-11-16)
 
 ### MOD-A1 — dialogs that take focus, and the 49 `grab_set` calls (medium)

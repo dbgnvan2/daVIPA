@@ -65,9 +65,53 @@ Five decisions in that rebuild:
   after `DROP TABLE` takes them, so it has its own guard
   (`test_svum2_rebuild_leaves_the_board_indexes_in_place`).
 
+Two more came out of the sweep over this batch:
+
+- **It is re-entrant.** `CREATE TABLE` is DDL in autocommit, durable the
+  moment it runs, so the `finally`'s rollback cannot undo it. A rebuild that
+  failed after it -- a write lock held by the packaged app on the `INSERT` --
+  left `project_boards_svu` on disk, and `sqlite_master` stores a `CREATE`
+  with `IF NOT EXISTS` stripped, so every later launch raised *table
+  project_boards_svu already exists* out of `DatabaseManager.__init__` and
+  that database could never be opened again. It now drops a leftover scratch
+  table first. The early return on a missing `project_boards` is what makes
+  that safe: a scratch table is only ever dropped on a launch where the real
+  one is present, so it can never be the last copy of the data.
+- **It refuses a connection whose commits are deferred.** `PRAGMA
+  foreign_keys = OFF` is ignored while a transaction is open, so the rebuild
+  depends on a commit it does not own -- and inside
+  `DatabaseManager.transaction()` that commit is a no-op, which would leave
+  enforcement ON and let `DROP TABLE project_boards` cascade every item and
+  note away. No caller does that today (both `initialize_schema` callers run
+  at construction); it refuses rather than rest on that holding, reads the
+  pragma back before the destructive half, and uses `force_commit` for the two
+  commits it owns.
+
+The "already migrated?" question is answered from the matched `CHECK`, not the
+whole schema text, so a comment that mentions `'canceled'` cannot make an
+un-migrated database skip the rebuild. The pattern is case-insensitive and
+tolerates a quoted column name.
+
 No row's `status` value is rewritten, in any table.
 
 Code: `database.py`.
+
+**SVU-M3.** A project can be canceled *and found again*.
+
+`set_project_board_status` gated on a hand-written set of three statuses, so it
+silently refused `canceled` once the vocabulary had it, and
+`get_project_boards` could only ever return active, pending and completed. The
+editor could set the status, so a canceled project left the Projects screen and
+nothing brought it back. The gate reads `ProjectBoardStatus.ALL`, the listing
+takes `show_canceled`, the toolbar has a `Show Canceled` box beside the other
+two, and the screen reports a refusal rather than refreshing over a discarded
+`False`.
+
+The three board filters sit **left** of the toolbar's spacer column. Right of
+it the new box joins the size controls in the wrapped second row and pushes it
+28px past the header's width at the default window (SPC-D10).
+
+Code: `db_manager_project_boards.py`, `screens/project_boards.py`.
 
 ## 3. LRP — the right-hand panel
 
@@ -130,13 +174,32 @@ Code: `screens/project_boards.py`.
 | LRP-C1 | Unticking everything shows nothing | `test_lrpc1_unticking_every_box_shows_nothing` |
 | LRP-C1 | An unknown status is surfaced | `test_lrpc1_unknown_status_is_shown` |
 | LRP-C1 | The Completed box also filters the notes | `test_lrpc1_completed_box_also_filters_the_notes` |
+| LRP-C1 | The empty-notes message names a control that exists | `test_lrpc1_the_empty_notes_message_names_a_control_that_exists` |
+| SVU-M2 | A leftover scratch table does not block the next launch | `test_svum2_a_leftover_scratch_table_does_not_block_the_next_launch` |
+| SVU-M2 | A deferred-commit connection is refused | `test_svum2_a_deferred_commit_connection_is_refused` |
+| SVU-M2 | A comment mentioning `canceled` does not skip the rebuild | `test_svum2_a_comment_mentioning_canceled_does_not_skip_the_rebuild` |
+| SVU-M2 | A lowercase `check(status in ...)` is widened too | `test_svum2_a_lowercase_check_is_widened_too` |
+| SVU-M3 | Every status in the vocabulary can be set | `test_svum3_every_board_status_can_be_set` |
+| SVU-M3 | An unknown board status is still refused | `test_svum3_an_unknown_board_status_is_refused` |
+| SVU-M3 | A canceled board is out of the default list and reachable | `test_svum3_a_canceled_board_is_hidden_but_reachable` |
+| SVU-M3 | A refused status change is reported, not redrawn | `test_svum3_a_refused_board_status_is_reported_not_swallowed` |
+| SVU-M3 | The toolbar offers Show Canceled | `test_svum3_the_toolbar_offers_show_canceled` |
 
 ## 5. Known gaps
 
-- **Nothing sets a project to `canceled` from the board list.** The editor's
-  dropdown offers it and the `CHECK` accepts it, but the toolbar's one-click
-  status buttons are still `Set Active` / `Set Pending` / `Complete`. Filed in
-  `BACKLOG.md`.
+- **Nothing sets a project to `canceled` in one click.** The editor's
+  dropdown offers it, the `CHECK` accepts it and `Show Canceled` finds it
+  again, but the toolbar's one-click status buttons are still `Set Active` /
+  `Set Pending` / `Complete`. Filed in `BACKLOG.md`.
+- **A `status` CHECK this cannot parse is left in place with a log line.**
+  That database then rejects `canceled`, and the failure surfaces later as an
+  unhandled `IntegrityError` from the editor rather than at startup. Only a
+  hand-edited database reaches it -- no such shape has ever shipped -- so it is
+  filed as `SVU-A3` rather than fixed here.
+- **The pragma read-back before the destructive half has no test**, by
+  construction: its one reachable trigger is refused earlier, and any other
+  connection would still roll back in the `finally`, so a guard could only ever
+  pass. The reason is recorded at the branch.
 - **The `Canceled` filter box has nothing to find on most boards** until an
   item is canceled somewhere. `complete_action_item` is the only writer of a
   terminal item status today; a "Cancel" action on an item is follow-up work,

@@ -1,9 +1,9 @@
 # Manual check: SVU/LRP, the Projects right-hand panel
 
-**Date:** 2026-11-17 **Batch:** `f136044`..`5d9c05c`
+**Date:** 2026-11-17 **Batch:** `f136044`..`bd510a2`
 **Spec:** [`docs/spec_2026-11-16_status_vocabulary.md`](../../spec_2026-11-16_status_vocabulary.md)
 
-The batch's 33 criteria are green under pytest, including widget-level checks
+The batch's 44 criteria are green under pytest, including widget-level checks
 that build the real panel. What pytest does **not** do is launch the app
 against the real database, and this session does not drive the machine. So the
 list below is for a human at the keyboard.
@@ -31,25 +31,32 @@ holds the database lock.
 5. Set one to **canceled** and save. It saves without an error — before this
    batch the table's CHECK constraint rejected that value.
 6. Reopen the editor: it still reads canceled.
+7. The project has left the board. Tick **Show Canceled** in the toolbar: it
+   is back. Untick it: gone again. This is the step that matters most — before
+   the sweep fix there was no way back.
+8. With it showing, set it Active from its tile and confirm it stays visible
+   once Show Canceled is unticked again.
+9. Narrow the window until the toolbar wraps: Show Pending / Show Complete /
+   Show Canceled stay on the first row and only the size controls wrap.
 
 ## The right-hand panel
 
-7. Click a project. The header line reads `Action Items`, then the count,
+10. Click a project. The header line reads `Action Items`, then the count,
    then three checkboxes — **Open**, **Completed**, **Canceled** — all
    left-justified on one line. Open is ticked, the other two are not.
-8. There is no `Next Step:` line in the detail header above it, and no
+11. There is no `Next Step:` line in the detail header above it, and no
    separate right-justified `Show Completed` row.
-9. The count reads `N items`, or `N shown • M hidden` when something is
+12. The count reads `N items`, or `N shown • M hidden` when something is
    filtered out.
-10. Select All is the unlabelled checkbox at the left of the column heading
+13. Select All is the unlabelled checkbox at the left of the column heading
     strip, directly above each row's own checkbox — the two line up.
-11. Tick **Completed**: completed items appear, and completed Project Notes
+14. Tick **Completed**: completed items appear, and completed Project Notes
     appear too. Untick it: both go away.
-12. Untick all three: the list is empty and says how many are hidden.
-13. Project Notes shows only its header line — `▸ Project Notes` and the
+15. Untick all three: the list is empty and says how many are hidden.
+16. Project Notes shows only its header line — `▸ Project Notes` and the
     count. Click the triangle: the notes list opens. Click again: it folds.
     The count stays visible either way.
-14. Resize the window: the four item columns still fill the width and the
+17. Resize the window: the four item columns still fill the width and the
     heading strip still sits over the rows (Select All replaced one of
     `build_header`'s heading labels, so this is the check that it did not
     disturb the column widths).
@@ -59,5 +66,6 @@ holds the database lock.
 - The label is **Canceled**, one `l`. That is the stored value and the
   spelling used everywhere else in the code.
 - Nothing cancels an action item from the panel, and nothing cancels a project
-  from the board toolbar's one-click buttons. Both are filed as `SVU-A1` and
-  `SVU-A2` in `BACKLOG.md`.
+  in one click from the board toolbar. Both are filed as `SVU-A1` and `SVU-A2`
+  in `BACKLOG.md`. A project is canceled from its editor, and `Show Canceled`
+  brings it back.

@@ -261,7 +261,7 @@ Note actions:
 
 Filters:
 - **Toolbar wrap** — What: The Note Size slider, Compact Height and the hint line sit at the toolbar's right-hand edge, and on a narrow window they move to a second toolbar row; the search row and the multi-link warning stay on their own rows. Narrower still than the second row needs, they clip again; there is no minimum window size. Why: Reach every control at any window size.
-- **Show Pending / Show Complete** — What: Toggles those note states onto the board. Why: Review inactive work without mixing it into the default active board.
+- **Show Pending / Show Complete / Show Canceled** — What: Toggles those project states onto the board. Why: Review inactive work without mixing it into the default active board. A project set to Canceled in its editor leaves the board, and Show Canceled is how you find it again.
 
 #### Project detail panel (right side)
 
