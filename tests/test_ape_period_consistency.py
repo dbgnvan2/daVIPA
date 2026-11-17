@@ -288,7 +288,7 @@ def test_apcm23_the_add_path_reaches_the_reporting():
             assign_ape_to_month=lambda ape_id, *_a: ape_id == "ape-ok"
         ),
         refresh_lists=lambda: said.append("refresh"),
-        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        set_status=lambda text, kind="muted": said.append(text),
         right_items=[],
         _describe_month_assignment=APEPeriodViewScreen._describe_month_assignment,
     )
@@ -335,7 +335,7 @@ def test_apcm23_drag_path_reaches_the_same_reporting():
             assign_ape_to_month=lambda *a: calls.append(a) or False
         ),
         refresh_lists=lambda: said.append("refresh"),
-        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        set_status=lambda text, kind="muted": said.append(text),
         right_items=[],
         _describe_month_assignment=APEPeriodViewScreen._describe_month_assignment,
     )
@@ -543,7 +543,7 @@ def test_apcm43_weekly_screen_left_panel_asks_by_month_only():
         _describe_counts=lambda: "",
         left_title_label=SimpleNamespace(configure=lambda **_k: None),
         right_title_label=SimpleNamespace(configure=lambda **_k: None),
-        status_label=SimpleNamespace(configure=lambda **_k: None),
+        set_status=lambda text, kind="muted": None,
     )
 
     WeeklyItemsScreen.load_selected_week(stub)
@@ -774,7 +774,7 @@ def test_apcm24_a_raising_assignment_is_counted_not_escaped():
         _parse_period=lambda: (2026, 4, 11),
         vps_manager=SimpleNamespace(assign_ape_to_month=assign),
         refresh_lists=lambda: said.append("refresh"),
-        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        set_status=lambda text, kind="muted": said.append(text),
         # The raising APE wrote nothing, so the month holds nothing --
         # "could not be assigned", not "partly assigned".
         right_items=[],
@@ -924,7 +924,7 @@ def test_apcm62_quarter_add_with_nothing_to_add_says_so():
             assign_ape_to_quarter=lambda *_a: pytest.fail("there was nothing to add")
         ),
         refresh_lists=lambda: said.append("refresh"),
-        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        set_status=lambda text, kind="muted": said.append(text),
         right_items=[],
         _describe_quarter_assignment=APEAssignmentScreen._describe_quarter_assignment,
     )
@@ -965,7 +965,7 @@ def test_apcm62_a_raising_quarter_assignment_is_counted_not_escaped():
         _parse_period=lambda: (2026, 4),
         vps_manager=SimpleNamespace(assign_ape_to_quarter=assign),
         refresh_lists=lambda: said.append("refresh"),
-        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        set_status=lambda text, kind="muted": said.append(text),
         right_items=[],
         _describe_quarter_assignment=APEAssignmentScreen._describe_quarter_assignment,
     )
@@ -1004,7 +1004,7 @@ def test_apcm62_quarter_drag_path_reaches_the_same_reporting():
             assign_ape_to_quarter=lambda *a: calls.append(a) or False
         ),
         refresh_lists=lambda: said.append("refresh"),
-        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        set_status=lambda text, kind="muted": said.append(text),
         right_items=[],
         _describe_quarter_assignment=APEAssignmentScreen._describe_quarter_assignment,
     )
@@ -1082,7 +1082,7 @@ def test_apcm25_a_half_written_assignment_is_reported_as_partial(tmp_path):
     stub = SimpleNamespace(
         _parse_period=lambda: (2026, 4, 11),
         vps_manager=vps,
-        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        set_status=lambda text, kind="muted": said.append(text),
         right_items=[],
         _describe_month_assignment=APEPeriodViewScreen._describe_month_assignment,
     )
@@ -1131,7 +1131,11 @@ def test_apcm26_a_failed_remove_is_reported():
     stub = SimpleNamespace(
         _parse_period=lambda: (2026, 4, 11),
         vps_manager=SimpleNamespace(unassign_ape_from_month=unassign),
-        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        # MOD-M1: records the kind too. These three outcomes went to the notice
+        # line as raw text with no kind at all, which left them in whatever
+        # colour the previous notice had set, and a problem rendered in the
+        # colour of the success before it is a problem reported wrongly.
+        set_status=lambda text, kind="muted": said.append((text, kind)),
         right_items=[],
     )
     stub.refresh_lists = lambda: setattr(stub, "right_items", list(state["in_month"]))
@@ -1144,16 +1148,18 @@ def test_apcm26_a_failed_remove_is_reported():
     )
     try:
         APEPeriodViewScreen.delete_month_item(stub, {"id": "ape-1", "key_field": "Blog"})
-        assert said[-1] == "Removed Blog from M11.", said[-1]
+        assert said[-1] == ("Removed Blog from M11.", "muted"), said[-1]
 
         state.update(in_month=[{"id": "ape-1"}], mode="raises_before_write")
         APEPeriodViewScreen.delete_month_item(stub, {"id": "ape-1", "key_field": "Blog"})
-        assert said[-1] == "Blog is still in M11 — see the log.", said[-1]
+        assert said[-1] == ("Blog is still in M11 — see the log.",
+                            "error"), said[-1]
 
         state.update(in_month=[{"id": "ape-1"}], mode="raises_after_write")
         APEPeriodViewScreen.delete_month_item(stub, {"id": "ape-1", "key_field": "Blog"})
         assert said[-1] == (
-            "Blog is out of M11, but the remove reported a problem — see the log."
+            "Blog is out of M11, but the remove reported a problem — see the log.",
+            "warning",
         ), said[-1]
     finally:
         ape_period_view.messagebox = original
@@ -1187,7 +1193,7 @@ def test_apcm63_a_half_written_quarter_assignment_is_reported_as_partial(tmp_pat
     stub = SimpleNamespace(
         _parse_period=lambda: (2026, 4),
         vps_manager=vps,
-        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        set_status=lambda text, kind="muted": said.append(text),
         right_items=[],
         _describe_quarter_assignment=APEAssignmentScreen._describe_quarter_assignment,
     )
@@ -1229,7 +1235,8 @@ def test_apcm64_a_failed_quarter_remove_is_reported():
     stub = SimpleNamespace(
         _parse_period=lambda: (2026, 4),
         vps_manager=SimpleNamespace(unassign_ape_from_quarter=unassign),
-        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        # MOD-M1: the kind, as on the month screen above (P5).
+        set_status=lambda text, kind="muted": said.append((text, kind)),
         right_items=[],
     )
     stub.refresh_lists = lambda: setattr(stub, "right_items", list(state["in_quarter"]))
@@ -1242,16 +1249,18 @@ def test_apcm64_a_failed_quarter_remove_is_reported():
     )
     try:
         APEAssignmentScreen.delete_quarter_item(stub, {"id": "ape-1", "key_field": "Blog"})
-        assert said[-1] == "Removed Blog from Q4.", said[-1]
+        assert said[-1] == ("Removed Blog from Q4.", "muted"), said[-1]
 
         state.update(in_quarter=[{"id": "ape-1"}], mode="raises_before_write")
         APEAssignmentScreen.delete_quarter_item(stub, {"id": "ape-1", "key_field": "Blog"})
-        assert said[-1] == "Blog is still in Q4 — see the log.", said[-1]
+        assert said[-1] == ("Blog is still in Q4 — see the log.",
+                            "error"), said[-1]
 
         state.update(in_quarter=[{"id": "ape-1"}], mode="raises_after_write")
         APEAssignmentScreen.delete_quarter_item(stub, {"id": "ape-1", "key_field": "Blog"})
         assert said[-1] == (
-            "Blog is out of Q4, but the remove reported a problem — see the log."
+            "Blog is out of Q4, but the remove reported a problem — see the log.",
+            "warning",
         ), said[-1]
     finally:
         ape_assignment.messagebox = original

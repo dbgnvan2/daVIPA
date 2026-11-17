@@ -546,17 +546,21 @@ def test_wt_m6b5_the_notifier_only_interrupts_when_it_should():
         assert phrase in describe_cascade(failed), status
 
 
-def test_wt_m6b5_a_failure_is_not_dressed_as_good_news(monkeypatch):
-    """A failed re-file must not arrive as the kind that clears itself.
+def test_wt_m6b5_a_cascade_notice_never_takes_itself_down(monkeypatch):
+    """Neither thing a cascade reports may arrive as a self-clearing kind.
 
     MOD-M2 moved this notice from a messagebox to the screen's notice line, so
-    the thing that must not be dressed as good news is now the *kind* rather
-    than the title and icon (case b: the behaviour changed on purpose). It
-    matters more than it did: an ``info`` kind takes itself down after
-    ``notice_dismiss_ms`` (MOD-M3), so a failure sent as ``info`` would be a
-    failure the user can miss entirely.
+    what must not be dressed as good news is now the *kind* rather than the
+    title and icon. The first version of this guard asserted ``info`` for the
+    rollover arm, which pinned a defect: ``info`` is in ``TRANSIENT_KINDS``,
+    so it takes itself down after ``notice_dismiss_ms`` (MOD-M3). Case (a),
+    the code was wrong -- ``cascade_needs_attention`` admits exactly two
+    things, a failure and rollover stubs, and both need the user, so there is
+    no arm of this function with a transient case to have. The stub text says
+    "need your words" and nothing else in the app will ever ask again.
     """
     from src.getmoredone.screens import week_collision_notice as notice
+    from src.getmoredone.screens.status_notice import TRANSIENT_KINDS
     from src.getmoredone.weekly_tactic import CascadeReport
 
     shown = []
@@ -567,13 +571,18 @@ def test_wt_m6b5_a_failure_is_not_dressed_as_good_news(monkeypatch):
     rollover = CascadeReport()
     rollover.record("annual_plans", "ap-1", "2027", stub=True)
     notice.notify_cascade(SimpleNamespace(last_cascade_report=rollover))
-    assert shown[-1][0] == "info", "what the cascade built is not a failure"
+    kind, text = shown[-1]
+    assert "need your words" in text
+    assert kind not in TRANSIENT_KINDS, (
+        "the one notice nothing else will ever repeat cannot self-clear"
+    )
 
     notice.notify_cascade(SimpleNamespace(
         last_cascade_report=CascadeReport(status="ape_missing")))
     assert shown[-1][0] == "warning", (
-        "a failure sent as info clears itself after a few seconds"
+        "a failure sent as a transient kind clears itself after six seconds"
     )
+    assert shown[-1][0] not in TRANSIENT_KINDS
 
 
 def test_wt_m6b5_every_report_producing_surface_reads_it():

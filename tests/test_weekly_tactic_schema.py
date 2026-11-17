@@ -417,7 +417,11 @@ def test_wt_m1c3_both_creation_paths_report_collisions(tmp_path):
             }
         ),
         refresh=lambda: calls.append("refresh"),
-        status_label=SimpleNamespace(configure=lambda **kw: calls.append(kw["text"])),
+        # MOD-M1: this screen reports through the contract now and writes to
+        # status_label nowhere, so a stubbed label was scaffolding nothing
+        # wrote to (case (b)). The kind is recorded because a notice that
+        # arrives on a self-clearing kind is one the user can miss.
+        set_status=lambda text, kind="muted": calls.append((text, kind)),
         _describe_week_creation=describe,
     )
     # VTF-M3.4 folded the four lines this method used to hold into
@@ -432,7 +436,8 @@ def test_wt_m1c3_both_creation_paths_report_collisions(tmp_path):
     WeeklyItemsScreen._assign_dragged_row(stub, {"id": "ape-1"})
 
     assert "refresh" in calls, "a collided drag must still refresh"
-    assert any("already existed" in c for c in calls if isinstance(c, str)), (
+    assert any("already existed" in c[0] for c in calls
+               if isinstance(c, tuple)), (
         f"the drag path never reported the collision: {calls}"
     )
 
@@ -445,10 +450,11 @@ def test_wt_m1c3_drag_without_a_week_selected_says_so(tmp_path):
     stub = SimpleNamespace(
         _selected_week_context=lambda: None,
         refresh=lambda: said.append("refresh"),
-        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        set_status=lambda text, kind="muted": said.append((text, kind)),
     )
     WeeklyItemsScreen._assign_dragged_row(stub, {"id": "ape-1"})
-    assert any("Select a Week Start" in s for s in said if isinstance(s, str)), said
+    assert ("Select a Week Start before dragging an Annual Plan Element.",
+            "warning") in said, said
     assert "refresh" not in said, "a drop with no week chosen must not redraw"
 
 
@@ -465,7 +471,7 @@ def test_wt_m1c3_drag_reports_a_stale_ape_instead_of_a_traceback(tmp_path):
         _selected_week_context=lambda: ("2026-02-23", 2026, 2),
         vps_manager=SimpleNamespace(create_week_action_items_for_ape=_raise),
         refresh=lambda: said.append("refresh"),
-        status_label=SimpleNamespace(configure=lambda **kw: said.append(kw["text"])),
+        set_status=lambda text, kind="muted": said.append((text, kind)),
     )
     # VTF-M3.4 folded the four lines this method used to hold into
     # `_create_tactic_for`, shared with the Add New dialog, so the drop path's
@@ -473,7 +479,8 @@ def test_wt_m1c3_drag_reports_a_stale_ape_instead_of_a_traceback(tmp_path):
     stub._create_tactic_for = WeeklyItemsScreen._create_tactic_for.__get__(
         stub, WeeklyItemsScreen)
     WeeklyItemsScreen._assign_dragged_row(stub, {"id": "ape-gone"})
-    assert any("Could not create" in s for s in said if isinstance(s, str)), said
+    assert any("Could not create" in s[0] for s in said
+               if isinstance(s, tuple)), said
     assert "refresh" not in said, "a refused create must not claim a redraw"
 
 

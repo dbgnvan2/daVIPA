@@ -401,3 +401,316 @@ def test_modm2_report_on_says_when_nothing_took_it():
             root.destroy()
         except Exception:
             pass
+
+
+# ------------------------------------------------ MOD-M1/M2 review round ----
+#
+# One guard per finding from the pre-push sweep (learning-qa and /code-review
+# converged on four of them). Each names the src line it depends on, and each
+# was mutation-checked: that line deleted or inverted, this test run, red
+# confirmed, the file restored with the verbatim original.
+
+
+def _notice_label_providers():
+    """Class name -> True for every class under ``src/`` that builds a line.
+
+    "Builds a line" is: calls ``create_status_line``, or assigns the attribute
+    its ``NOTICE_LABEL_ATTR`` names. Resolved transitively through base-class
+    *names*, which is enough here because no two screen classes share a name.
+
+    A mixin gets its line from its *sibling* in the concrete class's MRO, not
+    from its own bases, so one that builds no line itself counts as satisfied
+    when every class that mixes it in has one. ``PlanWeekViewMixin`` and
+    ``ItemEditorContactsMixin`` are that case; a mixin nobody mixes in is not.
+    """
+    classes = {}
+    for path in sorted(SRC.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            attr = "status_label"
+            builds = False
+            for sub in ast.walk(node):
+                if (isinstance(sub, ast.Assign)
+                        and any(isinstance(t, ast.Name)
+                                and t.id == "NOTICE_LABEL_ATTR"
+                                for t in sub.targets)
+                        and isinstance(sub.value, ast.Constant)):
+                    attr = sub.value.value
+            for sub in ast.walk(node):
+                if (isinstance(sub, ast.Call)
+                        and isinstance(sub.func, ast.Attribute)
+                        and sub.func.attr == "create_status_line"):
+                    builds = True
+                if (isinstance(sub, ast.Attribute) and sub.attr == attr
+                        and isinstance(sub.value, ast.Name)
+                        and sub.value.id == "self"
+                        and isinstance(sub.ctx, ast.Store)):
+                    builds = True
+            bases = [b.id for b in node.bases if isinstance(b, ast.Name)]
+            classes[node.name] = (builds, bases)
+
+    users = {}
+    for name, (_builds, bases) in classes.items():
+        for base in bases:
+            users.setdefault(base, []).append(name)
+
+    def has_line(name, seen=()):
+        if name in seen or name not in classes:
+            return False
+        builds, bases = classes[name]
+        if builds or any(has_line(b, seen + (name,)) for b in bases):
+            return True
+        mixed_into = users.get(name, [])
+        return bool(mixed_into) and all(
+            has_line(user, seen + (name,)) for user in mixed_into)
+
+    return {name: has_line(name) for name in classes}
+
+
+def _classes_calling(attr):
+    """Every class under ``src/`` with a ``self.<attr>(...)`` call in it."""
+    found = {}
+    for path in sorted(SRC.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for sub in ast.walk(node):
+                if (isinstance(sub, ast.Call)
+                        and isinstance(sub.func, ast.Attribute)
+                        and sub.func.attr == attr
+                        and isinstance(sub.func.value, ast.Name)
+                        and sub.func.value.id == "self"):
+                    found.setdefault(node.name, f"{rel}:{sub.lineno}")
+    return found
+
+
+def test_modm1_every_class_that_reports_has_a_line_to_report_on():
+    """The check the first 30 guards did not make, and the sweep needed.
+
+    Both high findings were a class calling into the notice contract with
+    nowhere for the notice to land, and the whole suite stayed green: the
+    MOD-M2 exact-set guard cannot see it, because the dialog really is gone --
+    the message just goes nowhere. ``WeekTacticActionsPanel`` reached for
+    ``notify_owner`` when it had a line of its own and its owner had none, and
+    ``ManageContactsScreen`` opened a reporting dialog with no line anywhere
+    above it. This is statically decidable, so it is asserted rather than
+    walked.
+    """
+    providers = _notice_label_providers()
+    missing = {name: where
+               for name, where in _classes_calling("set_status").items()
+               if not providers.get(name, False)}
+    assert missing == {}, (
+        "these classes call self.set_status with no notice label to draw on; "
+        "they need create_status_line, or the call belongs on another object: "
+        f"{missing}"
+    )
+
+
+def test_modm1_every_opener_of_a_reporting_dialog_has_a_line():
+    """``notify_owner`` walks up, so the *opener* is what must carry a line.
+
+    ``EditContactDialog`` is opened from two places. One had a line and one
+    did not, so Add / Update / Delete / Deactivate and "That contact no longer
+    exists." were shown to nobody whenever contacts were managed from the
+    Contacts tab -- the generic P5 shape, the dialog swept and one of its two
+    openers left behind.
+    """
+    providers = _notice_label_providers()
+    reporters = set(_classes_calling("notify_owner"))
+    assert reporters, "nothing calls notify_owner; this guard stopped looking"
+
+    bad = {}
+    for path in sorted(SRC.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for sub in ast.walk(node):
+                if (isinstance(sub, ast.Call)
+                        and isinstance(sub.func, ast.Name)
+                        and sub.func.id in reporters
+                        and not providers.get(node.name, False)):
+                    bad.setdefault(f"{node.name} -> {sub.func.id}",
+                                   f"{rel}:{sub.lineno}")
+    assert bad == {}, (
+        "these classes open a dialog that reports through notify_owner but "
+        f"have no notice line for it to walk up to: {bad}"
+    )
+
+
+def test_modm3_a_notice_carrying_required_action_can_be_made_to_persist(screen):
+    """``persist=True`` keeps a success notice up.
+
+    MOD-M3's auto-clear was applied blanket to ``success``, which retrofitted
+    a six-second lifetime onto notices that already existed on the Plan
+    screens -- including "export that day again to remove it from Google
+    Calendar", an instruction, and "removed 4 of 6 blocks", the partial
+    outcome the house rules require to be surfaced. Green is the right colour
+    for both; six seconds is not the right lifetime.
+    """
+    made = screen(AppSettings())
+    made.settings.notice_dismiss_ms = 40
+
+    made.set_status("Clear Day: removed 4 of 6 blocks", "success",
+                    persist=True)
+    for _ in range(30):
+        made.update()
+        time.sleep(0.005)
+    assert "4 of 6" in made.notice_label().cget("text"), (
+        "evidence that erases itself after six seconds is not surfaced"
+    )
+
+    made.set_status("Moved it", "success")
+    for _ in range(30):
+        made.update()
+        time.sleep(0.005)
+    assert made.notice_label().cget("text") == "", (
+        "persist must not be the default; a bare confirmation still clears"
+    )
+
+
+def test_modm3_destroy_cancels_a_pending_dismissal(screen):
+    """A dismissal must not outlive the widget it targets.
+
+    ``utils/after_tracker.py`` exists for exactly this (P30), and
+    ``TrackedAfterMixin`` does not cover it because it does not override
+    ``after``. Left untracked, a success notice followed by a sidebar click
+    within ``notice_dismiss_ms`` fired ``clear_status`` on a destroyed widget
+    and wrote an ERROR-level traceback to ``app.log`` for ordinary navigation
+    -- noise in the one file the MOD-M7 walk asks the user to read.
+    """
+    made = screen(AppSettings())
+    made.settings.notice_dismiss_ms = 50
+    made.set_status("Saved.", "success")
+    assert made._status_dismiss_after, "nothing was scheduled to cancel"
+
+    made.destroy()
+    assert made._status_dismiss_after is None, (
+        "the timer still points at a widget that has gone"
+    )
+
+
+def test_modm2_report_on_does_not_claim_a_write_that_did_not_land(screen):
+    """``report_on`` must answer with ``set_status``'s result, not its own.
+
+    ``set_status`` swallows a failed ``label.configure`` on purpose (MOD-M4).
+    Returning True regardless meant a half-torn-down ancestor took the notice
+    as far as every caller could tell: ``notify_week_collision`` recorded
+    ``shown = True``, skipped its warning, and told its caller a refused week
+    had been reported (P6 -- a status field is worth nothing unchecked).
+    """
+    from src.getmoredone.screens.status_notice import report_on
+
+    made = screen()
+
+    class _Deaf:
+        """A line that exists and refuses the write, as a dying screen does."""
+
+        def __init__(self, label):
+            self.status_label = label
+            self.master = None
+
+        def set_status(self, text, kind="muted"):
+            return False
+
+    deaf = _Deaf(made.notice_label())
+    assert report_on(deaf, "a refused week", "warning") is False, (
+        "a notice nobody drew must not be reported as delivered"
+    )
+
+    deaf.master = made
+    assert report_on(deaf, "a refused week", "warning") is True
+    assert "refused week" in made.notice_label().cget("text"), (
+        "the walk must carry on past a line that refused it"
+    )
+
+
+SHARED_LABEL_SCREENS = [
+    "weekly_items.py",
+    "ape_assignment.py",
+    "ape_period_view.py",
+    "annual_vision_segments.py",
+]
+
+
+@pytest.mark.parametrize("name", SHARED_LABEL_SCREENS)
+def test_modm1_a_shared_notice_line_has_exactly_one_writer(name):
+    """No ``self.status_label.configure`` left on a screen that also reports.
+
+    These four were given the mixin over a ``status_label`` that already
+    carried their own standing content. ``set_status`` sets ``text_color`` and
+    a raw ``configure(text=...)`` does not reset it, so a neutral count
+    summary written after an error notice rendered in the error colour and
+    stayed that way. Exact count, not a floor: a floor hides the narrowing it
+    was written to catch.
+    """
+    path = SRC / "getmoredone" / "screens" / name
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    raw = [node.lineno for node in ast.walk(tree)
+           if isinstance(node, ast.Call)
+           and isinstance(node.func, ast.Attribute)
+           and node.func.attr == "configure"
+           and isinstance(node.func.value, ast.Attribute)
+           and node.func.value.attr == "status_label"
+           and isinstance(node.func.value.value, ast.Name)
+           and node.func.value.value.id == "self"]
+    assert len(raw) == 0, (
+        f"{name} writes its own notice line directly at lines {raw}; route it "
+        "through set_status so the colour and any pending dismissal are reset"
+    )
+
+
+def test_modm1_a_muted_write_takes_the_previous_colour_back_off(screen):
+    """The behaviour the guard above protects, asserted once on the contract."""
+    made = screen()
+    made.set_status("Select a weekly tactic on the right first.", "warning")
+    assert made.notice_label().cget("text_color") == theme.status_text_color(
+        "warning")
+
+    made.set_status("3 month item(s) on left, 2 weekly tactic(s) on right",
+                    "muted")
+    assert made.notice_label().cget("text_color") == theme.status_text_color(
+        "muted"), "a neutral summary kept the last notice's colour"
+
+
+DESTROY_AND_REPORT_FILES = [
+    "vps_editors.py",
+    "vps_segment_editor.py",
+    "edit_contact.py",
+]
+
+
+@pytest.mark.parametrize("name", DESTROY_AND_REPORT_FILES)
+def test_modm2_a_dialog_does_not_close_inside_the_try_that_reports_for_it(name):
+    """``self.destroy()`` must not sit in a ``try`` whose handler reports here.
+
+    ``messagebox.showerror`` did not need the dialog to still exist; a label on
+    the dialog does. With ``destroy()`` inside the ``try``, a TclError out of
+    teardown after a save had already succeeded reported "Could not save ..."
+    onto a widget on its way out: a false failure, and an invisible one.
+    """
+    path = SRC / "getmoredone" / "screens" / name
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+
+    def calls(nodes, attr):
+        return any(isinstance(n, ast.Call)
+                   and isinstance(n.func, ast.Attribute)
+                   and n.func.attr == attr
+                   and isinstance(n.func.value, ast.Name)
+                   and n.func.value.id == "self"
+                   for body in nodes for n in ast.walk(body))
+
+    offenders = [node.lineno for node in ast.walk(tree)
+                 if isinstance(node, ast.Try)
+                 and calls(node.body, "destroy")
+                 and any(calls(h.body, "set_status") for h in node.handlers)]
+    assert offenders == [], (
+        f"{name} closes the dialog inside a try whose except reports on it, "
+        f"at lines {offenders}; move destroy() after the except"
+    )
