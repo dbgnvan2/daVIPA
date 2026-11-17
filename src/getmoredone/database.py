@@ -942,12 +942,18 @@ class Database:
             re.IGNORECASE,
         )
         if match is None:
-            # Anchored on the column, not merely on the word appearing
-            # somewhere in a CHECK: `CHECK(length(status) > 0)` is not a
-            # status vocabulary constraint, and warning about it would be the
-            # every-launch log line the branch below exists to avoid.
-            if re.search(r"CHECK\s*\(\s*[\"'`\[]?status[\"'`\]]?\s",
-                         create_source, re.IGNORECASE):
+            # Anchored on `status` being compared, not merely appearing
+            # inside a CHECK. `CHECK(length(status) > 0)` is not a vocabulary
+            # constraint and warning about it would be the every-launch log
+            # line the branch below exists to avoid; `CHECK(status='active'
+            # OR ...)` and a status IN behind another condition both are, and
+            # requiring `status` to come first in the CHECK lost them.
+            compared = re.search(
+                r"(?<![\w.])[\"'`\[]?status[\"'`\]]?\s*"
+                r"(?:IN\b|NOT\s+IN\b|=|<>|!=)",
+                create_source, re.IGNORECASE)
+            if compared and re.search(r"\bCHECK\b", create_source,
+                                      re.IGNORECASE):
                 # There is a status CHECK, and this could not rewrite it.
                 logger.warning(
                     "SVU-M2: project_boards has no status CHECK to widen; "

@@ -251,22 +251,35 @@ class ProjectBoardEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
                 "Select a valid Annual Plan Element before saving.", "error")
             return
 
+        # SVU-M3: the combobox is free-text (`combo_box_style()` sets
+        # colours, not `state`), and `create_project_board` /
+        # `update_project_board` do not gate what they are handed (SVU-A4). An
+        # unknown status either raises IntegrityError into Tk's callback
+        # handler or, on a database the migration leaves CHECK-less, stores and
+        # drops the board out of every status filter.
+        #
+        # Refused, not corrected. Folding case first means "Completed" -- the
+        # capitalisation the board's own buttons and the user guide use, while
+        # the dropdown's values are lowercase -- is accepted rather than
+        # refused. An unknown value is then reported like the invalid Annual
+        # Plan Element above it, because silently falling back to `active`
+        # moved a completed project to the top of the active group and
+        # discarded its `completed_at` below, telling the user nothing.
+        status = self.status_var.get().strip().casefold()
+        if status not in ProjectBoardStatus.ALL:
+            self.set_status(
+                "Status must be one of: "
+                f"{', '.join(ProjectBoardStatus.ALL)}.", "error")
+            return
+
         board = self.board or ProjectBoard(
             title="",
             annual_plan_element_id=ape_id,
         )
+        board.status = status
         board.title = self.title_var.get().strip()
         board.annual_plan_element_id = ape_id
         board.importance = self._extract_factor_value(self.priority_var.get())
-        # SVU-M3: the combobox is free-text, and `create_project_board` /
-        # `update_project_board` do not gate what they are handed. An unknown
-        # status either raises IntegrityError into Tk's callback handler or, on
-        # a database the migration leaves CHECK-less, stores and drops the
-        # board out of every status filter -- the same unreachability SVU-M3
-        # fixed, by another door. Ungated writers: SVU-A4.
-        typed = self.status_var.get().strip()
-        board.status = (typed if typed in ProjectBoardStatus.ALL
-                        else ProjectBoardStatus.ACTIVE)
         board.next_step = self.next_step_var.get().strip() or None
         board.notes = self.notes_box.get("1.0", "end").strip() or None
         # WT-D9: stored exactly as typed. No validation, no reordering.
@@ -1717,15 +1730,25 @@ class ProjectBoardsScreen(StatusNoticeMixin, ctk.CTkFrame):
         self.refresh()
 
     def set_board_status(self, board_id: str, status: str):
-        # SVU-M3: the manager refuses a status outside the vocabulary, and
-        # reports a write that did not land, by returning False. Refreshing
-        # over a discarded False redrew the unchanged board and looked exactly
-        # like success. Reported on this screen's own notice line: MOD-M2
+        # SVU-M3: reported on this screen's own notice line, because MOD-M2
         # leaves only two platform dialogs in the app, both for a failure with
         # no screen to put a notice on, and this is not one of them.
+        #
+        # The manager's False means either of two things and they need
+        # different answers, so the vocabulary is checked here: an unknown
+        # status changed nothing and leaves nothing to redraw, while a row that
+        # did not match means another screen deleted the board and this one is
+        # still showing its card -- which has to be refreshed away, or every
+        # further click on the ghost fails identically.
+        if status not in ProjectBoardStatus.ALL:
+            self.set_status(
+                "Status must be one of: "
+                f"{', '.join(ProjectBoardStatus.ALL)}.", "error")
+            return
         if not self.db_manager.set_project_board_status(board_id, status):
             self.set_status(
-                f"Could not set that project to '{status}'.", "error")
+                "That project no longer exists. Board refreshed.", "error")
+            self.refresh()
             return
         if status != ProjectBoardStatus.ACTIVE and self.selected_board_id == board_id:
             self.selected_board_id = None
