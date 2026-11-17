@@ -441,7 +441,13 @@ def test_spcm12_project_items_configure_and_rerender_refit(projects_screen,
 
 
 def test_spcm13_project_items_controls_preserved(projects_screen):
-    """SPC-M13 — the items contract: checkbox, Select All, count, the buttons."""
+    """SPC-M13 — the items contract: checkbox, Select All, count, the buttons.
+
+    LRP-A3/LRP-C1 (2026-11-16) changed what this contract looks like, so the
+    assertions below changed with it: Select All lost its label and moved into
+    the column header, and the single "Show Completed" box became one box per
+    action item status. The controls themselves are all still here.
+    """
     screen = projects_screen()
     assert screen.check_all_var is not None
     assert len(screen.item_checkbox_vars) == 4, screen.item_checkbox_vars
@@ -458,9 +464,9 @@ def test_spcm13_project_items_controls_preserved(projects_screen):
     for text in ("Edit", "Complete", "Unlink"):
         assert buttons.count(text) == 4, (text, buttons)
     boxes = _texts(screen.items_frame, ctk.CTkCheckBox)
-    assert "Select All" in boxes, boxes
-    assert "Show Completed" in boxes, boxes
-    assert boxes.count("") == 4, boxes
+    assert [b for b in boxes if b] == ["Open", "Completed", "Canceled"], boxes
+    # Four row checkboxes plus the unlabelled Select All in the column header.
+    assert boxes.count("") == 5, boxes
 
 
 # --------------------------------------------------------------------- toolbars

@@ -2,7 +2,7 @@
 
 import pytest
 from datetime import date, timedelta
-from src.getmoredone.models import ActionItem, ProjectBoard
+from src.getmoredone.models import ActionItem, ProjectBoard, Status
 from src.getmoredone.db_manager import DatabaseManager
 
 
@@ -323,7 +323,11 @@ def gui_screen_mixed(db_manager):
 
 
 class TestShowCompletedToggle:
-    """GUI tests for the Show Completed filter in the action items panel."""
+    """GUI tests for the Completed filter in the action items panel.
+
+    LRP-C1 (2026-11-16) replaced the single "Show Completed" box with one box
+    per action item status, so the filter these read is that box's variable.
+    """
 
     def test_default_hides_completed(self, gui_screen_mixed):
         """Default state hides completed items (M4 changed default to OFF).
@@ -331,7 +335,7 @@ class TestShowCompletedToggle:
         Spec: docs/unused-docs/implementation_plan_2026-06-06_project_notes.md#M4.A.1
         """
         screen, open_ids, completed_ids, _root = gui_screen_mixed
-        assert screen.show_completed_items_var.get() is False
+        assert screen.item_status_filter_vars[Status.COMPLETED].get() is False
         rendered = set(screen.item_checkbox_vars.keys())
         assert rendered == set(open_ids)
         for cid in completed_ids:
@@ -340,7 +344,7 @@ class TestShowCompletedToggle:
     def test_hiding_completed_filters_them_out(self, gui_screen_mixed):
         """Unchecking Show Completed hides completed items, keeps open ones."""
         screen, open_ids, completed_ids, root = gui_screen_mixed
-        screen.show_completed_items_var.set(False)
+        screen.item_status_filter_vars[Status.COMPLETED].set(False)
         screen._render_detail()
         root.update_idletasks()
         rendered = set(screen.item_checkbox_vars.keys())
@@ -351,7 +355,7 @@ class TestShowCompletedToggle:
     def test_select_all_respects_filter(self, gui_screen_mixed):
         """Select All only selects visible (open) items when completed are hidden."""
         screen, open_ids, completed_ids, root = gui_screen_mixed
-        screen.show_completed_items_var.set(False)
+        screen.item_status_filter_vars[Status.COMPLETED].set(False)
         screen._render_detail()
         root.update_idletasks()
         screen.check_all_var.set(True)

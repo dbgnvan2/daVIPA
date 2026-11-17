@@ -12,7 +12,7 @@ import sqlite3
 import pytest
 
 from src.getmoredone.db_manager import DatabaseManager
-from src.getmoredone.models import ProjectBoard, ProjectBoardLink
+from src.getmoredone.models import ProjectBoard, ProjectBoardLink, Status
 
 
 # ============================================================================
@@ -415,6 +415,10 @@ def gui_screen(db_manager):
         root, db_manager, SimpleNamespace(vps_manager=None)
     )
     screen.selected_board_id = board_id
+    # LRP-A4 — the Project Notes section starts collapsed; these tests read
+    # the note rows, so open it. The collapsed default has its own guard in
+    # tests/test_project_board_status_filters.py.
+    screen.notes_expanded = True
     screen.refresh()
     root.update_idletasks()
     yield screen, board_id, root
@@ -493,7 +497,7 @@ class TestM3UI:
         """A completed note shows Reopen instead of Complete."""
         screen, board_id, root = gui_screen
         # Need show_completed=True for completed notes to be visible
-        screen.show_completed_items_var.set(True)
+        screen.item_status_filter_vars[Status.COMPLETED].set(True)
         db_manager.add_project_board_link(
             ProjectBoardLink(
                 project_board_id=board_id, url="c://", label="B", status="completed"
@@ -527,7 +531,7 @@ class TestM3UI:
             project_board_id=board_id, url="x://", label="A", status="completed"
         )
         db_manager.add_project_board_link(link)
-        screen.show_completed_items_var.set(True)
+        screen.item_status_filter_vars[Status.COMPLETED].set(True)
         screen.load_notes()
         root.update_idletasks()
 
@@ -549,14 +553,14 @@ class TestM3UI:
             )
 
         # When showing all: "3 notes shown"
-        screen.show_completed_items_var.set(True)
+        screen.item_status_filter_vars[Status.COMPLETED].set(True)
         screen.load_notes()
         root.update_idletasks()
         labels = _all_labels(screen.notes_links_frame)
         assert any("3 notes shown" in s for s in labels)
 
         # When hiding completed: "2 shown • 1 completed hidden"
-        screen.show_completed_items_var.set(False)
+        screen.item_status_filter_vars[Status.COMPLETED].set(False)
         screen.load_notes()
         root.update_idletasks()
         labels = _all_labels(screen.notes_links_frame)
@@ -574,7 +578,7 @@ class TestM3UI:
                     label=label, created_at=ts,
                 )
             )
-        screen.show_completed_items_var.set(True)
+        screen.item_status_filter_vars[Status.COMPLETED].set(True)
         screen.load_notes()
         root.update_idletasks()
         labels = _all_labels(screen.notes_links_frame)
@@ -645,7 +649,7 @@ class TestM4SharedShowCompleted:
     def test_show_completed_default_off(self, gui_screen):
         """M4.A.1: Default is OFF (open-only view)."""
         screen, _board_id, _root = gui_screen
-        assert screen.show_completed_items_var.get() is False
+        assert screen.item_status_filter_vars[Status.COMPLETED].get() is False
 
     def test_show_completed_filters_both_lists(self, gui_screen, db_manager):
         """M4.A.2: Toggling the shared filter affects BOTH notes AND action items."""
@@ -681,7 +685,7 @@ class TestM4SharedShowCompleted:
         assert done_id not in screen.item_checkbox_vars
 
         # Flip ON: both completed entries reappear in their respective lists
-        screen.show_completed_items_var.set(True)
+        screen.item_status_filter_vars[Status.COMPLETED].set(True)
         screen._render_detail()
         root.update_idletasks()
         note_labels = _all_labels(screen.notes_links_frame)
