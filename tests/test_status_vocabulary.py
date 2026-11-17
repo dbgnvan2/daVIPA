@@ -65,16 +65,24 @@ LEGACY_BOARD_CHECK = (
     "CHECK(status IN ('active', 'pending', 'completed'))"
 )
 
+#: Every non-status column ``initialize_schema`` expects on the table. The
+#: index creation that runs after the migration reads
+#: ``annual_plan_element_id``, so a cut-down table fails there rather than in
+#: the code under test.
+BOARD_COLUMNS = (
+    "id TEXT PRIMARY KEY, title TEXT NOT NULL, "
+    "annual_plan_element_id TEXT, importance INTEGER, "
+    "next_step TEXT, notes TEXT, display_order INTEGER, "
+    "savor_count INTEGER NOT NULL DEFAULT 0"
+)
+
 
 def _legacy_db(path):
     """A database carrying the pre-SVU board constraint."""
     with sqlite3.connect(path) as conn:
         conn.execute(f"""
             CREATE TABLE project_boards (
-                id TEXT PRIMARY KEY, title TEXT NOT NULL,
-                annual_plan_element_id TEXT, importance INTEGER,
-                next_step TEXT, notes TEXT, display_order INTEGER,
-                savor_count INTEGER NOT NULL DEFAULT 0,
+                {BOARD_COLUMNS},
                 {LEGACY_BOARD_CHECK},
                 completed_at TEXT,
                 created_at TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -188,6 +196,90 @@ def test_svum2_foreign_keys_are_on_again_after_the_rebuild(tmp_path):
     try:
         assert manager.db.conn.execute(
             "PRAGMA foreign_keys").fetchone()[0] == 1
+    finally:
+        manager.close()
+
+
+class _FailOnDrop:
+    """A connection proxy that raises on ``DROP TABLE`` and nothing else.
+
+    The rebuild's own `DROP TABLE` is hard to make fail from outside, and the
+    failure has to land *after* the `INSERT` has opened a transaction -- which
+    is the whole point of the guard below.
+    """
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, sql, *args):
+        if sql.strip().upper().startswith("DROP TABLE"):
+            raise sqlite3.OperationalError("injected failure")
+        return self._conn.execute(sql, *args)
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
+def test_svum2_a_failed_rebuild_leaves_foreign_keys_on(tmp_path):
+    """`PRAGMA foreign_keys` is ignored while a transaction is open.
+
+    So a rebuild that raises after the copy must roll back before restoring
+    it, or enforcement stays OFF for the life of the connection and the next
+    board delete orphans its items and notes instead of cascading them.
+    """
+    db_path = _legacy_db(tmp_path / "legacy_failed.db")
+    manager = DatabaseManager(db_path)
+    try:
+        conn = manager.db.conn
+        # Put the old constraint back so the rebuild runs a second time.
+        conn.execute("DROP TABLE project_boards")
+        conn.execute(f"""
+            CREATE TABLE project_boards (
+                {BOARD_COLUMNS},
+                {LEGACY_BOARD_CHECK},
+                completed_at TEXT,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            )
+        """)
+        conn.execute(
+            "INSERT INTO project_boards (id, title, status, created_at, "
+            "updated_at) VALUES ('b9', 'B', 'active', 'd', 'd')")
+        conn.commit()
+
+        with pytest.raises(sqlite3.OperationalError):
+            manager.db._widen_board_status_check(_FailOnDrop(conn))
+
+        assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+    finally:
+        manager.close()
+
+
+def test_svum2_a_check_less_table_is_left_alone_without_warning(tmp_path, caplog):
+    """An older database added `status` by ALTER TABLE, so it has no CHECK.
+
+    There is nothing to widen and 'canceled' already stores, so this must not
+    log a warning on every launch for the rest of the database's life.
+    """
+    db_path = str(tmp_path / "no_check.db")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(f"""
+            CREATE TABLE project_boards (
+                {BOARD_COLUMNS},
+                status TEXT NOT NULL DEFAULT 'active',
+                completed_at TEXT,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+
+    with caplog.at_level("WARNING"):
+        manager = DatabaseManager(db_path)
+    try:
+        assert "SVU-M2" not in caplog.text, caplog.text
+        manager.db.conn.execute(
+            "INSERT INTO project_boards (id, title, status, created_at, "
+            "updated_at) VALUES ('b3', 'Z', 'canceled', 'd', 'd')")
+        manager.db.conn.commit()
     finally:
         manager.close()
 
