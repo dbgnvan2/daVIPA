@@ -117,6 +117,77 @@ it is a decision rather than an addition.
 If the walk shows a clipped row, the fix is the dialog's geometry, not the
 notice line's placement.
 
+## Found by the MOD fix-round re-sweep (filed 2026-11-16)
+
+The second sweep of the batch, over the fix commits only. Six findings: three
+were fixed in the same commit, and these three were not. Each is here with the
+reason it was left, written at the time rather than reconstructed later.
+
+### MOD-A4 — the four VSP describers render a failure in the neutral colour (medium)
+
+`weekly_items._create_tactic_for`, `annual_vision_segments._perform_add`,
+`ape_assignment._describe_quarter_assignment` and
+`ape_period_view._describe_month_assignment` each return one sentence covering
+several outcomes — assigned, partly assigned, refused, "reported assigned but
+not there", and a caught exception. Every one of them reaches the notice line
+as `set_status(text, "muted")`, so "1 could not be assigned — see the log."
+renders in the neutral colour.
+
+**Not a regression.** Before MOD those sentences were written with a raw
+`configure(text=...)`, which left whichever colour the previous notice had set
+— arbitrary rather than neutral. The message is present, specific, honest,
+persistent (`muted` is not in `TRANSIENT_KINDS`) and points at the log. What is
+wrong is only that it is not red.
+
+**Why it was not fixed in the fix round.** The kind has to travel with the
+text, which means those four functions return `(text, kind)` instead of `str`.
+About thirty call sites across `tests/test_vsp_tab_adds.py`,
+`tests/test_ape_period_consistency.py` and `tests/test_weekly_tactic_schema.py`
+assert on the returned string directly, and `pick_record_dialog`'s `report`
+contract changes with it. That is a refactor, not a fix, and the fix round of a
+25-file batch that has already had two warm passes and two cold ones is the
+worst moment in the batch to start one — `CLAUDE.md`'s own note on in-loop
+fixes says why.
+
+The four states are already computed inside the describers, so the work is
+mechanical once started: `refused` or `missing` → `error`, `partial` →
+`warning`, otherwise `muted`.
+
+### MOD-A5 — the confetti animation leaks an `after` chain (medium)
+
+`today.py:761` re-arms itself with a bare `self.after(35, lambda: ...)` about
+45 times, discarding every handle, and nothing cancels it. `TodayScreen` now
+inherits `StatusNoticeMixin.destroy`, which cancels the notice dismissal and
+nothing else, and `app.clear_content()` destroys the current screen — so a
+sidebar click during the celebration leaves the next frame calling
+`overlay.move(...)` on a destroyed canvas and raises inside the Tk callback.
+
+This is the same P30 shape MOD fixed for the notice timer, one class along, and
+it is **pre-existing** — the animation predates this batch and `today.py` is
+not one of the files it changed. Filed rather than swept in, per the global rule
+on adjacent issues. The fix is `utils/after_tracker.py`'s `tracked_after`, or a
+cancel in `destroy`; `tests/test_after_tracker.py:85` also carries a
+three-file list that would need `today.py` added, or dropping, as the two MOD
+guards just had theirs dropped.
+
+### MOD-A6 — the timer's one notice with no parent (low)
+
+`timer_window.py:1188` calls `notify_weekly_tactic_changes(self.db_manager)`
+with no parent, so `report_on(None)` returns False immediately and "the item
+was saved without being re-filed" reaches `app.log` only. It is the only one of
+35 such call sites under `src/` with no parent argument.
+
+**The obvious fix does not exist.** The sweep proposed passing the opener,
+since `self._tell_the_opener()` runs on the next line — but `on_close_callback`
+is a plain callable, not a widget, and the opener screen is a *sibling* of the
+timer Toplevel, not an ancestor, so `report_on` cannot walk to it from here at
+all. `self.master` reaches the root, which has no notice line. Delivering this
+one needs TimerWindow to hold the opener widget, which is a constructor change.
+The branch exists because the window is already gone, and the comment above it
+records that using a destroyed parent once raised "bad window path name" and
+was reported as "failed to complete" for an item that had completed. The log is
+the right answer until that constructor change is made.
+
 ## Orphaned by the Project Board button removal (LRP, filed 2026-11-16)
 
 ### LRP-A1 — three pieces of code with no caller (medium)

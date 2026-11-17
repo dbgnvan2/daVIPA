@@ -186,6 +186,69 @@ which case `set_status` succeeds, `winfo_exists()` is True, every guard passes
 and the user still sees nothing. It needs a mapped window to settle, so it is
 step 11 of the walk below and `BACKLOG.md` MOD-A3.
 
+## The re-sweep of the fix commits, and what it changed
+
+`/csdp` 2d sends the fix commits back through the sweep on their own, because a
+fix is the least-reviewed code in a batch — written last, fastest, by the
+context most anchored to the design it is patching. That pass ran over
+`f69af44...HEAD` (the three commits `d4068c9`, `2b1739e`, `5acf53f`) and
+returned six findings. Three were fixed here; three were left, and are in
+`BACKLOG.md` as MOD-A4, MOD-A5 and MOD-A6 with the reason each was left.
+
+**The one that mattered.** Fix 8 of the first round moved `self.destroy()` out
+of the `try` whose `except` reports on the dialog, in six places. Three more
+had the identical shape and were not touched, because they report by
+configuring a label directly rather than through `set_status`, and both the
+file list and the handler test of the new guard matched only the `set_status`
+spelling. They are worse than the six that were fixed:
+
+- `item_editor_note_dialogs.py` (two places) also called
+  `self.parent_window.load_notes()` *inside* the `try`. By then the note file
+  exists in the vault and the link row is in the database, so anything the
+  parent's refresh raised was painted as "Error: ..." onto a dialog on its way
+  out — a completed write reported as a failure, invisibly, and a user who
+  retries gets a second link.
+- `calendar_dialog.py` closes after the event is booked in Google, the
+  `ItemLink` is written and the item is marked a meeting. A `TclError` out of
+  teardown was caught by its last handler and shown as "Unexpected error: ...";
+  a retry books the meeting twice.
+
+All three are fixed the same way as the six, with `calendar_dialog` taking a
+`created` flag because its close sits inside an `if/else`.
+
+**Two guards dropped their lists.** `test_modm1_a_shared_notice_line_has_...`
+named four files and
+`test_modm2_a_dialog_does_not_close_inside_the_try_that_reports_for_it` named
+three, and the second list is exactly what hid the three sites above. Both are
+now stated over `src/` with no list:
+
+- the one-writer guard resolves `NOTICE_LABEL_ATTR` per class and asserts no
+  raw write to *that* attribute, which is what makes it list-free rather than
+  merely wider: `TimerWindow` writes `self.status_label` five times and is
+  right to, because its notice line is `notice_status_label` and those writes
+  are the break banner;
+- the destroy-in-`try` guard matches both reporting spellings — `set_status`
+  and `self.<label>.configure`.
+
+Run against the tree before the fixes, each would have failed. Run against it
+now, both are clean.
+
+**One guard could not fail for the reason it names.**
+`test_modm3_destroy_cancels_a_pending_dismissal` asserted only that the handle
+was cleared, so a `destroy()` that cancelled the dismissal and omitted
+`super().destroy()` satisfied it — while leaving every screen and dialog alive
+on navigation, a worse fault than the leak it guards. It asserts
+`not made.winfo_exists()` now.
+
+**The gate that checks the guards had a fault of its own.** The first run of
+the mutation script for the three repointed `test_weekly_tactic_schema` stubs
+reported all three RED on an exit code of 127: the script passed a minimal
+`PATH`, `nice` could not find `taskpolicy`, and a harness that cannot start
+reads exactly like a failing test when the check is `returncode != 0`. It
+requires pytest's own exit 1 with a reported failure now; anything else is
+`NOT RUN`. The nine mutations of the first round used the inherited
+environment and were not affected, which was checked rather than assumed.
+
 ## Verification
 
 - `GETMOREDONE_NO_MAPPED_WINDOWS=1 nice -n 19 taskpolicy -b ./venv/bin/python

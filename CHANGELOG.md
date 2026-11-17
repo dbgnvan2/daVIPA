@@ -41,6 +41,15 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   summary written after an error used to keep the error's red. It takes the
   right colour now, and a failed Remove on the two APE screens is red or amber
   rather than whatever came before it.
+- **Booking a calendar event, and creating or linking an Obsidian note, no
+  longer report a failure for work that succeeded.** Found by the second
+  review pass. All three closed their dialog inside the block that catches
+  errors, so anything that went wrong while the window was closing — or while
+  the list behind it refreshed — was reported as "Unexpected error" or
+  "Error: ..." on a dialog already on its way out: invisible, and about work
+  that had actually gone through. The event was booked, the note written, the
+  link saved. Pressing the button again because nothing seemed to happen
+  booked the meeting twice or added a second link.
 
 ### Changed — one set of resize principles for every list (2026-11-16)
 
