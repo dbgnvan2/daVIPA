@@ -15,12 +15,13 @@ import pytest
 
 from src.getmoredone.db_manager import DatabaseManager
 from src.getmoredone.models import (
-    ActionItem, ProjectBoard, ProjectBoardLink, Status)
+    ActionItem, ProjectBoard, ProjectBoardLink, ProjectBoardStatus, Status)
+from src.getmoredone.theme import status_text_color
 
 ctk = pytest.importorskip("customtkinter")
 
 from src.getmoredone.screens.project_boards import (  # noqa: E402
-    ProjectBoardsScreen)
+    ProjectBoardEditorDialog, ProjectBoardsScreen)
 
 
 # ------------------------------------------------------------------- fixtures
@@ -349,20 +350,63 @@ def test_svum3_a_refused_board_status_is_reported_not_swallowed(
     """`set_project_board_status` says no by returning False.
 
     The screen used to discard it and refresh, which redrew the unchanged
-    board and was indistinguishable from success.
+    board and was indistinguishable from success. It reports on this screen's
+    own notice line: MOD-M2 leaves only two platform dialogs in the app, both
+    for a failure with no screen to put a notice on, and this is not one.
     """
     screen_obj, board_id, _ids, _root = screen
-    shown = []
-    monkeypatch.setattr(
-        "src.getmoredone.screens.project_boards.messagebox.showerror",
-        lambda *args, **kwargs: shown.append(args))
     refreshed = []
     monkeypatch.setattr(screen_obj, "refresh", lambda: refreshed.append(1))
 
     screen_obj.set_board_status(board_id, "open")
 
-    assert shown, "a refused status change must be reported"
+    assert "open" in screen_obj.status_label.cget("text")
+    assert (screen_obj.status_label.cget("text_color")
+            == status_text_color("error"))
     assert not refreshed, "nothing changed, so there is nothing to redraw"
+
+
+def test_svum3_a_stale_board_id_is_not_reported_as_applied(screen):
+    """P6 -- the return value is the screen's evidence that the write landed.
+
+    A board deleted on another screen leaves a card whose button still carries
+    its id. `UPDATE ... WHERE id = ?` matches nothing and the statement still
+    succeeds, so the row count is what separates applied from accepted.
+    """
+    screen_obj, _board_id, _ids, _root = screen
+    assert screen_obj.db_manager.set_project_board_status(
+        "no-such-board", ProjectBoardStatus.COMPLETED) is False
+
+
+def test_svum3_a_typed_status_cannot_reach_the_writer(db_manager):
+    """The editor's Status combobox is free-text and the writers are ungated.
+
+    An unknown value either raises IntegrityError into Tk's callback handler
+    or, on a database the migration leaves CHECK-less, stores and drops the
+    board out of every status filter -- SVU-M3's own failure by another door.
+    """
+    board = ProjectBoard(title="Typed")
+    db_manager.create_project_board(board)
+    stub = SimpleNamespace(
+        board=db_manager.get_project_board(board.id),
+        title_var=SimpleNamespace(get=lambda: "Typed"),
+        ape_var=SimpleNamespace(get=lambda: "label"),
+        ape_label_to_id={"label": "ape-1"},
+        set_status=lambda *args, **kwargs: None,
+        priority_var=SimpleNamespace(get=lambda: ""),
+        status_var=SimpleNamespace(get=lambda: "actve"),
+        next_step_var=SimpleNamespace(get=lambda: ""),
+        notes_box=SimpleNamespace(get=lambda *a: ""),
+        start_date_var=SimpleNamespace(get=lambda: ""),
+        end_date_var=SimpleNamespace(get=lambda: ""),
+        _extract_factor_value=lambda _v: None,
+        result=None,
+        destroy=lambda: None,
+    )
+    ProjectBoardEditorDialog.save(stub)
+
+    assert stub.result is not None, "the dialog produced no board"
+    assert stub.result.status in ProjectBoardStatus.ALL, stub.result.status
 
 
 def test_svum3_the_toolbar_offers_show_canceled(screen):

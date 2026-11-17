@@ -151,6 +151,30 @@ def test_pl1_dialog_lists_active_and_pending_projects(tmp_path):
         vps.close()
 
 
+def test_svum3_current_project_is_listed_even_when_canceled(tmp_path):
+    """PL1 could not keep its promise for a canceled board.
+
+    `get_project_boards` never returned one, so the "or it is the current
+    board" escape hatch had nothing to match: the item's own project vanished
+    from its picker, with no row carrying the tick.
+    """
+    vps = make_vps(tmp_path)
+    try:
+        manager = vps.db_manager
+        ape_id = seed_ape(vps)
+        dropped = _seed_board(manager, "Dropped One", ape_id,
+                              ProjectBoardStatus.CANCELED)
+
+        stub = SimpleNamespace(
+            db_manager=manager, current_board_id=dropped.id,
+            SELECTABLE_STATUSES=SetProjectDialog.SELECTABLE_STATUSES)
+        titles = [row["title"] for row in SetProjectDialog.load_boards(stub)]
+
+        assert "Dropped One" in titles
+    finally:
+        vps.close()
+
+
 def test_pl1_1_current_project_is_listed_even_when_completed(tmp_path):
     """The item's own current project never disappears from the picker."""
     vps = make_vps(tmp_path)

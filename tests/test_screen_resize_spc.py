@@ -709,6 +709,32 @@ def test_spcs3_the_new_wrapped_rows_fit_the_default_window(
     _assert_wrapped_row_fits(name, screen)
 
 
+def test_spcs3_the_unwrapping_row_fits_the_default_window(projects_screen):
+    """SPC-S3 -- the controls that never wrap also have to fit.
+
+    This header is always wrapped at the default window (one row needs far
+    more than the budget), so what the user sees on launch is row 0 left of
+    the spacer column. `wrap_row_px` does not measure it, and SVU-M3's third
+    board filter took 140 of the 221 px of headroom it had -- the next one
+    added there would clip off the right edge with nothing failing, because
+    `ToolbarWrap` sets no window minsize.
+    """
+    screen = projects_screen()
+    wrap = screen.toolbar_wrap
+    budget = _toolbar_budget(wrap, screen)
+    used = 0
+    for child in wrap.toolbar.winfo_children():
+        info = child.grid_info() or {}
+        if not info or int(info["row"]) != wrap.control_row:
+            continue
+        if int(info["column"]) > wrap.spacer_col:
+            continue
+        used += child.winfo_reqwidth() + _pad_total(info.get("padx", 0))
+    assert used <= budget, (
+        f"the controls left of the spacer need {used} px and the header gets "
+        f"{budget} px at the default window")
+
+
 @pytest.mark.parametrize("name", list(OLD_TOOLBARS))
 def test_spcs3_the_old_wrapped_rows_fit_the_default_window(name, tmp_path):
     """SPC-S3 -- and so do the four toolbars that already wrapped."""

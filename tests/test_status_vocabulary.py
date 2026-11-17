@@ -510,3 +510,39 @@ def test_svum3_a_canceled_board_is_hidden_but_reachable(tmp_path):
     finally:
         manager.close()
 
+
+def test_svum2_a_length_check_does_not_warn_every_launch(tmp_path, caplog):
+    """A CHECK that merely mentions `status` is not a vocabulary constraint.
+
+    `CHECK(length(status) > 0)` has nothing to widen and 'canceled' already
+    stores, so warning about it would be the every-launch log line the
+    no-CHECK branch exists to avoid.
+    """
+    db_path = str(tmp_path / "length_check.db")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(f"""
+            CREATE TABLE project_boards (
+                {BOARD_COLUMNS},
+                status TEXT NOT NULL DEFAULT 'active'
+                    CHECK(length(status) > 0),
+                completed_at TEXT,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+
+    with caplog.at_level(logging.DEBUG, logger="src.getmoredone.database"):
+        manager = DatabaseManager(db_path)
+    try:
+        assert not [record for record in caplog.records
+                    if record.levelno >= logging.WARNING
+                    and "SVU-M2" in record.message], caplog.text
+        manager.db.conn.execute(
+            "INSERT INTO project_boards (id, title, status, created_at, "
+            "updated_at) VALUES ('b6', 'E', 'canceled', 'd', 'd')")
+        manager.db.conn.commit()
+        assert manager.db.conn.execute(
+            "SELECT status FROM project_boards WHERE id = 'b6'"
+        ).fetchone()["status"] == ProjectBoardStatus.CANCELED
+    finally:
+        manager.close()
