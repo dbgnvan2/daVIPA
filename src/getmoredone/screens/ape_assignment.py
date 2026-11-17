@@ -457,7 +457,7 @@ class APEAssignmentScreen(StatusNoticeMixin, ctk.CTkFrame):
             options=self._add_options(),
             initial=self._add_default(),
             confirm_text="Assign",
-            report=lambda text: self.status_label.configure(text=text),
+            report=lambda text: self.set_status(text, "muted"),
             on_confirm=self._perform_add,
             empty_message=self._empty_add_message(quarter),
         )
@@ -620,15 +620,18 @@ class APEAssignmentScreen(StatusNoticeMixin, ctk.CTkFrame):
         self.refresh_lists()
         still_there = row["id"] in self._ids_in_quarter()
         if ok and not still_there:
-            self.status_label.configure(text=f"Removed {label} from Q{quarter}.")
+            # MOD-M1: through ``set_status``, so this label has one writer.
+            # The two branches below report a problem and were rendered in
+            # whatever colour the last notice left behind.
+            self.set_status(f"Removed {label} from Q{quarter}.", "muted")
         elif still_there:
-            self.status_label.configure(
-                text=f"{label} is still in Q{quarter} — see the log."
+            self.set_status(
+                f"{label} is still in Q{quarter} — see the log.", "error"
             )
         else:
-            self.status_label.configure(
-                text=f"{label} is out of Q{quarter}, but the remove reported a "
-                     f"problem — see the log."
+            self.set_status(
+                f"{label} is out of Q{quarter}, but the remove reported a "
+                f"problem — see the log.", "warning"
             )
 
     def _remove_one(self, ape_id: str, quarter: int) -> bool:
@@ -674,8 +677,8 @@ class APEAssignmentScreen(StatusNoticeMixin, ctk.CTkFrame):
             _year, quarter = parsed
             ok = self._assign_one(row["id"], quarter)
             self.refresh_lists()
-            self.status_label.configure(
-                text=self._describe_quarter_assignment(
+            self.set_status(
+                self._describe_quarter_assignment(
                     [row["id"]],
                     {row["id"]} if ok else set(),
                     self._ids_in_quarter(),

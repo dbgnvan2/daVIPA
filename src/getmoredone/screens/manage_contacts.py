@@ -6,14 +6,28 @@ import customtkinter as ctk
 from typing import TYPE_CHECKING
 
 from ..theme import status_text_color
+from .status_notice import StatusNoticeMixin
 
 if TYPE_CHECKING:
     from ..db_manager import DatabaseManager
     from ..app import GetMoreDoneApp
 
 
-class ManageContactsScreen(ctk.CTkFrame):
-    """Screen for managing contacts."""
+class ManageContactsScreen(StatusNoticeMixin, ctk.CTkFrame):
+    """Screen for managing contacts.
+
+    Purpose: MOD-M1 -- this is the Contacts tab, and it is the opener of
+             ``EditContactDialog`` that the MOD-M2 sweep missed. That dialog
+             reports through ``notify_owner``, which walks up from its master;
+             with no notice line here, all five of its notices (Add, Update,
+             Delete, Deactivate, and "That contact no longer exists.") went to
+             the log and were shown to nobody. Its other opener,
+             ``item_editor_contacts``, has a line, which is why the gap was
+             easy to miss -- the generic P5 shape: the dialog was swept, one
+             of its two openers was not.
+    Spec:    docs/unused-docs/implementation_plan_2026-11-16_modeless_notices.md#mod-m1
+    Tests:   tests/test_modeless_notices.py::test_modm1_every_opener_of_a_reporting_dialog_has_a_line
+    """
 
     def __init__(self, parent, db_manager: 'DatabaseManager', app: 'GetMoreDoneApp'):
         super().__init__(parent)
@@ -67,6 +81,12 @@ class ManageContactsScreen(ctk.CTkFrame):
             command=self.create_new_contact
         )
         btn_new.grid(row=0, column=4, padx=10, pady=10)
+
+        # MOD-M1: under the header, over the list. Rows 0 (header) and 1 (the
+        # scrolling list, the only row with weight) are the screen's own, so
+        # row 2 is its bottom.
+        self.create_status_line(row=2, column=0, sticky="ew",
+                                padx=12, pady=(0, 8))
 
     def refresh(self):
         """Refresh the list of contacts."""

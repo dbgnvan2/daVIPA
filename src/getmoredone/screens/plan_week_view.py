@@ -736,13 +736,23 @@ class PlanWeekViewMixin:
             return
         self.refresh()
         text = f"Moved {block_label(block)} to {short_date(day)} at {moved.start_time}"
+        # MOD-M3: a bare "moved" is a confirmation and may clear itself after
+        # ``notice_dismiss_ms``. A caveat tail is not -- "export that day
+        # again to remove it from Google Calendar" is an instruction, and
+        # without it a stale calendar event survives. Six seconds is not long
+        # enough to find an instruction you were not watching for.
+        caveat = False
         if not self._week_day_read(day):
             text += " — calendar not read for that day"
+            caveat = True
         if moving_date:
-            text += self._take_non_work_note(day)
+            note = self._take_non_work_note(day)
+            text += note
+            caveat = caveat or bool(note)
             if forgotten:
                 text += f" — export {short_date(old_day)} again to remove it from Google Calendar"
-        self.set_status(text, "success")
+                caveat = True
+        self.set_status(text, "success", persist=caveat)
 
     def _placement_for(self, day: str):
         """``(span, committed)`` the placement rules read for ``day``.

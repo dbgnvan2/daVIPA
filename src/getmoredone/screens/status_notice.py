@@ -67,6 +67,10 @@ def report_on(widget, text: str, kind: str = "muted") -> bool:
     Tests:   tests/test_modeless_notices.py::test_modm2_report_on_finds_the_nearest_line
 
     Returns whether a line took it, so a caller that must fall back can tell.
+    That answer is ``set_status``'s own, not "a setter was called": a label
+    that exists can still refuse the write while it is being torn down, and a
+    caller told the user was informed when they were not is the silence this
+    module exists to remove (P6 -- verify the claim against the artifact).
     """
     node = widget
     seen = 0
@@ -79,10 +83,13 @@ def report_on(widget, text: str, kind: str = "muted") -> bool:
         if label is not None and callable(setter):
             try:
                 if label.winfo_exists():
-                    setter(text, kind)
-                    return True
+                    if setter(text, kind):
+                        return True
             except Exception:
-                logger.debug("a notice line on the way up was not usable")
+                # WARNING, not debug: this is one of the ways a notice goes
+                # nowhere, and the quiet ones are the ones nobody finds (P2).
+                logger.warning(
+                    "a notice line on the way up was not usable: %r", text)
         node = getattr(node, "master", None)
     return False
 
@@ -127,7 +134,8 @@ class StatusNoticeMixin:
             label.grid(**grid_kwargs)
         return label
 
-    def set_status(self, text: str, kind: str = "muted"):
+    def set_status(self, text: str, kind: str = "muted",
+                   persist: bool = False) -> bool:
         """Show ``text`` on the notice line, coloured for ``kind``.
 
         Purpose: MOD-M1/M3/M4 -- report to the user without a platform dialog,
@@ -141,6 +149,16 @@ class StatusNoticeMixin:
         An ``info`` or ``success`` notice clears itself after
         ``AppSettings.notice_dismiss_ms``; an ``error``, ``warning`` or
         ``muted`` one stays until the screen says otherwise (MOD-M3).
+
+        ``persist=True`` keeps a transient kind up anyway, for the notices
+        whose text carries something the user still has to do or account for:
+        "export that day again to remove it from Google Calendar" is an
+        instruction, and "removed 4 of 6 blocks" is the partial-outcome
+        evidence the house rules require to be surfaced. A green confirmation
+        is the right colour for both; six seconds is not the right lifetime.
+
+        Returns whether the notice was drawn, so ``report_on`` can keep
+        walking rather than report a write that did not land (P6).
         """
         label = self.notice_label()
         if label is None:
@@ -148,7 +166,7 @@ class StatusNoticeMixin:
             # notice line is a wiring mistake, and the message is the evidence.
             logger.warning("%s has no status line yet; notice dropped: %r",
                            type(self).__name__, text)
-            return
+            return False
 
         self._cancel_pending_dismiss()
         try:
@@ -158,12 +176,13 @@ class StatusNoticeMixin:
             # and a notice that raises there takes the gesture with it --
             # which is PD-M12's traceback. Report and carry on.
             logger.exception("notice could not be drawn: %r", text)
-            return
+            return False
 
-        if text and kind in TRANSIENT_KINDS:
+        if text and not persist and kind in TRANSIENT_KINDS:
             self._schedule_dismiss()
+        return True
 
-    def notify_owner(self, text: str, kind: str = "muted"):
+    def notify_owner(self, text: str, kind: str = "muted") -> bool:
         """Report on the nearest ancestor's notice line instead of this one.
 
         Purpose: MOD-M2 -- a dialog that reports and then closes cannot report
@@ -183,13 +202,14 @@ class StatusNoticeMixin:
         is no new wiring for 19 dialog classes to get wrong.
         """
         if report_on(getattr(self, "master", None), text, kind):
-            return
+            return True
         # Not silently dropped (P2). Falling back to this object's own line is
         # wrong here -- the caller is about to destroy it -- so say so, with
         # the message, and let the walk checklist find the screen that needs
         # a notice line of its own.
         logger.warning("no notice line above %s; %s notice dropped: %r",
                        type(self).__name__, kind, text)
+        return False
 
     def clear_status(self):
         """Take the notice down now."""
@@ -198,6 +218,12 @@ class StatusNoticeMixin:
         if label is None:
             return
         try:
+            if not label.winfo_exists():
+                # The screen went away before the dismissal fired. Nothing is
+                # wrong and nothing is lost, so this is not an ERROR: app.log
+                # is what the walk checklist reads for real dropped notices.
+                logger.debug("the notice line is gone; nothing to clear")
+                return
             label.configure(text="")
         except Exception:
             logger.exception("notice could not be cleared")
@@ -218,6 +244,23 @@ class StatusNoticeMixin:
         # A zero or negative delay would take the notice down in the same
         # frame it went up, which reads as the notice never having appeared.
         return value if value > 0 else default
+
+    def destroy(self):
+        """Cancel a pending dismissal before its target goes away.
+
+        Purpose: MOD-M3 -- ``utils/after_tracker.py`` was written for exactly
+                 this: a timer against a widget the user can close in the
+                 meantime fires into Tk as "invalid command name", or here
+                 lands in ``clear_status`` and writes an ERROR traceback to
+                 ``app.log`` for an ordinary sidebar click (P30).
+        Tests:   tests/test_modeless_notices.py::test_modm3_destroy_cancels_a_pending_dismissal
+
+        ``TrackedAfterMixin`` does not override ``after``, so mixing it in
+        does not cover this; the mixin sits ahead of it in every MRO, so
+        ``super().destroy()`` still reaches its cancellation and the widget's.
+        """
+        self._cancel_pending_dismiss()
+        super().destroy()
 
     def _schedule_dismiss(self):
         try:

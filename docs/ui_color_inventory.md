@@ -2421,7 +2421,7 @@ Each row is from grep output and includes `file:line` and a short snippet.
 
 | File:Line | Snippet |
 |---|---|
-| `src/getmoredone/screens/vps_editors.py:1301` | `separator = ctk.CTkFrame(main_frame, height=2, fg_color="gray")` |
+| `src/getmoredone/screens/vps_editors.py:1306` | `separator = ctk.CTkFrame(main_frame, height=2, fg_color="gray")` |
 | `src/getmoredone/theme.py:270` | `"gray": palette["muted_text"],` |
 | `themes/apple_grey.json:176` | `"gray",` |
 | `themes/apple_grey.json:177` | `"gray"` |

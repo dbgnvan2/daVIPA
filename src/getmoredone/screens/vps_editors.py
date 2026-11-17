@@ -256,11 +256,15 @@ class TLVisionEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
                     success_metrics=metrics_json
                 )
 
-            # Close dialog
-            self.destroy()
-
         except Exception as e:
             self.set_status(f"Could not save the vision: {e}", "error")
+            return
+        # MOD-M2: outside the ``try``. The ``except`` reports on this dialog's
+        # own notice line now, so a TclError out of ``destroy()`` after the
+        # save had already succeeded would write "could not save" onto a
+        # widget that is going away -- a false failure, and an invisible one.
+        # ``messagebox.showerror`` did not need the dialog to still exist.
+        self.destroy()
 
 
 class QuarterInitiativeEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
@@ -844,11 +848,11 @@ class AnnualPlanEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
                     description=description
                 )
 
-            # Close dialog
-            self.destroy()
-
         except Exception as e:
             self.set_status(f"Could not save the annual plan: {e}", "error")
+            return
+        # MOD-M2: outside the ``try`` -- see ``save_vision``.
+        self.destroy()
 
 
 class AnnualInitiativeEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
@@ -1008,10 +1012,12 @@ class AnnualInitiativeEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
                     outcome_statement=outcome_statement
                 )
 
-            self.destroy()
         except Exception as e:
             self.set_status(
                 f"Could not save the annual initiative: {e}", "error")
+            return
+        # MOD-M2: outside the ``try`` -- see ``save_vision``.
+        self.destroy()
 
 
 class MonthTacticEditorDialog(ctk.CTkToplevel):
@@ -1434,13 +1440,13 @@ class WeekActionEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
                 self.action_id = action_id
                 saved_id = action_id
 
-            if close_on_success:
-                self.destroy()
-            return saved_id
-
         except Exception as e:
             self.set_status(f"Could not save the week action: {e}", "error")
             return None
+        # MOD-M2: outside the ``try`` -- see ``save_vision``.
+        if close_on_success:
+            self.destroy()
+        return saved_id
 
     def save_action(self):
         """Save and close."""

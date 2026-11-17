@@ -276,8 +276,8 @@ class VPSSegmentEditorDialog(StatusNoticeMixin, ctk.CTkToplevel):
                     order_index=order_index
                 )
 
-            # Close dialog
-            self.destroy()
-
         except Exception as e:
             self.set_status(f"Could not save the segment: {e}", "error")
+            return
+        # MOD-M2: outside the ``try`` -- see ``vps_editors.save_vision``.
+        self.destroy()

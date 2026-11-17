@@ -180,8 +180,13 @@ class WeekTacticActionsPanel(TodayScreen):
         Tests: tests/test_ape_week_actions.py::test_awam54_add_action_item_links_by_weekly_tactic_id
         """
         if not self.selected_tactic:
-            # The panel has no line of its own; the screen around it does.
-            self.notify_owner(
+            # The panel's own line, inherited from TodayScreen at row 4 (see
+            # _build_toolbar). ``notify_owner`` was wrong here: it starts at
+            # ``self.master`` and WeekActionsScreen has no ``set_status``, so
+            # nothing above this panel can take a notice and the refusal went
+            # to the log only. This is the same line `notify_weekly_tactic_
+            # changes(self.db_manager, self)` below already reports on.
+            self.set_status(
                 "Select a Weekly Tactic on the left first.", "warning")
             return
 

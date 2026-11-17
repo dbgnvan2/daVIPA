@@ -408,10 +408,12 @@ class AnnualVisionSegmentsScreen(StatusNoticeMixin, ctk.CTkFrame):
         """
         key = row.get("id")
         if not key:
-            self.status_label.configure(
-                text="That row carries no Vision Element to add.")
+            self.set_status("That row carries no Vision Element to add.",
+                            "warning")
             return
-        self.status_label.configure(text=self._perform_add(key))
+        # MOD-M1: through ``set_status``, so this label has one writer and one
+        # colour contract. A raw write kept the last notice's colour.
+        self.set_status(self._perform_add(key), "muted")
 
     # --------------------------------------------------- VTF-M3: Add New
 
@@ -509,7 +511,7 @@ class AnnualVisionSegmentsScreen(StatusNoticeMixin, ctk.CTkFrame):
             options=self._add_options(),
             initial=self._add_default(),
             confirm_text="Add",
-            report=lambda text: self.status_label.configure(text=text),
+            report=lambda text: self.set_status(text, "muted"),
             on_confirm=self._perform_add,
             empty_message=self._empty_add_message(year),
         )

@@ -197,10 +197,11 @@ class EditContactDialog(StatusNoticeMixin, ctk.CTkToplevel):
                 self.db_manager.create_contact(new_contact)
                 self.notify_owner(f"Added {name}.", "success")
 
-            self.destroy()
-
         except Exception as e:
             self.set_status(f"Could not save the contact: {e}", "error")
+            return
+        # MOD-M2: outside the ``try`` -- see ``vps_editors.save_vision``.
+        self.destroy()
 
     def delete_contact(self):
         """Delete the contact."""
@@ -217,10 +218,14 @@ class EditContactDialog(StatusNoticeMixin, ctk.CTkToplevel):
         if not confirm:
             return
 
+        # MOD-M2: nothing that reports or closes sits inside these ``try``
+        # blocks -- see ``vps_editors.save_vision``. Here the outer ``except``
+        # does not even report: it asks, so a TclError out of ``destroy()``
+        # after a successful delete used to raise the "Cannot delete" prompt
+        # over a contact that had just gone (P5, the same shape as the five
+        # save paths).
         try:
             self.db_manager.delete_contact(self.contact_id)
-            self.notify_owner(f"Deleted {self.contact.name}.", "success")
-            self.destroy()
         except Exception as e:
             # If deletion fails (likely due to foreign key constraint), offer to deactivate instead
             deactivate = messagebox.askyesno(
@@ -232,12 +237,16 @@ class EditContactDialog(StatusNoticeMixin, ctk.CTkToplevel):
             if deactivate:
                 try:
                     self.db_manager.deactivate_contact(self.contact_id)
-                    self.notify_owner(
-                        f"Deactivated {self.contact.name}.", "success")
-                    self.destroy()
                 except Exception as e2:
                     self.set_status(
                         f"Could not deactivate the contact: {e2}", "error")
+                    return
+                self.notify_owner(
+                    f"Deactivated {self.contact.name}.", "success")
+                self.destroy()
+            return
+        self.notify_owner(f"Deleted {self.contact.name}.", "success")
+        self.destroy()
 
     def cancel(self):
         """Cancel and close dialog."""

@@ -2088,7 +2088,11 @@ class PlanScreen(StatusNoticeMixin, PlanWeekViewMixin, PlanCommitmentEditsMixin,
             detail = outcome.errors[0] if outcome.errors else ""
             self.set_status(f"{line}{(' — ' + detail) if detail else ''}", "error")
         elif outcome.exported or outcome.deleted_orphans:
-            self.set_status(line, "success")
+            # ``persist``: ``summary_line`` carries what was exported and what
+            # was deleted. The ``else`` below is ``muted`` and stays, so a
+            # self-clearing success here left the one branch with counts in it
+            # as the only one the user could miss.
+            self.set_status(line, "success", persist=True)
         else:
             self.set_status(line, "muted")
 
@@ -2369,7 +2373,10 @@ class PlanScreen(StatusNoticeMixin, PlanWeekViewMixin, PlanCommitmentEditsMixin,
             said += " — 1 break or buffer left in place"
         elif kept:
             said += f" — {kept} break and buffer blocks left in place"
-        self.set_status(said, "success")
+        # ``persist`` because of the comment above: the point of carrying both
+        # numbers is that the user can see what was left behind, and evidence
+        # that erases itself after six seconds is not surfaced (P2).
+        self.set_status(said, "success", persist=True)
 
     def first_clear_slot(self, minutes: int) -> Optional[int]:
         """The earliest box in today's grid with nothing in it at all.

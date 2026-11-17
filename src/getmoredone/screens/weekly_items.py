@@ -291,7 +291,7 @@ class WeeklyItemsScreen(StatusNoticeMixin, ctk.CTkFrame):
             self.all_right_items = []
             self.shown_week_start = ""
             self._render_lists()
-            self.status_label.configure(text="Choose a Week Start.")
+            self.set_status("Choose a Week Start.", "warning")
             return
 
         week_start, year, month = parsed
@@ -318,7 +318,11 @@ class WeeklyItemsScreen(StatusNoticeMixin, ctk.CTkFrame):
             text=f"Month-assigned APEs for {year}-{month:02d} "
                  "(tick to filter the tactics on the right)")
         self.right_title_label.configure(text=self._right_title())
-        self.status_label.configure(text=self._describe_counts())
+        # MOD-M1: through ``set_status``, not ``configure``. This label is
+        # also the screen's notice line, and a raw write left the previous
+        # notice's colour on a neutral count summary and left a pending
+        # dismissal running that would have blanked it.
+        self.set_status(self._describe_counts(), "muted")
 
     def jump_to_current_week(self):
         current_week_start = self._week_start_for(date.today()).isoformat()
@@ -474,7 +478,7 @@ class WeeklyItemsScreen(StatusNoticeMixin, ctk.CTkFrame):
         """VTF-M3.4/M5.4 — pick a parent APE and add a tactic for the week."""
         parsed = self._selected_week_context()
         if not parsed:
-            self.status_label.configure(text="Choose a Week Start first.")
+            self.set_status("Choose a Week Start first.", "warning")
             return None
         week_start, _year, _month = parsed
         return open_pick_record_dialog(
@@ -484,7 +488,7 @@ class WeeklyItemsScreen(StatusNoticeMixin, ctk.CTkFrame):
             options=self._add_options(),
             initial=self._add_default(),
             confirm_text="Add Tactic",
-            report=lambda text: self.status_label.configure(text=text),
+            report=lambda text: self.set_status(text, "muted"),
             on_confirm=self._create_tactic_for,
             empty_message=self._empty_add_message(),
         )
@@ -582,7 +586,7 @@ class WeeklyItemsScreen(StatusNoticeMixin, ctk.CTkFrame):
         self.selected_weekly_item = None
         self.right_items = self._visible_right_items()
         self.right_title_label.configure(text=self._right_title())
-        self.status_label.configure(text=self._describe_counts())
+        self.set_status(self._describe_counts(), "muted")
         self._render_right_rows()
 
     def _right_title(self) -> str:
@@ -821,11 +825,11 @@ class WeeklyItemsScreen(StatusNoticeMixin, ctk.CTkFrame):
         if not self._selected_week_context():
             # The dialog says the same thing on the same input; the drag path
             # used to do nothing at all for it.
-            self.status_label.configure(
-                text="Select a Week Start before dragging an Annual Plan Element."
-            )
+            self.set_status(
+                "Select a Week Start before dragging an Annual Plan Element.",
+                "warning")
             return
-        self.status_label.configure(text=self._create_tactic_for(row["id"]))
+        self.set_status(self._create_tactic_for(row["id"]), "muted")
 
     def _ape_matches_filters(self, row: Dict[str, object]) -> bool:
         seg, sub, cat = self._ape_parts(row)

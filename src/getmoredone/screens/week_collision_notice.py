@@ -124,10 +124,13 @@ def notify_cascade(db_manager: Any, parent: Any = None) -> bool:
     if not message:
         return False
     # MOD-M2: on the notice line of the screen that saved, not a dialog over
-    # it. A failure is a ``warning`` so it stays until the screen replaces it;
-    # what the cascade built is ``info`` and clears itself (MOD-M3).
-    kind = "warning" if getattr(report, "failed", False) else "info"
-    shown = report_on(parent, message, kind)
+    # it. Always a ``warning``, never a self-clearing ``info``:
+    # ``cascade_needs_attention`` admits exactly two things and both need the
+    # user, so there is no transient case to have. The stubs one says "need
+    # your words" and its own docstring says nothing else will ever ask, so a
+    # six-second lifetime would be quieter than the modal this replaced --
+    # the one way this change could make the app worse.
+    shown = report_on(parent, message, "warning")
     if not shown:
         # Not silently dropped (P2). No notice line above this parent means a
         # screen the MOD-M1 sweep did not reach, and the message is the
