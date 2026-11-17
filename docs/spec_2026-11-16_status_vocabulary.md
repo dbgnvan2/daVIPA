@@ -80,17 +80,26 @@ Two more came out of the sweep over this batch:
 - **It refuses a connection whose commits are deferred.** `PRAGMA
   foreign_keys = OFF` is ignored while a transaction is open, so the rebuild
   depends on a commit it does not own -- and inside
-  `DatabaseManager.transaction()` that commit is a no-op, which would leave
-  enforcement ON and let `DROP TABLE project_boards` cascade every item and
-  note away. No caller does that today (both `initialize_schema` callers run
-  at construction); it refuses rather than rest on that holding, reads the
-  pragma back before the destructive half, and uses `force_commit` for the two
-  commits it owns.
+  `DatabaseManager.transaction()` it must not make one, because committing
+  there makes the caller's partial work durable, which is the all-or-nothing
+  guarantee `_DeferredCommitConnection` exists to give. Going ahead without
+  committing would instead leave enforcement ON and let `DROP TABLE
+  project_boards` cascade every item and note away. Neither is acceptable, so
+  it declines the connection, and reads the pragma back before the destructive
+  half. It commits with the plain `commit`, not `force_commit`: if the refusal
+  were ever removed, a gated commit leaves the transaction open and the
+  read-back declines, where `force_commit` would commit and then destroy the
+  children. All three `initialize_schema` callers run at construction on an
+  undeferred connection -- and the third, `selftest.check_database()`, runs
+  this rebuild against the user's real database.
 
 The "already migrated?" question is answered from the matched `CHECK`, not the
 whole schema text, so a comment that mentions `'canceled'` cannot make an
 un-migrated database skip the rebuild. The pattern is case-insensitive and
-tolerates a quoted column name.
+tolerates a quoted column name. The fallback warning is anchored on the
+`status` column, so a `CHECK(length(status) > 0)` is not mistaken for a
+vocabulary constraint and warned about on every launch. The copy quotes its
+column names, since `action_items` already carries one called `group`.
 
 No row's `status` value is rewritten, in any table.
 
@@ -107,9 +116,33 @@ takes `show_canceled`, the toolbar has a `Show Canceled` box beside the other
 two, and the screen reports a refusal rather than refreshing over a discarded
 `False`.
 
+`set_project_board_status` returns the row count rather than the fact that a
+statement ran: a board deleted on another screen leaves a card whose button
+still carries its id, and the screen now builds a user-facing claim from that
+return value. The refusal is reported on the screen's own notice line, not in
+a platform dialog -- MOD-M2 keeps an exact allowlist of two, and this is not
+one of them.
+
+The same failure survived in the item editor's project picker, whose `PL1`
+promise is that the item's own project never disappears whatever its status.
+It is implemented as an escape hatch applied *after* the query, so a canceled
+board -- which the query could not return -- never reached it. It passes
+`show_canceled=True`; `SELECTABLE_STATUSES` still keeps canceled out of what
+is offered. The two `drag_schedule.py` callers correctly leave it out: a
+canceled project should not be schedulable.
+
+The Status combobox is free-text and `create_project_board` /
+`update_project_board` do not gate what they are handed, so the editor clamps
+a typed value to `ProjectBoardStatus.ALL`. The ungated writers themselves are
+`SVU-A4`.
+
 The three board filters sit **left** of the toolbar's spacer column. Right of
 it the new box joins the size controls in the wrapped second row and pushes it
-28px past the header's width at the default window (SPC-D10).
+28px past the header's width at the default window (SPC-D10). That header is
+always wrapped at the default window, so what the user sees on launch is the
+row left of the spacer -- which `wrap_row_px` does not measure and nothing
+watched. The third filter took 140 of the 221px of headroom it had, so it has
+its own budget guard now.
 
 Code: `db_manager_project_boards.py`, `screens/project_boards.py`.
 
@@ -184,6 +217,12 @@ Code: `screens/project_boards.py`.
 | SVU-M3 | A canceled board is out of the default list and reachable | `test_svum3_a_canceled_board_is_hidden_but_reachable` |
 | SVU-M3 | A refused status change is reported, not redrawn | `test_svum3_a_refused_board_status_is_reported_not_swallowed` |
 | SVU-M3 | The toolbar offers Show Canceled | `test_svum3_the_toolbar_offers_show_canceled` |
+| SVU-M3 | A refused change is reported on the notice line, not a dialog | `test_svum3_a_refused_board_status_is_reported_not_swallowed` |
+| SVU-M3 | A stale board id is not reported as applied | `test_svum3_a_stale_board_id_is_not_reported_as_applied` |
+| SVU-M3 | A typed status cannot reach the writer | `test_svum3_a_typed_status_cannot_reach_the_writer` |
+| SVU-M3 | The picker keeps the item's own canceled project | `tests/test_item_editor_project_link.py::test_svum3_current_project_is_listed_even_when_canceled` |
+| SVU-M3 | The row left of the spacer fits the default window | `tests/test_screen_resize_spc.py::test_spcs3_the_unwrapping_row_fits_the_default_window` |
+| SVU-M2 | A `CHECK(length(status) > 0)` does not warn every launch | `test_svum2_a_length_check_does_not_warn_every_launch` |
 
 ## 5. Known gaps
 
@@ -191,11 +230,16 @@ Code: `screens/project_boards.py`.
   dropdown offers it, the `CHECK` accepts it and `Show Canceled` finds it
   again, but the toolbar's one-click status buttons are still `Set Active` /
   `Set Pending` / `Complete`. Filed in `BACKLOG.md`.
-- **A `status` CHECK this cannot parse is left in place with a log line.**
-  That database then rejects `canceled`, and the failure surfaces later as an
-  unhandled `IntegrityError` from the editor rather than at startup. Only a
-  hand-edited database reaches it -- no such shape has ever shipped -- so it is
-  filed as `SVU-A3` rather than fixed here.
+- **Three paths out of the migration leave a database that cannot store
+  `canceled`, and publish nothing a caller can read**: an unparseable `status`
+  CHECK, the deferred-commit refusal, and the pragma read-back. Only the first
+  is reachable today, and only by a hand-edited database -- no such shape has
+  ever shipped. Filed as `SVU-A3`, whose fix is the
+  `weekly_tactic_migration_report` shape this file already uses twice.
+- **`create_project_board` and `update_project_board` do not validate
+  `status`.** The editor clamps before calling them, so nothing reaches them
+  unvalidated today, but the gate is in the caller rather than the writer.
+  Filed as `SVU-A4`.
 - **The pragma read-back before the destructive half has no test**, by
   construction: its one reachable trigger is refused earlier, and any other
   connection would still roll back in the `finally`, so a guard could only ever

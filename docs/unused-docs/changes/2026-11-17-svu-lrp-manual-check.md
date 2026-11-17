@@ -1,9 +1,9 @@
 # Manual check: SVU/LRP, the Projects right-hand panel
 
-**Date:** 2026-11-17 **Batch:** `f136044`..`bd510a2`
+**Date:** 2026-11-17 **Batch:** `f136044`..`0a10162`
 **Spec:** [`docs/spec_2026-11-16_status_vocabulary.md`](../../spec_2026-11-16_status_vocabulary.md)
 
-The batch's 44 criteria are green under pytest, including widget-level checks
+The batch's 49 criteria are green under pytest, including widget-level checks
 that build the real panel. What pytest does **not** do is launch the app
 against the real database, and this session does not drive the machine. So the
 list below is for a human at the keyboard.
@@ -38,25 +38,30 @@ holds the database lock.
    once Show Canceled is unticked again.
 9. Narrow the window until the toolbar wraps: Show Pending / Show Complete /
    Show Canceled stay on the first row and only the size controls wrap.
+10. Open an action item filed under that canceled project and click its
+    project field: the project is still listed, with the tick on it. (It was
+    not, until the second review pass.)
+11. In the project editor, type a nonsense status into the Status box and
+    save: the project comes back Active rather than raising.
 
 ## The right-hand panel
 
-10. Click a project. The header line reads `Action Items`, then the count,
+12. Click a project. The header line reads `Action Items`, then the count,
    then three checkboxes — **Open**, **Completed**, **Canceled** — all
    left-justified on one line. Open is ticked, the other two are not.
-11. There is no `Next Step:` line in the detail header above it, and no
+13. There is no `Next Step:` line in the detail header above it, and no
    separate right-justified `Show Completed` row.
-12. The count reads `N items`, or `N shown • M hidden` when something is
+14. The count reads `N items`, or `N shown • M hidden` when something is
    filtered out.
-13. Select All is the unlabelled checkbox at the left of the column heading
+15. Select All is the unlabelled checkbox at the left of the column heading
     strip, directly above each row's own checkbox — the two line up.
-14. Tick **Completed**: completed items appear, and completed Project Notes
+16. Tick **Completed**: completed items appear, and completed Project Notes
     appear too. Untick it: both go away.
-15. Untick all three: the list is empty and says how many are hidden.
-16. Project Notes shows only its header line — `▸ Project Notes` and the
+17. Untick all three: the list is empty and says how many are hidden.
+18. Project Notes shows only its header line — `▸ Project Notes` and the
     count. Click the triangle: the notes list opens. Click again: it folds.
     The count stays visible either way.
-17. Resize the window: the four item columns still fill the width and the
+19. Resize the window: the four item columns still fill the width and the
     heading strip still sits over the rows (Select All replaced one of
     `build_header`'s heading labels, so this is the check that it did not
     disturb the column widths).

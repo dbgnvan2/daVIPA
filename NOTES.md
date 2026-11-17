@@ -16,10 +16,19 @@ migration could brick the database.**
   Pending and Show Complete, and a refusal is reported instead of redrawn as
   success.
 
-Eleven new guards, each mutation-proved. One of the previous batch's own
-guards turned out to pass with the method stubbed out and was rewritten. Spec
-and criteria: [`docs/spec_2026-11-16_status_vocabulary.md`](docs/spec_2026-11-16_status_vocabulary.md),
-44 of 44.
+A second pair of passes over those fixes found the fix commit itself had left
+the suite red — the refusal used `messagebox.showerror`, and MOD-M2 keeps an
+exact allowlist of two platform dialogs — and that the same vanishing-project
+bug survived in the item editor's project picker, which could not keep its
+`PL1` promise for a canceled board. Both fixed.
+
+Fifteen new guards across the two fix rounds, each mutation-proved. Two
+guards written during this work turned out not to pin what they claimed: one
+passed with the method stubbed out, the other locked in place the dialog
+MOD-M2 forbids. Both rewritten. A third, for the pragma read-back, was deleted
+rather than kept, because no mutation of that branch is observable. Spec and criteria:
+[`docs/spec_2026-11-16_status_vocabulary.md`](docs/spec_2026-11-16_status_vocabulary.md),
+49 of 49.
 
 ## A project can be canceled, and the Projects panel rebuilt (2026-11-16)
 

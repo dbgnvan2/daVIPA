@@ -41,16 +41,31 @@ the `project_boards` `CHECK`, but the board toolbar's one-click buttons are
 still `Set Active` / `Set Pending` / `Complete`. Named here rather than added
 silently to a batch that was about the vocabulary (global rule 10).
 
-### SVU-A3 — a status CHECK the migration cannot parse (low)
+### SVU-A3 — the migration's three silent exits (low)
 
-`_widen_board_status_check` rewrites `project_boards`'s own `CHECK` by regex.
-Where that pattern does not match, it logs and leaves the table alone — and
-that database then rejects `canceled`, so the failure surfaces later as an
-unhandled `IntegrityError` from the project editor rather than at startup.
-Only a hand-edited database reaches it (`git log -S` shows no such shape has
-ever shipped), which is why it is filed rather than fixed. The fix is either
-to publish the outcome the way `weekly_tactic_migration_report` does, or to
-probe the constraint with a rolled-back insert instead of reading schema text.
+`_widen_board_status_check` has three paths that leave a database unable to
+store `canceled` while publishing nothing a caller can read: an unparseable
+`status` CHECK, the deferred-commit refusal, and the pragma read-back. Each
+logs and returns. The consequence surfaces later, if at all, as an
+`IntegrityError` from the project editor rather than at startup.
+
+Only the first is reachable today, and only on a hand-edited database (`git
+log -S` shows no such schema has ever shipped), which is why this is filed
+rather than fixed. The fix is the shape this file already uses twice —
+`weekly_tactic_migration_report` and `link_integrity_report`, both justified
+in-code as "a large data change is never silent (P2)": a
+`board_status_migration_report` attribute set on every exit path.
+
+### SVU-A4 — `create_project_board` / `update_project_board` do not gate status (low)
+
+`set_project_board_status` validates against `ProjectBoardStatus.ALL`, but the
+two writers the project editor uses take whatever they are handed, and the
+editor's Status combobox is free-text (`combo_box_style()` sets colours, not
+`state`). The editor clamps to the vocabulary before calling them, so nothing
+unvalidated reaches them today — but the gate is in the caller, which is what
+let `set_project_board_status` fall behind the vocabulary in the first place
+(global rule 8). Validate in the writers, and consider `state="readonly"` on
+the combobox.
 
 ## Recovered from a deleted branch (filed 2026-11-16)
 
