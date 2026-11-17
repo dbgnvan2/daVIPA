@@ -478,6 +478,18 @@ def test_svum3_every_board_status_can_be_set(tmp_path):
         manager.close()
 
 
+def test_svum3_a_stale_board_id_is_not_reported_as_applied(tmp_path):
+    """P6 -- the return value is the caller's evidence that the write landed.
+
+    A board deleted on another screen leaves a card whose button still carries
+    its id. `UPDATE ... WHERE id = ?` matches nothing and the statement still
+    succeeds, so the row count is what separates applied from accepted.
+    """
+    manager = DatabaseManager(str(tmp_path / "stale.db"))
+    assert manager.set_project_board_status(
+        "no-such-board", ProjectBoardStatus.COMPLETED) is False
+
+
 def test_svum3_an_unknown_board_status_is_refused(tmp_path):
     manager = DatabaseManager(str(tmp_path / "badstatus.db"))
     try:
@@ -509,6 +521,40 @@ def test_svum3_a_canceled_board_is_hidden_but_reachable(tmp_path):
         assert board_id in shown
     finally:
         manager.close()
+
+
+@pytest.mark.parametrize("check", [
+    # The splice only handles `CHECK(status IN (...))` as the whole body.
+    # Both of these are real vocabulary constraints it cannot widen, so
+    # 'canceled' will not store on such a database and the user has to be
+    # told. An anchor that required `status` to come first in the CHECK sent
+    # both to debug, which is silence.
+    "CHECK (title <> '' AND status IN ('active', 'pending', 'completed'))",
+    "CHECK (status = 'active' OR status = 'pending')",
+])
+def test_svum2_an_unwidenable_vocabulary_check_warns(tmp_path, caplog, check):
+    """A constraint the splice cannot parse is reported, not passed over."""
+    db_path = str(tmp_path / "odd_check.db")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(f"""
+            CREATE TABLE project_boards (
+                {BOARD_COLUMNS},
+                status TEXT NOT NULL DEFAULT 'active',
+                completed_at TEXT,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+                {check}
+            )
+        """)
+        conn.commit()
+
+    with caplog.at_level(logging.DEBUG, logger="src.getmoredone.database"):
+        DatabaseManager(db_path)
+
+    warnings = [record.message for record in caplog.records
+                if record.levelno >= logging.WARNING
+                and "SVU-M2" in record.message]
+    assert len(warnings) == 1, caplog.text
+    assert "no status CHECK to widen" in warnings[0]
 
 
 def test_svum2_a_length_check_does_not_warn_every_launch(tmp_path, caplog):

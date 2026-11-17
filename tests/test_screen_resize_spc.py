@@ -730,6 +730,9 @@ def test_spcs3_the_unwrapping_row_fits_the_default_window(projects_screen):
         if int(info["column"]) > wrap.spacer_col:
             continue
         used += child.winfo_reqwidth() + _pad_total(info.get("padx", 0))
+    assert used > 0, (
+        "no controls were measured -- control_row or spacer_col moved and this "
+        "guard would pass on an empty sum")
     assert used <= budget, (
         f"the controls left of the spacer need {used} px and the header gets "
         f"{budget} px at the default window")

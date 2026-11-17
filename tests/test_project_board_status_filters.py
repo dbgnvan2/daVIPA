@@ -345,14 +345,16 @@ def test_svum1_project_editor_offers_all_four_statuses(db_manager):
 
 # --------------------------------------------------------------------- SVU-M3
 
-def test_svum3_a_refused_board_status_is_reported_not_swallowed(
+def test_svum3_an_unknown_status_is_refused_without_a_redraw(
         screen, monkeypatch):
-    """`set_project_board_status` says no by returning False.
+    """The two reasons a status change does not land need different answers.
 
-    The screen used to discard it and refresh, which redrew the unchanged
-    board and was indistinguishable from success. It reports on this screen's
-    own notice line: MOD-M2 leaves only two platform dialogs in the app, both
-    for a failure with no screen to put a notice on, and this is not one.
+    An unknown status changed nothing, so there is nothing to redraw. The
+    notice names the vocabulary, as `validation.py`'s messages do -- a notice
+    that only says the attempt failed leaves the user without the one fact
+    that would let them fix it. Reported on this screen's own notice line:
+    MOD-M2 leaves only two platform dialogs in the app, both for a failure
+    with no screen to put a notice on, and this is not one.
     """
     screen_obj, board_id, _ids, _root = screen
     refreshed = []
@@ -360,41 +362,44 @@ def test_svum3_a_refused_board_status_is_reported_not_swallowed(
 
     screen_obj.set_board_status(board_id, "open")
 
-    assert "open" in screen_obj.status_label.cget("text")
+    assert screen_obj.status_label.cget("text") == (
+        "Status must be one of: active, pending, canceled, completed.")
     assert (screen_obj.status_label.cget("text_color")
             == status_text_color("error"))
     assert not refreshed, "nothing changed, so there is nothing to redraw"
 
 
-def test_svum3_a_stale_board_id_is_not_reported_as_applied(screen):
-    """P6 -- the return value is the screen's evidence that the write landed.
+def test_svum3_a_board_deleted_elsewhere_is_refreshed_away(
+        screen, monkeypatch):
+    """The other reason: a real status, and no row to apply it to.
 
-    A board deleted on another screen leaves a card whose button still carries
-    its id. `UPDATE ... WHERE id = ?` matches nothing and the statement still
-    succeeds, so the row count is what separates applied from accepted.
+    The card belongs to a board another screen deleted. Leaving it on the
+    board means every further click on it fails identically, with a notice
+    that describes a project the user can still see.
     """
     screen_obj, _board_id, _ids, _root = screen
-    assert screen_obj.db_manager.set_project_board_status(
-        "no-such-board", ProjectBoardStatus.COMPLETED) is False
+    refreshed = []
+    monkeypatch.setattr(screen_obj, "refresh", lambda: refreshed.append(1))
+
+    screen_obj.set_board_status("no-such-board", ProjectBoardStatus.COMPLETED)
+
+    assert screen_obj.status_label.cget("text") == (
+        "That project no longer exists. Board refreshed.")
+    assert (screen_obj.status_label.cget("text_color")
+            == status_text_color("error"))
+    assert refreshed, "the ghost card has to go, or the next click repeats this"
 
 
-def test_svum3_a_typed_status_cannot_reach_the_writer(db_manager):
-    """The editor's Status combobox is free-text and the writers are ungated.
-
-    An unknown value either raises IntegrityError into Tk's callback handler
-    or, on a database the migration leaves CHECK-less, stores and drops the
-    board out of every status filter -- SVU-M3's own failure by another door.
-    """
-    board = ProjectBoard(title="Typed")
-    db_manager.create_project_board(board)
-    stub = SimpleNamespace(
-        board=db_manager.get_project_board(board.id),
+def _editor_stub(db_manager, board, typed):
+    """The editor's save path with everything but Status held constant."""
+    return SimpleNamespace(
+        board=board,
         title_var=SimpleNamespace(get=lambda: "Typed"),
         ape_var=SimpleNamespace(get=lambda: "label"),
         ape_label_to_id={"label": "ape-1"},
-        set_status=lambda *args, **kwargs: None,
+        notices=[],
         priority_var=SimpleNamespace(get=lambda: ""),
-        status_var=SimpleNamespace(get=lambda: "actve"),
+        status_var=SimpleNamespace(get=lambda: typed),
         next_step_var=SimpleNamespace(get=lambda: ""),
         notes_box=SimpleNamespace(get=lambda *a: ""),
         start_date_var=SimpleNamespace(get=lambda: ""),
@@ -403,10 +408,58 @@ def test_svum3_a_typed_status_cannot_reach_the_writer(db_manager):
         result=None,
         destroy=lambda: None,
     )
+
+
+def test_svum3_a_typed_status_is_refused_not_corrected(db_manager):
+    """The editor's Status combobox is free-text and the writers are ungated.
+
+    An unknown value either raises IntegrityError into Tk's callback handler
+    or, on a database the migration leaves CHECK-less, stores and drops the
+    board out of every status filter -- SVU-M3's own failure by another door.
+
+    It is refused, the way the invalid Annual Plan Element three lines above
+    it is. A silent fallback to `active` was worse than either: it moved the
+    project into the active group and discarded `completed_at` below, and said
+    nothing.
+    """
+    board = ProjectBoard(title="Typed", status=ProjectBoardStatus.COMPLETED)
+    board.completed_at = "2026-11-17T09:00:00"
+    db_manager.create_project_board(board)
+    stub = _editor_stub(db_manager, db_manager.get_project_board(board.id),
+                        "actve")
+    stub.set_status = lambda text, kind=None: stub.notices.append((text, kind))
+
     ProjectBoardEditorDialog.save(stub)
 
+    assert stub.result is None, "a refused save must not produce a board"
+    assert stub.notices == [
+        ("Status must be one of: active, pending, canceled, completed.",
+         "error")]
+    stored = db_manager.get_project_board(board.id)
+    assert stored.status == ProjectBoardStatus.COMPLETED
+    assert stored.completed_at == "2026-11-17T09:00:00", (
+        "the clamp used to fall through to active and wipe this")
+
+
+def test_svum3_a_capitalised_status_is_accepted(db_manager):
+    """`Completed` is the capitalisation the board's buttons and the guide use.
+
+    The dropdown's own values are lowercase, so the two spellings meet in this
+    box. Folding case accepts it rather than refusing a user who typed what
+    the rest of the UI shows them.
+    """
+    board = ProjectBoard(title="Typed")
+    db_manager.create_project_board(board)
+    stub = _editor_stub(db_manager, db_manager.get_project_board(board.id),
+                        " Completed ")
+    stub.set_status = lambda text, kind=None: stub.notices.append((text, kind))
+
+    ProjectBoardEditorDialog.save(stub)
+
+    assert stub.notices == [], stub.notices
     assert stub.result is not None, "the dialog produced no board"
-    assert stub.result.status in ProjectBoardStatus.ALL, stub.result.status
+    assert stub.result.status == ProjectBoardStatus.COMPLETED
+    assert stub.result.completed_at, "a completed project is stamped"
 
 
 def test_svum3_the_toolbar_offers_show_canceled(screen):
