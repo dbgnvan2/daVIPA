@@ -72,19 +72,43 @@ def _ask_the_display(attribute: str) -> bool:
 def usefixtures_names(node) -> set:
     """The fixture names a ``usefixtures`` mark on this node asks for.
 
-    Separate from ``fixture_names`` because a ``ClassDef`` carries the same
-    mark and has no parameters to read, and pytest applies a class's mark
-    to every method on it.
+    Separate from ``fixture_names`` because the two nodes that carry the same
+    mark have no parameters to read: a ``ClassDef``, whose mark pytest
+    applies to every method on it, and a ``Module``, where the mark is written
+    as ``pytestmark = ...`` and applies to every test in the file. Ten
+    test files here already use the module spelling, so it is the house way to
+    mark a whole file, and reading only ``decorator_list`` made a module given
+    a real window read as needing none (cold pass, 2026-11-16).
+
+    Known gap, surfaced rather than handled: ``usefixtures(*NAMES)`` is a
+    ``Starred`` argument whose value cannot be resolved from the syntax, so it
+    contributes no names. Nothing in this repo writes it.
     """
     import ast
 
+    if isinstance(node, ast.Module):
+        marks = []
+        for statement in node.body:
+            if not isinstance(statement, ast.Assign):
+                continue
+            if not any(isinstance(target, ast.Name)
+                       and target.id == "pytestmark"
+                       for target in statement.targets):
+                continue
+            value = statement.value
+            marks.extend(value.elts
+                         if isinstance(value, (ast.List, ast.Tuple))
+                         else [value])
+    else:
+        marks = list(node.decorator_list)
+
     names = set()
-    for decorator in node.decorator_list:
-        if not isinstance(decorator, ast.Call):
+    for mark in marks:
+        if not isinstance(mark, ast.Call):
             continue
-        if (isinstance(decorator.func, ast.Attribute)
-                and decorator.func.attr == "usefixtures"):
-            names |= {a.value for a in decorator.args
+        if (isinstance(mark.func, ast.Attribute)
+                and mark.func.attr == "usefixtures"):
+            names |= {a.value for a in mark.args
                       if isinstance(a, ast.Constant) and isinstance(a.value, str)}
     return names
 
@@ -100,12 +124,17 @@ def fixture_names(func, enclosing=()) -> set:
     request the reader cannot see is a window on the screen that no count
     mentions (cold pass, 2026-11-16).
 
-    Shared, because two guards ask this question and they disagreed: the
-    read-back detector in ``tests/test_display_capabilities.py`` counted the
-    mark as mapping the window while the count in ``tests/test_ci_contract.py``
-    did not, so a new on-screen-window test written that way would have been
-    correctly cleared by one and invisible to the other -- the drift the count
-    exists to catch (cold pass, 2026-11-11).
+    Shared, because THREE guards ask this question and they have twice
+    disagreed. First on 2026-11-11: the read-back detector in
+    ``tests/test_display_capabilities.py`` counted the mark as mapping the
+    window while the count in ``tests/test_ci_contract.py`` did not, so a new
+    on-screen-window test written that way would have been correctly cleared by
+    one and invisible to the other -- the drift the count exists to catch.
+    Again on 2026-11-16, and this docstring's own "two guards" is why: widening
+    this function for the class mark, the detector in that same file was left
+    on the narrow call and would have reported a guarded test as unguarded. The
+    third reader is the guard in ``tests/test_tk_offscreen.py``. All three now
+    pass the enclosing chain.
     """
     import ast
 
@@ -210,10 +239,16 @@ def _reachable(func, lookup, enclosing=()) -> set:
         if name in seen or name not in lookup:
             continue
         seen.add(name)
-        node = lookup[name]
-        markers |= _markers(node)
-        todo.extend(bare_calls(node))
-        todo.extend(fixture_names(node))
+        # EVERY function of that name, not one of them. The lookup is keyed by
+        # the bare name a call site gives, and one name can have several
+        # bodies; keeping only one discarded the hazardous body whenever the
+        # harmless one won, which is a narrowing and so a silent pass. The
+        # union is the safe direction: a marker picked up from a body the call
+        # could not actually reach is a guard failure naming a test.
+        for node in lookup[name]:
+            markers |= _markers(node)
+            todo.extend(bare_calls(node))
+            todo.extend(fixture_names(node))
     return markers
 
 
@@ -240,35 +275,54 @@ def bare_calls(func) -> set:
 
 
 def module_functions(tree) -> dict:
-    """name -> node for every function in a module, nested ones included.
+    """name -> EVERY function of that name in a module, nested ones included.
 
-    Keyed by bare name, which is what a call site gives us. Module level wins
-    a collision with a method of the same name.
+    Keyed by the bare name a call site gives us, and valued by a tuple, not by
+    one node. One name can have several bodies -- 29 of this repo's test files
+    already define some name twice -- and keeping one of them dropped the
+    others. A caller is expected to union over the tuple, so a collision widens
+    the answer instead of narrowing it, because a widened answer is a guard
+    failure naming a test while a narrowed one is a hung suite naming nothing.
 
-    For a function reached as a CALLEE that is harmless: resolving a helper to
-    the wrong body of the same name can only widen what the caller sees, and a
-    widened answer is a guard failure naming a test rather than a silent pass.
-    It was **not** harmless for the function being asked about, which
-    ``_reachable`` used to look up by name -- a collision there replaced the
-    subject of the question and cleared it silently. That is why ``_reachable``
-    now starts from the node it was handed. This docstring asserted the
-    opposite until 2026-11-16.
+    This docstring claimed until 2026-11-16 that a collision on a callee "can
+    only widen what the caller sees". It was the opposite: the body that lost
+    the collision was discarded, markers and all. The claim is recorded here
+    because it is the second time this module's comments denied a hazard that
+    was reproducible in ten lines, and the comment is what stops the next
+    reader looking.
     """
     import ast
 
-    nested = {node.name: node for node in ast.walk(tree)
-              if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
-    top = {node.name: node for node in tree.body
-           if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
-    return {**nested, **top}
+    found = {}
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            found.setdefault(node.name, []).append(node)
+    return {name: tuple(nodes) for name, nodes in found.items()}
+
+
+def merge_functions(*lookups) -> dict:
+    """One ``module_functions`` lookup out of several, keeping every candidate.
+
+    ``{**a, **b}`` would drop ``a``'s bodies for any name ``b`` also defines,
+    which is the narrowing ``module_functions`` exists to avoid -- a shared
+    fixture in ``conftest.py`` and a same-named helper in the test file would
+    leave only one of them reachable.
+    """
+    merged = {}
+    for lookup in lookups:
+        for name, nodes in lookup.items():
+            merged[name] = merged.get(name, ()) + nodes
+    return merged
 
 
 def test_functions(tree) -> list:
-    """``(node, enclosing_classes)`` for every ``test_*`` function in a module.
+    """``(node, enclosing)`` for every ``test_*`` function in a module.
 
-    Methods on a class included, with the classes they are nested in, outermost
-    first -- a ``usefixtures`` mark on the class is a fixture request the method
-    node cannot see on its own.
+    ``enclosing`` is the module node followed by any classes the test is
+    nested in, outermost first. Both carry fixture requests the function's own
+    node cannot show -- a ``usefixtures`` mark on the class, and pytestmark
+    at module level -- so a caller passes the whole chain to ``fixture_names``.
+    A caller that wants only the class names filters on ``ast.ClassDef``.
     """
     import ast
 
@@ -285,7 +339,7 @@ def test_functions(tree) -> list:
             else:
                 walk(child, classes)
 
-    walk(tree, ())
+    walk(tree, (tree,))
     return found
 
 

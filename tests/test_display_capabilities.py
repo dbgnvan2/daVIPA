@@ -155,6 +155,9 @@ def _scan(source: str, label: str):
                        for inner in ast.walk(node)):
                     guarding_helpers.add(node.name)
 
+    enclosing_of = {id(found): chain
+                    for found, chain in caps.test_functions(tree)}
+
     reads, asks, maps = set(), set(), set()
     for node in ast.walk(tree):
         if not (isinstance(node, ast.FunctionDef)
@@ -181,7 +184,15 @@ def _scan(source: str, label: str):
                     reads.add((label, node.name))
                     if inner.func.id in guarding_helpers:
                         asks.add((label, node.name))
-        if "mapped_windows" in caps.fixture_names(node):
+        # Through the enclosing chain, like the other two readers: a
+        # `usefixtures` mark on the class, or `pytestmark` at module level,
+        # is a request this node cannot show on its own. Reading only the node
+        # here while the guard in tests/test_tk_offscreen.py and the count in
+        # tests/test_ci_contract.py read the chain would report a guarded test
+        # as unguarded -- the divergence display_capabilities exists to stop
+        # (cold pass, 2026-11-16).
+        if "mapped_windows" in caps.fixture_names(
+                node, enclosing_of.get(id(node), ())):
             maps.add((label, node.name))
     return reads, asks, maps
 
@@ -294,8 +305,9 @@ def test_cghm41_every_real_read_back_asks_or_maps():
 
 #: Each case is a module source and the tests the detector must report as
 #: unguarded read-backs. Every shape here was measured against this tree: the
-#: first four when the detector replaced the registry, the rest by the two
-#: cold passes of 2026-11-11, which found the detector blind or wrong on each.
+#: first four when the detector replaced the registry, the next six by the two
+#: cold passes of 2026-11-11 and the last two by the one of 2026-11-16, each of
+#: which found the detector blind or wrong on the shape it added.
 _DETECTOR_CASES = [
     ("a new test reading -topmost back with no precondition", """
         def test_offender():
@@ -398,6 +410,30 @@ _DETECTOR_CASES = [
         def test_guarded_inside_the_helper():
             assert _topmost_now() == 0
     """, set()),
+
+    # The two spellings a function's own node cannot show. The arm above maps
+    # by a mark on the FUNCTION, which ``decorator_list`` carries, so it
+    # passed either way and could not pin the fix that brought this reader
+    # onto ``fixture_names(node, enclosing)``. These two can: without the
+    # enclosing chain each reads as an unguarded read-back, while the guard in
+    # tests/test_tk_offscreen.py and the count in tests/test_ci_contract.py
+    # both clear it -- a guarded test reported as unguarded by the one reader
+    # left behind (cold pass, 2026-11-16).
+    ("a test that maps the window by a mark on its class", """
+        @pytest.mark.usefixtures("mapped_windows")
+        class TestMapped:
+            def test_maps_by_a_mark_on_the_class(self):
+                window = tk.Tk()
+                assert float(window.attributes("-alpha")) == 0.0
+    """, set()),
+
+    ("a whole file that maps the window by a module-level mark", """
+        pytestmark = pytest.mark.usefixtures("mapped_windows")
+
+        def test_maps_by_the_module_mark():
+            window = tk.Tk()
+            assert float(window.attributes("-alpha")) == 0.0
+    """, set()),
 ]
 
 
@@ -409,7 +445,8 @@ def test_cghm42_a_new_offender_is_detected(label, source, expected):
     A registry asserts set equality over the tests that already comply, so it
     catches one losing its precondition and cannot catch a new one written
     without any. Each row is a shape the detector was measured against; the
-    five after the fourth are shapes the cold passes found it wrong about, in
+    six after the fourth are shapes the cold passes of 2026-11-11 found it
+    wrong about and the last two the pass of 2026-11-16, in
     both directions -- a missed offender and a false accusation are each a
     reason nobody trusts the guard.
     """

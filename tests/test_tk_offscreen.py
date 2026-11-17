@@ -229,6 +229,7 @@ def test_every_test_that_needs_a_mapped_window_asks_for_one():
 
     from tests.display_capabilities import (
         fixture_names,
+        merge_functions,
         module_functions,
         needs_a_mapped_window,
         test_functions,
@@ -240,29 +241,39 @@ def test_every_test_that_needs_a_mapped_window_asks_for_one():
     # whose body is outside the lookup reads as needing nothing. Asserted
     # rather than assumed, because this arm contributes nothing to the live
     # tree and so could break green (cold pass, 2026-11-16).
-    conftests = [candidate for candidate in
-                 (tests_dir.parent / "conftest.py", tests_dir / "conftest.py")
-                 if candidate.exists()]
-    assert conftests, (
-        "no conftest.py beside tests/ or in it, so the shared-fixture arm of "
-        "this guard read nothing; a window mapped by a shared fixture would "
-        "be invisible to it"
+    root_conftest = tests_dir.parent / "conftest.py"
+    assert root_conftest.exists(), (
+        f"{root_conftest} is gone, and it is where this repo's shared fixtures "
+        "live; the shared-fixture arm of this guard would read nothing and a "
+        "window mapped by one of them would be invisible to it"
     )
-    shared = {}
-    for candidate in conftests:
-        shared.update(module_functions(
-            ast.parse(candidate.read_text(encoding="utf-8"))))
+    conftests = [candidate for candidate
+                 in (root_conftest, tests_dir / "conftest.py")
+                 if candidate.exists()]
+    shared = merge_functions(*(
+        module_functions(ast.parse(candidate.read_text(encoding="utf-8")))
+        for candidate in conftests))
+
+    def qualified(path, node, enclosing):
+        """The label a test is named by here: file, classes, then the test.
+
+        Qualified, because two classes in one file may give a method the same
+        name -- and a bare name would collapse them into one entry, so one of
+        the two disappearing would leave the set below still matching.
+        """
+        parts = [cls.name for cls in enclosing if isinstance(cls, ast.ClassDef)]
+        return f"{path.name}::" + ".".join(parts + [node.name])
 
     detected, offenders = set(), []
     for path in sorted(tests_dir.glob("test_*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        lookup = {**shared, **module_functions(tree)}
+        lookup = merge_functions(shared, module_functions(tree))
         for node, enclosing in test_functions(tree):
             if not needs_a_mapped_window(node, lookup, enclosing):
                 continue
-            detected.add(f"{path.name}::{node.name}")
+            detected.add(qualified(path, node, enclosing))
             if "mapped_windows" not in fixture_names(node, enclosing):
-                offenders.append(f"{path.name}::{node.name}")
+                offenders.append(qualified(path, node, enclosing))
     assert not offenders, (
         "these tests generate a real Tk event and then pump the event loop, "
         "or ask for a window that is not withdrawn, without requesting the "
@@ -286,9 +297,13 @@ def test_the_mapped_window_detector_asks_for_the_pair_not_the_token():
              in another guard's own source. Replacing it with a detector moves
              that risk into the detector, so the detector gets the assertions:
              an exact set over a synthetic module, one arm per way it could be
-             fooled. The last two arms are the cold pass's own findings — a
-             name collision between two classes cleared a hazardous test
-             silently, and a `usefixtures` mark on a class was invisible.
+             fooled. Six of the arms are the cold passes' own findings. The
+             first pass: a name collision between two classes cleared a
+             hazardous test silently, and a `usefixtures` mark on a class was
+             invisible. The second: the body that lost a collision on a CALLEE
+             was discarded too, a module-level mark was unread, and the
+             assertions below the arms pin the two functions that resolve a
+             collision rather than trusting an arm to exercise them.
     Spec:    BACKLOG.md MOD-A2
     Tests:   this test
 
@@ -302,6 +317,7 @@ def test_the_mapped_window_detector_asks_for_the_pair_not_the_token():
 
     from tests.display_capabilities import (
         fixture_names,
+        merge_functions,
         module_functions,
         needs_a_mapped_window,
         test_functions,
@@ -352,10 +368,20 @@ def test_the_mapped_window_detector_asks_for_the_pair_not_the_token():
             def test_a_method_calling_its_own_helper(self, widget):
                 self.helper(widget)
 
+        def _shadowed(widget):
+            widget.tap()
+
         class TestCollidingNameHazardous:
             def test_a_name_two_classes_share(self, root):
                 root.event_generate("<Button-1>")
                 root.update()
+
+            def _shadowed(self, widget):
+                widget.event_generate("<Button-1>")
+                widget.update()
+
+            def test_through_a_shadowed_helper(self, widget):
+                self._shadowed(widget)
 
         class TestCollidingNameHarmless:
             def test_a_name_two_classes_share(self):
@@ -377,7 +403,9 @@ def test_the_mapped_window_detector_asks_for_the_pair_not_the_token():
     lookup = module_functions(tree)
 
     def label(node, enclosing):
-        return ".".join([cls.name for cls in enclosing] + [node.name])
+        classes = [cls.name for cls in enclosing
+                   if isinstance(cls, ast.ClassDef)]
+        return ".".join(classes + [node.name])
 
     tripped = {label(node, enclosing)
                for node, enclosing in test_functions(tree)
@@ -389,6 +417,7 @@ def test_the_mapped_window_detector_asks_for_the_pair_not_the_token():
         "test_a_window_asked_for_on_purpose",
         "TestReachedThroughSelf.test_a_method_calling_its_own_helper",
         "TestCollidingNameHazardous.test_a_name_two_classes_share",
+        "TestCollidingNameHazardous.test_through_a_shadowed_helper",
         "TestMarkedOnTheClass.test_the_mark_is_the_request",
         "TestAskingOnTheClass.test_covered_by_the_class_mark",
     }, (
@@ -397,17 +426,80 @@ def test_the_mapped_window_detector_asks_for_the_pair_not_the_token():
         "it wrongly sees is a window on the user's screen for nothing"
     )
 
+    # A module-level mark, which is this repo's spelling for a whole file and
+    # needs its own source: written into the module above it would mark every
+    # test there and tell us nothing. Both halves again -- the mark as a way to
+    # reach a window, and the mark as the request for one.
+    whole_file = textwrap.dedent(f'''
+        {"py" + "test"}mark = {"py" + "test"}.mark.usefixtures("a_mapped_fixture")
+
+        def a_mapped_fixture():
+            make_screen(withdraw=False)
+
+        def test_covered_by_the_module_mark():
+            assert True
+    ''')
+    module_tree = ast.parse(whole_file)
+    module_lookup = module_functions(module_tree)
+    assert all(needs_a_mapped_window(node, module_lookup, enclosing)
+               for node, enclosing in test_functions(module_tree)), (
+        "a module-level mark asking for a window-mapping fixture read as "
+        "needing no window; ten test files here mark a whole file that way, "
+        "so a file given a real window would be invisible to the guard"
+    )
+
     # The other half of the class-mark finding: the request has to be read off
     # the class too, or the guard calls the test above an offender and sends
     # the author to add a parameter the mark already supplies.
     asked = {label(node, enclosing): fixture_names(node, enclosing)
              for node, enclosing in test_functions(tree)}
-    assert "mapped_windows" in asked[
-        "TestAskingOnTheClass.test_covered_by_the_class_mark"], (
+    assert "mapped_windows" in asked.get(
+        "TestAskingOnTheClass.test_covered_by_the_class_mark", set()), (
         "a usefixtures mark on the class was not read as a fixture request, "
         "so a test that does ask for a mapped window reads as one that does "
         "not -- an offender the guard invents, and a real window the "
         "documented count of 29 would not mention"
+    )
+
+    # Both collisions, asserted on the two functions that resolve them rather
+    # than only through an arm above that happens to exercise one of them. The
+    # shadowed-helper arm only reddens when the losing body is the hazardous
+    # one, which depends on the order ast.walk happens to yield; these two do
+    # not, and they name the function at fault when they fail.
+    hazardous = ast.parse(textwrap.dedent("""
+        def helper(widget):
+            widget.event_generate("<Button-1>")
+            widget.update()
+    """))
+    harmless = ast.parse(textwrap.dedent("""
+        def helper(widget):
+            widget.tap()
+    """))
+    for first, second, which in ((hazardous, harmless, "the later lookup"),
+                                 (harmless, hazardous, "the earlier lookup")):
+        merged = merge_functions(module_functions(first),
+                                 module_functions(second))
+        assert len(merged["helper"]) == 2, (
+            f"merging two lookups that both define `helper` kept "
+            f"{len(merged['helper'])} of the 2 bodies, dropping {which}'s; a "
+            "conftest fixture and a same-named helper in the test file collide "
+            "exactly this way, and the body that loses takes its markers with "
+            "it -- a silent pass"
+        )
+
+    one_module = ast.parse(textwrap.dedent("""
+        def helper(widget):
+            widget.tap()
+
+        class Holder:
+            def helper(self, widget):
+                widget.event_generate("<Button-1>")
+                widget.update()
+    """))
+    assert len(module_functions(one_module)["helper"]) == 2, (
+        "module_functions kept one body for a name defined twice in one "
+        "module, so whichever body lost the collision was discarded; 29 of "
+        "this repo's test files define some name twice"
     )
 
 
