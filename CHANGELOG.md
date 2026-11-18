@@ -26,10 +26,6 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   or affects: 479 passed, 1 skipped. That is those files, not the suite — the
   suite runs on Linux in CI, which is what confirms the two forced premises
   there.
-- **A guard on which width the toolbar wraps at.** Reverting LRP-M11, so that
-  the row wraps before a value filter gives up any width, left all 131 tests
-  in the two resize files green (measured 2026-11-18). The threshold is now
-  checked directly, on all seven screens those two files build.
 
 ## [0.3.6] - 2026-11-17
 
