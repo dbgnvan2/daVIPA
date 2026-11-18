@@ -529,7 +529,10 @@ def test_spcm15_narrow_window_wraps_and_nothing_clips(
     # nothing stops the window going there (D11) -- a fixed 760 put the
     # Scheduler (991) and Projects (844) below their own second row, where
     # the group overflowed the left edge and this test could not fail.
-    width = wrap.one_row_px() - 40
+    # The top of the band is min_one_row_px(), not one_row_px() (LRP-M11): a
+    # filter gives up width first, so Completed and the Scheduler did not wrap
+    # 40px under one_row_px() at all, and only CI ever ran this to find out.
+    width = max(wrap.wrap_row_px(), wrap.min_one_row_px() - 40)
     root = screen.winfo_toplevel()
     root.geometry(f"{width}x600")
     root.update()

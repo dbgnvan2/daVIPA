@@ -74,6 +74,26 @@ def _bind(stub, cls, *names):
     return stub
 
 
+def _with_notices(stub, cls):
+    """Put the real ``set_status`` on a stub, bound to it.
+
+    MOD-M1 made ``set_status`` the one writer of the notice line. A stub
+    carrying only ``status_label.configure`` models the contract the screens
+    had before that, so binding the real method is what keeps these tests on
+    the write the screens actually perform instead of a second fake that can
+    drift from it -- which is how they came to fail in CI.
+
+    The three helpers come along because ``set_status`` calls them, and
+    ``NOTICE_LABEL_ATTR`` is set because ``notice_label`` reads it off
+    ``self``: a SimpleNamespace inherits no class attribute. ``status_label``
+    is the name it resolves to, so the stub's own label still takes the write
+    and ``events`` records the same sentences.
+    """
+    stub.NOTICE_LABEL_ATTR = cls.NOTICE_LABEL_ATTR
+    return _bind(stub, cls, "set_status", "notice_label",
+                 "_cancel_pending_dismiss", "_schedule_dismiss")
+
+
 def _tick(value=True):
     return SimpleNamespace(get=lambda: value)
 
@@ -159,6 +179,7 @@ def _annual_stub(events, left=(), right=(), vps=None):
           "_ticked_vision_element_ids", "_add_options", "_add_default",
           "_perform_add", "_create_from_row", "_empty_add_message",
           "open_add_dialog")
+    _with_notices(stub, AnnualVisionSegmentsScreen)
     # `write` is whichever method this tab hands the dialog as `on_confirm`.
     stub.write = stub._perform_add
     return stub
@@ -196,6 +217,7 @@ def _quarter_stub(events, left=(), right=(), assign=None):
           "_ticked_ape_ids", "_ids_in_quarter", "_assign_one", "_add_options",
           "_add_default", "_perform_add", "_empty_add_message",
           "open_add_dialog")
+    _with_notices(stub, APEAssignmentScreen)
     stub.write = stub._perform_add
     return stub
 
@@ -229,6 +251,7 @@ def _month_stub(events, left=(), right=(), assign=None):
           "_ticked_ape_ids", "_ids_in_month", "_assign_one", "_add_options",
           "_add_default", "_perform_add", "_empty_add_message",
           "open_add_dialog")
+    _with_notices(stub, APEPeriodViewScreen)
     stub.write = stub._perform_add
     return stub
 
@@ -250,6 +273,7 @@ def _week_stub(events, left=(), create=None):
     _bind(stub, WeeklyItemsScreen, "_ticked_ape_ids", "_add_options",
           "_add_default", "_create_tactic_for", "_empty_add_message",
           "_any_filter_set", "open_add_dialog")
+    _with_notices(stub, WeeklyItemsScreen)
     # This tab hands the dialog the shared write itself: the drag path calls
     # the same method, so there is no one-row wrapper around it.
     stub.write = stub._create_tactic_for

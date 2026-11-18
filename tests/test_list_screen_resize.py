@@ -429,8 +429,15 @@ def test_lsrm10_narrow_window_wraps_and_nothing_clips(make, name, mapped_windows
     toolbar = screen.search_entry.master
     wrap = screen.toolbar_wrap
     wide = root.winfo_width()
-    short_by = toolbar.winfo_width() - wrap.one_row_px() + 40
-    root.geometry(f"{wide - short_by}x800")
+    # LRP-M11: the threshold is min_one_row_px(), with every filter at its
+    # minimum -- not one_row_px(), with them at their defaults. A width 40px
+    # under one_row_px() need not wrap at all, and for the screens whose
+    # filters can give up more than 40px between them it did not. Clamped at
+    # wrap_row_px() because below that the second row does not fit either,
+    # and the clipping checks would then be measuring an overflow the app has
+    # no width to avoid.
+    target = max(wrap.wrap_row_px(), wrap.min_one_row_px() - 40)
+    root.geometry(f"{wide - (toolbar.winfo_width() - target)}x800")
     root.update()
     root.update_idletasks()
     first_row_y = screen.search_entry.winfo_rooty()

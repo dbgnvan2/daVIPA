@@ -487,10 +487,25 @@ def test_cipm63_a_longer_total_widens_the_columns(screen, manager, root):
 def test_cipm63_the_divider_gives_way_to_the_week_and_comes_back(screen, root, monkeypatch):
     """In a window with room for the items setting beside the day but not beside
     the week, the week takes the difference from the items pane; the day gives it back."""
-    from src.getmoredone.screens.plan import PLAN_PANE_CHROME_PX
+    from src.getmoredone.screens.plan import (ITEMS_TEXT_INSET_PX,
+                                              PLAN_PANE_CHROME_PX)
 
     setting = screen.items_width_floor() + 40
     day_floor = screen.day_width_floor()
+    # The week's appetite is stated here, not measured. What the week needs
+    # comes from seven columns of text, so whether it exceeds a day row at all
+    # is a question about the platform's fonts: on this machine it does, and in
+    # CI it never has -- this test failed in every CI run from the one that
+    # added it, while passing here, and the assertion that caught it was its
+    # own premise. 30px is inside the band the assertions below need: more than
+    # the 10px of slack `room` carries, and under the 40 that would put the
+    # items pane on its own floor, which is a different clamp. How much the
+    # week really needs is test_cipm63_the_pane_floor_holds_the_week's subject;
+    # what the divider does about it is this one's.
+    monkeypatch.setattr(
+        type(screen), "week_width_need",
+        lambda self: (day_floor - ITEMS_TEXT_INSET_PX + 30
+                      if self._week_mode else 0))
     room = PLAN_PANE_CHROME_PX + setting + day_floor + 10
     monkeypatch.setattr(screen, "winfo_width", lambda: room)
     monkeypatch.setattr(screen, "items_col_width", lambda: setting)
@@ -500,21 +515,36 @@ def test_cipm63_the_divider_gives_way_to_the_week_and_comes_back(screen, root, m
     _week(screen, root)
     week_items = room - PLAN_PANE_CHROME_PX - screen.day_width_floor()
     assert week_items < setting, "the case this guards is the week needing more than the day"
+    assert week_items >= screen.items_width_floor(), (
+        "and not so far under it that the items pane is on its own floor -- "
+        "that is the other end of the clamp, and another test")
     assert screen._items_width == week_items
 
     screen.set_view_mode("Day")
     assert screen._items_width == setting
 
 
-def test_cipm63_the_pane_floor_holds_the_week(screen, root):
+def test_cipm63_the_pane_floor_holds_the_week(screen, root, monkeypatch):
     """The divider cannot squeeze the week below what its text needs; the day's floor returns after."""
+    from src.getmoredone.screens.plan import ITEMS_TEXT_INSET_PX
+
     day_floor = screen.day_width_floor()
+    # Forced, for the reason the divider test above carries: a week wider than
+    # a day row is a fact about the fonts, true here and false in CI. The
+    # column floor is a config constant that the real ``fit_week_columns``
+    # reads, so raising it widens the week along the path this test is about,
+    # rather than standing in for the number it checks.
+    monkeypatch.setattr(wv, "WEEK_COLUMN_WIDTH_PX",
+                        (day_floor - ITEMS_TEXT_INSET_PX) // wv.WEEK_DAYS + 20)
     _week(screen, root)
     side = max([screen.week_back_button.winfo_reqwidth()]
                + [label.winfo_reqwidth() for label in screen._week_hour_labels]) + 4
+    # ``_widest_text`` is read after the fit, when each label has been given
+    # its column, so it is the column -- whichever of the floor and the text
+    # was the wider of the two. Measured 2026-11-18: 86px with the floor at
+    # 86, and 148 with it at 148. Writing the ``max`` out here as well changed
+    # nothing, and no mutation of it was observable.
     need = side + 7 * (_widest_text(screen) + 2) + screen.week_forward_button.winfo_reqwidth() + 4
-
-    from src.getmoredone.screens.plan import ITEMS_TEXT_INSET_PX
 
     assert need + ITEMS_TEXT_INSET_PX > day_floor, "the case this guards is the week being wider"
     assert screen.day_width_floor() == need + ITEMS_TEXT_INSET_PX
