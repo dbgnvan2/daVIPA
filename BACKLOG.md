@@ -25,6 +25,22 @@ features, and the long-standing bugs, requests and user stories at the end.
 
 ## Follow-ups from the version-source batch (filed 2026-11-17)
 
+- **VER-A5 — the macOS bundle still carries no `CFBundleVersion`.** Low, found
+  by reading the published v0.3.6 artifact (global rule 10: flagged, not
+  silently fixed). PyInstaller's `BUNDLE(version=...)` writes
+  `CFBundleShortVersionString` only, so the shipped v0.3.6 plist holds
+  `{CFBundleInfoDictionaryVersion: 6.0, CFBundleShortVersionString: 0.3.6}`
+  and nothing else version-shaped. Absent, not wrong: Get Info's Version field
+  reads the short string and is now correct. But `CFBundleVersion` is what
+  macOS uses to order builds, what `mdls kMDItemVersion` reports, and what any
+  future update check would compare, so an app that ships twice under one
+  release number cannot be told apart. Pre-existing and not a regression --
+  v0.3.5's installed bundle has the same key set, with 0.0.0 for the short
+  string. Needs an `info_plist={...}` dict in `daVIPA.spec`'s BUNDLE call, and
+  a decision about what the build number should be (the release tag, a commit
+  count, a date). `tools/verify_release_version.py` would then check it the way
+  it checks the short string.
+
 - **VER-A3 — the bundle's version is not re-read after signing.** Low. The
   `--plist` check runs before codesign, notarisation and stapling, which is
   the right order (failing before notarisation is the cheap one), but it
