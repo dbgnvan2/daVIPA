@@ -7,6 +7,8 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-11-17
+
 ### Fixed — the Mac app says which version it is (2026-11-17)
 
 - **An installed daVIPA now carries its own version number.** Get Info on the
@@ -1800,7 +1802,8 @@ published release.
 - No auto-update. New versions are downloaded manually.
 - No bundled music. Point Settings at a folder of your own.
 
-[Unreleased]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.5...HEAD
+[Unreleased]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.6...HEAD
+[0.3.6]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.2...v0.3.4
 [0.3.2]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.1...v0.3.2

@@ -6,4 +6,4 @@
 # app does not ship CHANGELOG.md -- tools/packaging_filters.py keeps repo-only
 # files out of the bundle, and a runtime read would work from source and raise
 # in the .app.
-__version__ = "0.3.5"
+__version__ = "0.3.6"
