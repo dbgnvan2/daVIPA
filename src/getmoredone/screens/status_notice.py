@@ -39,6 +39,13 @@ TRANSIENT_KINDS = frozenset({"info", "blue", "success", "green"})
 INLINE_LIST_CAP = 3
 
 
+#: How many ancestors ``report_on`` walks before it gives up. A screen sits a
+#: handful of frames below its toplevel, so this is slack, not a limit any
+#: real widget reaches; it is here because ``master`` is whatever the widget
+#: says it is and a cycle would spin for ever.
+NOTICE_ANCESTRY_LIMIT = 20
+
+
 def inline_list(names, cap: int = INLINE_LIST_CAP) -> str:
     """Join names for a one-line notice, summarising past ``cap``.
 
@@ -74,7 +81,7 @@ def report_on(widget, text: str, kind: str = "muted") -> bool:
     """
     node = widget
     seen = 0
-    while node is not None and seen < 20:
+    while node is not None and seen < NOTICE_ANCESTRY_LIMIT:
         seen += 1
         getter = getattr(node, "notice_label", None)
         label = getter() if callable(getter) else getattr(node, "status_label",
