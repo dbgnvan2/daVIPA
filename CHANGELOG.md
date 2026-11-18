@@ -7,6 +7,19 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — the test suite runs green again (2026-11-18)
+
+- **Twelve failing tests, none of them a defect in the app.** `main` had been
+  red since 2026-11-14, through 21 CI runs and the v0.3.5 and v0.3.6 releases.
+  Four causes: four VSP tabs' test stubs still modelled the notice line as it
+  was before `set_status` became its one writer; the ancestry cap in
+  `report_on` was an unnamed literal `20`, which the screens' own guard against
+  that literal caught; two toolbar tests still aimed at `one_row_px()` after the
+  wrap threshold moved to `min_one_row_px()`; and two week-pane tests asserted a
+  premise they took from the platform's font metrics, so they passed on a Mac
+  and had never once passed in CI. The last three are now derived or forced
+  rather than assumed, so they hold on either platform.
+
 ## [0.3.6] - 2026-11-17
 
 ### Fixed — the Mac app says which version it is (2026-11-17)

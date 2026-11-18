@@ -23,6 +23,36 @@ One batch at a time in this checkout (`CLAUDE.md`). What is here is open work:
 adjacent issues from recent batches, screen reports, the carried-forward
 features, and the long-standing bugs, requests and user stories at the end.
 
+## Follow-ups from the red-suite batch (filed 2026-11-18)
+
+- **TST-A1 — a test behind `mapped_windows` is only ever run by CI, and CI is
+  not read.** Medium, and the loop that produced four of this batch's twelve
+  failures (global rule 10: the class, not the four instances). Those tests skip
+  on a dev machine by `GETMOREDONE_NO_MAPPED_WINDOWS`, so a change that moves
+  what they measure passes locally and reddens CI: `c73f225` moved the toolbar
+  wrap threshold and `a0984ac` updated the two siblings that run locally,
+  leaving the two that do not. The other two had never passed in CI at all,
+  from the run that added them. Neither was noticed, because `main` sat red for
+  four days and two releases with nothing surfacing it. The fix is in two parts
+  and neither is this batch's: something that reports a red `main` where the
+  work happens, and a cheap way to run just the mapped-window tests before a
+  push (they are ~13s for the resize files — the cost is the stolen keyboard
+  focus, not the time).
+
+- **TST-A2 — nothing guards which threshold the toolbar wraps at.** Medium,
+  adjacent, found by mutation while fixing the two tests that aimed at the old
+  one (global rule 10: flagged, not fixed here). `ToolbarWrap.fit` wraps at
+  `min_one_row_px()` since LRP-M11 (`c73f225`), and the point of that change is
+  that a value filter gives up width before the row wraps. Reverting it to
+  `one_row_px()` leaves **all 131 tests** in `tests/test_list_screen_resize.py`
+  and `tests/test_screen_resize_spc.py` green (measured 2026-11-18). The two
+  near-misses both just miss it: `test_lsrm10_toolbar_wraps_its_right_hand_group`
+  asserts that `fit(one_row_px())` does *not* wrap, which the mutant satisfies
+  too, and the band assertion `wrap_row_px() < min_one_row_px() <= one_row_px()`
+  is about the three numbers rather than which one `fit` reads. A check that a
+  width between the two leaves one row while the filters shrink would close it.
+  Not fixed here: that is LRP-M11's criterion, and this batch is the red suite.
+
 ## Follow-ups from the version-source batch (filed 2026-11-17)
 
 - **VER-A5 — the macOS bundle still carries no `CFBundleVersion`.** Low, found
