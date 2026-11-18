@@ -417,6 +417,16 @@ def test_lsrm10_toolbar_wraps_its_right_hand_group(make, name):
     wrap.fit(wrap.one_row_px())
     assert _placements(toolbar, wrap) == before
     assert not wrap.frame.grid_info(), "the empty second row is still gridded"
+    # LRP-M11's threshold itself, which nothing in either resize file pinned:
+    # at exactly min_one_row_px() the row still fits, because the filters can
+    # give up the difference. Wrapping at one_row_px() instead would hand the
+    # user two rows and a wide empty spacer while every filter was still at
+    # its default width -- and all 131 tests in the two files stayed green
+    # under that mutant (measured 2026-11-18). Closes TST-A2.
+    wrap.fit(wrap.min_one_row_px())
+    assert not wrap.wrapped, (
+        f"{name} wrapped at min_one_row_px(), so the filters were never asked "
+        f"to give up width before the row did")
 
 
 @pytest.mark.parametrize("name", SCREENS)

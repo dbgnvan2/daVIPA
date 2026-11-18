@@ -513,6 +513,10 @@ def test_cipm63_the_divider_gives_way_to_the_week_and_comes_back(screen, root, m
     assert screen._items_width == setting
 
     _week(screen, root)
+    # The real fit_week_columns still runs and still writes this. Without the
+    # check, the patched accessor above would also stand in for a week that
+    # had measured nothing at all.
+    assert screen._week_width_need > 0
     week_items = room - PLAN_PANE_CHROME_PX - screen.day_width_floor()
     assert week_items < setting, "the case this guards is the week needing more than the day"
     assert week_items >= screen.items_width_floor(), (
@@ -539,11 +543,15 @@ def test_cipm63_the_pane_floor_holds_the_week(screen, root, monkeypatch):
     _week(screen, root)
     side = max([screen.week_back_button.winfo_reqwidth()]
                + [label.winfo_reqwidth() for label in screen._week_hour_labels]) + 4
-    # ``_widest_text`` is read after the fit, when each label has been given
-    # its column, so it is the column -- whichever of the floor and the text
-    # was the wider of the two. Measured 2026-11-18: 86px with the floor at
-    # 86, and 148 with it at 148. Writing the ``max`` out here as well changed
-    # nothing, and no mutation of it was observable.
+    # ``_widest_text`` equals the column, whichever of the floor and the text
+    # is the wider: ``_draw_week_grid`` builds every heading and total with
+    # ``width=WEEK_COLUMN_WIDTH_PX`` (plan_week_view.py:368 and :402), and a
+    # CTkLabel's reqwidth is the larger of that option and its text. A grid
+    # minsize would not do it. So this leans on the ``width=`` argument:
+    # drop it from either label and this test fails in CI alone, where the
+    # patched floor exceeds the narrower text. Measured 2026-11-18: 86px with
+    # the floor at 86, 148 with it at 148 -- writing the ``max`` out here as
+    # well changed nothing, and no mutation of it was observable.
     need = side + 7 * (_widest_text(screen) + 2) + screen.week_forward_button.winfo_reqwidth() + 4
 
     assert need + ITEMS_TEXT_INSET_PX > day_floor, "the case this guards is the week being wider"

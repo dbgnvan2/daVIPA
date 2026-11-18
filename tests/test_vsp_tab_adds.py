@@ -81,7 +81,8 @@ def _with_notices(stub, cls):
     carrying only ``status_label.configure`` models the contract the screens
     had before that, so binding the real method is what keeps these tests on
     the write the screens actually perform instead of a second fake that can
-    drift from it -- which is how they came to fail in CI.
+    drift from it -- which is how these five came to fail. The AttributeError
+    was never platform-specific; the suite was simply red and unread.
 
     The three helpers come along because ``set_status`` calls them, and
     ``NOTICE_LABEL_ATTR`` is set because ``notice_label`` reads it off

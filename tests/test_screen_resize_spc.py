@@ -532,8 +532,18 @@ def test_spcm15_narrow_window_wraps_and_nothing_clips(
     # The top of the band is min_one_row_px(), not one_row_px() (LRP-M11): a
     # filter gives up width first, so Completed and the Scheduler did not wrap
     # 40px under one_row_px() at all, and only CI ever ran this to find out.
-    width = max(wrap.wrap_row_px(), wrap.min_one_row_px() - 40)
+    # Both arms of that clamp are toolbar pixels and `geometry` takes a window
+    # number, which is wider by every frame's padding -- the same mismatch the
+    # comment below the wrap check names (SPC-S3). So move the window by the
+    # toolbar's shortfall rather than setting it to a toolbar width: set
+    # directly, the `wrap_row_px()` arm would put the toolbar *below*
+    # wrap_row_px(), which is the one case that arm exists for, and the
+    # assertion below would fail by construction. It is the second arm that
+    # wins today on all three screens, so this is latent, not live.
     root = screen.winfo_toplevel()
+    root.update()
+    target = max(wrap.wrap_row_px(), wrap.min_one_row_px() - 40)
+    width = root.winfo_width() - (wrap.toolbar.winfo_width() - target)
     root.geometry(f"{width}x600")
     root.update()
     screen.update_idletasks()
