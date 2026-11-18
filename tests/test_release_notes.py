@@ -101,6 +101,22 @@ def test_rm4c_available_versions_lists_every_heading():
     assert available_versions(SAMPLE) == ["Unreleased", "0.2.0", "0.1.0"]
 
 
+def test_rm4c_an_empty_heading_is_seen_rather_than_skipped():
+    """`[^\\]]*` and not `+`, which made `## []` match no heading at all.
+
+    Invisible here, it was invisible to tools/version.py too: that module read
+    the release BELOW it as the newest one and stamped a bundle a version
+    behind, with nothing printed anywhere. Being listed is what lets
+    latest_released_version refuse it.
+    """
+    changelog = (
+        "## [0.2.0] - 2026-02-02\n\n- real\n\n"
+        "## []\n\n- orphan\n\n"
+        "## [0.1.0] - 2026-01-01\n\n- older\n"
+    )
+    assert available_versions(changelog) == ["0.2.0", "", "0.1.0"]
+
+
 # --------------------------------------------------------------------------
 # Failure modes — the point of the exercise
 # --------------------------------------------------------------------------

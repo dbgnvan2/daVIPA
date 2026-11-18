@@ -1031,13 +1031,15 @@ def test_rm4e_the_plist_check_runs_after_the_build():
 
 def test_rm4e_the_plist_check_runs_before_anything_is_published():
     body = _code_only(_job_blocks(RELEASE_WORKFLOW.read_text(encoding="utf-8"))["build-macos"])
-    plist_at = body.index("--plist")
-    for publish in ("upload-artifact", "action-gh-release"):
-        if publish in body:
-            assert plist_at < body.index(publish), (
-                f"the macOS job publishes via {publish} before checking the "
-                f"version its bundle reports"
-            )
+    # Unconditional: `if publish in body` meant this test could pass having
+    # asserted nothing at all. action-gh-release is not checked here because
+    # since BI1 it lives only in the publish job -- that ownership is asserted
+    # by the BI1 tests, and naming it here read as a second check while being
+    # a dead branch.
+    assert body.index("--plist") < body.index("upload-artifact"), (
+        "the macOS job uploads its artifact before checking the version its "
+        "bundle reports"
+    )
 
 
 def test_rm4e_the_tag_reaches_the_verifier_through_env_not_the_script_body():
@@ -1059,14 +1061,25 @@ def test_rm4e_one_expression_decides_which_tag_is_being_released():
     published. Three independent spellings of one fact is also how they drift.
     """
     text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
-    env_lines = [
-        line for line in text.splitlines()
-        if re.match(r"^\s{0,2}RELEASE_TAG:", line)
+    # Any indent, not just the workflow level. A step-level `env` OVERRIDES
+    # the workflow-level one, so matching only indent <= 2 would miss exactly
+    # the shape this requirement exists to prevent -- and the assertion below
+    # would still claim to have caught it.
+    declarations = [
+        line for line in _code_only(text).splitlines()
+        if re.match(r"^\s*RELEASE_TAG:\s*\S", line)
     ]
-    assert len(env_lines) == 1, (
-        f"expected one workflow-level RELEASE_TAG, found {len(env_lines)}. "
-        f"Per-step copies are what diverged."
+    assert len(declarations) == 1, (
+        f"expected one RELEASE_TAG declaration anywhere in the file, found "
+        f"{len(declarations)}: {declarations}. A per-step copy wins over the "
+        f"workflow-level one, so it is a second answer to which tag this is."
     )
+    indent = len(declarations[0]) - len(declarations[0].lstrip())
+    assert indent <= 2, (
+        f"RELEASE_TAG is declared at indent {indent}, inside a job or a step "
+        f"rather than at workflow level, so it does not reach every step"
+    )
+    env_lines = declarations
 
     gate = _code_only(_job_blocks(text)[PUBLISH_JOB]).splitlines()
     gate_lines = [line for line in gate if line.strip().startswith("if:")]
@@ -1085,10 +1098,10 @@ def test_rm4e_one_expression_decides_which_tag_is_being_released():
 
 def test_rm4e_nothing_re_derives_the_tag_from_the_event():
     """One spelling means one spelling: the notes step and tag_name read it too."""
-    code = "\n".join(
-        line for line in RELEASE_WORKFLOW.read_text(encoding="utf-8").splitlines()
-        if not line.strip().startswith("#")
-    )
+    # _code_only, not an inline filter: a trailing `# ... github.ref_name ...`
+    # on a code line would otherwise redden this and pressure the next person
+    # into deleting the explanation.
+    code = _code_only(RELEASE_WORKFLOW.read_text(encoding="utf-8"))
     assert "github.ref_type" not in code, (
         "github.ref_type is back; it is broader than the publish gate"
     )

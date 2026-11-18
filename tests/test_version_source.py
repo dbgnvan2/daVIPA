@@ -99,6 +99,8 @@ def test_an_out_of_order_changelog_raises_rather_than_being_sorted():
         pytest.param("0.4.0-rc1", id="a-pre-release"),
         pytest.param("0", id="one-part"),
         pytest.param("1.2.3.4", id="four-parts"),
+        pytest.param(" ", id="blank"),
+        pytest.param("v", id="prefix-only"),
     ],
 )
 def test_a_heading_that_is_not_a_version_raises(heading):
@@ -169,6 +171,24 @@ def test_a_heading_that_normalises_to_nothing_is_refused_not_dropped(heading):
         latest_released_version(changelog)
 
 
+def test_a_malformed_heading_below_the_newest_one_is_refused_too():
+    """Every heading is a candidate, so every heading is shape-checked.
+
+    The fixture this replaces had `## [ ]` in the MIDDLE and asserted it was
+    dropped; the topmost-only case above does not reach this path. A blank
+    heading anywhere in CHANGELOG.md now fails both build jobs, which is the
+    intended reading of "none can be waved through" -- and is new behaviour,
+    so it gets its own case rather than resting on the one above.
+    """
+    changelog = (
+        "## [9.9.9] - 2026-03-03\n\n- newest\n\n"
+        "## [ ] - 2026-02-02\n\n- blank, and not topmost\n\n"
+        "## [0.1.0] - 2026-01-01\n\n- oldest\n"
+    )
+    with pytest.raises(ValueError, match="not x.y or x.y.z"):
+        latest_released_version(changelog)
+
+
 def test_an_unreleased_heading_is_still_skipped_not_refused():
     """The guard above must not have made the ordinary file illegal.
 
@@ -222,13 +242,19 @@ def test_a_v_prefixed_heading_is_normalised():
         pytest.param("## [Unreleased]\n\n- only unshipped work\n", id="only-unreleased"),
         pytest.param("## [unreleased]\n\n- lower case\n", id="only-unreleased-lowercase"),
         pytest.param("## [UNRELEASED]\n\n- upper case\n", id="only-unreleased-uppercase"),
-        pytest.param("## [ ] - 2026-01-01\n\n- blank heading\n", id="blank-version"),
-        pytest.param("## [v] - 2026-01-01\n\n- prefix only\n", id="prefix-only"),
     ],
 )
 def test_no_released_version_raises(changelog):
-    """Never a default: a build stops rather than invent a version."""
-    with pytest.raises(ValueError):
+    """Never a default: a build stops rather than invent a version.
+
+    `match=` and not a bare `pytest.raises(ValueError)`: `## [ ]` and `## [v]`
+    used to be params here, raising this error because they were dropped and
+    left the list empty. They now raise the SHAPE error instead, and a bare
+    raises could not tell -- it stayed green straight through the behaviour
+    change, under a name that says the opposite. They live in
+    test_a_heading_that_is_not_a_version_raises now.
+    """
+    with pytest.raises(ValueError, match="names no released version"):
         latest_released_version(changelog)
 
 
