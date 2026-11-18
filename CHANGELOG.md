@@ -7,6 +7,15 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — the app says which version it is (2026-11-17)
+
+- **An installed daVIPA now carries its own version number.** Get Info on the
+  app, or Finder's Version column, read 0.0.0 on every build ever published,
+  because the build was never given one. The version is now read from this
+  file's newest released heading — the one place a release already
+  changes — so there is nothing to keep in step by hand. A build already on
+  your Mac keeps the number it was given; this shows up in the next release.
+
 ## [0.3.5] - 2026-11-17
 
 ### Changed — the app tells you things on the screen, not in a dialog (2026-11-16)
@@ -1786,6 +1795,7 @@ published release.
 [Unreleased]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.5...HEAD
 [0.3.5]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.2...v0.3.4
+[0.3.2]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/dbgnvan2/daVIPA/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/dbgnvan2/daVIPA/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dbgnvan2/daVIPA/releases/tag/v0.2.0

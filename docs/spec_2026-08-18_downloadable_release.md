@@ -128,6 +128,15 @@ Fixes F5.
 - **R-M4.C** — Release body is populated from the matching `CHANGELOG.md` section.
 - **R-M4.D** — `LICENSE` and `THIRD_PARTY_NOTICES.md` are included inside every
   distributed archive, not only in the repo.
+- **R-M4.E** — The macOS bundle carries a real version. `BUNDLE(version=...)`
+  is set from `CHANGELOG.md`'s newest released heading via
+  `tools/version.py`, and `getmoredone.__version__` is held to the same
+  value by `tests/test_version_source.py`. Left unset, PyInstaller writes
+  `CFBundleShortVersionString 0.0.0` and an installed app cannot be told
+  apart from any other build — every release up to and including v0.3.5
+  shipped that way. A literal version anywhere but the changelog is a
+  second place to forget, which is how `__version__` came to sit at 0.3.1
+  for four releases (rule 8, P6).
 
 ### R-M5 — First-run experience
 
