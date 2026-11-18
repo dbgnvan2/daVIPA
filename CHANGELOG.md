@@ -7,14 +7,21 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Fixed — the app says which version it is (2026-11-17)
+### Fixed — the Mac app says which version it is (2026-11-17)
 
 - **An installed daVIPA now carries its own version number.** Get Info on the
   app, or Finder's Version column, read 0.0.0 on every build ever published,
-  because the build was never given one. The version is now read from this
-  file's newest released heading — the one place a release already
-  changes — so there is nothing to keep in step by hand. A build already on
-  your Mac keeps the number it was given; this shows up in the next release.
+  because the build was never given one. It is now taken from this file's
+  newest released heading. A build already on your Mac keeps the number it was
+  given; this shows up in the next release. **The Windows build is unchanged**
+  and still reports no version — that needs a different mechanism and is
+  filed as `VER-A1`.
+- **A release now stops if the version does not agree with itself.** Before
+  building, and again on the built bundle, the release checks that the tag, this
+  file's newest heading and the package's own `__version__` all name the same
+  version, and fails if they do not. The check on the finished bundle is the
+  point: the 0.0.0 defect survived every release because nothing ever read what
+  the build produced.
 
 ## [0.3.5] - 2026-11-17
 

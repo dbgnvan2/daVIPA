@@ -128,15 +128,26 @@ Fixes F5.
 - **R-M4.C** — Release body is populated from the matching `CHANGELOG.md` section.
 - **R-M4.D** — `LICENSE` and `THIRD_PARTY_NOTICES.md` are included inside every
   distributed archive, not only in the repo.
-- **R-M4.E** — The macOS bundle carries a real version. `BUNDLE(version=...)`
-  is set from `CHANGELOG.md`'s newest released heading via
-  `tools/version.py`, and `getmoredone.__version__` is held to the same
-  value by `tests/test_version_source.py`. Left unset, PyInstaller writes
-  `CFBundleShortVersionString 0.0.0` and an installed app cannot be told
-  apart from any other build — every release up to and including v0.3.5
-  shipped that way. A literal version anywhere but the changelog is a
-  second place to forget, which is how `__version__` came to sit at 0.3.1
-  for four releases (rule 8, P6).
+- **R-M4.E** — The macOS bundle carries a real version, reconciled against
+  the artifact. `BUNDLE(version=...)` is set from `CHANGELOG.md`'s newest
+  released heading via `tools/version.py`; left unset, PyInstaller writes
+  `CFBundleShortVersionString 0.0.0`, which every release up to and including
+  v0.3.5 shipped. `tools/version.py` rejects a heading that is not `x.y`/`x.y.z`
+  and refuses a changelog that is not newest-first, because both used to pass
+  through into the bundle verbatim.
+  - **R-M4.E.1** — Each build job runs `tools/verify_release_version.py`
+    before PyInstaller: the tag being released, the newest changelog heading
+    and `getmoredone.__version__` must all name the same version. This is the
+    only place that runs on a tag push — `tests.yml` triggers on branches, so
+    the pytest guard never fires for a release.
+  - **R-M4.E.2** — The macOS job runs it again on
+    `dist/daVIPA.app/Contents/Info.plist` after building. This is the only
+    check in the repo that reads what the build produced; every other version
+    guard reads an input file, which is exactly why 0.0.0 went unnoticed for
+    five releases (P6).
+  - The Windows `EXE()` carries no version: PyInstaller needs a generated
+    version-resource file rather than a kwarg. Declared, not hidden — filed
+    as `VER-A1` (global rule 10).
 
 ### R-M5 — First-run experience
 

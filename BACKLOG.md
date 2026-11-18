@@ -23,6 +23,38 @@ One batch at a time in this checkout (`CLAUDE.md`). What is here is open work:
 adjacent issues from recent batches, screen reports, the carried-forward
 features, and the long-standing bugs, requests and user stories at the end.
 
+## Follow-ups from the version-source batch (filed 2026-11-17)
+
+### VER-A1 — the Windows build carries no version (medium)
+
+`daVIPA.spec` now passes `version=` to `BUNDLE()`, so the macOS bundle reports
+a real `CFBundleShortVersionString`. `EXE()` gets nothing, so the Windows
+`.exe` still shows no version under Properties → Details — the same "cannot
+tell one build from another" defect, for the other half of the artifacts the
+same workflow publishes.
+
+Not fixed in that batch because it is not the same change: PyInstaller wants a
+generated version-resource file (`--version-file`), not a string kwarg, so it
+needs a small generator fed from `tools/version.py` plus a guard that reads the
+built `.exe`'s resource table. The macOS half already has its artifact check
+(`tools/verify_release_version.py --plist`); this is the Windows equivalent and
+should not ship without one, or it will be asserted only on its input like the
+bug it fixes. Found by the pre-push sweep, 2026-11-17.
+
+### VER-A2 — there is no release runbook (low)
+
+Cutting a release means: add the `## [x.y.z]` heading, bump
+`getmoredone.__version__`, commit, tag, push the tag. That sequence is written
+down nowhere a person would look — `grep -rn "git tag" --include="*.md"`
+outside `docs/unused-docs/` finds nothing. It currently exists only as the
+failure message of `tests/test_version_source.py` and the error text of
+`tools/verify_release_version.py`, which is to say you learn it by getting it
+wrong. One short section in `INSTALL.md` or a `docs/RELEASING.md`.
+
+Low rather than dropped because the guards now fail loudly on each of the three
+ways to get it wrong, so this costs a confusing CI failure rather than a bad
+release. Found by the pre-push sweep, 2026-11-17.
+
 ## Follow-ups from the status vocabulary batch (filed 2026-11-16)
 
 ### SVU-A1 — nothing sets an action item to `canceled` (medium)
