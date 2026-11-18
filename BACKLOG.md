@@ -40,17 +40,12 @@ features, and the long-standing bugs, requests and user stories at the end.
   focus, not the time). One premise of the same class is left standing on
   purpose: `tests/test_plan_screen_week.py:463` asserts that a week total is
   wider than `WEEK_COLUMN_WIDTH_PX`, which is the case that test guards. It
-  holds on both platforms with room to spare — a 40px column floor against
-  ~86px of text — so forcing it would only hide the premise it is there to
-  state.
-
-- **TST-A2 — nothing guards which threshold the toolbar wraps at.** *Closed
-  2026-11-18, in the sweep of this same batch.* Filed as adjacent and deferred,
-  then fixed on the review pass that pointed out the guard is two lines in a
-  test already holding the right fixture:
-  `test_lsrm10_toolbar_wraps_its_right_hand_group` now fits the toolbar to
-  exactly `min_one_row_px()` and asserts it does not wrap. Kept here as the
-  record that the deferral was wrong, and leaves at the next tidy.
+  holds on both platforms, and the margin is not measured: the 86 and 148
+  readings taken while fixing the floor test are both the *patched* floor, so
+  they bound the real text at 86 and no more. With that test passing, it sits
+  somewhere in 41..86px against a 40px floor. Forcing the premise would hide
+  the thing the test states, so what is wanted is the measurement, not a
+  monkeypatch.
 
 ## Follow-ups from the version-source batch (filed 2026-11-17)
 

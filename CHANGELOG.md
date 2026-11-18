@@ -20,14 +20,16 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   premise they took from the platform's font metrics, so they passed on a Mac
   and had never once passed in CI. Only the literal `20` was a defect in the
   app, and a trivial one: the cap it set was already the intended one.
-  The last three causes are now derived or forced rather than assumed, so the
-  premise no longer reads the platform's font metrics. Verified on macOS with
-  the on-screen window tests enabled: 479 passed, 1 skipped. The CI run on
-  Linux is what confirms it there.
+  The three test-side causes are now derived or forced rather than assumed, so
+  no premise reads the platform's font metrics. Verified on macOS with the
+  on-screen window tests enabled, over the eight test files this batch touches
+  or affects: 479 passed, 1 skipped. That is those files, not the suite — the
+  suite runs on Linux in CI, which is what confirms the two forced premises
+  there.
 - **A guard on which width the toolbar wraps at.** Reverting LRP-M11, so that
   the row wraps before a value filter gives up any width, left all 131 tests
   in the two resize files green (measured 2026-11-18). The threshold is now
-  checked directly, on every list screen that has filters.
+  checked directly, on all seven screens those two files build.
 
 ## [0.3.6] - 2026-11-17
 
