@@ -145,9 +145,11 @@ Fixes F5.
     check in the repo that reads what the build produced; every other version
     guard reads an input file, which is exactly why 0.0.0 went unnoticed for
     five releases (P6).
-  - **R-M4.E.3** — One workflow-level `RELEASE_TAG` expression answers "which
-    tag is this run releasing", and it uses the publish job's own condition
-    (`startsWith(github.ref, 'refs/tags/v')`). The first version asked
+  - **R-M4.E.3** — One `RELEASE_TAG` expression answers "which tag is this run
+    releasing", declared at workflow level, and it uses the publish job's own
+    condition (`startsWith(github.ref, 'refs/tags/v')`). At workflow level
+    specifically: a step-level `env` of the same name overrides it, so a
+    per-step copy is a second answer rather than a redundant one. The first version asked
     `github.ref_type == 'tag'`, which is broader: a `workflow_dispatch` run
     against a tag not starting with `v` failed both build jobs on a run that
     would never have published. Three per-step copies of one fact is also how
