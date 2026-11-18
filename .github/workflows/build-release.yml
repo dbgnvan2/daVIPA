@@ -44,6 +44,20 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
 
+      # R-M4.E. Fails the build before PyInstaller runs when the tag being
+      # released, CHANGELOG.md's newest released heading and
+      # getmoredone.__version__ do not all name the same version. This is the
+      # only place that reconciliation happens on a tag push: tests.yml
+      # triggers on branches, so the pytest guard never runs for a release.
+      # The tag goes through env rather than into the script body, as the
+      # signing steps below do.
+      - name: Check the version agrees everywhere (R-M4.E)
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag != '' && inputs.release_tag || (github.ref_type == 'tag' && github.ref_name || '') }}
+        run: |
+          python tools/verify_release_version.py --tag "$env:RELEASE_TAG"
+
       - name: Build (PyInstaller)
         shell: pwsh
         run: |
@@ -122,9 +136,34 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
 
+      # R-M4.E. Fails the build before PyInstaller runs when the tag being
+      # released, CHANGELOG.md's newest released heading and
+      # getmoredone.__version__ do not all name the same version. This is the
+      # only place that reconciliation happens on a tag push: tests.yml
+      # triggers on branches, so the pytest guard never runs for a release.
+      # The tag goes through env rather than into the script body, as the
+      # signing steps below do.
+      - name: Check the version agrees everywhere (R-M4.E)
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag != '' && inputs.release_tag || (github.ref_type == 'tag' && github.ref_name || '') }}
+        run: |
+          python tools/verify_release_version.py --tag "$RELEASE_TAG"
+
       - name: Build (PyInstaller)
         run: |
           python -m PyInstaller --noconfirm --clean daVIPA.spec
+
+      # R-M4.E. The one check in this repo that reads what PyInstaller
+      # actually wrote. Every other version guard reads an input file, which
+      # is why CFBundleShortVersionString 0.0.0 shipped in every release up
+      # to and including v0.3.5 without anything noticing (P6).
+      - name: Check the built bundle reports that version (R-M4.E)
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag != '' && inputs.release_tag || (github.ref_type == 'tag' && github.ref_name || '') }}
+        run: |
+          python tools/verify_release_version.py \
+            --tag "$RELEASE_TAG" \
+            --plist dist/daVIPA.app/Contents/Info.plist
 
       # ------------------------------------------------------------------
       # Code signing and notarisation (macOS). Entirely optional: with no
