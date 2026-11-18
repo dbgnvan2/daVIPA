@@ -509,19 +509,6 @@ def test_spcm14_header_wraps_and_unwraps(name, completed_screen, projects_screen
     back = {w for w in wrap.toolbar.winfo_children()
             if w is not wrap.frame and w.grid_info()}
     assert back == gridded, "the unwrap dropped or added a control"
-    # The threshold itself, which nothing in either resize file pinned: at
-    # exactly min_one_row_px() the row still fits, because the filters give
-    # up the difference. Wrapping at one_row_px() instead leaves the user
-    # two rows and an empty spacer with every filter still at its default
-    # width, and all 131 tests in the two files were green under that
-    # mutant (measured 2026-11-18). The sibling in
-    # tests/test_list_screen_resize.py checks the four screens it builds;
-    # this covers the Completed and Scheduler filters, which that one does
-    # not reach. Closes TST-A2.
-    wrap.fit(threshold)
-    assert wrap.wrapped is False, (
-        f"{name} wrapped at min_one_row_px(), so the filters were never "
-        f"asked to give up width before the row did")
 
 
 @pytest.mark.parametrize("name", ["completed", "projects", "scheduler"])

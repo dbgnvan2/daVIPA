@@ -502,8 +502,11 @@ def test_cipm63_the_divider_gives_way_to_the_week_and_comes_back(screen, root, m
     # items pane on its own floor, which is a different clamp. How much the
     # week really needs is test_cipm63_the_pane_floor_holds_the_week's subject;
     # what the divider does about it is this one's.
+    # On the mixin, not on type(screen): monkeypatch's undo would otherwise
+    # setattr the inherited function onto PlanScreen itself, leaving a copy
+    # that shadows a later patch of the mixin.
     monkeypatch.setattr(
-        type(screen), "week_width_need",
+        wv.PlanWeekViewMixin, "week_width_need",
         lambda self: (day_floor - ITEMS_TEXT_INSET_PX + 30
                       if self._week_mode else 0))
     room = PLAN_PANE_CHROME_PX + setting + day_floor + 10

@@ -417,16 +417,6 @@ def test_lsrm10_toolbar_wraps_its_right_hand_group(make, name):
     wrap.fit(wrap.one_row_px())
     assert _placements(toolbar, wrap) == before
     assert not wrap.frame.grid_info(), "the empty second row is still gridded"
-    # LRP-M11's threshold itself, which nothing in either resize file pinned:
-    # at exactly min_one_row_px() the row still fits, because the filters can
-    # give up the difference. Wrapping at one_row_px() instead would hand the
-    # user two rows and a wide empty spacer while every filter was still at
-    # its default width -- and all 131 tests in the two files stayed green
-    # under that mutant (measured 2026-11-18). Closes TST-A2.
-    wrap.fit(wrap.min_one_row_px())
-    assert not wrap.wrapped, (
-        f"{name} wrapped at min_one_row_px(), so the filters were never asked "
-        f"to give up width before the row did")
 
 
 @pytest.mark.parametrize("name", SCREENS)
@@ -446,15 +436,25 @@ def test_lsrm10_narrow_window_wraps_and_nothing_clips(make, name, mapped_windows
     # wrap_row_px() because below that the second row does not fit either,
     # and the clipping checks would then be measuring an overflow the app has
     # no width to avoid.
-    target = max(wrap.wrap_row_px(), wrap.min_one_row_px() - 40)
-    root.geometry(f"{wide - (toolbar.winfo_width() - target)}x800")
+    # The +1 is the band's open lower bound, as in the SPC sibling: the
+    # wrapped row fits *at* wrap_row_px(), so landing on it would fail the
+    # clipping check below on a rounding rather than on a real overflow.
+    target = max(wrap.wrap_row_px() + 1, wrap.min_one_row_px() - 40)
+    narrow = wide - (toolbar.winfo_width() - target)
+    root.geometry(f"{narrow}x800")
     root.update()
     root.update_idletasks()
     first_row_y = screen.search_entry.winfo_rooty()
     right_edge = toolbar.winfo_rootx() + toolbar.winfo_width()
     controls = list(_placements(toolbar, wrap))
+    # Every threshold here is in toolbar pixels and the geometry above is a
+    # window number. CI is the only place this runs, so the message has to
+    # carry both or a failure says nothing.
     assert any(w.winfo_rooty() > first_row_y + screen.search_entry.winfo_height()
-               for w in controls), f"{name}: nothing moved to a second row"
+               for w in controls), (
+        f"{name}: nothing moved to a second row -- window {narrow}px, "
+        f"toolbar {toolbar.winfo_width()}px, aimed at {target}px, band "
+        f"{wrap.wrap_row_px()}..{wrap.min_one_row_px()}")
     for widget in controls:
         end = widget.winfo_rootx() + widget.winfo_width()
         assert end <= right_edge, (

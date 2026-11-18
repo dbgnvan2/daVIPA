@@ -42,6 +42,7 @@ from src.getmoredone.screens import annual_vision_segments as annual_mod  # noqa
 from src.getmoredone.screens import ape_assignment as quarter_mod  # noqa: E402
 from src.getmoredone.screens import ape_period_view as month_mod  # noqa: E402
 from src.getmoredone.screens import weekly_items as week_mod  # noqa: E402
+from src.getmoredone.theme import status_text_color  # noqa: E402
 from src.getmoredone.screens.annual_vision_segments import (  # noqa: E402
     AnnualVisionSegmentsScreen,
 )
@@ -89,8 +90,24 @@ def _with_notices(stub, cls):
     ``self``: a SimpleNamespace inherits no class attribute. ``status_label``
     is the name it resolves to, so the stub's own label still takes the write
     and ``events`` records the same sentences.
+
+    ``notice_colors`` is here because ``events`` records only the text, and
+    the kind is now half of what ``set_status`` writes: it decides the colour
+    and, for a transient kind, whether the line dismisses itself. A refusal
+    that turned ``"success"`` would go green and vanish with every sentence
+    assertion in this file still green.
     """
     stub.NOTICE_LABEL_ATTR = cls.NOTICE_LABEL_ATTR
+    label = getattr(stub, cls.NOTICE_LABEL_ATTR)
+    wrote = label.configure
+    stub.notice_colors = []
+
+    def configure(**kw):
+        if "text_color" in kw:
+            stub.notice_colors.append(kw["text_color"])
+        return wrote(**kw)
+
+    label.configure = configure
     return _bind(stub, cls, "set_status", "notice_label",
                  "_cancel_pending_dismiss", "_schedule_dismiss")
 
@@ -470,6 +487,11 @@ def test_vtfm37_a_dialog_with_nothing_to_offer_refuses_on_the_status_line():
     assert events == [
         f"Every Vision Element already has an annual record for {YEAR}."
     ], events
+    # The kind, which the sentence assertions cannot see. "muted" is not in
+    # TRANSIENT_KINDS, so the refusal stays up; reported as "success" it
+    # would go green and dismiss itself after notice_dismiss_ms.
+    assert stub.notice_colors == [status_text_color("muted")], \
+        stub.notice_colors
 
 
 def test_vtfm37_open_pick_record_dialog_reports_its_empty_refusal():
