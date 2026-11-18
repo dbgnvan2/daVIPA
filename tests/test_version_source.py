@@ -20,12 +20,28 @@ nobody chose, and makes "the format changed" look like a successful read (P19).
 from __future__ import annotations
 
 import ast
+import pathlib
+import sys
 from pathlib import Path
 
-import pytest
+# Before any project import. tests/test_ci_contract.py imports every test file
+# on its own with the repo root and src/ stripped from sys.path, so a file that
+# leans on conftest.py for them fails that probe.
+_ROOT = pathlib.Path(__file__).resolve().parents[1]
+for _entry in (str(_ROOT), str(_ROOT / "src")):
+    if _entry not in sys.path:
+        sys.path.insert(0, _entry)
 
-import getmoredone
-from tools.version import DEFAULT_CHANGELOG, latest_released_version, read_version
+import pytest  # noqa: E402
+
+import getmoredone  # noqa: E402
+from tools.version import (  # noqa: E402
+    DEFAULT_CHANGELOG,
+    latest_released_version,
+    read_version,
+    released_versions,
+    version_sort_key,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SPEC_FILE = REPO_ROOT / "daVIPA.spec"
@@ -52,12 +68,113 @@ def test_unreleased_is_not_a_version():
     assert latest_released_version(changelog) == "0.9.1"
 
 
-def test_the_newest_released_heading_wins():
+def test_an_out_of_order_changelog_raises_rather_than_being_sorted():
+    """Topmost AND highest, or an error.
+
+    This test has been through both behaviours. It first asserted that 2.0.0
+    above 1.0.0 returns 2.0.0 -- true under either rule, so it proved nothing.
+    Rewritten, it asserted the topmost heading wins even when lower, which was
+    the behaviour then. A review pointed out what that behaviour costs: the
+    build takes the wrong version and the __version__ guard compares against
+    that same wrong value, so it passes. Now it raises.
+
+    Sorting silently would return the right number from a broken file and
+    leave the file broken.
+    """
     changelog = (
-        "## [2.0.0] - 2026-02-02\n\n- newer\n\n"
-        "## [1.0.0] - 2026-01-01\n\n- older\n"
+        "## [1.0.0] - 2026-01-01\n\n- listed first\n\n"
+        "## [2.0.0] - 2026-02-02\n\n- listed second\n"
     )
-    assert latest_released_version(changelog) == "2.0.0"
+    with pytest.raises(ValueError, match="2.0.0 is newer"):
+        latest_released_version(changelog)
+
+
+@pytest.mark.parametrize(
+    "heading",
+    [
+        pytest.param("Yanked", id="a-word"),
+        pytest.param("TBD", id="a-placeholder"),
+        pytest.param("O.3.6", id="a-typod-leading-zero"),
+        pytest.param("Version 0.3.6", id="a-prose-heading"),
+        pytest.param("0.4.0-rc1", id="a-pre-release"),
+        pytest.param("0", id="one-part"),
+        pytest.param("1.2.3.4", id="four-parts"),
+    ],
+)
+def test_a_heading_that_is_not_a_version_raises(heading):
+    """Each of these used to pass straight through into the bundle's
+    CFBundleShortVersionString, verbatim -- `Version 0.3.6` arriving as
+    `ersion 0.3.6`, because normalise_version strips a leading V.
+
+    The pre-release case raises on purpose rather than being accepted: what a
+    bundle should report for `0.4.0-rc1` is a decision nobody has made, and
+    guessing it here is how this file got into trouble.
+    """
+    changelog = f"## [{heading}] - 2026-01-01\n\n- content\n"
+    with pytest.raises(ValueError, match="not x.y or x.y.z"):
+        latest_released_version(changelog)
+
+
+def test_the_repo_changelog_lists_releases_newest_first():
+    """What makes "topmost" mean "newest" for this repo.
+
+    latest_released_version does not compare versions, and nothing in the
+    Keep a Changelog format stops a heading being inserted out of order. Out of
+    order, a build is labelled with the wrong version and the __version__ drift
+    guard compares against that same wrong value, so it passes. This is the
+    check that cannot be satisfied by the mistake.
+    """
+    versions = released_versions(DEFAULT_CHANGELOG.read_text(encoding="utf-8"))
+    assert versions, "CHANGELOG.md names no released version"
+
+    keys = [version_sort_key(version) for version in versions]
+    assert keys == sorted(keys, reverse=True), (
+        f"CHANGELOG.md does not list releases newest-first: {versions}. "
+        "latest_released_version takes the topmost heading, so an out-of-order "
+        "heading labels the next build with the wrong version."
+    )
+    assert len(set(keys)) == len(keys), (
+        f"CHANGELOG.md repeats a version heading: {versions}"
+    )
+
+
+def test_released_versions_keeps_file_order_and_drops_non_versions():
+    changelog = (
+        "## [Unreleased]\n\n- pending\n\n"
+        "## [9.9.9] - 2026-03-03\n\n- newest\n\n"
+        "## [ ] - 2026-02-02\n\n- blank\n\n"
+        "## [0.1.0] - 2026-01-01\n\n- oldest\n"
+    )
+    assert released_versions(changelog) == ["9.9.9", "0.1.0"]
+
+
+def test_version_sort_key_compares_numerically_not_as_text():
+    """0.3.10 is newer than 0.3.5, which string ordering gets backwards."""
+    assert version_sort_key("0.3.10") > version_sort_key("0.3.5")
+    assert "0.3.10" < "0.3.5", "if this fails the test above has stopped proving anything"
+
+
+@pytest.mark.parametrize(
+    "version",
+    [
+        pytest.param("", id="empty"),
+        pytest.param("1.2.3a", id="suffix"),
+        pytest.param("1.2.x", id="placeholder"),
+        pytest.param("1..2", id="empty-part"),
+        pytest.param("one.two", id="words"),
+    ],
+)
+def test_version_sort_key_refuses_what_it_cannot_parse(version):
+    """Sorting an unparseable version as equal would pass the ordering guard
+    over exactly the heading it should have caught.
+
+    Matched on the message, not just the type. `int("3a")` raises ValueError on
+    its own, so a bare `pytest.raises(ValueError)` passes whether the explicit
+    check is there or not -- proved by mutation: relaxing `all` to `any` left
+    that weaker version of this test green.
+    """
+    with pytest.raises(ValueError, match="not a dotted numeric version"):
+        version_sort_key(version)
 
 
 def test_a_v_prefixed_heading_is_normalised():
