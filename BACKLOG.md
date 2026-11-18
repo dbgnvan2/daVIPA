@@ -37,21 +37,20 @@ features, and the long-standing bugs, requests and user stories at the end.
   and neither is this batch's: something that reports a red `main` where the
   work happens, and a cheap way to run just the mapped-window tests before a
   push (they are ~13s for the resize files — the cost is the stolen keyboard
-  focus, not the time).
+  focus, not the time). One premise of the same class is left standing on
+  purpose: `tests/test_plan_screen_week.py:463` asserts that a week total is
+  wider than `WEEK_COLUMN_WIDTH_PX`, which is the case that test guards. It
+  holds on both platforms with room to spare — a 40px column floor against
+  ~86px of text — so forcing it would only hide the premise it is there to
+  state.
 
-- **TST-A2 — nothing guards which threshold the toolbar wraps at.** Medium,
-  adjacent, found by mutation while fixing the two tests that aimed at the old
-  one (global rule 10: flagged, not fixed here). `ToolbarWrap.fit` wraps at
-  `min_one_row_px()` since LRP-M11 (`c73f225`), and the point of that change is
-  that a value filter gives up width before the row wraps. Reverting it to
-  `one_row_px()` leaves **all 131 tests** in `tests/test_list_screen_resize.py`
-  and `tests/test_screen_resize_spc.py` green (measured 2026-11-18). The two
-  near-misses both just miss it: `test_lsrm10_toolbar_wraps_its_right_hand_group`
-  asserts that `fit(one_row_px())` does *not* wrap, which the mutant satisfies
-  too, and the band assertion `wrap_row_px() < min_one_row_px() <= one_row_px()`
-  is about the three numbers rather than which one `fit` reads. A check that a
-  width between the two leaves one row while the filters shrink would close it.
-  Not fixed here: that is LRP-M11's criterion, and this batch is the red suite.
+- **TST-A2 — nothing guards which threshold the toolbar wraps at.** *Closed
+  2026-11-18, in the sweep of this same batch.* Filed as adjacent and deferred,
+  then fixed on the review pass that pointed out the guard is two lines in a
+  test already holding the right fixture:
+  `test_lsrm10_toolbar_wraps_its_right_hand_group` now fits the toolbar to
+  exactly `min_one_row_px()` and asserts it does not wrap. Kept here as the
+  record that the deferral was wrong, and leaves at the next tidy.
 
 ## Follow-ups from the version-source batch (filed 2026-11-17)
 

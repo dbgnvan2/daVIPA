@@ -9,7 +9,8 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed — the test suite runs green again (2026-11-18)
 
-- **Twelve failing tests, none of them a defect in the app.** `main` had been
+- **Twelve failing tests, eleven of them stale premises in the tests
+  themselves.** `main` had been
   red since 2026-11-14, through 21 CI runs and the v0.3.5 and v0.3.6 releases.
   Four causes: four VSP tabs' test stubs still modelled the notice line as it
   was before `set_status` became its one writer; the ancestry cap in
@@ -17,8 +18,16 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   that literal caught; two toolbar tests still aimed at `one_row_px()` after the
   wrap threshold moved to `min_one_row_px()`; and two week-pane tests asserted a
   premise they took from the platform's font metrics, so they passed on a Mac
-  and had never once passed in CI. The last three are now derived or forced
-  rather than assumed, so they hold on either platform.
+  and had never once passed in CI. Only the literal `20` was a defect in the
+  app, and a trivial one: the cap it set was already the intended one.
+  The last three causes are now derived or forced rather than assumed, so the
+  premise no longer reads the platform's font metrics. Verified on macOS with
+  the on-screen window tests enabled: 479 passed, 1 skipped. The CI run on
+  Linux is what confirms it there.
+- **A guard on which width the toolbar wraps at.** Reverting LRP-M11, so that
+  the row wraps before a value filter gives up any width, left all 131 tests
+  in the two resize files green (measured 2026-11-18). The threshold is now
+  checked directly, on every list screen that has filters.
 
 ## [0.3.6] - 2026-11-17
 
