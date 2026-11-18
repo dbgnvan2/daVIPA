@@ -16,6 +16,13 @@ SRC_PATH = str(PROJECT_ROOT / "src")
 sys.path.insert(0, str(PROJECT_ROOT))
 from tools.packaging_filters import filter_datas
 
+# One source for the version, read from CHANGELOG.md. A literal here would
+# be a third place to forget, which is how the bundle came to report 0.0.0
+# while __init__.py claimed 0.3.1. See tools/version.py.
+from tools.version import read_version
+
+APP_VERSION = read_version()
+
 # Be conservative with hidden imports; GUI + google libs sometimes need nudging.
 hiddenimports = []
 hiddenimports += collect_submodules("getmoredone")
@@ -111,4 +118,8 @@ app = BUNDLE(
     name="daVIPA.app",
     icon=str(PROJECT_ROOT / "assets" / "icons" / "davipa.icns"),
     bundle_identifier=None,
+    # Sets CFBundleShortVersionString. Left unset, the Info.plist reports
+    # 0.0.0 and an installed app cannot be told apart from any other
+    # build -- the whole reason tools/version.py exists.
+    version=APP_VERSION,
 )
