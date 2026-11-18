@@ -138,14 +138,47 @@ def test_the_repo_changelog_lists_releases_newest_first():
     )
 
 
-def test_released_versions_keeps_file_order_and_drops_non_versions():
+def test_released_versions_keeps_file_order_and_drops_only_unreleased():
     changelog = (
         "## [Unreleased]\n\n- pending\n\n"
         "## [9.9.9] - 2026-03-03\n\n- newest\n\n"
-        "## [ ] - 2026-02-02\n\n- blank\n\n"
         "## [0.1.0] - 2026-01-01\n\n- oldest\n"
     )
     assert released_versions(changelog) == ["9.9.9", "0.1.0"]
+
+
+@pytest.mark.parametrize("heading", ["", " ", "v", "V", "  v "])
+def test_a_heading_that_normalises_to_nothing_is_refused_not_dropped(heading):
+    """Behaviour changed deliberately: these used to be skipped.
+
+    Skipping the TOPMOST heading promotes the release below it. A changelog
+    whose newest heading is typo'd `## [v]` therefore read as the previous
+    version, with nothing printed anywhere -- and `daVIPA.spec` stamped the
+    bundle one release behind. It was the one malformed shape
+    `released_versions` waved through while `latest_released_version` refused
+    every other.
+    """
+    changelog = (
+        f"## [{heading}] - 2026-03-03\n\n- newest\n\n"
+        "## [0.1.0] - 2026-01-01\n\n- oldest\n"
+    )
+    assert "" in released_versions(changelog), (
+        "the empty heading was dropped before the shape check could see it"
+    )
+    with pytest.raises(ValueError, match="not x.y or x.y.z"):
+        latest_released_version(changelog)
+
+
+def test_an_unreleased_heading_is_still_skipped_not_refused():
+    """The guard above must not have made the ordinary file illegal.
+
+    Every real CHANGELOG.md here opens with `## [Unreleased]`.
+    """
+    changelog = (
+        "## [Unreleased]\n\n- pending\n\n"
+        "## [0.1.0] - 2026-01-01\n\n- oldest\n"
+    )
+    assert latest_released_version(changelog) == "0.1.0"
 
 
 def test_version_sort_key_compares_numerically_not_as_text():

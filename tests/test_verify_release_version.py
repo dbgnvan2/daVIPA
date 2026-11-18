@@ -93,12 +93,41 @@ def test_with_no_tag_and_no_plist_it_still_reconciles_the_package(run, capsys):
         "a skipped tag check has to say so, or a release build that verified "
         "nothing about its tag looks identical to one that verified it"
     )
+    assert "no plist given" in out, (
+        "a skipped plist check has to say so too. Without the note the only "
+        "difference between 'read the bundle and agreed' and 'never looked at "
+        "a bundle' is the ABSENCE of a line, and nobody reads an absence -- "
+        "which is the shape of the defect this script exists to close"
+    )
 
 
-def test_a_whitespace_tag_is_skipped_too(run, capsys):
-    """A workflow expression that collapses to blanks is not a tag either."""
-    assert run("--tag", "   ") == 0
-    assert "no tag given" in capsys.readouterr().out
+def test_a_checked_plist_announces_itself_rather_than_only_the_failure(
+        run, tmp_path, capsys):
+    """The ok: line is what makes the note above meaningful."""
+    plist = _plist(tmp_path, "Info.plist", {"CFBundleShortVersionString": "1.4.0"})
+    assert run("--plist", str(plist)) == 0
+    out = capsys.readouterr().out
+    assert "built bundle reports 1.4.0" in out
+    assert "no plist given" not in out
+
+
+@pytest.mark.parametrize("tag", ["   ", " ", "\t", "\n"])
+def test_a_whitespace_tag_is_an_error_not_a_skip(run, capsys, tag):
+    """Behaviour changed deliberately: this used to be skipped like "".
+
+    The two are not the same input. An unset workflow input expands to "",
+    which is a check to skip. Whitespace is a release_tag somebody set wrong
+    -- and the publish job gates on `inputs.release_tag != ''`, which is TRUE
+    for " ", so skipping here would reconcile nothing and still create a
+    public release under that tag. "Given nothing" and "given something
+    unusable" must not take the same quiet path (P1).
+    """
+    assert run("--tag", tag) == 1
+    captured = capsys.readouterr()
+    assert "blank but not empty" in captured.err
+    assert "no tag given" not in captured.out, (
+        "it reported the tag as absent as well as rejecting it"
+    )
 
 
 def test_an_empty_tag_is_skipped_and_announced(run, capsys):

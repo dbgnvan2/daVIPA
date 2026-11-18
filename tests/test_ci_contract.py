@@ -926,6 +926,184 @@ def test_rm4d_required_archive_files_exist_in_the_repo():
     assert not missing, f"the release workflow copies files that do not exist: {missing}"
 
 
+# --------------------------------------------------------------------------
+# R-M4.E — the version a release claims must be the version it built
+#
+# These exist because the fix for CFBundleShortVersionString 0.0.0 arrived
+# with no guard on its own wiring: the three workflow steps below could be
+# deleted and every one of the 73 tests covering the script itself stayed
+# green, which is the pre-fix state restored in one careless edit. Every
+# sibling requirement in this file is asserted against the YAML; this one was
+# not.
+# --------------------------------------------------------------------------
+
+VERSION_VERIFIER = "tools/verify_release_version.py"
+BUILT_PLIST = "dist/daVIPA.app/Contents/Info.plist"
+
+# Windows reconciles tag/changelog/__version__ before building. macOS does
+# that and then reads the bundle it produced. Exact counts, not floors: a
+# floor hides the narrowing it was written to catch.
+VERIFIER_INVOCATIONS = {"build-windows": 1, "build-macos": 2}
+
+# The command that BUILDS. Matching bare "pyinstaller" finds `pip install
+# pyinstaller` in the deps step, which comes first in both jobs — so an
+# ordering assertion against it is satisfied by anything at all.
+BUILD_COMMAND = "python -m PyInstaller"
+
+
+def _verifier_lines(job: str) -> list[str]:
+    """Every verify_release_version.py command in one job, continuations joined."""
+    body = _code_only(_job_blocks(RELEASE_WORKFLOW.read_text(encoding="utf-8"))[job])
+    body = re.sub(r"\\\s*\n\s*", " ", body)
+    return [line.strip() for line in body.splitlines() if VERSION_VERIFIER in line]
+
+
+def test_rm4e_the_verifier_script_exists():
+    """Adversarial: a renamed script makes every check below vacuous."""
+    assert (REPO_ROOT / VERSION_VERIFIER).exists(), (
+        f"{VERSION_VERIFIER} is gone, so the workflow steps asserted below "
+        f"would fail the release even though these tests pass"
+    )
+
+
+def test_rm4e_both_build_jobs_run_the_version_check():
+    found = {job: len(_verifier_lines(job)) for job in VERIFIER_INVOCATIONS}
+    assert found == VERIFIER_INVOCATIONS, (
+        f"expected {VERIFIER_INVOCATIONS} invocations of {VERSION_VERIFIER}, "
+        f"found {found}. This is the only version reconciliation that runs on "
+        f"a tag push — tests.yml triggers on branches, so the pytest guard "
+        f"never runs for a release."
+    )
+
+
+def test_rm4e_the_version_check_runs_before_anything_is_built():
+    """Failing after PyInstaller wastes the build and, on macOS, notarisation."""
+    for job in VERIFIER_INVOCATIONS:
+        body = _code_only(_job_blocks(RELEASE_WORKFLOW.read_text(encoding="utf-8"))[job])
+        assert body.index(VERSION_VERIFIER) < body.index(BUILD_COMMAND), (
+            f"{job} builds before it checks the version agrees"
+        )
+
+
+def test_rm4e_every_invocation_is_given_the_release_tag():
+    for job in VERIFIER_INVOCATIONS:
+        for line in _verifier_lines(job):
+            assert "--tag=" in line, (
+                f"{job} invokes the verifier without --tag, which silently "
+                f"reduces it to the __version__ check: {line!r}"
+            )
+
+
+def test_rm4e_the_tag_is_passed_as_a_single_token():
+    """`--tag "$X"` is two tokens and the empty one can be dropped.
+
+    pwsh 7.3+ defaults $PSNativeCommandArgumentPassing to Windows on the
+    runner, where an empty argument to a native command may not survive —
+    leaving argparse a bare `--tag` and exiting 2 on the commonest dispatch
+    path (a branch, a blank input). `--tag=` cannot be dropped or re-split.
+    """
+    for job in VERIFIER_INVOCATIONS:
+        for line in _verifier_lines(job):
+            assert not re.search(r"--tag\s+[\"'$]", line), (
+                f"{job} passes the tag as a separate argument: {line!r}"
+            )
+
+
+def test_rm4e_the_macos_job_reads_the_version_out_of_the_built_bundle():
+    """The one check in this repo that reads what PyInstaller wrote.
+
+    Every other version guard reads an input file, which is why
+    CFBundleShortVersionString 0.0.0 shipped in five releases unnoticed (P6).
+    """
+    lines = [line for line in _verifier_lines("build-macos") if "--plist" in line]
+    assert len(lines) == 1, f"expected one --plist check, found {len(lines)}"
+    assert BUILT_PLIST in lines[0], (
+        f"the macOS plist check does not read {BUILT_PLIST}: {lines[0]!r}"
+    )
+
+
+def test_rm4e_the_plist_check_runs_after_the_build():
+    body = _code_only(_job_blocks(RELEASE_WORKFLOW.read_text(encoding="utf-8"))["build-macos"])
+    assert body.index(BUILD_COMMAND) < body.index("--plist"), (
+        "the macOS job reads the bundle's Info.plist before building it"
+    )
+
+
+def test_rm4e_the_plist_check_runs_before_anything_is_published():
+    body = _code_only(_job_blocks(RELEASE_WORKFLOW.read_text(encoding="utf-8"))["build-macos"])
+    plist_at = body.index("--plist")
+    for publish in ("upload-artifact", "action-gh-release"):
+        if publish in body:
+            assert plist_at < body.index(publish), (
+                f"the macOS job publishes via {publish} before checking the "
+                f"version its bundle reports"
+            )
+
+
+def test_rm4e_the_tag_reaches_the_verifier_through_env_not_the_script_body():
+    """Same rule the signing steps follow: no `${{ }}` inside a run body."""
+    for job in VERIFIER_INVOCATIONS:
+        for line in _verifier_lines(job):
+            assert "${{" not in line, (
+                f"{job} interpolates an expression into the verifier command: "
+                f"{line!r}"
+            )
+
+
+def test_rm4e_one_expression_decides_which_tag_is_being_released():
+    """The verifier's notion of "a release" must be the publish gate's.
+
+    The first version of this read `github.ref_type == 'tag'`, which is
+    BROADER than the gate below: a workflow_dispatch against a tag not
+    starting with `v` failed both build jobs on a run that would never have
+    published. Three independent spellings of one fact is also how they drift.
+    """
+    text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+    env_lines = [
+        line for line in text.splitlines()
+        if re.match(r"^\s{0,2}RELEASE_TAG:", line)
+    ]
+    assert len(env_lines) == 1, (
+        f"expected one workflow-level RELEASE_TAG, found {len(env_lines)}. "
+        f"Per-step copies are what diverged."
+    )
+
+    gate = _code_only(_job_blocks(text)[PUBLISH_JOB]).splitlines()
+    gate_lines = [line for line in gate if line.strip().startswith("if:")]
+    assert len(gate_lines) == 1, f"expected one publish gate, found {gate_lines}"
+
+    for condition in ("startsWith(github.ref, 'refs/tags/v')",
+                      "inputs.release_tag != ''"):
+        assert condition in env_lines[0], (
+            f"RELEASE_TAG does not use the publish gate's {condition}"
+        )
+        assert condition in gate_lines[0], (
+            f"the publish gate no longer uses {condition}; RELEASE_TAG still "
+            f"does, so the two have diverged"
+        )
+
+
+def test_rm4e_nothing_re_derives_the_tag_from_the_event():
+    """One spelling means one spelling: the notes step and tag_name read it too."""
+    code = "\n".join(
+        line for line in RELEASE_WORKFLOW.read_text(encoding="utf-8").splitlines()
+        if not line.strip().startswith("#")
+    )
+    assert "github.ref_type" not in code, (
+        "github.ref_type is back; it is broader than the publish gate"
+    )
+    assert code.count("github.ref_name") == 1, (
+        "github.ref_name is read somewhere other than the RELEASE_TAG "
+        "expression, which is a second answer to which tag this is"
+    )
+    # Twice in the RELEASE_TAG expression (the test and the value it yields),
+    # once in the publish gate. A fourth is a second answer to the question.
+    assert code.count("inputs.release_tag") == 3, (
+        "inputs.release_tag is read somewhere other than the RELEASE_TAG "
+        "expression and the publish gate"
+    )
+
+
 def test_no_workflow_disables_the_mapped_window_tests():
     """The local focus-stealing opt-out must never become a CI default.
 
