@@ -25,6 +25,28 @@ features, and the long-standing bugs, requests and user stories at the end.
 
 ## Follow-ups from the version-source batch (filed 2026-11-17)
 
+- **VER-A3 — the bundle's version is not re-read after signing.** Low. The
+  `--plist` check runs before codesign, notarisation and stapling, which is
+  the right order (failing before notarisation is the cheap one), but it
+  leaves the segment *plist read → sign → staple → zip → checksum → publish*
+  unverified. The checksum is computed after signing, so a bundle whose
+  version changed during signing would round-trip with a matching checksum
+  and publish. The publish job already accepts this argument for checksums
+  and re-verifies them; the version now sits where the checksum used to.
+  Not fixed because codesign and stapler do not rewrite `Info.plist`, so the
+  cost of a second read is not yet justified by a real failure. A read in the
+  publish job against the unzipped download would close it.
+- **VER-A4 — three R-M4.A ordering guards match `pip install pyinstaller`.**
+  Low, adjacent, found while writing the R-M4.E ordering tests (global rule
+  10: flagged, not silently fixed). `test_rm4a_selftest_runs_after_the_build`
+  and its siblings assert `body.lower().index("pyinstaller") < ...`, which
+  finds the dependency-install step rather than `python -m PyInstaller`.
+  The install step is first in both jobs, so the assertion is satisfied by
+  anything at all and would pass with the selftest running before the build.
+  The new R-M4.E tests anchor on `BUILD_COMMAND = "python -m PyInstaller"`
+  instead. Not fixed here because changing an R-M4.A guard is an R-M4.A
+  change, and this batch is R-M4.E.
+
 ### VER-A1 — the Windows build carries no version (medium)
 
 `daVIPA.spec` now passes `version=` to `BUNDLE()`, so the macOS bundle reports

@@ -145,6 +145,28 @@ Fixes F5.
     check in the repo that reads what the build produced; every other version
     guard reads an input file, which is exactly why 0.0.0 went unnoticed for
     five releases (P6).
+  - **R-M4.E.3** — One workflow-level `RELEASE_TAG` expression answers "which
+    tag is this run releasing", and it uses the publish job's own condition
+    (`startsWith(github.ref, 'refs/tags/v')`). The first version asked
+    `github.ref_type == 'tag'`, which is broader: a `workflow_dispatch` run
+    against a tag not starting with `v` failed both build jobs on a run that
+    would never have published. Three per-step copies of one fact is also how
+    they drift (P4).
+  - **R-M4.E.4** — A `release_tag` of whitespace fails the build. An unset
+    input expands to `''` and is a check to skip; `" "` is a value somebody
+    set wrong, and the publish gate reads `inputs.release_tag != ''`, which is
+    true for it — so skipping would reconcile nothing and still publish a
+    release under that tag (P1).
+  - **R-M4.E.5** — A reconciliation that was skipped says so on stdout, both
+    halves. The absence of an `ok:` line is not a signal anyone reads, and a
+    run whose `--plist` was dropped must not be indistinguishable from one
+    that read the bundle and agreed (P2).
+  - The three workflow steps above are asserted by
+    `tests/test_ci_contract.py` — their presence, their arguments, their order
+    relative to the build and the upload, and that `RELEASE_TAG` still matches
+    the publish gate. The first version of this requirement had none: the
+    steps could be deleted with every test of the script still green, which is
+    the pre-fix state restored in one edit.
   - The Windows `EXE()` carries no version: PyInstaller needs a generated
     version-resource file rather than a kwarg. Declared, not hidden — filed
     as `VER-A1` (global rule 10).

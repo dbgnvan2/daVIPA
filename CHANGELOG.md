@@ -21,7 +21,8 @@ conventions and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   file's newest heading and the package's own `__version__` all name the same
   version, and fails if they do not. The check on the finished bundle is the
   point: the 0.0.0 defect survived every release because nothing ever read what
-  the build produced.
+  the build produced. A mistyped heading in this file stops the release too,
+  rather than quietly labelling the build with the release below it.
 
 ## [0.3.5] - 2026-11-17
 
