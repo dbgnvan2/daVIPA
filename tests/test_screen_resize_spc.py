@@ -509,6 +509,19 @@ def test_spcm14_header_wraps_and_unwraps(name, completed_screen, projects_screen
     back = {w for w in wrap.toolbar.winfo_children()
             if w is not wrap.frame and w.grid_info()}
     assert back == gridded, "the unwrap dropped or added a control"
+    # The threshold itself, which nothing in either resize file pinned: at
+    # exactly min_one_row_px() the row still fits, because the filters give
+    # up the difference. Wrapping at one_row_px() instead leaves the user
+    # two rows and an empty spacer with every filter still at its default
+    # width, and all 131 tests in the two files were green under that
+    # mutant (measured 2026-11-18). The sibling in
+    # tests/test_list_screen_resize.py checks the four screens it builds;
+    # this covers the Completed and Scheduler filters, which that one does
+    # not reach. Closes TST-A2.
+    wrap.fit(threshold)
+    assert wrap.wrapped is False, (
+        f"{name} wrapped at min_one_row_px(), so the filters were never "
+        f"asked to give up width before the row did")
 
 
 @pytest.mark.parametrize("name", ["completed", "projects", "scheduler"])
@@ -535,19 +548,26 @@ def test_spcm15_narrow_window_wraps_and_nothing_clips(
     # Both arms of that clamp are toolbar pixels and `geometry` takes a window
     # number, which is wider by every frame's padding -- the same mismatch the
     # comment below the wrap check names (SPC-S3). So move the window by the
-    # toolbar's shortfall rather than setting it to a toolbar width: set
-    # directly, the `wrap_row_px()` arm would put the toolbar *below*
-    # wrap_row_px(), which is the one case that arm exists for, and the
-    # assertion below would fail by construction. It is the second arm that
-    # wins today on all three screens, so this is latent, not live.
+    # toolbar's shortfall rather than setting it to a toolbar width. The
+    # +1 is the band's open lower bound: the assertion below is a strict
+    # `>`, so landing the toolbar *on* wrap_row_px() fails it, which is the
+    # one case that arm exists for. Both readings of wrap_row_px() are the
+    # same number across the wrap, so the equality would be exact rather
+    # than a near miss. It is the second arm that wins on all three screens
+    # today, so this arm is latent either way.
     root = screen.winfo_toplevel()
     root.update()
-    target = max(wrap.wrap_row_px(), wrap.min_one_row_px() - 40)
+    target = max(wrap.wrap_row_px() + 1, wrap.min_one_row_px() - 40)
     width = root.winfo_width() - (wrap.toolbar.winfo_width() - target)
     root.geometry(f"{width}x600")
     root.update()
     screen.update_idletasks()
-    assert wrap.wrapped is True, f"{name} did not wrap at {width}px"
+    # Every threshold here is in toolbar pixels and `width` is not, and CI is
+    # the only place this runs -- so report both or the failure says nothing.
+    assert wrap.wrapped is True, (
+        f"{name} did not wrap: window {width}px, toolbar "
+        f"{wrap.toolbar.winfo_width()}px, aimed at {target}px, band "
+        f"{wrap.wrap_row_px()}..{wrap.min_one_row_px()}")
     # The band, checked on the toolbar and not on the window: the geometry
     # above is a window number, and the toolbar is narrower by the sidebar
     # and by every frame's padding, so comparing the two measures different
