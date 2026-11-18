@@ -63,16 +63,21 @@ def version_sort_key(version: str) -> tuple[int, ...]:
 def released_versions(changelog: str) -> list[str]:
     """Every released version heading, in the order the file lists them.
 
-    `## [Unreleased]` is skipped. It is a heading, not a version, and a build
-    labelled with it tells the user nothing. So is a heading that normalises to
-    nothing -- `## [ ]` and `## [v]` both do.
+    `## [Unreleased]` is the one heading skipped. It is a heading, not a
+    version, and a build labelled with it tells the user nothing.
+
+    A heading that normalises to nothing -- `## []`, `## [ ]`, `## [v]` -- is
+    NOT skipped. It used to be, and that was the one shape of malformed
+    heading this function waved through: dropping the topmost heading silently
+    promotes the release below it, so a typo'd `## [v]` at the top of the file
+    stamps the bundle one version behind with nothing printed anywhere. It is
+    returned as the empty string and :func:`latest_released_version` refuses
+    it with every other malformed shape.
     """
     found: list[str] = []
     for match in VERSION_HEADING.finditer(changelog):
         version = normalise_version(match.group("version"))
         if version.casefold() == UNRELEASED:
-            continue
-        if not version:
             continue
         found.append(version)
     return found

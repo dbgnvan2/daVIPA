@@ -26,6 +26,23 @@ on:
 permissions:
   contents: write
 
+# R-M4.E. The ONE spelling of "which tag is this run releasing", read by both
+# version checks and by the publish job's tag_name and release notes. It is
+# deliberately the same condition as the publish job's `if:` below -- that gate
+# cannot read `env`, so the two cannot be literally shared, but writing the
+# verifier's notion of a release any other way is how they drift.
+#
+# The first spelling here asked whether the ref was a tag of any kind, which
+# is BROADER than the gate: a workflow_dispatch run against a tag not starting
+# with `v` made the version check compare that tag against the changelog and
+# fail both build jobs, on a run that would never have published anything.
+#
+# On a `push` event the `inputs` context is null, and GitHub casts null and ''
+# alike to 0 for a cross-type comparison, so `inputs.release_tag != ''` is
+# false and this falls through to the tag branch.
+env:
+  RELEASE_TAG: ${{ inputs.release_tag != '' && inputs.release_tag || (startsWith(github.ref, 'refs/tags/v') && github.ref_name || '') }}
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -49,14 +66,19 @@ jobs:
       # getmoredone.__version__ do not all name the same version. This is the
       # only place that reconciliation happens on a tag push: tests.yml
       # triggers on branches, so the pytest guard never runs for a release.
-      # The tag goes through env rather than into the script body, as the
-      # signing steps below do.
+      # The tag comes from the workflow-level RELEASE_TAG rather than being
+      # interpolated into the script body, as the signing steps below do.
+      #
+      # `--tag=` and not `--tag ` on purpose: pwsh 7.3+ defaults
+      # $PSNativeCommandArgumentPassing to Windows on this runner, where an
+      # empty argument to a native command can be dropped -- leaving argparse
+      # with a bare `--tag` and failing the commonest dispatch path (a branch,
+      # a blank input) for a reason that has nothing to do with versions.
+      # One token cannot be dropped or re-split in any mode.
       - name: Check the version agrees everywhere (R-M4.E)
         shell: pwsh
-        env:
-          RELEASE_TAG: ${{ inputs.release_tag != '' && inputs.release_tag || (github.ref_type == 'tag' && github.ref_name || '') }}
         run: |
-          python tools/verify_release_version.py --tag "$env:RELEASE_TAG"
+          python tools/verify_release_version.py --tag="$env:RELEASE_TAG"
 
       - name: Build (PyInstaller)
         shell: pwsh
@@ -141,13 +163,11 @@ jobs:
       # getmoredone.__version__ do not all name the same version. This is the
       # only place that reconciliation happens on a tag push: tests.yml
       # triggers on branches, so the pytest guard never runs for a release.
-      # The tag goes through env rather than into the script body, as the
-      # signing steps below do.
+      # The tag comes from the workflow-level RELEASE_TAG rather than being
+      # interpolated into the script body, as the signing steps below do.
       - name: Check the version agrees everywhere (R-M4.E)
-        env:
-          RELEASE_TAG: ${{ inputs.release_tag != '' && inputs.release_tag || (github.ref_type == 'tag' && github.ref_name || '') }}
         run: |
-          python tools/verify_release_version.py --tag "$RELEASE_TAG"
+          python tools/verify_release_version.py --tag="$RELEASE_TAG"
 
       - name: Build (PyInstaller)
         run: |
@@ -158,11 +178,9 @@ jobs:
       # is why CFBundleShortVersionString 0.0.0 shipped in every release up
       # to and including v0.3.5 without anything noticing (P6).
       - name: Check the built bundle reports that version (R-M4.E)
-        env:
-          RELEASE_TAG: ${{ inputs.release_tag != '' && inputs.release_tag || (github.ref_type == 'tag' && github.ref_name || '') }}
         run: |
           python tools/verify_release_version.py \
-            --tag "$RELEASE_TAG" \
+            --tag="$RELEASE_TAG" \
             --plist dist/daVIPA.app/Contents/Info.plist
 
       # ------------------------------------------------------------------
@@ -368,15 +386,18 @@ jobs:
         # Generated once now, rather than once per OS job. The two copies were
         # built from the same script and the same tag, so they agreed — but
         # nothing made them agree.
+        #
+        # RELEASE_TAG is the workflow-level expression every version check
+        # reads, so the notes, the tag on the release and the version the
+        # build verified cannot come from three different readings of which
+        # tag this is.
         run: |
-          TAG="${{ inputs.release_tag }}"
-          if [ -z "$TAG" ]; then TAG="${{ github.ref_name }}"; fi
-          python tools/extract_release_notes.py "$TAG" --output RELEASE_NOTES.md
+          python tools/extract_release_notes.py "$RELEASE_TAG" --output RELEASE_NOTES.md
 
       - name: Publish the GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
           # R-M4.C — the notes come from CHANGELOG.md rather than being typed
           # by hand, so the release and the repo cannot disagree.
           body_path: RELEASE_NOTES.md

@@ -36,6 +36,12 @@ The `__version__`-against-changelog reconciliation is unconditional, so this is
 never a no-op however it is called; a skipped tag or plist check says so on
 stdout rather than passing quietly.
 
+An empty `--tag` is a check to skip -- it is what an unset workflow input
+expands to. A `--tag` of whitespace is an error, because the workflow gate that
+decides whether to publish reads `inputs.release_tag != ''`, which is TRUE for
+" ": skipping there would reconcile nothing and still publish a release under
+that tag.
+
 Exits 0 when every reconciliation agrees and 1 on any disagreement, including
 a changelog, plist or package init it could not read.
 """
@@ -125,7 +131,24 @@ def main(argv: list[str] | None = None) -> int:
     # __version__ reconciliation below is unconditional, so there is always one
     # real check and this script is never a no-op. What it must not do is stay
     # quiet about the check it skipped.
-    tag = (args.tag or "").strip()
+    #
+    # Whitespace is different, and the difference is not cosmetic. The publish
+    # job gates on `inputs.release_tag != ''`, which is true for " ", so a
+    # release_tag typed as a space publishes a release whose tag was never
+    # reconciled against the changelog -- the exact hole this script exists to
+    # close. "I was given nothing" and "I was given something unusable" must
+    # not take the same quiet path (P1).
+    raw_tag = args.tag or ""
+    tag = raw_tag.strip()
+    if raw_tag and not tag:
+        print(
+            f"error: --tag {raw_tag!r} is blank but not empty. An unset "
+            f"workflow input expands to '' and is skipped; whitespace is a "
+            f"tag someone set wrong, and the publish gate would still treat "
+            f"it as a release to create.",
+            file=sys.stderr,
+        )
+        return 1
 
     if not args.changelog.exists():
         print(f"error: no changelog at {args.changelog}", file=sys.stderr)
@@ -165,6 +188,12 @@ def main(argv: list[str] | None = None) -> int:
                 )
             else:
                 print(f"ok: built bundle reports {built}")
+    else:
+        # The absence of an "ok:" line is not a signal anyone reads. Without
+        # this, a run invoked with --plist accidentally dropped looks exactly
+        # like one that read the bundle and agreed -- which is the shape of
+        # the defect this whole file exists to close.
+        print("note: no plist given -- the built bundle's version was not checked")
 
     # Not optional, and not gated on --tag/--plist. The pytest guard that holds
     # __version__ to the changelog does not run on a tag push: tests.yml

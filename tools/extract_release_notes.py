@@ -30,7 +30,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CHANGELOG = REPO_ROOT / "CHANGELOG.md"
 
 # Matches "## [0.1.0] - 2026-08-18" and "## [0.1.0]".
-VERSION_HEADING = re.compile(r"^##\s*\[(?P<version>[^\]]+)\]", re.MULTILINE)
+#
+# `*` and not `+`: an empty `## []` has to be SEEN. With `+` it matched no
+# heading at all, so tools/version.py read the release below it as the newest
+# one and stamped a bundle a version behind, with nothing printed anywhere.
+# Being matched here is what lets that module refuse it (VERSION_SHAPE).
+VERSION_HEADING = re.compile(r"^##\s*\[(?P<version>[^\]]*)\]", re.MULTILINE)
 
 
 def normalise_version(raw: str) -> str:
